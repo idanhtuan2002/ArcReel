@@ -20,6 +20,7 @@ from .enums import (
     ReviewerType,
     RuntimeTaskStatus,
 )
+from .execution import MethodDecision, PromptPlan, ProviderRequest
 from .preparation import (
     ProductionBinding,
     ProductionReadiness,
@@ -38,14 +39,17 @@ __all__ = [
     "CreativeApprovalStatus",
     "GenerationLifecycleStatus",
     "JSONValue",
+    "MethodDecision",
     "NonEmptyStr",
     "ProductionBinding",
     "ProductionBindingRole",
     "ProductionBindingTarget",
     "ProductionMethod",
     "ProductionReadiness",
+    "PromptPlan",
     "Provenance",
     "ProvenanceActor",
+    "ProviderRequest",
     "R2ContractModel",
     "ReadinessRequirement",
     "ReadinessState",
