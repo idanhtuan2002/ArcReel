@@ -1,3 +1,9 @@
+from .artifact_bridge import (
+    ArtifactHostSnapshot,
+    ArtifactManifestPort,
+    R2ArtifactBridge,
+    R2CurrencyEvaluation,
+)
 from .artifact_metadata import (
     ApprovedMasterMetadata,
     DependencySnapshot,
@@ -14,10 +20,14 @@ from .dependency_resolver import (
 __all__ = [
     "AmbiguousDependencyResolverError",
     "ApprovedMasterMetadata",
+    "ArtifactHostSnapshot",
+    "ArtifactManifestPort",
     "DependencyResolver",
     "DependencyResolverRegistry",
     "DependencySnapshot",
+    "R2ArtifactBridge",
     "R2ArtifactMetadata",
     "R2ContractRef",
+    "R2CurrencyEvaluation",
     "UnresolvedDependencyError",
 ]
