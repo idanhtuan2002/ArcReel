@@ -5,6 +5,7 @@ from .common import (
     R2ContractModel,
     ensure_json_value,
 )
+from .content_basis import ContentBasis
 from .enums import (
     ArtifactCurrencyStatus,
     CandidateSelectionStatus,
@@ -19,10 +20,12 @@ from .enums import (
     ReviewerType,
     RuntimeTaskStatus,
 )
+from .provenance import Provenance
 
 __all__ = [
     "ArtifactCurrencyStatus",
     "CandidateSelectionStatus",
+    "ContentBasis",
     "ContentBasisType",
     "ContractIdentity",
     "CreativeApprovalStatus",
@@ -32,6 +35,7 @@ __all__ = [
     "ProductionBindingRole",
     "ProductionBindingTarget",
     "ProductionMethod",
+    "Provenance",
     "ProvenanceActor",
     "R2ContractModel",
     "ReadinessState",
