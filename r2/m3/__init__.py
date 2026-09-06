@@ -1,2 +1,3 @@
 from .factual_fixture import GoldenAFactualBundle, load_golden_a_factual_bundle
 from .director import FixtureOpenMontageBackend, GoldenADirectionResult, GoldenAOpenMontageAdapter
+from .preparation import GoldenAMethodAssignment, GoldenAPreparedShot, GoldenAProductionPreparation
