@@ -1,0 +1,28 @@
+{
+  "phase": "R2.7",
+  "milestone": "R2-M0",
+  "status": "PLAN_READY_FOR_REVIEW",
+  "date": "2026-09-06",
+  "task_count": 8,
+  "tasks": [
+    "Create isolated R2 fork and upstream topology",
+    "Import frozen R2 design package",
+    "Add minimal R2 bootstrap module",
+    "Implement frozen-registry integrity checks",
+    "Register H1 known production blocker",
+    "Create reproducible ArcReel baseline verification",
+    "Verify PostgreSQL-first development baseline",
+    "Run frozen M0 regression gate"
+  ],
+  "explicit_out_of_scope": [
+    "Canon",
+    "OpenMontage integration",
+    "take integration",
+    "Jellyfish integration",
+    "DramaClaw integration",
+    "Method Router",
+    "CapabilityRegistry implementation",
+    "Artifact Manifest extension implementation",
+    "UI redesign"
+  ]
+}

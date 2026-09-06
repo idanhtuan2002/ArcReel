@@ -1,0 +1,70 @@
+{
+  "phase": "R2.6",
+  "status": "FROZEN_V1",
+  "approved": true,
+  "date": "2026-09-06",
+  "milestones": [
+    {
+      "id": "R2-M0",
+      "name": "Host Fork Foundation",
+      "depends_on": []
+    },
+    {
+      "id": "R2-M1",
+      "name": "R2 Contract Kernel",
+      "depends_on": [
+        "R2-M0"
+      ]
+    },
+    {
+      "id": "R2-M2",
+      "name": "Artifact Bridge",
+      "depends_on": [
+        "R2-M1"
+      ]
+    },
+    {
+      "id": "R2-M3",
+      "name": "Golden A General Content",
+      "depends_on": [
+        "R2-M2"
+      ]
+    },
+    {
+      "id": "R2-M4",
+      "name": "Production Intelligence",
+      "depends_on": [
+        "R2-M3"
+      ]
+    },
+    {
+      "id": "R2-M5",
+      "name": "Canon & Narrative Kernel",
+      "depends_on": [
+        "R2-M4"
+      ]
+    },
+    {
+      "id": "R2-M6",
+      "name": "Adaptation + Golden B",
+      "depends_on": [
+        "R2-M5"
+      ]
+    },
+    {
+      "id": "R2-M7",
+      "name": "Host Production Hardening",
+      "depends_on": [
+        "R2-M6"
+      ]
+    },
+    {
+      "id": "R2-M8",
+      "name": "Advanced Canvas / Learning / Multi-format",
+      "depends_on": [
+        "R2-M7"
+      ]
+    }
+  ],
+  "next": "R2.7_FIRST_EXECUTABLE_MILESTONE_PLAN"
+}

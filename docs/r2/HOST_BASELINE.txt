@@ -1,0 +1,5 @@
+upstream=https://github.com/ArcReel/ArcReel.git
+tag=v0.29.0
+sha=6ddedc775e7fe5f398b10081ab741985f7dceda7
+branch=r2/main
+origin_status=PENDING_USER_FORK_URL

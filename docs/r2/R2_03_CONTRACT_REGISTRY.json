@@ -1,0 +1,327 @@
+{
+  "registry_version": "1.0",
+  "phase": "R2.3",
+  "status": "FROZEN_V1",
+  "contracts": [
+    {
+      "name": "SourceRecord",
+      "family": "FACTUAL",
+      "authority": "FACTUAL_AUTHORITY",
+      "commit_authority": "FactualAuthorityService",
+      "provider_neutral": true
+    },
+    {
+      "name": "EvidenceRecord",
+      "family": "FACTUAL",
+      "authority": "FACTUAL_AUTHORITY",
+      "commit_authority": "FactualAuthorityService",
+      "provider_neutral": true
+    },
+    {
+      "name": "ResearchPack",
+      "family": "FACTUAL",
+      "authority": "FACTUAL_AUTHORITY",
+      "commit_authority": "FactualAuthorityService",
+      "provider_neutral": true
+    },
+    {
+      "name": "Claim",
+      "family": "FACTUAL",
+      "authority": "FACTUAL_AUTHORITY",
+      "commit_authority": "FactualAuthorityService",
+      "provider_neutral": true
+    },
+    {
+      "name": "ClaimLedger",
+      "family": "FACTUAL",
+      "authority": "FACTUAL_AUTHORITY",
+      "commit_authority": "FactualAuthorityService",
+      "provider_neutral": true
+    },
+    {
+      "name": "CanonBranch",
+      "family": "CANON",
+      "authority": "NARRATIVE_AUTHORITY",
+      "commit_authority": "CanonTransactionService",
+      "provider_neutral": true
+    },
+    {
+      "name": "CanonVersion",
+      "family": "CANON",
+      "authority": "NARRATIVE_AUTHORITY",
+      "commit_authority": "CanonTransactionService",
+      "provider_neutral": true
+    },
+    {
+      "name": "Entity",
+      "family": "CANON",
+      "authority": "NARRATIVE_AUTHORITY",
+      "commit_authority": "CanonTransactionService",
+      "provider_neutral": true
+    },
+    {
+      "name": "Fact",
+      "family": "CANON",
+      "authority": "NARRATIVE_AUTHORITY",
+      "commit_authority": "CanonTransactionService",
+      "provider_neutral": true
+    },
+    {
+      "name": "Event",
+      "family": "CANON",
+      "authority": "NARRATIVE_AUTHORITY",
+      "commit_authority": "CanonTransactionService",
+      "provider_neutral": true
+    },
+    {
+      "name": "KnowledgeState",
+      "family": "CANON",
+      "authority": "NARRATIVE_AUTHORITY",
+      "commit_authority": "CanonTransactionService",
+      "provider_neutral": true
+    },
+    {
+      "name": "StoryFrame",
+      "family": "AUTHORIAL_INTENT",
+      "authority": "AUTHORIAL_INTENT",
+      "commit_authority": "NarrativePlanService",
+      "provider_neutral": true
+    },
+    {
+      "name": "VolumePlan",
+      "family": "AUTHORIAL_INTENT",
+      "authority": "AUTHORIAL_INTENT",
+      "commit_authority": "NarrativePlanService",
+      "provider_neutral": true
+    },
+    {
+      "name": "EpisodePlan",
+      "family": "AUTHORIAL_INTENT",
+      "authority": "AUTHORIAL_INTENT",
+      "commit_authority": "NarrativePlanService",
+      "provider_neutral": true
+    },
+    {
+      "name": "ArcPlan",
+      "family": "AUTHORIAL_INTENT",
+      "authority": "AUTHORIAL_INTENT",
+      "commit_authority": "NarrativePlanService",
+      "provider_neutral": true
+    },
+    {
+      "name": "ChapterPlan",
+      "family": "AUTHORIAL_INTENT",
+      "authority": "AUTHORIAL_INTENT",
+      "commit_authority": "NarrativePlanService",
+      "provider_neutral": true
+    },
+    {
+      "name": "SceneContract",
+      "family": "AUTHORIAL_INTENT",
+      "authority": "AUTHORIAL_INTENT",
+      "commit_authority": "NarrativePlanService",
+      "provider_neutral": true
+    },
+    {
+      "name": "CreativePolicy",
+      "family": "AUTHORIAL_INTENT",
+      "authority": "AUTHORIAL_INTENT",
+      "commit_authority": "CreativePolicyService",
+      "provider_neutral": true
+    },
+    {
+      "name": "NarrativeContextPack",
+      "family": "NARRATIVE_WORKING",
+      "authority": "NON_AUTHORITATIVE",
+      "commit_authority": null,
+      "provider_neutral": true
+    },
+    {
+      "name": "SimulationEvent",
+      "family": "NARRATIVE_WORKING",
+      "authority": "NON_AUTHORITATIVE",
+      "commit_authority": null,
+      "provider_neutral": true
+    },
+    {
+      "name": "DraftCandidate",
+      "family": "NARRATIVE_WORKING",
+      "authority": "NON_AUTHORITATIVE",
+      "commit_authority": null,
+      "provider_neutral": true
+    },
+    {
+      "name": "NarrativeRevision",
+      "family": "NARRATIVE_WORKING",
+      "authority": "NON_AUTHORITATIVE",
+      "commit_authority": null,
+      "provider_neutral": true
+    },
+    {
+      "name": "NarrativeChangeSet",
+      "family": "NARRATIVE_WORKING",
+      "authority": "PROPOSAL",
+      "commit_authority": null,
+      "provider_neutral": true
+    },
+    {
+      "name": "CanonDelta",
+      "family": "NARRATIVE_WORKING",
+      "authority": "PROPOSAL_TO_NARRATIVE_AUTHORITY",
+      "commit_authority": null,
+      "provider_neutral": true
+    },
+    {
+      "name": "AdaptationBranch",
+      "family": "ADAPTATION",
+      "authority": "ADAPTATION_AUTHORITY",
+      "commit_authority": "AdaptationTransactionService",
+      "provider_neutral": true
+    },
+    {
+      "name": "AdaptationMap",
+      "family": "ADAPTATION",
+      "authority": "ADAPTATION_AUTHORITY",
+      "commit_authority": "AdaptationTransactionService",
+      "provider_neutral": true
+    },
+    {
+      "name": "ScreenplayArtifact",
+      "family": "ADAPTATION",
+      "authority": "CROSS_AUTHORITY_ARTIFACT",
+      "commit_authority": "AdaptationTransactionService",
+      "provider_neutral": true,
+      "content_basis_required": true
+    },
+    {
+      "name": "ContentBasis",
+      "family": "PRODUCTION_COMMON",
+      "authority": "CROSS_AUTHORITY_LINEAGE",
+      "commit_authority": null,
+      "provider_neutral": true
+    },
+    {
+      "name": "ScriptArtifact",
+      "family": "PRODUCTION_COMMON",
+      "authority": "CROSS_AUTHORITY_ARTIFACT",
+      "commit_authority": "FactualAuthorityService",
+      "provider_neutral": true,
+      "content_basis_required": true
+    },
+    {
+      "name": "SceneSpec",
+      "family": "PRODUCTION_COMMON",
+      "authority": "PRODUCTION_SEMANTIC",
+      "commit_authority": "R2ProductionSpecService",
+      "provider_neutral": true,
+      "content_basis_required": true,
+      "forbidden_fields": [
+        "provider",
+        "model",
+        "endpoint",
+        "payload",
+        "provider_job_id"
+      ]
+    },
+    {
+      "name": "ShotSpec",
+      "family": "PRODUCTION_COMMON",
+      "authority": "PRODUCTION_SEMANTIC",
+      "commit_authority": "R2ProductionSpecService",
+      "provider_neutral": true,
+      "content_basis_required": true,
+      "forbidden_fields": [
+        "provider",
+        "model",
+        "endpoint",
+        "payload",
+        "provider_job_id"
+      ]
+    },
+    {
+      "name": "ProductionBinding",
+      "family": "PRODUCTION_PREP",
+      "authority": "PRODUCTION_PREPARATION",
+      "commit_authority": "ProductionPreparationService",
+      "provider_neutral": true
+    },
+    {
+      "name": "VisualIdentityProfile",
+      "family": "PRODUCTION_PREP",
+      "authority": "PRODUCTION_PREPARATION",
+      "commit_authority": "ProductionPreparationService",
+      "provider_neutral": true
+    },
+    {
+      "name": "ProductionReadiness",
+      "family": "PRODUCTION_PREP",
+      "authority": "PRODUCTION_PREPARATION",
+      "commit_authority": "ProductionPreparationService",
+      "provider_neutral": true
+    },
+    {
+      "name": "MethodDecision",
+      "family": "PRODUCTION_PREP",
+      "authority": "METHOD_ROUTER",
+      "commit_authority": "MethodRouterService",
+      "provider_neutral": true,
+      "forbidden_fields": [
+        "provider",
+        "model",
+        "endpoint"
+      ]
+    },
+    {
+      "name": "PromptPlan",
+      "family": "PRODUCTION_PREP",
+      "authority": "GENERATION_PREPARATION",
+      "commit_authority": "PromptCompilerService",
+      "provider_neutral": true
+    },
+    {
+      "name": "ProviderRequest",
+      "family": "EXECUTION",
+      "authority": "RUNTIME_ADAPTER",
+      "commit_authority": "ArcReelProviderExecution",
+      "provider_neutral": false
+    },
+    {
+      "name": "GenerationCandidate",
+      "family": "PRODUCTION_RESULT",
+      "authority": "PRODUCTION_AUTHORITY",
+      "commit_authority": "ArcReel Artifact/Application Services",
+      "provider_neutral": false
+    },
+    {
+      "name": "ApprovedMaster",
+      "family": "PRODUCTION_RESULT",
+      "authority": "PRODUCTION_AUTHORITY",
+      "commit_authority": "ProductionApprovalService",
+      "provider_neutral": true
+    },
+    {
+      "name": "EditTimelineArtifact",
+      "family": "PRODUCTION_RESULT",
+      "authority": "PRODUCTION_AUTHORITY",
+      "commit_authority": "ArcReel Artifact/Application Services",
+      "provider_neutral": true
+    },
+    {
+      "name": "QualityReport",
+      "family": "PRODUCTION_RESULT",
+      "authority": "REVIEW_PLANE",
+      "commit_authority": "QualityReviewService",
+      "provider_neutral": true
+    }
+  ],
+  "global_rules": {
+    "stable_logical_id": true,
+    "monotonic_object_version": true,
+    "schema_version_independent": true,
+    "content_basis_required_at_production_boundary": true,
+    "content_fingerprint_separate_from_execution_fingerprint": true,
+    "status_families_are_orthogonal": true,
+    "direct_edge_invalidation": true,
+    "one_commit_authority_per_authoritative_state": true
+  }
+}

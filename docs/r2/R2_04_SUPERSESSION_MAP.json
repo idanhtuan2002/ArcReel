@@ -1,0 +1,47 @@
+{
+  "phase": "R2.4",
+  "mappings": [
+    {
+      "legacy_decision": "LEGACY-THREE-STATE-PLANES",
+      "new_status": "SUPERSEDED",
+      "superseded_by": "R2-DEC-003",
+      "reason": "Factual truth and authorial intent require independent authorities."
+    },
+    {
+      "legacy_decision": "LEGACY-TAKE-UNIVERSAL-DIRECTOR",
+      "new_status": "SUPERSEDED",
+      "superseded_by": "R2-DEC-015",
+      "reason": "General content and cinematic fiction require different director adapters."
+    },
+    {
+      "legacy_decision": "LEGACY-ONE-FLAT-CANON-FOR-ALL-MEDIA",
+      "new_status": "SUPERSEDED",
+      "superseded_by": "R2-DEC-009",
+      "reason": "Adaptations need explicit branch/overlay lineage."
+    },
+    {
+      "legacy_decision": "LEGACY-STORY-BIBLE-AS-MONOLITHIC-TRUTH",
+      "new_status": "SUPERSEDED",
+      "superseded_by": "R2-DEC-005",
+      "reason": "StoryBibleView is a projection of Canon + Plan + Policy."
+    },
+    {
+      "legacy_decision": "LEGACY-CUSTOM-PARALLEL-ARTIFACT-REGISTRY",
+      "new_status": "REJECTED",
+      "superseded_by": "R2-DEC-013",
+      "reason": "ArcReel Artifact Manifest is the production artifact authority."
+    },
+    {
+      "legacy_decision": "LEGACY-SECOND-GENERAL-MEDIA-QUEUE",
+      "new_status": "REJECTED",
+      "superseded_by": "R2-DEC-014",
+      "reason": "ArcReel queue/recovery/idempotency is verified and should remain authoritative."
+    },
+    {
+      "legacy_decision": "LEGACY-PROVIDER-CONFIG-STALES-CONTENT",
+      "new_status": "REJECTED",
+      "superseded_by": "R2-DEC-024",
+      "reason": "Execution configuration belongs to execution fingerprint, not content currency."
+    }
+  ]
+}

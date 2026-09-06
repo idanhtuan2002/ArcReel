@@ -1,0 +1,61 @@
+{
+  "phase": "R2.5",
+  "status": "FROZEN_V1",
+  "approved": true,
+  "date": "2026-09-06",
+  "host_baseline": {
+    "tag": "v0.29.0",
+    "sha": "6ddedc775e7fe5f398b10081ab741985f7dceda7"
+  },
+  "requirements": [
+    {
+      "id": "H1",
+      "name": "Execution Identity",
+      "severity": "PRODUCTION_BLOCKER",
+      "decision_ref": "R2-HOST-001"
+    },
+    {
+      "id": "H2",
+      "name": "Idempotency",
+      "severity": "PRODUCTION_BLOCKER"
+    },
+    {
+      "id": "H3",
+      "name": "Artifact Safety",
+      "severity": "PRODUCTION_BLOCKER"
+    },
+    {
+      "id": "H4",
+      "name": "Transaction Boundary",
+      "severity": "PRODUCTION_BLOCKER"
+    },
+    {
+      "id": "H5",
+      "name": "Recovery",
+      "severity": "PRODUCTION_BLOCKER"
+    },
+    {
+      "id": "H6",
+      "name": "Backup Restore",
+      "severity": "PRODUCTION_BLOCKER"
+    },
+    {
+      "id": "H7",
+      "name": "Observability",
+      "severity": "PRODUCTION_CANDIDATE_GATE"
+    },
+    {
+      "id": "H8",
+      "name": "Upgrade Safety",
+      "severity": "ONGOING_MAINTENANCE_GATE"
+    }
+  ],
+  "maturity": [
+    "DEV",
+    "INTEGRATION_READY",
+    "RECOVERY_VERIFIED",
+    "PRODUCTION_CANDIDATE",
+    "PRODUCTION_APPROVED"
+  ],
+  "next": "R2.6_IMPLEMENTATION_ROADMAP"
+}

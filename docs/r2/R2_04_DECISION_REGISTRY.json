@@ -1,0 +1,763 @@
+{
+  "registry_version": "1.0",
+  "phase": "R2.4",
+  "status": "FROZEN_V1",
+  "approved": true,
+  "date": "2026-09-06",
+  "decision_status_values": [
+    "LOCKED",
+    "ACTIVE",
+    "SUPERSEDED",
+    "DEFERRED",
+    "REJECTED"
+  ],
+  "reopen_gate": [
+    "verified implementation blocker",
+    "upstream breaking change",
+    "measured unacceptable performance/cost",
+    "security/data-integrity problem",
+    "contract contradiction discovered",
+    "materially superior replacement with executable evidence"
+  ],
+  "decisions": [
+    {
+      "decision_id": "R2-DEC-001",
+      "title": "Human Showrunner remains final creative/governance authority",
+      "status": "LOCKED",
+      "category": "AUTHORITY_GOVERNANCE",
+      "decision": "Human approval/override is explicit, auditable, and cannot be replaced by autonomous agent mutation.",
+      "rationale": "Prevents silent authority drift while preserving automation.",
+      "legacy_refs": [],
+      "supersedes": [],
+      "affected_contracts": [
+        "CreativePolicy",
+        "CanonDelta",
+        "ApprovedMaster"
+      ],
+      "affected_components": [
+        "Governance",
+        "CanonTransactionService",
+        "ProductionApprovalService"
+      ],
+      "reopen_conditions": [
+        "verified governance blocker",
+        "security/data-integrity problem"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-002",
+      "title": "Exactly one commit authority per authoritative state family",
+      "status": "LOCKED",
+      "category": "AUTHORITY_GOVERNANCE",
+      "decision": "Every authoritative state family has exactly one formal commit authority; other systems may only read/propose/approve according to R2.2.",
+      "rationale": "Prevents conflicting stores and multi-agent write races.",
+      "legacy_refs": [],
+      "supersedes": [],
+      "affected_contracts": [
+        "all authoritative contracts"
+      ],
+      "affected_components": [
+        "all adapters",
+        "CI architecture tests"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-003",
+      "title": "Five authority planes",
+      "status": "LOCKED",
+      "category": "AUTHORITY_GOVERNANCE",
+      "decision": "Freeze Factual Authority, Narrative Authority, Authorial Intent, Production Authority, and Runtime Authority as distinct planes.",
+      "rationale": "R1 evidence showed the former three-plane model was insufficient for factual truth and authorial-plan separation.",
+      "legacy_refs": [],
+      "supersedes": [
+        "LEGACY-THREE-STATE-PLANES"
+      ],
+      "affected_contracts": [
+        "ResearchPack",
+        "ClaimLedger",
+        "CanonVersion",
+        "NarrativePlan",
+        "Artifact Manifest",
+        "Runtime Task"
+      ],
+      "affected_components": [
+        "FactualAuthorityService",
+        "Canon Kernel",
+        "NarrativePlanService",
+        "ArcReel Host"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-004",
+      "title": "Candidate is never Canon",
+      "status": "LOCKED",
+      "category": "NARRATIVE",
+      "decision": "Drafts, simulations, extracted changes, reviews, and generated candidates remain non-authoritative until an explicit transaction commits them.",
+      "rationale": "Separates creative exploration from truth mutation.",
+      "legacy_refs": [
+        "R2-D48",
+        "R2-D54"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "DraftCandidate",
+        "SimulationEvent",
+        "NarrativeChangeSet",
+        "CanonDelta"
+      ],
+      "affected_components": [
+        "Novel Studio adapters",
+        "Shenbi adapters",
+        "StoryBox adapters",
+        "CanonTransactionService"
+      ],
+      "reopen_conditions": [
+        "none except architecture change approval"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-005",
+      "title": "NarrativePlan is separate from Canon",
+      "status": "LOCKED",
+      "category": "NARRATIVE",
+      "decision": "Future authorial intent is stored in NarrativePlan/SceneContract, not as established world truth.",
+      "rationale": "Prevents planned future events from contaminating current Canon.",
+      "legacy_refs": [
+        "R2-D52",
+        "R2-D53"
+      ],
+      "supersedes": [
+        "LEGACY-STORY-BIBLE-AS-MONOLITHIC-TRUTH"
+      ],
+      "affected_contracts": [
+        "StoryFrame",
+        "VolumePlan",
+        "EpisodePlan",
+        "ArcPlan",
+        "ChapterPlan",
+        "SceneContract",
+        "CanonVersion"
+      ],
+      "affected_components": [
+        "NarrativePlanService",
+        "StoryBibleView"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-006",
+      "title": "KnowledgeState is first-class",
+      "status": "LOCKED",
+      "category": "NARRATIVE",
+      "decision": "Who knows, suspects, falsely believes, or does not know a proposition is explicit authoritative state.",
+      "rationale": "Prevents secret leakage and makes epistemic continuity mechanically testable.",
+      "legacy_refs": [],
+      "supersedes": [],
+      "affected_contracts": [
+        "KnowledgeState"
+      ],
+      "affected_components": [
+        "Epistemic Engine",
+        "NarrativeContextCompiler"
+      ],
+      "reopen_conditions": [
+        "materially superior representation with executable evidence"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-007",
+      "title": "NarrativeContextCompiler is R2 core",
+      "status": "LOCKED",
+      "category": "NARRATIVE",
+      "decision": "Authoritative context selection and epistemic filtering belong to the R2-owned NarrativeContextCompiler.",
+      "rationale": "Donor context systems are useful but cannot define authoritative visibility rules.",
+      "legacy_refs": [
+        "R2-D51"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "NarrativeContextPack"
+      ],
+      "affected_components": [
+        "NarrativeContextCompiler"
+      ],
+      "reopen_conditions": [
+        "verified implementation blocker"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-008",
+      "title": "NarrativeChangeSet is distinct from CanonDelta",
+      "status": "LOCKED",
+      "category": "NARRATIVE",
+      "decision": "NarrativeChangeSet describes inferred changes from prose; CanonDelta is the explicit authoritative mutation proposal.",
+      "rationale": "Separates extraction uncertainty from intended truth mutation.",
+      "legacy_refs": [
+        "R2-D49",
+        "R2-D54"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "NarrativeChangeSet",
+        "CanonDelta"
+      ],
+      "affected_components": [
+        "Huohuo adapter",
+        "CanonDeltaCompiler",
+        "CanonTransactionService"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-009",
+      "title": "Adaptation uses explicit branch/overlay lineage",
+      "status": "LOCKED",
+      "category": "ADAPTATION",
+      "decision": "Medium adaptation never silently mutates source Canon; it uses parent-linked AdaptationBranch plus AdaptationMap.",
+      "rationale": "Allows screenplay/audio variants while preserving source IP truth.",
+      "legacy_refs": [
+        "R2-D57",
+        "R2-D58",
+        "R2-D59",
+        "R2-D60"
+      ],
+      "supersedes": [
+        "LEGACY-ONE-FLAT-CANON-FOR-ALL-MEDIA"
+      ],
+      "affected_contracts": [
+        "ContentBasis",
+        "AdaptationBranch",
+        "AdaptationMap",
+        "ScreenplayArtifact"
+      ],
+      "affected_components": [
+        "AdaptationTransactionService",
+        "Huohuo adapter"
+      ],
+      "reopen_conditions": [
+        "verified implementation blocker"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-010",
+      "title": "Factual truth and fiction truth remain distinct",
+      "status": "LOCKED",
+      "category": "FACTUAL",
+      "decision": "Factual content uses ResearchPack/ClaimLedger/Evidence; fiction uses Canon/Epistemic. They converge only at ScriptLikeArtifact/SceneSpec/ShotSpec.",
+      "rationale": "Avoids forcing evidence truth into fiction semantics.",
+      "legacy_refs": [
+        "R2-D56",
+        "R2-D57"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "ResearchPack",
+        "ClaimLedger",
+        "ContentBasis",
+        "ScriptArtifact",
+        "ScreenplayArtifact",
+        "SceneSpec",
+        "ShotSpec"
+      ],
+      "affected_components": [
+        "FactualAuthorityService",
+        "DirectorAdapter"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-011",
+      "title": "ArcReel-derived Host is primary runtime",
+      "status": "LOCKED",
+      "category": "HOST_RUNTIME",
+      "decision": "ArcReel-derived Host owns PostgreSQL, runtime tasks, queue, provider execution, Artifact Manifest, currency, provenance, recovery, idempotency, cost, review, and export.",
+      "rationale": "R1.8 target-Ubuntu evidence passed source, PostgreSQL, restart, fault/recovery, idempotency, and backup/restore checks.",
+      "legacy_refs": [
+        "R2-D08",
+        "R2-D29",
+        "R2-D30",
+        "R2-D31",
+        "R2-D65"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "ProviderRequest",
+        "GenerationCandidate",
+        "Artifact Manifest",
+        "ApprovedMaster"
+      ],
+      "affected_components": [
+        "ArcReel Host"
+      ],
+      "reopen_conditions": [
+        "verified implementation blocker",
+        "upstream breaking change",
+        "security/data-integrity problem",
+        "measured unacceptable performance/cost"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-012",
+      "title": "Use PostgreSQL from Host fork start",
+      "status": "LOCKED",
+      "category": "HOST_RUNTIME",
+      "decision": "The R2 Host fork starts on PostgreSQL rather than SQLite as the production development baseline.",
+      "rationale": "R1.8 validated PostgreSQL migrations and restart health on the target machine.",
+      "legacy_refs": [],
+      "supersedes": [],
+      "affected_contracts": [],
+      "affected_components": [
+        "ArcReel Host",
+        "database deployment"
+      ],
+      "reopen_conditions": [
+        "verified deployment blocker"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-013",
+      "title": "Extend ArcReel Artifact Manifest; no parallel artifact registry",
+      "status": "LOCKED",
+      "category": "HOST_RUNTIME",
+      "decision": "R2 content lineage extends ArcReel Artifact Manifest instead of introducing a second authoritative artifact registry.",
+      "rationale": "Avoids dual artifact truth and reuses verified ArcReel currency/provenance machinery.",
+      "legacy_refs": [
+        "R2-D29",
+        "R2-D65"
+      ],
+      "supersedes": [
+        "LEGACY-CUSTOM-PARALLEL-ARTIFACT-REGISTRY"
+      ],
+      "affected_contracts": [
+        "ContentBasis",
+        "SceneSpec",
+        "ShotSpec",
+        "ProductionBinding"
+      ],
+      "affected_components": [
+        "ArcReel Artifact Manifest"
+      ],
+      "reopen_conditions": [
+        "verified ArcReel manifest blocker"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-014",
+      "title": "No second general media queue",
+      "status": "LOCKED",
+      "category": "HOST_RUNTIME",
+      "decision": "Provider execution, durable task recovery, deduplication, and cancellation stay in ArcReel runtime.",
+      "rationale": "A second queue would duplicate the strongest verified ArcReel capability.",
+      "legacy_refs": [
+        "R2-D30",
+        "R2-D40",
+        "R2-D41"
+      ],
+      "supersedes": [
+        "LEGACY-SECOND-GENERAL-MEDIA-QUEUE"
+      ],
+      "affected_contracts": [
+        "ProviderRequest",
+        "GenerationCandidate"
+      ],
+      "affected_components": [
+        "ArcReel Queue",
+        "donor runtime adapters"
+      ],
+      "reopen_conditions": [
+        "verified ArcReel queue blocker"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-015",
+      "title": "DirectorAdapter is format-sensitive",
+      "status": "LOCKED",
+      "category": "DIRECTOR",
+      "decision": "Use TakeDirector for fiction/cinematic, OpenMontageDirector for general content, and ArcReelNativeDirector as fallback.",
+      "rationale": "R1.6 showed take is not universal and OpenMontage has stronger general-content scene planning.",
+      "legacy_refs": [
+        "R2-D15",
+        "R2-D61",
+        "R2-D62"
+      ],
+      "supersedes": [
+        "LEGACY-TAKE-UNIVERSAL-DIRECTOR"
+      ],
+      "affected_contracts": [
+        "ScriptArtifact",
+        "ScreenplayArtifact",
+        "SceneSpec",
+        "ShotSpec"
+      ],
+      "affected_components": [
+        "DirectorAdapter",
+        "TakeDirector",
+        "OpenMontageDirector"
+      ],
+      "reopen_conditions": [
+        "measured inferior director quality for target format"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-016",
+      "title": "Shot readiness is distinct from content status and runtime task status",
+      "status": "LOCKED",
+      "category": "PRODUCTION",
+      "decision": "ShotPreparationService produces ProductionBinding and ProductionReadiness independently of creative approval and runtime tasks.",
+      "rationale": "Prevents expensive generation with unresolved production prerequisites.",
+      "legacy_refs": [
+        "R2-D16",
+        "R2-D42",
+        "R2-D63"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "ProductionBinding",
+        "ProductionReadiness"
+      ],
+      "affected_components": [
+        "ShotPreparationService"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-017",
+      "title": "VisualIdentityProfile is first-class production state",
+      "status": "LOCKED",
+      "category": "PRODUCTION",
+      "decision": "Character visual identity, look locks, and production variants are explicit production bindings, separate from Canon identity.",
+      "rationale": "Improves continuity without contaminating Canon with production asset paths.",
+      "legacy_refs": [
+        "R2-D17",
+        "R2-D43"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "VisualIdentityProfile",
+        "ProductionBinding"
+      ],
+      "affected_components": [
+        "ai-short-film adapter",
+        "ArcReel character variants"
+      ],
+      "reopen_conditions": [
+        "materially superior representation with executable evidence"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-018",
+      "title": "Previous-frame chaining is conditional",
+      "status": "ACTIVE",
+      "category": "PRODUCTION",
+      "decision": "Use prior approved end-frame as a continuity binding only when the continuity segment and provider capability justify it.",
+      "rationale": "Preserves continuity without over-constraining every shot.",
+      "legacy_refs": [
+        "R2-D44"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "ProductionBinding",
+        "ShotSpec"
+      ],
+      "affected_components": [
+        "continuity policy",
+        "provider adapters"
+      ],
+      "reopen_conditions": [
+        "measured quality evidence"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-019",
+      "title": "ProductionBinding is the semantic-to-production bridge",
+      "status": "LOCKED",
+      "category": "PRODUCTION",
+      "decision": "All semantic entities/assets needed for production are connected through ProductionBinding rather than direct asset fields in Canon/ShotSpec.",
+      "rationale": "Keeps semantic truth and production variants decoupled.",
+      "legacy_refs": [
+        "R2-D63"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "ProductionBinding",
+        "ShotSpec",
+        "VisualIdentityProfile"
+      ],
+      "affected_components": [
+        "ProductionPreparationService",
+        "ArcReel adapters"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-020",
+      "title": "Method before provider",
+      "status": "LOCKED",
+      "category": "ROUTING",
+      "decision": "Choose REUSE/STOCK/SCREEN_CAPTURE/DETERMINISTIC/GENERATED_IMAGE/GENERATED_VIDEO/COMPOSITE before provider/model selection.",
+      "rationale": "Encodes reuse-first economics and avoids provider-driven creative architecture.",
+      "legacy_refs": [
+        "R2-D33",
+        "R2-D34"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "MethodDecision",
+        "ProviderRequest"
+      ],
+      "affected_components": [
+        "MethodRouterService",
+        "CapabilityRegistry"
+      ],
+      "reopen_conditions": [
+        "measured unacceptable routing performance"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-021",
+      "title": "One normalized CapabilityRegistry",
+      "status": "LOCKED",
+      "category": "ROUTING",
+      "decision": "Business routing reads one R2 CapabilityRegistry normalized from ArcReel, DC-Media, OpenMontage and local/deterministic capabilities.",
+      "rationale": "Prevents multiple competing provider catalogs in business logic.",
+      "legacy_refs": [
+        "R2-D33",
+        "R2-D37",
+        "R2-D38",
+        "R2-D39"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "MethodDecision",
+        "ProviderRequest"
+      ],
+      "affected_components": [
+        "CapabilityRegistry"
+      ],
+      "reopen_conditions": [
+        "verified capability-model blocker"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-022",
+      "title": "PromptPlan is separate from ProviderRequest",
+      "status": "LOCKED",
+      "category": "ROUTING",
+      "decision": "Butterfly-derived PromptCompiler produces provider-neutral PromptPlan; provider adapters produce exact ProviderRequest payloads.",
+      "rationale": "Keeps stable creative semantics independent of vendor API.",
+      "legacy_refs": [
+        "R2-D18",
+        "R2-D45"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "PromptPlan",
+        "ProviderRequest"
+      ],
+      "affected_components": [
+        "PromptCompilerService",
+        "Provider adapters"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-023",
+      "title": "SceneSpec and ShotSpec are provider-neutral",
+      "status": "LOCKED",
+      "category": "PRODUCTION",
+      "decision": "Stable production semantic contracts cannot contain provider/model/endpoint/API payload/provider job identity.",
+      "rationale": "Allows routing and runtime changes without rewriting creative semantics.",
+      "legacy_refs": [],
+      "supersedes": [],
+      "affected_contracts": [
+        "SceneSpec",
+        "ShotSpec"
+      ],
+      "affected_components": [
+        "DirectorAdapter",
+        "architecture CI"
+      ],
+      "reopen_conditions": [
+        "none except explicit architecture change"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-024",
+      "title": "Content fingerprint is distinct from execution fingerprint",
+      "status": "LOCKED",
+      "category": "PRODUCTION",
+      "decision": "Artifact currency uses semantic/content dependencies; provider/model/seed/resolution belong to execution provenance and candidate comparison.",
+      "rationale": "Provider changes should not automatically stale valid content.",
+      "legacy_refs": [
+        "R2-D64"
+      ],
+      "supersedes": [
+        "LEGACY-PROVIDER-CONFIG-STALES-CONTENT"
+      ],
+      "affected_contracts": [
+        "GenerationCandidate",
+        "Artifact Manifest"
+      ],
+      "affected_components": [
+        "artifact currency",
+        "provider execution"
+      ],
+      "reopen_conditions": [
+        "verified incorrect invalidation behavior"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-025",
+      "title": "ApprovedMaster requires explicit selection",
+      "status": "LOCKED",
+      "category": "PRODUCTION",
+      "decision": "A successful generation is not an approved master; selection/approval is explicit and failed later generations preserve the existing master.",
+      "rationale": "Protects usable production state and separates generation from editorial authority.",
+      "legacy_refs": [
+        "R2-D66"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "GenerationCandidate",
+        "ApprovedMaster"
+      ],
+      "affected_components": [
+        "ProductionApprovalService",
+        "ArcReel version storage"
+      ],
+      "reopen_conditions": [
+        "contract contradiction discovered"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-026",
+      "title": "Creative Canvas is exploration-only until PROMOTE",
+      "status": "LOCKED",
+      "category": "CREATIVE_CANVAS",
+      "decision": "DramaClaw-derived canvas cannot directly mutate production authority; explicit audited PROMOTE creates formal production artifacts.",
+      "rationale": "Preserves experimentation without state contamination.",
+      "legacy_refs": [
+        "R2-D35",
+        "R2-D36"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "CanvasCandidate",
+        "ApprovedMaster"
+      ],
+      "affected_components": [
+        "DramaClaw canvas adapter",
+        "promotion service"
+      ],
+      "reopen_conditions": [
+        "verified UX blocker requiring a different promotion boundary"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-027",
+      "title": "Director World is deferred advanced spatial planning",
+      "status": "DEFERRED",
+      "category": "CREATIVE_CANVAS",
+      "decision": "DramaClaw Director World/3D spatial planning is deferred until advanced creative workbench phase.",
+      "rationale": "High value but not required for first implementation milestone.",
+      "legacy_refs": [
+        "R2-D37"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "ProductionBinding"
+      ],
+      "affected_components": [
+        "advanced canvas"
+      ],
+      "reopen_conditions": [
+        "R8/advanced creative workbench start"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-028",
+      "title": "OpenMontage/Remotion is primary deterministic composition path",
+      "status": "ACTIVE",
+      "category": "COMPOSITION",
+      "decision": "Use Remotion for general mixed compositions; ArcReel/FFmpeg retain media mechanics and drama assembly; HyperFrames stays specialized.",
+      "rationale": "Matches donor strengths and avoids replacing proven FFmpeg/runtime mechanics.",
+      "legacy_refs": [
+        "R2-D19"
+      ],
+      "supersedes": [],
+      "affected_contracts": [
+        "EditTimelineArtifact"
+      ],
+      "affected_components": [
+        "Remotion",
+        "FFmpeg",
+        "ArcReel",
+        "HyperFrames"
+      ],
+      "reopen_conditions": [
+        "measured composition quality/performance blocker"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-029",
+      "title": "Learning produces recommendations, not authority mutation",
+      "status": "LOCKED",
+      "category": "LEARNING",
+      "decision": "Analytics/Learning can recommend experiments, routing or policy changes but cannot directly mutate Canon, Claim truth, NarrativePlan or CreativePolicy.",
+      "rationale": "Prevents metric optimization from silently rewriting creative/governance authority.",
+      "legacy_refs": [],
+      "supersedes": [],
+      "affected_contracts": [
+        "PerformanceReport",
+        "CreativePolicy",
+        "NarrativePlan"
+      ],
+      "affected_components": [
+        "LearningEngine",
+        "Governance"
+      ],
+      "reopen_conditions": [
+        "none except explicit governance redesign"
+      ]
+    },
+    {
+      "decision_id": "R2-DEC-030",
+      "title": "R2-HOST-001 blocks production provider-reconfiguration during vulnerable I2V recovery",
+      "status": "ACTIVE",
+      "category": "HOST_RUNTIME",
+      "decision": "Before production, persist actual execution identity at provider submission or block affected provider/base-url changes while matching active I2V tasks exist.",
+      "rationale": "Mitigates the known ArcReel recovery identity gap documented during R1.8.",
+      "legacy_refs": [],
+      "supersedes": [],
+      "affected_contracts": [
+        "ProviderRequest"
+      ],
+      "affected_components": [
+        "ArcReel provider execution",
+        "configuration service"
+      ],
+      "reopen_conditions": [
+        "upstream fix merged and verified",
+        "equivalent local patch verified"
+      ]
+    }
+  ]
+}
