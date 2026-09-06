@@ -1,0 +1,75 @@
+{
+  "phase": "R2-M2",
+  "milestone": "Artifact Bridge",
+  "technical_gate": "PASS",
+  "verified_head": "735a11148c13a7b23c64f7831e409d9aabb27b9c",
+  "branch": "r2/main",
+  "baseline_sha": "6ddedc775e7fe5f398b10081ab741985f7dceda7",
+  "origin_before_verification_commit": "05099d48421bd61d8d9a0dc4bf7653c057e7c549",
+  "checks": {
+    "m2_production_tests": "53 PASS",
+    "m1_contract_tests": "41 PASS",
+    "m0_regression_tests": "15 PASS",
+    "frozen_registry": "PASS",
+    "host_baseline": "PASS",
+    "arcreel_focused_host_tests": "349 PASS",
+    "arcreel_audit_gate": "PASS / 0 violations",
+    "postgres_migration_health_restart": "PASS",
+    "git_diff_check": "PASS",
+    "database_migrations_added_by_m2": "NONE",
+    "parallel_r2_artifact_registry": "NONE",
+    "host_runtime_files_modified_by_m2": [
+      "lib/artifact_manifest.py"
+    ],
+    "host_patch_allowlist": [
+      "lib/artifact_manifest.py"
+    ],
+    "known_blocker_h1": "OPEN / PRODUCTION_BLOCKER",
+    "external_provider_spend": "NONE"
+  },
+  "invariants_verified": [
+    "legacy ArcReel artifacts without r2 metadata retain native behavior",
+    "malformed present r2 metadata projects BLOCKED",
+    "direct dependency snapshot mismatch projects STALE without mutating stored snapshot",
+    "unrelated dependency changes do not stale an artifact",
+    "execution identity is excluded from semantic content currency",
+    "GenerationCandidate does not become ApprovedMaster without explicit promotion",
+    "failed or unapproved candidate preserves prior ApprovedMaster",
+    "ApprovedMaster promotion coordinates host version selection and manifest metadata",
+    "restart/reload preserves R2 metadata and ApprovedMaster",
+    "concurrent promotion cannot leave active version and ApprovedMaster mismatched",
+    "no parallel SQL or JSON artifact registry was introduced"
+  ],
+  "h1": {
+    "id": "H1",
+    "decision_ref": "R2-HOST-001",
+    "severity": "PRODUCTION_BLOCKER",
+    "status": "OPEN"
+  },
+  "environment": {
+    "timestamp": "20260906-203445",
+    "python": "3.13.14",
+    "uv": "uv 0.12.2 (x86_64-unknown-linux-gnu)",
+    "git": "git version 2.53.0",
+    "docker": "Docker version 29.1.3, build 29.1.3-0ubuntu4.1",
+    "compose": "Docker Compose version 2.40.3+ds1-0ubuntu1"
+  },
+  "audit_tail": [
+    "闸门通过：0 处违规"
+  ],
+  "postgres_tail": [
+    "[2026-09-06T20:35:20+07:00] Restarting backend against same PostgreSQL and data directory",
+    "[2026-09-06T20:35:24+07:00] backend restart health: PASS",
+    "",
+    "===== HEALTH =====",
+    "{\"status\":\"ok\",\"message\":\"视频项目管理 WebUI 运行正常\"}",
+    "===== ALEMBIC CURRENT =====",
+    "9f3c7a52d1b4 (head)",
+    "",
+    "===== ALEMBIC HEADS =====",
+    "9f3c7a52d1b4 (head)",
+    "",
+    "R2-M0 PostgreSQL baseline verification: PASS"
+  ],
+  "next": "R2-M3 Artifact Bridge / Golden A General Content, with R2-HOST-001 still a production blocker to close in its scheduled hardening milestone."
+}
