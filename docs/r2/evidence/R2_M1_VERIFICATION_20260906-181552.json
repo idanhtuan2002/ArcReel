@@ -1,0 +1,24 @@
+{
+  "phase": "R2-M1",
+  "milestone": "Contract Kernel",
+  "status": "PASS",
+  "timestamp": "2026-09-06T18:16:40+07:00",
+  "head_before_evidence_commit": "d4d200a729250da6c4ccaf19ae6ab2453c2d920f",
+  "branch": "r2/main",
+  "baseline_sha": "6ddedc775e7fe5f398b10081ab741985f7dceda7",
+  "checks": {
+    "m1_contract_tests": "41 PASS",
+    "m0_r2_regression": "15 PASS",
+    "frozen_registry": "PASS",
+    "host_baseline": "PASS",
+    "arcreel_focused_host_tests": "349 PASS",
+    "arcreel_audit_gate": "PASS",
+    "provider_neutrality": "PASS",
+    "content_vs_execution_fingerprint": "PASS",
+    "json_roundtrip": "PASS",
+    "database_migrations_added": "NONE",
+    "arcreel_runtime_files_modified": "NONE",
+    "known_blocker_h1": "OPEN / PRODUCTION_BLOCKER"
+  },
+  "next": "R2-M2 Artifact Bridge"
+}
