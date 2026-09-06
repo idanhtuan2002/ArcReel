@@ -113,6 +113,8 @@ class ArtifactComparison:
 class ArtifactManifestEntry:
     artifact_path: str
     basis_digest: str
+    # Optional additive R2 semantic metadata. The Host treats this as opaque JSON.
+    r2: object | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1941,14 +1943,23 @@ def _entries_match(
     return all(adapter.get_entry(key) == entry for key, entry in expected.items())
 
 
+def _serialize_manifest_entry(entry: ArtifactManifestEntry) -> dict[str, object]:
+    """Serialize one entry while preserving legacy bytes when no R2 envelope exists."""
+
+    payload: dict[str, object] = {
+        "artifact_path": entry.artifact_path,
+        "basis_digest": entry.basis_digest,
+    }
+    if entry.r2 is not None:
+        payload["r2"] = entry.r2
+    return payload
+
+
 def _serialize_manifest(entries: Mapping[str, ArtifactManifestEntry]) -> bytes:
     _assert_unique_artifact_paths(entries)
     payload = {
         "entries": {
-            key: {
-                "artifact_path": entry.artifact_path,
-                "basis_digest": entry.basis_digest,
-            }
+            key: _serialize_manifest_entry(entry)
             for key, entry in sorted(entries.items())
         },
         "hash_algorithm": HASH_ALGORITHM,
@@ -2088,7 +2099,7 @@ def _parse_manifest(raw: bytes, *, validate_path_ownership: bool = True) -> dict
             ArtifactKey.decode(encoded_key)
         except ValueError as exc:
             raise ArtifactManifestError(f"artifact manifest contains an invalid key: {encoded_key!r}") from exc
-        if not isinstance(raw_entry, dict) or set(raw_entry) != {"artifact_path", "basis_digest"}:
+        if not isinstance(raw_entry, dict) or set(raw_entry) not in ({"artifact_path", "basis_digest"}, {"artifact_path", "basis_digest", "r2"}):
             raise ArtifactManifestError(f"artifact manifest entry has an invalid schema: {encoded_key}")
         artifact_path = raw_entry["artifact_path"]
         basis_digest = raw_entry["basis_digest"]
@@ -2103,6 +2114,7 @@ def _parse_manifest(raw: bytes, *, validate_path_ownership: bool = True) -> dict
         entries[encoded_key] = ArtifactManifestEntry(
             artifact_path=normalized_path,
             basis_digest=basis_digest,
+            r2=raw_entry.get("r2"),
         )
     if validate_path_ownership:
         _assert_unique_artifact_paths(entries)
