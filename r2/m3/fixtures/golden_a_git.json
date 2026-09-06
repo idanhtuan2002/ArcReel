@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "SRC-GIT-ADD",
+      "source_type": "OFFICIAL_DOC_SNAPSHOT",
+      "title": "SRC GIT ADD",
+      "origin": "https://git-scm.com/docs/git-add",
+      "captured_at": "2026-09-06T00:00:00+00:00",
+      "source_fingerprint": "ea32ac034f67aa9f85751a4fad100a874b0c83778493ba159492c7c3d6340f50",
+      "provenance": {
+        "fixture": "golden-a",
+        "snapshot_text": "git add updates the index using content found in the working tree."
+      }
+    },
+    {
+      "id": "SRC-GIT-COMMIT",
+      "source_type": "OFFICIAL_DOC_SNAPSHOT",
+      "title": "SRC GIT COMMIT",
+      "origin": "https://git-scm.com/docs/git-commit",
+      "captured_at": "2026-09-06T00:00:00+00:00",
+      "source_fingerprint": "7c12e49da94b77287fb0302921a9c25707c8fa7613ff0d59f54e8363d8015109",
+      "provenance": {
+        "fixture": "golden-a",
+        "snapshot_text": "git commit records the current contents of the index as a new commit."
+      }
+    },
+    {
+      "id": "SRC-GIT-GLOSSARY",
+      "source_type": "OFFICIAL_DOC_SNAPSHOT",
+      "title": "SRC GIT GLOSSARY",
+      "origin": "https://git-scm.com/docs/gitglossary",
+      "captured_at": "2026-09-06T00:00:00+00:00",
+      "source_fingerprint": "0cfd26e6548f8b8d6276195a395086d9fe4f56e0e45b07d8403dbed10c49f4f1",
+      "provenance": {
+        "fixture": "golden-a",
+        "snapshot_text": "The working tree contains checked-out files; the index tracks content prepared for the next commit."
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EVID-001",
+      "source_ref": "SRC-GIT-ADD",
+      "locator": "frozen-snapshot:SRC-GIT-ADD",
+      "excerpt_or_structured_fact": "git add updates the index using content found in the working tree.",
+      "evidence_type": "TEXT_SNAPSHOT",
+      "captured_at": "2026-09-06T00:00:00+00:00",
+      "provenance": {
+        "fixture": "golden-a"
+      }
+    },
+    {
+      "id": "EVID-002",
+      "source_ref": "SRC-GIT-COMMIT",
+      "locator": "frozen-snapshot:SRC-GIT-COMMIT",
+      "excerpt_or_structured_fact": "git commit records the current contents of the index as a new commit.",
+      "evidence_type": "TEXT_SNAPSHOT",
+      "captured_at": "2026-09-06T00:00:00+00:00",
+      "provenance": {
+        "fixture": "golden-a"
+      }
+    },
+    {
+      "id": "EVID-003",
+      "source_ref": "SRC-GIT-GLOSSARY",
+      "locator": "frozen-snapshot:SRC-GIT-GLOSSARY",
+      "excerpt_or_structured_fact": "The working tree contains checked-out files; the index tracks content prepared for the next commit.",
+      "evidence_type": "TEXT_SNAPSHOT",
+      "captured_at": "2026-09-06T00:00:00+00:00",
+      "provenance": {
+        "fixture": "golden-a"
+      }
+    }
+  ],
+  "research_pack": {
+    "id": "RP-GOLDEN-A",
+    "version": 1,
+    "topic": "Git Working Tree, Index, Commit",
+    "scope": "Golden A factual explainer",
+    "source_refs": [
+      "SRC-GIT-ADD",
+      "SRC-GIT-COMMIT",
+      "SRC-GIT-GLOSSARY"
+    ],
+    "evidence_refs": [
+      "EVID-001",
+      "EVID-002",
+      "EVID-003"
+    ],
+    "synthesis": "Working tree edits are staged into the index with git add; git commit records the index.",
+    "uncertainties": [],
+    "open_questions": [],
+    "provenance": {
+      "fixture": "golden-a"
+    }
+  },
+  "claim_ledger": {
+    "id": "LEDGER-GOLDEN-A",
+    "version": 1,
+    "research_pack_ref": "RP-GOLDEN-A",
+    "claims": [
+      {
+        "id": "CLAIM-001",
+        "version": 1,
+        "statement": "The working tree contains the checked-out files that you edit.",
+        "evidence_refs": [
+          "EVID-003"
+        ],
+        "confidence": 1.0,
+        "status": "VERIFIED",
+        "provenance": {
+          "fixture": "golden-a"
+        }
+      },
+      {
+        "id": "CLAIM-002",
+        "version": 1,
+        "statement": "git add updates the index from selected working-tree content.",
+        "evidence_refs": [
+          "EVID-001"
+        ],
+        "confidence": 1.0,
+        "status": "VERIFIED",
+        "provenance": {
+          "fixture": "golden-a"
+        }
+      },
+      {
+        "id": "CLAIM-003",
+        "version": 1,
+        "statement": "git commit records the current index contents as a new commit.",
+        "evidence_refs": [
+          "EVID-002"
+        ],
+        "confidence": 1.0,
+        "status": "VERIFIED",
+        "provenance": {
+          "fixture": "golden-a"
+        }
+      }
+    ]
+  },
+  "script": {
+    "id": "SCRIPT-GOLDEN-A",
+    "version": 1,
+    "content_basis": {
+      "basis_type": "FACTUAL",
+      "basis_version": "golden-a-v1",
+      "refs": [
+        "research:RP-GOLDEN-A",
+        "claim:CLAIM-001",
+        "claim:CLAIM-002",
+        "claim:CLAIM-003"
+      ]
+    },
+    "sections": [
+      {
+        "id": "SEC-01",
+        "text": "Start with the working tree: these are the checked-out files you edit. Changes here are not yet the next commit. Think of this as your active workspace, where you modify files before deciding what belongs in the next saved revision.",
+        "claim_refs": [
+          "CLAIM-001"
+        ],
+        "target_duration_seconds": 22.0
+      },
+      {
+        "id": "SEC-02",
+        "text": "When you run git add, Git updates the index with the selected content. The index is often called the staging area because it represents what you are proposing for the next commit. You can keep editing the working tree after staging, so the two can differ.",
+        "claim_refs": [
+          "CLAIM-002"
+        ],
+        "target_duration_seconds": 25.0
+      },
+      {
+        "id": "SEC-03",
+        "text": "Finally, git commit records the current contents of the index as a new commit. The sequence is simple: edit in the working tree, stage selected content into the index, then commit the index. Understanding these three states makes everyday Git much easier to reason about.",
+        "claim_refs": [
+          "CLAIM-003"
+        ],
+        "target_duration_seconds": 25.0
+      }
+    ],
+    "participants": [],
+    "timing_intent": "60-90s factual explainer",
+    "creative_constraints": [
+      "factual",
+      "concise",
+      "provider-neutral"
+    ],
+    "approval_status": "APPROVED"
+  }
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#111"/>
+  <rect x="80" y="90" width="1120" height="540" rx="18" fill="#1e1e1e" stroke="#888" stroke-width="3"/>
+  <text x="125" y="165" font-family="monospace" font-size="34" fill="#eee">$ git status</text>
+  <text x="125" y="225" font-family="monospace" font-size="28" fill="#ddd">working tree -&gt; index -&gt; commit</text>
+  <text x="125" y="300" font-family="monospace" font-size="25" fill="#aaa">Golden A reusable local asset</text>
+</svg>
