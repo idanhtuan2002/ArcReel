@@ -225,3 +225,44 @@ class R2ArtifactBridge:
             reason="dependencies_current",
             metadata=metadata,
         )
+
+
+class ArcReelVersionRestorePromoter:
+    """Bind a generic host-version ref to ArcReel's rollback-safe restore seam."""
+
+    def __init__(
+        self,
+        versions,
+        *,
+        resource_type: str,
+        resource_id: str,
+        current_file: Path,
+    ) -> None:
+        self._versions = versions
+        self._resource_type = resource_type
+        self._resource_id = resource_id
+        self._current_file = Path(current_file)
+
+    def __call__(
+        self,
+        host_version_ref: str,
+        on_select: Callable[[], None],
+    ) -> object:
+        try:
+            version = int(host_version_ref)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"ArcReel host_version_ref must be a decimal version: {host_version_ref!r}"
+            ) from exc
+        if version <= 0 or str(version) != host_version_ref:
+            raise ValueError(
+                f"ArcReel host_version_ref must be a positive canonical decimal: {host_version_ref!r}"
+            )
+
+        return self._versions.restore_version(
+            self._resource_type,
+            self._resource_id,
+            version,
+            self._current_file,
+            on_restore=lambda _record: on_select(),
+        )

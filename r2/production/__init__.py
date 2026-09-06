@@ -1,5 +1,6 @@
 from .artifact_bridge import (
     ArcReelArtifactManifestPort,
+    ArcReelVersionRestorePromoter,
     ArtifactManifestConflictError,
     ArtifactHostSnapshot,
     ArtifactManifestPort,
@@ -22,6 +23,7 @@ from .dependency_resolver import (
 __all__ = [
     "AmbiguousDependencyResolverError",
     "ArcReelArtifactManifestPort",
+    "ArcReelVersionRestorePromoter",
     "ArtifactManifestConflictError",
     "ApprovedMasterMetadata",
     "ArtifactHostSnapshot",
