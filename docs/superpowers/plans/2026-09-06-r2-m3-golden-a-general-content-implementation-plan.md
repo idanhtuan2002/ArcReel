@@ -333,6 +333,13 @@ class ScriptArtifact(R2ContractModel):
 
 When Task 0 shows a common field is already inherited, Task 1 uses the inherited field rather than redeclaring it.
 
+
+**Task 1 plan correction (2026-09-06):** Frozen R2.3 `ScriptArtifact`
+includes `approval_status`. Checkpoint B binds this field to the single existing
+M1 creative-approval enum identified by runtime preflight. No new creative
+status family is introduced. This correction supersedes the Task 1 interface
+block where that field was accidentally omitted.
+
 - [ ] **Step 1: Write factual RED tests**
 
 Required tests:
