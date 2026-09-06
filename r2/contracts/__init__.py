@@ -20,6 +20,12 @@ from .enums import (
     ReviewerType,
     RuntimeTaskStatus,
 )
+from .preparation import (
+    ProductionBinding,
+    ProductionReadiness,
+    ReadinessRequirement,
+    VisualIdentityProfile,
+)
 from .production import SceneSpec, ShotSpec
 from .provenance import Provenance
 
@@ -33,16 +39,20 @@ __all__ = [
     "GenerationLifecycleStatus",
     "JSONValue",
     "NonEmptyStr",
+    "ProductionBinding",
     "ProductionBindingRole",
     "ProductionBindingTarget",
     "ProductionMethod",
+    "ProductionReadiness",
     "Provenance",
     "ProvenanceActor",
     "R2ContractModel",
+    "ReadinessRequirement",
     "ReadinessState",
     "ReviewerType",
     "RuntimeTaskStatus",
     "SceneSpec",
     "ShotSpec",
+    "VisualIdentityProfile",
     "ensure_json_value",
 ]
