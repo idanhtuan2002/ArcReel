@@ -33,5 +33,9 @@ __all__ = [
     "R2ArtifactMetadata",
     "R2ContractRef",
     "R2CurrencyEvaluation",
+    "ProductionApprovalService",
+    "PromotionResult",
     "UnresolvedDependencyError",
 ]
+
+from .approval_service import ProductionApprovalService, PromotionResult
