@@ -1,0 +1,50 @@
+{
+  "baseline_sha": "6ddedc775e7fe5f398b10081ab741985f7dceda7",
+  "manifest_model": {
+    "path": "lib/artifact_manifest.py",
+    "symbol": "ArtifactManifestEntry"
+  },
+  "manifest_read": {
+    "path": "lib/artifact_manifest.py",
+    "symbol": "_load_unlocked"
+  },
+  "manifest_write": {
+    "path": "lib/artifact_manifest.py",
+    "symbol": "replace_entries_atomically"
+  },
+  "activation_read": {
+    "path": "lib/artifact_currency.py",
+    "symbol": "resolve_current_artifact_target"
+  },
+  "activation_write": {
+    "path": "lib/artifact_activation.py",
+    "symbol": "activate_artifact_target_state"
+  },
+  "currency_projection": {
+    "path": "lib/artifact_currency.py",
+    "symbol": "ArtifactCurrencyResolver"
+  },
+  "provenance_path": {
+    "path": "lib/artifact_provenance.py",
+    "symbol": "build_script_plan_basis"
+  },
+  "lock_or_atomicity": {
+    "path": "lib/artifact_manifest.py",
+    "symbol": "_atomic_replace"
+  },
+  "legacy_tests": [
+    "tests/integration/lib/test_artifact_manifest_storage.py",
+    "tests/unit/lib/test_artifact_manifest.py",
+    "tests/unit/lib/test_artifact_provenance.py",
+    "tests/unit/lib/test_artifact_activation_schema_gate.py",
+    "tests/integration/server/services/test_artifact_version_restore.py",
+    "tests/unit/lib/test_version_manager.py",
+    "tests/integration/server/services/test_video_artifact_currency.py",
+    "tests/integration/lib/test_video_artifact_commit.py",
+    "tests/integration/lib/test_project_manager_concurrent_save.py"
+  ],
+  "extension_seam_available": true,
+  "host_files_if_patch_required": [
+    "lib/artifact_manifest.py"
+  ]
+}
