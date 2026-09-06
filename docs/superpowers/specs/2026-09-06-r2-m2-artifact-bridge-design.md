@@ -1,10 +1,10 @@
 # R2-M2 Artifact Bridge Design
 
-**Project:** Content & Narrative Production OS  
-**Milestone:** R2-M2 — Artifact Bridge  
-**Date:** 2026-09-06  
-**Status:** DESIGN APPROVED / SPEC REVIEW REQUIRED  
-**Architecture baseline:** R2.1–R2.7 frozen  
+**Project:** Content & Narrative Production OS
+**Milestone:** R2-M2 — Artifact Bridge
+**Date:** 2026-09-06
+**Status:** DESIGN APPROVED / SPEC REVIEW REQUIRED
+**Architecture baseline:** R2.1–R2.7 frozen
 **Depends on:** R2-M1 Contract Kernel — COMPLETE
 
 ---

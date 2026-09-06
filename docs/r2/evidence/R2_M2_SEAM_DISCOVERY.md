@@ -1,8 +1,8 @@
 # R2-M2 ArcReel Seam Discovery
 
-**Status:** VERIFIED  
-**Baseline:** `6ddedc775e7fe5f398b10081ab741985f7dceda7`  
-**Branch:** `r2/main`  
+**Status:** VERIFIED
+**Baseline:** `6ddedc775e7fe5f398b10081ab741985f7dceda7`
+**Branch:** `r2/main`
 **Discovery method:** codebase-memory-mcp 0.10.5 first, followed by targeted local source confirmation.
 
 ## Selected exact seam
