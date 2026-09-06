@@ -24,3 +24,5 @@ __all__ = [
     "VisualIdentityProfile", "canonical_json_bytes", "compute_content_fingerprint",
     "compute_execution_fingerprint", "ensure_json_value",
 ]
+from .factual import Claim, ClaimLedger, ClaimStatus, EvidenceRecord, ResearchPack, SourceRecord
+from .script import ScriptArtifact, ScriptSection
