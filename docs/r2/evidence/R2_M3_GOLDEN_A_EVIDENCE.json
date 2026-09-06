@@ -1,0 +1,240 @@
+{
+  "external_provider_cost": "0",
+  "final": {
+    "content_fingerprint": "5a15f4bfdf8dadf1326763d8de4c6f14db19556f0b2af59feb14f6e2da90a040",
+    "duration_seconds": 72.0,
+    "execution_fingerprint": "ce194844f7f80b271be1d1541ed5da69c1d07239838cc8dc12c627b0da76d32c",
+    "path": "/tmp/r2-m3-golden-a-checkpoint-d/host_project/final/final.mp4",
+    "sha256": "86f6028b90a03651c29f09a0a67dfda324eebbd8e711be37d5cd4bcc37dc2f64"
+  },
+  "invalidation": {
+    "FINAL-GOLDEN-A": "STALE",
+    "SH01": "CURRENT",
+    "SH02": "STALE",
+    "SH03": "STALE",
+    "SH04": "CURRENT"
+  },
+  "lineage": {
+    "final": {
+      "sha256": "86f6028b90a03651c29f09a0a67dfda324eebbd8e711be37d5cd4bcc37dc2f64",
+      "source_master_refs": [
+        "SH01:CAND-SH01-V1:1",
+        "SH02:CAND-SH02-V1:1",
+        "SH03:CAND-SH03-V1:1",
+        "SH04:CAND-SH04-V1:1"
+      ],
+      "target_ref": "FINAL-GOLDEN-A"
+    },
+    "shots": [
+      {
+        "approved_master": {
+          "approval_record": "APR-SH01",
+          "host_version_ref": "1",
+          "selected_at": "2026-09-06T22:30:00Z",
+          "selected_by": "human-showrunner",
+          "selected_candidate_id": "CAND-SH01-V1"
+        },
+        "claims": [
+          "CLAIM-001"
+        ],
+        "evidence": [
+          "EVID-003"
+        ],
+        "final_ref": "FINAL-GOLDEN-A",
+        "scene_spec": "SC01",
+        "script_sections": [
+          "SEC-01"
+        ],
+        "shot_spec": "SH01",
+        "sources": [
+          "SRC-GIT-GLOSSARY"
+        ]
+      },
+      {
+        "approved_master": {
+          "approval_record": "APR-SH02",
+          "host_version_ref": "1",
+          "selected_at": "2026-09-06T22:30:00Z",
+          "selected_by": "human-showrunner",
+          "selected_candidate_id": "CAND-SH02-V1"
+        },
+        "claims": [
+          "CLAIM-002"
+        ],
+        "evidence": [
+          "EVID-001"
+        ],
+        "final_ref": "FINAL-GOLDEN-A",
+        "scene_spec": "SC02",
+        "script_sections": [
+          "SEC-02"
+        ],
+        "shot_spec": "SH02",
+        "sources": [
+          "SRC-GIT-ADD"
+        ]
+      },
+      {
+        "approved_master": {
+          "approval_record": "APR-SH03",
+          "host_version_ref": "1",
+          "selected_at": "2026-09-06T22:30:00Z",
+          "selected_by": "human-showrunner",
+          "selected_candidate_id": "CAND-SH03-V1"
+        },
+        "claims": [
+          "CLAIM-002"
+        ],
+        "evidence": [
+          "EVID-001"
+        ],
+        "final_ref": "FINAL-GOLDEN-A",
+        "scene_spec": "SC02",
+        "script_sections": [
+          "SEC-02"
+        ],
+        "shot_spec": "SH03",
+        "sources": [
+          "SRC-GIT-ADD"
+        ]
+      },
+      {
+        "approved_master": {
+          "approval_record": "APR-SH04",
+          "host_version_ref": "1",
+          "selected_at": "2026-09-06T22:30:00Z",
+          "selected_by": "human-showrunner",
+          "selected_candidate_id": "CAND-SH04-V1"
+        },
+        "claims": [
+          "CLAIM-003"
+        ],
+        "evidence": [
+          "EVID-002"
+        ],
+        "final_ref": "FINAL-GOLDEN-A",
+        "scene_spec": "SC03",
+        "script_sections": [
+          "SEC-03"
+        ],
+        "shot_spec": "SH04",
+        "sources": [
+          "SRC-GIT-COMMIT"
+        ]
+      }
+    ]
+  },
+  "methods": [
+    "COMPOSITE",
+    "DETERMINISTIC",
+    "REUSE"
+  ],
+  "provenance": [
+    {
+      "content_fingerprint": "4e6f78de8d96ee0cc294fd3a922a4b727f22b47545044c686e31bb92ca519600",
+      "direct_dependencies": [
+        {
+          "fingerprint": "ec748ecded244e5d0914ce711d1fefd7f2139298a9841c98022a0f75b352955c",
+          "ref": "claim:CLAIM-001",
+          "version": "1"
+        }
+      ],
+      "execution_fingerprint": "27ba8498ecf338517a476c93cfa6550c080feafde4e7f1092d67406a0e852494",
+      "external_provider_cost": "0",
+      "method": "REUSE",
+      "output_sha256": "95bb02d8cea8dcd24f0d5302b48c7623489fbd953792985fce2f52b8f0e1aed3",
+      "target_ref": "SH01",
+      "tool": "ffmpeg",
+      "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
+      "wall_time_seconds": 0.06653619200369576
+    },
+    {
+      "content_fingerprint": "003c5cf235b175de902d64ef9160943c7bb6d06ccce814ff13ad3b8b9df0f254",
+      "direct_dependencies": [
+        {
+          "fingerprint": "d3768fd8c162f24a0b847dd9ead98b53d95027608c127aa925e9d6bf4654e07e",
+          "ref": "claim:CLAIM-002",
+          "version": "1"
+        }
+      ],
+      "execution_fingerprint": "44c59804e68f7986f692a81d8c032f9ad50f2a2eb7469543e8b4df3d173e0c65",
+      "external_provider_cost": "0",
+      "method": "DETERMINISTIC",
+      "output_sha256": "c8c3ac40aa8ea6a9d506c1a6e8a2801abb04ebb5ef1354d6d465b4b3bc60b1ec",
+      "target_ref": "SH02",
+      "tool": "ffmpeg",
+      "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
+      "wall_time_seconds": 0.05157873799907975
+    },
+    {
+      "content_fingerprint": "70e116194ea7eef931202209323d09e8eb659684b15f963da487419fed0afa49",
+      "direct_dependencies": [
+        {
+          "fingerprint": "d3768fd8c162f24a0b847dd9ead98b53d95027608c127aa925e9d6bf4654e07e",
+          "ref": "claim:CLAIM-002",
+          "version": "1"
+        }
+      ],
+      "execution_fingerprint": "07be25792e45d184ef6858e2cb8115019e0e0ea9c2b11396b73a59939ce76bfd",
+      "external_provider_cost": "0",
+      "method": "DETERMINISTIC",
+      "output_sha256": "dd6ab2e4dfb137ff42df537e22714ed952d6d36a74a24573164de8261a160da2",
+      "target_ref": "SH03",
+      "tool": "ffmpeg",
+      "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
+      "wall_time_seconds": 0.05880247000459349
+    },
+    {
+      "content_fingerprint": "d627c4bf5123872f3eaad4219bbe5bc29978c0ab876ada4d75d4e6764424be75",
+      "direct_dependencies": [
+        {
+          "fingerprint": "359e60f9927471cb215145efdacaba30ac7ef1ec7d0796354c0e61a164e5d6e6",
+          "ref": "claim:CLAIM-003",
+          "version": "1"
+        }
+      ],
+      "execution_fingerprint": "36f7dac0e46080b5271de1162f96af7b7df63b74e57693e47fefd35b972ce186",
+      "external_provider_cost": "0",
+      "method": "DETERMINISTIC",
+      "output_sha256": "4075d8fec51027abe7c70c4a950f17307afb66ed3127cb0fdff5704fc4e40b2b",
+      "target_ref": "SH04",
+      "tool": "ffmpeg",
+      "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
+      "wall_time_seconds": 0.07865087299433071
+    },
+    {
+      "content_fingerprint": "5a15f4bfdf8dadf1326763d8de4c6f14db19556f0b2af59feb14f6e2da90a040",
+      "direct_dependencies": [
+        {
+          "fingerprint": "4e6f78de8d96ee0cc294fd3a922a4b727f22b47545044c686e31bb92ca519600",
+          "ref": "artifact:SH01",
+          "version": "1"
+        },
+        {
+          "fingerprint": "003c5cf235b175de902d64ef9160943c7bb6d06ccce814ff13ad3b8b9df0f254",
+          "ref": "artifact:SH02",
+          "version": "1"
+        },
+        {
+          "fingerprint": "70e116194ea7eef931202209323d09e8eb659684b15f963da487419fed0afa49",
+          "ref": "artifact:SH03",
+          "version": "1"
+        },
+        {
+          "fingerprint": "d627c4bf5123872f3eaad4219bbe5bc29978c0ab876ada4d75d4e6764424be75",
+          "ref": "artifact:SH04",
+          "version": "1"
+        }
+      ],
+      "execution_fingerprint": "ce194844f7f80b271be1d1541ed5da69c1d07239838cc8dc12c627b0da76d32c",
+      "external_provider_cost": "0",
+      "method": "COMPOSITE",
+      "output_sha256": "86f6028b90a03651c29f09a0a67dfda324eebbd8e711be37d5cd4bcc37dc2f64",
+      "target_ref": "FINAL-GOLDEN-A",
+      "tool": "ffmpeg",
+      "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
+      "wall_time_seconds": 0.03275198299525073
+    }
+  ],
+  "restart_verified": true
+}

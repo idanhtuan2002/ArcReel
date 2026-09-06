@@ -4,3 +4,4 @@ from .preparation import GoldenAMethodAssignment, GoldenAPreparedShot, GoldenAPr
 from .local_production import GoldenALocalProducer, LocalProducedAsset
 from .host_integration import GoldenAHostIntegration, RegisteredGoldenACandidate, compute_content_fingerprint
 from .composition import GoldenAComposer, GoldenACompositeAsset
+from .golden_a import GoldenARunResult, GoldenARunner
