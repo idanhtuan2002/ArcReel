@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "baseline_head": "9cc04edd88fe8d96e0610c2d9381f09547da0239",
+  "observed_head": "9a47c9265da6f99a6a976584f53d67a67f8a3ae5",
+  "observed_at": "2026-09-06T14:07:02.319540+00:00",
+  "workspace_mode": "IN_PLACE_USER_APPROVED",
+  "contracts_export_path": "r2/contracts/__init__.py",
+  "openmontage_mode": "FIXTURE_ADAPTER",
+  "openmontage_module_or_path": null,
+  "openmontage_callable": null,
+  "composition_mode": "FFMPEG_EXISTING",
+  "ffmpeg_path": "/usr/bin/ffmpeg",
+  "ffprobe_path": "/usr/bin/ffprobe",
+  "artifact_manifest_adapter": "lib.artifact_manifest.ProjectArtifactManifestAdapter",
+  "r2_artifact_port": "r2.production.ArcReelArtifactManifestPort",
+  "version_manager": "lib.version_manager.VersionManager",
+  "version_promoter": "r2.production.ArcReelVersionRestorePromoter",
+  "artifact_key_strategy": "lib.artifact_manifest.ArtifactKey.episode_video(episode: 'int', resource_id: 'str') -> 'Self'",
+  "cost_provenance_sources": [
+    "lib/artifact_provenance.py",
+    "lib/artifact_currency.py",
+    "r2/contracts/execution.py",
+    "r2/contracts/preparation.py",
+    "lib/kling_shared.py",
+    "lib/asset_derivatives.py",
+    "lib/project_migrations/staged_swap.py",
+    "lib/project_migrations/runner.py",
+    "lib/project_migrations/v9_to_v10_script_plan_naming.py",
+    "lib/reference_video/request_projection.py",
+    "lib/ledger.py",
+    "lib/artifact_activation.py"
+  ],
+  "host_patch_allowlist": [],
+  "screen_capture_mode": "DEFERRED",
+  "cbm": {
+    "binary": "/home/anhtuan/.local/bin/codebase-memory-mcp",
+    "version": "codebase-memory-mcp 0.10.5",
+    "project": "home-anhtuan-content-production-os",
+    "queries": {
+      "cbm_approval": {
+        "sha256": "24dc2c5ef4868746a153179c8370ce8e1691e34d335203d8a9569f1e4ca37714",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 2\nresults: 2  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhome-anhtuan-content-production-os.docs.superpowers.specs.2026-09-06-r2-m2-artifact-bridge-design.22 (docs/superpowers/specs/2026-09-06-r2-m2-artifact-bridge-design.md):\n  -ProductionApprovalService Section 612-613 0 0\nhome-anhtuan-content-production-os.r2.production.approval_service (r2/production/approval_service.py):\n  ProductionApprovalService Class 22-79 7 0\nhas_more: false\n\n"
+      },
+      "cbm_architecture": {
+        "sha256": "a1330044aaffcc3876bc681c0b3e887445380a854649d8a559368f61bb3ee6a2",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\nproject: home-anhtuan-content-production-os\naspects_hint: \"Summary view (default). More on request via aspects:[...] — structure, dependencies, routes, hotspots, boundaries, layers, clusters, file_tree — or [\\\"all\\\"] for everything.\"\ntotal_nodes: 37210\ntotal_edges: 223535\nnode_labels: 15  (cols: label count)\n  Function 11633\n  Method 9450\n  Variable 4535\n  Section 2996\n  File 2318\n  Module 2262\n  Class 2252\n  Route 692\n  Interface 531\n  Folder 287\n  Type 164\n  EnvVar 62\n  Decorator 26\n  Branch 1\n  Project 1\nedge_types: 25  (cols: type count)\n  CALLS 64377\n  DEFINES 46898\n  USAGE 42240\n  TESTS 21741\n  WRITES 17437\n  IMPORTS 12260\n  DEFINES_METHOD 9445\n  DECORATES 2592\n  CONTAINS_FILE 2318\n  SIMILAR_TO 1114\n  FILE_CHANGES_WITH 691\n  RAISES 531\n  CALL_REFERENCE 338\n  CONFIGURES 283\n  CONTAINS_FOLDER 275\n  HANDLES 273\n  HTTP_CALLS 186\n  INHERITS 167\n  TESTS_FILE 149\n  THROWS 85\n  OVERRIDE 62\n  SEMANTICALLY_RELATED 59\n  IMPLEMENTS 7\n  GRAPHQL_CALLS 6\n  HAS_BRANCH 1\nlanguages: 8  (cols: language files)\n  Python 1139\n  TypeScript 546\n  YAML 51\n  Bash 20\n  CSS 6\n  Ja"
+      },
+      "cbm_artifact_key": {
+        "sha256": "fe1bdbddcf959253a0103a5444283c485f5365da08a0c1ea90ef66e6fb2acd3a",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 2\nresults: 2  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhome-anhtuan-content-production-os.lib.artifact_manifest (lib/artifact_manifest.py):\n  ArtifactKey Class 1670-1829 41 1\n  ArtifactKeyParts Class 1641-1645 2 0\nhas_more: false\n\n"
+      },
+      "cbm_artifact_manifest": {
+        "sha256": "a178a56b494b6e395bc329990ccf1390025d52fcc58e67f0443b77d3960f47b6",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 10\nresults: 10  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhome-anhtuan-content-production-os.lib.artifact_manifest (lib/artifact_manifest.py):\n  ArtifactManifest Class 251-500 88 0\n  ArtifactManifestAdapter Class 137-183 3 0\n  ArtifactManifestArchiveSnapshot Class 121-125 4 1\n  ArtifactManifestEntry Class 113-117 107 1\n  ArtifactManifestError Class 86-87 52 0\n  InMemoryArtifactManifestAdapter Class 503-590 18 0\n  ProjectArtifactManifestAdapter Class 593-1479 218 0\nhome-anhtuan-content-production-os.r2.production.artifact_bridge (r2/production/artifact_bridge.py):\n  ArcReelArtifactManifestPort Class 65-146 4 0\n  ArtifactManifestConflictError Class 58-59 2 0\n  ArtifactManifestPort Class 37-55 1 0\nhas_more: false\n\n"
+      },
+      "cbm_cost": {
+        "sha256": "9c0c90e2a0d5feb765cd238f954239ca34c8a69e31db1cc388eea21857194fc0",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 0\nresults: 0  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhas_more: false\nhint: \"No nodes match this pattern. Check spelling or try a broader regex.\"\n\n"
+      },
+      "cbm_index": {
+        "sha256": "edc2cfd89913735f38951bc19451744176b71fa3a8fe8842b940fe6cf0b6b936",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\n{\"project\":\"home-anhtuan-content-production-os\",\"excluded\":{\"dirs\":[\".git\",\".pytest_cache\",\"deploy\",\".venv\",\".claude\"],\"count\":63,\"truncated\":true},\"skipped_count\":0,\"logfile\":\"/home/anhtuan/.cache/codebase-memory-mcp/logs/home-anhtuan-content-production-os-1788703602.log\",\"parse_partial_count\":5,\"parse_partial\":{\"files\":[{\"path\":\"frontend/src/css/studio.css\",\"error_ranges\":\"2-2,2-2\"},{\"path\":\".agents/skills/pr-ai-review-loop/scripts/wait.sh\",\"error_ranges\":\"84-84\"},{\"path\":\"frontend/src/index.css\",\"error_ranges\":\"3-3,144-144\"},{\"path\":\"frontend/src/css/app.css\",\"error_ranges\":\"1-1,1-1\"},{\"path\":\"docs/research/arcreel-mysql-compatibility-research.md\",\"error_ranges\":\"100-100,101-101,102-102\"}],\"count\":5,\"truncated\":false,\"note\":\"Indexed, but constructs in these line ranges may be missing (best-effort signal); examples only — full list via index_status or 'logfile'.\"},\"not_indexed_files_count\":50,\"not_indexed_files\":{\"files\":[{\"path\":\"uv.lock\",\"reason\":\"gitignore\"},{\"path\":\"docs/assets/feishu-qr.png\",\"reason\":\"ignored-suffix\"},{\"path\":\"docs/assets/hero-screensh"
+      },
+      "cbm_openmontage": {
+        "sha256": "635043cde64ec883760710123714f0b7ffd42d86b0a34f320f5909a146f43d42",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 6\nresults: 6  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhome-anhtuan-content-production-os.docs.r2.R2_01_FROZEN_ARCHITECTURE (docs/r2/R2_01_FROZEN_ARCHITECTURE.md):\n  OpenMontageDirector Section 477-478 0 0\nhome-anhtuan-content-production-os.docs.r2.R2_02_FROZEN_RESPONSIBILITY_MATRIX.5 (docs/r2/R2_02_FROZEN_RESPONSIBILITY_MATRIX.md):\n  7-OpenMontageDirector Section 283-284 0 0\nhome-anhtuan-content-production-os.docs.r2.R2_02_FROZEN_RESPONSIBILITY_MATRIX (docs/r2/R2_02_FROZEN_RESPONSIBILITY_MATRIX.md):\n  OpenMontage Section 608-609 0 0\nhome-anhtuan-content-production-os.docs.r2.R2_04_CONSOLIDATED_DECISION_LOG (docs/r2/R2_04_CONSOLIDATED_DECISION_LOG.md):\n  R2-DEC-028-—-OpenMontage/Remotion-is-primary-deterministic-composition-path Section 500-501 0 0\nhome-anhtuan-content-production-os.docs.superpowers.plans.2026-09-06-r2-m3-golden-a-general-content-implementation-plan (docs/superpowers/plans/2026-09-06-r2-m3-golden-a-general-content-implementation-plan.md):\n  Task-3:-Golden-A-OpenMontage-Direction-Boundary Section 505-506 0 0\nhome-"
+      },
+      "cbm_projects": {
+        "sha256": "b9aaa7287ccc1d35a3c3ded1e7d93329e4e10025b7c6338528ffbd420dfb5b21",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\n{\"projects\":[{\"name\":\"home-anhtuan-PIOS-dsh-m1-98592a4\",\"root_path\":\"/home/anhtuan/PIOS/.worktrees/feat-dsh-m1-kernel-keyed-emit\",\"branch\":\"feat/dsh-m1-kernel-keyed-emit\",\"nodes\":6794,\"edges\":26798,\"size_bytes\":24641536},{\"name\":\"home-anhtuan-PIOS\",\"root_path\":\"/home/anhtuan/PIOS\",\"branch\":\"master\",\"nodes\":13566,\"edges\":49266,\"size_bytes\":41943040},{\"name\":\"home-anhtuan-PIOS-dsh-m1-1d2aab0\",\"root_path\":\"/home/anhtuan/PIOS/.worktrees/feat-dsh-m1-kernel-keyed-emit\",\"branch\":\"feat/dsh-m1-kernel-keyed-emit\",\"nodes\":6868,\"edges\":27254,\"size_bytes\":24379392},{\"name\":\"home-anhtuan-PIOS-dsh-m1-812f6d7\",\"root_path\":\"/home/anhtuan/PIOS/.worktrees/feat-dsh-m1-kernel-keyed-emit\",\"branch\":\"feat/dsh-m1-kernel-keyed-emit\",\"nodes\":6776,\"edges\":26630,\"size_bytes\":23986176},{\"name\":\"home-anhtuan-content-production-os\",\"root_path\":\"/home/anhtuan/content-production-os\",\"branch\":\"r2/main\",\"nodes\":37210,\"edges\":223535,\"size_bytes\":184811520}]}\n"
+      },
+      "cbm_provenance": {
+        "sha256": "91de437e64bc7feb9d6806473728896674576c0fe24d167b57aaf5d1690f3623",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 38\nresults: 38  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhome-anhtuan-content-production-os.agents.skills.impeccable.reference.critique (.agents/skills/impeccable/reference/critique.md):\n  Report-header-provenance Section 106-107 0 0\nhome-anhtuan-content-production-os.docs.r2.R2_03_FROZEN_DOMAIN_STATE_CONTRACTS.30 (docs/r2/R2_03_FROZEN_DOMAIN_STATE_CONTRACTS.md):\n  -Provenance Section 1423-1424 0 0\nhome-anhtuan-content-production-os.docs.r2.evidence.R2_M2_SEAM_DISCOVERY (docs/r2/evidence/R2_M2_SEAM_DISCOVERY.md):\n  Provenance Section 34-35 0 0\nhome-anhtuan-content-production-os.docs.r2.evidence.R2_M2_SEAM_DISCOVERY (docs/r2/evidence/R2_M2_SEAM_DISCOVERY.json):\n  provenance_path Variable 27-30 0 0\nhome-anhtuan-content-production-os.docs.superpowers.plans.2026-09-06-r2-m1-contract-kernel-implementation-plan (docs/superpowers/plans/2026-09-06-r2-m1-contract-kernel-implementation-plan.md):\n  Task-2:-ContentBasis-and-Provenance Section 385-386 0 0\nhome-anhtuan-content-production-os.docs.superpowers.specs.2026-09-06-r2-m1-contract-kern"
+      },
+      "cbm_r2_port": {
+        "sha256": "8d35436c34dcb923a879af289ed0dea76b90b3524efbcb919f6eda7f745b32e9",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 1\nresults: 1  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhome-anhtuan-content-production-os.r2.production.artifact_bridge (r2/production/artifact_bridge.py):\n  ArcReelArtifactManifestPort Class 65-146 4 0\nhas_more: false\n\n"
+      },
+      "cbm_remotion": {
+        "sha256": "15f2e0b310fd6c3e29844d269b1f881ee2de4814cc726ed2fe6b385002faf1e4",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 1\nresults: 1  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhome-anhtuan-content-production-os.docs.r2.R2_04_CONSOLIDATED_DECISION_LOG (docs/r2/R2_04_CONSOLIDATED_DECISION_LOG.md):\n  R2-DEC-028-—-OpenMontage/Remotion-is-primary-deterministic-composition-path Section 500-501 0 0\nhas_more: false\n\n"
+      },
+      "cbm_schema": {
+        "sha256": "441a5f034011e8a889067c39407b8155d4b26cf4415e896d3a1f5d59b0c82f9a",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\n{\"node_labels\":[{\"label\":\"Function\",\"count\":11633,\"properties\":[\"name\",\"qualified_name\",\"file_path\",\"start_line\",\"end_line\",\"alloc_in_loop\",\"cognitive\",\"complexity\",\"decorator_tags\",\"decorators\",\"docstring\",\"is_entry_point\",\"is_exported\",\"is_test\",\"linear_scan_in_loop\",\"lines\",\"loop_count\",\"loop_depth\",\"max_access_depth\",\"param_count\",\"param_names\",\"param_types\",\"recursion_in_loop\",\"recursive\",\"return_type\",\"route_method\",\"route_path\",\"self_recursive\",\"signature\",\"transitive_loop_depth\",\"unguarded_recursion\"]},{\"label\":\"Method\",\"count\":9450,\"properties\":[\"name\",\"qualified_name\",\"file_path\",\"start_line\",\"end_line\",\"alloc_in_loop\",\"cognitive\",\"complexity\",\"decorator_tags\",\"decorators\",\"docstring\",\"is_entry_point\",\"is_exported\",\"is_test\",\"linear_scan_in_loop\",\"lines\",\"loop_count\",\"loop_depth\",\"max_access_depth\",\"param_count\",\"param_types\",\"parent_class\",\"recursion_in_loop\",\"recursive\",\"return_type\",\"route_method\",\"route_path\",\"self_recursive\",\"signature\",\"transitive_loop_depth\",\"unguarded_recursion\"]},{\"label\":\"Variable\",\"count\":4535,\"properties\":[\"name\",\"qualif"
+      },
+      "cbm_version_manager": {
+        "sha256": "fa2f81a3b3970b3bc27b6d320192cfacfe81378755da1550d62e2fdb3833a3d0",
+        "excerpt": "level=info msg=mem.allocator.owned classes=all\nlevel=info msg=mem.init budget_mb=8071 total_ram_mb=23060 source=ram_fraction\ntotal: 3\nresults: 3  (rows: name label lines in out; qn = group prefix + \".\" + name)\nhome-anhtuan-content-production-os.lib.version_manager (lib/version_manager.py):\n  VersionManager Class 119-1382 143 0\nhome-anhtuan-content-production-os.tests.unit.lib.test_tts_skeleton (tests/unit/lib/test_tts_skeleton.py):\n  TestVersionManagerAudio Class 38-49 0 0\nhome-anhtuan-content-production-os.tests.unit.lib.test_version_manager (tests/unit/lib/test_version_manager.py):\n  TestVersionManager Class 12-653 0 0\nhas_more: false\n\n"
+      }
+    }
+  },
+  "notes": [
+    "CBM mentions OpenMontage but no local callable integration was proven; use approved FIXTURE_ADAPTER.",
+    "No proven Remotion composition seam found in repository.",
+    "SCREEN_CAPTURE remains DEFERRED for baseline Golden A; it is optional by approved spec.",
+    "Initial Host patch allowlist remains empty.",
+    "No production code was modified during Task 0."
+  ]
+}
