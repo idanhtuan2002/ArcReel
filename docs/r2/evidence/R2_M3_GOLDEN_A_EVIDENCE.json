@@ -4,7 +4,7 @@
     "content_fingerprint": "5a15f4bfdf8dadf1326763d8de4c6f14db19556f0b2af59feb14f6e2da90a040",
     "duration_seconds": 72.0,
     "execution_fingerprint": "ce194844f7f80b271be1d1541ed5da69c1d07239838cc8dc12c627b0da76d32c",
-    "path": "/tmp/r2-m3-golden-a-checkpoint-d/host_project/final/final.mp4",
+    "path": "/tmp/r2-m3-golden-a-final-verification/host_project/final/final.mp4",
     "sha256": "86f6028b90a03651c29f09a0a67dfda324eebbd8e711be37d5cd4bcc37dc2f64"
   },
   "invalidation": {
@@ -146,7 +146,7 @@
       "target_ref": "SH01",
       "tool": "ffmpeg",
       "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
-      "wall_time_seconds": 0.06653619200369576
+      "wall_time_seconds": 0.06278561299404828
     },
     {
       "content_fingerprint": "003c5cf235b175de902d64ef9160943c7bb6d06ccce814ff13ad3b8b9df0f254",
@@ -164,7 +164,7 @@
       "target_ref": "SH02",
       "tool": "ffmpeg",
       "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
-      "wall_time_seconds": 0.05157873799907975
+      "wall_time_seconds": 0.055992507994233165
     },
     {
       "content_fingerprint": "70e116194ea7eef931202209323d09e8eb659684b15f963da487419fed0afa49",
@@ -182,7 +182,7 @@
       "target_ref": "SH03",
       "tool": "ffmpeg",
       "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
-      "wall_time_seconds": 0.05880247000459349
+      "wall_time_seconds": 0.05744105700432556
     },
     {
       "content_fingerprint": "d627c4bf5123872f3eaad4219bbe5bc29978c0ab876ada4d75d4e6764424be75",
@@ -200,7 +200,7 @@
       "target_ref": "SH04",
       "tool": "ffmpeg",
       "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
-      "wall_time_seconds": 0.07865087299433071
+      "wall_time_seconds": 0.06790486400132068
     },
     {
       "content_fingerprint": "5a15f4bfdf8dadf1326763d8de4c6f14db19556f0b2af59feb14f6e2da90a040",
@@ -233,7 +233,7 @@
       "target_ref": "FINAL-GOLDEN-A",
       "tool": "ffmpeg",
       "tool_version": "ffmpeg version 8.0.1-3ubuntu2+esm1 Copyright (c) 2000-2025 the FFmpeg developers",
-      "wall_time_seconds": 0.03275198299525073
+      "wall_time_seconds": 0.03237433499452891
     }
   ],
   "restart_verified": true
