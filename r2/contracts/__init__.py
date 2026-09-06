@@ -29,14 +29,22 @@ from .preparation import (
 )
 from .production import SceneSpec, ShotSpec
 from .provenance import Provenance
+from .results import (
+    ApprovedMaster,
+    GenerationCandidate,
+    QualityFinding,
+    QualityReport,
+)
 
 __all__ = [
+    "ApprovedMaster",
     "ArtifactCurrencyStatus",
     "CandidateSelectionStatus",
     "ContentBasis",
     "ContentBasisType",
     "ContractIdentity",
     "CreativeApprovalStatus",
+    "GenerationCandidate",
     "GenerationLifecycleStatus",
     "JSONValue",
     "MethodDecision",
@@ -50,6 +58,8 @@ __all__ = [
     "Provenance",
     "ProvenanceActor",
     "ProviderRequest",
+    "QualityFinding",
+    "QualityReport",
     "R2ContractModel",
     "ReadinessRequirement",
     "ReadinessState",
