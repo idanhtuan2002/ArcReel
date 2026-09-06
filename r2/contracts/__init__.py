@@ -20,6 +20,7 @@ from .enums import (
     ReviewerType,
     RuntimeTaskStatus,
 )
+from .production import SceneSpec, ShotSpec
 from .provenance import Provenance
 
 __all__ = [
@@ -41,5 +42,7 @@ __all__ = [
     "ReadinessState",
     "ReviewerType",
     "RuntimeTaskStatus",
+    "SceneSpec",
+    "ShotSpec",
     "ensure_json_value",
 ]
