@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
-from collections.abc import Callable
 from typing import Protocol
 
 from pydantic import ValidationError
 
-from r2.contracts import ArtifactCurrencyStatus
-
 from lib.artifact_manifest import ArtifactKey, ProjectArtifactManifestAdapter
+from r2.contracts import ArtifactCurrencyStatus
 
 from .artifact_metadata import R2ArtifactMetadata
 from .dependency_resolver import (
@@ -85,7 +84,8 @@ class ArcReelArtifactManifestPort:
         currency = self._native_currency(artifact_key)
         return ArtifactHostSnapshot(
             artifact_key=artifact_key,
-            usable=currency in {
+            usable=currency
+            in {
                 ArtifactCurrencyStatus.CURRENT,
                 ArtifactCurrencyStatus.STALE,
             },
@@ -110,9 +110,7 @@ class ArcReelArtifactManifestPort:
             replacements={key: replacement},
         )
         if not changed:
-            raise ArtifactManifestConflictError(
-                f"artifact manifest changed while writing R2 metadata: {artifact_key}"
-            )
+            raise ArtifactManifestConflictError(f"artifact manifest changed while writing R2 metadata: {artifact_key}")
         return True
 
     def promote_version_with_r2_metadata(
@@ -198,10 +196,7 @@ class R2ArtifactBridge:
             )
 
         try:
-            current_dependencies = [
-                self._resolvers.resolve(stored.ref)
-                for stored in metadata.direct_dependencies
-            ]
+            current_dependencies = [self._resolvers.resolve(stored.ref) for stored in metadata.direct_dependencies]
         except (
             UnresolvedDependencyError,
             AmbiguousDependencyResolverError,
@@ -251,13 +246,9 @@ class ArcReelVersionRestorePromoter:
         try:
             version = int(host_version_ref)
         except (TypeError, ValueError) as exc:
-            raise ValueError(
-                f"ArcReel host_version_ref must be a decimal version: {host_version_ref!r}"
-            ) from exc
+            raise ValueError(f"ArcReel host_version_ref must be a decimal version: {host_version_ref!r}") from exc
         if version <= 0 or str(version) != host_version_ref:
-            raise ValueError(
-                f"ArcReel host_version_ref must be a positive canonical decimal: {host_version_ref!r}"
-            )
+            raise ValueError(f"ArcReel host_version_ref must be a positive canonical decimal: {host_version_ref!r}")
 
         return self._versions.restore_version(
             self._resource_type,

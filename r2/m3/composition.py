@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from decimal import Decimal
 import hashlib
 import json
-from pathlib import Path
 import subprocess
 import time
-from typing import Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
+from decimal import Decimal
+from pathlib import Path
 
 from r2.contracts.enums import ProductionMethod
+
 from .host_integration import GoldenAHostIntegration
 
 
@@ -73,19 +74,13 @@ class GoldenAComposer:
 
             inputs.append(current)
             source_hashes.append(_sha256(current))
-            source_master_refs.append(
-                f"{shot_ref}:{master.selected_candidate_id}:"
-                f"{master.host_version_ref}"
-            )
+            source_master_refs.append(f"{shot_ref}:{master.selected_candidate_id}:{master.host_version_ref}")
 
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         concat_file = output_path.with_suffix(".concat.txt")
         concat_file.write_text(
-            "".join(
-                f"file '{path.resolve().as_posix()}'\n"
-                for path in inputs
-            ),
+            "".join(f"file '{path.resolve().as_posix()}'\n" for path in inputs),
             encoding="utf-8",
         )
 
@@ -109,11 +104,21 @@ class GoldenAComposer:
         start = time.perf_counter()
         subprocess.run(
             [
-                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                "-f", "concat", "-safe", "0",
-                "-i", str(concat_file),
-                "-c", "copy",
-                "-map_metadata", "-1",
+                "ffmpeg",
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(concat_file),
+                "-c",
+                "copy",
+                "-map_metadata",
+                "-1",
                 str(output_path),
             ],
             check=True,
@@ -125,9 +130,13 @@ class GoldenAComposer:
 
         probe = subprocess.run(
             [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=nw=1:nk=1",
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=nw=1:nk=1",
                 str(output_path),
             ],
             check=True,

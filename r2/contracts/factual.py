@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated
+
 from pydantic import Field, field_validator, model_validator
+
 from .common import JSONValue, NonEmptyStr, R2ContractModel
 
 
@@ -16,7 +19,7 @@ def _sorted_unique(values: list[NonEmptyStr]) -> list[NonEmptyStr]:
     return sorted(set(values))
 
 
-class ClaimStatus(str, Enum):
+class ClaimStatus(StrEnum):
     PROPOSED = "PROPOSED"
     VERIFIED = "VERIFIED"
     DISPUTED = "DISPUTED"
@@ -71,7 +74,7 @@ class Claim(R2ContractModel):
     _evidence_refs_sorted = field_validator("evidence_refs")(_sorted_unique)
 
     @model_validator(mode="after")
-    def _verified_has_evidence(self) -> "Claim":
+    def _verified_has_evidence(self) -> Claim:
         if self.status is ClaimStatus.VERIFIED and not self.evidence_refs:
             raise ValueError("VERIFIED claim requires evidence")
         return self
@@ -84,7 +87,7 @@ class ClaimLedger(R2ContractModel):
     claims: list[Claim]
 
     @model_validator(mode="after")
-    def _unique_claim_ids(self) -> "ClaimLedger":
+    def _unique_claim_ids(self) -> ClaimLedger:
         ids = [claim.id for claim in self.claims]
         if len(ids) != len(set(ids)):
             raise ValueError("ClaimLedger claim ids must be unique")

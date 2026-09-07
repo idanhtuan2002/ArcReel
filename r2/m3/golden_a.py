@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from decimal import Decimal
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from lib.artifact_manifest import (
     ArtifactKey,
@@ -22,6 +22,7 @@ from r2.production import (
     R2ArtifactMetadata,
     R2ContractRef,
 )
+
 from .composition import GoldenAComposer
 from .director import FixtureOpenMontageBackend, GoldenAOpenMontageAdapter
 from .factual_fixture import GoldenAFactualBundle, load_golden_a_factual_bundle
@@ -29,10 +30,7 @@ from .host_integration import GoldenAHostIntegration, compute_content_fingerprin
 from .local_production import GoldenALocalProducer
 from .preparation import GoldenAProductionPreparation
 
-
-FIXED_APPROVAL_TIME = datetime(
-    2026, 9, 6, 22, 30, tzinfo=timezone.utc
-)
+FIXED_APPROVAL_TIME = datetime(2026, 9, 6, 22, 30, tzinfo=UTC)
 
 
 def _stable_hash(payload) -> str:
@@ -87,19 +85,11 @@ class GoldenARunner:
         }
 
     def _shot_claim_ids(self, bundle: GoldenAFactualBundle, direction):
-        section_claims = {
-            section.id: list(section.claim_refs)
-            for section in bundle.script.sections
-        }
-        scene_sections = {
-            scene.id: list(scene.source_unit_refs)
-            for scene in direction.scenes
-        }
+        section_claims = {section.id: list(section.claim_refs) for section in bundle.script.sections}
+        scene_sections = {scene.id: list(scene.source_unit_refs) for scene in direction.scenes}
         return {
             shot.id: [
-                claim_id
-                for section_id in scene_sections[shot.scene_id]
-                for claim_id in section_claims[section_id]
+                claim_id for section_id in scene_sections[shot.scene_id] for claim_id in section_claims[section_id]
             ]
             for shot in direction.shots
         }
@@ -125,10 +115,7 @@ class GoldenARunner:
             {
                 "target_ref": "FINAL-GOLDEN-A",
                 "method": ProductionMethod.COMPOSITE.value,
-                "dependencies": [
-                    dep.model_dump(mode="json")
-                    for dep in dependencies
-                ],
+                "dependencies": [dep.model_dump(mode="json") for dep in dependencies],
             }
         )
         metadata = R2ArtifactMetadata(
@@ -156,9 +143,7 @@ class GoldenARunner:
         if not adapter.put_entry(key, entry):
             existing = adapter.get_entry(key)
             if existing != entry:
-                raise RuntimeError(
-                    "final manifest entry already exists with different data"
-                )
+                raise RuntimeError("final manifest entry already exists with different data")
         return key.encode(), content_fingerprint
 
     def _lineage(
@@ -178,26 +163,11 @@ class GoldenARunner:
         for shot in direction.shots:
             scene = scene_by_id[shot.scene_id]
             section_ids = list(scene.source_unit_refs)
-            claim_ids = sorted(
-                {
-                    claim_id
-                    for section_id in section_ids
-                    for claim_id in sections[section_id].claim_refs
-                }
-            )
+            claim_ids = sorted({claim_id for section_id in section_ids for claim_id in sections[section_id].claim_refs})
             evidence_ids = sorted(
-                {
-                    evidence_id
-                    for claim_id in claim_ids
-                    for evidence_id in claims[claim_id].evidence_refs
-                }
+                {evidence_id for claim_id in claim_ids for evidence_id in claims[claim_id].evidence_refs}
             )
-            source_ids = sorted(
-                {
-                    evidence[evidence_id].source_ref
-                    for evidence_id in evidence_ids
-                }
-            )
+            source_ids = sorted({evidence[evidence_id].source_ref for evidence_id in evidence_ids})
             master = host.snapshot(shot.id).approved_master
             if master is None:
                 raise RuntimeError(f"{shot.id} has no approved master")
@@ -239,9 +209,7 @@ class GoldenARunner:
         current_claims["CLAIM-002"] = DependencySnapshot(
             ref=old_claim2.ref,
             version="2",
-            fingerprint=hashlib.sha256(
-                b"CLAIM-002-semantic-change-v2"
-            ).hexdigest(),
+            fingerprint=hashlib.sha256(b"CLAIM-002-semantic-change-v2").hexdigest(),
         )
 
         port = ArcReelArtifactManifestPort(
@@ -251,14 +219,7 @@ class GoldenARunner:
         claim_bridge = R2ArtifactBridge(
             port,
             DependencyResolverRegistry(
-                [
-                    MappingResolver(
-                        {
-                            snapshot.ref: snapshot
-                            for snapshot in current_claims.values()
-                        }
-                    )
-                ]
+                [MappingResolver({snapshot.ref: snapshot for snapshot in current_claims.values()})]
             ),
         )
 
@@ -267,17 +228,12 @@ class GoldenARunner:
         shot_by_id = {shot.id: shot for shot in direction.shots}
 
         for shot_id in ("SH01", "SH02", "SH03", "SH04"):
-            status = claim_bridge.evaluate_currency(
-                host.artifact_key_for(shot_id)
-            ).status
+            status = claim_bridge.evaluate_currency(host.artifact_key_for(shot_id)).status
             if status is None:
                 raise RuntimeError(f"missing R2 currency for {shot_id}")
             results[shot_id] = status.value
 
-            current_dependencies = [
-                current_claims[claim_id]
-                for claim_id in shot_claim_ids[shot_id]
-            ]
+            current_dependencies = [current_claims[claim_id] for claim_id in shot_claim_ids[shot_id]]
             current_content_fp = compute_content_fingerprint(
                 shot_by_id[shot_id],
                 current_dependencies,
@@ -290,9 +246,7 @@ class GoldenARunner:
 
         final_bridge = R2ArtifactBridge(
             port,
-            DependencyResolverRegistry(
-                [MappingResolver(shot_current_snapshots)]
-            ),
+            DependencyResolverRegistry([MappingResolver(shot_current_snapshots)]),
         )
         final_status = final_bridge.evaluate_currency(final_key).status
         if final_status is None:
@@ -307,9 +261,7 @@ class GoldenARunner:
         production_dir = output_dir / "production"
 
         bundle = load_golden_a_factual_bundle()
-        direction = GoldenAOpenMontageAdapter(
-            FixtureOpenMontageBackend()
-        ).direct(bundle.script)
+        direction = GoldenAOpenMontageAdapter(FixtureOpenMontageBackend()).direct(bundle.script)
         prepared = GoldenAProductionPreparation().prepare(
             direction.shots,
             reused_asset_ref="r2/m3/fixtures/assets/reused_terminal_frame.svg",
@@ -328,10 +280,7 @@ class GoldenARunner:
         methods: set[ProductionMethod] = set()
 
         for item in prepared:
-            dependencies = [
-                claim_snapshots[claim_id]
-                for claim_id in shot_claim_ids[item.shot.id]
-            ]
+            dependencies = [claim_snapshots[claim_id] for claim_id in shot_claim_ids[item.shot.id]]
             content_fp = compute_content_fingerprint(
                 item.shot,
                 dependencies,
@@ -367,13 +316,8 @@ class GoldenARunner:
                     "execution_fingerprint": produced.execution_fingerprint,
                     "output_sha256": produced.sha256,
                     "wall_time_seconds": produced.wall_time_seconds,
-                    "external_provider_cost": str(
-                        produced.external_provider_cost
-                    ),
-                    "direct_dependencies": [
-                        dep.model_dump(mode="json")
-                        for dep in dependencies
-                    ],
+                    "external_provider_cost": str(produced.external_provider_cost),
+                    "direct_dependencies": [dep.model_dump(mode="json") for dep in dependencies],
                 }
             )
 
@@ -385,10 +329,7 @@ class GoldenARunner:
         )
         methods.add(final_asset.method)
 
-        shot_metadata = {
-            shot.id: host.snapshot(shot.id)
-            for shot in direction.shots
-        }
+        shot_metadata = {shot.id: host.snapshot(shot.id) for shot in direction.shots}
         final_key, final_content_fp = self._register_final(
             project_dir=project_dir,
             episode=1,
@@ -406,9 +347,7 @@ class GoldenARunner:
                 "execution_fingerprint": final_asset.execution_fingerprint,
                 "output_sha256": final_asset.sha256,
                 "wall_time_seconds": final_asset.wall_time_seconds,
-                "external_provider_cost": str(
-                    final_asset.external_provider_cost
-                ),
+                "external_provider_cost": str(final_asset.external_provider_cost),
                 "direct_dependencies": [
                     {
                         "ref": f"artifact:{shot_id}",
@@ -441,26 +380,16 @@ class GoldenARunner:
             episode=1,
         )
         restart_verified = all(
-            restarted.snapshot(shot.id).approved_master is not None
-            and restarted.current_file_for(shot.id).is_file()
+            restarted.snapshot(shot.id).approved_master is not None and restarted.current_file_for(shot.id).is_file()
             for shot in direction.shots
         )
-        final_entry = ProjectArtifactManifestAdapter(
-            project_dir
-        ).get_entry(
+        final_entry = ProjectArtifactManifestAdapter(project_dir).get_entry(
             ArtifactKey.episode_video(1, "FINAL-GOLDEN-A")
         )
-        restart_verified = (
-            restart_verified
-            and final_entry is not None
-            and final_path.is_file()
-        )
+        restart_verified = restart_verified and final_entry is not None and final_path.is_file()
 
         total_cost = sum(
-            (
-                Decimal(record["external_provider_cost"])
-                for record in provenance
-            ),
+            (Decimal(record["external_provider_cost"]) for record in provenance),
             Decimal("0"),
         )
         evidence = {

@@ -1,9 +1,13 @@
 from __future__ import annotations
+
 from typing import Annotated
+
 from pydantic import Field, model_validator
+
 from .common import R2ContractModel
 from .content_basis import ContentBasis
 from .enums import ContentBasisType, CreativeApprovalStatus
+
 try:
     from .common import NonEmptyStr
 except ImportError:
@@ -28,7 +32,7 @@ class ScriptArtifact(R2ContractModel):
     approval_status: CreativeApprovalStatus
 
     @model_validator(mode="after")
-    def _factual_claim_refs_are_declared(self) -> "ScriptArtifact":
+    def _factual_claim_refs_are_declared(self) -> ScriptArtifact:
         if self.content_basis.basis_type is not ContentBasisType.FACTUAL:
             raise ValueError("ScriptArtifact in M3 requires FACTUAL ContentBasis")
         declared = set(self.content_basis.refs)

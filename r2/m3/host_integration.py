@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
-from pathlib import Path
 import shutil
-from typing import Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
 
 from pydantic import TypeAdapter
 
@@ -32,6 +32,7 @@ from r2.production import (
     R2ArtifactMetadata,
     R2ContractRef,
 )
+
 from .local_production import LocalProducedAsset
 
 
@@ -47,9 +48,7 @@ def _metadata_schema_version():
             return adapter.validate_python(candidate)
         except Exception:
             pass
-    raise RuntimeError(
-        "cannot resolve R2ArtifactMetadata.metadata_schema_version"
-    )
+    raise RuntimeError("cannot resolve R2ArtifactMetadata.metadata_schema_version")
 
 
 def compute_content_fingerprint(
@@ -93,9 +92,7 @@ class GoldenAHostIntegration:
         self.project_dir = Path(project_dir)
         self.project_dir.mkdir(parents=True, exist_ok=True)
         if resource_type not in VersionManager.RESOURCE_TYPES:
-            raise ValueError(
-                f"unsupported VersionManager resource type: {resource_type}"
-            )
+            raise ValueError(f"unsupported VersionManager resource type: {resource_type}")
         self.resource_type = resource_type
         self.episode = episode
         self.versions = VersionManager(self.project_dir)
@@ -108,11 +105,7 @@ class GoldenAHostIntegration:
         ).encode()
 
     def current_file_for(self, target_ref: str) -> Path:
-        return (
-            self.project_dir
-            / "r2_m3_current"
-            / f"{target_ref}.mp4"
-        )
+        return self.project_dir / "r2_m3_current" / f"{target_ref}.mp4"
 
     def _native_currency(
         self,
@@ -154,9 +147,7 @@ class GoldenAHostIntegration:
         key = self.artifact_key_for(target_ref)
         existing = self._port(target_ref).load_artifact(key)
         if existing is not None and existing.r2_raw is not None:
-            approved = R2ArtifactMetadata.model_validate(
-                existing.r2_raw
-            ).approved_master
+            approved = R2ArtifactMetadata.model_validate(existing.r2_raw).approved_master
 
         return R2ArtifactMetadata(
             metadata_schema_version=_metadata_schema_version(),
@@ -189,13 +180,8 @@ class GoldenAHostIntegration:
             return
 
         current_file = self.current_file_for(target_ref)
-        rel = current_file.relative_to(
-            self.project_dir
-        ).as_posix()
-        digest = (
-            "sha256-v1:"
-            + _sha_text(metadata.content_fingerprint)
-        )
+        rel = current_file.relative_to(self.project_dir).as_posix()
+        digest = "sha256-v1:" + _sha_text(metadata.content_fingerprint)
         entry = ArtifactManifestEntry(
             artifact_path=rel,
             basis_digest=digest,
@@ -215,9 +201,7 @@ class GoldenAHostIntegration:
         contract_schema_version: str,
     ) -> RegisteredGoldenACandidate:
         if produced.target_ref != target_ref:
-            raise ValueError(
-                "produced asset target does not match candidate target"
-            )
+            raise ValueError("produced asset target does not match candidate target")
 
         metadata = self._metadata(
             target_ref=target_ref,
@@ -236,10 +220,7 @@ class GoldenAHostIntegration:
 
         staged_dir = self.project_dir / "r2_m3_staged"
         staged_dir.mkdir(parents=True, exist_ok=True)
-        staged = staged_dir / (
-            f"{target_ref}-"
-            f"{produced.execution_fingerprint[:12]}.mp4"
-        )
+        staged = staged_dir / (f"{target_ref}-{produced.execution_fingerprint[:12]}.mp4")
         shutil.copy2(produced.path, staged)
 
         commit = self.versions.commit_staged_paid_version(
@@ -251,19 +232,14 @@ class GoldenAHostIntegration:
             select_current=False,
             method=produced.method.value,
             execution_fingerprint=produced.execution_fingerprint,
-            external_provider_cost=str(
-                produced.external_provider_cost
-            ),
+            external_provider_cost=str(produced.external_provider_cost),
         )
         candidate = GenerationCandidate(
             id=f"CAND-{target_ref}-V{commit.version}",
             target_ref=target_ref,
             content_fingerprint=content_fingerprint,
             execution_fingerprint=produced.execution_fingerprint,
-            provider_execution_ref=(
-                "local:ffmpeg:"
-                + produced.execution_fingerprint
-            ),
+            provider_execution_ref=("local:ffmpeg:" + produced.execution_fingerprint),
             output_asset_ref=str(produced.path),
             lifecycle_state=GenerationLifecycleStatus.GENERATED,
             selection_state=CandidateSelectionStatus.UNREVIEWED,
@@ -306,6 +282,4 @@ class GoldenAHostIntegration:
         snapshot = self._port(target_ref).load_artifact(key)
         if snapshot is None or snapshot.r2_raw is None:
             raise KeyError(key)
-        return R2ArtifactMetadata.model_validate(
-            snapshot.r2_raw
-        )
+        return R2ArtifactMetadata.model_validate(snapshot.r2_raw)

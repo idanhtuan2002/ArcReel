@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from decimal import Decimal
 import hashlib
 import json
-from pathlib import Path
 import subprocess
 import time
+from dataclasses import dataclass
+from decimal import Decimal
+from pathlib import Path
 
 from r2.contracts.enums import ProductionMethod, ReadinessState
+
 from .preparation import GoldenAPreparedShot
 
 
@@ -53,9 +54,7 @@ class GoldenALocalProducer:
         execution_variant: str = "default",
     ) -> LocalProducedAsset:
         if prepared.readiness.state is not ReadinessState.READY:
-            raise ValueError(
-                f"{prepared.shot.id} is BLOCKED and cannot be produced"
-            )
+            raise ValueError(f"{prepared.shot.id} is BLOCKED and cannot be produced")
 
         work_dir = Path(work_dir)
         work_dir.mkdir(parents=True, exist_ok=True)
@@ -73,9 +72,7 @@ class GoldenALocalProducer:
 
         palette = ["black", "navy", "darkgreen", "maroon", "gray"]
         seed = int(
-            hashlib.sha256(
-                f"{prepared.shot.id}:{execution_variant}:{source_hash}".encode()
-            ).hexdigest()[:8],
+            hashlib.sha256(f"{prepared.shot.id}:{execution_variant}:{source_hash}".encode()).hexdigest()[:8],
             16,
         )
         color = palette[seed % len(palette)]
@@ -103,16 +100,28 @@ class GoldenALocalProducer:
         ).hexdigest()
 
         cmd = [
-            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-            "-f", "lavfi",
-            "-i", f"color=c={color}:s=1280x720:r=2:d={duration}",
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c={color}:s=1280x720:r=2:d={duration}",
             "-an",
-            "-c:v", "mpeg4",
-            "-q:v", "5",
-            "-pix_fmt", "yuv420p",
-            "-fflags", "+bitexact",
-            "-flags:v", "+bitexact",
-            "-map_metadata", "-1",
+            "-c:v",
+            "mpeg4",
+            "-q:v",
+            "5",
+            "-pix_fmt",
+            "yuv420p",
+            "-fflags",
+            "+bitexact",
+            "-flags:v",
+            "+bitexact",
+            "-map_metadata",
+            "-1",
             str(output),
         ]
         start = time.perf_counter()
@@ -126,9 +135,13 @@ class GoldenALocalProducer:
 
         probe = subprocess.run(
             [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=nw=1:nk=1",
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=nw=1:nk=1",
                 str(output),
             ],
             check=True,
@@ -137,10 +150,7 @@ class GoldenALocalProducer:
         )
         actual = float(probe.stdout.strip())
         if abs(actual - duration) > 0.6:
-            raise RuntimeError(
-                f"ffmpeg duration drift for {prepared.shot.id}: "
-                f"{actual} vs {duration}"
-            )
+            raise RuntimeError(f"ffmpeg duration drift for {prepared.shot.id}: {actual} vs {duration}")
 
         return LocalProducedAsset(
             target_ref=prepared.shot.id,
