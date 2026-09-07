@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from r2.contracts import (
     ApprovedMaster,
@@ -51,7 +51,7 @@ def test_foundation_contracts_round_trip():
     provenance = Provenance(
         created_by=ProvenanceActor.SYSTEM,
         source_refs=["source:1"],
-        created_at=datetime(2026, 9, 6, 10, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 6, 10, 0, tzinfo=UTC),
     )
     assert _roundtrip(provenance) == provenance
 
@@ -114,18 +114,20 @@ def test_preparation_contracts_round_trip():
     )
     assert _roundtrip(identity) == identity
 
-    readiness = ProductionReadiness(
-        id="READY-SH001",
-        target_id="SH001",
-        requirements=[
-            ReadinessRequirement(
-                requirement_id="char",
-                role=ProductionBindingRole.CHARACTER,
-                required=True,
-                status=ReadinessState.READY,
-                resolved_binding=binding.id,
-            )
-        ],
+    readiness = ProductionReadiness.model_validate(
+        {
+            "id": "READY-SH001",
+            "target_id": "SH001",
+            "requirements": [
+                ReadinessRequirement(
+                    requirement_id="char",
+                    role=ProductionBindingRole.CHARACTER,
+                    required=True,
+                    status=ReadinessState.READY,
+                    resolved_binding=binding.id,
+                )
+            ],
+        }
     )
     assert _roundtrip(readiness) == readiness
 
@@ -186,7 +188,7 @@ def test_result_contracts_round_trip():
         target_ref="SH001",
         selected_candidate_id="CAND-1",
         approval_record="approval:1",
-        selected_at=datetime(2026, 9, 6, 10, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 10, 0, tzinfo=UTC),
         selected_by="showrunner:1",
     )
     assert _roundtrip(master) == master
@@ -205,6 +207,6 @@ def test_result_contracts_round_trip():
             )
         ],
         reviewer_type=ReviewerType.AGENT,
-        created_at=datetime(2026, 9, 6, 10, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 6, 10, 0, tzinfo=UTC),
     )
     assert _roundtrip(report) == report

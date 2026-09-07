@@ -3,10 +3,10 @@ import json
 import pytest
 
 from lib.artifact_manifest import (
+    MANIFEST_FILENAME,
     ArtifactKey,
     ArtifactManifestEntry,
     ArtifactManifestError,
-    MANIFEST_FILENAME,
     ProjectArtifactManifestAdapter,
 )
 

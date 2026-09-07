@@ -29,46 +29,50 @@ def test_production_binding_keeps_semantic_and_production_identity_separate():
 
 
 def test_readiness_state_is_derived_from_required_requirements():
-    blocked = ProductionReadiness(
-        id="READY-SH042",
-        target_id="SH042",
-        requirements=[
-            ReadinessRequirement(
-                requirement_id="char",
-                role=ProductionBindingRole.CHARACTER,
-                required=True,
-                status=ReadinessState.BLOCKED,
-                reason="character binding missing",
-            ),
-            ReadinessRequirement(
-                requirement_id="style",
-                role=ProductionBindingRole.STYLE,
-                required=False,
-                status=ReadinessState.BLOCKED,
-                reason="optional style reference missing",
-            ),
-        ],
+    blocked = ProductionReadiness.model_validate(
+        {
+            "id": "READY-SH042",
+            "target_id": "SH042",
+            "requirements": [
+                ReadinessRequirement(
+                    requirement_id="char",
+                    role=ProductionBindingRole.CHARACTER,
+                    required=True,
+                    status=ReadinessState.BLOCKED,
+                    reason="character binding missing",
+                ),
+                ReadinessRequirement(
+                    requirement_id="style",
+                    role=ProductionBindingRole.STYLE,
+                    required=False,
+                    status=ReadinessState.BLOCKED,
+                    reason="optional style reference missing",
+                ),
+            ],
+        }
     )
     assert blocked.state is ReadinessState.BLOCKED
 
-    ready = ProductionReadiness(
-        id="READY-SH043",
-        target_id="SH043",
-        requirements=[
-            ReadinessRequirement(
-                requirement_id="char",
-                role=ProductionBindingRole.CHARACTER,
-                required=True,
-                status=ReadinessState.READY,
-                resolved_binding="B001",
-            ),
-            ReadinessRequirement(
-                requirement_id="style",
-                role=ProductionBindingRole.STYLE,
-                required=False,
-                status=ReadinessState.BLOCKED,
-            ),
-        ],
+    ready = ProductionReadiness.model_validate(
+        {
+            "id": "READY-SH043",
+            "target_id": "SH043",
+            "requirements": [
+                ReadinessRequirement(
+                    requirement_id="char",
+                    role=ProductionBindingRole.CHARACTER,
+                    required=True,
+                    status=ReadinessState.READY,
+                    resolved_binding="B001",
+                ),
+                ReadinessRequirement(
+                    requirement_id="style",
+                    role=ProductionBindingRole.STYLE,
+                    required=False,
+                    status=ReadinessState.BLOCKED,
+                ),
+            ],
+        }
     )
     assert ready.state is ReadinessState.READY
 
@@ -92,18 +96,20 @@ def test_readiness_rejects_explicit_contradictory_state():
 
 
 def test_readiness_round_trip_preserves_derived_state():
-    original = ProductionReadiness(
-        id="READY-SH045",
-        target_id="SH045",
-        requirements=[
-            ReadinessRequirement(
-                requirement_id="char",
-                role=ProductionBindingRole.CHARACTER,
-                required=True,
-                status=ReadinessState.READY,
-                resolved_binding="B045",
-            )
-        ],
+    original = ProductionReadiness.model_validate(
+        {
+            "id": "READY-SH045",
+            "target_id": "SH045",
+            "requirements": [
+                ReadinessRequirement(
+                    requirement_id="char",
+                    role=ProductionBindingRole.CHARACTER,
+                    required=True,
+                    status=ReadinessState.READY,
+                    resolved_binding="B045",
+                )
+            ],
+        }
     )
     restored = ProductionReadiness.model_validate(original.model_dump(mode="json"))
     assert restored == original

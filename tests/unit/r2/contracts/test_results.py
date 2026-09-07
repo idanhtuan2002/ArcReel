@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -15,16 +15,16 @@ from r2.contracts import (
 
 
 def _candidate(**overrides):
-    data = dict(
-        id="CAND-1",
-        target_ref="SH042",
-        content_fingerprint="a" * 64,
-        execution_fingerprint="b" * 64,
-        provider_execution_ref="job:123",
-        output_asset_ref="asset:generated-1",
-        lifecycle_state=GenerationLifecycleStatus.GENERATED,
-        selection_state=CandidateSelectionStatus.UNREVIEWED,
-    )
+    data = {
+        "id": "CAND-1",
+        "target_ref": "SH042",
+        "content_fingerprint": "a" * 64,
+        "execution_fingerprint": "b" * 64,
+        "provider_execution_ref": "job:123",
+        "output_asset_ref": "asset:generated-1",
+        "lifecycle_state": GenerationLifecycleStatus.GENERATED,
+        "selection_state": CandidateSelectionStatus.UNREVIEWED,
+    }
     data.update(overrides)
     return GenerationCandidate(**data)
 
@@ -54,7 +54,7 @@ def test_approved_master_is_explicit_not_latest_generation():
         target_ref="SH042",
         selected_candidate_id="CAND-1",
         approval_record="approval:77",
-        selected_at=datetime(2026, 9, 6, 10, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 10, 0, tzinfo=UTC),
         selected_by="showrunner:1",
     )
     assert master.selected_candidate_id == "CAND-1"
@@ -73,11 +73,9 @@ def test_quality_report_score_is_bounded_and_finding_planes_are_consistent():
                 blocking=True,
             )
         ],
-        advisory_findings=[
-            QualityFinding(code="MINOR", message="tiny drift", blocking=False)
-        ],
+        advisory_findings=[QualityFinding(code="MINOR", message="tiny drift", blocking=False)],
         reviewer_type=ReviewerType.AGENT,
-        created_at=datetime(2026, 9, 6, 10, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 6, 10, 0, tzinfo=UTC),
     )
     assert report.score == 0.95
 
@@ -88,9 +86,7 @@ def test_quality_report_score_is_bounded_and_finding_planes_are_consistent():
         QualityReport(
             **{
                 **report.model_dump(),
-                "blocking_findings": [
-                    {"code": "WRONG", "message": "wrong plane", "blocking": False}
-                ],
+                "blocking_findings": [{"code": "WRONG", "message": "wrong plane", "blocking": False}],
             }
         )
 
@@ -98,9 +94,7 @@ def test_quality_report_score_is_bounded_and_finding_planes_are_consistent():
         QualityReport(
             **{
                 **report.model_dump(),
-                "advisory_findings": [
-                    {"code": "WRONG", "message": "wrong plane", "blocking": True}
-                ],
+                "advisory_findings": [{"code": "WRONG", "message": "wrong plane", "blocking": True}],
             }
         )
 

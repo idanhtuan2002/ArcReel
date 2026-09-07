@@ -65,5 +65,5 @@ def test_registry_rejects_resolver_returning_different_ref():
     )
     registry = DependencyResolverRegistry([Resolver("r2:", wrong)])
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="resolver returned"):
         registry.resolve("r2:ShotSpec:SH1")

@@ -24,7 +24,7 @@ def test_method_decision_is_provider_neutral():
         ],
     )
     with pytest.raises(ValidationError):
-        MethodDecision(**decision.model_dump(), provider="seedance")
+        MethodDecision.model_validate({**decision.model_dump(), "provider": "seedance"})
 
 
 def test_prompt_plan_is_provider_neutral():
@@ -43,7 +43,7 @@ def test_prompt_plan_is_provider_neutral():
         compiler_version="butterfly-compiler-v1",
     )
     with pytest.raises(ValidationError):
-        PromptPlan(**plan.model_dump(), endpoint="https://example.invalid")
+        PromptPlan.model_validate({**plan.model_dump(), "endpoint": "https://example.invalid"})
 
 
 def test_provider_request_accepts_execution_fields_and_rejects_python_objects():

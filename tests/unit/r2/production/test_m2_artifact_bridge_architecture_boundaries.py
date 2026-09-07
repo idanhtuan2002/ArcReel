@@ -8,7 +8,6 @@ from pathlib import Path
 from r2.bootstrap import frozen_docs_dir
 from r2.production import DependencySnapshot, R2ArtifactMetadata
 
-
 REPO = Path(__file__).resolve().parents[4]
 M1_HEAD = "9330bcf3"
 
@@ -36,9 +35,7 @@ def production_imports() -> set[str]:
 
 def runtime_m2_text() -> str:
     paths = list((REPO / "r2" / "production").glob("*.py"))
-    discovery = json.loads(
-        (REPO / "docs/r2/evidence/R2_M2_SEAM_DISCOVERY.json").read_text()
-    )
+    discovery = json.loads((REPO / "docs/r2/evidence/R2_M2_SEAM_DISCOVERY.json").read_text())
     paths.extend(REPO / path for path in discovery["host_files_if_patch_required"])
     return "\n".join(path.read_text(encoding="utf-8") for path in paths)
 
@@ -53,9 +50,7 @@ def test_production_layer_has_no_forbidden_authority_or_provider_execution_impor
         "r2.director",
         "server.",
     )
-    violations = sorted(
-        name for name in imports if name.startswith(forbidden_prefixes)
-    )
+    violations = sorted(name for name in imports if name.startswith(forbidden_prefixes))
 
     assert violations == []
 
@@ -69,8 +64,7 @@ def test_no_r2_sql_migration_was_added_or_modified():
     suspicious = {
         path
         for path in changed_paths()
-        if any(marker in path.lower() for marker in migration_markers)
-        and path.endswith(".py")
+        if any(marker in path.lower() for marker in migration_markers) and path.endswith(".py")
     }
 
     assert suspicious == set()
@@ -113,25 +107,17 @@ def test_r2_artifact_metadata_excludes_execution_identity_fields():
 
 
 def test_host_files_changed_since_m1_are_subset_of_task0_allowlist():
-    discovery = json.loads(
-        (REPO / "docs/r2/evidence/R2_M2_SEAM_DISCOVERY.json").read_text()
-    )
+    discovery = json.loads((REPO / "docs/r2/evidence/R2_M2_SEAM_DISCOVERY.json").read_text())
     allowlist = set(discovery["host_files_if_patch_required"])
 
-    host_changed = {
-        path
-        for path in changed_paths()
-        if path.startswith(("lib/", "server/"))
-    }
+    host_changed = {path for path in changed_paths() if path.startswith(("lib/", "server/"))}
 
     assert host_changed <= allowlist
     assert host_changed == {"lib/artifact_manifest.py"}
 
 
 def test_r2_host_001_remains_open_production_blocker():
-    registry = json.loads(
-        (frozen_docs_dir() / "R2_05_HOST_HARDENING_REGISTRY.json").read_text()
-    )
+    registry = json.loads((frozen_docs_dir() / "R2_05_HOST_HARDENING_REGISTRY.json").read_text())
     h1 = next(item for item in registry["requirements"] if item["id"] == "H1")
 
     assert h1["severity"] == "PRODUCTION_BLOCKER"

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -110,16 +110,18 @@ def test_r2_artifact_metadata_rejects_conflicting_duplicate_dependency_refs():
 
 def test_r2_artifact_metadata_requires_content_basis():
     with pytest.raises(ValidationError):
-        R2ArtifactMetadata(
-            metadata_schema_version="1",
-            contract_ref=R2ContractRef(
-                contract_type="ShotSpec",
-                id="SH042",
-                version=4,
-                schema_version="2.1",
-            ),
-            direct_dependencies=[],
-            content_fingerprint="c" * 64,
+        R2ArtifactMetadata.model_validate(
+            {
+                "metadata_schema_version": "1",
+                "contract_ref": {
+                    "contract_type": "ShotSpec",
+                    "id": "SH042",
+                    "version": 4,
+                    "schema_version": "2.1",
+                },
+                "direct_dependencies": [],
+                "content_fingerprint": "c" * 64,
+            }
         )
 
 
@@ -139,7 +141,7 @@ def test_approved_master_accepts_timezone_aware_selected_at():
         selected_candidate_id="C1",
         host_version_ref="V17",
         approval_record="APR1",
-        selected_at=datetime(2026, 9, 6, 18, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 18, 0, tzinfo=UTC),
         selected_by="showrunner:1",
     )
 

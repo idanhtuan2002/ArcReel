@@ -43,7 +43,7 @@ def test_scene_spec_requires_content_basis_and_rejects_provider_fields():
     assert scene.entity_refs == ["char:a", "char:b"]
 
     with pytest.raises(ValidationError):
-        SceneSpec(**scene.model_dump(), provider="seedance")
+        SceneSpec.model_validate({**scene.model_dump(), "provider": "seedance"})
 
 
 def test_shot_spec_requires_positive_duration_and_rejects_provider_fields():
@@ -67,7 +67,7 @@ def test_shot_spec_requires_positive_duration_and_rejects_provider_fields():
     assert shot.target_duration == 4.0
 
     with pytest.raises(ValidationError):
-        ShotSpec(**shot.model_dump(), model="h3")
+        ShotSpec.model_validate({**shot.model_dump(), "model": "h3"})
 
     with pytest.raises(ValidationError):
         ShotSpec(**{**shot.model_dump(), "target_duration": 0})

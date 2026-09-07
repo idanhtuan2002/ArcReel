@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -39,16 +39,16 @@ def metadata(**updates) -> R2ArtifactMetadata:
 
 
 def candidate(**updates) -> GenerationCandidate:
-    data = dict(
-        id="C1",
-        target_ref="SH1",
-        content_fingerprint="c" * 64,
-        execution_fingerprint="e" * 64,
-        provider_execution_ref="job:1",
-        output_asset_ref="asset:C1",
-        lifecycle_state=GenerationLifecycleStatus.GENERATED,
-        selection_state=CandidateSelectionStatus.UNREVIEWED,
-    )
+    data = {
+        "id": "C1",
+        "target_ref": "SH1",
+        "content_fingerprint": "c" * 64,
+        "execution_fingerprint": "e" * 64,
+        "provider_execution_ref": "job:1",
+        "output_asset_ref": "asset:C1",
+        "lifecycle_state": GenerationLifecycleStatus.GENERATED,
+        "selection_state": CandidateSelectionStatus.UNREVIEWED,
+    }
     data.update(updates)
     return GenerationCandidate(**data)
 
@@ -87,7 +87,7 @@ def service(host):
 
 
 def selected_at():
-    return datetime(2026, 9, 6, 19, 0, tzinfo=timezone.utc)
+    return datetime(2026, 9, 6, 19, 0, tzinfo=UTC)
 
 
 def test_generated_unreviewed_candidate_can_be_explicitly_promoted():
@@ -189,7 +189,7 @@ def test_same_candidate_and_host_version_is_idempotent():
         host_version_ref="2",
         approval_record="approval:2",
         selected_by="showrunner:2",
-        selected_at=datetime(2026, 9, 6, 20, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 20, 0, tzinfo=UTC),
     )
 
     assert first.changed is True
