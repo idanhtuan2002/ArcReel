@@ -7,9 +7,12 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from r2.contracts import (
     ExecutionDecision,
+    IdentityConstraint,
+    IdentityStrength,
     MethodDecision,
     PromptPlan,
     ProviderRequest,
@@ -66,6 +69,27 @@ def test_stable_semantic_contracts_carry_no_provider_or_runtime_fields() -> None
 def test_execution_side_contracts_do_carry_provider_identity() -> None:
     assert {"provider_id", "model_or_tool_id", "adapter_id"} <= set(ExecutionDecision.model_fields)
     assert {"provider", "model", "endpoint"} <= set(ProviderRequest.model_fields)
+
+
+def test_provider_neutrality_is_enforced_on_semantic_values_not_only_field_names() -> None:
+    # D05/D08 — a provider CLI flag / payload token in a *value* is rejected even
+    # though the carrying field name is provider-neutral.
+    with pytest.raises(ValidationError):
+        IdentityConstraint(
+            semantic_key="wardrobe",
+            strength=IdentityStrength.LOCKED,
+            semantic_value="--cref https://ref.example --cw 100",
+        )
+    with pytest.raises(ValidationError):
+        PromptPlan(
+            id="PP:SH01",
+            schema_version="1",
+            version=1,
+            target_ref="SH01",
+            semantic_instruction="establish the courtyard",
+            compiler_version="m4-prompt-planner-v1",
+            visual_identity_constraints=["style=<lora:add_detail:0.8>"],
+        )
 
 
 def test_production_intelligence_never_imports_lib_db() -> None:

@@ -183,6 +183,14 @@ by Claude before triage.
 - **Direction:** validate identity/prompt semantic strings against a provider-syntax
   denylist (or an allowed semantic-key vocabulary); add an architecture check on
   values, not just names.
+- **FIXED (next-session batch):** new `r2/contracts/provider_syntax.py` denylist
+  (`detect_provider_syntax` / `reject_provider_syntax`) — structural patterns
+  (`--flag`, `::weight`, `<lora:…>`, `(term:1.3)`) plus a brand/payload-key token
+  set. Wired as `field_validator`s on `IdentityConstraint.{semantic_key,
+  semantic_value}`, `ResolvedIdentityConstraint.{semantic_key, effective_value}`,
+  and `PromptPlan.{visual_identity_constraints, reference_requirements}`.
+  `test_provider_syntax_guard.py` covers the guard + each wiring;
+  `test_architecture_boundaries.py` gains a value-level neutrality assertion.
 
 ### Med-4 — DefaultPromptCompiler is a generic request builder
 - **Where:** `r2/production_intelligence/prompting.py` (`DefaultPromptCompiler`).

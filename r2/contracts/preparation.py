@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from .common import ContractIdentity, NonEmptyStr, R2ContractModel
 from .enums import (
@@ -14,6 +14,7 @@ from .enums import (
     ResolvedIdentityStatus,
 )
 from .provenance import Provenance
+from .provider_syntax import reject_provider_syntax
 
 
 class ProductionBinding(ContractIdentity):
@@ -46,6 +47,11 @@ class IdentityConstraint(R2ContractModel):
     binding_role_ref: ProductionBindingRole | None = None
     provenance: Provenance | None = None
 
+    @field_validator("semantic_key", "semantic_value")
+    @classmethod
+    def _reject_provider_syntax(cls, value: str, info: ValidationInfo) -> str:
+        return reject_provider_syntax(value, field=info.field_name or "value")
+
 
 class VisualIdentityProfile(ContractIdentity):
     semantic_character_ref: NonEmptyStr
@@ -73,6 +79,11 @@ class ResolvedIdentityConstraint(R2ContractModel):
     effective_strength: IdentityStrength
     effective_value: NonEmptyStr
     source_scope_ref: NonEmptyStr
+
+    @field_validator("semantic_key", "effective_value")
+    @classmethod
+    def _reject_provider_syntax(cls, value: str, info: ValidationInfo) -> str:
+        return reject_provider_syntax(value, field=info.field_name or "value")
 
 
 class ResolvedVisualIdentity(R2ContractModel):

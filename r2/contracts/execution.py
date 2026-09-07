@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import AwareDatetime, ConfigDict, Field, field_validator
+from pydantic import AwareDatetime, ConfigDict, Field, ValidationInfo, field_validator
 
 from .common import (
     ContractIdentity,
@@ -18,6 +18,7 @@ from .enums import (
     ProductionMethod,
 )
 from .provenance import Provenance
+from .provider_syntax import reject_provider_syntax
 
 
 class RejectedMethod(R2ContractModel):
@@ -67,6 +68,13 @@ class PromptPlan(ContractIdentity):
     required_controls: list[NonEmptyStr] = Field(default_factory=list)
     negative_constraints: list[NonEmptyStr] = Field(default_factory=list)
     output_requirements: dict[str, JSONValue] = Field(default_factory=dict)
+
+    @field_validator("visual_identity_constraints", "reference_requirements")
+    @classmethod
+    def _reject_provider_syntax_items(cls, value: list[str], info: ValidationInfo) -> list[str]:
+        for item in value:
+            reject_provider_syntax(item, field=info.field_name or "value")
+        return value
 
 
 class ProviderRequest(R2ContractModel):
