@@ -194,6 +194,16 @@ by Claude before triage.
 - **Direction:** drive `ProductionApprovalService` and the C04 reservation service
   against a real (SQLite) session, close and reopen it, and re-assert master /
   reservation / currency across the reopen.
+- **FIXED (next-session batch):** new `test_persistence_restart.py` drives the
+  real `BudgetReservationService` + `BudgetReservationRepository` against a
+  file-backed SQLite engine (NullPool): reserve → dispose the engine → new engine
+  on the same file → claim → dispose → reopen → re-assert
+  `state=CLAIMED` / `reserved_amount` / `currency` / `execution_decision_ref`. A
+  second case runs `M4HostIntegration.execute_admitted` through the *real*
+  reservation service (no `_FakeReservationService`) and re-asserts the claim
+  after a reopen. `test_approved_master_semantics` now also re-asserts the
+  currency inputs (`content_fingerprint` / factual basis / dependencies) survive
+  the reopen.
 
 ### Med-1 — identity resolver applies profiles unrelated to the target
 - **Where:** `r2/production_intelligence/identity.py` (`VisualIdentityResolver.resolve`).

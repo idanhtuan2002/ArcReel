@@ -102,9 +102,14 @@ def test_failed_or_unapproved_later_candidate_never_replaces_the_master() -> Non
     result_d = _promote(host, _candidate("D"), "4")
     assert result_d.approved_master.selected_candidate_id == "D"
 
-    # "Restart": a fresh service over the persisted metadata still sees D.
+    # "Restart": a fresh service over the persisted metadata still sees D, and
+    # the currency inputs (content fingerprint + factual basis + dependencies)
+    # round-trip unchanged.
     reopened = ProductionApprovalService(_Host(host.value))
     snapshot = reopened._host.load_artifact("video:SH1")
     reloaded = R2ArtifactMetadata.model_validate(snapshot.r2_raw)
     assert reloaded.approved_master is not None
     assert reloaded.approved_master.selected_candidate_id == "D"
+    assert reloaded.content_fingerprint == _CONTENT_FP
+    assert reloaded.content_basis.basis_type is ContentBasisType.NARRATIVE
+    assert reloaded.direct_dependencies == []
