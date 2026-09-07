@@ -1,8 +1,9 @@
 {
   "approved_c04_host_changes": [],
   "blocking_violation_count": 0,
-  "final_head": "a2f3280e920b6d3d5f55f9d2fb3e1e9d6d9b4115",
+  "final_head": "593fce5a56014c6f2602876c5f7c8f01b391aedb",
   "m5_scope_leakage": [],
+  "mutated_c04_host_files": [],
   "schema_version": "1",
   "starting_head": "863ab4993b3dce725fb5f12b5d2f2a74a79031a3",
   "unapproved_db_migrations": [],

@@ -2,7 +2,7 @@
 
 - Gate D status: **INCOMPLETE_PENDING_WAIVER** (`gate_d_pass=False`)
 - Starting head: `863ab4993b3dce725fb5f12b5d2f2a74a79031a3`
-- Verified head: `a2f3280e920b6d3d5f55f9d2fb3e1e9d6d9b4115` (expected `a2f3280e920b6d3d5f55f9d2fb3e1e9d6d9b4115`, match: True)
+- Verified head: `593fce5a56014c6f2602876c5f7c8f01b391aedb` (expected `593fce5a56014c6f2602876c5f7c8f01b391aedb`, match: True)
 - Branch: `feat/r2-m4-production-intelligence`
 - Worktree clean (strict / modulo generated evidence): **False / True**
 - H1 / R2-HOST-001: **OPEN**
@@ -25,7 +25,7 @@
 
 | suite | pass | fail | skip | result |
 |---|--:|--:|--:|---|
-| m4_focused | 177 | 0 | 0 | PASS |
+| m4_focused | 270 | 0 | 0 | PASS |
 | m1_frozen (expected 41) | 41 | 0 | 0 | PASS |
 | m2_frozen (expected 53) | 53 | 0 | 0 | PASS |
 | m3_focused (expected 122) | 122 | 0 | 0 | PASS |
