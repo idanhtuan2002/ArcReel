@@ -267,7 +267,9 @@ async def run_pipeline(
         descriptor=descriptor,
     )
     result.execution_decision = execution_decision
-    result.provider_request = DefaultPromptCompiler().compile(plan=prompt_plan, decision=execution_decision)
+    result.provider_request = DefaultPromptCompiler.for_descriptors([descriptor]).compile(
+        plan=prompt_plan, decision=execution_decision
+    )
     result.trace.extend(["ExecutionDecision", "ProviderRequest"])
     return result
 

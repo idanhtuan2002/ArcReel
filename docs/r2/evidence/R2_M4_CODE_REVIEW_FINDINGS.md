@@ -246,6 +246,15 @@ by Claude before triage.
 - **Direction:** make the compiler a per-adapter strategy keyed off
   `ExecutionDecision.adapter_id` / descriptor features; keep the fail-closed
   contract but drive it from the candidate's real capability surface.
+- **FIXED (next-session batch):** new `AdapterCompileProfile.from_descriptor`
+  derives the representable control/reference surface + endpoint from the
+  selected candidate's `CapabilityDescriptor` (identity refs gated on
+  `CHARACTER_REFERENCE`, keyframe/continuity controls on their features).
+  `DefaultPromptCompiler(adapter_profiles=…)` / `.for_descriptors(…)` keys on
+  `decision.adapter_id`; an unregistered adapter fails closed
+  (`UNKNOWN_ADAPTER:`), and `COMPILATION_INCOMPATIBLE` is now raised per the
+  candidate's real surface. Callers build the compiler from the descriptor(s)
+  in scope.
 
 ---
 

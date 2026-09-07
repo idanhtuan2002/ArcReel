@@ -132,7 +132,7 @@ async def test_mut_05_same_method_provider_fallback_new_ed_same_content_fp_chang
         selected_capability_id=fallback_cap,
         descriptor=alt_descriptor,
     )
-    req_b = DefaultPromptCompiler().compile(plan=result.prompt_plan, decision=ed_b)
+    req_b = DefaultPromptCompiler.for_descriptors([alt_descriptor]).compile(plan=result.prompt_plan, decision=ed_b)
 
     assert ed_a.id != ed_b.id
     assert ed_a.method_decision_ref == ed_b.method_decision_ref

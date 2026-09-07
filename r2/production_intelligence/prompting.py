@@ -6,10 +6,12 @@ syntax never appears here; that translation happens later at the PromptCompiler.
 
 from __future__ import annotations
 
-from collections.abc import Set
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import Protocol, cast
 
 from r2.contracts import (
+    CapabilityDescriptor,
     ExecutionDecision,
     IdentityStrength,
     JSONValue,
@@ -24,12 +26,17 @@ from r2.contracts import (
 PROMPT_PLANNER_VERSION = "m4-prompt-planner-v1"
 PROMPT_COMPILER_VERSION = "m4-prompt-compiler-v1"
 
-_DEFAULT_SUPPORTED_CONTROLS = frozenset(
-    {"narration", "dialogue", "silent", "opening_frame", "ending_frame", "previous_shot"}
-)
-_DEFAULT_SUPPORTED_REFERENCE_KINDS = frozenset(
-    {"hairstyle", "face_master", "wardrobe", "style", "structure", "character", "location", "prop"}
-)
+# Every adapter can express plain narration/dialogue/silence and the
+# non-identity reference kinds. Identity references and keyframe/continuity
+# controls are only representable when the candidate's descriptor declares the
+# matching typed feature.
+_BASE_CONTROLS = frozenset({"narration", "dialogue", "silent"})
+_BASE_REFERENCE_KINDS = frozenset({"wardrobe", "style", "structure", "location", "prop"})
+_CHARACTER_REFERENCE_KINDS = frozenset({"hairstyle", "face_master", "character"})
+_FEATURE_CONTROLS: dict[str, frozenset[str]] = {
+    "KEYFRAME_CONTROL": frozenset({"opening_frame", "ending_frame"}),
+    "SHOT_CONTINUITY": frozenset({"previous_shot"}),
+}
 
 
 class PromptPlanner:
@@ -81,23 +88,54 @@ class PromptCompiler(Protocol):
         ...
 
 
-class DefaultPromptCompiler:
-    """Translation-only compiler. Provider/model identity comes solely from the
-    ExecutionDecision; unmappable required semantics raise
-    ``PromptCompilationIncompatible``."""
+@dataclass(frozen=True)
+class AdapterCompileProfile:
+    """The representable surface of one execution adapter, derived from the
+    selected candidate's real capability descriptor."""
 
-    def __init__(
-        self,
-        *,
-        supported_controls: Set[str] = _DEFAULT_SUPPORTED_CONTROLS,
-        supported_reference_kinds: Set[str] = _DEFAULT_SUPPORTED_REFERENCE_KINDS,
-    ) -> None:
-        self._controls = frozenset(supported_controls)
-        self._reference_kinds = frozenset(supported_reference_kinds)
+    adapter_id: str
+    supported_controls: frozenset[str]
+    supported_reference_kinds: frozenset[str]
+    endpoint: str
+
+    @classmethod
+    def from_descriptor(cls, descriptor: CapabilityDescriptor) -> AdapterCompileProfile:
+        features = set(descriptor.typed_features)
+        controls = set(_BASE_CONTROLS)
+        for feature, extra in _FEATURE_CONTROLS.items():
+            if feature in features:
+                controls |= extra
+        reference_kinds = set(_BASE_REFERENCE_KINDS)
+        if "CHARACTER_REFERENCE" in features:
+            reference_kinds |= _CHARACTER_REFERENCE_KINDS
+        return cls(
+            adapter_id=descriptor.adapter_id,
+            supported_controls=frozenset(controls),
+            supported_reference_kinds=frozenset(reference_kinds),
+            endpoint=f"{descriptor.adapter_id}/generate/{descriptor.execution_type.value.lower()}",
+        )
+
+
+class DefaultPromptCompiler:
+    """Per-adapter translation-only compiler. Provider/model identity comes solely
+    from the ExecutionDecision; the representable surface is the selected
+    candidate's own ``AdapterCompileProfile``. An unregistered adapter or an
+    unmappable required semantic raises ``PromptCompilationIncompatible``."""
+
+    def __init__(self, *, adapter_profiles: Mapping[str, AdapterCompileProfile] | None = None) -> None:
+        self._profiles: dict[str, AdapterCompileProfile] = dict(adapter_profiles or {})
+
+    @classmethod
+    def for_descriptors(cls, descriptors: Iterable[CapabilityDescriptor]) -> DefaultPromptCompiler:
+        return cls(adapter_profiles={d.adapter_id: AdapterCompileProfile.from_descriptor(d) for d in descriptors})
 
     def compile(self, *, plan: PromptPlan, decision: ExecutionDecision) -> ProviderRequest:
-        unmapped_controls = [c for c in plan.required_controls if c not in self._controls]
-        unmapped_refs = [r for r in plan.reference_requirements if r not in self._reference_kinds]
+        profile = self._profiles.get(decision.adapter_id)
+        if profile is None:
+            raise PromptCompilationIncompatible(("COMPILATION_INCOMPATIBLE", f"UNKNOWN_ADAPTER:{decision.adapter_id}"))
+
+        unmapped_controls = [c for c in plan.required_controls if c not in profile.supported_controls]
+        unmapped_refs = [r for r in plan.reference_requirements if r not in profile.supported_reference_kinds]
         if unmapped_controls or unmapped_refs:
             reasons = ["COMPILATION_INCOMPATIBLE"]
             reasons += [f"UNSUPPORTED_CONTROL:{c}" for c in unmapped_controls]
@@ -129,7 +167,7 @@ class DefaultPromptCompiler:
             prompt_plan_ref=plan.id,
             provider=decision.provider_id,
             model=decision.model_or_tool_id,
-            endpoint=f"generate/{decision.execution_type.value.lower()}",
+            endpoint=profile.endpoint,
             payload=payload,
             execution_options={
                 "request_semantics_hash": decision.request_semantics_hash,
