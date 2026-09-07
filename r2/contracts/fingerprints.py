@@ -25,12 +25,14 @@ def _sha256(value: JSONValue) -> str:
 
 
 def compute_content_fingerprint(
-    *, shot_spec: ShotSpec, bindings: Sequence[ProductionBinding],
-    visual_identity_refs: Sequence[str], approved_source_asset_refs: Sequence[str],
+    *,
+    shot_spec: ShotSpec,
+    bindings: Sequence[ProductionBinding],
+    visual_identity_refs: Sequence[str],
+    approved_source_asset_refs: Sequence[str],
 ) -> str:
     binding_payload = [
-        binding.model_dump(mode="json")
-        for binding in sorted(bindings, key=lambda item: (item.id, item.version))
+        binding.model_dump(mode="json") for binding in sorted(bindings, key=lambda item: (item.id, item.version))
     ]
     payload: dict[str, JSONValue] = {
         "shot_spec": shot_spec.model_dump(mode="json"),
@@ -42,9 +44,15 @@ def compute_content_fingerprint(
 
 
 def compute_execution_fingerprint(
-    *, provider: str, model: str, endpoint: str, seed: int | None,
-    resolution: str | None, generation_settings: Mapping[str, JSONValue],
-    prompt_compiler_version: str, provider_adapter_version: str,
+    *,
+    provider: str,
+    model: str,
+    endpoint: str,
+    seed: int | None,
+    resolution: str | None,
+    generation_settings: Mapping[str, JSONValue],
+    prompt_compiler_version: str,
+    provider_adapter_version: str,
 ) -> str:
     settings = ensure_json_value(dict(generation_settings))
     if not isinstance(settings, dict):

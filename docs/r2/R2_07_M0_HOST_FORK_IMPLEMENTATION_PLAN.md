@@ -347,9 +347,7 @@ def test_frozen_registry_integrity():
 
 
 def test_every_authoritative_contract_has_one_commit_authority():
-    data = json.loads(
-        (frozen_docs_dir() / "R2_03_CONTRACT_REGISTRY.json").read_text()
-    )
+    data = json.loads((frozen_docs_dir() / "R2_03_CONTRACT_REGISTRY.json").read_text())
     for item in data["contracts"]:
         if item["authority"] not in {
             "NON_AUTHORITATIVE",
@@ -439,9 +437,7 @@ from r2.bootstrap import frozen_docs_dir
 
 
 def test_execution_identity_is_registered_as_production_blocker():
-    data = json.loads(
-        (frozen_docs_dir() / "R2_05_HOST_HARDENING_REGISTRY.json").read_text()
-    )
+    data = json.loads((frozen_docs_dir() / "R2_05_HOST_HARDENING_REGISTRY.json").read_text())
     h1 = next(item for item in data["requirements"] if item["id"] == "H1")
     assert h1["severity"] == "PRODUCTION_BLOCKER"
     assert h1["decision_ref"] == "R2-HOST-001"

@@ -1958,10 +1958,7 @@ def _serialize_manifest_entry(entry: ArtifactManifestEntry) -> dict[str, object]
 def _serialize_manifest(entries: Mapping[str, ArtifactManifestEntry]) -> bytes:
     _assert_unique_artifact_paths(entries)
     payload = {
-        "entries": {
-            key: _serialize_manifest_entry(entry)
-            for key, entry in sorted(entries.items())
-        },
+        "entries": {key: _serialize_manifest_entry(entry) for key, entry in sorted(entries.items())},
         "hash_algorithm": HASH_ALGORITHM,
         "schema_version": MANIFEST_SCHEMA_VERSION,
     }
@@ -2099,7 +2096,10 @@ def _parse_manifest(raw: bytes, *, validate_path_ownership: bool = True) -> dict
             ArtifactKey.decode(encoded_key)
         except ValueError as exc:
             raise ArtifactManifestError(f"artifact manifest contains an invalid key: {encoded_key!r}") from exc
-        if not isinstance(raw_entry, dict) or set(raw_entry) not in ({"artifact_path", "basis_digest"}, {"artifact_path", "basis_digest", "r2"}):
+        if not isinstance(raw_entry, dict) or set(raw_entry) not in (
+            {"artifact_path", "basis_digest"},
+            {"artifact_path", "basis_digest", "r2"},
+        ):
             raise ArtifactManifestError(f"artifact manifest entry has an invalid schema: {encoded_key}")
         artifact_path = raw_entry["artifact_path"]
         basis_digest = raw_entry["basis_digest"]

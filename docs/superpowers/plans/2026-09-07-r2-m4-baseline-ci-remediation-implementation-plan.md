@@ -295,6 +295,7 @@ Then change:
 ```python
 from enum import StrEnum
 
+
 class ClaimStatus(StrEnum):
     PROPOSED = "PROPOSED"
     VERIFIED = "VERIFIED"

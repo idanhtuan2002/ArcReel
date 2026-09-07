@@ -48,9 +48,7 @@ class ProductionApprovalService:
         if candidate.target_ref != metadata.contract_ref.id:
             raise ValueError("candidate target_ref does not match artifact contract")
         if candidate.content_fingerprint != metadata.content_fingerprint:
-            raise ValueError(
-                "candidate content_fingerprint does not match current semantic state"
-            )
+            raise ValueError("candidate content_fingerprint does not match current semantic state")
         if not host_version_ref:
             raise ValueError("host_version_ref must be non-empty")
 

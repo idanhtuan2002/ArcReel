@@ -39,9 +39,7 @@ def _git(repo: Path, *args: str) -> str:
         capture_output=True,
     )
     if proc.returncode:
-        raise BaselineError(
-            f"git {' '.join(args)} failed: {proc.stderr.strip() or proc.stdout.strip()}"
-        )
+        raise BaselineError(f"git {' '.join(args)} failed: {proc.stderr.strip() or proc.stdout.strip()}")
     return proc.stdout.strip()
 
 
@@ -53,29 +51,21 @@ def verify_repository(
 ) -> None:
     actual_branch = _git(repo, "branch", "--show-current")
     if actual_branch != cfg["branch"]:
-        raise BaselineError(
-            f"branch mismatch: expected {cfg['branch']}, got {actual_branch}"
-        )
+        raise BaselineError(f"branch mismatch: expected {cfg['branch']}, got {actual_branch}")
 
     tag_sha = _git(repo, "rev-parse", f"{cfg['tag']}^{{commit}}")
     if tag_sha != cfg["sha"]:
-        raise BaselineError(
-            f"tag {cfg['tag']} mismatch: expected {cfg['sha']}, got {tag_sha}"
-        )
+        raise BaselineError(f"tag {cfg['tag']} mismatch: expected {cfg['sha']}, got {tag_sha}")
 
     head = _git(repo, "rev-parse", "HEAD")
     merge_base = _git(repo, "merge-base", head, cfg["sha"])
     if merge_base != cfg["sha"]:
-        raise BaselineError(
-            f"pinned baseline {cfg['sha']} is not an ancestor of HEAD {head}"
-        )
+        raise BaselineError(f"pinned baseline {cfg['sha']} is not an ancestor of HEAD {head}")
 
     if check_remote:
         upstream = _git(repo, "remote", "get-url", "upstream")
         if upstream != cfg["upstream"]:
-            raise BaselineError(
-                f"upstream mismatch: expected {cfg['upstream']}, got {upstream}"
-            )
+            raise BaselineError(f"upstream mismatch: expected {cfg['upstream']}, got {upstream}")
 
 
 def main() -> int:
@@ -94,10 +84,7 @@ def main() -> int:
         cfg,
         check_remote=not args.no_remote_check,
     )
-    print(
-        "R2 host baseline verification: PASS "
-        f"(tag={cfg['tag']} sha={cfg['sha']} branch={cfg['branch']})"
-    )
+    print(f"R2 host baseline verification: PASS (tag={cfg['tag']} sha={cfg['sha']} branch={cfg['branch']})")
     return 0
 
 

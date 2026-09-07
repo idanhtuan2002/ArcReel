@@ -55,14 +55,8 @@ class ReadinessRequirement(R2ContractModel):
 
     @model_validator(mode="after")
     def validate_resolution(self):
-        if (
-            self.required
-            and self.status is ReadinessState.READY
-            and self.resolved_binding is None
-        ):
-            raise ValueError(
-                "required READY requirement must include resolved_binding"
-            )
+        if self.required and self.status is ReadinessState.READY and self.resolved_binding is None:
+            raise ValueError("required READY requirement must include resolved_binding")
         return self
 
 
@@ -112,8 +106,7 @@ class ProductionReadiness(R2ContractModel):
                 return normalized
             if supplied_state is not expected:
                 raise ValueError(
-                    f"readiness state {supplied_state.value} contradicts requirements; "
-                    f"expected {expected.value}"
+                    f"readiness state {supplied_state.value} contradicts requirements; expected {expected.value}"
                 )
 
         normalized["state"] = expected

@@ -39,7 +39,5 @@ class DependencyResolverRegistry:
 
         snapshot = matches[0].resolve(ref)
         if snapshot.ref != ref:
-            raise ValueError(
-                f"resolver returned {snapshot.ref!r} for {ref!r}"
-            )
+            raise ValueError(f"resolver returned {snapshot.ref!r} for {ref!r}")
         return snapshot

@@ -53,7 +53,5 @@ class ProviderRequest(R2ContractModel):
     def validate_json_mappings(cls, value: Any) -> dict[str, JSONValue]:
         normalized = ensure_json_value(value)
         if not isinstance(normalized, dict):
-            raise ValueError(
-                "provider execution fields must be JSON-compatible mappings"
-            )
+            raise ValueError("provider execution fields must be JSON-compatible mappings")
         return normalized
