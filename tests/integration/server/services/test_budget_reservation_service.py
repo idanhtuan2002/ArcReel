@@ -15,6 +15,11 @@ from lib.budget_reservation import (
 )
 from lib.db.models.api_call import ApiCall
 from lib.db.repositories.budget_reservation_repo import BudgetReservationRepository
+from server.services.budget_reservation_events import (
+    BudgetEventContext,
+    BudgetEventName,
+    RecordingBudgetEventSink,
+)
 from server.services.budget_reservation_service import BudgetReservationService
 
 NOW = datetime(2026, 9, 7, 9, 0, tzinfo=UTC)
@@ -239,3 +244,161 @@ async def test_reconcile_rejects_second_cost_record(
             cost_record_ref=other_ref,
             now=NOW + timedelta(seconds=3),
         )
+
+
+async def test_each_operation_emits_exactly_one_event(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    sink = RecordingBudgetEventSink()
+    service = BudgetReservationService(session_factory, event_sink=sink)
+
+    await service.create_scope(
+        budget_scope_ref="scope-1",
+        currency="USD",
+        authorized_limit=Decimal("10"),
+        now=NOW,
+    )
+    await service.reserve_for_execution(
+        budget_scope_ref="scope-1",
+        reservation_ref="reservation-1",
+        execution_decision_ref="decision-1",
+        amount=Decimal("4"),
+        expires_at=None,
+        provenance={},
+        now=NOW,
+    )
+    await service.claim_for_submission(
+        reservation_ref="reservation-1",
+        execution_decision_ref="decision-1",
+        now=NOW + timedelta(seconds=1),
+    )
+    cost_ref = await _insert_api_call(session_factory, cost=Decimal("3"))
+    await service.reconcile(
+        reservation_ref="reservation-1",
+        execution_decision_ref="decision-1",
+        cost_record_ref=cost_ref,
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert [event.name for event in sink.events] == [
+        BudgetEventName.SCOPE_CREATED,
+        BudgetEventName.RESERVATION_ACTIVE,
+        BudgetEventName.RESERVATION_CLAIMED,
+        BudgetEventName.RESERVATION_RECONCILED,
+    ]
+
+
+async def test_release_and_expire_emit_their_events(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    sink = RecordingBudgetEventSink()
+    service = BudgetReservationService(session_factory, event_sink=sink)
+    await service.create_scope(
+        budget_scope_ref="scope-1",
+        currency="USD",
+        authorized_limit=Decimal("10"),
+        now=NOW,
+    )
+    await service.reserve_for_execution(
+        budget_scope_ref="scope-1",
+        reservation_ref="reservation-release",
+        execution_decision_ref="decision-release",
+        amount=Decimal("2"),
+        expires_at=None,
+        provenance={},
+        now=NOW,
+    )
+    await service.reserve_for_execution(
+        budget_scope_ref="scope-1",
+        reservation_ref="reservation-expire",
+        execution_decision_ref="decision-expire",
+        amount=Decimal("2"),
+        expires_at=NOW + timedelta(seconds=1),
+        provenance={},
+        now=NOW,
+    )
+    sink.events.clear()
+
+    await service.release_pre_submit(
+        reservation_ref="reservation-release",
+        execution_decision_ref="decision-release",
+        now=NOW + timedelta(seconds=1),
+    )
+    expired = await service.expire_due(
+        budget_scope_ref="scope-1",
+        now=NOW + timedelta(seconds=2),
+    )
+
+    assert [event.name for event in sink.events] == [
+        BudgetEventName.RESERVATION_RELEASED,
+        BudgetEventName.RESERVATION_EXPIRED,
+    ]
+    assert [event.reservation_ref for event in sink.events] == [
+        "reservation-release",
+        "reservation-expire",
+    ]
+    assert [snapshot.reservation_ref for snapshot in expired] == ["reservation-expire"]
+
+
+async def test_denied_reserve_emits_single_denied_event(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    sink = RecordingBudgetEventSink()
+    service = BudgetReservationService(session_factory, event_sink=sink)
+    await service.create_scope(
+        budget_scope_ref="scope-1",
+        currency="USD",
+        authorized_limit=Decimal("1"),
+        now=NOW,
+    )
+    sink.events.clear()
+
+    with pytest.raises(BudgetDeniedError):
+        await service.reserve_for_execution(
+            budget_scope_ref="scope-1",
+            reservation_ref="reservation-1",
+            execution_decision_ref="decision-1",
+            amount=Decimal("5"),
+            expires_at=None,
+            provenance={},
+            now=NOW,
+        )
+
+    assert len(sink.events) == 1
+    denied = sink.events[0]
+    assert denied.name is BudgetEventName.RESERVATION_DENIED
+    assert denied.reservation_ref == "reservation-1"
+    assert denied.execution_decision_ref == "decision-1"
+    assert denied.reason_code is not None
+
+
+async def test_event_context_propagates_correlation_ids(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    sink = RecordingBudgetEventSink()
+    context = BudgetEventContext(attempt_ref="attempt-9", trace_id="trace-9", span_id="span-9")
+    service = BudgetReservationService(session_factory, event_sink=sink, event_context=context)
+    await service.create_scope(
+        budget_scope_ref="scope-1",
+        currency="USD",
+        authorized_limit=Decimal("10"),
+        now=NOW,
+    )
+    await service.reserve_for_execution(
+        budget_scope_ref="scope-1",
+        reservation_ref="reservation-1",
+        execution_decision_ref="decision-1",
+        amount=Decimal("4"),
+        expires_at=None,
+        provenance={},
+        now=NOW,
+    )
+
+    for event in sink.events:
+        assert event.attempt_ref == "attempt-9"
+        assert event.trace_id == "trace-9"
+        assert event.span_id == "span-9"
+    active = sink.events[-1]
+    assert active.budget_scope_ref == "scope-1"
+    assert active.reservation_ref == "reservation-1"
+    assert active.execution_decision_ref == "decision-1"
