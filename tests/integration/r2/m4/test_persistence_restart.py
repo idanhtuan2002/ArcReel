@@ -1,10 +1,9 @@
-"""High-6 / D11 §1477-1482 — restart evidence against real persistence.
+"""Restart safety for the C04 reservation state M4 consumes.
 
-The C04 reservation state that M4 consumes through the paid-submission guard is
-driven against a real file-backed SQLite session here; the engine is disposed and
-a fresh one is opened on the same database file, and the reservation / amount /
-currency are re-asserted across the reopen. No in-memory fake stands in for the
-Host boundary M4 actually calls.
+The reservation is driven against a real file-backed SQLite session through the
+paid-submission guard; the engine is disposed and a fresh one opened on the same
+database file, and the reservation / amount / currency are re-asserted across the
+reopen. No in-memory fake stands in for the Host boundary M4 calls.
 """
 
 from __future__ import annotations

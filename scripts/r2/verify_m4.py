@@ -30,8 +30,8 @@ _PLAN = (
     / "2026-09-07-r2-m4-production-intelligence-implementation-plan-APPROVED.md"
 )
 
-# Frozen figures from the M4 plan Global Constraints, unchanged since the
-# post-remediation acceptance (R2_M4_BASELINE_CI_REMEDIATION.md).
+# Expected pass counts for the four frozen regression selections. A run that
+# does not reproduce these exactly (0 fail, 0 skip) fails the gate.
 _FROZEN_EXPECTED = {"m1_frozen": 41, "m2_frozen": 53, "m3_focused": 122, "host_frozen": 349}
 _M4_FOCUSED = ["tests/unit/r2/production_intelligence", "tests/integration/r2/m4"]
 _MUTATIONS = "tests/integration/r2/m4/test_golden_12_mutations.py"

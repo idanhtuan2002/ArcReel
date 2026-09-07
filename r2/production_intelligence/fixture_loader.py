@@ -34,18 +34,9 @@ from r2.contracts import (
     ShotSpec,
     VisualIdentityProfile,
 )
+from r2.production_intelligence.capability_registry import METHOD_HARD_FEATURE
 
 _EPOCH = datetime(2026, 9, 7, 12, 0, tzinfo=UTC)
-
-_METHOD_FEATURE: dict[ProductionMethod, str] = {
-    ProductionMethod.REUSE: "ASSET_REUSE",
-    ProductionMethod.STOCK: "STOCK_LIBRARY",
-    ProductionMethod.SCREEN_CAPTURE: "SCREEN_CAPTURE",
-    ProductionMethod.DETERMINISTIC: "DETERMINISTIC_RENDER",
-    ProductionMethod.GENERATED_IMAGE: "IMAGE_OUTPUT",
-    ProductionMethod.GENERATED_VIDEO: "VIDEO_OUTPUT",
-    ProductionMethod.COMPOSITE: "COMPOSITE_ASSEMBLY",
-}
 
 
 @dataclass(frozen=True)
@@ -150,7 +141,7 @@ def _build_case(entry: dict[str, object]) -> M4ShotCase:
 
     bindings: tuple[ProductionBinding, ...] = ()
     identity_profiles: tuple[VisualIdentityProfile, ...] = ()
-    hard_features = [_METHOD_FEATURE[method]]
+    hard_features = [METHOD_HARD_FEATURE[method]]
     if needs_identity:
         bindings = (
             ProductionBinding(

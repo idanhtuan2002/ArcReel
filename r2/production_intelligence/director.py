@@ -146,7 +146,7 @@ class DirectorValidator:
         # Only a DirectorFailure is trusted verbatim. A DirectorSuccess — even one
         # an adapter built itself — is re-run through the same semantic checks so a
         # malformed or mislabeled success cannot masquerade as a normalized
-        # contract (§322-330).
+        # contract.
         if isinstance(raw_result, DirectorFailure):
             return raw_result
         if isinstance(raw_result, DirectorSuccess):

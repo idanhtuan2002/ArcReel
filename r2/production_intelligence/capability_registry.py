@@ -51,7 +51,8 @@ _HARD_DYNAMIC_PREDICATES: tuple[tuple[str, str, str], ...] = (
     ("runtime_dependencies_ready", "RUNTIME_DEPENDENCIES_NOT_READY", "NO_RUNTIME_DEPENDENCIES_PROOF"),
 )
 
-_METHOD_FEATURE: dict[ProductionMethod, str] = {
+# The hard capability feature every production method requires by definition.
+METHOD_HARD_FEATURE: dict[ProductionMethod, str] = {
     ProductionMethod.REUSE: "ASSET_REUSE",
     ProductionMethod.STOCK: "STOCK_LIBRARY",
     ProductionMethod.SCREEN_CAPTURE: "SCREEN_CAPTURE",
@@ -70,7 +71,8 @@ _EXEC_RANK: dict[ExecutionType, int] = {
 
 
 def default_freshness_policy(*, created_at: datetime | None = None) -> CapabilityFreshnessPolicy:
-    """Concrete Capability Freshness Policy v1 (see plan Global Constraints)."""
+    """Concrete Capability Freshness Policy v1: availability 30s / resource-fit 5s
+    / quota 15s are hard, latency 300s / cost 60s are soft."""
 
     now = created_at or datetime.now(UTC)
     return CapabilityFreshnessPolicy(
@@ -124,7 +126,7 @@ class CapabilityRequirementBuilder:
         identity: ResolvedVisualIdentity,
         shot: ShotSpec,
     ) -> CapabilityRequirements:
-        hard = [_METHOD_FEATURE[method_decision.method]]
+        hard = [METHOD_HARD_FEATURE[method_decision.method]]
         soft: list[str] = []
         for constraint in identity.resolved_constraints:
             if constraint.effective_strength is IdentityStrength.LOCKED:
@@ -257,9 +259,9 @@ class CapabilityMatcher:
                 rejected.append(RejectedCapabilityCandidate(candidate=cap_id, reasons=["STALE_AVAILABILITY"]))
                 continue
 
-            # C03 §754-779 — credentials / endpoint health / runtime deps are HARD
-            # DYNAMIC predicates for a hard requirement: an explicit False rejects,
-            # an unobserved (None) predicate is UNKNOWN and therefore ineligible.
+            # credentials / endpoint health / runtime deps are hard-dynamic
+            # predicates for a hard requirement: an explicit False rejects, an
+            # unobserved (None) predicate is UNKNOWN and therefore ineligible.
             hard_predicate_failed = False
             for pred_name, false_reason, unknown_reason in _HARD_DYNAMIC_PREDICATES:
                 value: bool | None = getattr(availability, pred_name)

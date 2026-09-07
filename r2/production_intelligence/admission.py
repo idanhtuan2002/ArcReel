@@ -7,7 +7,7 @@ port (an atomic reserve); M4 keeps no shadow balance or second cost ledger.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -32,7 +32,7 @@ ADMISSION_POLICY_VERSION = "m4-generation-admission-v1"
 @dataclass(frozen=True)
 class HardDynamicRevalidation:
     """The result of re-proving the selected candidate's hard-dynamic predicates
-    synchronously, immediately before ADMITTED (C03 §754-779)."""
+    synchronously, immediately before ADMITTED."""
 
     ok: bool
     reason_codes: tuple[str, ...] = ()
@@ -40,6 +40,45 @@ class HardDynamicRevalidation:
 
 # Given the selected capability id, re-prove its hard-dynamic predicates now.
 HardDynamicRevalidator = Callable[[str], Awaitable[HardDynamicRevalidation]]
+
+
+@dataclass(frozen=True)
+class _AdmissionInputs:
+    """The provider-neutral inputs every ``GenerationAdmission`` for one attempt
+    is built from; identical across the outcome branches."""
+
+    now: datetime
+    readiness: ProductionReadiness
+    method_decision: MethodDecision
+    capability_resolution: CapabilityResolution
+    prompt_plan: PromptPlan
+
+    @property
+    def target(self) -> str:
+        return self.prompt_plan.target_ref
+
+    def outcome(
+        self,
+        outcome: AdmissionOutcome,
+        reason_codes: Sequence[str],
+        *,
+        budget_reservation_ref: str | None = None,
+        approval_ref: str | None = None,
+    ) -> GenerationAdmission:
+        return GenerationAdmission(
+            id=f"GA:{self.target}:{self.now.strftime('%Y%m%dT%H%M%S%f')}",
+            target_ref=self.target,
+            outcome=outcome,
+            method_decision_ref=self.method_decision.id,
+            capability_resolution_ref=self.capability_resolution.requirement_set_ref,
+            prompt_plan_ref=self.prompt_plan.id,
+            readiness_ref=self.readiness.id,
+            budget_reservation_ref=budget_reservation_ref,
+            approval_ref=approval_ref,
+            reason_codes=list(reason_codes),
+            evaluated_at=self.now,
+            provenance=Provenance(created_by=ProvenanceActor.SYSTEM, created_at=self.now),
+        )
 
 
 class GenerationAdmissionService:
@@ -63,163 +102,71 @@ class GenerationAdmissionService:
         requires_approval: bool = False,
         policy_ok: bool = True,
     ) -> GenerationAdmission:
-        target = prompt_plan.target_ref
+        ctx = _AdmissionInputs(
+            now=now,
+            readiness=readiness,
+            method_decision=method_decision,
+            capability_resolution=capability_resolution,
+            prompt_plan=prompt_plan,
+        )
 
         if readiness.state is not ReadinessState.READY:
-            return self._deny(
-                target,
+            return ctx.outcome(
                 AdmissionOutcome.DENIED_NOT_READY,
-                now,
-                prompt_plan,
-                method_decision,
-                readiness,
-                capability_resolution,
                 ["READINESS_BLOCKED", readiness.blocked_reason or "NOT_READY"],
             )
         if not readiness_is_current:
-            return self._deny(
-                target,
-                AdmissionOutcome.DENIED_NOT_READY,
-                now,
-                prompt_plan,
-                method_decision,
-                readiness,
-                capability_resolution,
-                ["STALE_READINESS"],
-            )
+            return ctx.outcome(AdmissionOutcome.DENIED_NOT_READY, ["STALE_READINESS"])
 
         if not capability_resolution.eligible_candidates:
-            outcome = (
-                AdmissionOutcome.DENIED_UNAVAILABLE
-                if capability_resolution.unknown_candidates
-                else AdmissionOutcome.DENIED_NO_CAPABILITY
-            )
-            reason = "CAPABILITY_UNKNOWN" if capability_resolution.unknown_candidates else "NO_HARD_CAPABILITY"
-            return self._deny(
-                target, outcome, now, prompt_plan, method_decision, readiness, capability_resolution, [reason]
-            )
+            if capability_resolution.unknown_candidates:
+                return ctx.outcome(AdmissionOutcome.DENIED_UNAVAILABLE, ["CAPABILITY_UNKNOWN"])
+            return ctx.outcome(AdmissionOutcome.DENIED_NO_CAPABILITY, ["NO_HARD_CAPABILITY"])
 
         if requires_approval and approval_ref is None:
-            return self._deny(
-                target,
-                AdmissionOutcome.APPROVAL_REQUIRED,
-                now,
-                prompt_plan,
-                method_decision,
-                readiness,
-                capability_resolution,
-                ["APPROVAL_MISSING"],
-                approval_ref=approval_ref,
-            )
+            return ctx.outcome(AdmissionOutcome.APPROVAL_REQUIRED, ["APPROVAL_MISSING"], approval_ref=approval_ref)
 
         if not policy_ok:
-            return self._deny(
-                target,
-                AdmissionOutcome.DENIED_POLICY,
-                now,
-                prompt_plan,
-                method_decision,
-                readiness,
-                capability_resolution,
-                ["POLICY_DENIED"],
-            )
+            return ctx.outcome(AdmissionOutcome.DENIED_POLICY, ["POLICY_DENIED"])
 
-        # Synchronously re-prove the selected (top-ranked) candidate's hard-dynamic
+        # Synchronously re-prove the top-ranked eligible candidate's hard-dynamic
         # predicates before any reservation, so a stale/broken candidate cannot be
         # admitted and cannot leave a dangling reservation behind.
         selected_candidate = capability_resolution.eligible_candidates[0]
         revalidation = await revalidate(selected_candidate)
         if not revalidation.ok:
-            return self._deny(
-                target,
+            return ctx.outcome(
                 AdmissionOutcome.DENIED_UNAVAILABLE,
-                now,
-                prompt_plan,
-                method_decision,
-                readiness,
-                capability_resolution,
                 ["HARD_DYNAMIC_REVALIDATION_FAILED", *revalidation.reason_codes],
                 approval_ref=approval_ref,
             )
 
         budget_reservation_ref: str | None = None
         if budget_scope_ref is not None:
-            reservation_ref = f"RSV:{target}:{now.strftime('%Y%m%dT%H%M%S%f')}"
+            reservation_ref = f"RSV:{ctx.target}:{now.strftime('%Y%m%dT%H%M%S%f')}"
             try:
                 snapshot = await self._budget_port.reserve(
                     budget_scope_ref=budget_scope_ref,
                     reservation_ref=reservation_ref,
-                    execution_decision_ref=f"ED-PENDING:{target}",
+                    execution_decision_ref=f"ED-PENDING:{ctx.target}",
                     amount=budget_amount if budget_amount is not None else Decimal("0"),
                     currency=budget_currency or "",
                     expires_at=None,
-                    provenance={"stage": "admission", "target_ref": target},
+                    provenance={"stage": "admission", "target_ref": ctx.target},
                 )
             except BudgetDeniedError:
-                return self._deny(
-                    target,
-                    AdmissionOutcome.DENIED_BUDGET,
-                    now,
-                    prompt_plan,
-                    method_decision,
-                    readiness,
-                    capability_resolution,
-                    ["HOST_RESERVE_DENIED"],
-                    approval_ref=approval_ref,
-                )
+                return ctx.outcome(AdmissionOutcome.DENIED_BUDGET, ["HOST_RESERVE_DENIED"], approval_ref=approval_ref)
             if snapshot.state is not BudgetReservationState.ACTIVE:
-                return self._deny(
-                    target,
+                return ctx.outcome(
                     AdmissionOutcome.DENIED_BUDGET,
-                    now,
-                    prompt_plan,
-                    method_decision,
-                    readiness,
-                    capability_resolution,
                     [f"RESERVATION_{snapshot.state.value}"],
                     approval_ref=approval_ref,
                 )
             budget_reservation_ref = reservation_ref
 
-        return GenerationAdmission(
-            id=f"GA:{target}:{now.strftime('%Y%m%dT%H%M%S%f')}",
-            target_ref=target,
-            outcome=AdmissionOutcome.ADMITTED,
-            method_decision_ref=method_decision.id,
-            capability_resolution_ref=capability_resolution.requirement_set_ref,
-            prompt_plan_ref=prompt_plan.id,
-            readiness_ref=readiness.id,
+        return ctx.outcome(
+            AdmissionOutcome.ADMITTED,
+            ["ALL_CHECKS_PASS"],
             budget_reservation_ref=budget_reservation_ref,
             approval_ref=approval_ref,
-            reason_codes=["ALL_CHECKS_PASS"],
-            evaluated_at=now,
-            provenance=Provenance(created_by=ProvenanceActor.SYSTEM, created_at=now),
-        )
-
-    @staticmethod
-    def _deny(
-        target: str,
-        outcome: AdmissionOutcome,
-        now: datetime,
-        prompt_plan: PromptPlan,
-        method_decision: MethodDecision,
-        readiness: ProductionReadiness,
-        capability_resolution: CapabilityResolution,
-        reason_codes: list[str],
-        *,
-        approval_ref: str | None = None,
-    ) -> GenerationAdmission:
-        return GenerationAdmission(
-            id=f"GA:{target}:{now.strftime('%Y%m%dT%H%M%S%f')}",
-            target_ref=target,
-            outcome=outcome,
-            method_decision_ref=method_decision.id,
-            capability_resolution_ref=capability_resolution.requirement_set_ref,
-            prompt_plan_ref=prompt_plan.id,
-            readiness_ref=readiness.id,
-            budget_reservation_ref=None,
-            approval_ref=approval_ref,
-            reason_codes=reason_codes,
-            evaluated_at=now,
-            provenance=Provenance(created_by=ProvenanceActor.SYSTEM, created_at=now),
         )

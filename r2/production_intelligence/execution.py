@@ -50,10 +50,10 @@ class ExecutionDecisionService:
         if descriptor is None:
             raise ExecutionNotAdmitted("no capability descriptor for the selected candidate")
 
-        # The attempt choice is locked here (§947-949): the selected candidate must
-        # be one Gate 2 actually found eligible, the descriptor must describe that
-        # same candidate, and the admission / resolution / prompt-plan the decision
-        # cites must all be the ones evaluated for this target (§1075-1084).
+        # The attempt choice is locked here: the selected candidate must be one
+        # Gate 2 actually found eligible, the descriptor must describe that same
+        # candidate, and the admission / resolution / prompt-plan the decision
+        # cites must all be the ones evaluated for this target.
         if selected_capability_id not in capability_resolution.eligible_candidates:
             raise ValueError(
                 f"selected capability {selected_capability_id!r} is not in the eligible candidates "

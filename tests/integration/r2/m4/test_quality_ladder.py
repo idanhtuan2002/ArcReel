@@ -1,9 +1,8 @@
-"""High-4 / C05 §17.3.1 — the Quality Ladder.
+"""Quality Ladder — the MethodDecision is authoritative and tier-independent.
 
-For a generative shot the MethodDecision is authoritative and tier-independent:
-swapping the execution tier (local / cheap-cloud / premium-cloud) must leave the
-MethodDecision untouched while moving the ExecutionDecision and its
-execution_fingerprint.
+For a generative shot, swapping the execution tier (local / cheap-cloud /
+premium-cloud) leaves the MethodDecision untouched while the ExecutionDecision
+and its execution_fingerprint move.
 """
 
 from __future__ import annotations

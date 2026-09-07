@@ -1,5 +1,5 @@
-"""Med-3 — provider neutrality must be enforced on semantic string *values*,
-not only on top-level field names.
+"""Provider neutrality is enforced on semantic string *values*, not only on
+top-level field names.
 
 ``IdentityConstraint`` / ``ResolvedIdentityConstraint`` / ``PromptPlan`` carry
 free semantic strings. A denylist rejects provider payload/CLI syntax so it can

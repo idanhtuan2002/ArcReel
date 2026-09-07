@@ -1,7 +1,7 @@
-"""Med-2 — a CONFLICTED visual identity must not fail silently.
+"""A CONFLICTED visual identity does not fail silently.
 
 The Gate-1 block emits a ``FailureRecord(HUMAN_ACTION_REQUIRED)`` and a
-correlated ``ProductionEvent`` (the C01 review signal), not a bare return.
+correlated ``ProductionEvent`` review signal, not a bare return.
 """
 
 from __future__ import annotations
