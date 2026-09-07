@@ -143,8 +143,14 @@ class DirectorValidator:
         attempted_director: DirectorKind,
         raw_result: object,
     ) -> DirectorResult:
-        if isinstance(raw_result, (DirectorSuccess, DirectorFailure)):
+        # Only a DirectorFailure is trusted verbatim. A DirectorSuccess — even one
+        # an adapter built itself — is re-run through the same semantic checks so a
+        # malformed or mislabeled success cannot masquerade as a normalized
+        # contract (§322-330).
+        if isinstance(raw_result, DirectorFailure):
             return raw_result
+        if isinstance(raw_result, DirectorSuccess):
+            return self._validate_success(raw_result, routing, attempted_director)
 
         scenes = _extract(raw_result, "scenes")
         shots = _extract(raw_result, "shots")
@@ -169,6 +175,27 @@ class DirectorValidator:
                 routing, attempted_director, f"contract validation failed: {exc.error_count()} error(s)"
             )
 
+        return self._validate_success(success, routing, attempted_director)
+
+    def _validate_success(
+        self,
+        success: DirectorSuccess,
+        routing: RoutingDecision,
+        attempted_director: DirectorKind,
+    ) -> DirectorResult:
+        if success.routing_decision_ref != routing.routing_decision_id:
+            return self._contract_failure(
+                routing,
+                attempted_director,
+                f"director success cites routing {success.routing_decision_ref!r}, "
+                f"expected {routing.routing_decision_id!r}",
+            )
+        if success.actual_director is not attempted_director:
+            return self._contract_failure(
+                routing,
+                attempted_director,
+                f"director success reports {success.actual_director.value}, attempted {attempted_director.value}",
+            )
         if not success.shots:
             return self._contract_failure(routing, attempted_director, "director produced no shots")
         scene_ids = {scene.id for scene in success.scenes}

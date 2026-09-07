@@ -112,6 +112,11 @@ by Claude before triage.
   linkage.
 - **Direction:** always re-run the semantic checks; for an incoming `DirectorSuccess`
   re-validate its scenes/shots and refs; only pass a `DirectorFailure` through.
+- **FIXED (next-session batch):** `normalize` now passes only a `DirectorFailure`
+  through verbatim. A `DirectorSuccess` (adapter-built or raw-payload-derived)
+  goes through the shared `_validate_success`: routing-ref match, `actual_director`
+  == attempted, non-empty shots, every `shot.scene_id` present in `scenes`. 4 new
+  rejection tests + a coherent-passthrough + a `DirectorFailure`-passthrough guard.
 
 ### High-4 — Golden-12 is answer-fed; no Quality Ladder
 - **Where:** `r2/production_intelligence/fixtures/m4_golden_12_shots.json`,

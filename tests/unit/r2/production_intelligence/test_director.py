@@ -13,6 +13,8 @@ from r2.contracts import (
     DirectorFailureClass,
     DirectorKind,
     DirectorSuccess,
+    Provenance,
+    ProvenanceActor,
 )
 from r2.m3.director import FixtureOpenMontageBackend, GoldenAOpenMontageAdapter
 from r2.m3.factual_fixture import load_golden_a_factual_bundle
@@ -285,6 +287,87 @@ def test_validator_rejects_shot_referencing_unknown_scene() -> None:
 
 def _split(golden):
     return list(golden.scenes), list(golden.shots)
+
+
+# --------------------------------------------------------------------------- #
+# High-3 — a pre-built DirectorSuccess is still semantically re-validated
+# --------------------------------------------------------------------------- #
+
+
+def _prebuilt_success(routing, director, *, scenes=None, shots=None) -> DirectorSuccess:
+    s, sh = _split(_golden_raw())
+    return DirectorSuccess(
+        routing_decision_ref=routing.routing_decision_id,
+        actual_director=director,
+        scenes=s if scenes is None else scenes,
+        shots=sh if shots is None else shots,
+        validation_summary="adapter-asserted PASS",
+        provenance=Provenance(created_by=ProvenanceActor.SYSTEM, created_at=_CLOCK),
+    )
+
+
+def _run_with_prebuilt(prebuilt, routing):
+    return _service().execute(
+        routing=routing,
+        adapters={DirectorKind.OPENMONTAGE: _FakeAdapter(DirectorKind.OPENMONTAGE, result=prebuilt)},
+        artifact=object(),
+    )
+
+
+def test_prebuilt_director_success_with_orphan_shot_is_rejected() -> None:
+    routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
+    _, shots = _split(_golden_raw())
+    orphan = shots[0].model_copy(update={"scene_id": "SC-NOWHERE"})
+    result = _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE, shots=[orphan]), routing)
+    assert isinstance(result, DirectorFailure)
+    assert result.failure_class is DirectorFailureClass.CONTRACT_OR_SEMANTIC_FAILURE
+
+
+def test_prebuilt_director_success_citing_a_foreign_routing_ref_is_rejected() -> None:
+    routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
+    prebuilt = _prebuilt_success(routing, DirectorKind.OPENMONTAGE).model_copy(
+        update={"routing_decision_ref": "RD:some-other-run"}
+    )
+    result = _run_with_prebuilt(prebuilt, routing)
+    assert isinstance(result, DirectorFailure)
+    assert result.failure_class is DirectorFailureClass.CONTRACT_OR_SEMANTIC_FAILURE
+
+
+def test_prebuilt_director_success_reporting_a_different_director_is_rejected() -> None:
+    routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
+    prebuilt = _prebuilt_success(routing, DirectorKind.TAKE)  # attempted is OPENMONTAGE
+    result = _run_with_prebuilt(prebuilt, routing)
+    assert isinstance(result, DirectorFailure)
+    assert result.failure_class is DirectorFailureClass.CONTRACT_OR_SEMANTIC_FAILURE
+
+
+def test_prebuilt_director_success_with_no_shots_is_rejected() -> None:
+    routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
+    result = _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE, shots=[]), routing)
+    assert isinstance(result, DirectorFailure)
+    assert result.failure_class is DirectorFailureClass.CONTRACT_OR_SEMANTIC_FAILURE
+
+
+def test_a_coherent_prebuilt_director_success_still_passes() -> None:
+    routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
+    result = _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE), routing)
+    assert isinstance(result, DirectorSuccess)
+    assert result.actual_director is DirectorKind.OPENMONTAGE
+
+
+def test_a_prebuilt_director_failure_passes_through_untouched() -> None:
+    routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
+    failure = DirectorFailure(
+        routing_decision_ref="RD:whatever",
+        attempted_director=DirectorKind.TAKE,
+        failure_class=DirectorFailureClass.ROUTE_UNAVAILABLE,
+        retryable=False,
+        fallback_eligible=False,
+        error_code="ROUTE_UNAVAILABLE",
+        message="donor down",
+    )
+    result = _run_with_prebuilt(failure, routing)
+    assert result is failure
 
 
 if __name__ == "__main__":  # pragma: no cover
