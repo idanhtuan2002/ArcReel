@@ -43,6 +43,15 @@ def _resolver() -> VisualIdentityResolver:
     return VisualIdentityResolver()
 
 
+# The SH01 target's scope ancestry: one ref per level it descends from.
+_ANCESTRY = {
+    IdentityScopeType.PROJECT: "PRJ",
+    IdentityScopeType.SEQUENCE: "SEQ1",
+    IdentityScopeType.SCENE: "SC01",
+    IdentityScopeType.SHOT: "SH01",
+}
+
+
 def _by_key(resolved):
     return {rc.semantic_key: rc for rc in resolved.resolved_constraints}
 
@@ -50,6 +59,7 @@ def _by_key(resolved):
 def test_specific_preferred_refines_broader_preferred() -> None:
     resolved = _resolver().resolve(
         target_ref="SH01",
+        scope_ancestry=_ANCESTRY,
         profiles=[
             _profile("P-proj", IdentityScopeType.PROJECT, "PRJ", _c("hairstyle", IdentityStrength.PREFERRED, "bob")),
             _profile(
@@ -67,6 +77,7 @@ def test_specific_preferred_refines_broader_preferred() -> None:
 def test_weaker_narrower_constraint_cannot_weaken_inherited_locked() -> None:
     resolved = _resolver().resolve(
         target_ref="SH01",
+        scope_ancestry=_ANCESTRY,
         profiles=[
             _profile("P-proj", IdentityScopeType.PROJECT, "PRJ", _c("hairstyle", IdentityStrength.LOCKED, "bob")),
             _profile("P-shot", IdentityScopeType.SHOT, "SH01", _c("hairstyle", IdentityStrength.PREFERRED, "ponytail")),
@@ -81,6 +92,7 @@ def test_weaker_narrower_constraint_cannot_weaken_inherited_locked() -> None:
 def test_narrower_locked_may_strengthen_broader_preferred() -> None:
     resolved = _resolver().resolve(
         target_ref="SH01",
+        scope_ancestry=_ANCESTRY,
         profiles=[
             _profile("P-proj", IdentityScopeType.PROJECT, "PRJ", _c("hairstyle", IdentityStrength.PREFERRED, "bob")),
             _profile("P-scene", IdentityScopeType.SCENE, "SC01", _c("hairstyle", IdentityStrength.LOCKED, "bob")),
@@ -93,6 +105,7 @@ def test_narrower_locked_may_strengthen_broader_preferred() -> None:
 def test_conflicting_locked_constraints_produce_conflict_not_a_silent_winner() -> None:
     resolved = _resolver().resolve(
         target_ref="SH01",
+        scope_ancestry=_ANCESTRY,
         profiles=[
             _profile("P-scene", IdentityScopeType.SCENE, "SC01", _c("hairstyle", IdentityStrength.LOCKED, "bob")),
             _profile("P-shot", IdentityScopeType.SHOT, "SH01", _c("hairstyle", IdentityStrength.LOCKED, "long braid")),
@@ -108,14 +121,15 @@ def test_resolution_is_deterministic_regardless_of_profile_order() -> None:
         _profile("P-seq", IdentityScopeType.SEQUENCE, "SEQ1", _c("wardrobe", IdentityStrength.LOCKED, "grey coat")),
         _profile("P-scene", IdentityScopeType.SCENE, "SC01", _c("hairstyle", IdentityStrength.LOCKED, "bob")),
     ]
-    a = _resolver().resolve(target_ref="SH01", profiles=profiles)
-    b = _resolver().resolve(target_ref="SH01", profiles=list(reversed(profiles)))
+    a = _resolver().resolve(target_ref="SH01", scope_ancestry=_ANCESTRY, profiles=profiles)
+    b = _resolver().resolve(target_ref="SH01", scope_ancestry=_ANCESTRY, profiles=list(reversed(profiles)))
     assert a.model_dump(mode="json") == b.model_dump(mode="json")
 
 
 def test_flat_hairstyle_lock_is_treated_as_a_locked_constraint() -> None:
     resolved = _resolver().resolve(
         target_ref="SH01",
+        scope_ancestry=_ANCESTRY,
         profiles=[_profile("P-flat", None, None, hairstyle_lock="bob")],
     )
     hairstyle = _by_key(resolved)["hairstyle"]
@@ -126,12 +140,76 @@ def test_flat_hairstyle_lock_is_treated_as_a_locked_constraint() -> None:
 def test_resolved_view_carries_no_provider_fields() -> None:
     resolved = _resolver().resolve(
         target_ref="SH01",
+        scope_ancestry=_ANCESTRY,
         profiles=[
             _profile("P-proj", IdentityScopeType.PROJECT, "PRJ", _c("hairstyle", IdentityStrength.LOCKED, "bob"))
         ],
     )
     assert set(resolved.model_dump(mode="json")).isdisjoint(FORBIDDEN_PROVIDER_FIELDS)
     assert resolved.observed_profile_versions == ["P-proj@1"]
+
+
+def test_profile_scoped_to_a_different_shot_is_excluded_from_resolution() -> None:
+    resolved = _resolver().resolve(
+        target_ref="SH01",
+        scope_ancestry=_ANCESTRY,
+        profiles=[
+            _profile("P-scene", IdentityScopeType.SCENE, "SC01", _c("hairstyle", IdentityStrength.LOCKED, "bob")),
+            _profile(
+                "P-other-shot", IdentityScopeType.SHOT, "SH99", _c("hairstyle", IdentityStrength.LOCKED, "long braid")
+            ),
+        ],
+    )
+    # The SH99-scoped lock is not on SH01's ancestry, so it never contributes:
+    # no phantom conflict, no phantom provenance.
+    assert resolved.status is ResolvedIdentityStatus.RESOLVED
+    assert _by_key(resolved)["hairstyle"].effective_value == "bob"
+    assert "P-other-shot" not in resolved.contributing_profile_refs
+    assert resolved.observed_profile_versions == ["P-scene@1"]
+
+
+def test_episode_scope_outranks_format_scope_deterministically() -> None:
+    resolved = _resolver().resolve(
+        target_ref="SH01",
+        scope_ancestry={
+            IdentityScopeType.FORMAT: "FMT-explainer",
+            IdentityScopeType.EPISODE: "EP01",
+            IdentityScopeType.SHOT: "SH01",
+        },
+        profiles=[
+            _profile(
+                "P-fmt", IdentityScopeType.FORMAT, "FMT-explainer", _c("palette", IdentityStrength.PREFERRED, "cool")
+            ),
+            _profile("P-ep", IdentityScopeType.EPISODE, "EP01", _c("palette", IdentityStrength.PREFERRED, "warm")),
+        ],
+    )
+    palette = _by_key(resolved)["palette"]
+    assert palette.effective_value == "warm"
+    assert palette.source_scope_ref == "EP01"
+
+
+def test_sibling_format_profile_off_the_ancestry_is_dropped() -> None:
+    resolved = _resolver().resolve(
+        target_ref="SH01",
+        scope_ancestry={IdentityScopeType.FORMAT: "FMT-a", IdentityScopeType.SHOT: "SH01"},
+        profiles=[
+            _profile("P-fmt-a", IdentityScopeType.FORMAT, "FMT-a", _c("palette", IdentityStrength.LOCKED, "warm")),
+            _profile("P-fmt-b", IdentityScopeType.FORMAT, "FMT-b", _c("palette", IdentityStrength.LOCKED, "cool")),
+        ],
+    )
+    assert resolved.status is ResolvedIdentityStatus.RESOLVED
+    assert _by_key(resolved)["palette"].effective_value == "warm"
+    assert resolved.contributing_profile_refs == ["P-fmt-a"]
+
+
+def test_unscoped_profile_always_contributes_as_the_broad_base() -> None:
+    resolved = _resolver().resolve(
+        target_ref="SH01",
+        scope_ancestry={IdentityScopeType.SHOT: "SH01"},
+        profiles=[_profile("P-flat", None, None, hairstyle_lock="bob")],
+    )
+    assert _by_key(resolved)["hairstyle"].effective_value == "bob"
+    assert resolved.contributing_profile_refs == ["P-flat"]
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -65,6 +65,14 @@ class M4ShotCase:
     paid: bool
     requires_approval: bool
 
+    @property
+    def scope_ancestry(self) -> dict[IdentityScopeType, str]:
+        """The scope refs this shot descends from, for identity resolution."""
+        return {
+            IdentityScopeType.SCENE: self.scene.id,
+            IdentityScopeType.SHOT: self.shot.id,
+        }
+
 
 @dataclass(frozen=True)
 class M4GoldenFixture:

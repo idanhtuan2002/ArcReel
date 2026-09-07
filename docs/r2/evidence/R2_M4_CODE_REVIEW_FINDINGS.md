@@ -159,6 +159,14 @@ by Claude before triage.
 - **Direction:** pass the target's scope ancestry (project / format / episode /
   sequence / scene / shot refs) and filter profiles whose `scope_ref` is on that
   path; define a deterministic FORMAT-vs-EPISODE precedence.
+- **FIXED (next-session batch):** `VisualIdentityResolver.resolve` now takes a
+  required `scope_ancestry: Mapping[IdentityScopeType, str]`. `_is_on_ancestry`
+  keeps an unscoped profile (broad base) and a scoped profile only when
+  `scope_ancestry[scope_type] == scope_ref`; off-path siblings are dropped from
+  `contributing_profile_refs` / `observed_profile_versions`, never id-tie-broken.
+  `_SCOPE_RANK` is now a total order with EPISODE (3) more specific than FORMAT
+  (2). `M4ShotCase.scope_ancestry` supplies the golden path; new `test_identity`
+  cases cover exclusion, EPISODE-over-FORMAT, sibling drop and the unscoped base.
 
 ### Med-2 — frozen VisualIdentity locks silently disappear; conflict emits no signal
 - **Where:** `r2/production_intelligence/identity.py` (`_flat_constraints`), pipeline.

@@ -232,7 +232,9 @@ async def test_mut_08_stale_capability_observation_cannot_silently_admit(golden_
 
 def _resolved_identity(result):
     return VisualIdentityResolver().resolve(
-        target_ref=result.case.shot.id, profiles=list(result.case.identity_profiles)
+        target_ref=result.case.shot.id,
+        scope_ancestry=result.case.scope_ancestry,
+        profiles=list(result.case.identity_profiles),
     )
 
 

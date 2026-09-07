@@ -138,7 +138,11 @@ async def run_pipeline(
         return result
     result.trace.append("DirectorSuccess")
 
-    resolved_identity = VisualIdentityResolver().resolve(target_ref=case.shot.id, profiles=list(case.identity_profiles))
+    resolved_identity = VisualIdentityResolver().resolve(
+        target_ref=case.shot.id,
+        scope_ancestry=case.scope_ancestry,
+        profiles=list(case.identity_profiles),
+    )
     bindings = () if drop_required_binding else case.bindings
     readiness = ProductionReadinessEvaluator().evaluate(
         shot=case.shot,

@@ -8,7 +8,7 @@ Showrunner to resolve upstream.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from r2.contracts import (
     IdentityConstraint,
@@ -22,15 +22,16 @@ from r2.contracts import (
 
 RESOLUTION_POLICY_VERSION = "m4-identity-resolution-v1"
 
-# Broad -> specific. FORMAT and EPISODE are siblings; a profile with no scope is
-# treated as the broadest possible base.
+# Broad -> specific, total order. An EPISODE belongs to a FORMAT, so an
+# episode-scoped constraint is the more specific of the two and wins a tie. A
+# profile with no scope is treated as the broadest possible base.
 _SCOPE_RANK: dict[IdentityScopeType, int] = {
     IdentityScopeType.PROJECT: 1,
     IdentityScopeType.FORMAT: 2,
-    IdentityScopeType.EPISODE: 2,
-    IdentityScopeType.SEQUENCE: 3,
-    IdentityScopeType.SCENE: 4,
-    IdentityScopeType.SHOT: 5,
+    IdentityScopeType.EPISODE: 3,
+    IdentityScopeType.SEQUENCE: 4,
+    IdentityScopeType.SCENE: 5,
+    IdentityScopeType.SHOT: 6,
 }
 _STRENGTH_RANK: dict[IdentityStrength, int] = {
     IdentityStrength.ADVISORY: 0,
@@ -51,6 +52,22 @@ class _Effective:
 
 def _scope_rank(scope_type: IdentityScopeType | None) -> int:
     return 0 if scope_type is None else _SCOPE_RANK[scope_type]
+
+
+def _is_on_ancestry(
+    profile: VisualIdentityProfile,
+    scope_ancestry: Mapping[IdentityScopeType, str],
+) -> bool:
+    """A profile contributes only when its scope is one the target descends from.
+
+    Unscoped profiles are the broad base and always apply. A scoped profile
+    applies iff the target's ancestor at that scope level is exactly the
+    profile's ``scope_ref`` — a profile scoped to a sibling scene/shot/format is
+    dropped, never tie-broken on profile id.
+    """
+    if profile.scope_type is None:
+        return True
+    return scope_ancestry.get(profile.scope_type) == profile.scope_ref
 
 
 def _flat_constraints(profile: VisualIdentityProfile) -> list[IdentityConstraint]:
@@ -79,9 +96,11 @@ class VisualIdentityResolver:
         self,
         *,
         target_ref: str,
+        scope_ancestry: Mapping[IdentityScopeType, str],
         profiles: Sequence[VisualIdentityProfile],
     ) -> ResolvedVisualIdentity:
-        ordered = sorted(profiles, key=lambda p: (_scope_rank(p.scope_type), p.id))
+        applicable = [p for p in profiles if _is_on_ancestry(p, scope_ancestry)]
+        ordered = sorted(applicable, key=lambda p: (_scope_rank(p.scope_type), p.id))
 
         effective: dict[str, _Effective] = {}
         conflicts: list[str] = []
@@ -105,11 +124,11 @@ class VisualIdentityResolver:
         return ResolvedVisualIdentity(
             target_ref=target_ref,
             status=status,
-            contributing_profile_refs=sorted(p.id for p in profiles),
+            contributing_profile_refs=sorted(p.id for p in applicable),
             resolved_constraints=resolved_constraints,
             conflicts=sorted(conflicts),
             resolution_policy_version=RESOLUTION_POLICY_VERSION,
-            observed_profile_versions=sorted(f"{p.id}@{p.version}" for p in profiles),
+            observed_profile_versions=sorted(f"{p.id}@{p.version}" for p in applicable),
         )
 
     @staticmethod
