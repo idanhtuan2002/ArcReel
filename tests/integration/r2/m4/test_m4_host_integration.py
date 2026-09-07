@@ -75,3 +75,27 @@ async def test_paid_submission_without_reservation_service_is_rejected(hostkit) 
             attempt_ref="ATT-1",
             content_fingerprint=_CONTENT_FP,
         )
+
+
+async def test_request_provider_must_match_the_execution_decision(hostkit) -> None:
+    with pytest.raises(ValueError, match="provider"):
+        await M4HostIntegration(submitter=hostkit.Submitter()).execute_admitted(
+            decision=hostkit.make_decision(provider="cloud", reservation=None),
+            request=hostkit.make_request(provider="somewhere-else"),
+            attempt_ref="ATT-1",
+            content_fingerprint=_CONTENT_FP,
+        )
+    assert hostkit.Submitter().calls == 0
+
+
+async def test_request_model_must_match_the_execution_decision(hostkit) -> None:
+    submitter = hostkit.Submitter()
+    mismatched = hostkit.make_request(provider="cloud").model_copy(update={"model": "cap:other"})
+    with pytest.raises(ValueError, match="model"):
+        await M4HostIntegration(submitter=submitter).execute_admitted(
+            decision=hostkit.make_decision(provider="cloud", reservation=None),
+            request=mismatched,
+            attempt_ref="ATT-1",
+            content_fingerprint=_CONTENT_FP,
+        )
+    assert submitter.calls == 0

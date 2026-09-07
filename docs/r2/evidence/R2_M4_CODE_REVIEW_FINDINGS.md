@@ -94,6 +94,14 @@ by Claude before triage.
 - **Direction:** validate candidate membership + descriptor identity + ref/target
   coherence in `create()`; in host integration assert `request.provider ==
   decision.provider_id` and `request.model == decision.model_or_tool_id`.
+- **FIXED (next-session batch):** `ExecutionDecisionService.create` now rejects
+  (`ValueError`) a `selected_capability_id` outside
+  `capability_resolution.eligible_candidates`, a `descriptor.capability_id` that
+  is not the selected one, and an `admission` whose `capability_resolution_ref` /
+  `prompt_plan_ref` / `target_ref` disagree with the resolution / plan it is
+  handed. `M4HostIntegration.execute_admitted` asserts `request.provider ==
+  decision.provider_id` and `request.model == decision.model_or_tool_id` before
+  any submit. 5 + 2 new tests.
 
 ### High-3 — a pre-built DirectorSuccess bypasses D03 validation
 - **Where:** `r2/production_intelligence/director.py` (`DirectorValidator.normalize`).

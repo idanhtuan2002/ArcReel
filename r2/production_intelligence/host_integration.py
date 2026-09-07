@@ -58,6 +58,19 @@ class M4HostIntegration:
         attempt_ref: str,
         content_fingerprint: str,
     ) -> GenerationCandidate:
+        # The request must carry exactly the provider/model the ExecutionDecision
+        # locked; the Host adapter never silently submits to a different one.
+        if request.provider != decision.provider_id:
+            raise ValueError(
+                f"request provider {request.provider!r} does not match the ExecutionDecision provider "
+                f"{decision.provider_id!r}"
+            )
+        if request.model != decision.model_or_tool_id:
+            raise ValueError(
+                f"request model {request.model!r} does not match the ExecutionDecision model_or_tool_id "
+                f"{decision.model_or_tool_id!r}"
+            )
+
         execution_fingerprint = compute_execution_fingerprint(
             provider=request.provider,
             model=request.model,

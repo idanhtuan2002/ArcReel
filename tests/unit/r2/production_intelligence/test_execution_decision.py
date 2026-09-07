@@ -124,6 +124,64 @@ def test_non_admitted_admission_cannot_create_an_execution_decision() -> None:
         )
 
 
+def test_rejects_a_selected_capability_absent_from_eligible_candidates() -> None:
+    with pytest.raises(ValueError, match="eligible"):
+        _create("cap:not-eligible", "provider-x")
+
+
+def test_rejects_a_descriptor_whose_capability_id_is_not_the_selected_one() -> None:
+    with pytest.raises(ValueError, match="descriptor"):
+        ExecutionDecisionService().create(
+            admission=_admission(),
+            capability_resolution=_resolution(),
+            prompt_plan=_plan(),
+            selected_capability_id="cap:a",
+            descriptor=_descriptor("cap:b", "provider-x"),
+        )
+
+
+def test_rejects_admission_whose_resolution_ref_does_not_match_the_resolution() -> None:
+    other = CapabilityResolution(
+        requirement_set_ref="a-different-hash",
+        registry_version="reg-v1",
+        observation_snapshot_ref="obs-1",
+        matcher_policy_version="match-v1",
+        eligible_candidates=["cap:a", "cap:b"],
+    )
+    with pytest.raises(ValueError, match="capability_resolution_ref"):
+        ExecutionDecisionService().create(
+            admission=_admission(),
+            capability_resolution=other,
+            prompt_plan=_plan(),
+            selected_capability_id="cap:a",
+            descriptor=_descriptor("cap:a", "provider-x"),
+        )
+
+
+def test_rejects_admission_whose_prompt_plan_ref_does_not_match_the_plan() -> None:
+    plan = _plan().model_copy(update={"id": "PP:DIFFERENT"})
+    with pytest.raises(ValueError, match="prompt_plan_ref"):
+        ExecutionDecisionService().create(
+            admission=_admission(),
+            capability_resolution=_resolution(),
+            prompt_plan=plan,
+            selected_capability_id="cap:a",
+            descriptor=_descriptor("cap:a", "provider-x"),
+        )
+
+
+def test_rejects_admission_and_plan_that_disagree_on_the_target() -> None:
+    plan = _plan().model_copy(update={"target_ref": "SH99"})
+    with pytest.raises(ValueError, match="target"):
+        ExecutionDecisionService().create(
+            admission=_admission(),
+            capability_resolution=_resolution(),
+            prompt_plan=plan,
+            selected_capability_id="cap:a",
+            descriptor=_descriptor("cap:a", "provider-x"),
+        )
+
+
 def test_execution_decision_service_has_no_method_change_surface() -> None:
     service = ExecutionDecisionService()
     assert not any("method" in name.lower() and "change" in name.lower() for name in dir(service))

@@ -50,6 +50,36 @@ class ExecutionDecisionService:
         if descriptor is None:
             raise ExecutionNotAdmitted("no capability descriptor for the selected candidate")
 
+        # The attempt choice is locked here (§947-949): the selected candidate must
+        # be one Gate 2 actually found eligible, the descriptor must describe that
+        # same candidate, and the admission / resolution / prompt-plan the decision
+        # cites must all be the ones evaluated for this target (§1075-1084).
+        if selected_capability_id not in capability_resolution.eligible_candidates:
+            raise ValueError(
+                f"selected capability {selected_capability_id!r} is not in the eligible candidates "
+                f"{list(capability_resolution.eligible_candidates)}"
+            )
+        if descriptor.capability_id != selected_capability_id:
+            raise ValueError(
+                f"descriptor capability_id {descriptor.capability_id!r} does not match the selected "
+                f"capability {selected_capability_id!r}"
+            )
+        if admission.capability_resolution_ref != capability_resolution.requirement_set_ref:
+            raise ValueError(
+                f"admission capability_resolution_ref {admission.capability_resolution_ref!r} does not match "
+                f"the resolution requirement_set_ref {capability_resolution.requirement_set_ref!r}"
+            )
+        if admission.prompt_plan_ref != prompt_plan.id:
+            raise ValueError(
+                f"admission prompt_plan_ref {admission.prompt_plan_ref!r} does not match the prompt plan "
+                f"{prompt_plan.id!r}"
+            )
+        if admission.target_ref != prompt_plan.target_ref:
+            raise ValueError(
+                f"admission target_ref {admission.target_ref!r} and prompt plan target_ref "
+                f"{prompt_plan.target_ref!r} disagree"
+            )
+
         request_semantics_hash = _request_semantics_hash(prompt_plan, admission, selected_capability_id)
         return ExecutionDecision(
             id=f"ED:{prompt_plan.target_ref}:{selected_capability_id}:{request_semantics_hash[:12]}",
