@@ -191,6 +191,9 @@ def _build_case(entry: dict[str, object]) -> M4ShotCase:
         capability_id=descriptor.capability_id,
         observation_class="HARD_DYNAMIC_AVAILABILITY",
         availability=CapabilityAvailability.AVAILABLE,
+        credentials_ready=True,
+        endpoint_healthy=True,
+        runtime_dependencies_ready=True,
         observed_at=_EPOCH,
         observation_version=f"{descriptor.capability_id}-obs-1",
     )

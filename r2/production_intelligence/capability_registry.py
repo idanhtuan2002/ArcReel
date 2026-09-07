@@ -44,6 +44,13 @@ _CLASS_AVAILABILITY = "HARD_DYNAMIC_AVAILABILITY"
 _CLASS_RESOURCE_FIT = "HARD_DYNAMIC_RESOURCE_FIT"
 _CLASS_QUOTA = "HARD_DYNAMIC_QUOTA"
 
+# (observation field, reason when False, reason when unobserved)
+_HARD_DYNAMIC_PREDICATES: tuple[tuple[str, str, str], ...] = (
+    ("credentials_ready", "CREDENTIALS_NOT_READY", "NO_CREDENTIALS_PROOF"),
+    ("endpoint_healthy", "ENDPOINT_UNHEALTHY", "NO_ENDPOINT_HEALTH_PROOF"),
+    ("runtime_dependencies_ready", "RUNTIME_DEPENDENCIES_NOT_READY", "NO_RUNTIME_DEPENDENCIES_PROOF"),
+)
+
 _METHOD_FEATURE: dict[ProductionMethod, str] = {
     ProductionMethod.REUSE: "ASSET_REUSE",
     ProductionMethod.STOCK: "STOCK_LIBRARY",
@@ -210,6 +217,13 @@ class CapabilityMatcher:
                 rejected.append(RejectedCapabilityCandidate(candidate=cap_id, reasons=["METHOD_UNSUPPORTED"]))
                 continue
 
+            if (
+                requirements.required_execution_types
+                and descriptor.execution_type not in requirements.required_execution_types
+            ):
+                rejected.append(RejectedCapabilityCandidate(candidate=cap_id, reasons=["EXECUTION_TYPE_DISALLOWED"]))
+                continue
+
             hard_states = [feature_support.get(f, CapabilitySupport.UNKNOWN) for f in requirements.hard_features]
             if CapabilitySupport.UNSUPPORTED in hard_states:
                 missing = [
@@ -241,6 +255,24 @@ class CapabilityMatcher:
             if _is_stale(availability, rules, now):
                 unknown.add(cap_id)
                 rejected.append(RejectedCapabilityCandidate(candidate=cap_id, reasons=["STALE_AVAILABILITY"]))
+                continue
+
+            # C03 §754-779 — credentials / endpoint health / runtime deps are HARD
+            # DYNAMIC predicates for a hard requirement: an explicit False rejects,
+            # an unobserved (None) predicate is UNKNOWN and therefore ineligible.
+            hard_predicate_failed = False
+            for pred_name, false_reason, unknown_reason in _HARD_DYNAMIC_PREDICATES:
+                value: bool | None = getattr(availability, pred_name)
+                if value is None:
+                    unknown.add(cap_id)
+                    rejected.append(RejectedCapabilityCandidate(candidate=cap_id, reasons=[unknown_reason]))
+                    hard_predicate_failed = True
+                    break
+                if value is False:
+                    rejected.append(RejectedCapabilityCandidate(candidate=cap_id, reasons=[false_reason]))
+                    hard_predicate_failed = True
+                    break
+            if hard_predicate_failed:
                 continue
 
             resource_fit = obs_by_class.get(_CLASS_RESOURCE_FIT)

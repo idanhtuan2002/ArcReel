@@ -7,6 +7,8 @@ port (an atomic reserve); M4 keeps no shadow balance or second cost ledger.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
@@ -27,6 +29,19 @@ from r2.production.budget_port import BudgetAuthorizationPort
 ADMISSION_POLICY_VERSION = "m4-generation-admission-v1"
 
 
+@dataclass(frozen=True)
+class HardDynamicRevalidation:
+    """The result of re-proving the selected candidate's hard-dynamic predicates
+    synchronously, immediately before ADMITTED (C03 §754-779)."""
+
+    ok: bool
+    reason_codes: tuple[str, ...] = ()
+
+
+# Given the selected capability id, re-prove its hard-dynamic predicates now.
+HardDynamicRevalidator = Callable[[str], Awaitable[HardDynamicRevalidation]]
+
+
 class GenerationAdmissionService:
     def __init__(self, *, budget_port: BudgetAuthorizationPort) -> None:
         self._budget_port = budget_port
@@ -43,6 +58,7 @@ class GenerationAdmissionService:
         budget_currency: str | None,
         approval_ref: str | None,
         now: datetime,
+        revalidate: HardDynamicRevalidator,
         readiness_is_current: bool = True,
         requires_approval: bool = False,
         policy_ok: bool = True,
@@ -106,6 +122,24 @@ class GenerationAdmissionService:
                 readiness,
                 capability_resolution,
                 ["POLICY_DENIED"],
+            )
+
+        # Synchronously re-prove the selected (top-ranked) candidate's hard-dynamic
+        # predicates before any reservation, so a stale/broken candidate cannot be
+        # admitted and cannot leave a dangling reservation behind.
+        selected_candidate = capability_resolution.eligible_candidates[0]
+        revalidation = await revalidate(selected_candidate)
+        if not revalidation.ok:
+            return self._deny(
+                target,
+                AdmissionOutcome.DENIED_UNAVAILABLE,
+                now,
+                prompt_plan,
+                method_decision,
+                readiness,
+                capability_resolution,
+                ["HARD_DYNAMIC_REVALIDATION_FAILED", *revalidation.reason_codes],
+                approval_ref=approval_ref,
             )
 
         budget_reservation_ref: str | None = None

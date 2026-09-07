@@ -51,11 +51,22 @@ def _descriptor(
     )
 
 
-def _availability(cap_id: str, *, availability=CapabilityAvailability.AVAILABLE, age_seconds: float = 1.0):
+def _availability(
+    cap_id: str,
+    *,
+    availability=CapabilityAvailability.AVAILABLE,
+    age_seconds: float = 1.0,
+    credentials_ready: bool | None = True,
+    endpoint_healthy: bool | None = True,
+    runtime_dependencies_ready: bool | None = True,
+):
     return CapabilityObservation(
         capability_id=cap_id,
         observation_class="HARD_DYNAMIC_AVAILABILITY",
         availability=availability,
+        credentials_ready=credentials_ready,
+        endpoint_healthy=endpoint_healthy,
+        runtime_dependencies_ready=runtime_dependencies_ready,
         observed_at=_NOW - timedelta(seconds=age_seconds),
         observation_version=f"{cap_id}-avail",
     )
@@ -66,6 +77,9 @@ def _feature_obs(cap_id: str, feature: str, support: CapabilitySupport, *, age_s
         capability_id=cap_id,
         observation_class="HARD_DYNAMIC_AVAILABILITY",
         availability=CapabilityAvailability.AVAILABLE,
+        credentials_ready=True,
+        endpoint_healthy=True,
+        runtime_dependencies_ready=True,
         feature_support=[CapabilityFeatureSupport(feature_key=feature, support=support)],
         observed_at=_NOW - timedelta(seconds=age_seconds),
         observation_version=f"{cap_id}-feat",
@@ -250,6 +264,94 @@ def test_eligible_candidates_ranked_local_before_api() -> None:
         ["CHARACTER_REFERENCE"],
     )
     assert res.eligible_candidates == ["cap:local", "cap:api"]
+
+
+@pytest.mark.parametrize(
+    ("predicate", "reason"),
+    [
+        ("credentials_ready", "CREDENTIALS_NOT_READY"),
+        ("endpoint_healthy", "ENDPOINT_UNHEALTHY"),
+        ("runtime_dependencies_ready", "RUNTIME_DEPENDENCIES_NOT_READY"),
+    ],
+)
+def test_a_false_hard_dynamic_predicate_rejects_the_candidate(predicate: str, reason: str) -> None:
+    res = _resolve(
+        [_descriptor("cap:a", methods=[ProductionMethod.GENERATED_IMAGE], features=["CHARACTER_REFERENCE"])],
+        [_availability("cap:a", **{predicate: False})],
+        ["CHARACTER_REFERENCE"],
+    )
+    assert res.eligible_candidates == []
+    assert any(r.candidate == "cap:a" and reason in r.reasons for r in res.rejected_candidates)
+
+
+@pytest.mark.parametrize("predicate", ["credentials_ready", "endpoint_healthy", "runtime_dependencies_ready"])
+def test_an_unobserved_hard_dynamic_predicate_makes_the_candidate_unknown(predicate: str) -> None:
+    res = _resolve(
+        [_descriptor("cap:a", methods=[ProductionMethod.GENERATED_IMAGE], features=["CHARACTER_REFERENCE"])],
+        [_availability("cap:a", **{predicate: None})],
+        ["CHARACTER_REFERENCE"],
+    )
+    assert res.eligible_candidates == []
+    assert res.unknown_candidates == ["cap:a"]
+
+
+def test_required_execution_types_excludes_a_disallowed_execution_type() -> None:
+    requirements = CapabilityRequirementBuilder().build_from_features(
+        target_ref="SH01",
+        method=ProductionMethod.GENERATED_IMAGE,
+        hard_features=["CHARACTER_REFERENCE"],
+        soft_features=[],
+    )
+    requirements = requirements.model_copy(update={"required_execution_types": [ExecutionType.LOCAL]})
+    registry = CapabilityRegistry(
+        descriptors=[
+            _descriptor(
+                "cap:api",
+                methods=[ProductionMethod.GENERATED_IMAGE],
+                features=["CHARACTER_REFERENCE"],
+                execution_type=ExecutionType.API,
+            )
+        ],
+        observations=[_availability("cap:api")],
+        registry_version="reg-v1",
+    )
+    res = CapabilityMatcher().resolve(
+        requirements=requirements,
+        registry=registry,
+        freshness_policy=default_freshness_policy(created_at=_NOW),
+        now=_NOW,
+    )
+    assert res.eligible_candidates == []
+    assert any(r.candidate == "cap:api" and "EXECUTION_TYPE_DISALLOWED" in r.reasons for r in res.rejected_candidates)
+
+
+def test_required_execution_types_admits_a_matching_execution_type() -> None:
+    requirements = CapabilityRequirementBuilder().build_from_features(
+        target_ref="SH01",
+        method=ProductionMethod.GENERATED_IMAGE,
+        hard_features=["CHARACTER_REFERENCE"],
+        soft_features=[],
+    )
+    requirements = requirements.model_copy(update={"required_execution_types": [ExecutionType.LOCAL]})
+    registry = CapabilityRegistry(
+        descriptors=[
+            _descriptor(
+                "cap:local",
+                methods=[ProductionMethod.GENERATED_IMAGE],
+                features=["CHARACTER_REFERENCE"],
+                execution_type=ExecutionType.LOCAL,
+            )
+        ],
+        observations=[_availability("cap:local")],
+        registry_version="reg-v1",
+    )
+    res = CapabilityMatcher().resolve(
+        requirements=requirements,
+        registry=registry,
+        freshness_policy=default_freshness_policy(created_at=_NOW),
+        now=_NOW,
+    )
+    assert res.eligible_candidates == ["cap:local"]
 
 
 def test_freshness_policy_constants_match_global_constraints() -> None:

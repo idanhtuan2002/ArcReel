@@ -80,6 +80,18 @@ by Claude before triage.
   hard requirement; enforce `required_execution_types`; add a synchronous
   revalidation hook (or required freshness-proof argument) to admission for the
   selected candidate before `ADMITTED`.
+- **FIXED (next-session batch):** `CapabilityMatcher.resolve` now treats
+  `credentials_ready` / `endpoint_healthy` / `runtime_dependencies_ready` on the
+  availability observation as hard predicates — `False` rejects with a specific
+  reason, unobserved (`None`) is UNKNOWN and ineligible — and rejects a candidate
+  whose `descriptor.execution_type` is outside a non-empty
+  `requirements.required_execution_types` (`EXECUTION_TYPE_DISALLOWED`).
+  `GenerationAdmissionService.evaluate` gains a required `revalidate:
+  HardDynamicRevalidator` awaited on the top-ranked eligible candidate
+  immediately before the reservation; a non-`ok` result is
+  `DENIED_UNAVAILABLE` / `HARD_DYNAMIC_REVALIDATION_FAILED` and reserves nothing.
+  The golden runner supplies a real re-`resolve` revalidator; the golden
+  observation now carries the three predicates.
 
 ### High-1 — ExecutionDecision does not lock the selected capability/provider
 - **Where:** `r2/production_intelligence/execution.py` (`ExecutionDecisionService.create`),

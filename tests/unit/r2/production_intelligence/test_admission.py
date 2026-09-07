@@ -15,10 +15,20 @@ from r2.contracts import (
     ProductionMethod,
     ProductionReadiness,
 )
-from r2.production_intelligence.admission import GenerationAdmissionService
+from r2.production_intelligence.admission import GenerationAdmissionService, HardDynamicRevalidation
 from r2.production_intelligence.execution import ExecutionDecisionService, ExecutionNotAdmitted
 
 _NOW = datetime(2026, 9, 7, 12, 0, tzinfo=UTC)
+
+
+class _RevalidatorSpy:
+    def __init__(self, *, ok: bool = True, reason_codes: tuple[str, ...] = ()) -> None:
+        self._result = HardDynamicRevalidation(ok=ok, reason_codes=reason_codes)
+        self.seen: list[str] = []
+
+    async def __call__(self, capability_id: str) -> HardDynamicRevalidation:
+        self.seen.append(capability_id)
+        return self._result
 
 
 class _FakeBudgetPort:
@@ -107,6 +117,7 @@ async def _evaluate(port, **over):
         "budget_currency": None,
         "approval_ref": None,
         "now": _NOW,
+        "revalidate": _RevalidatorSpy(),
     }
     kwargs.update(over)
     return await GenerationAdmissionService(budget_port=port).evaluate(**kwargs)
@@ -188,3 +199,33 @@ async def test_hard_budget_admitted_carries_reservation_ref() -> None:
     assert admission.outcome is AdmissionOutcome.ADMITTED
     assert admission.budget_reservation_ref is not None
     assert port.reserve_calls == 1
+
+
+async def test_failed_hard_dynamic_revalidation_denies_even_with_eligible_candidates() -> None:
+    port = _FakeBudgetPort()
+    spy = _RevalidatorSpy(ok=False, reason_codes=("ENDPOINT_UNHEALTHY",))
+    admission = await _evaluate(port, revalidate=spy)
+    assert admission.outcome is AdmissionOutcome.DENIED_UNAVAILABLE
+    assert "HARD_DYNAMIC_REVALIDATION_FAILED" in admission.reason_codes
+    assert "ENDPOINT_UNHEALTHY" in admission.reason_codes
+
+
+async def test_revalidation_targets_the_top_ranked_eligible_candidate() -> None:
+    port = _FakeBudgetPort()
+    spy = _RevalidatorSpy()
+    await _evaluate(port, capability_resolution=_resolution(eligible=("cap:top", "cap:second")), revalidate=spy)
+    assert spy.seen == ["cap:top"]
+
+
+async def test_failed_revalidation_does_not_reserve_budget() -> None:
+    port = _FakeBudgetPort()
+    spy = _RevalidatorSpy(ok=False, reason_codes=("STALE_AVAILABILITY",))
+    admission = await _evaluate(
+        port,
+        budget_scope_ref="scope:1",
+        budget_amount=Decimal("2.50"),
+        budget_currency="USD",
+        revalidate=spy,
+    )
+    assert admission.outcome is AdmissionOutcome.DENIED_UNAVAILABLE
+    assert port.reserve_calls == 0

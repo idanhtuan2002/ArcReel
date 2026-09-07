@@ -101,6 +101,9 @@ async def test_mut_05_same_method_provider_fallback_new_ed_same_content_fp_chang
         capability_id="cap:sh05-alt",
         observation_class="HARD_DYNAMIC_AVAILABILITY",
         availability=CapabilityAvailability.AVAILABLE,
+        credentials_ready=True,
+        endpoint_healthy=True,
+        runtime_dependencies_ready=True,
         observed_at=_NOW,
         observation_version="cap:sh05-alt-obs",
     )

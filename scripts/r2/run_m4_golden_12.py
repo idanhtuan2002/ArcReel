@@ -31,7 +31,7 @@ from r2.contracts import (
     ProductionMethod,
     ReadinessState,
 )
-from r2.production_intelligence.admission import GenerationAdmissionService
+from r2.production_intelligence.admission import GenerationAdmissionService, HardDynamicRevalidation
 from r2.production_intelligence.capability_registry import (
     CapabilityMatcher,
     CapabilityRegistry,
@@ -228,6 +228,17 @@ async def run_pipeline(
     result.prompt_plan = prompt_plan
     result.trace.append("PromptPlan")
 
+    async def _revalidate(capability_id: str) -> HardDynamicRevalidation:
+        fresh = CapabilityMatcher().resolve(
+            requirements=requirements,
+            registry=registry,
+            freshness_policy=default_freshness_policy(created_at=_NOW),
+            now=_NOW,
+        )
+        if capability_id in fresh.eligible_candidates:
+            return HardDynamicRevalidation(ok=True)
+        return HardDynamicRevalidation(ok=False, reason_codes=("NO_LONGER_ELIGIBLE",))
+
     port = _FakeBudgetPort(deny=budget_denied)
     admission = await GenerationAdmissionService(budget_port=port).evaluate(
         readiness=readiness,
@@ -239,6 +250,7 @@ async def run_pipeline(
         budget_currency="USD" if case.paid else None,
         approval_ref=f"APPROVAL:{case.shot.id}" if case.requires_approval else None,
         now=_NOW,
+        revalidate=_revalidate,
         requires_approval=case.requires_approval,
     )
     result.admission = admission
