@@ -1,5 +1,5 @@
 # Frozen regression recovery log
-# generated 2026-09-07T22:54:55.775173+00:00 at HEAD b58993c3c2b1b23607c2dd3fb840b68197e283cd
+# generated 2026-09-07T22:56:39.404656+00:00 at HEAD 4fbc0d4107d92c47b9d4d7f61f58d48418901f58
 
 Recovery commands (run at each pinned corpus commit via a temporary worktree):
   M1  git worktree add --detach <wt> 9330bcf3 && pytest --co -q tests/unit/r2/contracts/
