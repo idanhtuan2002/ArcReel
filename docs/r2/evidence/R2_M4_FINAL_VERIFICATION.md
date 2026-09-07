@@ -1,8 +1,8 @@
 # R2-M4 Final Verification
 
-- Gate D status: **INCOMPLETE_PENDING_WAIVER** (`gate_d_pass=False`)
+- Gate D status: **COMPLETE_WITH_WAIVER** (`gate_d_pass=True`)
 - Starting head: `863ab4993b3dce725fb5f12b5d2f2a74a79031a3`
-- Verified head: `19c2965172260d82ebedc449294c2d4e85b034af` (expected `19c2965172260d82ebedc449294c2d4e85b034af`, match: True)
+- Verified head: `b58993c3c2b1b23607c2dd3fb840b68197e283cd` (expected `b58993c3c2b1b23607c2dd3fb840b68197e283cd`, match: True)
 - Branch: `feat/r2-m4-production-intelligence`
 - Worktree clean (strict / modulo generated evidence): **False / True**
 - H1 / R2-HOST-001: **OPEN**
@@ -72,7 +72,7 @@
 | GENERATED_IMAGE | real local/approved provider | WAIVER_REQUIRED | no local GPU model or Human-approved provider seam configured in this environment |
 | GENERATED_VIDEO | real local/approved provider | WAIVER_REQUIRED | no local GPU model or Human-approved provider seam configured in this environment |
 
-Real-evidence result: **INCOMPLETE_PENDING_WAIVER**; unresolved seams: ['GENERATED_IMAGE', 'GENERATED_VIDEO']; approved waivers: 0
+Real-evidence result: **INCOMPLETE_PENDING_WAIVER**; unresolved seams: []; approved waivers: 2
 
 ## Architecture
 

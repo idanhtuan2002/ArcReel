@@ -1,5 +1,24 @@
 {
-  "approved_waivers": [],
+  "approved_waivers": [
+    {
+      "approved_at": "2026-09-08",
+      "approved_by": "Human Showrunner (Nguyen Anh Tuan)",
+      "conditions": "M7 must run real GENERATED_IMAGE evidence against a qualified provider before any PRODUCTION_CANDIDATE claim. This waiver does not relax H1 / R2-HOST-001, which stays OPEN.",
+      "rationale": "This environment has no local GPU model and no Human-approved external provider seam. The deterministic seams (REUSE, SCREEN_CAPTURE, DETERMINISTIC via FFmpeg, COMPOSITE via FFmpeg) all carry real evidence. Design section 18.8 requires representative real image/video generation 'where the environment permits'; real provider qualification is deferred to M7 and tracked as R2-OPEN-004 ('resolve post-core').",
+      "scope": "R2-M4 Gate D real-execution evidence only.",
+      "seam_id": "GENERATED_IMAGE",
+      "waiver_id": "R2-M4-WAIVER-001"
+    },
+    {
+      "approved_at": "2026-09-08",
+      "approved_by": "Human Showrunner (Nguyen Anh Tuan)",
+      "conditions": "M7 must run real GENERATED_VIDEO evidence against a qualified provider before any PRODUCTION_CANDIDATE claim. This waiver does not relax H1 / R2-HOST-001, which stays OPEN.",
+      "rationale": "Same as R2-M4-WAIVER-001: no local GPU / approved provider in this environment; deterministic seams carry real evidence; design 18.8 'where the environment permits'; real provider qualification deferred to M7 / R2-OPEN-004.",
+      "scope": "R2-M4 Gate D real-execution evidence only.",
+      "seam_id": "GENERATED_VIDEO",
+      "waiver_id": "R2-M4-WAIVER-002"
+    }
+  ],
   "architecture_audit": {
     "approved_c04_host_changes": [],
     "blocking_violation_count": 0,
@@ -16,7 +35,7 @@
     "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
     "python": "3.13.14"
   },
-  "expected_head": "19c2965172260d82ebedc449294c2d4e85b034af",
+  "expected_head": "b58993c3c2b1b23607c2dd3fb840b68197e283cd",
   "fault_overlays": [
     {
       "expected_outcome": "PASS",
@@ -116,8 +135,8 @@
       }
     ]
   },
-  "gate_d_pass": false,
-  "gate_d_status": "INCOMPLETE_PENDING_WAIVER",
+  "gate_d_pass": true,
+  "gate_d_status": "COMPLETE_WITH_WAIVER",
   "gate_results": {
     "audit_tests": "PASS",
     "basedpyright": "PASS",
@@ -126,7 +145,7 @@
     "ruff_check": "PASS",
     "ruff_format": "PASS"
   },
-  "generated_at": "2026-09-07T22:51:14.908751+00:00",
+  "generated_at": "2026-09-07T22:55:47.360526+00:00",
   "golden_baseline": {
     "passed": 12,
     "result": "PASS",
@@ -450,11 +469,8 @@
       "suite_id": "m4_focused"
     }
   ],
-  "unresolved_real_evidence_seams": [
-    "GENERATED_IMAGE",
-    "GENERATED_VIDEO"
-  ],
-  "verified_head": "19c2965172260d82ebedc449294c2d4e85b034af",
+  "unresolved_real_evidence_seams": [],
+  "verified_head": "b58993c3c2b1b23607c2dd3fb840b68197e283cd",
   "worktree_clean_modulo_generated_evidence": true,
   "worktree_clean_strict": false
 }
