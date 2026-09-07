@@ -9,9 +9,7 @@ def test_frozen_docs_dir_contains_decision_registry():
 
 
 def test_every_authoritative_contract_has_one_commit_authority():
-    data = json.loads(
-        (frozen_docs_dir() / "R2_03_CONTRACT_REGISTRY.json").read_text()
-    )
+    data = json.loads((frozen_docs_dir() / "R2_03_CONTRACT_REGISTRY.json").read_text())
     non_authoritative = {
         "NON_AUTHORITATIVE",
         "PROPOSAL",

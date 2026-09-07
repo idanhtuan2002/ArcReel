@@ -1,38 +1,33 @@
-from datetime import datetime, timezone
-from decimal import Decimal
 import hashlib
 import subprocess
+from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 
 from r2.contracts.enums import ProductionMethod
-from r2.production import DependencySnapshot
 from r2.m3.composition import GoldenAComposer
 from r2.m3.director import FixtureOpenMontageBackend, GoldenAOpenMontageAdapter
 from r2.m3.factual_fixture import load_golden_a_factual_bundle
 from r2.m3.host_integration import GoldenAHostIntegration, compute_content_fingerprint
 from r2.m3.local_production import GoldenALocalProducer
 from r2.m3.preparation import GoldenAProductionPreparation
+from r2.production import DependencySnapshot
 
-
-FIXED_TIME = datetime(2026, 9, 6, 22, 30, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 9, 6, 22, 30, tzinfo=UTC)
 
 
 def dep_for(index: int) -> DependencySnapshot:
     return DependencySnapshot(
         ref=f"claim:CLAIM-{index:03d}",
         version="1",
-        fingerprint=hashlib.sha256(
-            f"CLAIM-{index:03d}-v1".encode()
-        ).hexdigest(),
+        fingerprint=hashlib.sha256(f"CLAIM-{index:03d}-v1".encode()).hexdigest(),
     )
 
 
 def approved_host(tmp_path):
     bundle = load_golden_a_factual_bundle()
-    direction = GoldenAOpenMontageAdapter(
-        FixtureOpenMontageBackend()
-    ).direct(bundle.script)
+    direction = GoldenAOpenMontageAdapter(FixtureOpenMontageBackend()).direct(bundle.script)
     prepared = GoldenAProductionPreparation().prepare(
         direction.shots,
         reused_asset_ref="r2/m3/fixtures/assets/reused_terminal_frame.svg",
@@ -103,10 +98,15 @@ def test_ffmpeg_composes_real_approved_masters_into_final_mp4(tmp_path):
 
     probe = subprocess.run(
         [
-            "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=codec_type",
-            "-of", "default=nw=1:nk=1",
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "default=nw=1:nk=1",
             str(result.path),
         ],
         check=True,

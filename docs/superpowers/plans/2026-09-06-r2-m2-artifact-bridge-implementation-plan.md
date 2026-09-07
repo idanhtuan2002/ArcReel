@@ -380,9 +380,7 @@ def test_r2_artifact_metadata_round_trips_and_sorts_direct_dependencies():
         content_fingerprint="c" * 64,
     )
 
-    restored = R2ArtifactMetadata.model_validate(
-        metadata.model_dump(mode="json")
-    )
+    restored = R2ArtifactMetadata.model_validate(metadata.model_dump(mode="json"))
     assert restored == metadata
     assert [d.ref for d in metadata.direct_dependencies] == [
         "r2:ProductionBinding:B01",
@@ -483,9 +481,7 @@ class R2ArtifactMetadata(R2ContractModel):
         for item in value:
             existing = by_ref.get(item.ref)
             if existing is not None and existing != item:
-                raise ValueError(
-                    f"conflicting dependency snapshots for {item.ref}"
-                )
+                raise ValueError(f"conflicting dependency snapshots for {item.ref}")
             by_ref[item.ref] = item
         return [by_ref[key] for key in sorted(by_ref)]
 ```
@@ -564,9 +560,7 @@ def test_registry_resolves_exactly_one_claimant():
         version="1",
         fingerprint="a" * 64,
     )
-    registry = DependencyResolverRegistry(
-        [Resolver("r2:", snapshot)]
-    )
+    registry = DependencyResolverRegistry([Resolver("r2:", snapshot)])
     assert registry.resolve(snapshot.ref) == snapshot
 
 
@@ -582,9 +576,7 @@ def test_registry_rejects_multiple_claimants():
         version="1",
         fingerprint="a" * 64,
     )
-    registry = DependencyResolverRegistry(
-        [Resolver("r2:", snapshot), Resolver("r2:Shot", snapshot)]
-    )
+    registry = DependencyResolverRegistry([Resolver("r2:", snapshot), Resolver("r2:Shot", snapshot)])
     with pytest.raises(AmbiguousDependencyResolverError):
         registry.resolve(snapshot.ref)
 ```
@@ -641,9 +633,7 @@ class DependencyResolverRegistry:
 
         snapshot = matches[0].resolve(ref)
         if snapshot.ref != ref:
-            raise ValueError(
-                f"resolver returned {snapshot.ref!r} for {ref!r}"
-            )
+            raise ValueError(f"resolver returned {snapshot.ref!r} for {ref!r}")
         return snapshot
 ```
 
@@ -933,6 +923,7 @@ git commit -m "feat(r2): bridge artifact metadata to host manifest"
 ```python
 class ArtifactManifestPort(Protocol):
     ...
+
     def promote_version_with_r2_metadata(
         self,
         artifact_key: str,
@@ -986,8 +977,7 @@ def promote(
     approval_record: str,
     selected_by: str,
     selected_at: datetime,
-) -> PromotionResult:
-    ...
+) -> PromotionResult: ...
 ```
 
 Validation order:

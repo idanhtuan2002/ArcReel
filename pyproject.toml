@@ -109,7 +109,7 @@ exclude_lines = [
 ]
 
 [tool.importlinter]
-root_packages = ["lib"]
+root_packages = ["lib", "r2"]
 
 # lib.config < lib.*_backends < lib.custom_provider：config 是配置解析的基础层，backends
 # 在其上组装出各供应商实现，custom_provider 再在 backends 之上拼装自定义供应商。四个 backend
@@ -176,11 +176,24 @@ source_modules = [
 ]
 forbidden_modules = ["lib.reference_video"]
 
+# C04 例外：Host 预算授权是唯一获批的 r2 → Host 依赖点，且只能经由 server 层服务委托。
+# R2 面向的 budget_port 适配器不得直连 Host 持久化层——它按结构化 Protocol 委托，
+# 不持有 session / 表 / 锁 / Usage 写入。清零一条即删一行。
+[[tool.importlinter.contracts]]
+name = "C04 R2 预算端口不直连 Host DB 层"
+type = "forbidden"
+source_modules = ["r2.production.budget_port"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+]
+
 [tool.deptry]
-# 扫描范围与 basedpyright 的 include 对齐：核心库、服务端、迁移基础设施、脚本与测试。
+# 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2
 # exclude 是 deptry 默认值去掉 tests（测试的 import 也要参与依赖卫生判定）再补上 worktree 目录。
 exclude = ["venv", "\\.venv", "\\.direnv", "\\.git", "setup\\.py", "\\.worktrees", "\\.claude/worktrees"]
-known_first_party = ["lib", "server", "alembic", "scripts", "tests"]
+known_first_party = ["lib", "server", "alembic", "scripts", "tests", "r2"]
 
 [tool.deptry.per_rule_ignores]
 # DEP002（声明了但无 import）——全部是靠 entry point / 后端注册被运行时加载的插件，
@@ -225,7 +238,7 @@ extend-immutable-calls = [
 ]
 
 [tool.basedpyright]
-include = ["lib", "server", "alembic", "tests", "scripts"]
+include = ["lib", "server", "alembic", "tests", "scripts", "r2"]
 exclude = [
     "**/__pycache__",
     ".venv",

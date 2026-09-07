@@ -44,8 +44,6 @@ class R2ArtifactMetadata(R2ContractModel):
         for item in value:
             existing = by_ref.get(item.ref)
             if existing is not None and existing != item:
-                raise ValueError(
-                    f"conflicting dependency snapshots for {item.ref}"
-                )
+                raise ValueError(f"conflicting dependency snapshots for {item.ref}")
             by_ref[item.ref] = item
         return [by_ref[key] for key in sorted(by_ref)]

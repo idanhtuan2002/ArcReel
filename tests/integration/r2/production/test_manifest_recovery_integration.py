@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from threading import Barrier
 
 from lib.artifact_manifest import (
@@ -30,7 +30,6 @@ from r2.production import (
     R2ArtifactMetadata,
     R2ContractRef,
 )
-
 
 BASIS_DIGEST = "sha256-v1:" + ("a" * 64)
 
@@ -72,7 +71,7 @@ def approved_master(
         selected_candidate_id=candidate_id,
         host_version_ref=host_version_ref,
         approval_record=f"approval:{candidate_id}",
-        selected_at=datetime(2026, 9, 6, 18, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 18, 0, tzinfo=UTC),
         selected_by="showrunner:1",
     )
 
@@ -243,16 +242,14 @@ def test_restart_reload_preserves_approved_master_and_active_version(tmp_path):
         b"CANDIDATE-C",
     )
 
-    service = ProductionApprovalService(
-        port(tmp_path, versions=versions, current=current)
-    )
+    service = ProductionApprovalService(port(tmp_path, versions=versions, current=current))
     service.promote(
         artifact_key=artifact_key.encode(),
         candidate=candidate("C"),
         host_version_ref=str(c_version),
         approval_record="approval:C",
         selected_by="showrunner:1",
-        selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=UTC),
     )
 
     restarted_versions = VersionManager(tmp_path)
@@ -273,9 +270,7 @@ def test_stale_currency_evaluation_does_not_refresh_stored_dependency_snapshot(t
 
     bridge = R2ArtifactBridge(
         port(tmp_path),
-        DependencyResolverRegistry(
-            [MappingResolver({stored.ref: current_dep})]
-        ),
+        DependencyResolverRegistry([MappingResolver({stored.ref: current_dep})]),
     )
     result = bridge.evaluate_currency(artifact_key.encode())
 
@@ -316,12 +311,8 @@ def test_concurrent_r2_metadata_updates_leave_one_valid_manifest(tmp_path):
 
 def test_concurrent_promotions_cannot_create_active_version_master_mismatch(tmp_path):
     current, versions, artifact_key, _b_version = setup_master_b(tmp_path)
-    c_version = add_unapproved_version(
-        tmp_path, versions, current, "C", b"CANDIDATE-C"
-    )
-    d_version = add_unapproved_version(
-        tmp_path, versions, current, "D", b"CANDIDATE-D"
-    )
+    c_version = add_unapproved_version(tmp_path, versions, current, "C", b"CANDIDATE-C")
+    d_version = add_unapproved_version(tmp_path, versions, current, "D", b"CANDIDATE-D")
     version_by_candidate = {"C": c_version, "D": d_version}
     payload_by_candidate = {"C": b"CANDIDATE-C", "D": b"CANDIDATE-D"}
     barrier = Barrier(2)
@@ -351,7 +342,7 @@ def test_concurrent_promotions_cannot_create_active_version_master_mismatch(tmp_
                 host_version_ref=str(version_by_candidate[candidate_id]),
                 approval_record=f"approval:{candidate_id}",
                 selected_by=f"showrunner:{candidate_id}",
-                selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=timezone.utc),
+                selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=UTC),
             )
             return ("ok", result.changed)
         except ArtifactManifestConflictError:
@@ -372,7 +363,7 @@ def test_concurrent_promotions_cannot_create_active_version_master_mismatch(tmp_
 
 
 def test_stale_approved_master_remains_selected_until_explicit_replacement(tmp_path):
-    current, versions, artifact_key, b_version = setup_master_b(tmp_path)
+    current, _versions, artifact_key, b_version = setup_master_b(tmp_path)
 
     stored_dep = dependency(version="1", fingerprint="d" * 64)
     with_dependency = metadata(
@@ -387,9 +378,7 @@ def test_stale_approved_master_remains_selected_until_explicit_replacement(tmp_p
     current_dep = dependency(version="2", fingerprint="e" * 64)
     bridge = R2ArtifactBridge(
         port(tmp_path),
-        DependencyResolverRegistry(
-            [MappingResolver({stored_dep.ref: current_dep})]
-        ),
+        DependencyResolverRegistry([MappingResolver({stored_dep.ref: current_dep})]),
     )
 
     result = bridge.evaluate_currency(artifact_key.encode())

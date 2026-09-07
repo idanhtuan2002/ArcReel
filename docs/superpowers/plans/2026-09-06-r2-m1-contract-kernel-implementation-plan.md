@@ -144,9 +144,9 @@ def test_status_families_are_distinct_enum_types():
 
 
 def test_ensure_json_value_rejects_arbitrary_python_objects():
-    assert ensure_json_value(
-        {"nested": [1, "x", True, None, {"score": 0.5}]}
-    ) == {"nested": [1, "x", True, None, {"score": 0.5}]}
+    assert ensure_json_value({"nested": [1, "x", True, None, {"score": 0.5}]}) == {
+        "nested": [1, "x", True, None, {"score": 0.5}]
+    }
 
     class NotJSON:
         pass
@@ -988,14 +988,8 @@ class ReadinessRequirement(R2ContractModel):
 
     @model_validator(mode="after")
     def validate_resolution(self):
-        if (
-            self.required
-            and self.status is ReadinessState.READY
-            and self.resolved_binding is None
-        ):
-            raise ValueError(
-                "required READY requirement must include resolved_binding"
-            )
+        if self.required and self.status is ReadinessState.READY and self.resolved_binding is None:
+            raise ValueError("required READY requirement must include resolved_binding")
         return self
 
 
@@ -1342,18 +1336,14 @@ def test_quality_report_score_is_bounded():
         checks=["identity", "continuity"],
         score=0.95,
         blocking_findings=[],
-        advisory_findings=[
-            QualityFinding(code="MINOR", message="tiny drift", blocking=False)
-        ],
+        advisory_findings=[QualityFinding(code="MINOR", message="tiny drift", blocking=False)],
         reviewer_type=ReviewerType.AGENT,
         created_at=datetime(2026, 9, 6, 10, 0, tzinfo=timezone.utc),
     )
     assert report.score == 0.95
 
     with pytest.raises(ValidationError):
-        QualityReport(
-            **{**report.model_dump(), "score": 1.5}
-        )
+        QualityReport(**{**report.model_dump(), "score": 1.5})
 ```
 
 - [ ] **Step 2: Run result tests and confirm RED**
@@ -1819,9 +1809,7 @@ def test_provider_neutral_contracts_have_no_provider_runtime_fields():
 
 
 def test_frozen_registry_forbidden_fields_are_not_weakened():
-    registry = json.loads(
-        (frozen_docs_dir() / "R2_03_CONTRACT_REGISTRY.json").read_text()
-    )
+    registry = json.loads((frozen_docs_dir() / "R2_03_CONTRACT_REGISTRY.json").read_text())
     by_name = {item["name"]: item for item in registry["contracts"]}
 
     for name in ("SceneSpec", "ShotSpec"):

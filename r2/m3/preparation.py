@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from r2.contracts import ShotSpec
 from r2.contracts.enums import (
@@ -46,15 +46,9 @@ class GoldenAProductionPreparation:
         result: list[GoldenAPreparedShot] = []
 
         for shot in shots:
-            method = (
-                ProductionMethod.REUSE
-                if shot.id == "SH01"
-                else ProductionMethod.DETERMINISTIC
-            )
+            method = ProductionMethod.REUSE if shot.id == "SH01" else ProductionMethod.DETERMINISTIC
             if method not in shot.allowed_methods:
-                raise ValueError(
-                    f"Golden A method {method.value} is not allowed by {shot.id}"
-                )
+                raise ValueError(f"Golden A method {method.value} is not allowed by {shot.id}")
 
             bindings: tuple[ProductionBinding, ...] = ()
             requirements: list[ReadinessRequirement] = []

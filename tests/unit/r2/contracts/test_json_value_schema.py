@@ -8,6 +8,6 @@ def test_recursive_json_value_can_build_pydantic_schema():
     schema = adapter.json_schema()
     assert "$defs" in schema
     assert "JSONValue" in schema["$defs"]
-    assert adapter.validate_python(
-        {"nested": [1, "x", True, None, {"score": 0.5}]}
-    ) == {"nested": [1, "x", True, None, {"score": 0.5}]}
+    assert adapter.validate_python({"nested": [1, "x", True, None, {"score": 0.5}]}) == {
+        "nested": [1, "x", True, None, {"score": 0.5}]
+    }

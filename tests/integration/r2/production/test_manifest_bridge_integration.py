@@ -1,3 +1,4 @@
+from lib.artifact_manifest import ArtifactKey, ArtifactManifestEntry, ProjectArtifactManifestAdapter
 from r2.contracts import ArtifactCurrencyStatus, ContentBasis, ContentBasisType
 from r2.production import (
     ArcReelArtifactManifestPort,
@@ -6,8 +7,6 @@ from r2.production import (
     R2ArtifactMetadata,
     R2ContractRef,
 )
-
-from lib.artifact_manifest import ArtifactKey, ArtifactManifestEntry, ProjectArtifactManifestAdapter
 
 
 def metadata() -> R2ArtifactMetadata:

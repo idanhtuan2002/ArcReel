@@ -199,11 +199,7 @@ No broader repository reread unless these probes are insufficient.
 Use:
 
 ```python
-mode = (
-    "OPENMONTAGE_CALLABLE"
-    if local_openmontage_is_importable_callable_and_usable
-    else "FIXTURE_ADAPTER"
-)
+mode = "OPENMONTAGE_CALLABLE" if local_openmontage_is_importable_callable_and_usable else "FIXTURE_ADAPTER"
 ```
 
 For `OPENMONTAGE_CALLABLE`, record the observed module/path and callable.
@@ -270,6 +266,7 @@ class ClaimStatus(str, Enum):
     DISPUTED = "DISPUTED"
     RETIRED = "RETIRED"
 
+
 class SourceRecord(R2ContractModel):
     id: str
     source_type: str
@@ -279,6 +276,7 @@ class SourceRecord(R2ContractModel):
     source_fingerprint: str
     provenance: dict[str, JSONValue]
 
+
 class EvidenceRecord(R2ContractModel):
     id: str
     source_ref: str
@@ -287,6 +285,7 @@ class EvidenceRecord(R2ContractModel):
     evidence_type: str
     captured_at: datetime
     provenance: dict[str, JSONValue]
+
 
 class ResearchPack(R2ContractModel):
     id: str
@@ -300,6 +299,7 @@ class ResearchPack(R2ContractModel):
     open_questions: list[str]
     provenance: dict[str, JSONValue]
 
+
 class Claim(R2ContractModel):
     id: str
     version: int
@@ -309,17 +309,20 @@ class Claim(R2ContractModel):
     status: ClaimStatus
     provenance: dict[str, JSONValue]
 
+
 class ClaimLedger(R2ContractModel):
     id: str
     version: int
     research_pack_ref: str
     claims: list[Claim]
 
+
 class ScriptSection(R2ContractModel):
     id: str
     text: str
     claim_refs: list[str]
     target_duration_seconds: float | None
+
 
 class ScriptArtifact(R2ContractModel):
     id: str
@@ -450,10 +453,10 @@ class GoldenAFactualBundle:
     claim_ledger: ClaimLedger
     script: ScriptArtifact
 
+
 def load_golden_a_factual_bundle(
     fixture_path: Path | None = None,
-) -> GoldenAFactualBundle:
-    ...
+) -> GoldenAFactualBundle: ...
 ```
 
 - [ ] **Step 1: Write RED fixture tests**
@@ -523,8 +526,10 @@ class GoldenADirectionResult:
     scenes: tuple[SceneSpec, ...]
     shots: tuple[ShotSpec, ...]
 
+
 class GoldenAOpenMontageBackend(Protocol):
     def direct(self, script: ScriptArtifact) -> GoldenADirectionResult: ...
+
 
 class GoldenAOpenMontageAdapter:
     def __init__(self, backend: GoldenAOpenMontageBackend) -> None: ...
@@ -601,6 +606,7 @@ class GoldenAMethodAssignment:
     method: ProductionMethod
     rationale: str
 
+
 @dataclass(frozen=True)
 class GoldenAPreparedShot:
     shot: ShotSpec
@@ -608,14 +614,14 @@ class GoldenAPreparedShot:
     readiness: ProductionReadiness
     method: GoldenAMethodAssignment
 
+
 class GoldenAProductionPreparation:
     def prepare(
         self,
         shots: Sequence[ShotSpec],
         *,
         reused_asset_ref: str,
-    ) -> tuple[GoldenAPreparedShot, ...]:
-        ...
+    ) -> tuple[GoldenAPreparedShot, ...]: ...
 ```
 
 Baseline:
@@ -687,14 +693,14 @@ class LocalProducedAsset:
     wall_time_seconds: float
     external_provider_cost: Decimal
 
+
 class GoldenALocalProducer:
     def produce(
         self,
         prepared: GoldenAPreparedShot,
         *,
         work_dir: Path,
-    ) -> LocalProducedAsset:
-        ...
+    ) -> LocalProducedAsset: ...
 ```
 
 - [ ] **Step 1: Write RED local-production tests**
@@ -748,6 +754,7 @@ class RegisteredGoldenACandidate:
     candidate: GenerationCandidate
     host_version_ref: str
 
+
 class GoldenAHostIntegration:
     def stage_candidate(
         self,
@@ -756,8 +763,7 @@ class GoldenAHostIntegration:
         target_ref: str,
         content_fingerprint: str,
         produced: LocalProducedAsset,
-    ) -> RegisteredGoldenACandidate:
-        ...
+    ) -> RegisteredGoldenACandidate: ...
 
     def approve(
         self,
@@ -766,8 +772,7 @@ class GoldenAHostIntegration:
         approval_record: str,
         selected_by: str,
         selected_at: datetime,
-    ) -> ApprovedMasterMetadata:
-        ...
+    ) -> ApprovedMasterMetadata: ...
 ```
 
 The class delegates to M2 `ArcReelArtifactManifestPort`, `ArcReelVersionRestorePromoter`, `ProductionApprovalService`, and ArcReel `VersionManager`.
@@ -836,14 +841,14 @@ class FinalMediaArtifact:
     wall_time_seconds: float
     external_provider_cost: Decimal
 
+
 class GoldenAComposer:
     def compose(
         self,
         approved_inputs: Sequence[Path],
         *,
         output_path: Path,
-    ) -> FinalMediaArtifact:
-        ...
+    ) -> FinalMediaArtifact: ...
 ```
 
 - [ ] **Step 1: Write RED composition test**
@@ -908,6 +913,7 @@ class GoldenALineageReport:
     evidence_refs: tuple[str, ...]
     source_refs: tuple[str, ...]
 
+
 @dataclass(frozen=True)
 class GoldenARunResult:
     project_dir: Path
@@ -916,12 +922,12 @@ class GoldenARunResult:
     method_counts: Mapping[str, int]
     evidence_dir: Path
 
+
 def run_golden_a(
     *,
     project_dir: Path,
     evidence_dir: Path,
-) -> GoldenARunResult:
-    ...
+) -> GoldenARunResult: ...
 ```
 
 - [ ] **Step 1: Write RED lineage test**

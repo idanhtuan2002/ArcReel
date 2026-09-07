@@ -1,7 +1,4 @@
-from pathlib import Path
-
 from r2.bootstrap import r2_root
-
 
 SCRIPT_PATH = r2_root() / "scripts" / "r2" / "verify_postgres_baseline.sh"
 

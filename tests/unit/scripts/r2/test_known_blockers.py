@@ -6,9 +6,7 @@ from scripts.r2.verify_frozen_registries import verify
 
 
 def test_execution_identity_is_registered_as_production_blocker():
-    data = json.loads(
-        (frozen_docs_dir() / "R2_05_HOST_HARDENING_REGISTRY.json").read_text()
-    )
+    data = json.loads((frozen_docs_dir() / "R2_05_HOST_HARDENING_REGISTRY.json").read_text())
     h1 = next(item for item in data["requirements"] if item["id"] == "H1")
     assert h1["severity"] == "PRODUCTION_BLOCKER"
     assert h1["decision_ref"] == "R2-HOST-001"

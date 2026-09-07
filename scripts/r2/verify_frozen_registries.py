@@ -6,7 +6,6 @@ from pathlib import Path
 
 from r2.bootstrap import frozen_docs_dir
 
-
 VALID_DECISION_STATUSES = {
     "LOCKED",
     "ACTIVE",
@@ -96,27 +95,22 @@ def verify(docs_dir: Path | None = None) -> list[str]:
         errors.append("duplicate decision IDs")
     id_set = set(ids)
 
-    for item in decisions["decisions"]:
-        if item.get("status") not in VALID_DECISION_STATUSES:
-            errors.append(
-                f"{item.get('decision_id')} has invalid status {item.get('status')}"
-            )
+    errors.extend(
+        f"{item.get('decision_id')} has invalid status {item.get('status')}"
+        for item in decisions["decisions"]
+        if item.get("status") not in VALID_DECISION_STATUSES
+    )
 
     for mapping in supersession["mappings"]:
         target = mapping.get("superseded_by")
         if target not in id_set:
-            errors.append(
-                f"supersession target missing: {mapping.get('legacy_decision')} -> {target}"
-            )
+            errors.append(f"supersession target missing: {mapping.get('legacy_decision')} -> {target}")
 
     by_name: dict[str, dict] = {}
     for item in contracts["contracts"]:
         name = item["name"]
         by_name[name] = item
-        if (
-            item.get("authority") not in NON_AUTHORITATIVE_PLANES
-            and not item.get("commit_authority")
-        ):
+        if item.get("authority") not in NON_AUTHORITATIVE_PLANES and not item.get("commit_authority"):
             errors.append(f"{name} has no commit authority")
 
     for name in ("SceneSpec", "ShotSpec"):

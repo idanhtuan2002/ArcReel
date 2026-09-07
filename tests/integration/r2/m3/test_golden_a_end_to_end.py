@@ -1,6 +1,6 @@
-from decimal import Decimal
 import json
 import subprocess
+from decimal import Decimal
 
 from r2.contracts.enums import ArtifactCurrencyStatus, ProductionMethod
 from r2.m3.golden_a import GoldenARunner
@@ -22,10 +22,15 @@ def test_single_run_produces_real_60_90s_final_and_three_methods(tmp_path):
 
     probe = subprocess.run(
         [
-            "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=codec_type",
-            "-of", "default=nw=1:nk=1",
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "default=nw=1:nk=1",
             str(result.final_path),
         ],
         check=True,

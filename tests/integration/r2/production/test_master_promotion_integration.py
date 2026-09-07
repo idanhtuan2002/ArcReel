@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -42,7 +42,7 @@ def base_metadata(candidate_id: str, version_ref: str) -> R2ArtifactMetadata:
             selected_candidate_id=candidate_id,
             host_version_ref=version_ref,
             approval_record=f"approval:{candidate_id}",
-            selected_at=datetime(2026, 9, 6, 18, 0, tzinfo=timezone.utc),
+            selected_at=datetime(2026, 9, 6, 18, 0, tzinfo=UTC),
             selected_by="showrunner:1",
         ),
     )
@@ -146,7 +146,7 @@ def test_failed_candidate_preserves_master_b(tmp_path):
             host_version_ref="999",
             approval_record="approval:C",
             selected_by="showrunner:1",
-            selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=timezone.utc),
+            selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=UTC),
         )
 
     assert versions.get_current_version("videos", "SH1") == b_version
@@ -165,7 +165,7 @@ def test_explicit_promotion_changes_version_and_approved_master_together(tmp_pat
         host_version_ref=str(c_version),
         approval_record="approval:C",
         selected_by="showrunner:1",
-        selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=UTC),
     )
 
     assert b_version != c_version
@@ -216,7 +216,7 @@ def test_manifest_commit_failure_rolls_back_host_version_selection(tmp_path):
             host_version_ref=str(c_version),
             approval_record="approval:C",
             selected_by="showrunner:1",
-            selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=timezone.utc),
+            selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=UTC),
         )
 
     assert versions.get_current_version("videos", "SH1") == b_version
@@ -235,7 +235,7 @@ def test_second_promotion_of_same_candidate_is_idempotent(tmp_path):
         host_version_ref=str(c_version),
         approval_record="approval:C",
         selected_by="showrunner:1",
-        selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 19, 0, tzinfo=UTC),
     )
     second = svc.promote(
         artifact_key=key.encode(),
@@ -243,7 +243,7 @@ def test_second_promotion_of_same_candidate_is_idempotent(tmp_path):
         host_version_ref=str(c_version),
         approval_record="approval:C2",
         selected_by="showrunner:2",
-        selected_at=datetime(2026, 9, 6, 20, 0, tzinfo=timezone.utc),
+        selected_at=datetime(2026, 9, 6, 20, 0, tzinfo=UTC),
     )
 
     assert first.changed is True

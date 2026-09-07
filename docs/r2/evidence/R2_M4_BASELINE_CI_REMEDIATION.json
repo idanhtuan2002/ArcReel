@@ -1,0 +1,18 @@
+{
+  "architecture_blocking_violations": 0,
+  "basedpyright": "PASS",
+  "db_migrations_added": 0,
+  "deptry": "PASS",
+  "feature_changes": 0,
+  "full_pytest": "PASS",
+  "host_pass_count": 349,
+  "import_linter": "PASS",
+  "m1_pass_count": 41,
+  "m2_pass_count": 53,
+  "m3_pass_count": 122,
+  "ruff_check": "PASS",
+  "ruff_format": "PASS",
+  "schema_version": "1",
+  "starting_head": "1985b815d70dd600519839973b1da20472012d8f",
+  "verified_head": "e72cce2272e1e496a7c8a52df2d3513fd20e815d"
+}

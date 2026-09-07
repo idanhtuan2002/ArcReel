@@ -32,11 +32,13 @@ def test_contract_identity_requires_non_empty_id_and_positive_version():
 
 def test_unknown_fields_are_rejected():
     with pytest.raises(ValidationError):
-        ContractIdentity(
-            id="SH042",
-            schema_version="2.1",
-            version=1,
-            provider="seedance",
+        ContractIdentity.model_validate(
+            {
+                "id": "SH042",
+                "schema_version": "2.1",
+                "version": 1,
+                "provider": "seedance",
+            }
         )
 
 
@@ -52,9 +54,9 @@ def test_status_families_are_distinct_enum_types():
 
 
 def test_ensure_json_value_rejects_arbitrary_python_objects_and_non_finite_floats():
-    assert ensure_json_value(
-        {"nested": [1, "x", True, None, {"score": 0.5}]}
-    ) == {"nested": [1, "x", True, None, {"score": 0.5}]}
+    assert ensure_json_value({"nested": [1, "x", True, None, {"score": 0.5}]}) == {
+        "nested": [1, "x", True, None, {"score": 0.5}]
+    }
 
     class NotJSON:
         pass

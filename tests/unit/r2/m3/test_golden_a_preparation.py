@@ -8,9 +8,7 @@ from r2.m3.preparation import GoldenAProductionPreparation
 
 def directed_shots():
     script = load_golden_a_factual_bundle().script
-    return GoldenAOpenMontageAdapter(
-        FixtureOpenMontageBackend()
-    ).direct(script).shots
+    return GoldenAOpenMontageAdapter(FixtureOpenMontageBackend()).direct(script).shots
 
 
 def by_id(items):
@@ -28,10 +26,7 @@ def test_golden_a_assigns_reuse_and_deterministic_methods():
     assert prepared["SH02"].method.method is ProductionMethod.DETERMINISTIC
     assert prepared["SH03"].method.method is ProductionMethod.DETERMINISTIC
     assert prepared["SH04"].method.method is ProductionMethod.DETERMINISTIC
-    assert all(
-        item.readiness.state is ReadinessState.READY
-        for item in prepared.values()
-    )
+    assert all(item.readiness.state is ReadinessState.READY for item in prepared.values())
 
 
 def test_reuse_shot_is_blocked_when_required_binding_is_missing():
@@ -50,9 +45,7 @@ def test_reuse_shot_is_blocked_when_required_binding_is_missing():
 
 def test_assignment_must_be_allowed_by_shot_spec():
     shots = list(directed_shots())
-    sh01 = shots[0].model_copy(
-        update={"allowed_methods": [ProductionMethod.DETERMINISTIC]}
-    )
+    sh01 = shots[0].model_copy(update={"allowed_methods": [ProductionMethod.DETERMINISTIC]})
     with pytest.raises(ValueError, match="allowed"):
         GoldenAProductionPreparation().prepare(
             [sh01, *shots[1:]],

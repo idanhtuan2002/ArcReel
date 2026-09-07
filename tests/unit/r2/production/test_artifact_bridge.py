@@ -172,9 +172,7 @@ def test_changed_direct_dependency_is_stale():
     current_dep = dep(version="2", fingerprint="b" * 64)
     bridge = R2ArtifactBridge(
         Port(host(r2_raw=metadata([stored_dep]).model_dump(mode="json"))),
-        DependencyResolverRegistry(
-            [MappingResolver({stored_dep.ref: current_dep})]
-        ),
+        DependencyResolverRegistry([MappingResolver({stored_dep.ref: current_dep})]),
     )
 
     result = bridge.evaluate_currency("shot:SH1")
@@ -224,9 +222,7 @@ def test_currency_evaluation_does_not_mutate_stored_dependency_snapshots():
     current_dep = dep(version="2", fingerprint="b" * 64)
     bridge = R2ArtifactBridge(
         Port(host(r2_raw=raw)),
-        DependencyResolverRegistry(
-            [MappingResolver({stored_dep.ref: current_dep})]
-        ),
+        DependencyResolverRegistry([MappingResolver({stored_dep.ref: current_dep})]),
     )
 
     result = bridge.evaluate_currency("shot:SH1")
