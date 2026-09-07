@@ -14,6 +14,7 @@ from lib.budget_reservation import (
     BudgetReservationSnapshot,
     BudgetReservationState,
     BudgetScopeSnapshot,
+    InvalidBudgetTransitionError,
     ReserveBudgetResult,
     require_nonnegative_money,
     require_positive_money,
@@ -92,7 +93,7 @@ class BudgetReservationRepository(BaseRepository):
         *,
         scope: BudgetScopeModel,
         now: datetime,
-    ) -> None:
+    ) -> tuple[BudgetReservationModel, ...]:
         result = await self.session.execute(
             select(BudgetReservationModel)
             .where(
@@ -103,13 +104,45 @@ class BudgetReservationRepository(BaseRepository):
             )
             .with_for_update()
         )
-        for reservation in result.scalars():
+        expired = tuple(result.scalars())
+        for reservation in expired:
             reservation.state = BudgetReservationState.EXPIRED.value
             reservation.released_at = now
             reservation.version += 1
             scope.reserved_total -= reservation.reserved_amount
             scope.version += 1
             scope.updated_at = now
+        return expired
+
+    async def _reservation_scope_ref(self, reservation_ref: str) -> str:
+        result = await self.session.execute(
+            select(BudgetReservationModel.budget_scope_ref).where(
+                BudgetReservationModel.reservation_ref == reservation_ref
+            )
+        )
+        budget_scope_ref = result.scalar_one_or_none()
+        if budget_scope_ref is None:
+            raise BudgetReservationIntegrityError(f"unknown budget reservation: {reservation_ref}")
+        return budget_scope_ref
+
+    async def _locked_reservation(self, reservation_ref: str) -> BudgetReservationModel:
+        result = await self.session.execute(
+            select(BudgetReservationModel)
+            .where(BudgetReservationModel.reservation_ref == reservation_ref)
+            .with_for_update()
+        )
+        reservation = result.scalar_one_or_none()
+        if reservation is None:
+            raise BudgetReservationIntegrityError(f"unknown budget reservation: {reservation_ref}")
+        return reservation
+
+    @staticmethod
+    def _require_execution_decision(
+        reservation: BudgetReservationModel,
+        execution_decision_ref: str,
+    ) -> None:
+        if reservation.execution_decision_ref != execution_decision_ref:
+            raise BudgetReservationIntegrityError("reservation does not belong to this execution decision")
 
     async def create_scope(
         self,
@@ -220,3 +253,111 @@ class BudgetReservationRepository(BaseRepository):
         )
         row = result.scalar_one_or_none()
         return _reservation_snapshot(row) if row is not None else None
+
+    async def claim_or_revalidate(
+        self,
+        *,
+        reservation_ref: str,
+        execution_decision_ref: str,
+        now: datetime,
+    ) -> BudgetReservationSnapshot:
+        now = _require_aware(now, field_name="now")
+        try:
+            await self._begin_serialized_write()
+            budget_scope_ref = await self._reservation_scope_ref(reservation_ref)
+            scope = await self._locked_scope(budget_scope_ref)
+            reservation = await self._locked_reservation(reservation_ref)
+            self._require_execution_decision(reservation, execution_decision_ref)
+
+            expires_at = _stored_aware(reservation.expires_at)
+            if (
+                reservation.state == BudgetReservationState.ACTIVE.value
+                and expires_at is not None
+                and expires_at <= now
+            ):
+                reservation.state = BudgetReservationState.EXPIRED.value
+                reservation.released_at = now
+                reservation.version += 1
+                scope.reserved_total -= reservation.reserved_amount
+                scope.version += 1
+                scope.updated_at = now
+                await self.session.commit()
+                raise InvalidBudgetTransitionError("expired reservation cannot be claimed")
+
+            if reservation.state != BudgetReservationState.ACTIVE.value:
+                raise InvalidBudgetTransitionError(f"cannot claim reservation in state {reservation.state}")
+            if reservation.currency != scope.currency:
+                raise BudgetReservationIntegrityError("reservation currency does not match its budget scope")
+            if scope.reserved_total < reservation.reserved_amount:
+                raise BudgetReservationIntegrityError("reservation is not represented in the scope hold total")
+
+            reservation.state = BudgetReservationState.CLAIMED.value
+            reservation.claimed_at = now
+            reservation.version += 1
+            scope.version += 1
+            scope.updated_at = now
+            await self.session.flush()
+            snapshot = _reservation_snapshot(reservation)
+            await self.session.commit()
+            return snapshot
+        except InvalidBudgetTransitionError:
+            if self.session.in_transaction():
+                await self.session.rollback()
+            raise
+        except BudgetReservationIntegrityError:
+            await self.session.rollback()
+            raise
+
+    async def release(
+        self,
+        *,
+        reservation_ref: str,
+        execution_decision_ref: str,
+        now: datetime,
+    ) -> BudgetReservationSnapshot:
+        now = _require_aware(now, field_name="now")
+        try:
+            await self._begin_serialized_write()
+            budget_scope_ref = await self._reservation_scope_ref(reservation_ref)
+            scope = await self._locked_scope(budget_scope_ref)
+            reservation = await self._locked_reservation(reservation_ref)
+            self._require_execution_decision(reservation, execution_decision_ref)
+            if reservation.state != BudgetReservationState.ACTIVE.value:
+                raise InvalidBudgetTransitionError(f"cannot release reservation in state {reservation.state}")
+            if reservation.currency != scope.currency:
+                raise BudgetReservationIntegrityError("reservation currency does not match its budget scope")
+            if scope.reserved_total < reservation.reserved_amount:
+                raise BudgetReservationIntegrityError("reservation is not represented in the scope hold total")
+
+            reservation.state = BudgetReservationState.RELEASED.value
+            reservation.released_at = now
+            reservation.version += 1
+            scope.reserved_total -= reservation.reserved_amount
+            scope.version += 1
+            scope.updated_at = now
+            await self.session.flush()
+            snapshot = _reservation_snapshot(reservation)
+            await self.session.commit()
+            return snapshot
+        except (BudgetReservationIntegrityError, InvalidBudgetTransitionError):
+            await self.session.rollback()
+            raise
+
+    async def expire_active(
+        self,
+        *,
+        budget_scope_ref: str,
+        now: datetime,
+    ) -> tuple[BudgetReservationSnapshot, ...]:
+        now = _require_aware(now, field_name="now")
+        try:
+            await self._begin_serialized_write()
+            scope = await self._locked_scope(budget_scope_ref)
+            expired = await self._expire_eligible_locked(scope=scope, now=now)
+            await self.session.flush()
+            snapshots = tuple(_reservation_snapshot(item) for item in expired)
+            await self.session.commit()
+            return snapshots
+        except BudgetReservationIntegrityError:
+            await self.session.rollback()
+            raise
