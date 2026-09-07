@@ -361,3 +361,57 @@ class BudgetReservationRepository(BaseRepository):
         except BudgetReservationIntegrityError:
             await self.session.rollback()
             raise
+
+    async def reconcile(
+        self,
+        *,
+        reservation_ref: str,
+        execution_decision_ref: str,
+        cost_record_ref: str,
+        actual_cost: Decimal,
+        evidence_currency: str,
+        now: datetime,
+    ) -> BudgetReservationSnapshot:
+        actual_cost = require_nonnegative_money(actual_cost, field_name="actual_cost")
+        now = _require_aware(now, field_name="now")
+        if not cost_record_ref:
+            raise BudgetReservationIntegrityError("cost record reference is required")
+
+        try:
+            await self._begin_serialized_write()
+            budget_scope_ref = await self._reservation_scope_ref(reservation_ref)
+            scope = await self._locked_scope(budget_scope_ref)
+            reservation = await self._locked_reservation(reservation_ref)
+            self._require_execution_decision(reservation, execution_decision_ref)
+
+            if reservation.state != BudgetReservationState.CLAIMED.value:
+                raise InvalidBudgetTransitionError(f"cannot reconcile reservation in state {reservation.state}")
+            if evidence_currency != scope.currency:
+                raise BudgetReservationIntegrityError("cost evidence currency does not match its budget scope")
+
+            if reservation.reconciled_at is not None:
+                if reservation.cost_record_ref != cost_record_ref:
+                    raise BudgetReservationIntegrityError(
+                        "reservation is already reconciled against a different cost record"
+                    )
+                snapshot = _reservation_snapshot(reservation)
+                await self.session.rollback()
+                return snapshot
+
+            if scope.reserved_total < reservation.reserved_amount:
+                raise BudgetReservationIntegrityError("reservation is not represented in the scope hold total")
+
+            scope.reserved_total -= reservation.reserved_amount
+            scope.committed_total += actual_cost
+            scope.version += 1
+            scope.updated_at = now
+            reservation.cost_record_ref = cost_record_ref
+            reservation.reconciled_at = now
+            reservation.version += 1
+            await self.session.flush()
+            snapshot = _reservation_snapshot(reservation)
+            await self.session.commit()
+            return snapshot
+        except (BudgetReservationIntegrityError, InvalidBudgetTransitionError):
+            await self.session.rollback()
+            raise

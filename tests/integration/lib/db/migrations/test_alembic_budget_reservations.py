@@ -48,9 +48,7 @@ def test_upgrade_adds_budget_tables_constraints_and_indexes(
                 "ck_budget_scopes_reserved_total_nonnegative",
                 "ck_budget_scopes_version_nonnegative",
             }
-            reservation_checks = {
-                item["name"] for item in inspector.get_check_constraints("budget_reservations")
-            }
+            reservation_checks = {item["name"] for item in inspector.get_check_constraints("budget_reservations")}
             assert reservation_checks == {
                 "ck_budget_reservations_reserved_amount_positive",
                 "ck_budget_reservations_state",
