@@ -137,6 +137,35 @@ def test_flat_hairstyle_lock_is_treated_as_a_locked_constraint() -> None:
     assert hairstyle.effective_value == "bob"
 
 
+def test_every_frozen_flat_lock_reaches_the_resolved_view() -> None:
+    resolved = _resolver().resolve(
+        target_ref="SH01",
+        scope_ancestry={IdentityScopeType.SHOT: "SH01"},
+        profiles=[
+            _profile(
+                "P-flat",
+                None,
+                None,
+                face_master_ref="asset:face-1",
+                full_body_master_ref="asset:body-1",
+                side_profile_ref="asset:side-1",
+                costume_locks=["asset:coat", "asset:boots"],
+                accessory_locks=["asset:watch"],
+                state_variants=["rain-soaked"],
+            )
+        ],
+    )
+    keys = _by_key(resolved)
+    assert keys["full_body_master"].effective_strength is IdentityStrength.LOCKED
+    assert keys["full_body_master"].effective_value == "asset:body-1"
+    assert keys["side_profile"].effective_value == "asset:side-1"
+    assert keys["costume_lock:asset:coat"].effective_strength is IdentityStrength.LOCKED
+    assert keys["costume_lock:asset:boots"].effective_value == "asset:boots"
+    assert keys["accessory_lock:asset:watch"].effective_strength is IdentityStrength.LOCKED
+    # State variants are an allowed-variance envelope, not a pinned reference.
+    assert keys["state_variant:rain-soaked"].effective_strength is IdentityStrength.PREFERRED
+
+
 def test_resolved_view_carries_no_provider_fields() -> None:
     resolved = _resolver().resolve(
         target_ref="SH01",

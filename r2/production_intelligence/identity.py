@@ -71,23 +71,26 @@ def _is_on_ancestry(
 
 
 def _flat_constraints(profile: VisualIdentityProfile) -> list[IdentityConstraint]:
+    """Every frozen flat lock on the legacy profile shape becomes a typed
+    constraint so it reaches the resolved view, the capability requirements and
+    the PromptPlan. Master/costume/accessory refs are LOCKED; state variants are
+    an allowed-variance envelope (PREFERRED), not a pinned reference."""
     derived: list[IdentityConstraint] = []
-    if profile.hairstyle_lock:
-        derived.append(
-            IdentityConstraint(
-                semantic_key="hairstyle",
-                strength=IdentityStrength.LOCKED,
-                semantic_value=profile.hairstyle_lock,
-            )
-        )
-    if profile.face_master_ref:
-        derived.append(
-            IdentityConstraint(
-                semantic_key="face_master",
-                strength=IdentityStrength.LOCKED,
-                semantic_value=profile.face_master_ref,
-            )
-        )
+
+    def _add(key: str, value: str | None, strength: IdentityStrength) -> None:
+        if value:
+            derived.append(IdentityConstraint(semantic_key=key, strength=strength, semantic_value=value))
+
+    _add("hairstyle", profile.hairstyle_lock, IdentityStrength.LOCKED)
+    _add("face_master", profile.face_master_ref, IdentityStrength.LOCKED)
+    _add("full_body_master", profile.full_body_master_ref, IdentityStrength.LOCKED)
+    _add("side_profile", profile.side_profile_ref, IdentityStrength.LOCKED)
+    for ref in profile.costume_locks:
+        _add(f"costume_lock:{ref}", ref, IdentityStrength.LOCKED)
+    for ref in profile.accessory_locks:
+        _add(f"accessory_lock:{ref}", ref, IdentityStrength.LOCKED)
+    for ref in profile.state_variants:
+        _add(f"state_variant:{ref}", ref, IdentityStrength.PREFERRED)
     return derived
 
 

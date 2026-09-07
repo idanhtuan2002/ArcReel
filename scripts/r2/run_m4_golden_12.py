@@ -25,6 +25,9 @@ from r2.contracts import (
     DirectorKind,
     DirectorResult,
     DirectorSuccess,
+    FailureDomain,
+    FailureRecord,
+    ProductionEvent,
     ProductionMethod,
     ReadinessState,
 )
@@ -37,11 +40,13 @@ from r2.production_intelligence.capability_registry import (
 )
 from r2.production_intelligence.director import DirectorExecutionService, DirectorRoutingPolicy
 from r2.production_intelligence.execution import ExecutionDecisionService
+from r2.production_intelligence.failure import FailureNormalizer
 from r2.production_intelligence.fixture_loader import M4ShotCase, load_m4_golden_12
 from r2.production_intelligence.identity import VisualIdentityResolver
 from r2.production_intelligence.method_router import MethodRouter, MethodRoutingContext
 from r2.production_intelligence.prompting import DefaultPromptCompiler, PromptPlanner
 from r2.production_intelligence.readiness import ProductionReadinessEvaluator
+from r2.production_intelligence.telemetry import ProductionTelemetryProjector
 from scripts.r2.m4_test_doubles import DirectorDoubleMode, FixtureDirectorAdapter
 
 _NOW = datetime(2026, 9, 7, 12, 0, tzinfo=UTC)
@@ -99,6 +104,8 @@ class M4PipelineResult:
     execution_decision: Any = None
     provider_request: Any = None
     method_error: BaseException | None = None
+    failure: FailureRecord | None = None
+    events: list[ProductionEvent] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)
 
     @property
@@ -154,6 +161,19 @@ async def run_pipeline(
     result.readiness = readiness
     result.trace.append(f"ProductionReadiness={readiness.state.value}")
     if readiness.state is not ReadinessState.READY:
+        reason_code = readiness.blocked_reason or "NOT_READY"
+        failure = FailureNormalizer().normalize_outcome(
+            domain=FailureDomain.READINESS,
+            reason_code=reason_code,
+            target_ref=case.shot.id,
+            now=_NOW,
+            decision_refs=[readiness.id],
+        )
+        result.failure = failure
+        result.events.append(
+            ProductionTelemetryProjector(production_run_id=f"run:{case.shot.id}").project_failure(failure)
+        )
+        result.trace.append(f"FailureRecord={reason_code}")
         return result
 
     try:

@@ -179,6 +179,17 @@ by Claude before triage.
   `CONFLICTED` the pipeline just returns — no `FailureRecord`, no `ProductionEvent`.
 - **Direction:** flatten every frozen lock to a typed constraint; on identity
   conflict emit a `FailureRecord(HUMAN_ACTION_REQUIRED)` + `ProductionEvent`.
+- **FIXED (next-session batch):** `_flat_constraints` now flattens
+  `full_body_master_ref`, `side_profile_ref`, `costume_locks`, `accessory_locks`
+  (LOCKED, per-value keys) and `state_variants` (PREFERRED envelope) — these
+  reach the resolved view, the generic `IDENTITY_LOCK:` / `IDENTITY_PREF:`
+  capability requirements and the PromptPlan. The golden-12 `run_pipeline` no
+  longer bare-returns on a non-READY Gate 1: it builds a
+  `FailureNormalizer.normalize_outcome(READINESS, reason_code=blocked_reason or
+  "NOT_READY")` (→ `HUMAN_ACTION_REQUIRED`, explicit in
+  `_EXPECTED_OUTCOME_DISPOSITION`) and a projected `ProductionEvent`, both on
+  `M4PipelineResult.{failure,events}`. New `test_identity_conflict_signal.py` +
+  `test_every_frozen_flat_lock_reaches_the_resolved_view`.
 
 ### Med-3 — provider-neutrality enforced by field names, not values
 - **Where:** `r2/contracts/preparation.py` (`IdentityConstraint`),

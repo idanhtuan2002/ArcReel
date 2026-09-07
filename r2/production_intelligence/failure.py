@@ -129,6 +129,8 @@ _EXCEPTION_MAP: list[tuple[type[BaseException], tuple[FailureDomain, FailureClas
 
 _EXPECTED_OUTCOME_DISPOSITION: dict[str, RetryDisposition] = {
     "BLOCKED": RetryDisposition.HUMAN_ACTION_REQUIRED,
+    "IDENTITY_CONFLICT": RetryDisposition.HUMAN_ACTION_REQUIRED,
+    "NOT_READY": RetryDisposition.HUMAN_ACTION_REQUIRED,
     "DENIED_BUDGET": RetryDisposition.NEW_EXECUTION_DECISION_REQUIRED,
     "DENIED_NOT_READY": RetryDisposition.HUMAN_ACTION_REQUIRED,
     "DENIED_NO_CAPABILITY": RetryDisposition.NEW_METHOD_DECISION_REQUIRED,
