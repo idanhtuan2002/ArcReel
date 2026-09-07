@@ -4,7 +4,7 @@
 
 **Goal:** Build the durable, append-only Canon authority that creates pinned branches, commits approved deltas atomically, resolves immutable versions deterministically, and proves recovery and concurrency on PostgreSQL.
 
-**Architecture:** Pure R2 contracts, hashing, state application, and validation live under `r2/`; persistence-neutral protocols keep them independent of SQLAlchemy. Host-side ORM, repository, and unit-of-work modules bind those protocols to the existing async database. `CanonTransactionService` is the only authority that calls write-port methods and completes a unit-of-work; `CanonResolver` can rebuild only disposable projections.
+**Architecture:** Pure R2 contracts, hashing, state application, and validation live under `r2/`; persistence-neutral protocols keep them independent of SQLAlchemy. Host-side ORM, repository, and capability-specific unit-of-work modules bind those protocols to the existing async database. `CanonTransactionService` alone receives the authority UoW and calls write-port methods; `CanonResolutionService` owns the projection UoW that makes a resolver rebuild durable.
 
 **Tech Stack:** Python 3.12+, Pydantic v2, SQLAlchemy async ORM, Alembic, PostgreSQL 16, SQLite focused tests, pytest/pytest-asyncio, ruff, basedpyright, import-linter, deptry.
 
@@ -12,10 +12,10 @@
 
 ## Global Constraints
 
-- Start execution only after the M4 Gate D result is accepted and integrated; rebase this worktree onto that accepted revision before Task 1 without changing the approved M5A design.
+- Start execution only through Task 0 after M4 Gate D is accepted. Pin a new implementation worktree to the exact clean M4 handoff head; do not rebase or mutate this design worktree.
 - Preserve ADR-0075: accepted `CanonDelta`, immutable `CanonVersion`, and `CanonBranch` are authority; `canon_resolved_projections` is disposable.
 - `CanonTransactionService` is the sole Canon commit authority and the sole caller of authoritative write-port methods.
-- One service call owns one fresh `AsyncSession` transaction through `CanonUnitOfWork`; repositories and resolvers never commit, roll back, or open sessions.
+- One service call owns one fresh `AsyncSession` transaction through either `CanonAuthorityUnitOfWork` or `CanonProjectionUnitOfWork`; repositories and resolvers never commit, roll back, or open sessions.
 - Use `(user_id, project_name)` on every read, replay, branch creation, commit, projection rebuild, and integrity check. Cross-scope identifiers return the same result as unknown identifiers.
 - `base_canon_version_id` is the semantic base: null for main genesis, the pinned parent version for narrative version 1, and the preceding local version afterward.
 - Persist `sha256`, `r2-canon-delta-v1`, `r2-canon-content-v1`, and `r2-canon-schema-v1`; unsupported stored versions fail closed.
@@ -40,12 +40,13 @@
 | `r2/narrative/validation.py` | Structural, interval, reference, and exact-fact contradiction validation |
 | `r2/narrative/ports.py` | Read, projection, write, and unit-of-work protocols |
 | `r2/narrative/canon_resolver.py` | Version-DAG replay, projection verification, and projection rebuild |
+| `r2/narrative/canon_resolution.py` | Projection-only UoW lifecycle for durable reads/rebuilds |
 | `r2/narrative/canon_transaction.py` | Branch creation and the only approved Canon commit orchestration |
 | `r2/narrative/integrity.py` | Executable logical-FK, lineage, linkage, and hash integrity checker |
 | `r2/narrative/__init__.py` | Deliberate public narrative API; excludes persistence primitives |
 | `lib/db/models/canon.py` | Four SQLAlchemy tables and physical constraints |
 | `lib/db/models/__init__.py` | Register/export Canon ORM models |
-| `lib/db/repositories/canon_repo.py` | Scoped SQLAlchemy reads and transaction-bound persistence primitives; no commit/rollback |
+| `lib/db/repositories/canon_repo.py` | Scoped projection adapter plus authority adapter with transaction-bound persistence primitives; no commit/rollback |
 | `lib/db/canon_uow.py` | AsyncSession lifecycle and SQLite/PostgreSQL transaction startup |
 | `alembic/versions/5a7c4a0e0001_add_canon_authority.py` | Additive schema from parent `c04b7d93e5a1` |
 | `tests/unit/r2/contracts/test_narrative.py` | Strict contracts, discriminated operations, timestamps, normalization |
@@ -56,12 +57,114 @@
 | `tests/integration/lib/db/migrations/test_alembic_canon_authority.py` | SQLite Alembic upgrade/downgrade schema proof |
 | `tests/integration/lib/db/repositories/test_canon_repo.py` | Scoped repository, UoW, uniqueness, and no-commit behavior |
 | `tests/integration/r2/narrative/test_canon_resolver.py` | Replay, pinned ancestry, projection loss/corruption/race |
+| `tests/integration/r2/narrative/test_canon_resolution.py` | Projection UoW commit/rollback and durable rebuild lifecycle |
 | `tests/integration/r2/narrative/test_canon_transaction.py` | Approval, idempotency, base conflict, atomic commit |
 | `tests/integration/r2/narrative/test_canon_concurrency.py` | PostgreSQL same-branch/different-branch concurrency and restart |
 | `tests/integration/r2/narrative/test_canon_integrity.py` | Executable checker over valid and intentionally corrupted fixtures |
 | `tests/unit/r2/narrative/test_canon_architecture_boundaries.py` | Commit authority and import/session ownership fitness rules |
+| `scripts/r2/verify_m5a_scope.py` | Machine-checkable implementation and evidence-only diff allowlists |
+| `tests/unit/scripts/r2/test_verify_m5a_scope.py` | Scope checker acceptance and rejection cases |
 | `pyproject.toml` | Import-linter contract keeping R2 narrative core independent of Host persistence |
+| `docs/r2/evidence/R2_M5A_STARTING_STATE.json` | Accepted M4 lineage, clean start, migration reservation, authority hashes, graph generation, and baseline gates |
 | `docs/r2/evidence/R2_M5A_FINAL_VERIFICATION.md` | Exact revision, migration head, commands, exit codes, and disposable PostgreSQL identity |
+
+---
+
+### Task 0: Pin the accepted M4 handoff and revalidate every execution seam
+
+**Files:**
+- Create in the new implementation worktree: `docs/r2/evidence/R2_M5A_STARTING_STATE.json`
+
+**Interfaces:**
+- Consumes: accepted M4 Gate-D evidence, its exact clean handoff head, this M5A design branch, the current Alembic graph, Codebase Memory MCP, and baseline quality gates.
+- Produces: a clean `/home/anhtuan/content-production-os-m5a-impl` worktree on `feat/r2-m5a-canon-authority`, plus a machine-readable starting-state checkpoint committed before implementation.
+
+- [ ] **Step 1: Verify the M4 authority and evidence-only handoff**
+
+Read `docs/r2/evidence/r2_m4_evidence.json`, `docs/r2/evidence/R2_M4_FINAL_VERIFICATION.md`, and the approved waiver artifact from the M4 worktree. Set `M4_VERIFIED_HEAD` from the structured evidence and set `M4_HANDOFF_HEAD` from the clean M4 worktree HEAD. Require `gate_d_pass == true`, `gate_d_status == "COMPLETE_WITH_WAIVER"`, both named waiver IDs present, and `git status --short` empty.
+
+Run separately in the M4 worktree:
+
+```bash
+uv run python -c 'import json; from pathlib import Path; evidence=json.loads(Path("docs/r2/evidence/r2_m4_evidence.json").read_text()); waivers=json.loads(Path("docs/r2/evidence/R2_M4_GENERATIVE_SEAM_WAIVER.json").read_text()); assert evidence["gate_d_pass"] is True; assert evidence["gate_d_status"] == "COMPLETE_WITH_WAIVER"; assert {item["waiver_id"] for item in waivers} == {"R2-M4-WAIVER-001", "R2-M4-WAIVER-002"}'
+M4_VERIFIED_HEAD="$(uv run python -c 'import json; print(json.load(open("docs/r2/evidence/r2_m4_evidence.json"))["verified_head"])')"
+M4_HANDOFF_HEAD="$(git rev-parse HEAD)"
+git status --short
+git merge-base --is-ancestor "$M4_VERIFIED_HEAD" "$M4_HANDOFF_HEAD"
+git diff --name-only "$M4_VERIFIED_HEAD"..."$M4_HANDOFF_HEAD"
+```
+
+Expected: validation and ancestry exit 0; status is empty; every post-verified path is under `docs/r2/evidence/`. Reject a code, contract, migration, config, runtime, or test path. The executor must use current observed SHAs; the plan intentionally does not freeze `7faabb0f` because M4 may add a later evidence-only handoff commit before execution.
+
+- [ ] **Step 2: Create a fresh implementation worktree at that exact handoff**
+
+From the primary checkout, require that the accepted M4 handoff commit is present in the local object database, then create the implementation branch directly from it:
+
+```bash
+git worktree add -b feat/r2-m5a-canon-authority /home/anhtuan/content-production-os-m5a-impl "$M4_HANDOFF_HEAD"
+```
+
+Do not rebase the design worktree and do not cherry-pick M4 through an inferred branch tip. If the target path or branch already exists, stop and inspect it; do not delete or overwrite it.
+
+- [ ] **Step 3: Materialize the approved M5A authority documents**
+
+In the implementation worktree, record the current design branch tip as `M5A_DOCS_SOURCE_HEAD`, then cherry-pick its contiguous documentation series beginning with `0b177548`:
+
+```bash
+M5A_DOCS_SOURCE_HEAD="$(git rev-parse design/r2-m5a-canon-authority)"
+git cherry-pick 0b177548^.."$M5A_DOCS_SOURCE_HEAD"
+git diff --name-only "$M4_HANDOFF_HEAD"...HEAD
+M5A_DOCS_HEAD="$(git rev-parse HEAD)"
+```
+
+Expected: only `CONTEXT.md`, `docs/adr/0075-canon-authority-append-only-deltas.md`, the M5A design spec, and this implementation plan differ. Record the resulting implementation-worktree docs commit as `M5A_DOCS_HEAD`.
+
+- [ ] **Step 4: Prove the migration parent and reserve the revision ID**
+
+Run:
+
+```bash
+uv run alembic heads
+rg -n 'revision: str = "5a7c4a0e0001"|revision = "5a7c4a0e0001"' alembic/versions
+```
+
+Expected: Alembic reports exactly `c04b7d93e5a1 (head)` and the `rg` command returns no matches. Otherwise stop and revise the migration filename, revision, parent, and every expected-head assertion before Task 1.
+
+- [ ] **Step 5: Re-index and verify the rebased source graph**
+
+Use Codebase Memory MCP `list_projects` and `index_status`. If no indexed project has root `/home/anhtuan/content-production-os-m5a-impl` at `M5A_DOCS_HEAD`, index that exact worktree as `home-anhtuan-content-production-os-m5a-impl`, then query the transaction, repository, test-fixture, migration, architecture-test, and frozen-registry seams used by this plan. Call `check_index_coverage` once with every relied-on path and read any reported missed ranges directly. Record project name, generation, indexed HEAD, coverage results, and direct-source fallbacks.
+
+- [ ] **Step 6: Run starting-state baseline gates**
+
+Run each command separately:
+
+```bash
+uv run ruff check r2 lib/db tests/unit/r2 tests/integration/r2
+uv run basedpyright --warnings
+uv run lint-imports
+uv run python -m pytest tests/unit/r2/test_bootstrap.py tests/unit/r2/contracts/test_architecture_boundaries.py tests/unit/r2/production/test_c04_budget_architecture_boundaries.py -q
+uv run python scripts/audit_tests.py --check
+```
+
+Expected: every command exits 0 and pytest collects at least one test. A baseline failure is recorded and resolved before Canon implementation begins.
+
+- [ ] **Step 7: Persist and commit the starting-state checkpoint**
+
+Compute SHA-256 for the ADR, design spec, and plan:
+
+```bash
+sha256sum docs/adr/0075-canon-authority-append-only-deltas.md docs/superpowers/specs/2026-09-07-r2-m5a-canon-authority-and-transactions-design.md docs/superpowers/plans/2026-09-07-r2-m5a-canon-authority-and-transactions.md
+```
+
+Create `R2_M5A_STARTING_STATE.json` with observed values for M4 status, `m4_verified_head`, `m4_handoff_head`, post-verified paths, `m5a_docs_source_head`, `m5a_docs_head`, clean-tree result, Alembic head, reserved revision, authority-document hashes, graph project/generation/HEAD/coverage, and every baseline command/exit code.
+
+```bash
+git add docs/r2/evidence/R2_M5A_STARTING_STATE.json
+git commit -m "docs(r2): pin M5A starting state"
+git status --short
+```
+
+Expected: the checkpoint commit succeeds and final status is empty. Its parentage must descend from the exact accepted M4 handoff. Task 1 may start only after this gate passes.
 
 ---
 
@@ -711,7 +814,7 @@ git commit -m "feat(db): add canon authority schema"
 
 **Interfaces:**
 - Consumes: Canon snapshots/contracts and four ORM models.
-- Produces: `CanonReadRepositoryPort`, `CanonProjectionRepositoryPort`, `CanonWriteRepositoryPort`, `CanonUnitOfWork`, `CanonUnitOfWorkFactory`, `CanonRepository`, `SqlAlchemyCanonUnitOfWork`, and `SqlAlchemyCanonUnitOfWorkFactory`.
+- Produces: `CanonReadRepositoryPort`, `CanonProjectionRepositoryPort`, `CanonWriteRepositoryPort`, `CanonProjectionUnitOfWork`, `CanonAuthorityUnitOfWork`, their separate factories, capability-limited `CanonProjectionRepository`, authority-only `CanonRepository`, `SqlAlchemyCanonProjectionUnitOfWork`, `SqlAlchemyCanonAuthorityUnitOfWork`, and their separate factories.
 
 - [ ] **Step 1: Write failing scoped-read and transaction-ownership tests**
 
@@ -766,22 +869,33 @@ class CanonWriteRepositoryPort(CanonProjectionRepositoryPort, Protocol):
     async def flush(self) -> None: ...
 
 
-class CanonUnitOfWork(Protocol):
-    repository: CanonWriteRepositoryPort
-    async def __aenter__(self) -> CanonUnitOfWork: ...
+class CanonProjectionUnitOfWork(Protocol):
+    repository: CanonProjectionRepositoryPort
+    async def __aenter__(self) -> CanonProjectionUnitOfWork: ...
     async def __aexit__(self, exc_type: object, exc: object, traceback: object) -> None: ...
     async def commit(self) -> None: ...
 
 
-class CanonUnitOfWorkFactory(Protocol):
-    def __call__(self, *, serialized_authority_write: bool) -> CanonUnitOfWork: ...
+class CanonAuthorityUnitOfWork(Protocol):
+    repository: CanonWriteRepositoryPort
+    async def __aenter__(self) -> CanonAuthorityUnitOfWork: ...
+    async def __aexit__(self, exc_type: object, exc: object, traceback: object) -> None: ...
+    async def commit(self) -> None: ...
+
+
+class CanonProjectionUnitOfWorkFactory(Protocol):
+    def __call__(self) -> CanonProjectionUnitOfWork: ...
+
+
+class CanonAuthorityUnitOfWorkFactory(Protocol):
+    def __call__(self) -> CanonAuthorityUnitOfWork: ...
 ```
 
-Only `CanonUnitOfWork.repository` and `CanonTransactionService` may type against `CanonWriteRepositoryPort`. Do not export `CanonRepository` from `lib.db.repositories.__init__`; Host assembly imports the concrete adapter by its full module path.
+Only `CanonAuthorityUnitOfWork.repository` and `CanonTransactionService` may type against `CanonWriteRepositoryPort`. A projection consumer receives only `CanonProjectionUnitOfWorkFactory`; it cannot reach `insert_delta`, `insert_version`, `advance_head`, or `lock_branch` through its declared capability. Do not export `CanonRepository` from `lib.db.repositories.__init__`; Host assembly imports the concrete adapter by its full module path.
 
 - [ ] **Step 4: Implement scoped SQLAlchemy repository methods**
 
-Every SELECT starts with all three available scope predicates, joining through branch ownership when the selected table does not carry user/project columns. `lock_branch` adds `.with_for_update()`. Before projection upsert, load the referenced version through that scoped join and raise `CanonNotFoundError` if unavailable. Snapshot conversion validates stored JSON through Pydantic. Corrupt branch/version/delta rows become `CanonIntegrityError`; corrupt projection JSON or metadata makes `load_projection` return `None` so the resolver can rebuild and replace that disposable row. Repository methods call `session.add`, `session.execute`, or `session.flush`; they contain no `commit`, `rollback`, session factory, or engine construction.
+`CanonProjectionRepository` implements only scoped reads plus projection load/upsert. `CanonRepository` extends it with branch locking and authority writes. Every SELECT starts with all three available scope predicates, joining through branch ownership when the selected table does not carry user/project columns. `lock_branch` adds `.with_for_update()`. Before projection upsert, load the referenced version through that scoped join and raise `CanonNotFoundError` if unavailable. Snapshot conversion validates stored JSON through Pydantic. Corrupt branch/version/delta rows become `CanonIntegrityError`; corrupt projection JSON or metadata makes `load_projection` return `None` so the resolver can rebuild and replace that disposable row. Repository methods call `session.add`, `session.execute`, or `session.flush`; they contain no `commit`, `rollback`, session factory, or engine construction.
 
 ```python
 async def advance_head(self, *, branch_id: str, expected_head_id: str | None, version_id: str, project_name: str, user_id: str) -> None:
@@ -804,10 +918,10 @@ Implement `upsert_projection` with `sqlalchemy.dialects.postgresql.insert` or `s
 - [ ] **Step 5: Implement the Host unit-of-work adapter**
 
 ```python
-class SqlAlchemyCanonUnitOfWork:
-    async def __aenter__(self) -> SqlAlchemyCanonUnitOfWork:
+class SqlAlchemyCanonAuthorityUnitOfWork:
+    async def __aenter__(self) -> SqlAlchemyCanonAuthorityUnitOfWork:
         self.session = self._session_factory()
-        if self.session.get_bind().dialect.name == "sqlite" and self._serialized_authority_write:
+        if self.session.get_bind().dialect.name == "sqlite":
             await self.session.execute(text("BEGIN IMMEDIATE"))
         else:
             await self.session.begin()
@@ -823,7 +937,9 @@ class SqlAlchemyCanonUnitOfWork:
         await self.session.close()
 ```
 
-`SqlAlchemyCanonUnitOfWorkFactory.__call__(*, serialized_authority_write: bool)` returns a new UoW each time. The transaction service requests `serialized_authority_write=True`; read/projection facades request `False`. The flag selects SQLite `BEGIN IMMEDIATE`; it does not grant authority, and a projection-only UoW may still upsert its disposable cache row.
+`SqlAlchemyCanonProjectionUnitOfWork` has the same session/commit/rollback lifecycle but always uses ordinary `session.begin()` and constructs `CanonProjectionRepository`, which has no authority methods. The authority UoW constructs `CanonRepository`. Both factories return a new UoW each time. They may share a private Host-side lifecycle base, but the public factories and repository objects remain structurally separate; there is no boolean mode that changes a consumer's authority.
+
+Add tests that type and inspect a projection UoW as `CanonProjectionUnitOfWork`, prove its repository lacks write methods through the exposed adapter/proxy, and prove each factory creates a fresh session. The authority UoW alone uses SQLite `BEGIN IMMEDIATE`; PostgreSQL authority serialization comes from `lock_branch()`.
 
 - [ ] **Step 6: Run repository/UoW tests on the dialect-aware fixture**
 
@@ -854,11 +970,14 @@ git commit -m "feat(db): bind canon persistence unit of work"
 
 **Files:**
 - Create: `r2/narrative/canon_resolver.py`
+- Create: `r2/narrative/canon_resolution.py`
+- Modify: `r2/narrative/__init__.py`
 - Test: `tests/integration/r2/narrative/test_canon_resolver.py`
+- Test: `tests/integration/r2/narrative/test_canon_resolution.py`
 
 **Interfaces:**
-- Consumes: `CanonProjectionRepositoryPort`, state application, validation, and versioned hashing.
-- Produces: `CanonResolver(repository: CanonProjectionRepositoryPort, *, clock: Callable[[], datetime] = utc_now)` with `resolve(*, branch_id: str, version_id: str | None, project_name: str, user_id: str) -> ResolvedCanonView`.
+- Consumes: `CanonProjectionRepositoryPort`, `CanonProjectionUnitOfWorkFactory`, state application, validation, and versioned hashing.
+- Produces: `CanonResolver(repository: CanonProjectionRepositoryPort, *, clock: Callable[[], datetime] = utc_now)` with `resolve(*, branch_id: str, version_id: str | None, project_name: str, user_id: str) -> ResolvedCanonView`; and `CanonResolutionService(projection_uow_factory: CanonProjectionUnitOfWorkFactory, *, clock: Callable[[], datetime] = utc_now)` with the same scoped `resolve` signature.
 
 - [ ] **Step 1: Write failing replay and pinned-parent tests**
 
@@ -919,9 +1038,27 @@ async def test_two_missing_projection_rebuilders_converge(concurrent_session_fac
 
 Also prove corrupt projection replacement, corrupt authoritative delta failure, broken parent failure, unsupported historical hash version failure, and no use of current parent head.
 
-- [ ] **Step 5: Run resolver tests and audit**
+- [ ] **Step 5: Implement and test the durable projection lifecycle**
 
-Run: `uv run python -m pytest tests/integration/r2/narrative/test_canon_resolver.py -q`
+```python
+class CanonResolutionService:
+    async def resolve(self, *, branch_id: str, version_id: str | None, project_name: str, user_id: str) -> ResolvedCanonView:
+        async with self._projection_uow_factory() as uow:
+            result = await CanonResolver(uow.repository, clock=self._clock).resolve(
+                branch_id=branch_id,
+                version_id=version_id,
+                project_name=project_name,
+                user_id=user_id,
+            )
+            await uow.commit()
+            return result
+```
+
+Test with a missing projection, exit the service call, open a fresh session, and assert the rebuilt row is durable. Inject resolver failure and assert the projection UoW rolls back. Assert the service constructor accepts only `CanonProjectionUnitOfWorkFactory`. Commit-time replay in Task 8 still constructs `CanonResolver` with the authority transaction's repository so delta/version/head/projection remain in one session and one transaction.
+
+- [ ] **Step 6: Run resolver tests and audit**
+
+Run: `uv run python -m pytest tests/integration/r2/narrative/test_canon_resolver.py tests/integration/r2/narrative/test_canon_resolution.py -q`
 
 Expected: all tests pass.
 
@@ -929,10 +1066,10 @@ Run: `uv run python scripts/audit_tests.py --check`
 
 Expected: exit 0.
 
-- [ ] **Step 6: Commit replay and recovery**
+- [ ] **Step 7: Commit replay and recovery**
 
 ```bash
-git add r2/narrative/canon_resolver.py tests/integration/r2/narrative/test_canon_resolver.py
+git add r2/narrative/canon_resolver.py r2/narrative/canon_resolution.py r2/narrative/__init__.py tests/integration/r2/narrative/test_canon_resolver.py tests/integration/r2/narrative/test_canon_resolution.py
 git commit -m "feat(r2): resolve canon lineage and projections"
 ```
 
@@ -946,8 +1083,8 @@ git commit -m "feat(r2): resolve canon lineage and projections"
 - Test: `tests/integration/r2/narrative/test_canon_transaction.py`
 
 **Interfaces:**
-- Consumes: `CanonUnitOfWorkFactory`, `CanonResolver`, hashing, state, validation, contracts, and error taxonomy.
-- Produces: `CanonCommitStage`; `CanonTransactionService(uow_factory: CanonUnitOfWorkFactory, *, version_id_factory: Callable[[], str] = new_version_id, fault_hook: Callable[[CanonCommitStage], None] = ignore_commit_stage)`; `create_branch(command: CreateCanonBranch) -> CanonBranchSnapshot`; and `commit(*, delta: CanonDelta, approval: CanonCommitApproval, project_name: str, user_id: str, now: datetime) -> CanonCommitResult`.
+- Consumes: `CanonAuthorityUnitOfWorkFactory`, `CanonResolver`, hashing, state, validation, contracts, and error taxonomy.
+- Produces: `CanonCommitStage`; `CanonTransactionService(uow_factory: CanonAuthorityUnitOfWorkFactory, *, version_id_factory: Callable[[], str] = new_version_id, fault_hook: Callable[[CanonCommitStage], None] = ignore_commit_stage)`; `create_branch(command: CreateCanonBranch) -> CanonBranchSnapshot`; and `commit(*, delta: CanonDelta, approval: CanonCommitApproval, project_name: str, user_id: str, now: datetime) -> CanonCommitResult`.
 
 - [ ] **Step 1: Write failing branch-creation and approved-commit tests**
 
@@ -977,7 +1114,7 @@ For MAIN require both parent fields null. For NARRATIVE_BRANCH require both, loa
 Before opening the UoW, call `verify_canon_delta_hash(delta)` and validate the approval's status, aware timestamp, delta ID, payload hash/selectors, scope, and non-empty `approved_by`. The authenticated application facade is responsible for deriving `approved_by` from the request principal; M5A exposes no unauthenticated router or Agent-tool entry point. Repeat the exact receipt binding check after the branch is locked and the semantic base is known; pre-lock validation is an early rejection, while the locked check is authoritative.
 
 ```python
-async with self._uow_factory(serialized_authority_write=True) as uow:
+async with self._uow_factory() as uow:
     repository = uow.repository
     branch = await repository.lock_branch(
         branch_id=delta.target_branch_id,
@@ -1064,7 +1201,7 @@ git commit -m "feat(r2): commit approved canon deltas atomically"
 
 **Interfaces:**
 - Consumes: `CanonCommitStage` and the `fault_hook` seam.
-- Produces: all-or-nothing evidence at `BEFORE_DELTA_INSERT`, `AFTER_DELTA_FLUSH`, `AFTER_VERSION_FLUSH`, `AFTER_HEAD_FLUSH`, and `BEFORE_PROJECTION_FLUSH`.
+- Produces: all-or-nothing evidence at `BEFORE_DELTA_INSERT`, `AFTER_DELTA_FLUSH`, `AFTER_VERSION_FLUSH`, `AFTER_HEAD_FLUSH`, `BEFORE_PROJECTION_FLUSH`, `AFTER_PROJECTION_FLUSH`, and `BEFORE_COMMIT`.
 
 - [ ] **Step 1: Write failing parameterized rollback tests**
 
@@ -1088,9 +1225,20 @@ Run: `uv run python -m pytest tests/integration/r2/narrative/test_canon_concurre
 
 Expected: fail because commit stages are not emitted at every boundary.
 
-- [ ] **Step 3: Emit deterministic fault stages after explicit flushes**
+- [ ] **Step 3: Emit deterministic fault stages at every persistence and commit boundary**
 
-Call the injected synchronous hook only at the five public enum stages. Do not catch hook exceptions inside the transaction; UoW exit rolls back. The production default is a module-level no-op function passed as a constructor default, and tests inject the hook without patching private names.
+Call the injected synchronous hook only at the seven public enum stages. `AFTER_PROJECTION_FLUSH` proves that delta, version, head, and projection were all flushed but remain rollback-able; `BEFORE_COMMIT` is emitted immediately before `await uow.commit()` and proves the final transaction edge. Do not catch hook exceptions inside the transaction; UoW exit rolls back. The production default is a module-level no-op function passed as a constructor default, and tests inject the hook without patching private names.
+
+```python
+class CanonCommitStage(StrEnum):
+    BEFORE_DELTA_INSERT = "BEFORE_DELTA_INSERT"
+    AFTER_DELTA_FLUSH = "AFTER_DELTA_FLUSH"
+    AFTER_VERSION_FLUSH = "AFTER_VERSION_FLUSH"
+    AFTER_HEAD_FLUSH = "AFTER_HEAD_FLUSH"
+    BEFORE_PROJECTION_FLUSH = "BEFORE_PROJECTION_FLUSH"
+    AFTER_PROJECTION_FLUSH = "AFTER_PROJECTION_FLUSH"
+    BEFORE_COMMIT = "BEFORE_COMMIT"
+```
 
 - [ ] **Step 4: Write same-branch and different-branch concurrency tests**
 
@@ -1170,13 +1318,11 @@ Expected: collection fails because the checker does not exist.
 
 ```python
 INTEGRITY_RULE_ORDER = (
-    "M5A_HEAD_MISSING",
-    "M5A_HEAD_SCOPE_MISMATCH",
+    "M5A_HEAD_MISSING_OR_OUT_OF_SCOPE",
     "M5A_HEAD_BRANCH_MISMATCH",
     "M5A_HEAD_NOT_LATEST",
     "M5A_VERSION_GAP",
-    "M5A_PARENT_MISSING",
-    "M5A_PARENT_SCOPE_MISMATCH",
+    "M5A_PARENT_MISSING_OR_OUT_OF_SCOPE",
     "M5A_PARENT_BRANCH_MISMATCH",
     "M5A_VERSION_PARENT_MISMATCH",
     "M5A_DELTA_LINK_MISMATCH",
@@ -1185,11 +1331,11 @@ INTEGRITY_RULE_ORDER = (
 )
 ```
 
-Check each branch independently, collect rather than repair, sort by rule order then affected IDs, and never consult a projection as authority. A null head requires zero local versions; a non-null head must be the highest contiguous version. Narrative version 1 points to the pinned parent, later versions point locally, and every version's delta base equals its parent.
+Check each branch independently, collect rather than repair, sort by rule order then affected IDs, and never consult a projection as authority. The checker uses the same scoped repository port as runtime reads: nonexistent and cross-scope identifiers deliberately produce the same `*_MISSING_OR_OUT_OF_SCOPE` rule, public fields, and message shape. Do not add an unscoped ownership lookup or a trusted raw repository in M5A. A null head requires zero local versions; a non-null head must be the highest contiguous version. Narrative version 1 points to the pinned parent, later versions point locally, and every version's delta base equals its parent.
 
 - [ ] **Step 4: Add corruption coverage for every logical pointer and hash**
 
-Corrupt rows only through explicit SQL in the test transaction. Cover missing/wrong-scope/wrong-branch head, parent mismatch, version gap, delta/version linkage, unsupported selectors, and authoritative hash mismatch. Assert the checker leaves bytes unchanged.
+Corrupt rows only through explicit SQL in the test transaction. Cover missing/cross-scope/wrong-branch head, missing/cross-scope/wrong-branch parent, parent mismatch, version gap, delta/version linkage, unsupported selectors, and authoritative hash mismatch. For each missing/cross-scope pair, assert identical rule ID and indistinguishable public finding shape. Assert the checker leaves bytes unchanged.
 
 - [ ] **Step 5: Run integrity tests and audit**
 
@@ -1214,12 +1360,14 @@ git commit -m "feat(r2): verify canon authority integrity"
 
 **Files:**
 - Create: `tests/unit/r2/narrative/test_canon_architecture_boundaries.py`
+- Create: `scripts/r2/verify_m5a_scope.py`
+- Create: `tests/unit/scripts/r2/test_verify_m5a_scope.py`
 - Modify: `pyproject.toml`
 - Create: `docs/r2/evidence/R2_M5A_FINAL_VERIFICATION.md`
 
 **Interfaces:**
 - Consumes: frozen contract registry, completed M5A implementation, existing AST/import-linter patterns, and PostgreSQL-compatible fixtures.
-- Produces: executable one-authority/session-boundary rules and a revision-bound acceptance record.
+- Produces: executable one-authority/session-boundary rules, machine-checkable implementation/evidence diff allowlists, and a verified-head-to-handoff acceptance record.
 
 - [ ] **Step 1: Write failing architecture tests**
 
@@ -1240,7 +1388,7 @@ def test_repository_and_resolver_do_not_own_transactions() -> None:
             assert forbidden not in code
 ```
 
-Also assert no router, worker, Agent tool, Canvas, production, or donor module imports `CanonWriteRepositoryPort`, `CanonRepository`, or `SqlAlchemyCanonUnitOfWork`; Canon modules do not import or instantiate `ProductionApprovalService`; projection code cannot touch branch heads/deltas/versions; `r2.contracts.narrative` remains provider/ORM/endpoint neutral; the frozen registry still names `CanonTransactionService` for authoritative Canon contracts.
+Also assert no router, worker, Agent tool, Canvas, production, or donor module imports `CanonWriteRepositoryPort`, `CanonRepository`, `SqlAlchemyCanonAuthorityUnitOfWork`, or its factory; only `CanonTransactionService` accepts `CanonAuthorityUnitOfWorkFactory`; `CanonResolutionService` accepts only the projection factory; the concrete projection UoW constructs only `CanonProjectionRepository`; Canon modules do not import or instantiate `ProductionApprovalService`; projection code cannot touch branch heads/deltas/versions; `r2.contracts.narrative` remains provider/ORM/endpoint neutral; the frozen registry still names `CanonTransactionService` for authoritative Canon contracts.
 
 - [ ] **Step 2: Run architecture tests to verify RED**
 
@@ -1264,7 +1412,60 @@ forbidden_modules = [
 
 Do not add `ignore_imports`. Keep SQLAlchemy and session types out of `r2/narrative`; the Host adapter implements the protocols. `server` is not an import-linter root package, so the architecture test enforces that boundary with AST import inspection instead of weakening or expanding the existing root-package configuration.
 
-- [ ] **Step 4: Run focused M5A and architecture gates**
+- [ ] **Step 4: Implement and test the executable scope allowlist**
+
+`scripts/r2/verify_m5a_scope.py` accepts `--base`, `--head`, and `--mode implementation|handoff`, obtains `git diff --name-only <base>...<head>`, and exits non-zero with every unexpected path. Keep the decision in a pure function so unit tests cover accepted paths and forbidden Canvas, provider, runtime activation, M5B/M5C, second-migration, and arbitrary evidence paths.
+
+Implementation mode permits exactly:
+
+```text
+CONTEXT.md
+docs/adr/0075-canon-authority-append-only-deltas.md
+docs/superpowers/specs/2026-09-07-r2-m5a-canon-authority-and-transactions-design.md
+docs/superpowers/plans/2026-09-07-r2-m5a-canon-authority-and-transactions.md
+docs/r2/evidence/R2_M5A_STARTING_STATE.json
+r2/contracts/narrative.py
+r2/contracts/__init__.py
+r2/narrative/__init__.py
+r2/narrative/errors.py
+r2/narrative/hashing.py
+r2/narrative/canon_state.py
+r2/narrative/validation.py
+r2/narrative/ports.py
+r2/narrative/canon_resolver.py
+r2/narrative/canon_resolution.py
+r2/narrative/canon_transaction.py
+r2/narrative/integrity.py
+lib/db/models/canon.py
+lib/db/models/__init__.py
+lib/db/repositories/canon_repo.py
+lib/db/canon_uow.py
+alembic/versions/5a7c4a0e0001_add_canon_authority.py
+tests/unit/r2/contracts/test_narrative.py
+tests/unit/r2/narrative/test_hashing.py
+tests/unit/r2/narrative/test_canon_state.py
+tests/unit/r2/narrative/test_validation.py
+tests/unit/r2/narrative/test_canon_architecture_boundaries.py
+tests/unit/lib/db/models/test_canon.py
+tests/unit/scripts/r2/test_verify_m5a_scope.py
+tests/integration/lib/db/migrations/test_alembic_canon_authority.py
+tests/integration/lib/db/repositories/test_canon_repo.py
+tests/integration/r2/narrative/test_canon_resolver.py
+tests/integration/r2/narrative/test_canon_resolution.py
+tests/integration/r2/narrative/test_canon_transaction.py
+tests/integration/r2/narrative/test_canon_concurrency.py
+tests/integration/r2/narrative/test_canon_integrity.py
+scripts/r2/verify_m5a_scope.py
+pyproject.toml
+```
+
+Handoff mode permits exactly `docs/r2/evidence/R2_M5A_FINAL_VERIFICATION.md`. The implementation checker also requires exactly one changed file under `alembic/versions/` and that its path equals the reserved migration.
+
+Run: `uv run python -m pytest tests/unit/scripts/r2/test_verify_m5a_scope.py -q`
+
+Expected: all tests pass and collection count is non-zero.
+
+- [ ] **Step 5: Run focused M5A and architecture gates**
 
 Run: `uv run python -m pytest tests/unit/r2/contracts/test_narrative.py tests/unit/r2/narrative tests/integration/r2/narrative tests/integration/lib/db/repositories/test_canon_repo.py tests/integration/lib/db/migrations/test_alembic_canon_authority.py -q`
 
@@ -1278,14 +1479,26 @@ Run: `uv run python scripts/audit_tests.py --check`
 
 Expected: exit 0.
 
-- [ ] **Step 5: Commit architecture gates before acceptance runs**
+- [ ] **Step 6: Commit architecture and scope gates before acceptance runs**
 
 ```bash
-git add tests/unit/r2/narrative/test_canon_architecture_boundaries.py pyproject.toml
+git add tests/unit/r2/narrative/test_canon_architecture_boundaries.py scripts/r2/verify_m5a_scope.py tests/unit/scripts/r2/test_verify_m5a_scope.py pyproject.toml
 git commit -m "test(r2): enforce M5A canon boundaries"
 ```
 
-- [ ] **Step 6: Run the complete backend quality gate**
+- [ ] **Step 7: Prove the complete implementation diff before acceptance**
+
+Set `M5A_STARTING_HEAD` to the `m4_handoff_head` recorded by Task 0 and run separately:
+
+```bash
+git diff --name-status "$M5A_STARTING_HEAD"...HEAD
+git diff --check "$M5A_STARTING_HEAD"...HEAD
+uv run python scripts/r2/verify_m5a_scope.py --base "$M5A_STARTING_HEAD" --head HEAD --mode implementation
+```
+
+Expected: diff is limited to the implementation allowlist, whitespace check exits 0, and the scope verifier exits 0. Any second migration, M5B/M5C, Canvas, provider, server runtime activation, worker, router, production activation, donor, or unrelated path stops the gate.
+
+- [ ] **Step 8: Run the complete backend quality gate**
 
 Run each command separately and record its exit code:
 
@@ -1301,7 +1514,7 @@ uv run python -m pytest -n 4 --dist loadfile
 
 Expected: every command exits 0. If formatting fails, run `uv run ruff format .`, inspect the diff, rerun affected focused tests, and repeat this gate.
 
-- [ ] **Step 7: Start a disposable PostgreSQL 16 acceptance database**
+- [ ] **Step 9: Start a disposable PostgreSQL 16 acceptance database**
 
 Use container `r2-m5a-postgres`, label `com.content-production-os.r2-m5a=1`, host port `55435`, database `arcreel_r2_m5a`, user `arcreel`, and a local-only password. Refuse to remove or reuse a container unless that exact ownership label is present.
 
@@ -1312,44 +1525,74 @@ docker exec r2-m5a-postgres pg_isready -U arcreel -d arcreel_r2_m5a
 
 Expected: `pg_isready` reports accepting connections. This is disposable test infrastructure; do not point `DATABASE_URL` at an operating database.
 
-- [ ] **Step 8: Run PostgreSQL migration and M5A acceptance**
+- [ ] **Step 10: Capture the disposable PostgreSQL identity**
+
+After readiness, run and preserve the exact output of each command:
+
+```bash
+docker exec r2-m5a-postgres psql -U arcreel -d arcreel_r2_m5a -Atc 'SELECT version();'
+docker inspect -f '{{.Id}}' r2-m5a-postgres
+docker inspect -f '{{.Image}}' r2-m5a-postgres
+docker inspect -f '{{ index .Config.Labels "com.content-production-os.r2-m5a" }}' r2-m5a-postgres
+docker inspect -f '{{json .NetworkSettings.Ports}}' r2-m5a-postgres
+```
+
+Expected: PostgreSQL identifies version 16; container ID and immutable image ID are non-empty; ownership label is exactly `1`; port mapping contains `127.0.0.1:55435`. Record container name, database name, and image reference `postgres:16-alpine` alongside these observed values.
+
+- [ ] **Step 11: Run PostgreSQL migration, compatibility regression, and serial M5A authority acceptance**
 
 With `DATABASE_URL=postgresql+asyncpg://arcreel:r2-m5a-local-only@127.0.0.1:55435/arcreel_r2_m5a`, run separately:
 
 ```bash
+export DATABASE_URL=postgresql+asyncpg://arcreel:r2-m5a-local-only@127.0.0.1:55435/arcreel_r2_m5a
 uv run alembic upgrade head
 uv run alembic upgrade head
 uv run alembic downgrade base
 uv run alembic upgrade head
 uv run python -m pytest -v -m "uses_db and not sqlite_only" -n 4 --dist loadfile
-uv run python -m pytest -q tests/integration/r2/narrative/test_canon_concurrency.py tests/integration/r2/narrative/test_canon_integrity.py tests/integration/r2/narrative/test_canon_resolver.py
+uv run python -m pytest -q -n 0 tests/integration/lib/db/repositories/test_canon_repo.py tests/integration/r2/narrative/test_canon_transaction.py tests/integration/r2/narrative/test_canon_concurrency.py tests/integration/r2/narrative/test_canon_integrity.py tests/integration/r2/narrative/test_canon_resolver.py tests/integration/r2/narrative/test_canon_resolution.py
 uv run alembic current
 uv run alembic heads
 ```
 
-Expected: all commands exit 0; current and heads both report `5a7c4a0e0001`; same-branch concurrency has one winner; different branches both win; projection race converges; restart and integrity tests pass.
+The repository's dialect-aware factories create a unique PostgreSQL schema per test. The registered `async_session` exception uses an outer transaction plus SAVEPOINT against `public`, and `--dist loadfile` keeps each file on one worker. Therefore the `-n 4` command remains the existing CI-compatible database regression. It is not the M5A concurrency authority. The following focused command runs serially; its tests create their own explicit concurrency and are the deterministic M5A authority evidence.
 
-- [ ] **Step 9: Capture the revision-bound evidence document**
+Expected: all commands exit 0; current and heads both report `5a7c4a0e0001`; same-branch concurrency has one winner; different branches both win; projection race converges; restart, projection lifecycle, and integrity tests pass.
+
+- [ ] **Step 12: Freeze the verified implementation head**
+
+After all gates pass and before creating final evidence, require a clean worktree and set:
+
+```bash
+git status --short
+M5A_VERIFIED_HEAD="$(git rev-parse HEAD)"
+uv run python scripts/r2/verify_m5a_scope.py --base "$M5A_STARTING_HEAD" --head "$M5A_VERIFIED_HEAD" --mode implementation
+```
+
+Expected: status is empty and the scope verifier exits 0. Any code, test, config, or migration change after this point invalidates `M5A_VERIFIED_HEAD` and requires rerunning affected tests plus the complete backend and PostgreSQL acceptance gates.
+
+- [ ] **Step 13: Capture the revision-bound evidence document**
 
 Populate `docs/r2/evidence/R2_M5A_FINAL_VERIFICATION.md` with observed values only:
 
 ```markdown
 # R2 M5A Final Verification
 
-- Implementation revision: output of `git rev-parse HEAD` before this evidence-only commit
+- Starting head: exact `M5A_STARTING_HEAD` from Task 0
+- Verified head: exact `M5A_VERIFIED_HEAD` that ran every PASS gate
 - Migration current/head: exact `uv run alembic current` and `uv run alembic heads` output
-- PostgreSQL: exact `SELECT version()` output, image ID from `docker inspect`, container name, ownership label, port, and database name
+- PostgreSQL: exact `SELECT version()` output, container ID, immutable image ID, image reference, container name, ownership label, port, and database name
 - Focused M5A tests: command, collected/passed count, exit code
 - Full backend tests: command, passed/skipped/deselected count, exit code
 - Static gates: every command and exit code
 - Recovery: projection deletion/rebuild, authoritative corruption failure, new-engine restart results
 - Concurrency: same-branch and different-branch test names and results
-- Scope exclusions: no M5B/M5C, Canvas, provider, production activation, operating migration, push, or publish action
+- Scope proof: exact name-status diff, `git diff --check`, implementation allowlist command/result, one migration, and no M5B/M5C, Canvas, provider, server runtime activation, production activation, operating migration, push, or publish action
 ```
 
 Redact the database password. Include failures and their resolution if any gate required a code change; after any code change, rerun the affected focused tests and the complete backend gate before recording PASS.
 
-- [ ] **Step 10: Stop the disposable database and verify ownership before removal**
+- [ ] **Step 14: Stop the disposable database and verify ownership before removal**
 
 Run: `docker inspect -f '{{ index .Config.Labels "com.content-production-os.r2-m5a" }}' r2-m5a-postgres`
 
@@ -1359,19 +1602,25 @@ Run: `docker rm -f r2-m5a-postgres`
 
 Expected: container name is printed and no operating database is touched.
 
-- [ ] **Step 11: Commit final evidence**
+- [ ] **Step 15: Commit final evidence**
 
 ```bash
 git add docs/r2/evidence/R2_M5A_FINAL_VERIFICATION.md
 git commit -m "docs(r2): record M5A canon verification"
 ```
 
-- [ ] **Step 12: Verify the final branch state**
+- [ ] **Step 16: Prove the evidence-only handoff and final branch state**
 
-Run: `git status --short`
+Set `M5A_HANDOFF_HEAD` from the clean evidence commit, then run separately:
 
-Expected: no output.
+```bash
+M5A_HANDOFF_HEAD="$(git rev-parse HEAD)"
+git merge-base --is-ancestor "$M5A_VERIFIED_HEAD" "$M5A_HANDOFF_HEAD"
+git rev-parse "$M5A_HANDOFF_HEAD^"
+git diff --name-only "$M5A_VERIFIED_HEAD"..."$M5A_HANDOFF_HEAD"
+uv run python scripts/r2/verify_m5a_scope.py --base "$M5A_VERIFIED_HEAD" --head "$M5A_HANDOFF_HEAD" --mode handoff
+git status --short
+git log --oneline --decorate -12
+```
 
-Run: `git log --oneline --decorate -12`
-
-Expected: the M5A commits are present after the accepted M4 integration point, ending with the evidence-only commit.
+Expected: ancestry exits 0; the handoff parent is exactly `M5A_VERIFIED_HEAD`; the diff contains only `docs/r2/evidence/R2_M5A_FINAL_VERIFICATION.md`; the handoff scope verifier exits 0; status is empty; and the log shows M5A descending from the exact accepted M4 handoff and ending with the evidence-only commit. Report both heads. The handoff SHA is intentionally derived after the evidence commit rather than embedded self-referentially in that commit.
