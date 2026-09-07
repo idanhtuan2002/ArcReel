@@ -213,6 +213,7 @@ def build(args: argparse.Namespace) -> dict[str, object]:
         arch.get("blocking_violation_count") == 0
         and not arch.get("unapproved_host_runtime_changes")
         and not arch.get("unapproved_db_migrations")
+        and not arch.get("mutated_c04_host_files")
     )
     head_ok = head == expected_head
 

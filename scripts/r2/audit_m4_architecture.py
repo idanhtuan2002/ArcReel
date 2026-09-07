@@ -57,6 +57,24 @@ def _is_host_runtime(path: str) -> bool:
     )
 
 
+def _blob_at(rev: str, path: str) -> bytes | None:
+    result = subprocess.run(["git", "show", f"{rev}:{path}"], capture_output=True, check=False)
+    return result.stdout if result.returncode == 0 else None
+
+
+def _mutated_c04_files(starting_head: str) -> list[str]:
+    """Structural freeze: an approved C04 Host file must be byte-identical to the
+    pinned baseline. A rename or a semantic rewrite that keeps the path is caught
+    here even though the path is on the approved list."""
+    mutated: list[str] = []
+    for path in sorted(_APPROVED_C04_HOST_PATHS):
+        base = _blob_at(starting_head, path)
+        head = _blob_at("HEAD", path)
+        if base != head:
+            mutated.append(path)
+    return mutated
+
+
 def audit(starting_head: str) -> dict[str, object]:
     changed = _changed_paths(starting_head)
     approved_c04: list[str] = []
@@ -82,12 +100,15 @@ def audit(starting_head: str) -> dict[str, object]:
 
     final_head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
 
-    blocking = len(unapproved_host) + len(unapproved_migrations) + len(m5_leakage)
+    mutated_c04 = _mutated_c04_files(starting_head)
+
+    blocking = len(unapproved_host) + len(unapproved_migrations) + len(m5_leakage) + len(mutated_c04)
     return {
         "schema_version": "1",
         "starting_head": starting_head,
         "final_head": final_head,
         "approved_c04_host_changes": sorted(approved_c04),
+        "mutated_c04_host_files": mutated_c04,
         "unapproved_host_runtime_changes": sorted(unapproved_host),
         "unapproved_db_migrations": sorted(unapproved_migrations),
         "m5_scope_leakage": sorted(m5_leakage),
@@ -105,7 +126,12 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    for key in ("unapproved_host_runtime_changes", "unapproved_db_migrations", "m5_scope_leakage"):
+    for key in (
+        "unapproved_host_runtime_changes",
+        "unapproved_db_migrations",
+        "m5_scope_leakage",
+        "mutated_c04_host_files",
+    ):
         offenders = report[key]
         assert isinstance(offenders, list)
         for path in offenders:

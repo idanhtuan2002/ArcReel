@@ -160,6 +160,17 @@ by Claude before triage.
   syntax; assert telemetry/​projector classes expose no method that writes to an
   authority port (by import + call-graph, not name); detect a second queue/ledger
   by structural role, not name.
+- **FIXED (next-session batch):** `audit_m4_architecture.py` now byte-diffs every
+  `_APPROVED_C04_HOST_PATHS` file against the pinned baseline
+  (`mutated_c04_host_files`, blocking); `verify_m4.arch_ok` gates on it. The
+  fitness tests: `rglob` (recursive) for every PI-module scan; provider-field
+  check recurses nested pydantic models (Provenance envelope excluded) and keeps
+  the Med-3 value-level check; telemetry is checked by AST — no authority import,
+  no `Call` to an authority-write attr (`persist`/`save`/`promote`/… — `persist()`
+  no longer passes), and every projector method has a non-`None` return
+  annotation; a hand-rolled queue/ledger is caught by structural role (a
+  collection instance attr accumulated outside `__init__`), `M4HostIntegration`
+  allow-listed for its C04 `cost_records`.
 
 ### High-6 — persistence/restart evidence uses in-memory fakes
 - **Where:** `tests/integration/r2/m4/conftest.py`,

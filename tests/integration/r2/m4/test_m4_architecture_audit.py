@@ -51,6 +51,12 @@ def test_no_m5_scope_leakage(report: dict[str, object]) -> None:
     assert report["m5_scope_leakage"] == []
 
 
+def test_approved_c04_host_files_are_byte_frozen_at_the_baseline(report: dict[str, object]) -> None:
+    # A semantic rewrite that keeps an approved C04 path is a blocking violation,
+    # not a pass — the sensor diffs content against the pinned baseline.
+    assert report["mutated_c04_host_files"] == []
+
+
 def test_report_pins_the_starting_head(report: dict[str, object]) -> None:
     assert report["starting_head"] == _M4_STARTING_HEAD
     assert report["final_head"]
