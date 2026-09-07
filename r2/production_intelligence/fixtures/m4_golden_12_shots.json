@@ -1,0 +1,18 @@
+{
+  "fixture_id": "m4-golden-12-v1",
+  "description": "D09 canonical 12-shot mixed-method baseline. 3 Directors, all 7 ProductionMethods.",
+  "shots": [
+    { "id": "SH01", "director": "OPENMONTAGE",   "method": "REUSE",           "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false },
+    { "id": "SH02", "director": "OPENMONTAGE",   "method": "SCREEN_CAPTURE",  "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false },
+    { "id": "SH03", "director": "OPENMONTAGE",   "method": "DETERMINISTIC",   "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false },
+    { "id": "SH04", "director": "OPENMONTAGE",   "method": "COMPOSITE",       "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false },
+    { "id": "SH05", "director": "TAKE",          "method": "GENERATED_IMAGE", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  },
+    { "id": "SH06", "director": "TAKE",          "method": "GENERATED_VIDEO", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  },
+    { "id": "SH07", "director": "TAKE",          "method": "GENERATED_VIDEO", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  },
+    { "id": "SH08", "director": "TAKE",          "method": "COMPOSITE",       "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": false },
+    { "id": "SH09", "director": "ARCREEL_NATIVE","method": "STOCK",           "content_basis_type": "NARRATIVE", "needs_character_identity": false, "paid": false },
+    { "id": "SH10", "director": "ARCREEL_NATIVE","method": "DETERMINISTIC",   "content_basis_type": "NARRATIVE", "needs_character_identity": false, "paid": false },
+    { "id": "SH11", "director": "ARCREEL_NATIVE","method": "GENERATED_IMAGE", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  },
+    { "id": "SH12", "director": "ARCREEL_NATIVE","method": "GENERATED_VIDEO", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  }
+  ]
+}
