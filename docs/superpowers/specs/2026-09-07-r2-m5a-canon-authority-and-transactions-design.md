@@ -104,16 +104,21 @@ committed_delta_id
 committed_at
 committed_by
 content_hash
+content_hash_algorithm
+content_hash_version
+content_schema_version
 ```
 
 Rules:
 
 - Version numbers are contiguous within a branch and start at `1`.
 - Version 1 on a main branch is produced by a genesis delta against an empty view.
-- Version 1 on a narrative branch applies its first local delta over the pinned parent view.
+- Version 1 on a narrative branch applies its first local delta over the pinned parent view and sets `parent_version_id` to `CanonBranch.parent_version_id`.
 - Every later version points to the previous local branch version.
+- `parent_version_id` always identifies the semantic content base: `null` only for main genesis, the pinned parent version for narrative version 1, and the previous local version thereafter.
 - A committed version, its delta reference, and its content hash never change.
 - `content_hash` covers the canonical resolved view, not execution metadata or projection storage metadata.
+- M5A writes `content_hash_algorithm = "sha256"`, `content_hash_version = "r2-canon-content-v1"`, and `content_schema_version = "r2-canon-schema-v1"`. Replay selects the recorded versions and fails closed on an unsupported value.
 
 ### 5.3 CanonDelta
 
@@ -128,6 +133,9 @@ source_change_set_refs[]
 author_decision_refs[]
 validation_report_refs[]
 payload_hash
+payload_hash_algorithm
+payload_hash_version
+content_schema_version
 created_at
 created_by
 ```
@@ -146,7 +154,9 @@ The remaining frozen operation kinds enter with the slice that owns their semant
 
 An operation has a stable `operation_id`, a kind, a target ID, and a strictly validated payload. Ordering is significant and canonical. Two operations in one delta cannot claim the same `operation_id`.
 
-`payload_hash` covers the delta ID, schema version, target branch, expected base, ordered operations, and sorted source/author/validation references. Creation time and database row metadata are excluded. User/project scope and approval identity are checked separately, so an approval cannot be replayed across scopes or under a new delta ID.
+`base_canon_version_id` is the expected semantic content base, not merely the current local head. It is `null` for main genesis, the pinned parent version for the first local narrative delta, and the previous local version thereafter. The service derives that expected base from the locked branch as `head_version_id` when present, otherwise `parent_version_id` for a narrative branch, otherwise `null`.
+
+`payload_hash` covers the delta ID, content schema version, payload hash version, target branch, expected semantic base, ordered operations, and sorted source/author/validation references. M5A writes `payload_hash_algorithm = "sha256"` and `payload_hash_version = "r2-canon-delta-v1"`. Creation time and database row metadata are excluded. User/project scope and approval identity are checked separately, so an approval cannot be replayed across scopes or under a new delta ID. Replay fails closed on an unsupported hash or schema version.
 
 ### 5.4 Core atoms
 
@@ -166,6 +176,9 @@ Resolved atoms are immutable values inside a `ResolvedCanonView`. An update oper
 canon_version_id
 branch_id
 content_hash
+content_hash_algorithm
+content_hash_version
+content_schema_version
 content:
   entities_by_id
   facts_by_id
@@ -183,6 +196,8 @@ narrative branch:
 ```
 
 `content_hash` covers only the canonical `content` object. It excludes `canon_version_id`, `branch_id`, the hash field itself, projection timestamps, and execution metadata. Map keys are sorted during canonical serialization. Set-like lists are normalized to sorted unique values. Timestamps use UTC-aware ISO 8601. Non-finite floats and non-string JSON object keys are rejected by the existing JSON contract helpers.
+
+Fact validity uses half-open intervals `[effective_from, effective_until)`. A null start means negative infinity; a null end means positive infinity. Intervals that meet at the same timestamp do not overlap. `RETIRE_FACT` carries an explicit, non-null `effective_until` in its operation payload; replay never derives it from wall-clock time. The value must be later than a finite `effective_from`, and retiring a fact whose end is already finite fails validation.
 
 ## 6. Physical persistence
 
@@ -204,31 +219,34 @@ M5A adds one additive Alembic revision with four tables.
 - scope: `user_id`, `project_name`, `target_branch_id`;
 - expected base: nullable `base_canon_version_id`;
 - immutable payload: `operations_json`, source/author/validation reference arrays, `payload_hash`;
-- authorization receipt: `approval_ref`, `approved_by`, `approved_at`;
+- hash metadata: `payload_hash_algorithm`, `payload_hash_version`, `content_schema_version`;
+- authorization receipt: `approval_ref`, `approval_status`, `approved_by`, `approved_at`;
 - metadata: `created_at`, `created_by`;
 - foreign key to the target branch;
-- unique `(target_branch_id, payload_hash, base_canon_version_id)` for exact retry lookup, with service-level handling for nullable genesis bases.
+- unique `approval_ref`: one approval receipt authorizes exactly one accepted Canon delta identity;
+- check constraint requires `approval_status = "APPROVED"`;
+- `canon_delta_id` is the sole idempotency identity. Payload/base uniqueness is not an implicit retry mechanism.
 
 ### `canon_versions`
 
 - primary key: `canon_version_id`;
 - foreign keys: `branch_id`, nullable `parent_version_id`, unique `committed_delta_id`;
-- immutable receipt: `version_number`, `content_hash`, `committed_at`, `committed_by`;
+- immutable receipt: `version_number`, `content_hash`, `content_hash_algorithm`, `content_hash_version`, `content_schema_version`, `committed_at`, `committed_by`;
 - unique `(branch_id, version_number)`;
 - unique `(branch_id, content_hash, parent_version_id)` is not required: a no-op delta is rejected before persistence.
 
 ### `canon_resolved_projections`
 
 - primary/foreign key: `canon_version_id`;
-- `resolved_view_json`, `content_hash`, `built_at`;
+- `resolved_view_json`, `content_hash`, `content_hash_algorithm`, `content_hash_version`, `content_schema_version`, `built_at`;
 - optional `replay_count` for diagnostics only;
 - no branch head, approval state, or independent version number.
 
-The projection table is not an authority table. Deleting all projection rows must leave every branch/version/delta intact and all views reconstructable.
+The projection table is not an authority table. Deleting all projection rows must leave every branch/version/delta intact and all views reconstructable. Projection persistence is an idempotent upsert keyed by version ID. It may replace a missing or invalid row only after replay produces the immutable version's exact hash and hash/schema versions. Concurrent rebuilders of the same version therefore converge on identical bytes; a duplicate projection writer is not a Canon conflict.
 
 ### Foreign-key cycle handling
 
-`canon_branches.head_version_id`/`parent_version_id` and `canon_versions.branch_id` form a logical cycle. The database keeps the strong direction: versions reference branches, version parents reference versions, and child branches reference parent branches. The two version pointers on a branch are indexed IDs without physical foreign keys; `CanonTransactionService` validates their existence, branch membership, and scope while holding the branch lock. This avoids dialect-specific post-create constraints while keeping every authoritative version tied to a real branch. ORM relationships must avoid cascade paths that could delete history. Canon rows use restrictive deletion; project deletion follows the repository's explicit project lifecycle rather than database cascade from a branch.
+`canon_branches.head_version_id`/`parent_version_id` and `canon_versions.branch_id` form a logical cycle. The database keeps the strong direction: versions reference branches, version parents reference versions, and child branches reference parent branches. The two version pointers on a branch are indexed IDs without physical foreign keys; `CanonTransactionService` validates their existence, branch membership, and scope while holding the branch lock. This avoids dialect-specific post-create constraints while keeping every authoritative version tied to a real branch. An executable integrity checker compensates for the omitted foreign keys: it verifies branch pointer existence/scope/membership, head/version contiguity, semantic parent lineage, committed delta linkage, and supported hash/schema versions. ORM relationships must avoid cascade paths that could delete history. Canon rows use restrictive deletion; project deletion follows the repository's explicit project lifecycle rather than database cascade from a branch.
 
 ## 7. Service boundaries
 
@@ -270,6 +288,8 @@ Resolution behavior:
 
 A corrupt delta, broken lineage, missing parent, or final hash mismatch raises `CanonIntegrityError`. Resolution never guesses, skips an operation, or substitutes the current parent head.
 
+`CanonResolver` does not own a session. It receives a transaction-bound `CanonRepository` for commit-time replay. A read-only application facade may open a unit-of-work and bind both repository and resolver to it; projection rebuild uses that same unit-of-work. No resolver or repository method opens a nested or independent session.
+
 ### CanonTransactionService
 
 ```python
@@ -292,6 +312,9 @@ class CanonCommitApproval(R2ContractModel):
     approval_ref: NonEmptyStr
     canon_delta_id: NonEmptyStr
     payload_hash: NonEmptyStr
+    payload_hash_algorithm: Literal["sha256"]
+    payload_hash_version: Literal["r2-canon-delta-v1"]
+    content_schema_version: Literal["r2-canon-schema-v1"]
     project_name: NonEmptyStr
     user_id: NonEmptyStr
     approved_by: NonEmptyStr
@@ -299,7 +322,9 @@ class CanonCommitApproval(R2ContractModel):
     status: Literal["APPROVED"]
 ```
 
-The authenticated application facade constructs this receipt only for an explicit approval action and calls `CanonTransactionService` in the same request. The service requires exact delta ID, payload hash, project, user, and actor binding, then persists the receipt fields with the accepted delta. This mirrors the existing explicit production-promotion receipt pattern while keeping approval domain-specific. M5A does not reuse `ProductionApprovalService` as Canon approval authority and does not create a general workflow engine.
+The authenticated application facade constructs this receipt only for an explicit approval action and calls `CanonTransactionService` in the same request. The service requires exact delta ID, payload hash and versions, content schema version, project, user, actor, status, and timestamp binding, then persists the complete receipt fields with the accepted delta. One `approval_ref` can authorize exactly one `(user_id, project_name, canon_delta_id, payload_hash, payload_hash_algorithm, payload_hash_version, content_schema_version)` tuple. This mirrors the existing explicit production-promotion receipt pattern while keeping approval domain-specific. M5A does not reuse `ProductionApprovalService` as Canon approval authority and does not create a general workflow engine.
+
+`CanonTransactionService` receives an `async_sessionmaker` (or an equivalent `CanonUnitOfWork` factory), not a repository with an ambiguous lifecycle. Each `create_branch` or `commit` call opens exactly one fresh `AsyncSession` transaction, constructs one repository bound to that session, and passes that repository to every resolver and persistence operation on the authoritative path. Only the service commits or rolls back that unit-of-work.
 
 ## 8. Commit transaction
 
@@ -308,16 +333,16 @@ The commit path is one database transaction:
 1. Validate the command, delta schema, approval receipt, timestamps, IDs, operation kinds, reference lists, and canonical payload hash before acquiring a lock.
 2. Begin a fresh async session transaction.
 3. Lock the scoped branch row with `SELECT ... FOR UPDATE` on PostgreSQL.
-4. Compare `delta.base_canon_version_id` with the locked branch head. Genesis requires both to be absent.
-5. Check whether `canon_delta_id` already exists.
-   - Same scope, payload hash, base, approval reference/actor, and committed version returns the original `CanonCommitResult`.
+4. Look up `canon_delta_id` within the transaction before checking the current base.
+   - Same scope, exact canonical payload bytes/hash metadata, semantic base, complete approval receipt identity, and committed version returns the original `CanonCommitResult` without replay or writes.
    - Any mismatch under the same ID raises `CanonIdentityConflictError`.
-6. Resolve the locked base view. A narrative branch with no local head starts from its pinned parent version.
+5. For a new delta, derive the locked semantic base: local head when present, otherwise the pinned parent version for a narrative branch, otherwise `null` for main genesis. Compare it with `delta.base_canon_version_id`; a mismatch raises `CanonBaseVersionConflict` with zero writes.
+6. Resolve that locked semantic base view. A narrative branch with no local head starts from its pinned parent version.
 7. Apply operations in declared order to a copy of the view.
 8. Run M5A validators.
 9. Reject an empty semantic change; a delta must alter the canonical resolved view.
 10. Compute the resolved content hash with the existing canonical JSON rules.
-11. Revalidate the approval receipt against the exact locked scope, delta ID, and payload hash.
+11. Revalidate the approval receipt against the exact locked scope, delta ID, payload hash, hash/schema versions, actor, status, and approval timestamp. Verify that `approval_ref` has not authorized any other delta identity.
 12. Insert the immutable delta and next version.
 13. Update the branch head from the expected old value to the new version.
 14. Insert the resolved projection with the same content hash.
@@ -335,9 +360,11 @@ M5A validators are deterministic and side-effect free.
 - Atom IDs are unique within the resolved view.
 - Referenced entity/event/location IDs exist after applying earlier operations in the same delta.
 - Effective intervals have an ordered start/end when both exist.
+- Fact intervals use `[effective_from, effective_until)`; null bounds mean the corresponding infinity and equal adjacent endpoints do not overlap.
 - Event participant and causal references contain no duplicates.
 - An event cannot causally reference itself.
 - A fact cannot be retired when absent or already retired in the resolved base.
+- `RETIRE_FACT` supplies its deterministic `effective_until`; it cannot use transaction time as Canon content.
 - `UPDATE_ENTITY` requires an existing entity and cannot change its ID or entity type.
 - Adding an existing ID or updating a missing ID fails.
 
@@ -361,6 +388,7 @@ Commits to different branches may proceed independently. Creating two main branc
 
 - Retrying a successfully committed `canon_delta_id` with the exact same payload and approval returns the original result.
 - Reusing that ID with different bytes, scope, base, or approval fails closed.
+- Reusing an `approval_ref` for any other `(user_id, project_name, canon_delta_id, payload_hash, hash/schema versions)` fails closed. An exact retry of the original delta may reuse its recorded receipt.
 - Retrying a transaction that failed before commit behaves like a fresh attempt.
 - Callers decide how to create a new delta after a base conflict; the service does not mutate or rebase their proposal.
 
@@ -372,7 +400,17 @@ M5A must prove these restart properties:
 - A missing projection is rebuilt to the recorded version hash.
 - A corrupted projection is ignored, rebuilt, and replaced only when replay matches the version hash.
 - A corrupted authoritative delta or broken lineage fails closed and remains observable; it is never repaired by changing history.
+- Concurrent projection rebuilds converge through idempotent upsert and cannot create an authoritative conflict.
 - A simulated failure after each flush point leaves either the old complete authority state or the new complete authority state.
+
+The M5A integrity checker reports and fails its gate when any of these conditions is false:
+
+- a branch head exists in the same scope and belongs to that branch;
+- a null head has no local versions, while a non-null head is the highest contiguous local version;
+- a narrative parent version exists in the same scope and belongs to `parent_branch_id`;
+- main genesis has no semantic parent, narrative version 1 points to the pinned parent version, and every later version points to the previous local version;
+- each version's committed delta belongs to the same scope/branch and names the same semantic base;
+- every stored hash/schema version is supported and every authoritative payload verifies under its recorded version.
 
 Backup/restore execution remains an M7 gate, but M5A records all authoritative Canon data in the existing PostgreSQL backup scope and defines a consistency checker suitable for the M7 restore drill.
 
@@ -419,6 +457,7 @@ The `r2/narrative` package may depend on stable contracts and an injected persis
 
 - strict extra-field rejection and timezone awareness;
 - deterministic normalization and hashing;
+- historical content/delta verification uses persisted algorithm, canonicalization, and schema versions; unsupported versions fail closed;
 - each operation kind accepts only its typed payload;
 - invalid atom references and duplicate operation IDs fail.
 
@@ -426,6 +465,7 @@ The `r2/narrative` package may depend on stable contracts and an injected persis
 
 - genesis, update, fact retirement, event creation, and ordered multi-operation delta;
 - exact fact contradiction and overlapping effective intervals;
+- half-open boundaries, null infinities, and deterministic fact retirement timestamps;
 - deterministic replay gives identical bytes and hash;
 - parent-pinned narrative branch stays unchanged after parent advances.
 
@@ -437,6 +477,7 @@ The `r2/narrative` package may depend on stable contracts and an injected persis
 - immutable history is not exposed through repository update/delete APIs;
 - SQLite focused lifecycle tests pass;
 - disposable PostgreSQL tests prove `FOR UPDATE` concurrency and uniqueness behavior.
+- duplicate concurrent projection rebuilds converge on the same verified row.
 
 ### Transaction tests
 
@@ -445,7 +486,9 @@ The `r2/narrative` package may depend on stable contracts and an injected persis
 - stale base produces zero writes;
 - concurrent same-base commits produce one success and one base conflict;
 - exact retry returns the original version;
+- exact retry is checked before current-base conflict and performs no new writes;
 - conflicting ID retry fails closed;
+- approval-reference reuse across a different delta identity fails closed;
 - injected failures before delta insert, after delta insert, after version insert, after head update, and during projection insert preserve the prior complete state;
 - restart with a new engine/session resolves the same head and hash;
 - deleted/corrupt projection rebuilds; corrupt delta fails closed.
@@ -455,6 +498,7 @@ The `r2/narrative` package may depend on stable contracts and an injected persis
 - exactly one public Canon commit authority exists;
 - donor, worker, router, Agent-tool, Canvas, production, and runtime modules cannot import transaction-private Canon persistence primitives;
 - projection code cannot update branch heads, deltas, or versions;
+- resolver/repository collaborators on the commit path cannot create sessions or commit transactions;
 - `r2/contracts/narrative.py` stays provider/model/endpoint neutral;
 - no second database, artifact registry, queue, or approval authority is introduced.
 
@@ -467,7 +511,8 @@ M5A is complete only when:
 3. the branch projection can be deleted and reproduced byte-for-byte;
 4. every rejected or fault-injected commit leaves the prior branch head and history unchanged;
 5. evidence records exact revision, migration head, commands, exit codes, and PostgreSQL container identity;
-6. the implementation diff contains no M5B/M5C, M6, provider, Canvas, or M7 activation.
+6. the executable integrity checker passes over the committed PostgreSQL fixture, including every logical branch version pointer;
+7. the implementation diff contains no M5B/M5C, M6, provider, Canvas, or M7 activation.
 
 ## 15. Risks and controls
 
