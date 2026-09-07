@@ -1,0 +1,38 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 52%]
+.................................................................        [100%]
+=============================== warnings summary ===============================
+tests/unit/r2/contracts/test_fingerprints.py::test_canonical_json_is_stable_across_mapping_order_and_unicode
+tests/unit/r2/production/test_artifact_bridge.py::test_legacy_non_r2_artifact_has_no_r2_currency_override
+tests/unit/r2/contracts/test_preparation.py::test_production_binding_keeps_semantic_and_production_identity_separate
+tests/unit/r2/production/test_m2_artifact_bridge_architecture_boundaries.py::test_production_layer_has_no_forbidden_authority_or_provider_execution_imports
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+0.85s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_single_run_produces_real_60_90s_final_and_three_methods
+0.84s call     tests/integration/r2/m3/test_golden_a_composition.py::test_ffmpeg_composes_real_approved_masters_into_final_mp4
+0.80s setup    tests/unit/r2/production/test_m2_artifact_bridge_architecture_boundaries.py::test_production_layer_has_no_forbidden_authority_or_provider_execution_imports
+0.79s setup    tests/unit/r2/contracts/test_preparation.py::test_production_binding_keeps_semantic_and_production_identity_separate
+0.78s setup    tests/unit/r2/production/test_artifact_bridge.py::test_legacy_non_r2_artifact_has_no_r2_currency_override
+0.78s setup    tests/unit/r2/contracts/test_fingerprints.py::test_canonical_json_is_stable_across_mapping_order_and_unicode
+0.66s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_lineage_reaches_claim_evidence_and_source
+0.62s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_claim2_change_selectively_invalidates_expected_shots_and_final
+0.61s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_evidence_files_capture_cost_provenance_lineage_and_restart
+0.36s call     tests/integration/r2/m3/test_host_integration.py::test_real_host_b_c_d_master_semantics_and_restart
+0.33s call     tests/unit/r2/m3/test_local_production.py::test_execution_variant_changes_execution_fingerprint_not_method
+0.29s call     tests/unit/r2/m3/test_local_production.py::test_deterministic_output_is_byte_stable_for_same_execution_variant
+0.20s call     tests/unit/r2/m3/test_local_production.py::test_reuse_production_preserves_source_and_emits_valid_mp4
+0.19s call     tests/integration/r2/m3/test_host_integration.py::test_manifest_metadata_keeps_factual_basis_and_dependencies
+0.06s call     tests/integration/r2/production/test_manifest_recovery_integration.py::test_concurrent_promotions_cannot_create_active_version_master_mismatch
+0.05s call     tests/integration/r2/production/test_manifest_recovery_integration.py::test_concurrent_r2_metadata_updates_leave_one_valid_manifest
+0.02s call     tests/unit/scripts/r2/test_verify_baseline.py::test_wrong_branch_is_rejected
+0.02s call     tests/unit/scripts/r2/test_verify_baseline.py::test_descendant_head_is_valid
+0.02s call     tests/unit/scripts/r2/test_verify_baseline.py::test_wrong_pinned_sha_is_rejected
+0.01s call     tests/unit/r2/contracts/test_architecture_boundaries.py::test_contract_modules_do_not_import_arcreel_runtime_or_persistence_layers
+
+(5 durations < 0.005s hidden.  Use -vv to show these durations.)
+137 passed, 4 warnings in 6.81s

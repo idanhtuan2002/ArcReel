@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /home/anhtuan/content-os-r1-8/work/take/packages/core
+
+ ✓ test/core.test.ts (12 tests) 13ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  15:48:21
+   Duration  405ms (transform 79ms, setup 0ms, collect 98ms, tests 13ms, environment 0ms, prepare 63ms)
+

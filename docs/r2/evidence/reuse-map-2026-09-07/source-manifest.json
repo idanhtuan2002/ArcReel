@@ -1,0 +1,202 @@
+[
+  {
+    "repo": "dramaclaw/dramaclaw",
+    "revision": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+    "path": "frontend/src/features/freezone/commit/promoteToAsset.ts",
+    "sha256": "f3a301bb28e91435716c72ef596dae0692c27a111ef057859e1ddaf078d579f2",
+    "url": "https://github.com/dramaclaw/dramaclaw/blob/b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83/frontend/src/features/freezone/commit/promoteToAsset.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "dramaclaw/dramaclaw",
+    "revision": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+    "path": "frontend/src/features/canvas/application/canvasServices.ts",
+    "sha256": "649c4936482f7b55b6a1e7553fe8e7d425a902004e3c67b60d5299d1e28ee3bb",
+    "url": "https://github.com/dramaclaw/dramaclaw/blob/b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83/frontend/src/features/canvas/application/canvasServices.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "dramaclaw/dramaclaw",
+    "revision": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+    "path": "frontend/src/stores/canvasStore.ts",
+    "sha256": "d04d3f2da71d2e1e1cd7c353f0fb35eccd171000eec14d207e4f8e9f1ff61f0c",
+    "url": "https://github.com/dramaclaw/dramaclaw/blob/b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83/frontend/src/stores/canvasStore.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "dramaclaw/dramaclaw",
+    "revision": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+    "path": "src/novelvideo/director_world/scene_spatial_contract.py",
+    "sha256": "975e634cdd99500be5e29901da4930db14d5b81b1d14e6616e7e2e71081f1c92",
+    "url": "https://github.com/dramaclaw/dramaclaw/blob/b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83/src/novelvideo/director_world/scene_spatial_contract.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "YfengJ/novel-studio-ai",
+    "revision": "9b690ae2e2f6921f9bd2782b42cef53c1662ad3b",
+    "path": "src/lib/context/contextPack.ts",
+    "sha256": "3559ed3c6d8c4efdf863373d8c899bdabeb9f3380a79b9f5fef2c31a49f777f5",
+    "url": "https://github.com/YfengJ/novel-studio-ai/blob/9b690ae2e2f6921f9bd2782b42cef53c1662ad3b/src/lib/context/contextPack.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "YfengJ/novel-studio-ai",
+    "revision": "9b690ae2e2f6921f9bd2782b42cef53c1662ad3b",
+    "path": "src/lib/continuity/hardRules.ts",
+    "sha256": "7756c4093b52e11e3f591c58af1719887428fd5e437f4ade0828533ac3663954",
+    "url": "https://github.com/YfengJ/novel-studio-ai/blob/9b690ae2e2f6921f9bd2782b42cef53c1662ad3b/src/lib/continuity/hardRules.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "YfengJ/novel-studio-ai",
+    "revision": "9b690ae2e2f6921f9bd2782b42cef53c1662ad3b",
+    "path": "src/lib/memory/memoryService.ts",
+    "sha256": "7e3459a8023b5e8454c05439ba252894afc0b303f65c74932ec9e620c0c31e9f",
+    "url": "https://github.com/YfengJ/novel-studio-ai/blob/9b690ae2e2f6921f9bd2782b42cef53c1662ad3b/src/lib/memory/memoryService.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "YfengJ/novel-studio-ai",
+    "revision": "9b690ae2e2f6921f9bd2782b42cef53c1662ad3b",
+    "path": "src/lib/ai/extractMemory.ts",
+    "sha256": "13a69a8c206add43192b2b7224419aa3e95e571730c3c90992ed5cb9d60aba10",
+    "url": "https://github.com/YfengJ/novel-studio-ai/blob/9b690ae2e2f6921f9bd2782b42cef53c1662ad3b/src/lib/ai/extractMemory.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "ThomasChangX/shenbi",
+    "revision": "65ddfc261f4e491b07c36e548f78de36109be218",
+    "path": "skills/shenbi-state-settling/SKILL.md",
+    "sha256": "3fe0f9a9f4f8b07259c4aaa13d538346caebdc373be716a99400f8c983edfa52",
+    "url": "https://github.com/ThomasChangX/shenbi/blob/65ddfc261f4e491b07c36e548f78de36109be218/skills/shenbi-state-settling/SKILL.md",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "ThomasChangX/shenbi",
+    "revision": "65ddfc261f4e491b07c36e548f78de36109be218",
+    "path": "skills/shenbi-context-composing/SKILL.md",
+    "sha256": "9cc7510819f1a1fc6cefec509a76e14cda0a5d103b9c46f80b9198f512efb83d",
+    "url": "https://github.com/ThomasChangX/shenbi/blob/65ddfc261f4e491b07c36e548f78de36109be218/skills/shenbi-context-composing/SKILL.md",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "ThomasChangX/shenbi",
+    "revision": "65ddfc261f4e491b07c36e548f78de36109be218",
+    "path": "src/shenbi/gates/g4/state_settling.py",
+    "sha256": "7583a79338ea44b62960bd8cc42d4cd4fb226884aab36fb21e44bc612080eced",
+    "url": "https://github.com/ThomasChangX/shenbi/blob/65ddfc261f4e491b07c36e548f78de36109be218/src/shenbi/gates/g4/state_settling.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "appolloqin/huohuo-drama",
+    "revision": "f104b853b3563e124d9cde25f9331d323fb483b9",
+    "path": "workbench-server/src/common/novel/novel-change-record.ts",
+    "sha256": "dd3a310e1d83f80fca132a6ea64380c3d953c780054d0ea93e9f865c09fb5088",
+    "url": "https://github.com/appolloqin/huohuo-drama/blob/f104b853b3563e124d9cde25f9331d323fb483b9/workbench-server/src/common/novel/novel-change-record.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "appolloqin/huohuo-drama",
+    "revision": "f104b853b3563e124d9cde25f9331d323fb483b9",
+    "path": "workbench-server/src/services/novel/novel-causal-chain/ensure-causal-change-record.ts",
+    "sha256": "d4115af414b47477d22d85d1403fd44d715859b31ae23051318c7720b067797e",
+    "url": "https://github.com/appolloqin/huohuo-drama/blob/f104b853b3563e124d9cde25f9331d323fb483b9/workbench-server/src/services/novel/novel-causal-chain/ensure-causal-change-record.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "appolloqin/huohuo-drama",
+    "revision": "f104b853b3563e124d9cde25f9331d323fb483b9",
+    "path": "workbench-server/src/services/novel/novel-outline-drama-fields.ts",
+    "sha256": "7a7db8a7674445d8352beb7a165fb5fe40bf02c1d526a89c31a6c74fa9029c67",
+    "url": "https://github.com/appolloqin/huohuo-drama/blob/f104b853b3563e124d9cde25f9331d323fb483b9/workbench-server/src/services/novel/novel-outline-drama-fields.ts",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "amcghm/StoryBox",
+    "revision": "ba24ff64e6023e8d071af4adb7e64b03bd9b08b1",
+    "path": "reverie/persona/cognitive/perceive.py",
+    "sha256": "f14dadff92d3b0ff009e54e247b8444d338518883c2766834eacfdaf15e86dfd",
+    "url": "https://github.com/amcghm/StoryBox/blob/ba24ff64e6023e8d071af4adb7e64b03bd9b08b1/reverie/persona/cognitive/perceive.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "amcghm/StoryBox",
+    "revision": "ba24ff64e6023e8d071af4adb7e64b03bd9b08b1",
+    "path": "reverie/manager/event_manager.py",
+    "sha256": "a4254f36ab6a5125259c14764b6cb7329bc2285a6724801a528fa788b4bed025",
+    "url": "https://github.com/amcghm/StoryBox/blob/ba24ff64e6023e8d071af4adb7e64b03bd9b08b1/reverie/manager/event_manager.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "amcghm/StoryBox",
+    "revision": "ba24ff64e6023e8d071af4adb7e64b03bd9b08b1",
+    "path": "reverie/common/event.py",
+    "sha256": "c620047ae3fa4fe9e32aeb1b2283fdae981bdd34fd5f6a1423bd725ffe13b47c",
+    "url": "https://github.com/amcghm/StoryBox/blob/ba24ff64e6023e8d071af4adb7e64b03bd9b08b1/reverie/common/event.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "Forget-C/Jellyfish",
+    "revision": "a9678194ddf2d9be3ccbe78d4287d87d5089e123",
+    "path": "backend/app/services/studio/shot_preparation_state.py",
+    "sha256": "5b0669d4cb31dba37240a47db9b9ff0115e5b08ce825db0ab084cf433da0b5fc",
+    "url": "https://github.com/Forget-C/Jellyfish/blob/a9678194ddf2d9be3ccbe78d4287d87d5089e123/backend/app/services/studio/shot_preparation_state.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "Forget-C/Jellyfish",
+    "revision": "a9678194ddf2d9be3ccbe78d4287d87d5089e123",
+    "path": "backend/app/services/studio/shot_video_readiness.py",
+    "sha256": "81f733de06e036b50f6b14dcf52adfb420136e98db9acca84a9f937446abfdcb",
+    "url": "https://github.com/Forget-C/Jellyfish/blob/a9678194ddf2d9be3ccbe78d4287d87d5089e123/backend/app/services/studio/shot_video_readiness.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "wushaojun321/ai-short-film",
+    "revision": "3dc93a62bf472e46cb5edf2999971769a4989cab",
+    "path": "backend/app/parsing/continuity_seed_builder.py",
+    "sha256": "0c8e0a3f6468f50a728800d160fab855c1fbf17ec655fc5646e3ca133523288a",
+    "url": "https://github.com/wushaojun321/ai-short-film/blob/3dc93a62bf472e46cb5edf2999971769a4989cab/backend/app/parsing/continuity_seed_builder.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "wushaojun321/ai-short-film",
+    "revision": "3dc93a62bf472e46cb5edf2999971769a4989cab",
+    "path": "backend/app/services/shot_reference_builder.py",
+    "sha256": "69a9e35c1ce1b40ec7f67f7e41465a11c63768bc88170986cb2d851dcfd81dde",
+    "url": "https://github.com/wushaojun321/ai-short-film/blob/3dc93a62bf472e46cb5edf2999971769a4989cab/backend/app/services/shot_reference_builder.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "abhijha8287/butterfly-director-ai",
+    "revision": "04e694ce4ceecb4ea651724e8be3199bd1959edd",
+    "path": "apps/api/app/agents/prompt_director/schema.py",
+    "sha256": "bbeb58bc28a1b094a4e9895033c83458966209276c5cfabe49024c89c5ac1e8e",
+    "url": "https://github.com/abhijha8287/butterfly-director-ai/blob/04e694ce4ceecb4ea651724e8be3199bd1959edd/apps/api/app/agents/prompt_director/schema.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "abhijha8287/butterfly-director-ai",
+    "revision": "04e694ce4ceecb4ea651724e8be3199bd1959edd",
+    "path": "apps/api/app/agents/prompt_director/validators.py",
+    "sha256": "4f78c92ea8c0cad1d1ba6ac32764fdf7be014d438b80d30b508da0c9c6bd9ec5",
+    "url": "https://github.com/abhijha8287/butterfly-director-ai/blob/04e694ce4ceecb4ea651724e8be3199bd1959edd/apps/api/app/agents/prompt_director/validators.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "abhijha8287/butterfly-director-ai",
+    "revision": "04e694ce4ceecb4ea651724e8be3199bd1959edd",
+    "path": "apps/api/app/agents/prompt_director/agent.py",
+    "sha256": "9dbba52b70a40d86cbd57675143b996bb9a2974d768095f6626145b117ff5971",
+    "url": "https://github.com/abhijha8287/butterfly-director-ai/blob/04e694ce4ceecb4ea651724e8be3199bd1959edd/apps/api/app/agents/prompt_director/agent.py",
+    "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "dramaclaw/dramaclaw-gateway",
+    "revision": "0a608d458739226584702943e682da269bf90027",
+    "path": "dc-media-protocol.en.md",
+    "sha256": "966ec07ae7d5bdca62ab5bf96d1c513df882bba37b2750901f271322a4819f23",
+    "url": "https://github.com/dramaclaw/dramaclaw-gateway/blob/0a608d458739226584702943e682da269bf90027/dc-media-protocol.en.md",
+    "inspection": "acquired; depth varies, see research report"
+  }
+]

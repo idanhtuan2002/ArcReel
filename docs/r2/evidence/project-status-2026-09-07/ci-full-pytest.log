@@ -1,0 +1,252 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  0%]
+........................................................................ [  1%]
+........................................................................ [  1%]
+........................................................................ [  2%]
+........................................................................ [  2%]
+........................................................................ [  3%]
+........................................................................ [  4%]
+........................................................................ [  4%]
+........................................................................ [  5%]
+........................................................................ [  5%]
+........................................................................ [  6%]
+........................................................................ [  7%]
+........................................................................ [  7%]
+........................................................................ [  8%]
+........................................................................ [  8%]
+........................................................................ [  9%]
+........................................................................ [ 10%]
+........................................................................ [ 10%]
+........................................................................ [ 11%]
+........................................................................ [ 11%]
+........................................................................ [ 12%]
+........................................................................ [ 13%]
+........................................................................ [ 13%]
+........................................................................ [ 14%]
+........................................................................ [ 14%]
+........................................................................ [ 15%]
+........................................................................ [ 16%]
+........................................................................ [ 16%]
+........................................................................ [ 17%]
+........................................................................ [ 17%]
+........................................................................ [ 18%]
+........................................................................ [ 19%]
+........................................................................ [ 19%]
+........................................................................ [ 20%]
+........................................................................ [ 20%]
+........................................................................ [ 21%]
+........................................................................ [ 21%]
+........................................................................ [ 22%]
+........................................................................ [ 23%]
+........................................................................ [ 23%]
+........................................................................ [ 24%]
+........................................................................ [ 24%]
+........................................................................ [ 25%]
+........................................................................ [ 26%]
+........................................................................ [ 26%]
+........................................................................ [ 27%]
+........................................................................ [ 27%]
+........................................................................ [ 28%]
+........................................................................ [ 29%]
+........................................................................ [ 29%]
+........................................................................ [ 30%]
+........................................................................ [ 30%]
+........................................................................ [ 31%]
+........................................................................ [ 32%]
+........................................................................ [ 32%]
+........................................................................ [ 33%]
+........................................................................ [ 33%]
+........................................................................ [ 34%]
+........................................................................ [ 35%]
+........................................................................ [ 35%]
+........................................................................ [ 36%]
+...............................s........................................ [ 36%]
+........................................................................ [ 37%]
+........................................................................ [ 38%]
+........................................................................ [ 38%]
+........................................................................ [ 39%]
+........................................................................ [ 39%]
+........................................................................ [ 40%]
+........................................................................ [ 40%]
+........................................................................ [ 41%]
+........................................................................ [ 42%]
+........................................................................ [ 42%]
+........................................................................ [ 43%]
+........................................................................ [ 43%]
+........................................................................ [ 44%]
+........................................................................ [ 45%]
+........................................................................ [ 45%]
+........................................................................ [ 46%]
+........................................................................ [ 46%]
+........................................................................ [ 47%]
+........................................................................ [ 48%]
+........................................................................ [ 48%]
+........................................................................ [ 49%]
+........................................................................ [ 49%]
+........................................................................ [ 50%]
+........................................................................ [ 51%]
+........................................................................ [ 51%]
+........................................................................ [ 52%]
+........................................................................ [ 52%]
+........................................................................ [ 53%]
+........................................................................ [ 54%]
+........................................................................ [ 54%]
+........................................................................ [ 55%]
+........................................................................ [ 55%]
+........................................................................ [ 56%]
+........................................................................ [ 57%]
+........................................................................ [ 57%]
+........................................................................ [ 58%]
+........................................................................ [ 58%]
+........................................................................ [ 59%]
+........................................................................ [ 59%]
+........................................................................ [ 60%]
+........................................................................ [ 61%]
+........................................................................ [ 61%]
+........................................................................ [ 62%]
+........................................................................ [ 62%]
+........................................................................ [ 63%]
+........................................................................ [ 64%]
+........................................................................ [ 64%]
+........................................................................ [ 65%]
+........................................................................ [ 65%]
+........................................................................ [ 66%]
+........................................................................ [ 67%]
+........................................................................ [ 67%]
+........................................................................ [ 68%]
+........................................................................ [ 68%]
+........................................................................ [ 69%]
+........................................................................ [ 70%]
+........................................................................ [ 70%]
+........................................................................ [ 71%]
+........................................................................ [ 71%]
+........................................................................ [ 72%]
+........................................................................ [ 73%]
+........................................................................ [ 73%]
+........................................................................ [ 74%]
+........................................................................ [ 74%]
+........................................................................ [ 75%]
+........................................................................ [ 76%]
+........................................................................ [ 76%]
+........................................................................ [ 77%]
+........................................................................ [ 77%]
+........................................................................ [ 78%]
+........................................................................ [ 78%]
+........................................................................ [ 79%]
+........................................................................ [ 80%]
+........................................................................ [ 80%]
+........................................................................ [ 81%]
+........................................................................ [ 81%]
+........................................................................ [ 82%]
+........................................................................ [ 83%]
+........................................................................ [ 83%]
+........................................................................ [ 84%]
+........................................................................ [ 84%]
+........................................................................ [ 85%]
+........................................................................ [ 86%]
+........................................................................ [ 86%]
+........................................................................ [ 87%]
+........................................................................ [ 87%]
+........................................................................ [ 88%]
+........................................................................ [ 89%]
+........................................................................ [ 89%]
+........................................................................ [ 90%]
+........................................................................ [ 90%]
+........................................................................ [ 91%]
+........................................................................ [ 92%]
+........................................................................ [ 92%]
+........................................................................ [ 93%]
+........................................................................ [ 93%]
+........................................................................ [ 94%]
+........................................................................ [ 95%]
+........................................................................ [ 95%]
+........................................................................ [ 96%]
+........................................................................ [ 96%]
+........................................................................ [ 97%]
+........................................................................ [ 97%]
+........................................................................ [ 98%]
+........................................................................ [ 99%]
+...................................................................s.... [ 99%]
+.............................                                            [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+  /home/anhtuan/content-production-os-r2-ci/.venv/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/unit/lib/video_backends/test_wan_family_consistency.py: 1 warning
+tests/integration/lib/config/test_config_resolver.py: 1 warning
+tests/integration/server/agent_runtime/sdk_tools/test_patch_tools.py: 1 warning
+tests/unit/server/agent_runtime/test_agent_access_policy.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py: 15 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_provider_max_workers.py: 8 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py: 7 warnings
+tests/integration/lib/db/migrations/test_alembic_task_endpoint_base_url_split.py: 5 warnings
+tests/integration/lib/db/migrations/test_alembic_split_default_image_backend.py: 4 warnings
+tests/integration/lib/db/migrations/test_alembic_asset_derivatives_table.py: 4 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_provider_capability_overrides.py: 3 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_endpoint_table.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_submitted_base_url.py: 3 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_provider_endpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_generation_batches.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_execution_checkpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_resource_type_dedupe_downgrade.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_provider_endpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_last_provider_response.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_supported_durations_backfill.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_drop_task_events_downgrade.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_split_minimax_video_endpoints.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_task_dedup_user_scope.py: 1 warning
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+tests/unit/server/test_auth_kill_switch.py::TestLoginRouteKillSwitch::test_disabled_login_succeeds_with_any_password
+tests/integration/server/test_remote_mcp.py::test_remote_mcp_accepts_source_upload_sized_requests
+tests/unit/server/test_app_module.py::TestAppModule::test_lifespan_starts_and_stops_worker
+  /home/anhtuan/content-production-os-r2-ci/.venv/lib/python3.13/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+    warnings.warn(
+
+tests/integration/test_mutmut_fork_isolation.py::test_forked_child_running_atexit_handlers_keeps_shared_test_db_dir
+  /home/anhtuan/content-production-os-r2-ci/tests/integration/test_mutmut_fork_isolation.py:49: DeprecationWarning: This process (pid=3634851) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+tests/integration/lib/db/migrations/test_alembic_generation_batches.py::test_upgrade_adds_batches_without_changing_existing_tasks
+  /home/anhtuan/content-production-os-r2-ci/tests/integration/lib/db/migrations/test_alembic_generation_batches.py:46: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    indexes = {index["name"] for index in sa.inspect(conn).get_indexes("tasks")}
+
+tests/integration/lib/db/test_db_engine_fork.py::test_forked_child_can_query_module_level_engine_after_parent_used_pool
+  /home/anhtuan/content-production-os-r2-ci/tests/integration/lib/db/test_db_engine_fork.py:22: DeprecationWarning: This process (pid=3634845) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+4.20s call     tests/integration/test_mutmut_fork_isolation.py::test_mutmut_session_uses_private_basetemp_outside_shared_root
+3.19s call     tests/integration/lib/test_media_generator_module.py::TestReferenceCompressionSeam::test_backend_receives_compressed_copy_source_untouched
+2.77s call     tests/unit/lib/test_image_compression_batch.py::test_compress_batch_nine_images_memory_ok
+2.15s call     tests/unit/lib/test_image_utils.py::TestCompressImageBytes::test_normalize_uploaded_image_still_default
+2.09s call     tests/integration/test_imports.py::test_module_imports_first_in_fresh_process[lib.custom_provider.factory]
+2.08s call     tests/integration/test_imports.py::test_module_imports_first_in_fresh_process[lib.config.resolver]
+2.03s call     tests/integration/test_imports.py::test_module_imports_first_in_fresh_process[lib.custom_provider.loader]
+2.02s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_full_chain_downgrade_only_drops_intentional_indexes
+2.00s call     tests/integration/lib/test_task_failure_capability.py::test_no_unscannable_capability_construction_sites
+1.97s call     tests/integration/test_imports.py::test_module_imports_first_in_fresh_process[lib.custom_provider.endpoints]
+1.94s call     tests/integration/test_imports.py::test_module_imports_first_in_fresh_process[lib.custom_provider.backends]
+1.90s call     tests/integration/test_imports.py::test_module_imports_first_in_fresh_process[lib.custom_provider.discovery]
+1.89s call     tests/unit/lib/test_reference_compression.py::test_frame_never_resizes_even_above_2048
+1.81s call     tests/integration/test_imports.py::test_module_imports_first_in_fresh_process[lib.custom_provider.capabilities]
+1.73s call     tests/integration/lib/test_task_failure_capability.py::test_capability_construction_sites_supply_every_template_param
+1.66s call     tests/integration/lib/db/migrations/test_alembic_drop_task_events_downgrade.py::test_downgrade_rebuilds_task_events_with_named_fk
+1.57s call     tests/integration/lib/test_task_failure_capability.py::test_capability_codes_registered_no_drift
+1.51s call     tests/integration/server/services/test_project_events_service.py::TestProjectEventService::test_stale_rebuild_does_not_broadcast_reverse_diff
+1.50s call     tests/unit/server/agent_runtime/test_session_lifecycle.py::TestCleanup::test_cleanup_skips_if_session_resumed
+1.50s call     tests/unit/server/agent_runtime/test_session_lifecycle.py::TestCleanup::test_cleanup_disconnects_after_delay
+1.35s call     tests/unit/server/routers/test_custom_providers_api.py::TestConnectionTest::test_connection_failure
+1.21s call     tests/unit/lib/test_generation_queue.py::TestGenerationQueue::test_worker_lease_takeover
+1.13s call     tests/integration/server/test_remote_mcp.py::test_text_task_is_shared_by_remote_and_embedded_hosts_and_cancelled_best_effort
+1.01s call     tests/integration/server/services/test_project_events_service.py::TestProjectEventService::test_sweep_leaves_change_described_by_another_inflight_batch
+0.91s call     tests/integration/server/test_auth_enforcement.py::test_every_protected_endpoint_rejects_anonymous
+12123 passed, 2 skipped, 80 warnings in 78.53s (0:01:18)

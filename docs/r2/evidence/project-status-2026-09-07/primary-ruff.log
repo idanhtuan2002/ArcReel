@@ -1,0 +1,115 @@
+r2/contracts/__init__.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/contracts/__init__.py:27:22: F401 `.factual.Claim` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/contracts/__init__.py:27:29: F401 `.factual.ClaimLedger` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/contracts/__init__.py:27:42: F401 `.factual.ClaimStatus` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/contracts/__init__.py:27:55: F401 `.factual.EvidenceRecord` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/contracts/__init__.py:27:71: F401 `.factual.ResearchPack` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/contracts/__init__.py:27:85: F401 `.factual.SourceRecord` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/contracts/__init__.py:28:21: F401 `.script.ScriptArtifact` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/contracts/__init__.py:28:37: F401 `.script.ScriptSection` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/contracts/common.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/contracts/factual.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/contracts/factual.py:19:7: UP042 Class ClaimStatus inherits from both `str` and `enum.Enum`
+r2/contracts/factual.py:74:41: UP037 [*] Remove quotes from type annotation
+r2/contracts/factual.py:87:36: UP037 [*] Remove quotes from type annotation
+r2/contracts/script.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/contracts/script.py:31:51: UP037 [*] Remove quotes from type annotation
+r2/m3/__init__.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/m3/__init__.py:1:30: F401 `.factual_fixture.GoldenAFactualBundle` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:1:52: F401 `.factual_fixture.load_golden_a_factual_bundle` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:2:23: F401 `.director.FixtureOpenMontageBackend` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:2:50: F401 `.director.GoldenADirectionResult` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:2:74: F401 `.director.GoldenAOpenMontageAdapter` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:3:26: F401 `.preparation.GoldenAMethodAssignment` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:3:51: F401 `.preparation.GoldenAPreparedShot` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:3:72: F401 `.preparation.GoldenAProductionPreparation` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:4:31: F401 `.local_production.GoldenALocalProducer` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:4:53: F401 `.local_production.LocalProducedAsset` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:5:31: F401 `.host_integration.GoldenAHostIntegration` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:5:55: F401 `.host_integration.RegisteredGoldenACandidate` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:5:83: F401 `.host_integration.compute_content_fingerprint` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:6:26: F401 `.composition.GoldenAComposer` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:6:43: F401 `.composition.GoldenACompositeAsset` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:7:23: F401 `.golden_a.GoldenARunResult` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/__init__.py:7:41: F401 `.golden_a.GoldenARunner` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+r2/m3/composition.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/m3/composition.py:10:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
+r2/m3/director.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/m3/director.py:16:42: E701 Multiple statements on one line (colon)
+r2/m3/director.py:25:49: E701 Multiple statements on one line (colon)
+r2/m3/factual_fixture.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/m3/factual_fixture.py:25:39: E702 Multiple statements on one line (semicolon)
+r2/m3/factual_fixture.py:25:78: E702 Multiple statements on one line (semicolon)
+r2/m3/factual_fixture.py:26:61: E701 Multiple statements on one line (colon)
+r2/m3/factual_fixture.py:27:56: E701 Multiple statements on one line (colon)
+r2/m3/factual_fixture.py:28:60: E701 Multiple statements on one line (colon)
+r2/m3/factual_fixture.py:30:52: E701 Multiple statements on one line (colon)
+r2/m3/factual_fixture.py:31:56: E701 Multiple statements on one line (colon)
+r2/m3/factual_fixture.py:33:54: E701 Multiple statements on one line (colon)
+r2/m3/factual_fixture.py:34:71: E701 Multiple statements on one line (colon)
+r2/m3/golden_a.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/m3/golden_a.py:9:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
+r2/m3/golden_a.py:34:32: UP017 [*] Use `datetime.UTC` alias
+r2/m3/host_integration.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/m3/host_integration.py:8:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
+r2/m3/local_production.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/m3/preparation.py:4:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
+r2/production/__init__.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+r2/production/__init__.py:23:11: RUF022 [*] `__all__` is not sorted
+r2/production/artifact_bridge.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+scripts/r2/run_m3_golden_a.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+scripts/r2/verify_frozen_registries.py:2:1: I001 [*] Import block is un-sorted or un-formatted
+scripts/r2/verify_frozen_registries.py:101:13: PERF401 Use `list.extend` to create a transformed list
+tests/integration/r2/m3/test_golden_a_composition.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/integration/r2/m3/test_golden_a_composition.py:18:50: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/m3/test_golden_a_end_to_end.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/integration/r2/m3/test_host_integration.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/integration/r2/m3/test_host_integration.py:85:34: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/m3/test_host_integration.py:110:38: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/m3/test_host_integration.py:147:34: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_manifest_bridge_integration.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/integration/r2/production/test_manifest_recovery_integration.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/integration/r2/production/test_manifest_recovery_integration.py:75:56: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_manifest_recovery_integration.py:255:56: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_manifest_recovery_integration.py:354:64: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_manifest_recovery_integration.py:375:14: RUF059 Unpacked variable `versions` is never used
+tests/integration/r2/production/test_master_promotion_integration.py:45:60: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_master_promotion_integration.py:149:60: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_master_promotion_integration.py:168:56: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_master_promotion_integration.py:219:60: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_master_promotion_integration.py:238:56: UP017 [*] Use `datetime.UTC` alias
+tests/integration/r2/production/test_master_promotion_integration.py:246:56: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/contracts/test_architecture_boundaries.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/r2/contracts/test_architecture_boundaries.py:2:1: E401 [*] Multiple imports on one line
+tests/unit/r2/contracts/test_architecture_boundaries.py:52:21: PERF401 Use `list.extend` to create a transformed list
+tests/unit/r2/contracts/test_factual.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/r2/contracts/test_fingerprints.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/r2/contracts/test_provenance.py:13:55: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/contracts/test_results.py:18:12: C408 Unnecessary `dict()` call (rewrite as a literal)
+tests/unit/r2/contracts/test_results.py:57:56: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/contracts/test_results.py:80:55: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/contracts/test_roundtrip.py:54:55: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/contracts/test_roundtrip.py:189:56: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/contracts/test_roundtrip.py:208:55: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/contracts/test_script.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/r2/m3/test_director.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/r2/m3/test_director.py:8:29: E701 Multiple statements on one line (colon)
+tests/unit/r2/m3/test_director.py:13:5: PT018 Assertion should be broken down into multiple parts
+tests/unit/r2/m3/test_director.py:19:48: E702 Multiple statements on one line (semicolon)
+tests/unit/r2/m3/test_director.py:21:45: E701 Multiple statements on one line (colon)
+tests/unit/r2/m3/test_director.py:22:42: E701 Multiple statements on one line (colon)
+tests/unit/r2/m3/test_director.py:25:41: E701 Multiple statements on one line (colon)
+tests/unit/r2/m3/test_local_production.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/r2/m3/test_local_production.py:42:5: PT018 Assertion should be broken down into multiple parts
+tests/unit/r2/production/test_approval_service.py:42:12: C408 Unnecessary `dict()` call (rewrite as a literal)
+tests/unit/r2/production/test_approval_service.py:90:47: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/production/test_approval_service.py:192:56: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/production/test_artifact_metadata.py:142:56: UP017 [*] Use `datetime.UTC` alias
+tests/unit/r2/production/test_dependency_resolver.py:68:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+tests/unit/r2/production/test_host_manifest_r2_extension.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/r2/production/test_m2_artifact_bridge_architecture_boundaries.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/scripts/r2/test_verify_baseline.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/scripts/r2/test_verify_postgres_baseline_script.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+tests/unit/scripts/r2/test_verify_postgres_baseline_script.py:1:21: F401 [*] `pathlib.Path` imported but unused
+Found 113 errors.
+[*] 63 fixable with the `--fix` option (6 hidden fixes can be enabled with the `--unsafe-fixes` option).

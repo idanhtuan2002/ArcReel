@@ -1,0 +1,77 @@
+{
+  "purpose": "Observed research revisions; not approved integration pins",
+  "repositories": [
+    {
+      "repo": "Forget-C/Jellyfish",
+      "sha": "a9678194ddf2d9be3ccbe78d4287d87d5089e123",
+      "commit_date": "2026-04-20T05:41:35Z",
+      "default_branch": "main",
+      "truncated": false,
+      "tree_entries": 910
+    },
+    {
+      "repo": "ThomasChangX/shenbi",
+      "sha": "65ddfc261f4e491b07c36e548f78de36109be218",
+      "commit_date": "2026-09-07T06:55:18Z",
+      "default_branch": "main",
+      "truncated": false,
+      "tree_entries": 4099
+    },
+    {
+      "repo": "YfengJ/novel-studio-ai",
+      "sha": "9b690ae2e2f6921f9bd2782b42cef53c1662ad3b",
+      "commit_date": "2026-06-30T14:33:03Z",
+      "default_branch": "main",
+      "truncated": false,
+      "tree_entries": 177
+    },
+    {
+      "repo": "abhijha8287/butterfly-director-ai",
+      "sha": "04e694ce4ceecb4ea651724e8be3199bd1959edd",
+      "commit_date": "2026-08-07T10:37:13Z",
+      "default_branch": "master",
+      "truncated": false,
+      "tree_entries": 448
+    },
+    {
+      "repo": "amcghm/StoryBox",
+      "sha": "ba24ff64e6023e8d071af4adb7e64b03bd9b08b1",
+      "commit_date": "2026-03-27T04:08:42Z",
+      "default_branch": "main",
+      "truncated": false,
+      "tree_entries": 445
+    },
+    {
+      "repo": "appolloqin/huohuo-drama",
+      "sha": "f104b853b3563e124d9cde25f9331d323fb483b9",
+      "commit_date": "2026-09-03T05:56:24Z",
+      "default_branch": "main",
+      "truncated": false,
+      "tree_entries": 1179
+    },
+    {
+      "repo": "dramaclaw/dramaclaw-gateway",
+      "sha": "0a608d458739226584702943e682da269bf90027",
+      "commit_date": "2026-09-04T08:25:29Z",
+      "default_branch": "main",
+      "truncated": false,
+      "tree_entries": 2392
+    },
+    {
+      "repo": "dramaclaw/dramaclaw",
+      "sha": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+      "commit_date": "2026-09-07T03:37:00Z",
+      "default_branch": "main",
+      "truncated": false,
+      "tree_entries": 2452
+    },
+    {
+      "repo": "wushaojun321/ai-short-film",
+      "sha": "3dc93a62bf472e46cb5edf2999971769a4989cab",
+      "commit_date": "2026-07-17T06:44:36Z",
+      "default_branch": "main",
+      "truncated": false,
+      "tree_entries": 201
+    }
+  ]
+}

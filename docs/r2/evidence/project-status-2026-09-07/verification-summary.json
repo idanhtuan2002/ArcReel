@@ -1,0 +1,82 @@
+{
+  "date": "2026-09-07",
+  "primary_head": "1985b815d70dd600519839973b1da20472012d8f",
+  "ci_head": "521aad2f83a19bdb03219923b6bd2268a338f617",
+  "ci_historical_verified_head": "e72cce2272e1e496a7c8a52df2d3513fd20e815d",
+  "primary_r2_tests": {
+    "exit_code": 0,
+    "passed": 137,
+    "warnings": 4,
+    "seconds": 6.81,
+    "selection": "tests/unit/r2 tests/integration/r2 tests/unit/scripts/r2 -n 4 --dist loadfile -q"
+  },
+  "ci_full_pytest": {
+    "exit_code": 0,
+    "passed": 12123,
+    "skipped": 2,
+    "warnings": 80,
+    "seconds": 78.53
+  },
+  "primary_ruff": {
+    "exit_code": 1,
+    "findings": 113
+  },
+  "primary_audit": {
+    "exit_code": 0,
+    "violations": 0
+  },
+  "primary_frozen_registries": {
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  "primary_host_baseline": {
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  "ci_static": {
+    "ruff": 0,
+    "format": 0,
+    "pyright": 0,
+    "deptry": 0,
+    "imports": 0,
+    "audit": 0
+  },
+  "golden_a": {
+    "exit_code": 0,
+    "sha256": "86f6028b90a03651c29f09a0a67dfda324eebbd8e711be37d5cd4bcc37dc2f64",
+    "duration_seconds": 72,
+    "width": 1280,
+    "height": 720,
+    "fps": 2,
+    "audio_streams": 0,
+    "content_review": "solid color frames, not a delivered factual explainer"
+  },
+  "not_run": [
+    "frontend checks/build/browser dogfood",
+    "website checks/build",
+    "production PostgreSQL recovery/restore",
+    "paid provider qualification",
+    "frozen historical node-ID corpora reruns"
+  ],
+  "github_issues": "fork has disabled issues",
+  "graph_generation": "2026-09-06T14:06:41Z",
+  "graph_limitations": "M3 files not_tracked; CI worktree not separately indexed; source/diff fallback used",
+  "files_sha256": {
+    "primary-r2-tests.log": "770a01a2c49c7709653d27e1c50d20334dc6e1466cd05b2cc06164884595cb8e",
+    "primary-ruff.log": "1da03eaf31806813ff826a45d85b93a489bc86ac1bfe20504639ac528bdfa048",
+    "primary-test-audit.log": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55",
+    "ci-full-pytest.log": "45c7e312b86e56269c5e84754c00622ae67ca8fc6f936260e5e7b15c3f9be7aa",
+    "ci-static-exit-codes.json": "5d4e351250a0832719711fc1cf555ee86fb669eb84b50a4e4cb7c2f5a3214b55",
+    "golden-a-run.json": "8c39324870fa3c20603b0d9ac02dca6bc5a6a8ec48eab6130c2ca5611a3999cd",
+    "golden-a-evidence.json": "61b3356bb104db6970bd84ef90292d03bc1b0c4cb56ed12b914a9761240f80d0",
+    "golden-a-contact-sheet.png": "e8e400206114a23289dc87ad06bd3e5aab8a5a2792796a13641e1eea61c897f4",
+    "pytest-sandbox-diagnosis.log": "03d741841e0a20665a4b54459167f1376d3b11c43bcfcf2ae256b5c71c9e2f9b",
+    "ci-ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "ci-format.log": "bc26d51a7cc662ae73e875c0390fdd1da7d5aa88ab76f33a2d14b54c2afce5ec",
+    "ci-pyright.log": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c",
+    "ci-deptry.log": "656a49be92a376735ac5a665f41bfbbfc61b688d72aa686bed429a4d8be9efae",
+    "ci-imports.log": "e764895dc1da2ca2b3a8e54e32e7175f3793fbd4723c0f327510fe3b82f19c4d",
+    "ci-audit.log": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55"
+  },
+  "graph_generation_at_final_check": "2026-09-07T05:00:10Z"
+}
