@@ -217,6 +217,36 @@ async def test_revalidation_targets_the_top_ranked_eligible_candidate() -> None:
     assert spy.seen == ["cap:top"]
 
 
+async def test_evaluate_revalidates_and_records_the_named_selected_candidate() -> None:
+    port = _FakeBudgetPort()
+    spy = _RevalidatorSpy()
+    admission = await _evaluate(
+        port,
+        capability_resolution=_resolution(eligible=("cap:top", "cap:second")),
+        selected_capability_id="cap:second",
+        revalidate=spy,
+    )
+    assert spy.seen == ["cap:second"]
+    assert admission.selected_capability_id == "cap:second"
+
+
+async def test_named_candidate_absent_from_eligible_is_denied() -> None:
+    port = _FakeBudgetPort()
+    admission = await _evaluate(
+        port,
+        capability_resolution=_resolution(eligible=("cap:top",)),
+        selected_capability_id="cap:not-eligible",
+    )
+    assert admission.outcome is AdmissionOutcome.DENIED_NO_CAPABILITY
+
+
+async def test_admitted_default_records_the_top_ranked_candidate() -> None:
+    port = _FakeBudgetPort()
+    admission = await _evaluate(port, capability_resolution=_resolution(eligible=("cap:top", "cap:second")))
+    assert admission.outcome is AdmissionOutcome.ADMITTED
+    assert admission.selected_capability_id == "cap:top"
+
+
 async def test_failed_revalidation_does_not_reserve_budget() -> None:
     port = _FakeBudgetPort()
     spy = _RevalidatorSpy(ok=False, reason_codes=("STALE_AVAILABILITY",))

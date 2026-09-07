@@ -170,6 +170,19 @@ def test_rejects_admission_whose_prompt_plan_ref_does_not_match_the_plan() -> No
         )
 
 
+def test_rejects_a_candidate_the_admission_did_not_select() -> None:
+    admission = _admission()
+    admission = admission.model_copy(update={"selected_capability_id": "cap:b"})
+    with pytest.raises(ValueError, match="selected"):
+        ExecutionDecisionService().create(
+            admission=admission,
+            capability_resolution=_resolution(),
+            prompt_plan=_plan(),
+            selected_capability_id="cap:a",
+            descriptor=_descriptor("cap:a", "provider-x"),
+        )
+
+
 def test_rejects_admission_and_plan_that_disagree_on_the_target() -> None:
     plan = _plan().model_copy(update={"target_ref": "SH99"})
     with pytest.raises(ValueError, match="target"):

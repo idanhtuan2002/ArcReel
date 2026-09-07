@@ -325,6 +325,22 @@ def test_required_execution_types_excludes_a_disallowed_execution_type() -> None
     assert any(r.candidate == "cap:api" and "EXECUTION_TYPE_DISALLOWED" in r.reasons for r in res.rejected_candidates)
 
 
+def test_builder_plumbs_required_execution_types_into_the_requirements() -> None:
+    builder = CapabilityRequirementBuilder()
+    without = builder.build_from_features(
+        target_ref="SH01", method=ProductionMethod.GENERATED_IMAGE, hard_features=["X"], soft_features=[]
+    )
+    with_lock = builder.build_from_features(
+        target_ref="SH01",
+        method=ProductionMethod.GENERATED_IMAGE,
+        hard_features=["X"],
+        soft_features=[],
+        required_execution_types=[ExecutionType.LOCAL, ExecutionType.LOCAL_GPU],
+    )
+    assert with_lock.required_execution_types == [ExecutionType.LOCAL, ExecutionType.LOCAL_GPU]
+    assert with_lock.requirement_set_hash != without.requirement_set_hash
+
+
 def test_required_execution_types_admits_a_matching_execution_type() -> None:
     requirements = CapabilityRequirementBuilder().build_from_features(
         target_ref="SH01",

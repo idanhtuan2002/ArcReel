@@ -62,6 +62,7 @@ class _AdmissionInputs:
         outcome: AdmissionOutcome,
         reason_codes: Sequence[str],
         *,
+        selected_capability_id: str | None = None,
         budget_reservation_ref: str | None = None,
         approval_ref: str | None = None,
     ) -> GenerationAdmission:
@@ -73,6 +74,7 @@ class _AdmissionInputs:
             capability_resolution_ref=self.capability_resolution.requirement_set_ref,
             prompt_plan_ref=self.prompt_plan.id,
             readiness_ref=self.readiness.id,
+            selected_capability_id=selected_capability_id,
             budget_reservation_ref=budget_reservation_ref,
             approval_ref=approval_ref,
             reason_codes=list(reason_codes),
@@ -98,6 +100,7 @@ class GenerationAdmissionService:
         approval_ref: str | None,
         now: datetime,
         revalidate: HardDynamicRevalidator,
+        selected_capability_id: str | None = None,
         readiness_is_current: bool = True,
         requires_approval: bool = False,
         policy_ok: bool = True,
@@ -123,21 +126,33 @@ class GenerationAdmissionService:
                 return ctx.outcome(AdmissionOutcome.DENIED_UNAVAILABLE, ["CAPABILITY_UNKNOWN"])
             return ctx.outcome(AdmissionOutcome.DENIED_NO_CAPABILITY, ["NO_HARD_CAPABILITY"])
 
+        # This attempt is for exactly one candidate: the named one, or the
+        # top-ranked eligible one. Gate 2 revalidates and records that candidate;
+        # a same-method provider fallback must re-run evaluate() for its pick.
+        selected = selected_capability_id or capability_resolution.eligible_candidates[0]
+        if selected not in capability_resolution.eligible_candidates:
+            return ctx.outcome(AdmissionOutcome.DENIED_NO_CAPABILITY, ["SELECTED_CANDIDATE_NOT_ELIGIBLE"])
+
         if requires_approval and approval_ref is None:
-            return ctx.outcome(AdmissionOutcome.APPROVAL_REQUIRED, ["APPROVAL_MISSING"], approval_ref=approval_ref)
+            return ctx.outcome(
+                AdmissionOutcome.APPROVAL_REQUIRED,
+                ["APPROVAL_MISSING"],
+                selected_capability_id=selected,
+                approval_ref=approval_ref,
+            )
 
         if not policy_ok:
-            return ctx.outcome(AdmissionOutcome.DENIED_POLICY, ["POLICY_DENIED"])
+            return ctx.outcome(AdmissionOutcome.DENIED_POLICY, ["POLICY_DENIED"], selected_capability_id=selected)
 
-        # Synchronously re-prove the top-ranked eligible candidate's hard-dynamic
-        # predicates before any reservation, so a stale/broken candidate cannot be
-        # admitted and cannot leave a dangling reservation behind.
-        selected_candidate = capability_resolution.eligible_candidates[0]
-        revalidation = await revalidate(selected_candidate)
+        # Synchronously re-prove the selected candidate's hard-dynamic predicates
+        # before any reservation, so a stale/broken candidate cannot be admitted
+        # and cannot leave a dangling reservation behind.
+        revalidation = await revalidate(selected)
         if not revalidation.ok:
             return ctx.outcome(
                 AdmissionOutcome.DENIED_UNAVAILABLE,
                 ["HARD_DYNAMIC_REVALIDATION_FAILED", *revalidation.reason_codes],
+                selected_capability_id=selected,
                 approval_ref=approval_ref,
             )
 
@@ -155,11 +170,17 @@ class GenerationAdmissionService:
                     provenance={"stage": "admission", "target_ref": ctx.target},
                 )
             except BudgetDeniedError:
-                return ctx.outcome(AdmissionOutcome.DENIED_BUDGET, ["HOST_RESERVE_DENIED"], approval_ref=approval_ref)
+                return ctx.outcome(
+                    AdmissionOutcome.DENIED_BUDGET,
+                    ["HOST_RESERVE_DENIED"],
+                    selected_capability_id=selected,
+                    approval_ref=approval_ref,
+                )
             if snapshot.state is not BudgetReservationState.ACTIVE:
                 return ctx.outcome(
                     AdmissionOutcome.DENIED_BUDGET,
                     [f"RESERVATION_{snapshot.state.value}"],
+                    selected_capability_id=selected,
                     approval_ref=approval_ref,
                 )
             budget_reservation_ref = reservation_ref
@@ -167,6 +188,7 @@ class GenerationAdmissionService:
         return ctx.outcome(
             AdmissionOutcome.ADMITTED,
             ["ALL_CHECKS_PASS"],
+            selected_capability_id=selected,
             budget_reservation_ref=budget_reservation_ref,
             approval_ref=approval_ref,
         )

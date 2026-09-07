@@ -59,6 +59,11 @@ class ExecutionDecisionService:
                 f"selected capability {selected_capability_id!r} is not in the eligible candidates "
                 f"{list(capability_resolution.eligible_candidates)}"
             )
+        if admission.selected_capability_id is not None and selected_capability_id != admission.selected_capability_id:
+            raise ValueError(
+                f"selected capability {selected_capability_id!r} is not the one Gate 2 revalidated "
+                f"({admission.selected_capability_id!r})"
+            )
         if descriptor.capability_id != selected_capability_id:
             raise ValueError(
                 f"descriptor capability_id {descriptor.capability_id!r} does not match the selected "

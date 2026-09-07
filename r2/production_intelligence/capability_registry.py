@@ -125,6 +125,7 @@ class CapabilityRequirementBuilder:
         method_decision: MethodDecision,
         identity: ResolvedVisualIdentity,
         shot: ShotSpec,
+        required_execution_types: Sequence[ExecutionType] = (),
     ) -> CapabilityRequirements:
         hard = [METHOD_HARD_FEATURE[method_decision.method]]
         soft: list[str] = []
@@ -137,7 +138,11 @@ class CapabilityRequirementBuilder:
             else:
                 soft.append(f"IDENTITY_PREF:{constraint.semantic_key}")
         return self.build_from_features(
-            target_ref=shot.id, method=method_decision.method, hard_features=hard, soft_features=soft
+            target_ref=shot.id,
+            method=method_decision.method,
+            hard_features=hard,
+            soft_features=soft,
+            required_execution_types=required_execution_types,
         )
 
     def build_from_features(
@@ -147,17 +152,21 @@ class CapabilityRequirementBuilder:
         method: ProductionMethod,
         hard_features: Sequence[str],
         soft_features: Sequence[str],
+        required_execution_types: Sequence[ExecutionType] = (),
     ) -> CapabilityRequirements:
         hard = sorted(set(hard_features))
         soft = sorted(set(soft_features))
-        digest = hashlib.sha256(
-            canonical_json_bytes(ensure_json_value({"method": method.value, "hard": hard, "soft": soft}))
-        ).hexdigest()
+        exec_types = list(dict.fromkeys(required_execution_types))
+        hashed: dict[str, object] = {"method": method.value, "hard": hard, "soft": soft}
+        if exec_types:
+            hashed["required_execution_types"] = [t.value for t in exec_types]
+        digest = hashlib.sha256(canonical_json_bytes(ensure_json_value(hashed))).hexdigest()
         return CapabilityRequirements(
             target_ref=target_ref,
             method=method,
             hard_features=hard,
             soft_features=soft,
+            required_execution_types=exec_types,
             requirement_set_hash=digest,
             policy_version=CAPABILITY_REQUIREMENTS_POLICY_VERSION,
         )

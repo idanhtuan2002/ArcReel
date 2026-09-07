@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from r2.contracts import (
     AdmissionOutcome,
@@ -19,6 +20,7 @@ from r2.contracts import (
     compute_content_fingerprint,
     compute_execution_fingerprint,
 )
+from r2.production_intelligence.admission import GenerationAdmissionService, HardDynamicRevalidation
 from r2.production_intelligence.capability_registry import (
     CapabilityMatcher,
     CapabilityRegistry,
@@ -37,8 +39,13 @@ from scripts.r2.m4_test_doubles import (
     ExecutionMode,
     ExecutionTier,
 )
+from scripts.r2.run_m4_golden_12 import _FakeBudgetPort
 
 _NOW = datetime(2026, 9, 7, 12, 0, tzinfo=UTC)
+
+
+async def _always_fresh(_capability_id: str) -> HardDynamicRevalidation:
+    return HardDynamicRevalidation(ok=True)
 
 
 async def test_mut_01_missing_required_binding_blocks_with_zero_expensive_execution(golden_12, pipeline) -> None:
@@ -125,8 +132,28 @@ async def test_mut_05_same_method_provider_fallback_new_ed_same_content_fp_chang
     fallback_cap = next(c for c in resolution_b.eligible_candidates if c != primary_cap)
     assert fallback_cap == "cap:sh05-alt"
 
+    # A same-method provider fallback is a fresh Gate-2 evaluation for the new
+    # candidate — the prior admission cannot be reused for a candidate it never
+    # revalidated.
+    admission_b = await GenerationAdmissionService(budget_port=_FakeBudgetPort()).evaluate(
+        readiness=result.readiness,
+        method_decision=result.method_decision,
+        capability_resolution=resolution_b,
+        prompt_plan=result.prompt_plan,
+        budget_scope_ref=f"scope:{case.shot.id}",
+        budget_amount=Decimal("3.00"),
+        budget_currency="USD",
+        approval_ref=None,
+        now=_NOW,
+        revalidate=_always_fresh,
+        selected_capability_id=fallback_cap,
+    )
+    assert admission_b.outcome is AdmissionOutcome.ADMITTED
+    assert admission_b.selected_capability_id == fallback_cap
+    assert result.admission.selected_capability_id == primary_cap
+
     ed_b = ExecutionDecisionService().create(
-        admission=result.admission,
+        admission=admission_b,
         capability_resolution=resolution_b,
         prompt_plan=result.prompt_plan,
         selected_capability_id=fallback_cap,

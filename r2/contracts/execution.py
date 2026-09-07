@@ -133,6 +133,9 @@ class GenerationAdmission(R2ContractModel):
     capability_resolution_ref: NonEmptyStr
     prompt_plan_ref: NonEmptyStr
     readiness_ref: NonEmptyStr
+    # The candidate Gate 2 evaluated and revalidated this attempt for. An
+    # ExecutionDecision must lock this exact capability.
+    selected_capability_id: NonEmptyStr | None = None
     budget_reservation_ref: NonEmptyStr | None = None
     approval_ref: NonEmptyStr | None = None
     reason_codes: list[NonEmptyStr] = Field(default_factory=list)
