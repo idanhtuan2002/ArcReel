@@ -8,6 +8,7 @@ change is out of this service's authority and must go back to the Method Router.
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 
 from r2.contracts import (
     AdmissionOutcome,
@@ -19,6 +20,8 @@ from r2.contracts import (
     PromptPlan,
     Provenance,
     ProvenanceActor,
+    ProviderRequest,
+    RetryDisposition,
     ensure_json_value,
 )
 from r2.contracts.fingerprints import canonical_json_bytes
@@ -91,6 +94,92 @@ def _request_semantics_hash(
             "required_controls": sorted(prompt_plan.required_controls),
             "negative_constraints": sorted(prompt_plan.negative_constraints),
             "selected_capability_id": selected_capability_id,
+        }
+    )
+    return hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
+
+
+# --------------------------------------------------------------------------- #
+# C02 — same-execution Retry Identity Guard
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class RetryGuardResult:
+    allowed: bool
+    disposition: RetryDisposition
+    reason_codes: tuple[str, ...]
+
+
+class RetryIdentityGuard:
+    """A transient failure may retry under the SAME ExecutionDecision only when
+    every identity-relevant fact is unchanged and no unsafe ambiguous side effect
+    is unresolved. Otherwise a new admission/execution decision is required."""
+
+    def evaluate(
+        self,
+        *,
+        prior_decision: ExecutionDecision,
+        current_decision: ExecutionDecision,
+        prior_request: ProviderRequest,
+        current_request: ProviderRequest,
+        previous_attempt_side_effect_ambiguous: bool,
+        provider_idempotency_supported: bool,
+    ) -> RetryGuardResult:
+        reasons: list[str] = []
+
+        checks = {
+            "ED_ID_MISMATCH": prior_decision.id != current_decision.id,
+            "METHOD_DECISION_MISMATCH": prior_decision.method_decision_ref != current_decision.method_decision_ref,
+            "PROMPT_PLAN_MISMATCH": prior_decision.prompt_plan_ref != current_decision.prompt_plan_ref,
+            "ADAPTER_MISMATCH": prior_decision.adapter_id != current_decision.adapter_id,
+            "PROVIDER_MISMATCH": prior_decision.provider_id != current_decision.provider_id,
+            "MODEL_OR_TOOL_MISMATCH": prior_decision.model_or_tool_id != current_decision.model_or_tool_id,
+            "DESCRIPTOR_VERSION_MISMATCH": (
+                prior_decision.capability_descriptor_version != current_decision.capability_descriptor_version
+            ),
+            "REQUEST_SEMANTICS_MISMATCH": (
+                prior_decision.request_semantics_hash != current_decision.request_semantics_hash
+            ),
+            "REQUEST_FINGERPRINT_MISMATCH": _request_fingerprint(prior_request)
+            != _request_fingerprint(current_request),
+        }
+        reasons.extend(code for code, mismatched in checks.items() if mismatched)
+
+        if (
+            current_decision.execution_identity_stability is ExecutionIdentityStability.MUTABLE_ALIAS
+            and current_decision.resolved_model_or_tool_revision is None
+        ):
+            reasons.append("MUTABLE_ALIAS_NO_REVISION_PROOF")
+
+        if previous_attempt_side_effect_ambiguous and not provider_idempotency_supported:
+            reasons.append("AMBIGUOUS_SIDE_EFFECT_NO_IDEMPOTENCY")
+
+        if not reasons:
+            return RetryGuardResult(True, RetryDisposition.RETRY_SAME_EXECUTION, ())
+
+        ordered = tuple(sorted(set(reasons)))
+        if "METHOD_DECISION_MISMATCH" in ordered:
+            disposition = RetryDisposition.NEW_METHOD_DECISION_REQUIRED
+        elif ordered == ("AMBIGUOUS_SIDE_EFFECT_NO_IDEMPOTENCY",):
+            disposition = RetryDisposition.HUMAN_ACTION_REQUIRED
+        else:
+            disposition = RetryDisposition.NEW_EXECUTION_DECISION_REQUIRED
+        return RetryGuardResult(False, disposition, ordered)
+
+
+def _request_fingerprint(request: ProviderRequest) -> str:
+    """Deterministic request identity excluding retry-variant transport metadata."""
+
+    payload = ensure_json_value(
+        {
+            "provider": request.provider,
+            "model": request.model,
+            "endpoint": request.endpoint,
+            "payload": request.payload,
+            "adapter_version": request.adapter_version,
+            "method_decision_ref": request.method_decision_ref,
+            "prompt_plan_ref": request.prompt_plan_ref,
         }
     )
     return hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
