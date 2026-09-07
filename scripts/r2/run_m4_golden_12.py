@@ -183,7 +183,7 @@ async def run_pipeline(
                 allowed_methods=case.allowed_methods,
                 readiness=readiness,
                 identity=resolved_identity,
-                source_authenticity_required=False,
+                source_authenticity_required=case.source_authenticity_required,
                 reusable_asset_current=case.reusable_asset_current,
                 deterministic_equivalent_available=case.deterministic_equivalent_available,
                 policy_version="m4-method-router-v1",

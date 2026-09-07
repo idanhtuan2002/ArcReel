@@ -144,6 +144,16 @@ by Claude before triage.
   make the *expected* one win (e.g. SH02 with a synthetic alternative it must
   outrank); add SH05/06/07 tier doubles and assert MethodDecision stable while
   ExecutionDecision + execution_fingerprint move.
+- **FIXED (next-session batch):** the golden fixture now gives every shot ≥2
+  `allowed_methods` with the expected one provably winning — a lower-priority
+  competitor stays eligible-but-outranked and, where the method has an
+  eligibility precondition, a higher-priority competitor is present but filtered
+  (SH02 restricts via `source_authenticity_required`, threaded through the runner
+  and `M4ShotCase`). `test_golden_12_baseline` asserts real competition
+  (`eligible_methods ≥ 2` or `rejected_methods`) per shot. New
+  `test_quality_ladder.py` runs SH05/06/07 through local / cheap-cloud /
+  premium-cloud tier descriptors and asserts the `MethodDecision` is identical
+  while `ExecutionDecision.id` and `execution_fingerprint` differ per tier.
 
 ### High-5 — architecture fitness sensors are name-based, not semantic
 - **Where:** `scripts/r2/audit_m4_architecture.py`,

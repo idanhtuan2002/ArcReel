@@ -21,6 +21,11 @@ async def test_baseline_shot_completes_the_public_trace(golden_12, pipeline, sho
     assert result.readiness.state.value == "READY"
     assert result.method_decision is not None
     assert result.method_decision.method is case.method
+    # The router chose among real competitors, not a single pre-supplied option:
+    # at least one other allowed method was eligible-but-outranked or filtered.
+    assert len(case.allowed_methods) >= 2
+    md = result.method_decision
+    assert len(md.eligible_methods) >= 2 or md.rejected_methods, (shot_id, md.eligible_methods, md.rejected_methods)
     assert result.capability_resolution is not None
     assert result.capability_resolution.eligible_candidates
     assert result.prompt_plan is not None

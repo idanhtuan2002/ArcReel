@@ -1,18 +1,41 @@
 {
   "fixture_id": "m4-golden-12-v1",
-  "description": "D09 canonical 12-shot mixed-method baseline. 3 Directors, all 7 ProductionMethods.",
+  "description": "D09 canonical 12-shot mixed-method baseline. 3 Directors, all 7 ProductionMethods. Every shot offers >=2 allowed_methods so the MethodRouter proves an authoritative choice, not single-option plumbing: at least one competitor is eligible-but-outranked and (where the method has an eligibility precondition) at least one higher-priority competitor is present but filtered out.",
   "shots": [
-    { "id": "SH01", "director": "OPENMONTAGE",   "method": "REUSE",           "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false },
-    { "id": "SH02", "director": "OPENMONTAGE",   "method": "SCREEN_CAPTURE",  "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false },
-    { "id": "SH03", "director": "OPENMONTAGE",   "method": "DETERMINISTIC",   "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false },
-    { "id": "SH04", "director": "OPENMONTAGE",   "method": "COMPOSITE",       "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false },
-    { "id": "SH05", "director": "TAKE",          "method": "GENERATED_IMAGE", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  },
-    { "id": "SH06", "director": "TAKE",          "method": "GENERATED_VIDEO", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  },
-    { "id": "SH07", "director": "TAKE",          "method": "GENERATED_VIDEO", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  },
-    { "id": "SH08", "director": "TAKE",          "method": "COMPOSITE",       "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": false },
-    { "id": "SH09", "director": "ARCREEL_NATIVE","method": "STOCK",           "content_basis_type": "NARRATIVE", "needs_character_identity": false, "paid": false },
-    { "id": "SH10", "director": "ARCREEL_NATIVE","method": "DETERMINISTIC",   "content_basis_type": "NARRATIVE", "needs_character_identity": false, "paid": false },
-    { "id": "SH11", "director": "ARCREEL_NATIVE","method": "GENERATED_IMAGE", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  },
-    { "id": "SH12", "director": "ARCREEL_NATIVE","method": "GENERATED_VIDEO", "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true  }
+    { "id": "SH01", "director": "OPENMONTAGE",    "method": "REUSE",          "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false,
+      "allowed_methods": ["REUSE", "DETERMINISTIC", "GENERATED_IMAGE"], "source_authenticity_required": false, "reusable_asset_current": true,  "deterministic_equivalent_available": true },
+
+    { "id": "SH02", "director": "OPENMONTAGE",    "method": "SCREEN_CAPTURE", "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false,
+      "allowed_methods": ["SCREEN_CAPTURE", "STOCK", "DETERMINISTIC"], "source_authenticity_required": true,  "reusable_asset_current": false, "deterministic_equivalent_available": true },
+
+    { "id": "SH03", "director": "OPENMONTAGE",    "method": "DETERMINISTIC",  "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false,
+      "allowed_methods": ["DETERMINISTIC", "COMPOSITE", "GENERATED_IMAGE"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": true },
+
+    { "id": "SH04", "director": "OPENMONTAGE",    "method": "COMPOSITE",      "content_basis_type": "FACTUAL",   "needs_character_identity": false, "paid": false,
+      "allowed_methods": ["COMPOSITE", "GENERATED_IMAGE", "REUSE"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": false },
+
+    { "id": "SH05", "director": "TAKE",           "method": "GENERATED_IMAGE","content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true,
+      "allowed_methods": ["GENERATED_IMAGE", "GENERATED_VIDEO", "DETERMINISTIC"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": false },
+
+    { "id": "SH06", "director": "TAKE",           "method": "GENERATED_VIDEO","content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true,
+      "allowed_methods": ["GENERATED_VIDEO", "REUSE", "DETERMINISTIC"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": false },
+
+    { "id": "SH07", "director": "TAKE",           "method": "GENERATED_VIDEO","content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true,
+      "allowed_methods": ["GENERATED_VIDEO", "DETERMINISTIC", "REUSE"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": false },
+
+    { "id": "SH08", "director": "TAKE",           "method": "COMPOSITE",      "content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": false,
+      "allowed_methods": ["COMPOSITE", "GENERATED_IMAGE", "REUSE"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": false },
+
+    { "id": "SH09", "director": "ARCREEL_NATIVE", "method": "STOCK",          "content_basis_type": "NARRATIVE", "needs_character_identity": false, "paid": false,
+      "allowed_methods": ["STOCK", "GENERATED_IMAGE", "REUSE"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": false },
+
+    { "id": "SH10", "director": "ARCREEL_NATIVE", "method": "DETERMINISTIC",  "content_basis_type": "NARRATIVE", "needs_character_identity": false, "paid": false,
+      "allowed_methods": ["DETERMINISTIC", "COMPOSITE", "REUSE"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": true },
+
+    { "id": "SH11", "director": "ARCREEL_NATIVE", "method": "GENERATED_IMAGE","content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true,
+      "allowed_methods": ["GENERATED_IMAGE", "GENERATED_VIDEO", "DETERMINISTIC"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": false },
+
+    { "id": "SH12", "director": "ARCREEL_NATIVE", "method": "GENERATED_VIDEO","content_basis_type": "NARRATIVE", "needs_character_identity": true,  "paid": true,
+      "allowed_methods": ["GENERATED_VIDEO", "DETERMINISTIC", "REUSE"], "source_authenticity_required": false, "reusable_asset_current": false, "deterministic_equivalent_available": false }
   ]
 }

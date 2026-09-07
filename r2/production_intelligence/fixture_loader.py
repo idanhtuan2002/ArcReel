@@ -60,6 +60,7 @@ class M4ShotCase:
     descriptor: CapabilityDescriptor
     observation: CapabilityObservation
     allowed_methods: tuple[ProductionMethod, ...]
+    source_authenticity_required: bool
     reusable_asset_current: bool
     deterministic_equivalent_available: bool
     paid: bool
@@ -104,6 +105,13 @@ def _build_case(entry: dict[str, object]) -> M4ShotCase:
     basis_type = ContentBasisType(str(entry["content_basis_type"]))
     needs_identity = bool(entry["needs_character_identity"])
     paid = bool(entry["paid"])
+    allowed_raw = entry["allowed_methods"]
+    if not isinstance(allowed_raw, list):
+        raise ValueError(f"{shot_id}: allowed_methods must be a list")
+    allowed = tuple(ProductionMethod(str(m)) for m in allowed_raw)
+    source_authenticity_required = bool(entry["source_authenticity_required"])
+    reusable_asset_current = bool(entry["reusable_asset_current"])
+    deterministic_equivalent_available = bool(entry["deterministic_equivalent_available"])
 
     basis = ContentBasis(
         basis_type=basis_type,
@@ -120,7 +128,7 @@ def _build_case(entry: dict[str, object]) -> M4ShotCase:
         purpose=f"Scene for {shot_id}",
         duration_target=6.0,
         required_beats=[f"beat:{shot_id}"],
-        allowed_methods=[method],
+        allowed_methods=list(allowed),
         approval_status=CreativeApprovalStatus.APPROVED,
     )
     shot = ShotSpec(
@@ -208,9 +216,10 @@ def _build_case(entry: dict[str, object]) -> M4ShotCase:
         identity_profiles=identity_profiles,
         descriptor=descriptor,
         observation=observation,
-        allowed_methods=(method,),
-        reusable_asset_current=method is ProductionMethod.REUSE,
-        deterministic_equivalent_available=method is ProductionMethod.DETERMINISTIC,
+        allowed_methods=allowed,
+        source_authenticity_required=source_authenticity_required,
+        reusable_asset_current=reusable_asset_current,
+        deterministic_equivalent_available=deterministic_equivalent_available,
         paid=paid,
         requires_approval=method is ProductionMethod.GENERATED_VIDEO,
     )
@@ -225,3 +234,8 @@ def _validate(cases: tuple[M4ShotCase, ...]) -> None:
         raise ValueError("golden-12 must exercise all three Directors")
     if {c.method for c in cases} != set(ProductionMethod):
         raise ValueError("golden-12 must exercise all seven ProductionMethods")
+    for case in cases:
+        if case.method not in case.allowed_methods:
+            raise ValueError(f"{case.shot.id}: expected method {case.method.value} missing from allowed_methods")
+        if len(case.allowed_methods) < 2:
+            raise ValueError(f"{case.shot.id}: needs >=2 allowed_methods so routing proves an authoritative choice")
