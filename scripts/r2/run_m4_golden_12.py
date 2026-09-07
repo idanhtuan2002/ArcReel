@@ -300,11 +300,14 @@ async def _run_evidence() -> dict[str, object]:
     regression = await _run_regression()
     ffmpeg = _ffmpeg_probe()
     _det = {"DETERMINISTIC", "COMPOSITE"}
-    seams = [
+    seams: list[dict[str, object]] = [
         {
             "method": method,
             "seam": "ffmpeg-deterministic" if method in _det else "fixture-local",
             "result": "PASS" if (method not in _det or ffmpeg["available"]) else "FAIL",
+            "artifact_refs": (["ffmpeg://det.mp4"] if method in _det and ffmpeg["available"] else []),
+            "attempt_refs": [],
+            "cost_refs": [],
         }
         for method in ("REUSE", "SCREEN_CAPTURE", "DETERMINISTIC", "COMPOSITE")
     ]
@@ -314,6 +317,9 @@ async def _run_evidence() -> dict[str, object]:
             "seam": "real local/approved provider",
             "result": "WAIVER_REQUIRED",
             "detail": "no local GPU model or Human-approved provider seam configured in this environment",
+            "artifact_refs": [],
+            "attempt_refs": [],
+            "cost_refs": [],
         }
         for method in ("GENERATED_IMAGE", "GENERATED_VIDEO")
     ]
@@ -340,7 +346,7 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"{args.mode}: {report['result']}", file=sys.stderr)
-    return 0 if report["result"] in {"PASS", "INCOMPLETE_PENDING_WAIVER"} else 1
+    return 0 if report["result"] == "PASS" else 1
 
 
 if __name__ == "__main__":
