@@ -69,7 +69,30 @@ class PromptPlan(ContractIdentity):
     negative_constraints: list[NonEmptyStr] = Field(default_factory=list)
     output_requirements: dict[str, JSONValue] = Field(default_factory=dict)
 
-    @field_validator("visual_identity_constraints", "reference_requirements")
+    @field_validator(
+        "semantic_instruction",
+        "positive_prompt",
+        "negative_prompt",
+        "subject_intent",
+        "environment_intent",
+        "action_motion_intent",
+        "composition_intent",
+        "camera_intent",
+        "timing_intent",
+    )
+    @classmethod
+    def _reject_provider_syntax_text(cls, value: str, info: ValidationInfo) -> str:
+        reject_provider_syntax(value, field=info.field_name or "value")
+        return value
+
+    @field_validator(
+        "visual_identity_constraints",
+        "reference_requirements",
+        "identity_tokens",
+        "style_tokens",
+        "negative_constraints",
+        "exclusions",
+    )
     @classmethod
     def _reject_provider_syntax_items(cls, value: list[str], info: ValidationInfo) -> list[str]:
         for item in value:

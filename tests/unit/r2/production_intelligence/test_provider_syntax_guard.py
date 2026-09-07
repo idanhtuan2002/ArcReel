@@ -128,6 +128,60 @@ def test_prompt_plan_rejects_provider_syntax_in_reference_requirements() -> None
         )
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        "semantic_instruction",
+        "positive_prompt",
+        "negative_prompt",
+        "subject_intent",
+        "environment_intent",
+        "action_motion_intent",
+        "composition_intent",
+        "camera_intent",
+    ],
+)
+def test_prompt_plan_rejects_provider_syntax_in_free_text_intent(field: str) -> None:
+    base = {
+        "id": "PP:SH01",
+        "schema_version": "1",
+        "version": 1,
+        "target_ref": "SH01",
+        "semantic_instruction": "establish the courtyard",
+        "compiler_version": "m4-prompt-planner-v1",
+    }
+    with pytest.raises(ValidationError):
+        PromptPlan(**{**base, field: "cinematic portrait --stylize 250 <lora:add_detail:0.8>"})
+
+
+def test_prompt_plan_rejects_provider_syntax_in_token_lists() -> None:
+    with pytest.raises(ValidationError):
+        PromptPlan(
+            id="PP:SH01",
+            schema_version="1",
+            version=1,
+            target_ref="SH01",
+            semantic_instruction="establish the courtyard",
+            compiler_version="m4-prompt-planner-v1",
+            style_tokens=["midjourney niji style"],
+        )
+
+
+def test_prompt_plan_accepts_neutral_free_text_intent() -> None:
+    plan = PromptPlan(
+        id="PP:SH01",
+        schema_version="1",
+        version=1,
+        target_ref="SH01",
+        semantic_instruction="Maya turns to face the doorway, resolute",
+        compiler_version="m4-prompt-planner-v1",
+        subject_intent="Maya, mid-shot, three-quarter angle",
+        camera_intent="slow push-in, 16:9 framing",
+        negative_prompt="no watermark, no text overlay",
+    )
+    assert plan.camera_intent == "slow push-in, 16:9 framing"
+
+
 def test_prompt_plan_accepts_neutral_identity_constraints() -> None:
     plan = PromptPlan(
         id="PP:SH01",
