@@ -7,9 +7,66 @@
   },
   "branch": "feat/r2-m4-production-intelligence",
   "db_migration_count": 0,
+  "design_spec_hash": "7fda57922ea24e4253968818c90995271f86068a22007d4e6d102aeb3f8d3f09",
   "design_spec_ref": "docs/superpowers/specs/2026-09-06-r2-m4-production-intelligence-design.md",
-  "fault_overlays": "MUT-01..MUT-08 asserted in tests/integration/r2/m4/test_golden_12_mutations.py (8/8)",
-  "final_head": "01e71a809b449f8470dd35b9eec86183ab0d9f6d",
+  "dirty_beyond_evidence": [],
+  "environment_summary": {
+    "ffmpeg": true,
+    "ffprobe": true,
+    "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
+    "python": "3.13.14"
+  },
+  "expected_head": "a2f3280e920b6d3d5f55f9d2fb3e1e9d6d9b4115",
+  "fault_overlays": [
+    {
+      "expected_outcome": "PASS",
+      "mutation_id": "MUT-01",
+      "observed_outcome": "PASSED",
+      "result": "PASS"
+    },
+    {
+      "expected_outcome": "PASS",
+      "mutation_id": "MUT-02",
+      "observed_outcome": "PASSED",
+      "result": "PASS"
+    },
+    {
+      "expected_outcome": "PASS",
+      "mutation_id": "MUT-03",
+      "observed_outcome": "PASSED",
+      "result": "PASS"
+    },
+    {
+      "expected_outcome": "PASS",
+      "mutation_id": "MUT-04",
+      "observed_outcome": "PASSED",
+      "result": "PASS"
+    },
+    {
+      "expected_outcome": "PASS",
+      "mutation_id": "MUT-05",
+      "observed_outcome": "PASSED",
+      "result": "PASS"
+    },
+    {
+      "expected_outcome": "PASS",
+      "mutation_id": "MUT-06",
+      "observed_outcome": "PASSED",
+      "result": "PASS"
+    },
+    {
+      "expected_outcome": "PASS",
+      "mutation_id": "MUT-07",
+      "observed_outcome": "PASSED",
+      "result": "PASS"
+    },
+    {
+      "expected_outcome": "PASS",
+      "mutation_id": "MUT-08",
+      "observed_outcome": "PASSED",
+      "result": "PASS"
+    }
+  ],
   "frozen_regression": {
     "all_pass": true,
     "expected": {
@@ -19,6 +76,7 @@
       "m3_focused": 122
     },
     "note": "Exact node-id / file selections recovered from the pinned corpus commits (M1 9330bcf3, M2 9cc04edd, M3 1985b815; Host set from the M2 plan). Figures match the M4 plan Global Constraints and R2_M4_BASELINE_CI_REMEDIATION.md; no re-baselining occurred.",
+    "recovery_log_ref": "docs/r2/evidence/frozen_selections/recovery_log.txt",
     "results": [
       {
         "expected": 41,
@@ -58,13 +116,254 @@
       }
     ]
   },
-  "generated_at": "2026-09-07T15:15:28.687840+00:00",
+  "gate_d_pass": false,
+  "gate_d_status": "INCOMPLETE_PENDING_WAIVER",
+  "gate_results": {
+    "audit_tests": "PASS",
+    "basedpyright": "PASS",
+    "deptry": "PASS",
+    "lint_imports": "PASS",
+    "ruff_check": "PASS",
+    "ruff_format": "PASS"
+  },
+  "generated_at": "2026-09-07T16:05:20.301860+00:00",
   "golden_baseline": {
     "passed": 12,
     "result": "PASS",
+    "shots": [
+      {
+        "actual_director": "OPENMONTAGE",
+        "actual_method": "REUSE",
+        "expected_director": "OPENMONTAGE",
+        "expected_method": "REUSE",
+        "result": "PASS",
+        "shot_id": "SH01",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=REUSE",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "OPENMONTAGE",
+        "actual_method": "SCREEN_CAPTURE",
+        "expected_director": "OPENMONTAGE",
+        "expected_method": "SCREEN_CAPTURE",
+        "result": "PASS",
+        "shot_id": "SH02",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=SCREEN_CAPTURE",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "OPENMONTAGE",
+        "actual_method": "DETERMINISTIC",
+        "expected_director": "OPENMONTAGE",
+        "expected_method": "DETERMINISTIC",
+        "result": "PASS",
+        "shot_id": "SH03",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=DETERMINISTIC",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "OPENMONTAGE",
+        "actual_method": "COMPOSITE",
+        "expected_director": "OPENMONTAGE",
+        "expected_method": "COMPOSITE",
+        "result": "PASS",
+        "shot_id": "SH04",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=COMPOSITE",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "TAKE",
+        "actual_method": "GENERATED_IMAGE",
+        "expected_director": "TAKE",
+        "expected_method": "GENERATED_IMAGE",
+        "result": "PASS",
+        "shot_id": "SH05",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=GENERATED_IMAGE",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "TAKE",
+        "actual_method": "GENERATED_VIDEO",
+        "expected_director": "TAKE",
+        "expected_method": "GENERATED_VIDEO",
+        "result": "PASS",
+        "shot_id": "SH06",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=GENERATED_VIDEO",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "TAKE",
+        "actual_method": "GENERATED_VIDEO",
+        "expected_director": "TAKE",
+        "expected_method": "GENERATED_VIDEO",
+        "result": "PASS",
+        "shot_id": "SH07",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=GENERATED_VIDEO",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "TAKE",
+        "actual_method": "COMPOSITE",
+        "expected_director": "TAKE",
+        "expected_method": "COMPOSITE",
+        "result": "PASS",
+        "shot_id": "SH08",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=COMPOSITE",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "ARCREEL_NATIVE",
+        "actual_method": "STOCK",
+        "expected_director": "ARCREEL_NATIVE",
+        "expected_method": "STOCK",
+        "result": "PASS",
+        "shot_id": "SH09",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=STOCK",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "ARCREEL_NATIVE",
+        "actual_method": "DETERMINISTIC",
+        "expected_director": "ARCREEL_NATIVE",
+        "expected_method": "DETERMINISTIC",
+        "result": "PASS",
+        "shot_id": "SH10",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=DETERMINISTIC",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "ARCREEL_NATIVE",
+        "actual_method": "GENERATED_IMAGE",
+        "expected_director": "ARCREEL_NATIVE",
+        "expected_method": "GENERATED_IMAGE",
+        "result": "PASS",
+        "shot_id": "SH11",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=GENERATED_IMAGE",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      },
+      {
+        "actual_director": "ARCREEL_NATIVE",
+        "actual_method": "GENERATED_VIDEO",
+        "expected_director": "ARCREEL_NATIVE",
+        "expected_method": "GENERATED_VIDEO",
+        "result": "PASS",
+        "shot_id": "SH12",
+        "trace": [
+          "RoutingDecision",
+          "DirectorSuccess",
+          "ProductionReadiness=READY",
+          "MethodDecision=GENERATED_VIDEO",
+          "CapabilityResolution",
+          "PromptPlan",
+          "GenerationAdmission=ADMITTED",
+          "ExecutionDecision",
+          "ProviderRequest"
+        ]
+      }
+    ],
     "total": 12
   },
   "h1_status": "OPEN",
+  "head_matches_expected": true,
   "host_baseline": {
     "branch": "r2/main",
     "origin_status": "PENDING_USER_FORK_URL",
@@ -73,6 +372,8 @@
     "upstream": "https://github.com/ArcReel/ArcReel.git"
   },
   "host_runtime_change_count": 0,
+  "implementation_plan_hash": "042a07358d5ef67d3f0e0a34de1787e58b57946f0b7672af978c476a856850a8",
+  "implementation_plan_ref": "/home/anhtuan/B\u1ea3n t\u1ea3i v\u1ec1/conten os/2026-09-07-r2-m4-production-intelligence-implementation-plan-APPROVED.md",
   "milestone": "R2-M4",
   "open_blockers": [
     "R2-HOST-001 / H1"
@@ -80,36 +381,62 @@
   "real_evidence_result": "INCOMPLETE_PENDING_WAIVER",
   "real_execution_evidence": [
     {
-      "method": "REUSE",
+      "artifact_refs": [],
+      "attempt_refs": [],
+      "cost_refs": [],
+      "detail": null,
       "result": "PASS",
-      "seam": "fixture-local"
+      "seam": "fixture-local",
+      "seam_id": "REUSE"
     },
     {
-      "method": "SCREEN_CAPTURE",
+      "artifact_refs": [],
+      "attempt_refs": [],
+      "cost_refs": [],
+      "detail": null,
       "result": "PASS",
-      "seam": "fixture-local"
+      "seam": "fixture-local",
+      "seam_id": "SCREEN_CAPTURE"
     },
     {
-      "method": "DETERMINISTIC",
+      "artifact_refs": [
+        "ffmpeg://det.mp4"
+      ],
+      "attempt_refs": [],
+      "cost_refs": [],
+      "detail": null,
       "result": "PASS",
-      "seam": "ffmpeg-deterministic"
+      "seam": "ffmpeg-deterministic",
+      "seam_id": "DETERMINISTIC"
     },
     {
-      "method": "COMPOSITE",
+      "artifact_refs": [
+        "ffmpeg://det.mp4"
+      ],
+      "attempt_refs": [],
+      "cost_refs": [],
+      "detail": null,
       "result": "PASS",
-      "seam": "ffmpeg-deterministic"
+      "seam": "ffmpeg-deterministic",
+      "seam_id": "COMPOSITE"
     },
     {
+      "artifact_refs": [],
+      "attempt_refs": [],
+      "cost_refs": [],
       "detail": "no local GPU model or Human-approved provider seam configured in this environment",
-      "method": "GENERATED_IMAGE",
       "result": "WAIVER_REQUIRED",
-      "seam": "real local/approved provider"
+      "seam": "real local/approved provider",
+      "seam_id": "GENERATED_IMAGE"
     },
     {
+      "artifact_refs": [],
+      "attempt_refs": [],
+      "cost_refs": [],
       "detail": "no local GPU model or Human-approved provider seam configured in this environment",
-      "method": "GENERATED_VIDEO",
       "result": "WAIVER_REQUIRED",
-      "seam": "real local/approved provider"
+      "seam": "real local/approved provider",
+      "seam_id": "GENERATED_VIDEO"
     }
   ],
   "schema_version": "1",
@@ -123,5 +450,11 @@
       "suite_id": "m4_focused"
     }
   ],
-  "worktree_clean": false
+  "unresolved_real_evidence_seams": [
+    "GENERATED_IMAGE",
+    "GENERATED_VIDEO"
+  ],
+  "verified_head": "a2f3280e920b6d3d5f55f9d2fb3e1e9d6d9b4115",
+  "worktree_clean_modulo_generated_evidence": true,
+  "worktree_clean_strict": false
 }
