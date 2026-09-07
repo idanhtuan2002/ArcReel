@@ -1,0 +1,127 @@
+{
+  "approved_waivers": [],
+  "architecture_audit": {
+    "approved_c04_host_changes": [],
+    "blocking_violation_count": 0,
+    "report_ref": "docs/r2/evidence/R2_M4_ARCHITECTURE_AUDIT.json"
+  },
+  "branch": "feat/r2-m4-production-intelligence",
+  "db_migration_count": 0,
+  "design_spec_ref": "docs/superpowers/specs/2026-09-06-r2-m4-production-intelligence-design.md",
+  "fault_overlays": "MUT-01..MUT-08 asserted in tests/integration/r2/m4/test_golden_12_mutations.py (8/8)",
+  "final_head": "01e71a809b449f8470dd35b9eec86183ab0d9f6d",
+  "frozen_regression": {
+    "all_pass": true,
+    "expected": {
+      "host_frozen": 349,
+      "m1_frozen": 41,
+      "m2_frozen": 53,
+      "m3_focused": 122
+    },
+    "note": "Exact node-id / file selections recovered from the pinned corpus commits (M1 9330bcf3, M2 9cc04edd, M3 1985b815; Host set from the M2 plan). Figures match the M4 plan Global Constraints and R2_M4_BASELINE_CI_REMEDIATION.md; no re-baselining occurred.",
+    "results": [
+      {
+        "expected": 41,
+        "fail_count": 0,
+        "pass_count": 41,
+        "result": "PASS",
+        "selection_ref": "docs/r2/evidence/frozen_selections/m1_contracts.nodeids.txt",
+        "skip_count": 0,
+        "suite_id": "m1_frozen"
+      },
+      {
+        "expected": 53,
+        "fail_count": 0,
+        "pass_count": 53,
+        "result": "PASS",
+        "selection_ref": "docs/r2/evidence/frozen_selections/m2_production.nodeids.txt",
+        "skip_count": 0,
+        "suite_id": "m2_frozen"
+      },
+      {
+        "expected": 122,
+        "fail_count": 0,
+        "pass_count": 122,
+        "result": "PASS",
+        "selection_ref": "docs/r2/evidence/frozen_selections/m3_focused.nodeids.txt",
+        "skip_count": 0,
+        "suite_id": "m3_focused"
+      },
+      {
+        "expected": 349,
+        "fail_count": 0,
+        "pass_count": 349,
+        "result": "PASS",
+        "selection_ref": "docs/r2/evidence/frozen_selections/host_arcreel_focused.paths.txt",
+        "skip_count": 0,
+        "suite_id": "host_frozen"
+      }
+    ]
+  },
+  "generated_at": "2026-09-07T15:15:28.687840+00:00",
+  "golden_baseline": {
+    "passed": 12,
+    "result": "PASS",
+    "total": 12
+  },
+  "h1_status": "OPEN",
+  "host_baseline": {
+    "branch": "r2/main",
+    "origin_status": "PENDING_USER_FORK_URL",
+    "sha": "6ddedc775e7fe5f398b10081ab741985f7dceda7",
+    "tag": "v0.29.0",
+    "upstream": "https://github.com/ArcReel/ArcReel.git"
+  },
+  "host_runtime_change_count": 0,
+  "milestone": "R2-M4",
+  "open_blockers": [
+    "R2-HOST-001 / H1"
+  ],
+  "real_evidence_result": "INCOMPLETE_PENDING_WAIVER",
+  "real_execution_evidence": [
+    {
+      "method": "REUSE",
+      "result": "PASS",
+      "seam": "fixture-local"
+    },
+    {
+      "method": "SCREEN_CAPTURE",
+      "result": "PASS",
+      "seam": "fixture-local"
+    },
+    {
+      "method": "DETERMINISTIC",
+      "result": "PASS",
+      "seam": "ffmpeg-deterministic"
+    },
+    {
+      "method": "COMPOSITE",
+      "result": "PASS",
+      "seam": "ffmpeg-deterministic"
+    },
+    {
+      "detail": "no local GPU model or Human-approved provider seam configured in this environment",
+      "method": "GENERATED_IMAGE",
+      "result": "WAIVER_REQUIRED",
+      "seam": "real local/approved provider"
+    },
+    {
+      "detail": "no local GPU model or Human-approved provider seam configured in this environment",
+      "method": "GENERATED_VIDEO",
+      "result": "WAIVER_REQUIRED",
+      "seam": "real local/approved provider"
+    }
+  ],
+  "schema_version": "1",
+  "starting_head": "863ab4993b3dce725fb5f12b5d2f2a74a79031a3",
+  "suite_results": [
+    {
+      "fail_count": 0,
+      "pass_count": 177,
+      "result": "PASS",
+      "skip_count": 0,
+      "suite_id": "m4_focused"
+    }
+  ],
+  "worktree_clean": false
+}

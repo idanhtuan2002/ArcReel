@@ -1,0 +1,10 @@
+{
+  "approved_c04_host_changes": [],
+  "blocking_violation_count": 0,
+  "final_head": "01e71a809b449f8470dd35b9eec86183ab0d9f6d",
+  "m5_scope_leakage": [],
+  "schema_version": "1",
+  "starting_head": "863ab4993b3dce725fb5f12b5d2f2a74a79031a3",
+  "unapproved_db_migrations": [],
+  "unapproved_host_runtime_changes": []
+}
