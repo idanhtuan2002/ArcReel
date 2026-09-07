@@ -10,11 +10,14 @@ from r2.production import DependencySnapshot, R2ArtifactMetadata
 
 REPO = Path(__file__).resolve().parents[4]
 M1_HEAD = "9330bcf3"
+# M2 tip ("record M2 artifact bridge verification"). These checks scope M2's own
+# commits; later milestones carry their own boundary tests and approved deltas.
+M2_HEAD = "9cc04edd"
 
 
 def changed_paths() -> set[str]:
     output = subprocess.check_output(
-        ["git", "diff", "--name-only", f"{M1_HEAD}..HEAD"],
+        ["git", "diff", "--name-only", f"{M1_HEAD}..{M2_HEAD}"],
         cwd=REPO,
         text=True,
     )
