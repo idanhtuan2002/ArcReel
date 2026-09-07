@@ -4,14 +4,9 @@ from typing import Annotated
 
 from pydantic import Field, model_validator
 
-from .common import R2ContractModel
+from .common import NonEmptyStr, R2ContractModel
 from .content_basis import ContentBasis
 from .enums import ContentBasisType, CreativeApprovalStatus
-
-try:
-    from .common import NonEmptyStr
-except ImportError:
-    NonEmptyStr = str
 
 
 class ScriptSection(R2ContractModel):

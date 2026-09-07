@@ -31,15 +31,18 @@ def compute_content_fingerprint(
     visual_identity_refs: Sequence[str],
     approved_source_asset_refs: Sequence[str],
 ) -> str:
-    binding_payload = [
-        binding.model_dump(mode="json") for binding in sorted(bindings, key=lambda item: (item.id, item.version))
+    binding_payload: list[JSONValue] = [
+        ensure_json_value(binding.model_dump(mode="json"))
+        for binding in sorted(bindings, key=lambda item: (item.id, item.version))
     ]
-    payload: dict[str, JSONValue] = {
-        "shot_spec": shot_spec.model_dump(mode="json"),
-        "bindings": binding_payload,
-        "visual_identity_refs": sorted(set(visual_identity_refs)),
-        "approved_source_asset_refs": sorted(set(approved_source_asset_refs)),
-    }
+    payload = ensure_json_value(
+        {
+            "shot_spec": shot_spec.model_dump(mode="json"),
+            "bindings": binding_payload,
+            "visual_identity_refs": sorted(set(visual_identity_refs)),
+            "approved_source_asset_refs": sorted(set(approved_source_asset_refs)),
+        }
+    )
     return _sha256(payload)
 
 
