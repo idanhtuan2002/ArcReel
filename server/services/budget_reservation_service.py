@@ -108,6 +108,7 @@ class BudgetReservationService:
         reservation_ref: str,
         execution_decision_ref: str,
         amount: Decimal,
+        currency: str,
         expires_at: datetime | None,
         provenance: Mapping[str, object],
         now: datetime,
@@ -122,6 +123,7 @@ class BudgetReservationService:
                     expires_at=expires_at,
                     provenance_json=dict(provenance),
                     now=now,
+                    currency=currency,
                 )
         except BudgetDeniedError:
             self._emit(

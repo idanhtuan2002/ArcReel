@@ -185,6 +185,7 @@ class BudgetReservationRepository(BaseRepository):
         expires_at: datetime | None,
         provenance_json: dict[str, object],
         now: datetime,
+        currency: str | None = None,
     ) -> ReserveBudgetResult:
         requested_amount = require_positive_money(requested_amount, field_name="requested_amount")
         now = _require_aware(now, field_name="now")
@@ -196,6 +197,10 @@ class BudgetReservationRepository(BaseRepository):
         try:
             await self._begin_serialized_write()
             scope = await self._locked_scope(budget_scope_ref)
+            if currency is not None and currency != scope.currency:
+                raise BudgetReservationIntegrityError(
+                    f"requested currency {currency} does not match budget scope currency {scope.currency}"
+                )
             await self._expire_eligible_locked(scope=scope, now=now)
             available = scope.authorized_limit - scope.committed_total - scope.reserved_total
             if requested_amount > available:
