@@ -7,9 +7,21 @@ by Claude before triage.
 
 ## Status legend
 
-- **FIXED** — addressed in this session.
-- **DEFERRED** — real gap, scoped for a follow-up session with its own review.
+- **FIXED** — addressed in the first triage session (Crit-1 / Low-1 / Med-5 / Med-6).
+- **DEFERRED → FIXED (next-session batch)** — the 10 deferred findings, all
+  addressed in the 2026-09-08 follow-up batch (commits `335cae56`..`90472c04` on
+  `feat/r2-m4-production-intelligence`, each test-first with its own commit). Every
+  finding block below carries a **FIXED (next-session batch)** note.
 - **NOT REPRODUCED** — could not confirm in this environment.
+
+Post-batch dogfoot (2026-09-08): `ruff check` / `ruff format --check` /
+`basedpyright --warnings` / `lint-imports` (8 kept) / `deptry` /
+`audit_tests.py --check` all clean; `pytest -n4` = **12442 passed, 2 skipped**;
+M4 focused 270; golden-12 regression PASS; architecture audit blocking 0 /
+`mutated_c04_host_files` []; frozen Gate-C selections 41 / 53 / 122 / 349 exact.
+Still pending (unchanged, user-deferred): full `verify_m4.py` Gate-D evidence
+regeneration + the `GENERATED_IMAGE` / `GENERATED_VIDEO` real-seam waiver, then
+the Human-approved push.
 
 ---
 
