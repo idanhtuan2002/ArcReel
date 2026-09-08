@@ -7,6 +7,7 @@ import pytest
 from r2.contracts import (
     AddEntityOperation,
     AddEventOperation,
+    AddTemporalRelationOperation,
     CanonBranchSnapshot,
     CanonBranchType,
     CanonContent,
@@ -18,6 +19,7 @@ from r2.contracts import (
     Event,
     Fact,
     RetireFactOperation,
+    TemporalRelation,
     UpdateEntityOperation,
 )
 from r2.narrative.canon_state import ResolvedCanonView, apply_canon_delta, empty_canon_content
@@ -181,6 +183,62 @@ def test_apply_canon_delta_upgrades_a_v1_base_under_a_v2_delta() -> None:
     assert result.entities_by_id["hero"].canonical_name == "Ada"
     assert result.knowledge_states_by_id == {}
     assert result.temporal_relations_by_id == {}
+
+
+def content_with_two_events() -> CanonContent:
+    return CanonContent(
+        entities_by_id={
+            "hero": Entity(entity_id="hero", entity_type=EntityType.CHARACTER, canonical_name="Ada", aliases=[])
+        },
+        facts_by_id={},
+        events_by_id={
+            "ev-a": Event(event_id="ev-a", event_type="ARRIVAL", participant_refs=["hero"]),
+            "ev-b": Event(event_id="ev-b", event_type="DEPARTURE", participant_refs=["hero"]),
+        },
+    )
+
+
+def add_relation(rel_id: str, left: str, right: str) -> AddTemporalRelationOperation:
+    return AddTemporalRelationOperation(
+        operation_id=f"op-{rel_id}",
+        target_id=rel_id,
+        temporal_relation=TemporalRelation(
+            temporal_relation_id=rel_id, left_event_ref=left, relation="BEFORE", right_event_ref=right
+        ),
+    )
+
+
+def test_reducer_stores_an_immutable_temporal_relation() -> None:
+    result = apply_canon_delta(
+        content_with_two_events(),
+        sealed_delta_v2(add_relation("r-1", "ev-a", "ev-b")),
+        base_schema_version="r2-canon-schema-v1",
+    )
+    stored = result.temporal_relations_by_id["r-1"]
+    assert (stored.left_event_ref, stored.relation, stored.right_event_ref) == ("ev-a", "BEFORE", "ev-b")
+
+
+def test_reducer_rejects_a_temporal_relation_referencing_a_missing_event() -> None:
+    with pytest.raises(CanonOperationError, match="temporal relation event"):
+        apply_canon_delta(
+            content_with_two_events(),
+            sealed_delta_v2(add_relation("r-1", "ev-a", "ev-ghost")),
+            base_schema_version="r2-canon-schema-v1",
+        )
+
+
+def test_reducer_rejects_reusing_a_temporal_relation_id() -> None:
+    once = apply_canon_delta(
+        content_with_two_events(),
+        sealed_delta_v2(add_relation("r-1", "ev-a", "ev-b")),
+        base_schema_version="r2-canon-schema-v1",
+    )
+    with pytest.raises(CanonOperationError, match="already exists"):
+        apply_canon_delta(
+            once,
+            sealed_delta_v2(add_relation("r-1", "ev-b", "ev-a")),
+            base_schema_version="r2-canon-schema-v2",
+        )
 
 
 def test_empty_branch_view_pins_null_version_and_matching_hash() -> None:

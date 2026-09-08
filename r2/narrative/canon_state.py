@@ -14,9 +14,12 @@ from r2.contracts import (
     CanonContent,
     CanonDelta,
     Entity,
+    EpistemicProposition,
     Event,
     Fact,
+    KnowledgeState,
     RetireFactOperation,
+    TemporalRelation,
     UpdateEntityOperation,
     UpdateKnowledgeOperation,
 )
@@ -81,6 +84,9 @@ def apply_canon_delta(base: CanonContent, delta: CanonDelta, *, base_schema_vers
     entities: dict[str, Entity] = dict(upgraded.entities_by_id)
     facts: dict[str, Fact] = dict(upgraded.facts_by_id)
     events: dict[str, Event] = dict(upgraded.events_by_id)
+    propositions: dict[str, EpistemicProposition] = dict(upgraded.epistemic_propositions_by_ref)
+    knowledge_states: dict[str, KnowledgeState] = dict(upgraded.knowledge_states_by_id)
+    temporal_relations: dict[str, TemporalRelation] = dict(upgraded.temporal_relations_by_id)
     for operation in delta.operations:
         match operation:
             case AddEntityOperation():
@@ -115,9 +121,17 @@ def apply_canon_delta(base: CanonContent, delta: CanonDelta, *, base_schema_vers
                 for event_ref in operation.event.causal_refs:
                     _require_present(events, event_ref, label="causal event")
                 events[operation.target_id] = operation.event
-            case UpdateKnowledgeOperation() | AddTemporalRelationOperation():
-                # Schema-v2 operation application lands in the later M5B-1 reducer stages
-                # (temporal relations, then epistemic supersession).
+            case AddTemporalRelationOperation():
+                relation = operation.temporal_relation
+                _require_target(operation.target_id, relation.temporal_relation_id)
+                _require_absent(temporal_relations, operation.target_id, label="temporal relation")
+                for event_ref in (relation.left_event_ref, relation.right_event_ref):
+                    _require_present(events, event_ref, label="temporal relation event")
+                for event_ref in relation.evidence_event_refs:
+                    _require_present(events, event_ref, label="temporal relation evidence event")
+                temporal_relations[operation.target_id] = relation
+            case UpdateKnowledgeOperation():
+                # Epistemic supersession lands in the next M5B-1 reducer stage.
                 raise CanonOperationError(f"operation kind {operation.kind} is not applied by this reducer stage")
             case _:  # pragma: no cover - exhaustiveness guard
                 assert_never(operation)
@@ -125,7 +139,7 @@ def apply_canon_delta(base: CanonContent, delta: CanonDelta, *, base_schema_vers
         entities_by_id=entities,
         facts_by_id=facts,
         events_by_id=events,
-        epistemic_propositions_by_ref=dict(upgraded.epistemic_propositions_by_ref),
-        knowledge_states_by_id=dict(upgraded.knowledge_states_by_id),
-        temporal_relations_by_id=dict(upgraded.temporal_relations_by_id),
+        epistemic_propositions_by_ref=propositions,
+        knowledge_states_by_id=knowledge_states,
+        temporal_relations_by_id=temporal_relations,
     )
