@@ -50,10 +50,13 @@ from .execution import (
 from .factual import Claim, ClaimLedger, ClaimStatus, EvidenceRecord, ResearchPack, SourceRecord
 from .fingerprints import canonical_json_bytes, compute_content_fingerprint, compute_execution_fingerprint
 from .narrative import (
+    CANON_SCHEMA_V1,
+    CANON_SCHEMA_V2,
     AcceptedCanonDeltaSnapshot,
     AddEntityOperation,
     AddEventOperation,
     AddFactOperation,
+    AddTemporalRelationOperation,
     CanonBranchSnapshot,
     CanonBranchType,
     CanonCommitApproval,
@@ -68,10 +71,18 @@ from .narrative import (
     CreateCanonBranch,
     Entity,
     EntityType,
+    EpistemicProposition,
+    EpistemicState,
     Event,
     Fact,
+    KnowledgeState,
     RetireFactOperation,
+    TemporalRelation,
+    TemporalRelationKind,
     UpdateEntityOperation,
+    UpdateKnowledgeOperation,
+    compute_epistemic_proposition_ref,
+    operation_kinds_for,
 )
 from .observability import FailureRecord, ProductionEvent
 from .preparation import (
@@ -89,10 +100,13 @@ from .results import ApprovedMaster, GenerationCandidate, QualityFinding, Qualit
 from .script import ScriptArtifact, ScriptSection
 
 __all__ = [
+    "CANON_SCHEMA_V1",
+    "CANON_SCHEMA_V2",
     "AcceptedCanonDeltaSnapshot",
     "AddEntityOperation",
     "AddEventOperation",
     "AddFactOperation",
+    "AddTemporalRelationOperation",
     "AdmissionOutcome",
     "ApprovedMaster",
     "ArtifactCurrencyStatus",
@@ -132,6 +146,8 @@ __all__ = [
     "DirectorSuccess",
     "Entity",
     "EntityType",
+    "EpistemicProposition",
+    "EpistemicState",
     "Event",
     "EvidenceRecord",
     "ExecutionDecision",
@@ -148,6 +164,7 @@ __all__ = [
     "IdentityScopeType",
     "IdentityStrength",
     "JSONValue",
+    "KnowledgeState",
     "MethodDecision",
     "NonEmptyStr",
     "ObservationExpiryBehavior",
@@ -182,10 +199,15 @@ __all__ = [
     "ScriptSection",
     "ShotSpec",
     "SourceRecord",
+    "TemporalRelation",
+    "TemporalRelationKind",
     "UpdateEntityOperation",
+    "UpdateKnowledgeOperation",
     "VisualIdentityProfile",
     "canonical_json_bytes",
     "compute_content_fingerprint",
+    "compute_epistemic_proposition_ref",
     "compute_execution_fingerprint",
     "ensure_json_value",
+    "operation_kinds_for",
 ]
