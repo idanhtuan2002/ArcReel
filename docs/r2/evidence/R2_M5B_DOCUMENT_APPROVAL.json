@@ -1,0 +1,12 @@
+{
+  "schema_version": "r2-m5b-document-approval-v1",
+  "status": "APPROVED",
+  "m5a_integration_head": "698c34f6b953bd6c7df3306da253e9827b6d94c0",
+  "approved_docs_source_head": "080f9c1eee98dadf13c845b0d10b62794764e6a3",
+  "design_path": "docs/superpowers/specs/2026-09-08-r2-m5b-epistemic-plan-context-design.md",
+  "design_sha256": "cb8059b209ab84e1bf16d28b09bfbcbd92b16845f7b6d96344537bb6b8200ef2",
+  "plan_path": "docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md",
+  "plan_sha256": "82a1838fcf027bde5ae3988a9114723e95e6f5e5268492b411370af814a5af62",
+  "approved_by": "human:anhtuan",
+  "approved_at": "2026-09-08T16:25:22+07:00"
+}
