@@ -40,3 +40,7 @@ class CanonIntegrityError(CanonError):
 
 class CanonOperationError(CanonError):
     """A single delta operation cannot be applied to the ordered base state."""
+
+
+class NarrativeSchemaVersionError(CanonError):
+    """An unsupported Canon content schema selector or an illegal schema transition."""

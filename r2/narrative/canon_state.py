@@ -9,6 +9,7 @@ from r2.contracts import (
     AddEntityOperation,
     AddEventOperation,
     AddFactOperation,
+    AddTemporalRelationOperation,
     CanonBranchSnapshot,
     CanonContent,
     CanonDelta,
@@ -17,11 +18,13 @@ from r2.contracts import (
     Fact,
     RetireFactOperation,
     UpdateEntityOperation,
+    UpdateKnowledgeOperation,
 )
 from r2.contracts.common import NonEmptyStr, R2ContractModel
 
 from .errors import CanonOperationError
 from .hashing import compute_canon_content_hash
+from .schema_upgrade import upgrade_canon_content
 
 
 class ResolvedCanonView(R2ContractModel):
@@ -66,10 +69,18 @@ def _require_present[T](mapping: Mapping[str, T], key: str, *, label: str = "ent
         raise CanonOperationError(f"missing {label} {key}") from None
 
 
-def apply_canon_delta(base: CanonContent, delta: CanonDelta) -> CanonContent:
-    entities: dict[str, Entity] = dict(base.entities_by_id)
-    facts: dict[str, Fact] = dict(base.facts_by_id)
-    events: dict[str, Event] = dict(base.events_by_id)
+def apply_canon_delta(base: CanonContent, delta: CanonDelta, *, base_schema_version: str | None = None) -> CanonContent:
+    """Apply an ordered delta to a base view.
+
+    ``base_schema_version`` is the recorded content schema selector of ``base`` (``None`` for
+    genesis). The base view is upgraded to the delta's content schema before any operation
+    runs; ``r2/narrative/schema_upgrade.py`` rejects an illegal transition. The result is
+    serialized under the delta's selector.
+    """
+    upgraded = upgrade_canon_content(base, from_schema=base_schema_version, to_schema=delta.content_schema_version)
+    entities: dict[str, Entity] = dict(upgraded.entities_by_id)
+    facts: dict[str, Fact] = dict(upgraded.facts_by_id)
+    events: dict[str, Event] = dict(upgraded.events_by_id)
     for operation in delta.operations:
         match operation:
             case AddEntityOperation():
@@ -104,6 +115,17 @@ def apply_canon_delta(base: CanonContent, delta: CanonDelta) -> CanonContent:
                 for event_ref in operation.event.causal_refs:
                     _require_present(events, event_ref, label="causal event")
                 events[operation.target_id] = operation.event
+            case UpdateKnowledgeOperation() | AddTemporalRelationOperation():
+                # Schema-v2 operation application lands in the later M5B-1 reducer stages
+                # (temporal relations, then epistemic supersession).
+                raise CanonOperationError(f"operation kind {operation.kind} is not applied by this reducer stage")
             case _:  # pragma: no cover - exhaustiveness guard
                 assert_never(operation)
-    return CanonContent(entities_by_id=entities, facts_by_id=facts, events_by_id=events)
+    return CanonContent(
+        entities_by_id=entities,
+        facts_by_id=facts,
+        events_by_id=events,
+        epistemic_propositions_by_ref=dict(upgraded.epistemic_propositions_by_ref),
+        knowledge_states_by_id=dict(upgraded.knowledge_states_by_id),
+        temporal_relations_by_id=dict(upgraded.temporal_relations_by_id),
+    )

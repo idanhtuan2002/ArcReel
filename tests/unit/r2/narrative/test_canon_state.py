@@ -21,7 +21,7 @@ from r2.contracts import (
     UpdateEntityOperation,
 )
 from r2.narrative.canon_state import ResolvedCanonView, apply_canon_delta, empty_canon_content
-from r2.narrative.errors import CanonOperationError
+from r2.narrative.errors import CanonOperationError, NarrativeSchemaVersionError
 from r2.narrative.hashing import compute_canon_content_hash, seal_canon_delta
 
 NOW = datetime(2026, 9, 7, 12, 0, 0, tzinfo=UTC)
@@ -145,6 +145,42 @@ def test_operation_target_must_match_its_atom_id() -> None:
     )
     with pytest.raises(CanonOperationError):
         apply_canon_delta(empty_canon_content(), sealed_delta(mismatched))
+
+
+def sealed_delta_v2(*operations: CanonOperation) -> CanonDelta:
+    payload = CanonDeltaPayload(
+        canon_delta_id="delta-1",
+        target_branch_id="main",
+        base_canon_version_id=None,
+        operations=list(operations),
+        source_change_set_refs=["s-1"],
+        author_decision_refs=["a-1"],
+        validation_report_refs=[],
+        content_schema_version="r2-canon-schema-v2",
+        created_at=NOW,
+        created_by="showrunner",
+    )
+    return seal_canon_delta(payload)
+
+
+def test_apply_canon_delta_rejects_a_v2_to_v1_downgrade() -> None:
+    with pytest.raises(NarrativeSchemaVersionError):
+        apply_canon_delta(
+            empty_canon_content(),
+            sealed_delta(add_entity("hero")),
+            base_schema_version="r2-canon-schema-v2",
+        )
+
+
+def test_apply_canon_delta_upgrades_a_v1_base_under_a_v2_delta() -> None:
+    result = apply_canon_delta(
+        empty_canon_content(),
+        sealed_delta_v2(add_entity("hero")),
+        base_schema_version="r2-canon-schema-v1",
+    )
+    assert result.entities_by_id["hero"].canonical_name == "Ada"
+    assert result.knowledge_states_by_id == {}
+    assert result.temporal_relations_by_id == {}
 
 
 def test_empty_branch_view_pins_null_version_and_matching_hash() -> None:

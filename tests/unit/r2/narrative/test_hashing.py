@@ -126,4 +126,12 @@ def test_other_unsupported_content_selectors_fail_closed() -> None:
     with pytest.raises(CanonIntegrityError, match="algorithm"):
         compute_canon_content_hash(empty_content(), algorithm="md5")
     with pytest.raises(CanonIntegrityError, match="schema version"):
-        compute_canon_content_hash(empty_content(), schema_version="r2-canon-schema-v2")
+        compute_canon_content_hash(empty_content(), schema_version="r2-canon-schema-v9")
+
+
+def test_schema_v2_content_hash_is_supported_and_distinct_from_v1() -> None:
+    content = empty_content()
+    v1_digest = compute_canon_content_hash(content, schema_version="r2-canon-schema-v1")
+    v2_digest = compute_canon_content_hash(content, schema_version="r2-canon-schema-v2")
+    assert v1_digest == compute_canon_content_hash(content)
+    assert v1_digest != v2_digest
