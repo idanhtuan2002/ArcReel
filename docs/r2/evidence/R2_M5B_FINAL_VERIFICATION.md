@@ -14,9 +14,10 @@
 | M5B document materialization head | `e83ce1a222e22c36ab37dffcf62839efcfe49655` |
 | M5B Task 0 starting-state head | `1c605228c1e9ea4d853d2e356ffce06672a55ad1` |
 | M5B pre-review verified head | `223e0c9f4d4defddab41c9603ffe33e112c02d5c` |
-| **M5B verified head (Codex review fixes applied)** | **`3085d14e`** |
+| M5B verified head (Codex review fixes applied) | `3085d14e` |
+| **M5B self-review head (Codex unavailable; see Post-verified section)** | **`62b07b4a`** |
 
-Every implementation commit descends from the accepted M5A integration head. `git diff --check 698c34f6...3085d14e` is clean.
+Every implementation commit descends from the accepted M5A integration head. `git diff --check 698c34f6...62b07b4a` is clean. The `3085d14e → 62b07b4a` range is the post-verified self-review; the scope gate for it is `uv run python scripts/r2/verify_m5b_scope.py --base 1c605228 --verified-head 62b07b4a` (exit 0).
 
 ## Implementation commits
 
