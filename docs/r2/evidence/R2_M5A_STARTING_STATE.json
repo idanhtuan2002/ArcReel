@@ -1,0 +1,116 @@
+{
+  "schema_version": "1",
+  "milestone": "R2-M5A",
+  "recorded_at": "2026-09-08",
+  "m4_handoff": {
+    "gate_d_status": "COMPLETE_WITH_WAIVER",
+    "gate_d_pass": true,
+    "waiver_ids": ["R2-M4-WAIVER-001", "R2-M4-WAIVER-002"],
+    "m4_verified_head": "216e31acb4a08f3a430c7c288b62c95431718828",
+    "m4_handoff_head": "2173463e88218248d8805e4f20df2102d1d6743a",
+    "m4_handoff_head_is_on": "origin/r2/main",
+    "verified_to_handoff_ancestry": "216e31ac is ancestor of 2173463e (git merge-base --is-ancestor exit 0)",
+    "post_verified_diff_note": "M4 was accepted via PR #1 --no-ff merge into r2/main rather than a linear worktree handoff. git diff --name-only 216e31ac...2173463e contains 30 files: all docs/r2/evidence/** artifacts plus docs/research/** markdown. Zero code, contract, migration, config, runtime, or test paths changed after the verified head (grep for r2|lib|server|alembic|tests|scripts|frontend paths and .py/.toml/.sql/.yaml returned nothing).",
+    "post_verified_paths": [
+      "docs/r2/evidence/PROJECT_STATUS_REVIEW_2026-09-07.md",
+      "docs/r2/evidence/R2_M4_ARCHITECTURE_AUDIT.json",
+      "docs/r2/evidence/R2_M4_FINAL_VERIFICATION.md",
+      "docs/r2/evidence/frozen_selections/recovery_log.txt",
+      "docs/r2/evidence/project-status-2026-09-07/ci-audit.log",
+      "docs/r2/evidence/project-status-2026-09-07/ci-deptry.log",
+      "docs/r2/evidence/project-status-2026-09-07/ci-format.log",
+      "docs/r2/evidence/project-status-2026-09-07/ci-full-pytest.log",
+      "docs/r2/evidence/project-status-2026-09-07/ci-imports.log",
+      "docs/r2/evidence/project-status-2026-09-07/ci-pyright.log",
+      "docs/r2/evidence/project-status-2026-09-07/ci-ruff.log",
+      "docs/r2/evidence/project-status-2026-09-07/ci-static-exit-codes.json",
+      "docs/r2/evidence/project-status-2026-09-07/golden-a-contact-sheet.png",
+      "docs/r2/evidence/project-status-2026-09-07/golden-a-evidence.json",
+      "docs/r2/evidence/project-status-2026-09-07/golden-a-run.json",
+      "docs/r2/evidence/project-status-2026-09-07/primary-r2-tests.log",
+      "docs/r2/evidence/project-status-2026-09-07/primary-ruff.log",
+      "docs/r2/evidence/project-status-2026-09-07/primary-test-audit.log",
+      "docs/r2/evidence/project-status-2026-09-07/verification-summary.json",
+      "docs/r2/evidence/r2_m4_evidence.json",
+      "docs/r2/evidence/reuse-map-2026-09-07/openmontage-probe.log",
+      "docs/r2/evidence/reuse-map-2026-09-07/research-pins.json",
+      "docs/r2/evidence/reuse-map-2026-09-07/source-manifest.json",
+      "docs/r2/evidence/reuse-map-2026-09-07/take-core-probe.log",
+      "docs/research/2026-09-07-r2-reuse-map-and-completion-gates.md",
+      "docs/research/r2-origin/00_PRODUCT_VISION.md",
+      "docs/research/r2-origin/01_RESEARCH_SYNTHESIS.md",
+      "docs/research/r2-origin/02_SYSTEM_REQUIREMENTS.md",
+      "docs/research/r2-origin/03_ARCHITECTURE.md",
+      "docs/research/r2-origin/README.md"
+    ]
+  },
+  "worktree": {
+    "path": "/home/anhtuan/content-production-os-m5a",
+    "branch": "feat/r2-m5a-canon-authority",
+    "note": "Per operator decision, the M5A design branch (originally design/r2-m5a-canon-authority @ 9374d902) was renamed to feat/r2-m5a-canon-authority and rebased onto the accepted M4 handoff r2/main @ 2173463e instead of creating a separate -impl worktree and cherry-picking. The four M5A documentation commits (CONTEXT.md, docs/adr/0075-canon-authority-append-only-deltas.md, the M5A design spec, this plan) now sit directly on 2173463e.",
+    "m5a_docs_source_head": "d151eafdd2e6b4080be29fc6951f99bdbe6ab4f1",
+    "m5a_docs_head": "d151eafdd2e6b4080be29fc6951f99bdbe6ab4f1",
+    "m5a_starting_head": "2173463e88218248d8805e4f20df2102d1d6743a",
+    "docs_diff_from_starting_head": [
+      "CONTEXT.md",
+      "docs/adr/0075-canon-authority-append-only-deltas.md",
+      "docs/superpowers/plans/2026-09-07-r2-m5a-canon-authority-and-transactions.md",
+      "docs/superpowers/specs/2026-09-07-r2-m5a-canon-authority-and-transactions-design.md"
+    ],
+    "clean_tree": "git status --short empty at d151eafd"
+  },
+  "migration": {
+    "alembic_heads": "c04b7d93e5a1 (head)",
+    "parent_revision": "c04b7d93e5a1",
+    "parent_revision_file": "alembic/versions/c04b7d93e5a1_add_budget_reservations.py",
+    "reserved_revision": "5a7c4a0e0001",
+    "reserved_revision_free": "rg 'revision: str = \"5a7c4a0e0001\"|revision = \"5a7c4a0e0001\"' alembic/versions returned no matches"
+  },
+  "authority_document_hashes": {
+    "algorithm": "sha256",
+    "docs/adr/0075-canon-authority-append-only-deltas.md": "0c18f50d3ec5034ca1737441721d5a063e2aa3485957861c8039692616cbbcae",
+    "docs/superpowers/specs/2026-09-07-r2-m5a-canon-authority-and-transactions-design.md": "58ef395567377270295852db9e6e029b2633be87a4fe326a66aca9c0bac49853",
+    "docs/superpowers/plans/2026-09-07-r2-m5a-canon-authority-and-transactions.md": "421309d861e75f9cc3dc659ca8e95db5461ac6371db92728cc44489be0d0cada"
+  },
+  "graph": {
+    "project": "home-anhtuan-content-production-os-m5a",
+    "generation": "2026-09-08T00:37:49Z",
+    "index_mode": "moderate",
+    "indexed_worktree": "/home/anhtuan/content-production-os-m5a",
+    "indexed_head": "d151eafdd2e6b4080be29fc6951f99bdbe6ab4f1",
+    "nodes": 24678,
+    "edges": 140194,
+    "reindex_reason": "The pre-existing index home-anhtuan-content-production-os is pinned to branch design/r2-m5b-narrative-context, which branched from 9d5e6a39 (pre-M4) and does not contain M4's r2/production_intelligence code or the M4-remediation contracts. A fresh index of the M5A worktree was required to query seams against the accepted M4 state.",
+    "coverage": {
+      "no_recorded_issue": [
+        "r2/contracts/common.py",
+        "r2/contracts/__init__.py",
+        "r2/contracts/fingerprints.py",
+        "lib/db/base.py",
+        "lib/db/models/__init__.py",
+        "lib/db/repositories/__init__.py",
+        "alembic/versions/c04b7d93e5a1_add_budget_reservations.py",
+        "tests/unit/r2/test_bootstrap.py",
+        "tests/unit/r2/contracts/test_architecture_boundaries.py",
+        "tests/unit/r2/production/test_c04_budget_architecture_boundaries.py"
+      ],
+      "excluded_by_design_read_directly": [
+        "scripts/r2/verify_frozen_registries.py",
+        "docs/r2/R2_03_CONTRACT_REGISTRY.json"
+      ]
+    },
+    "seams_confirmed": {
+      "contract_base": "r2/contracts/common.py defines NonEmptyStr, JSONValue (type alias), R2ContractModel (ConfigDict extra=forbid, validate_assignment=True, frozen=False), ensure_json_value; fingerprints.py defines canonical_json_bytes",
+      "frozen_registry": "docs/r2/R2_03_CONTRACT_REGISTRY.json names CanonTransactionService as commit_authority for the CANON contract family (CanonBranch, CanonVersion, CanonDelta, and siblings); enforced by tests/unit/scripts/r2/test_verify_frozen_registries.py",
+      "db_base": "lib/db/base.py defines Base (DeclarativeBase), utc_now(), UserOwnedMixin, TimestampMixin",
+      "alembic_parent": "alembic/versions/c04b7d93e5a1_add_budget_reservations.py present and sole head"
+    }
+  },
+  "baseline_gates": [
+    {"command": "uv run ruff check r2 lib/db tests/unit/r2 tests/integration/r2", "exit_code": 0, "result": "All checks passed!"},
+    {"command": "uv run basedpyright --warnings", "exit_code": 0, "result": "0 errors, 0 warnings, 0 notes"},
+    {"command": "uv run lint-imports", "exit_code": 0, "result": "8 kept, 0 broken"},
+    {"command": "uv run python -m pytest tests/unit/r2/test_bootstrap.py tests/unit/r2/contracts/test_architecture_boundaries.py tests/unit/r2/production/test_c04_budget_architecture_boundaries.py -q", "exit_code": 0, "result": "12 passed, 1 warning"},
+    {"command": "uv run python scripts/audit_tests.py --check", "exit_code": 0, "result": "0 violations"}
+  ]
+}
