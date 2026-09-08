@@ -29,6 +29,7 @@ from r2.contracts import (
     compute_source_content_hash,
 )
 from r2.narrative.canon_state import ResolvedCanonView
+from r2.narrative.errors import NarrativeSchemaVersionError
 from r2.narrative.hashing import compute_canon_content_hash
 from r2.narrative_context.compiler import NarrativeContextCompiler
 from r2.narrative_context.errors import NarrativeContextBudgetError, NarrativeContextInputError
@@ -44,6 +45,14 @@ class WordCounter:
 
     def count(self, content: str) -> int:
         return len(content.split())
+
+
+class _ExplodingReader:
+    def __getattr__(self, name: str):
+        async def _boom(*_args, **_kwargs):
+            raise AssertionError(f"authority read {name!r} must not run for an unsupported compiler version")
+
+        return _boom
 
 
 class FakeCanon:
@@ -236,6 +245,7 @@ def _request(
     pov: str | None = "char-a",
     budget: int = 200,
     snapshot_ref: str | None = "snap-1",
+    compiler_version: str = "compiler-v1",
 ) -> NarrativeContextRequest:
     return NarrativeContextRequest(
         user_id="u1",
@@ -252,7 +262,7 @@ def _request(
         pov_subject_entity_id=pov,
         story_time=FROM,
         token_budget=budget,
-        compiler_version="compiler-v1",
+        compiler_version=compiler_version,
         retrieval_snapshot_ref=snapshot_ref,
     )
 
@@ -350,6 +360,33 @@ async def test_plan_basis_must_equal_the_requested_canon_version() -> None:
     )
     with pytest.raises(NarrativeContextInputError):
         await compiler.compile(_request(mode="AUTHOR_DRAFT", pov=None, snapshot_ref=None))
+
+
+async def test_unsupported_compiler_version_is_rejected_at_the_seam() -> None:
+    canon = _canon_view(with_pov_knowledge=True)
+    with pytest.raises(NarrativeSchemaVersionError):
+        await _compiler(canon=canon, snapshot=None).compile(
+            _request(snapshot_ref=None, compiler_version="compiler-v99")
+        )
+
+
+async def test_latest_compiler_version_is_not_accepted_at_the_seam() -> None:
+    canon = _canon_view(with_pov_knowledge=True)
+    with pytest.raises(NarrativeSchemaVersionError):
+        await _compiler(canon=canon, snapshot=None).compile(_request(snapshot_ref=None, compiler_version="latest"))
+
+
+async def test_unsupported_compiler_version_is_rejected_before_authority_reads() -> None:
+    exploding = NarrativeContextCompiler(
+        canon_reader=_ExplodingReader(),
+        plan_reader=_ExplodingReader(),
+        policy_reader=_ExplodingReader(),
+        accepted_reader=_ExplodingReader(),
+        snapshot_reader=_ExplodingReader(),
+        token_counter=WordCounter(),
+    )
+    with pytest.raises(NarrativeSchemaVersionError):
+        await exploding.compile(_request(snapshot_ref=None, compiler_version="latest"))
 
 
 async def test_pack_hashes_are_deterministic_and_budget_sensitive() -> None:

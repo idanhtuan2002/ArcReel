@@ -34,7 +34,7 @@ from r2.contracts import (
 )
 from r2.narrative.canon_state import ResolvedCanonView
 from r2.narrative.epistemic import EpistemicView, EpistemicViewResolver
-from r2.narrative.errors import EpistemicIntegrityError
+from r2.narrative.errors import EpistemicIntegrityError, NarrativeSchemaVersionError
 from r2.narrative.validation import NarrativeInvariantValidator
 
 from .errors import (
@@ -51,6 +51,11 @@ from .ports import (
     RetrievalSnapshotReader,
     TokenCounter,
 )
+
+# Exact compiler versions this build implements. The priority tables below are
+# fixed per compiler version; "latest" and any unlisted value are rejected at the
+# compile seam.
+SUPPORTED_COMPILER_VERSIONS = frozenset({"compiler-v1"})
 
 _MANDATORY_PRIORITY = {
     ContextChannel.AUTHOR_TRUTH: 2,
@@ -147,6 +152,8 @@ class NarrativeContextCompiler:
         self._validator = validator or NarrativeInvariantValidator()
 
     async def compile(self, request: NarrativeContextRequest) -> NarrativeContextPack:
+        if request.compiler_version not in SUPPORTED_COMPILER_VERSIONS:
+            raise NarrativeSchemaVersionError(f"unsupported compiler version {request.compiler_version!r}")
         canon = await self._exact_canon(request)
         plan, scene = await self._exact_plan_and_scene(request)
         self._require_basis_equality(request, plan)
