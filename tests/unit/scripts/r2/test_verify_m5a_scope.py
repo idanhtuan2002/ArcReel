@@ -16,6 +16,8 @@ _HAPPY_IMPLEMENTATION = [
     "lib/db/repositories/canon_repo.py",
     "tests/integration/r2/narrative/_canon_authority.py",
     "tests/integration/r2/narrative/test_canon_concurrency.py",
+    "scripts/r2/audit_m4_architecture.py",
+    "tests/integration/r2/m4/test_m4_architecture_audit.py",
     RESERVED_MIGRATION,
     "pyproject.toml",
 ]

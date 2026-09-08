@@ -761,9 +761,7 @@ class CanonBranchModel(UserOwnedMixin, Base):
     branch_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     project_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     branch_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    parent_branch_id: Mapped[str | None] = mapped_column(
-        ForeignKey("canon_branches.branch_id", ondelete="RESTRICT")
-    )
+    parent_branch_id: Mapped[str | None] = mapped_column(ForeignKey("canon_branches.branch_id", ondelete="RESTRICT"))
     parent_version_id: Mapped[str | None] = mapped_column(String(255), index=True)
     head_version_id: Mapped[str | None] = mapped_column(String(255), index=True)
 ```
@@ -848,16 +846,28 @@ Expected: collection fails because the repository and ports do not exist.
 ```python
 class CanonReadRepositoryPort(Protocol):
     async def get_branch(self, *, branch_id: str, project_name: str, user_id: str) -> CanonBranchSnapshot | None: ...
-    async def get_version(self, *, canon_version_id: str, project_name: str, user_id: str) -> CanonVersionSnapshot | None: ...
-    async def get_accepted_delta(self, *, canon_delta_id: str, project_name: str, user_id: str) -> AcceptedCanonDeltaSnapshot | None: ...
-    async def get_accepted_delta_by_approval_ref(self, *, approval_ref: str, project_name: str, user_id: str) -> AcceptedCanonDeltaSnapshot | None: ...
+    async def get_version(
+        self, *, canon_version_id: str, project_name: str, user_id: str
+    ) -> CanonVersionSnapshot | None: ...
+    async def get_accepted_delta(
+        self, *, canon_delta_id: str, project_name: str, user_id: str
+    ) -> AcceptedCanonDeltaSnapshot | None: ...
+    async def get_accepted_delta_by_approval_ref(
+        self, *, approval_ref: str, project_name: str, user_id: str
+    ) -> AcceptedCanonDeltaSnapshot | None: ...
     async def list_scope_branches(self, *, project_name: str, user_id: str) -> tuple[CanonBranchSnapshot, ...]: ...
-    async def list_branch_versions(self, *, branch_id: str, project_name: str, user_id: str) -> tuple[CanonVersionSnapshot, ...]: ...
+    async def list_branch_versions(
+        self, *, branch_id: str, project_name: str, user_id: str
+    ) -> tuple[CanonVersionSnapshot, ...]: ...
 
 
 class CanonProjectionRepositoryPort(CanonReadRepositoryPort, Protocol):
-    async def load_projection(self, *, canon_version_id: str, project_name: str, user_id: str) -> ResolvedCanonView | None: ...
-    async def upsert_projection(self, *, view: ResolvedCanonView, built_at: datetime, project_name: str, user_id: str) -> None: ...
+    async def load_projection(
+        self, *, canon_version_id: str, project_name: str, user_id: str
+    ) -> ResolvedCanonView | None: ...
+    async def upsert_projection(
+        self, *, view: ResolvedCanonView, built_at: datetime, project_name: str, user_id: str
+    ) -> None: ...
 
 
 class CanonWriteRepositoryPort(CanonProjectionRepositoryPort, Protocol):
@@ -865,12 +875,15 @@ class CanonWriteRepositoryPort(CanonProjectionRepositoryPort, Protocol):
     async def insert_branch(self, branch: CanonBranchSnapshot) -> None: ...
     async def insert_delta(self, accepted: AcceptedCanonDeltaSnapshot) -> None: ...
     async def insert_version(self, version: CanonVersionSnapshot) -> None: ...
-    async def advance_head(self, *, branch_id: str, expected_head_id: str | None, version_id: str, project_name: str, user_id: str) -> None: ...
+    async def advance_head(
+        self, *, branch_id: str, expected_head_id: str | None, version_id: str, project_name: str, user_id: str
+    ) -> None: ...
     async def flush(self) -> None: ...
 
 
 class CanonProjectionUnitOfWork(Protocol):
     repository: CanonProjectionRepositoryPort
+
     async def __aenter__(self) -> CanonProjectionUnitOfWork: ...
     async def __aexit__(self, exc_type: object, exc: object, traceback: object) -> None: ...
     async def commit(self) -> None: ...
@@ -878,6 +891,7 @@ class CanonProjectionUnitOfWork(Protocol):
 
 class CanonAuthorityUnitOfWork(Protocol):
     repository: CanonWriteRepositoryPort
+
     async def __aenter__(self) -> CanonAuthorityUnitOfWork: ...
     async def __aexit__(self, exc_type: object, exc: object, traceback: object) -> None: ...
     async def commit(self) -> None: ...
@@ -898,14 +912,18 @@ Only `CanonAuthorityUnitOfWork.repository` and `CanonTransactionService` may typ
 `CanonProjectionRepository` implements only scoped reads plus projection load/upsert. `CanonRepository` extends it with branch locking and authority writes. Every SELECT starts with all three available scope predicates, joining through branch ownership when the selected table does not carry user/project columns. `lock_branch` adds `.with_for_update()`. Before projection upsert, load the referenced version through that scoped join and raise `CanonNotFoundError` if unavailable. Snapshot conversion validates stored JSON through Pydantic. Corrupt branch/version/delta rows become `CanonIntegrityError`; corrupt projection JSON or metadata makes `load_projection` return `None` so the resolver can rebuild and replace that disposable row. Repository methods call `session.add`, `session.execute`, or `session.flush`; they contain no `commit`, `rollback`, session factory, or engine construction.
 
 ```python
-async def advance_head(self, *, branch_id: str, expected_head_id: str | None, version_id: str, project_name: str, user_id: str) -> None:
+async def advance_head(
+    self, *, branch_id: str, expected_head_id: str | None, version_id: str, project_name: str, user_id: str
+) -> None:
     result = await self.session.execute(
         update(CanonBranchModel)
         .where(
             CanonBranchModel.branch_id == branch_id,
             CanonBranchModel.project_name == project_name,
             CanonBranchModel.user_id == user_id,
-            CanonBranchModel.head_version_id.is_(None) if expected_head_id is None else CanonBranchModel.head_version_id == expected_head_id,
+            CanonBranchModel.head_version_id.is_(None)
+            if expected_head_id is None
+            else CanonBranchModel.head_version_id == expected_head_id,
         )
         .values(head_version_id=version_id)
     )
@@ -1011,7 +1029,9 @@ class CanonResolver:
         self._repository = repository
         self._clock = clock
 
-    async def resolve(self, *, branch_id: str, version_id: str | None, project_name: str, user_id: str) -> ResolvedCanonView:
+    async def resolve(
+        self, *, branch_id: str, version_id: str | None, project_name: str, user_id: str
+    ) -> ResolvedCanonView:
         branch = await self._require_branch(branch_id=branch_id, project_name=project_name, user_id=user_id)
         selected = version_id or branch.head_version_id
         if selected is None:
@@ -1019,7 +1039,9 @@ class CanonResolver:
                 return ResolvedCanonView.for_empty_branch(branch)
             parent = await self._resolve_version(branch.parent_version_id, project_name=project_name, user_id=user_id)
             return parent.model_copy(update={"branch_id": branch.branch_id})
-        await self._require_version_reachable_from_branch(branch=branch, version_id=selected, project_name=project_name, user_id=user_id)
+        await self._require_version_reachable_from_branch(
+            branch=branch, version_id=selected, project_name=project_name, user_id=user_id
+        )
         return await self._resolve_version(selected, project_name=project_name, user_id=user_id)
 ```
 
@@ -1042,7 +1064,9 @@ Also prove corrupt projection replacement, corrupt authoritative delta failure, 
 
 ```python
 class CanonResolutionService:
-    async def resolve(self, *, branch_id: str, version_id: str | None, project_name: str, user_id: str) -> ResolvedCanonView:
+    async def resolve(
+        self, *, branch_id: str, version_id: str | None, project_name: str, user_id: str
+    ) -> ResolvedCanonView:
         async with self._projection_uow_factory() as uow:
             result = await CanonResolver(uow.repository, clock=self._clock).resolve(
                 branch_id=branch_id,
@@ -1092,7 +1116,9 @@ git commit -m "feat(r2): resolve canon lineage and projections"
 async def test_approved_main_genesis_advances_head_atomically(session_factory) -> None:
     service = service_for(session_factory, version_ids=iter(["version-1"]).__next__)
     await service.create_branch(main_branch_command())
-    result = await service.commit(delta=genesis_delta(), approval=approval_for(genesis_delta()), project_name="p", user_id=USER, now=NOW)
+    result = await service.commit(
+        delta=genesis_delta(), approval=approval_for(genesis_delta()), project_name="p", user_id=USER, now=NOW
+    )
     assert result.version.canon_version_id == "version-1"
     assert result.version.parent_version_id is None
     assert await authority_counts(session_factory) == {"deltas": 1, "versions": 1, "projections": 1}
@@ -1169,7 +1195,9 @@ Prove zero authority writes for missing/wrong/rejected approval, wrong payload h
 async def test_exact_retry_precedes_base_conflict(session_factory) -> None:
     service = service_for(session_factory)
     first = await approved_commit(service)
-    retried = await service.commit(delta=ORIGINAL_DELTA, approval=ORIGINAL_APPROVAL, project_name="p", user_id=USER, now=LATER)
+    retried = await service.commit(
+        delta=ORIGINAL_DELTA, approval=ORIGINAL_APPROVAL, project_name="p", user_id=USER, now=LATER
+    )
     assert retried == first
     assert await authority_counts(session_factory) == {"deltas": 1, "versions": 1, "projections": 1}
 ```
@@ -1374,10 +1402,14 @@ git commit -m "feat(r2): verify canon authority integrity"
 ```python
 def test_only_transaction_service_calls_canon_authority_writes() -> None:
     allowed = {"r2/narrative/canon_transaction.py"}
-    offenders = files_calling_any(
-        ("insert_delta", "insert_version", "advance_head"),
-        roots=(REPO / "r2", REPO / "server", REPO / "lib"),
-    ) - allowed - {"lib/db/repositories/canon_repo.py"}
+    offenders = (
+        files_calling_any(
+            ("insert_delta", "insert_version", "advance_head"),
+            roots=(REPO / "r2", REPO / "server", REPO / "lib"),
+        )
+        - allowed
+        - {"lib/db/repositories/canon_repo.py"}
+    )
     assert offenders == set()
 
 

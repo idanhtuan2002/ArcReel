@@ -59,6 +59,12 @@ IMPLEMENTATION_ALLOWLIST: frozenset[str] = frozenset(
         "tests/integration/r2/narrative/test_canon_integrity.py",
         "scripts/r2/verify_m5a_scope.py",
         "pyproject.toml",
+        # Retired at M4 closure: the M4 PR-scope tripwire (``_M5_MARKERS`` pre-registered
+        # r2/narrative etc. to keep M5 code out of the M4 PR) structurally cannot pass on
+        # an M5 branch. The permanent M4 fitness sensors stay in
+        # tests/unit/r2/production_intelligence/test_architecture_boundaries.py.
+        "scripts/r2/audit_m4_architecture.py",
+        "tests/integration/r2/m4/test_m4_architecture_audit.py",
     }
 )
 
