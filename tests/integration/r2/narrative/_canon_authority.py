@@ -246,6 +246,40 @@ async def seed_pinned_child(factory: Factory) -> dict[str, object]:
     }
 
 
+async def seed_nested_narrative(factory: Factory) -> None:
+    """main -> narrative "mid" -> narrative "kid". "kid" sorts before "mid", so a
+    MAIN-then-lexical checker would visit the grandchild before its parent branch."""
+    _, main_content = await seed_main_genesis(factory, entity_id="root", version_id="main-v1")
+    mid = narrative_branch(branch_id="mid", parent_version_id="main-v1")
+    mid_content = await commit_version(
+        factory,
+        branch=mid,
+        base_content=main_content,
+        base_version_id="main-v1",
+        add_entity_id="mid-entity",
+        version_id="mid-v1",
+        version_number=1,
+        parent_version_id="main-v1",
+        delta_id="delta-mid-1",
+        approval_ref="approval-mid-1",
+        insert_branch=True,
+    )
+    kid = narrative_branch(branch_id="kid", parent_branch_id="mid", parent_version_id="mid-v1")
+    await commit_version(
+        factory,
+        branch=kid,
+        base_content=mid_content,
+        base_version_id="mid-v1",
+        add_entity_id="kid-entity",
+        version_id="kid-v1",
+        version_number=1,
+        parent_version_id="mid-v1",
+        delta_id="delta-kid-1",
+        approval_ref="approval-kid-1",
+        insert_branch=True,
+    )
+
+
 def _entity(entity_id: str) -> Entity:
     return Entity(
         entity_id=entity_id,

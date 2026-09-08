@@ -18,6 +18,7 @@ from tests.integration.r2.narrative._canon_authority import (
     corrupt_version_hash_version,
     main_branch,
     seed_main_two_versions,
+    seed_nested_narrative,
     seed_pinned_child,
     set_branch_head,
     set_branch_parent_branch,
@@ -139,6 +140,20 @@ async def test_authoritative_hash_mismatch_is_reported(session_factory: Factory)
     await set_version_content_hash(session_factory, "main-v1", compute_canon_content_hash(empty_canon_content()))
     report = await run_checker(session_factory)
     assert rule_ids(report) == ["M5A_AUTHORITATIVE_HASH_MISMATCH"]
+
+
+async def test_nested_narrative_scope_passes_after_topological_ordering(session_factory: Factory) -> None:
+    await seed_nested_narrative(session_factory)
+    report = await run_checker(session_factory)
+    assert report.ok is True
+    assert report.findings == ()
+
+
+async def test_a_grandchild_narrative_version_is_still_hash_verified(session_factory: Factory) -> None:
+    await seed_nested_narrative(session_factory)
+    await set_version_content_hash(session_factory, "kid-v1", compute_canon_content_hash(empty_canon_content()))
+    report = await run_checker(session_factory)
+    assert "M5A_AUTHORITATIVE_HASH_MISMATCH" in rule_ids(report)
 
 
 async def test_checker_is_deterministic_and_leaves_rows_untouched(session_factory: Factory) -> None:

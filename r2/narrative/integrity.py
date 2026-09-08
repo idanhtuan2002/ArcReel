@@ -56,13 +56,42 @@ class CanonIntegrityReport(R2ContractModel):
         return not self.findings
 
 
+def _order_parent_branches_first(
+    branches: tuple[CanonBranchSnapshot, ...],
+) -> list[CanonBranchSnapshot]:
+    """Topological order: a branch's parent is verified before the branch itself, so a
+    narrative child pinned to another narrative version always sees its base content.
+    A ``parent_branch_id`` cycle degrades to the seed order — ``_branch_base`` then
+    emits a finding because the pinned base is not available."""
+    by_id = {branch.branch_id: branch for branch in branches}
+    seed = sorted(branches, key=lambda item: (item.branch_type is not CanonBranchType.MAIN, item.branch_id))
+    ordered: list[CanonBranchSnapshot] = []
+    done: set[str] = set()
+    visiting: set[str] = set()
+
+    def visit(branch: CanonBranchSnapshot) -> None:
+        if branch.branch_id in done or branch.branch_id in visiting:
+            return
+        visiting.add(branch.branch_id)
+        parent = by_id.get(branch.parent_branch_id) if branch.parent_branch_id is not None else None
+        if parent is not None:
+            visit(parent)
+        visiting.discard(branch.branch_id)
+        done.add(branch.branch_id)
+        ordered.append(branch)
+
+    for branch in seed:
+        visit(branch)
+    return ordered
+
+
 class CanonIntegrityChecker:
     def __init__(self, repository: CanonReadRepositoryPort) -> None:
         self._repository = repository
 
     async def check_scope(self, *, project_name: str, user_id: str) -> CanonIntegrityReport:
         branches = await self._repository.list_scope_branches(project_name=project_name, user_id=user_id)
-        ordered = sorted(branches, key=lambda item: (item.branch_type is not CanonBranchType.MAIN, item.branch_id))
+        ordered = _order_parent_branches_first(branches)
         content_by_version: dict[str, CanonContent] = {}
         findings: list[CanonIntegrityFinding] = []
         for branch in ordered:
@@ -303,6 +332,15 @@ class CanonIntegrityChecker:
 
         base_content = content_by_version.get(pinned.canon_version_id)
         if base_content is None:
+            findings.append(
+                self._finding(
+                    "M5A_PARENT_MISSING_OR_OUT_OF_SCOPE",
+                    branch,
+                    (pinned_id,),
+                    f"pinned parent version {pinned_id!r} could not be verified before this branch "
+                    "(broken parent lineage or a parent_branch_id cycle)",
+                )
+            )
             return empty_canon_content(), False, pinned_id
         return base_content, True, pinned_id
 
