@@ -29,6 +29,7 @@ DOC_ALLOWLIST: frozenset[str] = frozenset(
         "docs/r2/evidence/R2_M5B_3_REVIEW.md",
         "docs/research/2026-09-08-r2-m5b-reuse-and-boundary-research.md",
         "docs/research/2026-09-08-r2-m5b-author-draft-omniscient-gate.md",
+        "docs/research/2026-09-08-r2-m5b-validate-scene-plan-commit-rules.md",
     }
 )
 

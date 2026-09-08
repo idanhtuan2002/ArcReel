@@ -513,9 +513,20 @@ class NarrativeInvariantValidator:
     def validate_scene(
         self, *, canon: ResolvedCanonView, plan: NarrativePlan, scene: SceneContract
     ) -> NarrativeValidationReport:
-        _ = plan
         findings: list[NarrativeValidationFinding | None] = []
         window = scene.temporal_window
+
+        basis = plan.content.canon_basis
+        if basis.branch_id != canon.branch_id or basis.canon_version_id != canon.canon_version_id:
+            findings.append(
+                _mb_finding(
+                    "SCENE_BASIS_MISMATCH",
+                    (scene.scene_contract_id,),
+                    f"plan Canon basis {basis.branch_id}@{basis.canon_version_id} does not match the resolved "
+                    f"Canon {canon.branch_id}@{canon.canon_version_id}",
+                )
+            )
+
         findings.extend(
             _scene_state_finding(canon, item, at=window.effective_from, phase="ENTRY")
             for item in scene.entry_state_constraints
@@ -524,7 +535,51 @@ class NarrativeInvariantValidator:
             _forbidden_knowledge_finding(canon, item, window.effective_from, window.effective_until)
             for item in scene.forbidden_knowledge
         )
-        required_keys = {_event_selector_key(item) for item in scene.required_events}
+
+        forbidden_state_keys = {_knowledge_constraint_key(item) for item in scene.forbidden_knowledge}
+        findings.extend(
+            _mb_finding(
+                "SCENE_STATE_REQUIRED_FORBIDDEN_COLLISION",
+                (scene.scene_contract_id, item.constraint_id),
+                f"scene {scene.scene_contract_id} lists knowledge constraint {item.constraint_id} as both "
+                "an entry requirement and forbidden",
+            )
+            for item in scene.entry_state_constraints
+            if isinstance(item, SceneKnowledgeConstraint) and _knowledge_constraint_key(item) in forbidden_state_keys
+        )
+
+        findings.extend(
+            _mb_finding(
+                "SCENE_KNOWLEDGE_REVEAL_PRESTATE",
+                (scene.scene_contract_id, reveal.constraint_id, recipient.subject_entity_id),
+                f"reveal {reveal.constraint_id} recipient {recipient.subject_entity_id} already holds "
+                f"{recipient.resulting_state} at entry",
+                story_time=window.effective_from,
+            )
+            for reveal in scene.required_reveals
+            for recipient in reveal.recipients
+            if isinstance(recipient, CharacterRevealRecipient)
+            and _character_has_state(
+                canon,
+                recipient.subject_entity_id,
+                reveal.proposition_ref,
+                recipient.resulting_state,
+                window.effective_from,
+            )
+        )
+
+        required_keys: set[tuple[object, ...]] = set()
+        for item in scene.required_events:
+            required_keys.add(_event_selector_key(item))
+            reason = _selector_unsatisfiable_reason(canon.content, item)
+            if reason is not None:
+                findings.append(
+                    _mb_finding(
+                        "SCENE_EVENT_SELECTOR_UNSATISFIABLE",
+                        (scene.scene_contract_id, item.constraint_id),
+                        reason,
+                    )
+                )
         findings.extend(
             _mb_finding(
                 "SCENE_EVENT_REQUIRED_FORBIDDEN_COLLISION",
@@ -650,6 +705,34 @@ def _event_selector_key(selector: SceneEventConstraint) -> tuple[object, ...]:
         tuple(selector.participant_refs_all),
         selector.location_ref,
     )
+
+
+def _knowledge_constraint_key(item: SceneKnowledgeConstraint) -> tuple[object, ...]:
+    return (
+        item.subject_entity_id,
+        item.proposition_ref,
+        tuple(sorted(state.value for state in item.states)),
+        item.include_absent,
+    )
+
+
+def _selector_unsatisfiable_reason(content: CanonContent, selector: SceneEventConstraint) -> str | None:
+    if selector.event_ref is not None:
+        existing = content.events_by_id.get(selector.event_ref)
+        if existing is None:
+            return None
+        if not set(selector.participant_refs_all).issubset(set(existing.participant_refs)):
+            return f"required event_ref {selector.event_ref} does not include all named participants"
+        if selector.location_ref is not None and existing.location_ref != selector.location_ref:
+            return f"required event_ref {selector.event_ref} is not at {selector.location_ref}"
+        return None
+    named = [*selector.participant_refs_all]
+    if selector.location_ref is not None:
+        named.append(selector.location_ref)
+    missing = sorted(ref for ref in named if ref not in content.entities_by_id)
+    if missing:
+        return f"required event pattern {selector.constraint_id} names entities absent from the Canon basis: {missing}"
+    return None
 
 
 def _event_matches_selector(event: Event, selector: SceneEventConstraint) -> bool:

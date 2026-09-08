@@ -5,18 +5,23 @@ from datetime import UTC, datetime
 import pytest
 
 from r2.contracts import (
+    CanonBasis,
     CanonContent,
+    CharacterRevealRecipient,
     Entity,
     EntityType,
     EpistemicProposition,
     EpistemicState,
+    Event,
     Fact,
     KnowledgeState,
     NarrativePlan,
     NarrativePlanContent,
     SceneContract,
+    SceneEventConstraint,
     SceneFactConstraint,
     SceneKnowledgeConstraint,
+    SceneRevealConstraint,
     SceneTemporalWindow,
     compute_epistemic_proposition_ref,
 )
@@ -129,14 +134,22 @@ def _prop() -> EpistemicProposition:
     )
 
 
-def _canon(*, facts: list[Fact] | None = None, states: list[KnowledgeState] | None = None) -> ResolvedCanonView:
+def _canon(
+    *,
+    facts: list[Fact] | None = None,
+    states: list[KnowledgeState] | None = None,
+    events: list[Event] | None = None,
+    entities: dict[str, Entity] | None = None,
+) -> ResolvedCanonView:
     content = CanonContent(
-        entities_by_id={
+        entities_by_id=entities
+        if entities is not None
+        else {
             "char-a": Entity(entity_id="char-a", entity_type=EntityType.CHARACTER, canonical_name="A"),
             "obj-ring": Entity(entity_id="obj-ring", entity_type=EntityType.OBJECT, canonical_name="Ring"),
         },
         facts_by_id={fact.fact_id: fact for fact in (facts or [])},
-        events_by_id={},
+        events_by_id={event.event_id: event for event in (events or [])},
         epistemic_propositions_by_ref={RING: _prop()} if states else {},
         knowledge_states_by_id={state.knowledge_state_id: state for state in (states or [])},
     )
@@ -149,10 +162,10 @@ def _canon(*, facts: list[Fact] | None = None, states: list[KnowledgeState] | No
     )
 
 
-def _plan() -> NarrativePlan:
-    from r2.contracts import CanonBasis
-
-    content = NarrativePlanContent(canon_basis=CanonBasis(branch_id="main", canon_version_id="v-1"), story_frame="f")
+def _plan(*, branch_id: str = "main", canon_version_id: str = "v-1") -> NarrativePlan:
+    content = NarrativePlanContent(
+        canon_basis=CanonBasis(branch_id=branch_id, canon_version_id=canon_version_id), story_frame="f"
+    )
     return NarrativePlan(
         plan_id="plan-1",
         version=1,
@@ -164,7 +177,14 @@ def _plan() -> NarrativePlan:
     )
 
 
-def _scene(*, entry: list | None = None, forbidden_knowledge: list | None = None) -> SceneContract:
+def _scene(
+    *,
+    entry: list | None = None,
+    forbidden_knowledge: list | None = None,
+    required_events: list | None = None,
+    forbidden_events: list | None = None,
+    required_reveals: list | None = None,
+) -> SceneContract:
     draft = SceneContract(
         scene_contract_id="scene-1",
         version=1,
@@ -176,6 +196,9 @@ def _scene(*, entry: list | None = None, forbidden_knowledge: list | None = None
         temporal_window=SceneTemporalWindow(effective_from=S_FROM, effective_until=S_UNTIL),
         entry_state_constraints=entry or [],
         forbidden_knowledge=forbidden_knowledge or [],
+        required_events=required_events or [],
+        forbidden_events=forbidden_events or [],
+        required_reveals=required_reveals or [],
     )
     return draft.model_copy(update={"semantic_hash": compute_scene_semantic_hash(draft)})
 
@@ -210,3 +233,81 @@ def test_validate_scene_forbidden_knowledge_detects_a_window_overlap() -> None:
         canon=_canon(states=[state]), plan=_plan(), scene=_scene(forbidden_knowledge=[forbidden])
     )
     assert "SCENE_KNOWLEDGE_FORBIDDEN_MATCH" in [f.rule_id for f in report.findings]
+
+
+def _known_state(sid: str = "k-1", subject: str = "char-a") -> KnowledgeState:
+    return KnowledgeState(
+        knowledge_state_id=sid,
+        subject_entity_id=subject,
+        proposition_ref=RING,
+        epistemic_state=EpistemicState.KNOWN,
+        effective_from=S_FROM,
+    )
+
+
+def test_validate_scene_flags_a_reveal_whose_recipient_already_holds_the_state_at_entry() -> None:
+    reveal = SceneRevealConstraint(
+        constraint_id="rv-1",
+        proposition_ref=RING,
+        recipients=[CharacterRevealRecipient(subject_entity_id="char-a", resulting_state="KNOWN")],
+    )
+    report = NarrativeInvariantValidator().validate_scene(
+        canon=_canon(states=[_known_state()]), plan=_plan(), scene=_scene(required_reveals=[reveal])
+    )
+    assert "SCENE_KNOWLEDGE_REVEAL_PRESTATE" in rule_ids(report)
+
+
+def test_validate_scene_accepts_a_reveal_whose_recipient_does_not_yet_hold_the_state() -> None:
+    reveal = SceneRevealConstraint(
+        constraint_id="rv-1",
+        proposition_ref=RING,
+        recipients=[CharacterRevealRecipient(subject_entity_id="char-a", resulting_state="KNOWN")],
+    )
+    report = NarrativeInvariantValidator().validate_scene(
+        canon=_canon(), plan=_plan(), scene=_scene(required_reveals=[reveal])
+    )
+    assert report.findings == ()
+
+
+def test_validate_scene_flags_a_required_event_pattern_naming_an_unknown_entity() -> None:
+    selector = SceneEventConstraint(constraint_id="ev-1", event_type="DUEL", participant_refs_all=["char-ghost"])
+    report = NarrativeInvariantValidator().validate_scene(
+        canon=_canon(), plan=_plan(), scene=_scene(required_events=[selector])
+    )
+    assert "SCENE_EVENT_SELECTOR_UNSATISFIABLE" in rule_ids(report)
+
+
+def test_validate_scene_accepts_a_required_event_ref_absent_from_canon() -> None:
+    selector = SceneEventConstraint(constraint_id="ev-1", event_ref="ev-future")
+    report = NarrativeInvariantValidator().validate_scene(
+        canon=_canon(), plan=_plan(), scene=_scene(required_events=[selector])
+    )
+    assert report.findings == ()
+
+
+def test_validate_scene_flags_a_required_event_ref_that_contradicts_an_existing_event() -> None:
+    existing = Event(event_id="ev-1", event_type="MEETING", participant_refs=["char-a"])
+    selector = SceneEventConstraint(constraint_id="c-ev", event_ref="ev-1", participant_refs_all=["obj-ring"])
+    report = NarrativeInvariantValidator().validate_scene(
+        canon=_canon(events=[existing]), plan=_plan(), scene=_scene(required_events=[selector])
+    )
+    assert "SCENE_EVENT_SELECTOR_UNSATISFIABLE" in rule_ids(report)
+
+
+def test_validate_scene_flags_a_state_constraint_in_both_required_and_forbidden_lists() -> None:
+    shared = {"subject_entity_id": "char-a", "proposition_ref": RING, "states": [EpistemicState.KNOWN]}
+    entry = SceneKnowledgeConstraint(constraint_id="c-req", **shared)
+    forbidden = SceneKnowledgeConstraint(constraint_id="c-forb", **shared)
+    report = NarrativeInvariantValidator().validate_scene(
+        canon=_canon(states=[_known_state()]),
+        plan=_plan(),
+        scene=_scene(entry=[entry], forbidden_knowledge=[forbidden]),
+    )
+    assert "SCENE_STATE_REQUIRED_FORBIDDEN_COLLISION" in rule_ids(report)
+
+
+def test_validate_scene_flags_a_plan_basis_that_does_not_match_the_resolved_canon() -> None:
+    report = NarrativeInvariantValidator().validate_scene(
+        canon=_canon(), plan=_plan(canon_version_id="v-OTHER"), scene=_scene()
+    )
+    assert rule_ids(report) == ["SCENE_BASIS_MISMATCH"]
