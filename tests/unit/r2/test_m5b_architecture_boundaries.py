@@ -12,6 +12,20 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[3]
 _PURE_NARRATIVE_DIRS = (_ROOT / "r2" / "narrative", _ROOT / "r2" / "narrative_plan")
+_CONTEXT_DIR = _ROOT / "r2" / "narrative_context"
+_CONTEXT_FORBIDDEN_IMPORT_ROOTS = {"sqlalchemy", "server", "httpx", "fastapi"}
+_CONTEXT_FORBIDDEN_IMPORT_NEEDLES = (
+    "lib.db",
+    "alembic",
+    "canon_transaction",
+    "r2.narrative.ports",
+    "r2.narrative_plan.service",
+    "r2.narrative_plan.ports",
+    "WritePort",
+    "UnitOfWork",
+    "uow_factory",
+)
+_MUTATION_ATTRS = {"insert", "update", "delete", "flush", "commit", "rollback", "add", "execute"}
 # Plan-unique write attrs (``insert_version`` / ``advance_head`` names are shared with the
 # Canon repository, so the sensor keys on the two that are unambiguously plan-scoped).
 _PLAN_WRITE_ATTRS = {"insert_plan", "lock_plan"}
@@ -111,6 +125,24 @@ def test_only_the_plan_service_references_the_plan_write_port() -> None:
             if "NarrativePlanWritePort" in path.read_text(encoding="utf-8"):
                 referencing.add(path.relative_to(_ROOT).as_posix())
     assert referencing <= allowed, referencing - allowed
+
+
+def test_narrative_context_never_imports_writes_persistence_or_runtime() -> None:
+    for path in _py_files(_CONTEXT_DIR):
+        names = _imports(ast.parse(path.read_text(encoding="utf-8")))
+        for name in names:
+            root = name.split(".")[0]
+            assert root not in _CONTEXT_FORBIDDEN_IMPORT_ROOTS, (path.name, name)
+            for needle in _CONTEXT_FORBIDDEN_IMPORT_NEEDLES:
+                assert needle not in name, (path.name, needle)
+
+
+def test_narrative_context_has_no_session_or_mutation_call_shapes() -> None:
+    for path in _py_files(_CONTEXT_DIR):
+        text = path.read_text(encoding="utf-8")
+        assert "AsyncSession" not in text, path.name
+        called = _called_attrs(ast.parse(text))
+        assert called.isdisjoint({"commit", "rollback", "flush"}), (path.name, called & _MUTATION_ATTRS)
 
 
 def test_import_linter_pins_the_m5b_authority_boundaries() -> None:

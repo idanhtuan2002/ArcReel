@@ -281,6 +281,21 @@ forbidden_modules = [
     "lib.db.canon_uow",
 ]
 
+# M5B：NarrativeContextCompiler 只读——不得触达任一权威写口 / UoW / Host 持久化。
+[[tool.importlinter.contracts]]
+name = "M5B narrative context is read-only and persistence-neutral"
+type = "forbidden"
+source_modules = ["r2.narrative_context"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+    "r2.narrative.canon_transaction",
+    "r2.narrative.ports",
+    "r2.narrative_plan.service",
+    "r2.narrative_plan.ports",
+]
+
 [tool.deptry]
 # 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2
 # exclude 是 deptry 默认值去掉 tests（测试的 import 也要参与依赖卫生判定）再补上 worktree 目录。
