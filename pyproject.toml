@@ -53,7 +53,9 @@ dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
-    "ruff>=0.16.0",
+    # <0.16: 0.16 起 `ruff format` 会重排 Markdown 内的 Python 代码块，
+    # 会改写 sha256 已固定在 M5B 证据里的 docs/superpowers/plans/ 计划文档。
+    "ruff>=0.15.0,<0.16",
     "pre-commit>=4.0.0",
     "python-docx>=1.2.0",
     "basedpyright>=1.39.4",
