@@ -1,0 +1,20 @@
+[
+  {
+    "seam_id": "GENERATED_IMAGE",
+    "waiver_id": "R2-M4-WAIVER-001",
+    "approved_by": "Human Showrunner (Nguyen Anh Tuan)",
+    "approved_at": "2026-09-08",
+    "scope": "R2-M4 Gate D real-execution evidence only.",
+    "rationale": "This environment has no local GPU model and no Human-approved external provider seam. The deterministic seams (REUSE, SCREEN_CAPTURE, DETERMINISTIC via FFmpeg, COMPOSITE via FFmpeg) all carry real evidence. Design section 18.8 requires representative real image/video generation 'where the environment permits'; real provider qualification is deferred to M7 and tracked as R2-OPEN-004 ('resolve post-core').",
+    "conditions": "M7 must run real GENERATED_IMAGE evidence against a qualified provider before any PRODUCTION_CANDIDATE claim. This waiver does not relax H1 / R2-HOST-001, which stays OPEN."
+  },
+  {
+    "seam_id": "GENERATED_VIDEO",
+    "waiver_id": "R2-M4-WAIVER-002",
+    "approved_by": "Human Showrunner (Nguyen Anh Tuan)",
+    "approved_at": "2026-09-08",
+    "scope": "R2-M4 Gate D real-execution evidence only.",
+    "rationale": "Same as R2-M4-WAIVER-001: no local GPU / approved provider in this environment; deterministic seams carry real evidence; design 18.8 'where the environment permits'; real provider qualification deferred to M7 / R2-OPEN-004.",
+    "conditions": "M7 must run real GENERATED_VIDEO evidence against a qualified provider before any PRODUCTION_CANDIDATE claim. This waiver does not relax H1 / R2-HOST-001, which stays OPEN."
+  }
+]

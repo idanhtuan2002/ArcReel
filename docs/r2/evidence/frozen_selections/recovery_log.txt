@@ -1,0 +1,14 @@
+# Frozen regression recovery log
+# generated 2026-09-08T00:04:35.982638+00:00 at HEAD 216e31acb4a08f3a430c7c288b62c95431718828
+
+Recovery commands (run at each pinned corpus commit via a temporary worktree):
+  M1  git worktree add --detach <wt> 9330bcf3 && pytest --co -q tests/unit/r2/contracts/
+  M2  git worktree add --detach <wt> 9cc04edd && pytest --co -q tests/unit/r2/production/ tests/integration/r2/production/
+  M3  git worktree add --detach <wt> 1985b815 && pytest --co -q tests/unit/r2/m3/ tests/integration/r2/m3/ tests/unit/r2/production/ tests/integration/r2/production/ tests/unit/r2/contracts/
+  Host  file set verbatim from docs/superpowers/plans/2026-09-06-r2-m2-artifact-bridge-implementation-plan.md Step 6
+
+Execution at the M4 final head:
+  m1_frozen    expected=41 pass=41 fail=0 skip=0 -> PASS
+  m2_frozen    expected=53 pass=53 fail=0 skip=0 -> PASS
+  m3_focused   expected=122 pass=122 fail=0 skip=0 -> PASS
+  host_frozen  expected=349 pass=349 fail=0 skip=0 -> PASS

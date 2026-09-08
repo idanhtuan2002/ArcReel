@@ -1,0 +1,11 @@
+{
+  "approved_c04_host_changes": [],
+  "blocking_violation_count": 0,
+  "final_head": "216e31acb4a08f3a430c7c288b62c95431718828",
+  "m5_scope_leakage": [],
+  "mutated_c04_host_files": [],
+  "schema_version": "1",
+  "starting_head": "863ab4993b3dce725fb5f12b5d2f2a74a79031a3",
+  "unapproved_db_migrations": [],
+  "unapproved_host_runtime_changes": []
+}

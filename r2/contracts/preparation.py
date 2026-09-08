@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from .common import ContractIdentity, NonEmptyStr, R2ContractModel
 from .enums import (
+    IdentityScopeType,
+    IdentityStrength,
     ProductionBindingRole,
     ProductionBindingTarget,
     ReadinessState,
+    ResolvedIdentityStatus,
 )
+from .provenance import Provenance
+from .provider_syntax import reject_provider_syntax
 
 
 class ProductionBinding(ContractIdentity):
@@ -28,6 +33,26 @@ class ProductionBinding(ContractIdentity):
         return sorted(set(value))
 
 
+class IdentityConstraint(R2ContractModel):
+    """One typed identity/continuity/style constraint carried by a scoped profile.
+
+    ``semantic_value`` is a normalized intent string, never provider syntax.
+    ``binding_role_ref`` is a semantic pointer to a ProductionBinding role, not
+    asset ownership.
+    """
+
+    semantic_key: NonEmptyStr
+    strength: IdentityStrength
+    semantic_value: NonEmptyStr
+    binding_role_ref: ProductionBindingRole | None = None
+    provenance: Provenance | None = None
+
+    @field_validator("semantic_key", "semantic_value")
+    @classmethod
+    def _reject_provider_syntax(cls, value: str, info: ValidationInfo) -> str:
+        return reject_provider_syntax(value, field=info.field_name or "value")
+
+
 class VisualIdentityProfile(ContractIdentity):
     semantic_character_ref: NonEmptyStr
     face_master_ref: NonEmptyStr | None = None
@@ -38,11 +63,40 @@ class VisualIdentityProfile(ContractIdentity):
     accessory_locks: list[NonEmptyStr] = Field(default_factory=list)
     state_variants: list[NonEmptyStr] = Field(default_factory=list)
     approved_reference_refs: list[NonEmptyStr] = Field(default_factory=list)
+    # M4 D05 — optional scoped/typed overlay. Absent on legacy flat profiles.
+    scope_type: IdentityScopeType | None = None
+    scope_ref: NonEmptyStr | None = None
+    identity_constraints: list[IdentityConstraint] = Field(default_factory=list)
 
     @field_validator("approved_reference_refs")
     @classmethod
     def normalize_reference_refs(cls, value: list[str]) -> list[str]:
         return sorted(set(value))
+
+
+class ResolvedIdentityConstraint(R2ContractModel):
+    semantic_key: NonEmptyStr
+    effective_strength: IdentityStrength
+    effective_value: NonEmptyStr
+    source_scope_ref: NonEmptyStr
+
+    @field_validator("semantic_key", "effective_value")
+    @classmethod
+    def _reject_provider_syntax(cls, value: str, info: ValidationInfo) -> str:
+        return reject_provider_syntax(value, field=info.field_name or "value")
+
+
+class ResolvedVisualIdentity(R2ContractModel):
+    """Deterministic computed view over scoped profiles. Not a new authority store."""
+
+    target_ref: NonEmptyStr
+    status: ResolvedIdentityStatus
+    contributing_profile_refs: list[NonEmptyStr] = Field(default_factory=list)
+    resolved_constraints: list[ResolvedIdentityConstraint] = Field(default_factory=list)
+    conflicts: list[NonEmptyStr] = Field(default_factory=list)
+    resolution_policy_version: NonEmptyStr
+    observed_profile_versions: list[NonEmptyStr] = Field(default_factory=list)
+    provenance: Provenance | None = None
 
 
 class ReadinessRequirement(R2ContractModel):
@@ -51,6 +105,7 @@ class ReadinessRequirement(R2ContractModel):
     required: bool
     status: ReadinessState
     resolved_binding: NonEmptyStr | None = None
+    resolution_source: NonEmptyStr | None = None
     reason: NonEmptyStr | None = None
 
     @model_validator(mode="after")
@@ -87,6 +142,14 @@ class ProductionReadiness(R2ContractModel):
     target_id: NonEmptyStr
     state: ReadinessState
     requirements: list[ReadinessRequirement] = Field(default_factory=list)
+    # M4 D04 — Gate-1 freshness anchors; a stale READY must be re-evaluated
+    # before Gate 2.
+    observed_target_version: NonEmptyStr | None = None
+    observed_binding_snapshot_ref: NonEmptyStr | None = None
+    evaluation_policy_version: NonEmptyStr | None = None
+    # Non-binding-derived block cause (e.g. IDENTITY_CONFLICT). When set, the
+    # state is BLOCKED regardless of the requirement list.
+    blocked_reason: NonEmptyStr | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -96,6 +159,8 @@ class ProductionReadiness(R2ContractModel):
 
         normalized = dict(data)
         expected = _derive_readiness_state(normalized.get("requirements", []))
+        if normalized.get("blocked_reason"):
+            expected = ReadinessState.BLOCKED
         supplied = normalized.get("state")
 
         if supplied is not None:

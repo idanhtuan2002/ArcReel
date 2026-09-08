@@ -5,7 +5,14 @@ import json
 from pathlib import Path
 
 from r2.bootstrap import frozen_docs_dir
-from r2.contracts import MethodDecision, PromptPlan, SceneSpec, ShotSpec
+from r2.contracts import (
+    MethodDecision,
+    PromptPlan,
+    ResolvedVisualIdentity,
+    SceneSpec,
+    ShotSpec,
+    VisualIdentityProfile,
+)
 
 FORBIDDEN_PROVIDER_FIELDS = {
     "provider",
@@ -15,6 +22,8 @@ FORBIDDEN_PROVIDER_FIELDS = {
     "provider_job_id",
     "provider_request",
     "execution_options",
+    "submitted_base_url",
+    "api_key",
 }
 
 
@@ -24,7 +33,14 @@ def _registry_by_name():
 
 
 def test_provider_neutral_contracts_have_no_provider_runtime_fields():
-    for model in (SceneSpec, ShotSpec, MethodDecision, PromptPlan):
+    for model in (
+        SceneSpec,
+        ShotSpec,
+        MethodDecision,
+        PromptPlan,
+        VisualIdentityProfile,
+        ResolvedVisualIdentity,
+    ):
         fields = set(model.model_fields)
         overlap = fields & FORBIDDEN_PROVIDER_FIELDS
         assert overlap == set(), (model.__name__, overlap)
