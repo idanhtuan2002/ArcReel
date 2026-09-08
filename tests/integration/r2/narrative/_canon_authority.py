@@ -23,6 +23,7 @@ from r2.contracts import (
     AcceptedCanonDeltaSnapshot,
     AddEntityOperation,
     AddEventOperation,
+    AddFactOperation,
     CanonBranchSnapshot,
     CanonBranchType,
     CanonCommitApproval,
@@ -35,6 +36,8 @@ from r2.contracts import (
     Entity,
     EntityType,
     Event,
+    Fact,
+    RetireFactOperation,
     UpdateEntityOperation,
 )
 from r2.narrative.canon_state import apply_canon_delta, empty_canon_content
@@ -289,6 +292,42 @@ def make_event_delta(
         event=Event(event_id=event_id, event_type="ARRIVAL", participant_refs=[participant]),
     )
     return _seal(delta_id, branch_id, base_version_id, operation)
+
+
+def make_add_then_retire_fact_delta(
+    delta_id: str,
+    branch_id: str,
+    base_version_id: str | None,
+    *,
+    subject: str,
+    effective_from: datetime,
+    effective_until: datetime,
+) -> CanonDelta:
+    fact = Fact(
+        fact_id="fact-1",
+        subject_ref=subject,
+        predicate="mood",
+        value="calm",
+        effective_from=effective_from,
+    )
+    return seal_canon_delta(
+        CanonDeltaPayload(
+            canon_delta_id=delta_id,
+            target_branch_id=branch_id,
+            base_canon_version_id=base_version_id,
+            operations=[
+                AddFactOperation(operation_id="op-add-fact-1", target_id="fact-1", fact=fact),
+                RetireFactOperation(
+                    operation_id="op-retire-fact-1", target_id="fact-1", effective_until=effective_until
+                ),
+            ],
+            source_change_set_refs=["s-1"],
+            author_decision_refs=["a-1"],
+            validation_report_refs=[],
+            created_at=NOW,
+            created_by="showrunner",
+        )
+    )
 
 
 def make_approval(

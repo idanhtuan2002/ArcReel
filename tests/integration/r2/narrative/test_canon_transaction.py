@@ -25,6 +25,7 @@ from tests.integration.r2.narrative._canon_authority import (
     authority_counts,
     branch_head,
     main_branch_command,
+    make_add_then_retire_fact_delta,
     make_approval,
     make_entity_delta,
     make_event_delta,
@@ -33,6 +34,8 @@ from tests.integration.r2.narrative._canon_authority import (
 )
 
 LATER = datetime(2026, 9, 8, 12, 0, 0, tzinfo=UTC)
+T1 = datetime(2026, 1, 1, tzinfo=UTC)
+T2 = datetime(2026, 6, 1, tzinfo=UTC)
 
 
 def service(
@@ -194,6 +197,28 @@ async def test_invalid_candidate_is_rejected_and_writes_nothing(session_factory:
             now=NOW,
         )
     assert await authority_counts(session_factory) == {"deltas": 0, "versions": 0, "projections": 0}
+
+
+async def test_add_then_retire_fact_in_one_delta_is_rejected_and_writes_nothing(
+    session_factory: Factory,
+) -> None:
+    svc = service(session_factory, version_id_factory=iter(["version-1", "version-2"]).__next__)
+    await svc.create_branch(main_branch_command())
+    await commit_genesis(svc)  # adds entity "hero"
+    # ADD_FACT(effective_from=T2) then RETIRE_FACT(effective_until=T1): the fact is absent
+    # from the resolved base and its final interval is inverted.
+    delta = make_add_then_retire_fact_delta(
+        "delta-2", "main", "version-1", subject="hero", effective_from=T2, effective_until=T1
+    )
+    with pytest.raises(CanonValidationError):
+        await svc.commit(
+            delta=delta,
+            approval=make_approval(delta, approval_ref="approval-2"),
+            project_name=PROJECT,
+            user_id=USER,
+            now=NOW,
+        )
+    assert await authority_counts(session_factory) == {"deltas": 1, "versions": 1, "projections": 1}
 
 
 async def test_reusing_an_approval_ref_for_another_delta_is_rejected(session_factory: Factory) -> None:

@@ -92,11 +92,10 @@ def _event_causal_self_reference(candidate: CanonContent) -> Iterator[CanonValid
             )
 
 
-def _fact_interval_invalid(candidate: CanonContent, delta: CanonDelta) -> Iterator[CanonValidationFinding]:
-    retired_targets = {op.target_id for op in delta.operations if isinstance(op, RetireFactOperation)}
+def _fact_interval_invalid(candidate: CanonContent) -> Iterator[CanonValidationFinding]:
+    # Every final fact interval must have an ordered start/end when both exist,
+    # regardless of which operation produced it (ADD_FACT, RETIRE_FACT, ...).
     for fact in sorted(candidate.facts_by_id.values(), key=lambda item: item.fact_id):
-        if fact.fact_id in retired_targets:
-            continue
         if _interval_is_inverted(fact):
             yield _finding(
                 "M5A_FACT_INTERVAL_INVALID",
@@ -111,6 +110,11 @@ def _fact_retirement_invalid(base: CanonContent, delta: CanonDelta) -> Iterator[
             continue
         base_fact = base.facts_by_id.get(op.target_id)
         if base_fact is None:
+            yield _finding(
+                "M5A_FACT_RETIREMENT_INVALID",
+                (op.target_id,),
+                f"fact {op.target_id} is not present in the resolved base and cannot be retired",
+            )
             continue
         if base_fact.effective_until is not None:
             yield _finding(
@@ -162,7 +166,7 @@ def validate_canon_candidate(
     findings: list[CanonValidationFinding] = [
         *_reference_missing(candidate),
         *_event_causal_self_reference(candidate),
-        *_fact_interval_invalid(candidate, delta),
+        *_fact_interval_invalid(candidate),
         *_fact_retirement_invalid(base, delta),
         *_fact_active_collision(candidate),
     ]

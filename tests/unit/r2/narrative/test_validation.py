@@ -159,7 +159,7 @@ def test_fact_with_end_before_start_is_interval_invalid() -> None:
     assert [item.rule_id for item in report.findings] == ["M5A_FACT_INTERVAL_INVALID"]
 
 
-def test_retiring_a_fact_before_its_start_is_retirement_invalid() -> None:
+def test_retiring_a_fact_before_its_start_is_reported() -> None:
     open_fact = fact("fact-1", effective_from=T2, effective_until=None)
     retired = open_fact.model_copy(update={"effective_until": T1})
     base = content(facts=[open_fact])
@@ -169,7 +169,28 @@ def test_retiring_a_fact_before_its_start_is_retirement_invalid() -> None:
         delta=sealed_delta(RetireFactOperation(operation_id="op-r", target_id="fact-1", effective_until=T1)),
         candidate=candidate,
     )
-    assert [item.rule_id for item in report.findings] == ["M5A_FACT_RETIREMENT_INVALID"]
+    # The retirement is invalid, and the resulting interval is structurally inverted.
+    assert {item.rule_id for item in report.findings} == {
+        "M5A_FACT_INTERVAL_INVALID",
+        "M5A_FACT_RETIREMENT_INVALID",
+    }
+
+
+def test_retiring_a_fact_absent_from_the_resolved_base_is_reported() -> None:
+    added = fact("fact-1", effective_from=T2, effective_until=None)
+    retired = added.model_copy(update={"effective_until": T1})
+    candidate = content(facts=[retired])
+    report = validate_canon_candidate(
+        base=content(),
+        delta=sealed_delta(
+            add_fact_op(added),
+            RetireFactOperation(operation_id="op-retire-fact-1", target_id="fact-1", effective_until=T1),
+        ),
+        candidate=candidate,
+    )
+    rule_ids = {item.rule_id for item in report.findings}
+    assert "M5A_FACT_RETIREMENT_INVALID" in rule_ids
+    assert "M5A_FACT_INTERVAL_INVALID" in rule_ids
 
 
 def test_clean_candidate_yields_empty_report() -> None:
