@@ -15,6 +15,7 @@ from tests.integration.r2.narrative._canon_authority import (
     USER,
     Factory,
     commit_version,
+    corrupt_projection_branch,
     corrupt_projection_hash,
     corrupt_version_hash_version,
     delete_projection,
@@ -105,6 +106,17 @@ async def test_corrupt_projection_is_replaced_by_a_rebuild(session_factory: Fact
     view = await resolve(session_factory, branch_id="main")
     assert set(view.content.entities_by_id) == set(content.entities_by_id)
     assert view.content_hash != "tampered-projection-hash"
+
+
+async def test_projection_with_a_mismatched_branch_id_is_rejected_and_rebuilt(
+    session_factory: Factory,
+) -> None:
+    _, content = await seed_main_genesis(session_factory)
+    await resolve(session_factory, branch_id="main")
+    await corrupt_projection_branch(session_factory, "main-v1", "not-main")
+    view = await resolve(session_factory, branch_id="main")
+    assert view.branch_id == "main"
+    assert set(view.content.entities_by_id) == set(content.entities_by_id)
 
 
 async def test_matching_stored_projection_is_accepted_without_replay(session_factory: Factory) -> None:

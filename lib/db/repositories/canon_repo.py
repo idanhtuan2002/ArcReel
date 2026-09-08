@@ -235,7 +235,7 @@ class CanonProjectionRepository:
     ) -> ResolvedCanonView | None:
         row = (
             await self.session.execute(
-                select(CanonResolvedProjectionModel)
+                select(CanonResolvedProjectionModel, CanonVersionModel.branch_id)
                 .join(
                     CanonVersionModel,
                     CanonResolvedProjectionModel.canon_version_id == CanonVersionModel.canon_version_id,
@@ -247,19 +247,21 @@ class CanonProjectionRepository:
                     CanonBranchModel.user_id == user_id,
                 )
             )
-        ).scalar_one_or_none()
+        ).one_or_none()
         if row is None:
             return None
+        projection, version_branch_id = row
         try:
-            view = ResolvedCanonView.model_validate(row.resolved_view_json)
+            view = ResolvedCanonView.model_validate(projection.resolved_view_json)
         except ValidationError:
             return None
         if (
             view.canon_version_id != canon_version_id
-            or view.content_hash != row.content_hash
-            or view.content_hash_algorithm != row.content_hash_algorithm
-            or view.content_hash_version != row.content_hash_version
-            or view.content_schema_version != row.content_schema_version
+            or view.branch_id != version_branch_id
+            or view.content_hash != projection.content_hash
+            or view.content_hash_algorithm != projection.content_hash_algorithm
+            or view.content_hash_version != projection.content_hash_version
+            or view.content_schema_version != projection.content_schema_version
         ):
             return None
         return view
@@ -274,6 +276,11 @@ class CanonProjectionRepository:
         )
         if referenced is None:
             raise CanonNotFoundError(f"cannot cache projection for unknown version {view.canon_version_id!r}")
+        if referenced.branch_id != view.branch_id:
+            raise CanonIntegrityError(
+                f"resolved view labels branch {view.branch_id!r} but version "
+                f"{view.canon_version_id!r} belongs to {referenced.branch_id!r}"
+            )
         values = {
             "canon_version_id": view.canon_version_id,
             "resolved_view_json": view.model_dump(mode="json"),

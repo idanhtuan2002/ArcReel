@@ -93,8 +93,10 @@ class CanonResolver:
         return rebuilt
 
     def _projection_matches_receipt(self, view: ResolvedCanonView, version: CanonVersionSnapshot) -> bool:
+        # branch_id is deliberately outside the content hash, so it must be checked explicitly.
         if (
             view.canon_version_id != version.canon_version_id
+            or view.branch_id != version.branch_id
             or view.content_hash != version.content_hash
             or view.content_hash_algorithm != version.content_hash_algorithm
             or view.content_hash_version != version.content_hash_version

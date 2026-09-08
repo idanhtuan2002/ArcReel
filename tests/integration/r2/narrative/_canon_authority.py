@@ -476,6 +476,19 @@ async def corrupt_projection_hash(factory: Factory, version_id: str) -> None:
         await session.commit()
 
 
+async def corrupt_projection_branch(factory: Factory, version_id: str, new_branch_id: str) -> None:
+    async with factory() as session:
+        row = (
+            await session.execute(
+                select(CanonResolvedProjectionModel).where(CanonResolvedProjectionModel.canon_version_id == version_id)
+            )
+        ).scalar_one()
+        payload = dict(row.resolved_view_json)
+        payload["branch_id"] = new_branch_id
+        row.resolved_view_json = payload
+        await session.commit()
+
+
 async def corrupt_version_hash_version(factory: Factory, version_id: str) -> None:
     async with factory() as session:
         await session.execute(
