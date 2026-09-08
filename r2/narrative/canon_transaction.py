@@ -230,6 +230,7 @@ class CanonTransactionService:
             result = await self._append_version_and_projection(
                 repository=repository,
                 branch=branch,
+                semantic_base=current_base,
                 delta=delta,
                 approval=approval,
                 candidate=candidate,
@@ -291,6 +292,7 @@ class CanonTransactionService:
         *,
         repository: CanonWriteRepositoryPort,
         branch: CanonBranchSnapshot,
+        semantic_base: str | None,
         delta: CanonDelta,
         approval: CanonCommitApproval,
         candidate: CanonContent,
@@ -300,9 +302,12 @@ class CanonTransactionService:
         now: datetime,
     ) -> CanonCommitResult:
         version_id = self._version_id_factory()
+        # ``parent_version_id`` always identifies the semantic content base: null only
+        # for MAIN genesis, the pinned parent for narrative version 1, the previous
+        # local version afterward — i.e. exactly the locked ``semantic_base``.
+        version_parent_id = semantic_base
         if branch.head_version_id is None:
             version_number = 1
-            version_parent_id: str | None = None
         else:
             head_version = await repository.get_version(
                 canon_version_id=branch.head_version_id, project_name=project_name, user_id=user_id
@@ -310,7 +315,6 @@ class CanonTransactionService:
             if head_version is None:
                 raise CanonIntegrityError("locked Canon branch head points to a missing version")
             version_number = head_version.version_number + 1
-            version_parent_id = branch.head_version_id
 
         content_hash = compute_canon_content_hash(candidate)
         version = CanonVersionSnapshot(

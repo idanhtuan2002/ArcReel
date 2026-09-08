@@ -231,3 +231,23 @@ async def test_create_narrative_branch_pins_a_parent_version(session_factory: Fa
         await svc.create_branch(
             narrative_branch_command(branch_id="story-2", parent_branch_id="main", parent_version_id="ghost")
         )
+
+
+async def test_narrative_branch_first_commit_records_the_pinned_parent(session_factory: Factory) -> None:
+    svc = service(session_factory, version_id_factory=iter(["version-1", "version-2"]).__next__)
+    await svc.create_branch(main_branch_command())
+    await commit_genesis(svc)
+    await svc.create_branch(
+        narrative_branch_command(branch_id="story", parent_branch_id="main", parent_version_id="version-1")
+    )
+    child = make_entity_delta("delta-story-1", "story", "version-1", "villain")
+    result = await svc.commit(
+        delta=child,
+        approval=make_approval(child, approval_ref="approval-story-1"),
+        project_name=PROJECT,
+        user_id=USER,
+        now=NOW,
+    )
+    assert result.version.canon_version_id == "version-2"
+    assert result.version.version_number == 1
+    assert result.version.parent_version_id == "version-1"

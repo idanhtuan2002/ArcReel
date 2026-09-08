@@ -56,7 +56,7 @@ async def add_pinned_child(factory: Factory, main_content):
         add_entity_id="child-entity",
         version_id="child-v1",
         version_number=1,
-        parent_version_id=None,
+        parent_version_id="main-v1",  # narrative version 1 points to the pinned parent
         delta_id="delta-child-1",
         approval_ref="approval-child-1",
         insert_branch=True,

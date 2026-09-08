@@ -118,6 +118,7 @@ class CanonIntegrityChecker:
                     branch,
                     version,
                     expected_number=expected_number,
+                    expected_v1_parent=pinned_base,
                     previous_local_id=previous_local_id,
                     project_name=project_name,
                     user_id=user_id,
@@ -311,6 +312,7 @@ class CanonIntegrityChecker:
         version: CanonVersionSnapshot,
         *,
         expected_number: int,
+        expected_v1_parent: str | None,
         previous_local_id: str | None,
         project_name: str,
         user_id: str,
@@ -320,13 +322,15 @@ class CanonIntegrityChecker:
         findings: list[CanonIntegrityFinding] = []
 
         if expected_number == 1:
-            if parent_version_id is not None:
+            # MAIN genesis: null. Narrative version 1: the pinned parent version.
+            if parent_version_id != expected_v1_parent:
                 findings.append(
                     self._finding(
                         "M5A_VERSION_PARENT_MISMATCH",
                         branch,
                         (version_id,),
-                        f"version {version_id!r} is version 1 but declares a local parent",
+                        f"version {version_id!r} parent {parent_version_id!r} does not match the "
+                        f"expected version-1 semantic base {expected_v1_parent!r}",
                     )
                 )
             return findings
