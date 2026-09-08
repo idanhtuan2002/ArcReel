@@ -2,7 +2,7 @@
 
 - Gate D status: **COMPLETE_WITH_WAIVER** (`gate_d_pass=True`)
 - Starting head: `863ab4993b3dce725fb5f12b5d2f2a74a79031a3`
-- Verified head: `c50185a0da74e1372a49cb777feda2dc2c2abbe7` (expected `c50185a0da74e1372a49cb777feda2dc2c2abbe7`, match: True)
+- Verified head: `216e31acb4a08f3a430c7c288b62c95431718828` (expected `216e31acb4a08f3a430c7c288b62c95431718828`, match: True)
 - Branch: `feat/r2-m4-production-intelligence`
 - Worktree clean (strict / modulo generated evidence): **False / True**
 - H1 / R2-HOST-001: **OPEN**

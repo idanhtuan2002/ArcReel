@@ -35,7 +35,7 @@
     "platform": "Linux-7.0.0-30-generic-x86_64-with-glibc2.43",
     "python": "3.13.14"
   },
-  "expected_head": "c50185a0da74e1372a49cb777feda2dc2c2abbe7",
+  "expected_head": "216e31acb4a08f3a430c7c288b62c95431718828",
   "fault_overlays": [
     {
       "expected_outcome": "PASS",
@@ -145,7 +145,7 @@
     "ruff_check": "PASS",
     "ruff_format": "PASS"
   },
-  "generated_at": "2026-09-08T00:03:52.986376+00:00",
+  "generated_at": "2026-09-08T00:05:28.462302+00:00",
   "golden_baseline": {
     "passed": 12,
     "result": "PASS",
@@ -470,7 +470,7 @@
     }
   ],
   "unresolved_real_evidence_seams": [],
-  "verified_head": "c50185a0da74e1372a49cb777feda2dc2c2abbe7",
+  "verified_head": "216e31acb4a08f3a430c7c288b62c95431718828",
   "worktree_clean_modulo_generated_evidence": true,
   "worktree_clean_strict": false
 }
