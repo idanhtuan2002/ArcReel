@@ -82,6 +82,10 @@ def test_upgrade_creates_canon_authority_schema(
             assert "ck_canon_versions_version_number_positive" in version_checks
             branch_checks = {item["name"] for item in inspector.get_check_constraints("canon_branches")}
             assert "ck_canon_branches_branch_type" in branch_checks
+            assert "ck_canon_branches_parent_pairing" in branch_checks
+
+            version_uniques = {item["name"] for item in inspector.get_unique_constraints("canon_versions")}
+            assert "uq_canon_versions_committed_delta_id" in version_uniques
 
             delta_columns = {column["name"]: column for column in inspector.get_columns("canon_deltas")}
             assert delta_columns["operations_json"]["nullable"] is False

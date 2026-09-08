@@ -34,6 +34,12 @@ class CanonBranchModel(UserOwnedMixin, Base):
     __tablename__ = "canon_branches"
     __table_args__ = (
         CheckConstraint("branch_type IN ('MAIN', 'NARRATIVE_BRANCH')", name="ck_canon_branches_branch_type"),
+        CheckConstraint(
+            "(branch_type = 'MAIN' AND parent_branch_id IS NULL AND parent_version_id IS NULL) "
+            "OR (branch_type = 'NARRATIVE_BRANCH' "
+            "AND parent_branch_id IS NOT NULL AND parent_version_id IS NOT NULL)",
+            name="ck_canon_branches_parent_pairing",
+        ),
         Index("ix_canon_branches_project_name", "project_name"),
         Index("ix_canon_branches_parent_version_id", "parent_version_id"),
         Index("ix_canon_branches_head_version_id", "head_version_id"),
@@ -96,9 +102,9 @@ class CanonVersionModel(Base):
     __table_args__ = (
         CheckConstraint("version_number >= 1", name="ck_canon_versions_version_number_positive"),
         UniqueConstraint("branch_id", "version_number", name="uq_canon_versions_branch_version_number"),
+        UniqueConstraint("committed_delta_id", name="uq_canon_versions_committed_delta_id"),
         Index("ix_canon_versions_branch_id", "branch_id"),
         Index("ix_canon_versions_parent_version_id", "parent_version_id"),
-        Index("ix_canon_versions_committed_delta_id", "committed_delta_id"),
     )
 
     canon_version_id: Mapped[str] = mapped_column(_ID, primary_key=True)

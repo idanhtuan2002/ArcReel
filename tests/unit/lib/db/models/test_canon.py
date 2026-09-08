@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from sqlalchemy import CheckConstraint, UniqueConstraint
+
 from lib.db.base import Base
 from lib.db.models import register_models
 
@@ -44,3 +46,13 @@ def test_delta_carries_the_approval_and_committed_version_columns() -> None:
         delta.columns.keys()
     )
     assert delta.columns["operations_json"].nullable is False
+
+
+def test_branch_parent_pairing_check_and_delta_uniqueness_exist() -> None:
+    branch = Base.metadata.tables["canon_branches"]
+    branch_checks = {c.name for c in branch.constraints if isinstance(c, CheckConstraint)}
+    assert "ck_canon_branches_parent_pairing" in branch_checks
+
+    version = Base.metadata.tables["canon_versions"]
+    unique_column_sets = {tuple(c.columns.keys()) for c in version.constraints if isinstance(c, UniqueConstraint)}
+    assert ("committed_delta_id",) in unique_column_sets

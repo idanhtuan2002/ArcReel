@@ -33,6 +33,12 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("created_by", sa.String(length=255), nullable=False),
         sa.CheckConstraint("branch_type IN ('MAIN', 'NARRATIVE_BRANCH')", name="ck_canon_branches_branch_type"),
+        sa.CheckConstraint(
+            "(branch_type = 'MAIN' AND parent_branch_id IS NULL AND parent_version_id IS NULL) "
+            "OR (branch_type = 'NARRATIVE_BRANCH' "
+            "AND parent_branch_id IS NOT NULL AND parent_version_id IS NOT NULL)",
+            name="ck_canon_branches_parent_pairing",
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["parent_branch_id"],
@@ -138,15 +144,10 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("canon_version_id"),
         sa.UniqueConstraint("branch_id", "version_number", name="uq_canon_versions_branch_version_number"),
+        sa.UniqueConstraint("committed_delta_id", name="uq_canon_versions_committed_delta_id"),
     )
     op.create_index("ix_canon_versions_branch_id", "canon_versions", ["branch_id"], unique=False)
     op.create_index("ix_canon_versions_parent_version_id", "canon_versions", ["parent_version_id"], unique=False)
-    op.create_index(
-        "ix_canon_versions_committed_delta_id",
-        "canon_versions",
-        ["committed_delta_id"],
-        unique=False,
-    )
 
     op.create_table(
         "canon_resolved_projections",
@@ -170,7 +171,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     op.drop_table("canon_resolved_projections")
-    op.drop_index("ix_canon_versions_committed_delta_id", table_name="canon_versions")
     op.drop_index("ix_canon_versions_parent_version_id", table_name="canon_versions")
     op.drop_index("ix_canon_versions_branch_id", table_name="canon_versions")
     op.drop_table("canon_versions")

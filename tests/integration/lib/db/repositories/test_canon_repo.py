@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.canon_uow import canon_authority_uow_factory, canon_projection_uow_factory
@@ -252,6 +253,38 @@ async def _commit_branch(factory: Factory, branch: CanonBranchSnapshot) -> None:
     async with canon_authority_uow_factory(factory)() as uow:
         await uow.repository.insert_branch(branch)
         await uow.commit()
+
+
+async def _commit_version(factory: Factory, version: CanonVersionSnapshot) -> None:
+    async with canon_authority_uow_factory(factory)() as uow:
+        await uow.repository.insert_version(version)
+        await uow.commit()
+
+
+async def test_malformed_branch_parent_pairing_violates_the_check_constraint(
+    session_factory: Factory,
+) -> None:
+    await seed_branch(session_factory, branch_id="main")
+    malformed = CanonBranchSnapshot(
+        branch_id="story",
+        user_id=USER,
+        project_name=PROJECT,
+        branch_type=CanonBranchType.NARRATIVE_BRANCH,
+        parent_branch_id="main",
+        parent_version_id=None,
+        head_version_id=None,
+        created_at=NOW,
+        created_by="showrunner",
+    )
+    with pytest.raises(IntegrityError):
+        await _commit_branch(session_factory, malformed)
+
+
+async def test_two_versions_for_one_delta_violate_the_unique_constraint(session_factory: Factory) -> None:
+    await seed_full_version(session_factory)
+    duplicate = version_snapshot(version_id="version-2", number=2, parent="version-1", delta_id="delta-1")
+    with pytest.raises(IntegrityError):
+        await _commit_version(session_factory, duplicate)
 
 
 async def test_duplicate_approval_ref_is_rejected_by_the_database_constraint(
