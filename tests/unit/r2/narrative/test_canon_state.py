@@ -16,14 +16,19 @@ from r2.contracts import (
     CanonOperation,
     Entity,
     EntityType,
+    EpistemicProposition,
+    EpistemicState,
     Event,
     Fact,
+    KnowledgeState,
     RetireFactOperation,
     TemporalRelation,
     UpdateEntityOperation,
+    UpdateKnowledgeOperation,
+    compute_epistemic_proposition_ref,
 )
 from r2.narrative.canon_state import ResolvedCanonView, apply_canon_delta, empty_canon_content
-from r2.narrative.errors import CanonOperationError, NarrativeSchemaVersionError
+from r2.narrative.errors import CanonOperationError, EpistemicValidationError, NarrativeSchemaVersionError
 from r2.narrative.hashing import compute_canon_content_hash, seal_canon_delta
 
 NOW = datetime(2026, 9, 7, 12, 0, 0, tzinfo=UTC)
@@ -238,6 +243,124 @@ def test_reducer_rejects_reusing_a_temporal_relation_id() -> None:
             once,
             sealed_delta_v2(add_relation("r-1", "ev-b", "ev-a")),
             base_schema_version="r2-canon-schema-v2",
+        )
+
+
+K_AT_10 = datetime(2026, 3, 1, 10, tzinfo=UTC)
+K_AT_12 = datetime(2026, 3, 1, 12, tzinfo=UTC)
+K_AT_14 = datetime(2026, 3, 1, 14, tzinfo=UTC)
+
+
+def _proposition() -> EpistemicProposition:
+    ref = compute_epistemic_proposition_ref(subject_ref="obj-ring", predicate="owner", object_or_value="hero")
+    return EpistemicProposition(proposition_ref=ref, subject_ref="obj-ring", predicate="owner", object_or_value="hero")
+
+
+def content_for_knowledge(*, states: list[KnowledgeState] | None = None) -> CanonContent:
+    proposition = _proposition()
+    return CanonContent(
+        entities_by_id={
+            "hero": Entity(entity_id="hero", entity_type=EntityType.CHARACTER, canonical_name="Ada", aliases=[]),
+            "obj-ring": Entity(entity_id="obj-ring", entity_type=EntityType.OBJECT, canonical_name="Ring", aliases=[]),
+        },
+        facts_by_id={},
+        events_by_id={"ev-seen": Event(event_id="ev-seen", event_type="SIGHT", participant_refs=["hero"])},
+        epistemic_propositions_by_ref={proposition.proposition_ref: proposition} if states else {},
+        knowledge_states_by_id={state.knowledge_state_id: state for state in (states or [])},
+    )
+
+
+def known_op(
+    ks_id: str,
+    *,
+    frm: datetime,
+    until: datetime | None = None,
+    evidence: list[str] | None = None,
+    supersedes: str | None = None,
+) -> UpdateKnowledgeOperation:
+    return UpdateKnowledgeOperation(
+        operation_id=f"op-{ks_id}",
+        target_id=ks_id,
+        subject_entity_id="hero",
+        proposition=_proposition(),
+        epistemic_state=EpistemicState.KNOWN,
+        effective_from=frm,
+        effective_until=until,
+        evidence_event_refs=evidence or [],
+        supersedes_knowledge_state_id=supersedes,
+    )
+
+
+def existing_state(ks_id: str, *, frm: datetime, until: datetime | None = None) -> KnowledgeState:
+    proposition = _proposition()
+    return KnowledgeState(
+        knowledge_state_id=ks_id,
+        subject_entity_id="hero",
+        proposition_ref=proposition.proposition_ref,
+        epistemic_state=EpistemicState.KNOWN,
+        effective_from=frm,
+        effective_until=until,
+        evidence_event_refs=[],
+    )
+
+
+def test_update_knowledge_appends_state_and_dedupes_proposition() -> None:
+    result = apply_canon_delta(
+        content_for_knowledge(),
+        sealed_delta_v2(known_op("k-1", frm=K_AT_10, evidence=["ev-seen"])),
+        base_schema_version="r2-canon-schema-v1",
+    )
+    state = result.knowledge_states_by_id["k-1"]
+    assert state.evidence_event_refs == ["ev-seen"]
+    assert state.proposition_ref in result.epistemic_propositions_by_ref
+
+
+def test_update_knowledge_does_not_mutate_historical_events() -> None:
+    result = apply_canon_delta(
+        content_for_knowledge(),
+        sealed_delta_v2(known_op("k-1", frm=K_AT_10, evidence=["ev-seen"])),
+        base_schema_version="r2-canon-schema-v1",
+    )
+    assert result.events_by_id["ev-seen"].state_effect_refs == []
+
+
+def test_update_knowledge_without_supersession_rejects_an_active_prior_state() -> None:
+    base = content_for_knowledge(states=[existing_state("k-old", frm=K_AT_10)])
+    with pytest.raises(EpistemicValidationError, match="supersedes_knowledge_state_id is required"):
+        apply_canon_delta(
+            base,
+            sealed_delta_v2(known_op("k-new", frm=K_AT_12)),
+            base_schema_version="r2-canon-schema-v2",
+        )
+
+
+def test_update_knowledge_closes_the_named_prior_state_at_the_new_boundary() -> None:
+    base = content_for_knowledge(states=[existing_state("k-old", frm=K_AT_10)])
+    result = apply_canon_delta(
+        base,
+        sealed_delta_v2(known_op("k-new", frm=K_AT_12, supersedes="k-old")),
+        base_schema_version="r2-canon-schema-v2",
+    )
+    assert result.knowledge_states_by_id["k-old"].effective_until == K_AT_12
+    assert result.knowledge_states_by_id["k-new"].effective_from == K_AT_12
+
+
+def test_update_knowledge_rejects_superseding_an_already_closed_state() -> None:
+    base = content_for_knowledge(states=[existing_state("k-old", frm=K_AT_10, until=K_AT_12)])
+    with pytest.raises(EpistemicValidationError, match="not active at the transition instant"):
+        apply_canon_delta(
+            base,
+            sealed_delta_v2(known_op("k-new", frm=K_AT_14, supersedes="k-old")),
+            base_schema_version="r2-canon-schema-v2",
+        )
+
+
+def test_update_knowledge_rejects_a_missing_evidence_event() -> None:
+    with pytest.raises(CanonOperationError, match="knowledge evidence event"):
+        apply_canon_delta(
+            content_for_knowledge(),
+            sealed_delta_v2(known_op("k-1", frm=K_AT_10, evidence=["ev-ghost"])),
+            base_schema_version="r2-canon-schema-v1",
         )
 
 

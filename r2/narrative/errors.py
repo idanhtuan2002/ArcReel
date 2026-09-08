@@ -44,3 +44,15 @@ class CanonOperationError(CanonError):
 
 class NarrativeSchemaVersionError(CanonError):
     """An unsupported Canon content schema selector or an illegal schema transition."""
+
+
+class EpistemicIdentityError(CanonError):
+    """A proposition or KnowledgeState identity was reused with conflicting content."""
+
+
+class EpistemicIntegrityError(CanonError):
+    """Resolved Canon holds more than one active KnowledgeState for a subject/proposition."""
+
+
+class EpistemicValidationError(CanonError):
+    """An invalid epistemic interval, evidence link, or knowledge-state transition."""
