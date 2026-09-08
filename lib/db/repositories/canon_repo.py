@@ -60,17 +60,21 @@ def _require_stored_aware(value: datetime | None, *, field: str) -> datetime:
 
 
 def _branch_snapshot(row: CanonBranchModel) -> CanonBranchSnapshot:
+    # Stored selector strings (branch_type, ...) are coerced by the strict contract;
+    # an unsupported value raises ValidationError -> CanonIntegrityError below.
     try:
-        return CanonBranchSnapshot(
-            branch_id=row.branch_id,
-            user_id=row.user_id,
-            project_name=row.project_name,
-            branch_type=row.branch_type,  # type: ignore[arg-type]
-            parent_branch_id=row.parent_branch_id,
-            parent_version_id=row.parent_version_id,
-            head_version_id=row.head_version_id,
-            created_at=_require_stored_aware(row.created_at, field="created_at"),
-            created_by=row.created_by,
+        return CanonBranchSnapshot.model_validate(
+            {
+                "branch_id": row.branch_id,
+                "user_id": row.user_id,
+                "project_name": row.project_name,
+                "branch_type": row.branch_type,
+                "parent_branch_id": row.parent_branch_id,
+                "parent_version_id": row.parent_version_id,
+                "head_version_id": row.head_version_id,
+                "created_at": _require_stored_aware(row.created_at, field="created_at"),
+                "created_by": row.created_by,
+            }
         )
     except ValidationError as exc:
         raise CanonIntegrityError(f"corrupt Canon branch row {row.branch_id!r}: {exc}") from exc
@@ -114,18 +118,20 @@ def _accepted_delta_snapshot(row: CanonDeltaModel) -> AcceptedCanonDeltaSnapshot
                 "payload_hash": row.payload_hash,
             }
         )
-        approval = CanonCommitApproval(
-            approval_ref=row.approval_ref,
-            canon_delta_id=row.canon_delta_id,
-            payload_hash=row.payload_hash,
-            payload_hash_algorithm=row.payload_hash_algorithm,  # type: ignore[arg-type]
-            payload_hash_version=row.payload_hash_version,  # type: ignore[arg-type]
-            content_schema_version=row.content_schema_version,  # type: ignore[arg-type]
-            project_name=row.project_name,
-            user_id=row.user_id,
-            approved_by=row.approved_by,
-            approved_at=_require_stored_aware(row.approved_at, field="approved_at"),
-            status=row.approval_status,  # type: ignore[arg-type]
+        approval = CanonCommitApproval.model_validate(
+            {
+                "approval_ref": row.approval_ref,
+                "canon_delta_id": row.canon_delta_id,
+                "payload_hash": row.payload_hash,
+                "payload_hash_algorithm": row.payload_hash_algorithm,
+                "payload_hash_version": row.payload_hash_version,
+                "content_schema_version": row.content_schema_version,
+                "project_name": row.project_name,
+                "user_id": row.user_id,
+                "approved_by": row.approved_by,
+                "approved_at": _require_stored_aware(row.approved_at, field="approved_at"),
+                "status": row.approval_status,
+            }
         )
     except (ValidationError, CanonIntegrityError) as exc:
         raise CanonIntegrityError(f"corrupt Canon delta row {row.canon_delta_id!r}: {exc}") from exc
