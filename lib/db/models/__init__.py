@@ -5,6 +5,12 @@ from lib.db.models.api_call import ApiCall
 from lib.db.models.api_key import ApiKey
 from lib.db.models.asset import Asset, AssetDerivative
 from lib.db.models.budget_reservation import BudgetReservationModel, BudgetScopeModel
+from lib.db.models.canon import (
+    CanonBranchModel,
+    CanonDeltaModel,
+    CanonResolvedProjectionModel,
+    CanonVersionModel,
+)
 from lib.db.models.config import ProviderConfig, SystemSetting
 from lib.db.models.credential import ProviderCredential
 from lib.db.models.custom_endpoint import CustomEndpoint
@@ -27,6 +33,10 @@ __all__ = [
     "BatchTask",
     "BudgetReservationModel",
     "BudgetScopeModel",
+    "CanonBranchModel",
+    "CanonDeltaModel",
+    "CanonResolvedProjectionModel",
+    "CanonVersionModel",
     "CustomEndpoint",
     "CustomProvider",
     "CustomProviderModel",
