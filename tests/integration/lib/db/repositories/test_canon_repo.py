@@ -30,7 +30,9 @@ from r2.narrative.errors import (
 from r2.narrative.hashing import compute_canon_content_hash, seal_canon_delta
 
 NOW = datetime(2026, 9, 7, 12, 0, 0, tzinfo=UTC)
-USER = "user-a"
+# Seeded on PostgreSQL by tests/conftest.py::_PG_TEST_USER_IDS (users.id FK).
+USER = "u1"
+OTHER_USER = "conformance"
 PROJECT = "project-a"
 
 type Factory = async_sessionmaker[AsyncSession]
@@ -172,11 +174,11 @@ async def test_repository_never_commits_its_bound_session(session_factory: Facto
 
 
 async def test_cross_scope_ids_are_indistinguishable_from_unknown(session_factory: Factory) -> None:
-    await seed_branch(session_factory, user_id="user-a", project_name="p-a")
+    await seed_branch(session_factory, user_id=USER, project_name="p-a")
     async with session_factory() as session:
         repo = CanonRepository(session)
-        assert await repo.get_branch(branch_id="main", project_name="p-b", user_id="user-b") is None
-        assert await repo.get_branch(branch_id="missing", project_name="p-b", user_id="user-b") is None
+        assert await repo.get_branch(branch_id="main", project_name="p-b", user_id=OTHER_USER) is None
+        assert await repo.get_branch(branch_id="missing", project_name="p-b", user_id=OTHER_USER) is None
 
 
 async def test_authority_uow_persists_branch_delta_version_and_head(session_factory: Factory) -> None:

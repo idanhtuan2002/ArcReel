@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import pytest
+
 from lib.db.canon_uow import canon_projection_uow_factory
 from r2.narrative.canon_state import empty_canon_content
 from r2.narrative.hashing import compute_canon_content_hash
 from r2.narrative.integrity import CanonIntegrityChecker, CanonIntegrityReport
 from tests.integration.r2.narrative._canon_authority import (
+    FOREIGN_USER,
     PROJECT,
     USER,
     Factory,
@@ -50,7 +53,7 @@ async def test_cross_branch_head_pointer_fails_closed(session_factory: Factory) 
 
 async def test_missing_and_cross_scope_head_yield_the_same_rule(session_factory: Factory) -> None:
     await seed_pinned_child(session_factory)
-    foreign = main_branch(branch_id="other-main", user_id="user-b", project_name="project-b")
+    foreign = main_branch(branch_id="other-main", user_id=FOREIGN_USER, project_name="project-b")
     await commit_version(
         session_factory,
         branch=foreign,
@@ -96,17 +99,23 @@ async def test_version_numbering_gap_is_reported(session_factory: Factory) -> No
     assert rule_ids(report) == ["M5A_VERSION_GAP"]
 
 
-async def test_pinned_parent_on_the_wrong_branch_is_reported(session_factory: Factory) -> None:
-    await seed_pinned_child(session_factory)
-    await set_branch_parent_branch(session_factory, "story", "not-the-parent")
-    report = await run_checker(session_factory)
+# These two corrupt columns that carry a physical RESTRICT foreign key
+# (canon_branches.parent_branch_id, canon_versions.parent_version_id). PostgreSQL
+# rejects the corrupting UPDATE outright, so the executable checker is redundant
+# there; on SQLite (foreign_keys=OFF) it is the only guard, which is what we prove.
+@pytest.mark.sqlite_only
+async def test_pinned_parent_on_the_wrong_branch_is_reported(file_session_factory: Factory) -> None:
+    await seed_pinned_child(file_session_factory)
+    await set_branch_parent_branch(file_session_factory, "story", "not-the-parent")
+    report = await run_checker(file_session_factory)
     assert rule_ids(report) == ["M5A_PARENT_BRANCH_MISMATCH"]
 
 
-async def test_local_parent_out_of_scope_is_reported(session_factory: Factory) -> None:
-    await seed_main_two_versions(session_factory)
-    await set_version_parent(session_factory, "main-v2", "ghost-parent")
-    report = await run_checker(session_factory)
+@pytest.mark.sqlite_only
+async def test_local_parent_out_of_scope_is_reported(file_session_factory: Factory) -> None:
+    await seed_main_two_versions(file_session_factory)
+    await set_version_parent(file_session_factory, "main-v2", "ghost-parent")
+    report = await run_checker(file_session_factory)
     assert {"M5A_PARENT_MISSING_OR_OUT_OF_SCOPE", "M5A_VERSION_PARENT_MISMATCH"} <= set(rule_ids(report))
 
 

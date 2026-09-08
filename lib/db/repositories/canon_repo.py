@@ -35,6 +35,15 @@ from r2.narrative.canon_state import ResolvedCanonView
 from r2.narrative.errors import CanonApprovalError, CanonIdentityConflictError, CanonIntegrityError, CanonNotFoundError
 
 
+def _is_unique_violation(exc: IntegrityError) -> bool:
+    """A unique/exclusion constraint hit (23505/23P01) — not an FK or NOT NULL failure."""
+    sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+    if sqlstate is not None:
+        return sqlstate in {"23505", "23P01"}
+    message = str(getattr(exc, "orig", None) or exc).lower()
+    return "unique constraint failed" in message or "unique" in message
+
+
 def _stored_aware(value: datetime | None) -> datetime | None:
     if value is None:
         return None
@@ -329,6 +338,8 @@ class CanonRepository(CanonProjectionRepository):
         try:
             await self.session.flush()
         except IntegrityError as exc:
+            if not _is_unique_violation(exc):
+                raise
             raise CanonIdentityConflictError(
                 f"Canon branch {branch.branch_id!r} conflicts with an existing branch in this scope"
             ) from exc
@@ -363,6 +374,8 @@ class CanonRepository(CanonProjectionRepository):
         try:
             await self.session.flush()
         except IntegrityError as exc:
+            if not _is_unique_violation(exc):
+                raise
             raise CanonApprovalError(
                 f"approval {approval.approval_ref!r} or delta {delta.canon_delta_id!r} "
                 "was already recorded in this scope"

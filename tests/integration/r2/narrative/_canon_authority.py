@@ -42,7 +42,10 @@ from r2.narrative.canon_transaction import CanonTransactionService
 from r2.narrative.hashing import compute_canon_content_hash, seal_canon_delta
 
 NOW = datetime(2026, 9, 7, 12, 0, 0, tzinfo=UTC)
-USER = "user-a"
+# Must be a user id seeded on PostgreSQL by tests/conftest.py::_PG_TEST_USER_IDS;
+# the Canon branch/delta tables carry the UserOwnedMixin FK to users.id.
+USER = "u1"
+FOREIGN_USER = "conformance"
 PROJECT = "project-a"
 
 type Factory = async_sessionmaker[AsyncSession]
