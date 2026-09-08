@@ -8,8 +8,8 @@ from datetime import UTC, datetime
 import pytest
 
 from lib.db.canon_uow import canon_authority_uow_factory
-from r2.contracts import CanonBranchType
-from r2.narrative.canon_transaction import CanonTransactionService
+from r2.contracts import CanonBranchType, Entity, EntityType
+from r2.narrative.canon_transaction import CanonCommitStage, CanonTransactionService
 from r2.narrative.errors import (
     CanonApprovalError,
     CanonBaseVersionConflict,
@@ -17,6 +17,7 @@ from r2.narrative.errors import (
     CanonNotFoundError,
     CanonValidationError,
 )
+from r2.narrative.hashing import verify_canon_delta_hash
 from tests.integration.r2.narrative._canon_authority import (
     NOW,
     PROJECT,
@@ -256,6 +257,34 @@ async def test_create_narrative_branch_pins_a_parent_version(session_factory: Fa
         await svc.create_branch(
             narrative_branch_command(branch_id="story-2", parent_branch_id="main", parent_version_id="ghost")
         )
+
+
+async def test_mutating_the_delta_during_the_commit_does_not_change_the_persisted_bytes(
+    session_factory: Factory,
+) -> None:
+    original = make_entity_delta("delta-1", "main", None, "hero")
+    approval = make_approval(original, approval_ref="approval-1")
+
+    def mutate_at_lock(stage: CanonCommitStage) -> None:
+        if stage is CanonCommitStage.BEFORE_DELTA_INSERT:
+            original.operations[0].target_id = "tampered"
+            original.operations[0].entity = Entity(
+                entity_id="tampered", entity_type=EntityType.CHARACTER, canonical_name="Tampered", aliases=[]
+            )
+
+    svc = CanonTransactionService(
+        canon_authority_uow_factory(session_factory),
+        version_id_factory=iter(["version-1"]).__next__,
+        fault_hook=mutate_at_lock,
+    )
+    await svc.create_branch(main_branch_command())
+    await svc.commit(delta=original, approval=approval, project_name=PROJECT, user_id=USER, now=NOW)
+
+    async with canon_authority_uow_factory(session_factory)() as uow:
+        stored = await uow.repository.get_accepted_delta(canon_delta_id="delta-1", project_name=PROJECT, user_id=USER)
+    assert stored is not None
+    assert [operation.target_id for operation in stored.delta.operations] == ["hero"]
+    verify_canon_delta_hash(stored.delta)
 
 
 async def test_narrative_branch_first_commit_records_the_pinned_parent(session_factory: Factory) -> None:

@@ -170,6 +170,10 @@ class CanonTransactionService:
         user_id: str,
         now: datetime,
     ) -> CanonCommitResult:
+        # Decouple from a mutable caller-held object: an isolated round-trip copy
+        # cannot be mutated across the awaited branch lock, so the operations that
+        # apply, validate, and persist are exactly the bytes the approval hash binds.
+        delta = CanonDelta.model_validate(delta.model_dump(mode="json"))
         verify_canon_delta_hash(delta)
         self._validate_approval(delta=delta, approval=approval, project_name=project_name, user_id=user_id)
 
