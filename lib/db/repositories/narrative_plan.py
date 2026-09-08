@@ -112,13 +112,13 @@ class NarrativePlanRepository:
     async def get_version_by_revision(
         self, *, plan_revision_id: str, project_name: str, user_id: str
     ) -> NarrativePlanVersionSnapshot | None:
+        # plan_revision_id is GLOBALLY unique: the lookup is not scope-filtered so the
+        # service can reject cross-scope reuse before a write rather than leaning on the DB
+        # uniqueness constraint. The returned snapshot carries user_id / project_name.
+        _ = (project_name, user_id)
         row = (
             await self.session.execute(
-                select(NarrativePlanVersionModel).where(
-                    NarrativePlanVersionModel.plan_revision_id == plan_revision_id,
-                    NarrativePlanVersionModel.project_name == project_name,
-                    NarrativePlanVersionModel.user_id == user_id,
-                )
+                select(NarrativePlanVersionModel).where(NarrativePlanVersionModel.plan_revision_id == plan_revision_id)
             )
         ).scalar_one_or_none()
         return _version_snapshot(row) if row is not None else None
@@ -126,13 +126,11 @@ class NarrativePlanRepository:
     async def get_version_by_approval(
         self, *, approval_ref: str, project_name: str, user_id: str
     ) -> NarrativePlanVersionSnapshot | None:
+        # approval_ref is GLOBALLY unique -- see get_version_by_revision.
+        _ = (project_name, user_id)
         row = (
             await self.session.execute(
-                select(NarrativePlanVersionModel).where(
-                    NarrativePlanVersionModel.approval_ref == approval_ref,
-                    NarrativePlanVersionModel.project_name == project_name,
-                    NarrativePlanVersionModel.user_id == user_id,
-                )
+                select(NarrativePlanVersionModel).where(NarrativePlanVersionModel.approval_ref == approval_ref)
             )
         ).scalar_one_or_none()
         return _version_snapshot(row) if row is not None else None

@@ -306,18 +306,24 @@ def _relevant_facts(proposition: EpistemicProposition, facts: Iterable[Fact], *,
     return selected
 
 
-def _provably_later(graph: TemporalGraph, anchors: dict[str, datetime], event_ref: str, at: datetime) -> bool:
+def _provably_later(
+    graph: TemporalGraph, anchors: dict[str, datetime], event_ref: str, at: datetime
+) -> tuple[str, ...] | None:
+    """Return the stable evidence path (anchor + relation nodes) that proves the event is
+    later than ``at``, or ``None`` when it is not provably later."""
     direct = anchors.get(event_ref)
     if direct is not None and direct > at:
-        return True
-    for other_ref, other_anchor in anchors.items():
+        return (event_ref,)
+    for other_ref in sorted(anchors):
         if other_ref == event_ref:
             continue
+        other_anchor = anchors[other_ref]
         if other_anchor > at and graph.compare(event_ref, other_ref) is TemporalOrder.SIMULTANEOUS:
-            return True
+            return (other_ref, event_ref)
         if other_anchor >= at and graph.compare(other_ref, event_ref) is TemporalOrder.BEFORE:
-            return True
-    return False
+            path = graph.proof_path(other_ref, event_ref)
+            return path or (other_ref, event_ref)
+    return None
 
 
 class NarrativeInvariantValidator:
@@ -486,17 +492,20 @@ class NarrativeInvariantValidator:
                 )
             )
 
-        findings.extend(
-            _mb_finding(
-                "EPI_EVIDENCE_FUTURE",
-                refs,
-                f"evidence event {event_ref} is provably later than the transition instant",
-                story_time=operation.effective_from,
-                evidence_refs=(event_ref,),
+        for event_ref in operation.evidence_event_refs:
+            proof = _provably_later(graph, anchors, event_ref, operation.effective_from)
+            if proof is None:
+                continue
+            proof_refs = tuple(dict.fromkeys((event_ref, *proof)))
+            findings.append(
+                _mb_finding(
+                    "EPI_EVIDENCE_FUTURE",
+                    refs,
+                    f"evidence event {event_ref} is provably later than the transition instant",
+                    story_time=operation.effective_from,
+                    evidence_refs=proof_refs,
+                )
             )
-            for event_ref in operation.evidence_event_refs
-            if _provably_later(graph, anchors, event_ref, operation.effective_from)
-        )
         return findings
 
     # --- SceneContract validation (spec Section 8.2) -----------------------------

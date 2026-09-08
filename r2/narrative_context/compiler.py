@@ -19,6 +19,7 @@ from r2.contracts import (
     ContextMode,
     DescriptorAuthorityClass,
     DescriptorVisibilityPolicy,
+    Fact,
     NarrativeContextPack,
     NarrativeContextRequest,
     NarrativeContextSegment,
@@ -40,6 +41,7 @@ from .errors import (
     NarrativeContextBudgetError,
     NarrativeContextInputError,
     NarrativeContextValidationError,
+    NarrativeSourceMetadataError,
 )
 from .ports import (
     AcceptedNarrativeReader,
@@ -85,6 +87,45 @@ def _covers(descriptor: NarrativeSourceDescriptor, at: datetime) -> bool:
     return descriptor.effective_until is None or at < descriptor.effective_until
 
 
+def _iso(value: datetime | None) -> str | None:
+    return None if value is None else value.isoformat()
+
+
+def _fact_row(fact: Fact) -> str:
+    return json.dumps(
+        {
+            "subject_ref": fact.subject_ref,
+            "predicate": fact.predicate,
+            "value": ensure_json_value(fact.value),
+            "effective_from": _iso(fact.effective_from),
+            "effective_until": _iso(fact.effective_until),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _scene_constraint_digest(scene: SceneContract) -> str:
+    payload = {
+        "forbidden_events": [item.model_dump(mode="json") for item in scene.forbidden_events],
+        "forbidden_knowledge": [item.model_dump(mode="json") for item in scene.forbidden_knowledge],
+        "required_events": [item.model_dump(mode="json") for item in scene.required_events],
+        "required_reveals": [item.model_dump(mode="json") for item in scene.required_reveals],
+        "entry_state_constraints": [item.model_dump(mode="json") for item in scene.entry_state_constraints],
+        "exit_state_targets": [item.model_dump(mode="json") for item in scene.exit_state_targets],
+        "active_threads": list(scene.active_threads),
+        "promise_payoff_refs": list(scene.promise_payoff_refs),
+        "creative_constraints": list(scene.creative_constraints),
+        "participants": list(scene.participants),
+        "temporal_window": {
+            "effective_from": scene.temporal_window.effective_from.isoformat(),
+            "effective_until": scene.temporal_window.effective_until.isoformat(),
+        },
+    }
+    return json.dumps(ensure_json_value(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
 class NarrativeContextCompiler:
     def __init__(
         self,
@@ -115,7 +156,10 @@ class NarrativeContextCompiler:
         mandatory = self._mandatory_segments(request, canon, scene, pov_view)
         mandatory += await self._policy_segments(request)
 
-        optional, traces = await self._optional_segments_and_traces(request, pov_view)
+        optional, traces = await self._optional_segments_and_traces(request, canon)
+        recent_optional, recent_traces = await self._recent_accepted_segments_and_traces(request, canon)
+        optional += recent_optional
+        traces += recent_traces
 
         used, kept_optional, traces = self._allocate_budget(request, mandatory, optional, traces)
         segments = tuple(mandatory)
@@ -135,6 +179,7 @@ class NarrativeContextCompiler:
             "pov": request.pov_subject_entity_id,
             "story_time": request.story_time.isoformat(),
             "retrieval_snapshot_ref": request.retrieval_snapshot_ref,
+            "recent_accepted_refs": list(request.recent_accepted_refs),
             "token_budget": request.token_budget,
         }
         content_input = {
@@ -177,6 +222,8 @@ class NarrativeContextCompiler:
         )
         if view is None:
             raise NarrativeContextInputError(f"canon version {request.canon_version_id!r} not found in scope")
+        if view.canon_version_id != request.canon_version_id or view.branch_id != request.canon_branch_id:
+            raise NarrativeContextInputError("Canon reader returned a view for a different exact version")
         return view
 
     async def _exact_plan_and_scene(self, request: NarrativeContextRequest) -> tuple[NarrativePlan, SceneContract]:
@@ -196,6 +243,13 @@ class NarrativeContextCompiler:
         )
         if plan is None or scene is None:
             raise NarrativeContextInputError("exact plan or scene version not found in scope")
+        if (plan.plan_id, plan.version) != (request.plan_id, request.plan_version):
+            raise NarrativeContextInputError("plan reader returned a different exact plan version")
+        if (scene.scene_contract_id, scene.version) != (
+            request.scene_contract_id,
+            request.scene_contract_version,
+        ):
+            raise NarrativeContextInputError("plan reader returned a different exact scene version")
         if request.story_time != scene.temporal_window.effective_from:
             raise NarrativeContextInputError("story_time must equal the scene temporal_window.effective_from")
         return plan, scene
@@ -236,10 +290,16 @@ class NarrativeContextCompiler:
                 priority=_MANDATORY_PRIORITY[ContextChannel.AUTHORIAL_INTENT],
             )
         ]
-        if request.mode is ContextMode.AUTHOR_DRAFT:
-            truth = json.dumps(
-                sorted(f"{fact.subject_ref}/{fact.predicate}" for fact in canon.content.facts_by_id.values())
+        segments.append(
+            self._segment(
+                channel=ContextChannel.AUTHORIAL_INTENT,
+                source_ref=f"{request.scene_contract_id}@{request.scene_contract_version}#forbidden",
+                content=_scene_constraint_digest(scene),
+                priority=_MANDATORY_PRIORITY[ContextChannel.AUTHORIAL_INTENT],
             )
+        )
+        if request.mode is ContextMode.AUTHOR_DRAFT:
+            truth = json.dumps(sorted(_fact_row(fact) for fact in canon.content.facts_by_id.values()))
             segments.append(
                 self._segment(
                     channel=ContextChannel.AUTHOR_TRUTH,
@@ -251,6 +311,9 @@ class NarrativeContextCompiler:
         pov = request.pov_subject_entity_id
         if pov_view is not None and pov is not None:
             for bucket_name, channel in _POV_CHANNEL.items():
+                if bucket_name == "explicit_unknown" and request.mode is ContextMode.CHARACTER_SIMULATION:
+                    # Explicit-unknown content is forbidden in character simulation.
+                    continue
                 items = getattr(pov_view, bucket_name)
                 if not items:
                     continue
@@ -286,7 +349,7 @@ class NarrativeContextCompiler:
         ]
 
     async def _optional_segments_and_traces(
-        self, request: NarrativeContextRequest, pov_view: EpistemicView | None
+        self, request: NarrativeContextRequest, canon: ResolvedCanonView
     ) -> tuple[list[tuple[str, NarrativeContextSegment]], list[SelectionTrace]]:
         if request.retrieval_snapshot_ref is None:
             return [], []
@@ -303,7 +366,7 @@ class NarrativeContextCompiler:
         seen: set[tuple[str, str]] = set()
         for candidate in sorted(snapshot.candidates, key=lambda item: item.candidate_id):
             descriptor = candidate.source_descriptor
-            reason = self._reject_reason(request, descriptor, candidate.content, pov_view)
+            reason = self._reject_reason(request, descriptor, candidate.content, canon)
             if reason is not None:
                 traces.append(
                     SelectionTrace(
@@ -357,56 +420,133 @@ class NarrativeContextCompiler:
         request: NarrativeContextRequest,
         descriptor: NarrativeSourceDescriptor,
         prose: str,
-        pov_view: EpistemicView | None,
+        canon: ResolvedCanonView,
     ) -> SelectionTraceReason | None:
         if descriptor.user_id != request.user_id or descriptor.project_name != request.project_name:
             return SelectionTraceReason.WRONG_SCOPE
         if descriptor.content_hash != compute_source_content_hash(prose):
             return SelectionTraceReason.MISSING_SOURCE_METADATA
-        if descriptor.authority_class in (
+
+        requires_both_bases = descriptor.authority_class in (
             DescriptorAuthorityClass.ACCEPTED_NARRATIVE,
             DescriptorAuthorityClass.SUMMARY,
-        ):
-            canon_basis = descriptor.canon_basis
-            plan_basis = descriptor.plan_basis
-            if canon_basis is None or canon_basis.canon_version_id != request.canon_version_id:
+        )
+        subjects = descriptor.visibility_policy is DescriptorVisibilityPolicy.SUBJECTS
+        if requires_both_bases or subjects:
+            basis = descriptor.canon_basis
+            if (
+                basis is None
+                or basis.branch_id != request.canon_branch_id
+                or basis.canon_version_id != request.canon_version_id
+            ):
                 return SelectionTraceReason.UNRESOLVED_VISIBILITY_BASIS
+        if requires_both_bases:
+            plan_basis = descriptor.plan_basis
             if (
                 plan_basis is None
                 or plan_basis.plan_id != request.plan_id
                 or plan_basis.plan_version != request.plan_version
             ):
                 return SelectionTraceReason.UNRESOLVED_VISIBILITY_BASIS
+
         if not _covers(descriptor, request.story_time):
             return SelectionTraceReason.OUT_OF_TIME
-        return self._visibility_reason(request, descriptor, pov_view)
+        return self._visibility_reason(request, descriptor, canon)
 
     def _visibility_reason(
         self,
         request: NarrativeContextRequest,
         descriptor: NarrativeSourceDescriptor,
-        pov_view: EpistemicView | None,
+        canon: ResolvedCanonView,
     ) -> SelectionTraceReason | None:
         if descriptor.visibility_policy is DescriptorVisibilityPolicy.AUTHOR_ONLY:
             if request.mode is ContextMode.CHARACTER_SIMULATION:
                 return SelectionTraceReason.NOT_VISIBLE
             return None
-        # SUBJECTS
-        if request.mode is ContextMode.AUTHOR_DRAFT:
-            return None
-        pov = request.pov_subject_entity_id
-        if pov is None or pov not in descriptor.visibility_subjects or pov_view is None:
-            return SelectionTraceReason.NOT_VISIBLE
+
+        # SUBJECTS: the descriptor's whole declared proof matrix -- every (subject,
+        # proposition) pair -- must be proven by an active KnowledgeState named in
+        # visibility_knowledge_state_refs in KNOWN / SUSPECTED / FALSE_BELIEF at the
+        # story time. UNKNOWN and absence deny visibility. This is checked in every
+        # mode; author draft additionally sees the segment, simulation only if the POV
+        # subject is one of the named subjects.
         allowed_ks = set(descriptor.visibility_knowledge_state_refs)
-        proven_props = {
-            item.proposition.proposition_ref
-            for bucket in (pov_view.known, pov_view.suspected, pov_view.false_beliefs)
-            for item in bucket
-            if item.knowledge_state_id in allowed_ks
-        }
-        if not set(descriptor.proposition_refs).issubset(proven_props):
-            return SelectionTraceReason.NOT_VISIBLE
+        wanted = set(descriptor.proposition_refs)
+        for subject in descriptor.visibility_subjects:
+            try:
+                view = EpistemicViewResolver().resolve(canon=canon, subject_entity_id=subject, at=request.story_time)
+            except EpistemicIntegrityError:
+                return SelectionTraceReason.UNRESOLVED_VISIBILITY_BASIS
+            proven = {
+                item.proposition.proposition_ref
+                for bucket in (view.known, view.suspected, view.false_beliefs)
+                for item in bucket
+                if item.knowledge_state_id in allowed_ks
+            }
+            if not wanted.issubset(proven):
+                return SelectionTraceReason.NOT_VISIBLE
+
+        if request.mode is ContextMode.CHARACTER_SIMULATION:
+            pov = request.pov_subject_entity_id
+            if pov is None or pov not in descriptor.visibility_subjects:
+                return SelectionTraceReason.NOT_VISIBLE
         return None
+
+    async def _recent_accepted_segments_and_traces(
+        self, request: NarrativeContextRequest, canon: ResolvedCanonView
+    ) -> tuple[list[tuple[str, NarrativeContextSegment]], list[SelectionTrace]]:
+        eligible: list[tuple[str, NarrativeContextSegment]] = []
+        traces: list[SelectionTrace] = []
+        seen: set[tuple[str, str]] = set()
+        for ref in request.recent_accepted_refs:
+            record = await self._accepted_reader.get_exact(
+                accepted_narrative_ref=ref, project_name=request.project_name, user_id=request.user_id
+            )
+            if record is None:
+                raise NarrativeSourceMetadataError(f"recent accepted narrative {ref!r} not found in scope")
+            descriptor = record.descriptor
+            reason = self._reject_reason(request, descriptor, record.content, canon)
+            if reason is not None:
+                traces.append(
+                    SelectionTrace(
+                        candidate_id=ref,
+                        source_ref=descriptor.source_ref,
+                        status=SelectionTraceStatus.OMITTED,
+                        reason=reason,
+                    )
+                )
+                continue
+            key = (descriptor.source_ref, descriptor.content_hash)
+            if key in seen:
+                traces.append(
+                    SelectionTrace(
+                        candidate_id=ref,
+                        source_ref=descriptor.source_ref,
+                        status=SelectionTraceStatus.OMITTED,
+                        reason=SelectionTraceReason.DUPLICATE,
+                        content_hash=descriptor.content_hash,
+                        token_count=self._token_counter.count(record.content),
+                    )
+                )
+                continue
+            seen.add(key)
+            eligible.append(
+                (
+                    ref,
+                    self._segment(
+                        channel=ContextChannel.RECENT_ACCEPTED,
+                        source_ref=descriptor.source_ref,
+                        content=record.content,
+                        priority=_OPTIONAL_PRIORITY[ContextChannel.RECENT_ACCEPTED],
+                        descriptor_ref=descriptor.descriptor_ref,
+                        basis_refs=tuple(descriptor.source_basis_refs),
+                        effective_from=descriptor.effective_from,
+                        effective_until=descriptor.effective_until,
+                        visibility_subjects=tuple(descriptor.visibility_subjects),
+                    ),
+                )
+            )
+        return eligible, traces
 
     def _allocate_budget(
         self,
@@ -473,6 +613,11 @@ class NarrativeContextCompiler:
         return {
             "channel": seg.channel.value,
             "source_ref": seg.source_ref,
+            "descriptor_ref": seg.descriptor_ref,
+            "basis_refs": list(seg.basis_refs),
+            "effective_from": _iso(seg.effective_from),
+            "effective_until": _iso(seg.effective_until),
+            "visibility_subjects": list(seg.visibility_subjects),
             "content_hash": seg.content_hash,
             "token_count": seg.token_count,
             "priority": seg.priority,

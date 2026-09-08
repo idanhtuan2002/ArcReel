@@ -7,8 +7,6 @@ findings rather than repairing, and never selects a fallback version.
 
 from __future__ import annotations
 
-from itertools import pairwise
-
 from r2.contracts import (
     NarrativeValidationFinding,
     NarrativeValidationReport,
@@ -53,23 +51,16 @@ class NarrativePlanIntegrityChecker:
                 _finding("PLAN_VERSION_GAP", (plan_id,), f"plan {plan_id!r} version numbers are not 1..N: {numbers}")
             )
 
-        for earlier, later in pairwise(versions):
-            if later.parent_version != earlier.version:
+        for version in versions:
+            expected = None if version.version == 1 else version.version - 1
+            if version.parent_version != expected or version.content.parent_version != expected:
                 findings.append(
                     _finding(
                         "PLAN_VERSION_PARENT_MISMATCH",
-                        (plan_id, str(later.version)),
-                        f"plan {plan_id!r} version {later.version} does not name {earlier.version} as parent",
+                        (plan_id, str(version.version)),
+                        f"plan {plan_id!r} version {version.version} row/content parent_version is not {expected!r}",
                     )
                 )
-        if versions and versions[0].parent_version is not None:
-            findings.append(
-                _finding(
-                    "PLAN_VERSION_PARENT_MISMATCH",
-                    (plan_id, "1"),
-                    f"plan {plan_id!r} version 1 must have no parent",
-                )
-            )
 
         if head is not None and head.head_version is None and versions:
             findings.append(

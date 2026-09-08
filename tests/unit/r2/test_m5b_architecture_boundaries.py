@@ -26,9 +26,16 @@ _CONTEXT_FORBIDDEN_IMPORT_NEEDLES = (
     "uow_factory",
 )
 _MUTATION_ATTRS = {"insert", "update", "delete", "flush", "commit", "rollback", "add", "execute"}
-# Plan-unique write attrs (``insert_version`` / ``advance_head`` names are shared with the
-# Canon repository, so the sensor keys on the two that are unambiguously plan-scoped).
-_PLAN_WRITE_ATTRS = {"insert_plan", "lock_plan"}
+# The full NarrativePlan authoritative write surface (``NarrativePlanWritePort``).
+_PLAN_WRITE_ATTRS = {"insert_plan", "insert_version", "advance_head", "lock_plan"}
+# Files that legitimately drive the plan write port. Each is additionally asserted to
+# carry no Canon authority symbol, so a Canon writer cannot hide behind this allowlist.
+_PLAN_WRITE_ALLOWED = {
+    "r2/narrative_plan/service.py",
+    "lib/db/repositories/narrative_plan.py",
+    "lib/db/narrative_plan_uow.py",
+}
+_CANON_AUTHORITY_SYMBOLS = ("CanonWriteRepositoryPort", "CanonRepository", "CanonAuthorityUnitOfWork")
 _CANON_WRITE_IMPORT_NEEDLES = (
     "canon_transaction",
     "r2.narrative.ports",
@@ -95,10 +102,12 @@ def test_narrative_plan_service_cannot_reach_canon_authoritative_writes() -> Non
 
 
 def test_only_the_plan_service_calls_plan_authoritative_writes() -> None:
-    allowed = {
-        "r2/narrative_plan/service.py",
-        "lib/db/repositories/narrative_plan.py",
-        "lib/db/narrative_plan_uow.py",
+    # ``insert_version`` / ``advance_head`` names are shared with the Canon repository, so
+    # the two Canon-write files are also exempt; each plan-allowlist file is separately
+    # asserted (below) to carry no Canon authority symbol.
+    allowed = _PLAN_WRITE_ALLOWED | {
+        "r2/narrative/canon_transaction.py",
+        "lib/db/repositories/canon_repo.py",
     }
     offenders: set[str] = set()
     for root in ("r2", "server", "lib"):
@@ -111,11 +120,17 @@ def test_only_the_plan_service_calls_plan_authoritative_writes() -> None:
     assert offenders == set()
 
 
+def test_plan_write_allowlist_files_carry_no_canon_authority_symbol() -> None:
+    for rel in _PLAN_WRITE_ALLOWED:
+        text = (_ROOT / rel).read_text(encoding="utf-8")
+        for symbol in _CANON_AUTHORITY_SYMBOLS:
+            assert symbol not in text, (rel, symbol)
+
+
 def test_only_the_plan_service_references_the_plan_write_port() -> None:
     allowed = {
         "r2/narrative_plan/ports.py",
         "r2/narrative_plan/service.py",
-        "r2/narrative_plan/__init__.py",
         "lib/db/narrative_plan_uow.py",
         "lib/db/repositories/narrative_plan.py",
     }

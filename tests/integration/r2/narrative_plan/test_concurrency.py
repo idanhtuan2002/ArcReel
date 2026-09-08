@@ -48,14 +48,16 @@ class _Reader:
         )
 
 
-def _content(frame: str) -> NarrativePlanContent:
+def _content(frame: str, parent_version: int | None = None) -> NarrativePlanContent:
     return NarrativePlanContent(
-        canon_basis=CanonBasis(branch_id="main", canon_version_id="canon-v1"), story_frame=frame
+        parent_version=parent_version,
+        canon_basis=CanonBasis(branch_id="main", canon_version_id="canon-v1"),
+        story_frame=frame,
     )
 
 
 def _proposal(plan_id: str, expected: int | None, revision: str, frame: str) -> NarrativePlanRevisionProposal:
-    content = _content(frame)
+    content = _content(frame, parent_version=expected)
     return NarrativePlanRevisionProposal(
         plan_revision_id=revision,
         plan_id=plan_id,

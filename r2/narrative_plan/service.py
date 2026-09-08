@@ -62,6 +62,10 @@ class NarrativePlanService:
             raise NarrativePlanValidationError("proposal content_hash does not match its content")
         if approval.content_hash != recomputed_hash:
             raise NarrativePlanApprovalError("approval content_hash does not match the proposed content")
+        if content.parent_version != proposal.expected_version:
+            raise NarrativePlanValidationError(
+                "proposed_content.parent_version must equal the proposal expected_version"
+            )
 
         async with self._uow_factory() as uow:
             repository = uow.repository
@@ -70,7 +74,13 @@ class NarrativePlanService:
                 plan_revision_id=proposal.plan_revision_id, project_name=project_name, user_id=user_id
             )
             if existing is not None:
-                return self._resolve_exact_retry(existing=existing, proposal=proposal, approval=approval)
+                return self._resolve_exact_retry(
+                    existing=existing,
+                    proposal=proposal,
+                    approval=approval,
+                    project_name=project_name,
+                    user_id=user_id,
+                )
 
             approved_elsewhere = await repository.get_version_by_approval(
                 approval_ref=approval.approval_ref, project_name=project_name, user_id=user_id
@@ -171,11 +181,17 @@ class NarrativePlanService:
         existing: NarrativePlanVersionSnapshot,
         proposal: NarrativePlanRevisionProposal,
         approval: NarrativePlanApproval,
+        project_name: str,
+        user_id: str,
     ) -> NarrativePlanCommitResult:
+        expected_parent = None if proposal.expected_version is None else proposal.expected_version
         if (
             existing.approval_ref != approval.approval_ref
             or existing.content_hash != proposal.content_hash
             or existing.plan_id != proposal.plan_id
+            or existing.parent_version != expected_parent
+            or existing.user_id != user_id
+            or existing.project_name != project_name
         ):
             raise NarrativePlanIdentityConflictError(
                 f"plan revision {proposal.plan_revision_id!r} was already committed with a different identity"
@@ -205,6 +221,15 @@ class NarrativePlanService:
         if view is None:
             raise NarrativePlanValidationError(
                 f"canon basis {content.canon_basis.canon_version_id!r} not found in scope"
+            )
+        # ``get_exact`` is a claim; verify the returned identity so a fallback-to-head
+        # adapter cannot approve a plan against a different Canon version.
+        if (
+            view.branch_id != content.canon_basis.branch_id
+            or view.canon_version_id != content.canon_basis.canon_version_id
+        ):
+            raise NarrativePlanValidationError(
+                "Canon reader returned a view that does not match the requested exact basis"
             )
         return view
 

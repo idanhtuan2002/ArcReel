@@ -127,7 +127,11 @@ class NarrativeSourceDescriptor(R2ContractModel):
         ):
             raise ValueError("descriptor effective_until must be after effective_from")
 
-        canon_ok = self.canon_basis is not None and self.canon_basis.canon_version_id is not None
+        canon_ok = (
+            self.canon_basis is not None
+            and self.canon_basis.branch_id is not None
+            and self.canon_basis.canon_version_id is not None
+        )
         plan_ok = (
             self.plan_basis is not None
             and self.plan_basis.plan_id is not None

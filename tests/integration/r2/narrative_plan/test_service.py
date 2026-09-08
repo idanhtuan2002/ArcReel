@@ -58,16 +58,20 @@ def _canon_view(version_id: str = "canon-v1") -> ResolvedCanonView:
     )
 
 
-def _content(*, canon_version_id: str = "canon-v1", frame: str = "frame") -> NarrativePlanContent:
+def _content(
+    *, canon_version_id: str = "canon-v1", frame: str = "frame", parent_version: int | None = None
+) -> NarrativePlanContent:
     return NarrativePlanContent(
-        canon_basis=CanonBasis(branch_id="main", canon_version_id=canon_version_id), story_frame=frame
+        parent_version=parent_version,
+        canon_basis=CanonBasis(branch_id="main", canon_version_id=canon_version_id),
+        story_frame=frame,
     )
 
 
 def _proposal(
     *, plan_id: str = "plan-1", expected_version: int | None = None, revision: str = "rev-1", frame: str = "frame"
 ) -> NarrativePlanRevisionProposal:
-    content = _content(frame=frame)
+    content = _content(frame=frame, parent_version=expected_version)
     return NarrativePlanRevisionProposal(
         plan_revision_id=revision,
         plan_id=plan_id,

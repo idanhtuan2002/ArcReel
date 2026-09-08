@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from r2.contracts import NarrativePlan, SceneContract
-from r2.contracts.narrative_context import RetrievalSnapshot
+from r2.contracts.narrative_context import NarrativeSourceDescriptor, RetrievalSnapshot
 from r2.narrative.canon_state import ResolvedCanonView
 
 
@@ -59,7 +59,7 @@ class AcceptedNarrativeRecord(Protocol):
     def content(self) -> str: ...
 
     @property
-    def descriptor_ref(self) -> str: ...
+    def descriptor(self) -> NarrativeSourceDescriptor: ...
 
 
 class AcceptedNarrativeReader(Protocol):

@@ -16,6 +16,8 @@ from collections.abc import Iterable
 
 RESERVED_MIGRATION = "alembic/versions/5b7c4a0e0001_add_narrative_plans.py"
 
+FINAL_ONLY_ALLOWLIST: frozenset[str] = frozenset({"docs/r2/evidence/R2_M5B_FINAL_VERIFICATION.md"})
+
 DOC_ALLOWLIST: frozenset[str] = frozenset(
     {
         "docs/superpowers/specs/2026-09-08-r2-m5b-epistemic-plan-context-design.md",
@@ -29,72 +31,77 @@ DOC_ALLOWLIST: frozenset[str] = frozenset(
     }
 )
 
-IMPLEMENTATION_ALLOWLIST: frozenset[str] = DOC_ALLOWLIST | frozenset(
-    {
-        "pyproject.toml",
-        RESERVED_MIGRATION,
-        "r2/contracts/__init__.py",
-        "r2/contracts/narrative.py",
-        "r2/contracts/narrative_plan.py",
-        "r2/contracts/narrative_context.py",
-        "r2/narrative/__init__.py",
-        "r2/narrative/errors.py",
-        "r2/narrative/hashing.py",
-        "r2/narrative/schema_upgrade.py",
-        "r2/narrative/canon_state.py",
-        "r2/narrative/temporal.py",
-        "r2/narrative/epistemic.py",
-        "r2/narrative/validation.py",
-        "r2/narrative/canon_transaction.py",
-        "r2/narrative/canon_resolver.py",
-        "r2/narrative/integrity.py",
-        "r2/narrative_plan/__init__.py",
-        "r2/narrative_plan/errors.py",
-        "r2/narrative_plan/hashing.py",
-        "r2/narrative_plan/validation.py",
-        "r2/narrative_plan/integrity.py",
-        "r2/narrative_plan/ports.py",
-        "r2/narrative_plan/service.py",
-        "r2/narrative_context/__init__.py",
-        "r2/narrative_context/errors.py",
-        "r2/narrative_context/ports.py",
-        "r2/narrative_context/compiler.py",
-        "lib/db/models/__init__.py",
-        "lib/db/models/narrative_plan.py",
-        "lib/db/repositories/narrative_plan.py",
-        "lib/db/narrative_plan_uow.py",
-        "scripts/r2/verify_m5b_scope.py",
-        "tests/fixtures/r2/__init__.py",
-        "tests/fixtures/r2/m5b_narrative_corpus.py",
-        "tests/unit/r2/contracts/test_narrative_v2.py",
-        "tests/unit/r2/contracts/test_narrative_plan.py",
-        "tests/unit/r2/contracts/test_narrative_context.py",
-        "tests/unit/r2/narrative/test_schema_upgrade.py",
-        "tests/unit/r2/narrative/test_hashing.py",
-        "tests/unit/r2/narrative/test_canon_state.py",
-        "tests/unit/r2/narrative/test_temporal.py",
-        "tests/unit/r2/narrative/test_epistemic.py",
-        "tests/unit/r2/narrative/test_validation.py",
-        "tests/unit/r2/narrative/test_validation_m5b.py",
-        "tests/unit/r2/narrative/test_canon_architecture_boundaries.py",
-        "tests/unit/r2/narrative_plan/_helpers.py",
-        "tests/unit/r2/narrative_plan/test_plan_hashing.py",
-        "tests/unit/r2/narrative_plan/test_plan_validation.py",
-        "tests/unit/r2/narrative_context/test_compiler.py",
-        "tests/unit/r2/test_m5b_architecture_boundaries.py",
-        "tests/unit/lib/db/models/test_narrative_plan.py",
-        "tests/unit/scripts/r2/test_verify_m5b_scope.py",
-        "tests/integration/r2/narrative/test_canon_v2_replay.py",
-        "tests/integration/r2/narrative_plan/test_integrity.py",
-        "tests/integration/r2/narrative_plan/test_service.py",
-        "tests/integration/r2/narrative_plan/test_concurrency.py",
-        "tests/integration/r2/test_m5b_acceptance.py",
-        "tests/integration/lib/db/migrations/test_alembic_narrative_plan.py",
-        "tests/integration/lib/db/repositories/test_narrative_plan.py",
-    }
+# The final-verification doc is written after the pre-review verified head and
+# updated again when the Codex review fixes land, so it is in scope for both the
+# implementation range and the post-verified handoff range.
+IMPLEMENTATION_ALLOWLIST: frozenset[str] = (
+    DOC_ALLOWLIST
+    | FINAL_ONLY_ALLOWLIST
+    | frozenset(
+        {
+            "pyproject.toml",
+            RESERVED_MIGRATION,
+            "r2/contracts/__init__.py",
+            "r2/contracts/narrative.py",
+            "r2/contracts/narrative_plan.py",
+            "r2/contracts/narrative_context.py",
+            "r2/narrative/__init__.py",
+            "r2/narrative/errors.py",
+            "r2/narrative/hashing.py",
+            "r2/narrative/schema_upgrade.py",
+            "r2/narrative/canon_state.py",
+            "r2/narrative/temporal.py",
+            "r2/narrative/epistemic.py",
+            "r2/narrative/validation.py",
+            "r2/narrative/canon_transaction.py",
+            "r2/narrative/canon_resolver.py",
+            "r2/narrative/integrity.py",
+            "r2/narrative_plan/__init__.py",
+            "r2/narrative_plan/errors.py",
+            "r2/narrative_plan/hashing.py",
+            "r2/narrative_plan/validation.py",
+            "r2/narrative_plan/integrity.py",
+            "r2/narrative_plan/ports.py",
+            "r2/narrative_plan/service.py",
+            "r2/narrative_context/__init__.py",
+            "r2/narrative_context/errors.py",
+            "r2/narrative_context/ports.py",
+            "r2/narrative_context/compiler.py",
+            "lib/db/models/__init__.py",
+            "lib/db/models/narrative_plan.py",
+            "lib/db/repositories/narrative_plan.py",
+            "lib/db/narrative_plan_uow.py",
+            "scripts/r2/verify_m5b_scope.py",
+            "tests/fixtures/r2/__init__.py",
+            "tests/fixtures/r2/m5b_narrative_corpus.py",
+            "tests/unit/r2/contracts/test_narrative_v2.py",
+            "tests/unit/r2/contracts/test_narrative_plan.py",
+            "tests/unit/r2/contracts/test_narrative_context.py",
+            "tests/unit/r2/narrative/test_schema_upgrade.py",
+            "tests/unit/r2/narrative/test_hashing.py",
+            "tests/unit/r2/narrative/test_canon_state.py",
+            "tests/unit/r2/narrative/test_temporal.py",
+            "tests/unit/r2/narrative/test_epistemic.py",
+            "tests/unit/r2/narrative/test_validation.py",
+            "tests/unit/r2/narrative/test_validation_m5b.py",
+            "tests/unit/r2/narrative/test_canon_architecture_boundaries.py",
+            "tests/unit/r2/narrative_plan/_helpers.py",
+            "tests/unit/r2/narrative_plan/test_plan_hashing.py",
+            "tests/unit/r2/narrative_plan/test_plan_validation.py",
+            "tests/unit/r2/narrative_context/test_compiler.py",
+            "tests/unit/r2/test_m5b_architecture_boundaries.py",
+            "tests/unit/lib/db/models/test_narrative_plan.py",
+            "tests/unit/scripts/r2/test_verify_m5b_scope.py",
+            "tests/integration/r2/narrative/test_canon_v2_replay.py",
+            "tests/integration/r2/narrative_plan/test_integrity.py",
+            "tests/integration/r2/narrative_plan/test_service.py",
+            "tests/integration/r2/narrative_plan/test_concurrency.py",
+            "tests/integration/r2/test_m5b_acceptance.py",
+            "tests/integration/lib/db/migrations/test_alembic_narrative_plan.py",
+            "tests/integration/lib/db/repositories/test_narrative_plan.py",
+        }
+    )
 )
-
-FINAL_ONLY_ALLOWLIST: frozenset[str] = frozenset({"docs/r2/evidence/R2_M5B_FINAL_VERIFICATION.md"})
 
 
 def _git_diff_names(base: str, head: str) -> list[str]:

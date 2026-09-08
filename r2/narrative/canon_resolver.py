@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from r2.contracts import CanonBranchSnapshot, CanonContent, CanonDelta, CanonVersionSnapshot
+from r2.contracts import CANON_SCHEMA_V1, CanonBranchSnapshot, CanonContent, CanonDelta, CanonVersionSnapshot
 
 from .canon_state import ResolvedCanonView, apply_canon_delta, empty_canon_content
 from .errors import CanonIntegrityError, CanonNotFoundError, CanonOperationError
@@ -21,6 +21,15 @@ from .ports import CanonProjectionRepositoryPort
 from .validation import NarrativeInvariantValidator
 
 _DEFAULT_BASE_SCHEMA_VERSION = "r2-canon-schema-v1"
+
+
+def _content_is_schema_shaped(content: CanonContent, schema_version: str) -> bool:
+    """A v1-labelled view may not carry any schema-v2 content the v1 hash cannot cover."""
+    if schema_version != CANON_SCHEMA_V1:
+        return True
+    return not (
+        content.epistemic_propositions_by_ref or content.knowledge_states_by_id or content.temporal_relations_by_id
+    )
 
 
 def _utc_now() -> datetime:
@@ -104,6 +113,11 @@ class CanonResolver:
             or view.content_hash_version != version.content_hash_version
             or view.content_schema_version != version.content_schema_version
         ):
+            return False
+        if not _content_is_schema_shaped(view.content, view.content_schema_version):
+            # A v1 selector serialization excludes the v2 maps, so a v1 projection carrying
+            # non-empty epistemic/temporal content re-hashes to the same v1 digest. Force a
+            # replay rather than return the injected content as authority.
             return False
         recomputed = compute_canon_content_hash(
             view.content,
