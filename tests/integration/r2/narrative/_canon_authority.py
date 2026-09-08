@@ -48,11 +48,11 @@ PROJECT = "project-a"
 type Factory = async_sessionmaker[AsyncSession]
 
 
-def main_branch(*, branch_id: str = "main") -> CanonBranchSnapshot:
+def main_branch(*, branch_id: str = "main", user_id: str = USER, project_name: str = PROJECT) -> CanonBranchSnapshot:
     return CanonBranchSnapshot(
         branch_id=branch_id,
-        user_id=USER,
-        project_name=PROJECT,
+        user_id=user_id,
+        project_name=project_name,
         branch_type=CanonBranchType.MAIN,
         parent_branch_id=None,
         parent_version_id=None,
@@ -185,6 +185,36 @@ async def seed_main_genesis(
     return branch, content
 
 
+async def seed_main_two_versions(factory: Factory) -> tuple[CanonContent, CanonContent]:
+    branch = main_branch()
+    v1 = await commit_version(
+        factory,
+        branch=branch,
+        base_content=empty_canon_content(),
+        base_version_id=None,
+        add_entity_id="hero",
+        version_id="main-v1",
+        version_number=1,
+        parent_version_id=None,
+        delta_id="delta-main-1",
+        approval_ref="approval-main-1",
+        insert_branch=True,
+    )
+    v2 = await commit_version(
+        factory,
+        branch=branch,
+        base_content=v1,
+        base_version_id="main-v1",
+        add_entity_id="villain",
+        version_id="main-v2",
+        version_number=2,
+        parent_version_id="main-v1",
+        delta_id="delta-main-2",
+        approval_ref="approval-main-2",
+    )
+    return v1, v2
+
+
 async def seed_pinned_child(factory: Factory) -> dict[str, object]:
     _, main_content = await seed_main_genesis(factory, entity_id="parent-entity", version_id="main-v1")
     child = narrative_branch(parent_version_id="main-v1")
@@ -208,22 +238,6 @@ async def seed_pinned_child(factory: Factory) -> dict[str, object]:
         "child_content_hash": compute_canon_content_hash(child_content),
         "main_version_id": "main-v1",
     }
-
-
-async def advance_main_to_v2(factory: Factory) -> CanonContent:
-    _, main_content = await seed_main_genesis(factory, entity_id="parent-entity", version_id="main-v1")
-    return await commit_version(
-        factory,
-        branch=main_branch(),
-        base_content=main_content,
-        base_version_id="main-v1",
-        add_entity_id="main-extra",
-        version_id="main-v2",
-        version_number=2,
-        parent_version_id="main-v1",
-        delta_id="delta-main-2",
-        approval_ref="approval-main-2",
-    )
 
 
 def _entity(entity_id: str) -> Entity:
@@ -454,12 +468,62 @@ async def tamper_delta_operations(factory: Factory, delta_id: str) -> None:
         await session.commit()
 
 
-async def break_version_parent(factory: Factory, version_id: str) -> None:
+async def set_branch_head(factory: Factory, branch_id: str, head_version_id: str | None) -> None:
+    async with factory() as session:
+        await session.execute(
+            update(CanonBranchModel)
+            .where(CanonBranchModel.branch_id == branch_id)
+            .values(head_version_id=head_version_id)
+        )
+        await session.commit()
+
+
+async def set_version_number(factory: Factory, version_id: str, number: int) -> None:
     async with factory() as session:
         await session.execute(
             update(CanonVersionModel)
             .where(CanonVersionModel.canon_version_id == version_id)
-            .values(parent_version_id="ghost-parent")
+            .values(version_number=number)
+        )
+        await session.commit()
+
+
+async def set_version_parent(factory: Factory, version_id: str, parent_version_id: str | None) -> None:
+    async with factory() as session:
+        await session.execute(
+            update(CanonVersionModel)
+            .where(CanonVersionModel.canon_version_id == version_id)
+            .values(parent_version_id=parent_version_id)
+        )
+        await session.commit()
+
+
+async def set_version_content_hash(factory: Factory, version_id: str, content_hash: str) -> None:
+    async with factory() as session:
+        await session.execute(
+            update(CanonVersionModel)
+            .where(CanonVersionModel.canon_version_id == version_id)
+            .values(content_hash=content_hash)
+        )
+        await session.commit()
+
+
+async def set_delta_committed_version(factory: Factory, delta_id: str, committed_version_id: str) -> None:
+    async with factory() as session:
+        await session.execute(
+            update(CanonDeltaModel)
+            .where(CanonDeltaModel.canon_delta_id == delta_id)
+            .values(committed_version_id=committed_version_id)
+        )
+        await session.commit()
+
+
+async def set_branch_parent_branch(factory: Factory, branch_id: str, parent_branch_id: str) -> None:
+    async with factory() as session:
+        await session.execute(
+            update(CanonBranchModel)
+            .where(CanonBranchModel.branch_id == branch_id)
+            .values(parent_branch_id=parent_branch_id)
         )
         await session.commit()
 

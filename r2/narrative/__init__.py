@@ -19,6 +19,7 @@ from .hashing import (
     verify_canon_content_hash,
     verify_canon_delta_hash,
 )
+from .integrity import CanonIntegrityChecker, CanonIntegrityFinding, CanonIntegrityReport
 
 __all__ = [
     "CanonApprovalError",
@@ -26,7 +27,10 @@ __all__ = [
     "CanonCommitStage",
     "CanonError",
     "CanonIdentityConflictError",
+    "CanonIntegrityChecker",
     "CanonIntegrityError",
+    "CanonIntegrityFinding",
+    "CanonIntegrityReport",
     "CanonNotFoundError",
     "CanonOperationError",
     "CanonResolutionService",
