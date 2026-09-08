@@ -11,18 +11,30 @@ from r2.contracts import (
     CanonValidationReport,
     EpistemicProposition,
     EpistemicState,
+    Event,
     Fact,
     KnowledgeState,
+    NarrativePlan,
     NarrativeValidationFinding,
     NarrativeValidationReport,
     NarrativeValidationSeverity,
     RetireFactOperation,
+    SceneContract,
     UpdateKnowledgeOperation,
     canonical_json_bytes,
     ensure_json_value,
 )
+from r2.contracts.narrative_plan import (
+    AudienceRevealEvidence,
+    CharacterRevealRecipient,
+    SceneEventConstraint,
+    SceneFactConstraint,
+    SceneKnowledgeConstraint,
+)
 
 from .canon_state import ResolvedCanonView
+from .epistemic import EpistemicViewResolver
+from .errors import EpistemicIntegrityError
 from .temporal import TemporalGraph, TemporalOrder, validate_relations
 
 RULES = (
@@ -486,3 +498,276 @@ class NarrativeInvariantValidator:
             if _provably_later(graph, anchors, event_ref, operation.effective_from)
         )
         return findings
+
+    # --- SceneContract validation (spec Section 8.2) -----------------------------
+
+    def validate_scene(
+        self, *, canon: ResolvedCanonView, plan: NarrativePlan, scene: SceneContract
+    ) -> NarrativeValidationReport:
+        _ = plan
+        findings: list[NarrativeValidationFinding | None] = []
+        window = scene.temporal_window
+        findings.extend(
+            _scene_state_finding(canon, item, at=window.effective_from, phase="ENTRY")
+            for item in scene.entry_state_constraints
+        )
+        findings.extend(
+            _forbidden_knowledge_finding(canon, item, window.effective_from, window.effective_until)
+            for item in scene.forbidden_knowledge
+        )
+        required_keys = {_event_selector_key(item) for item in scene.required_events}
+        findings.extend(
+            _mb_finding(
+                "SCENE_EVENT_REQUIRED_FORBIDDEN_COLLISION",
+                (scene.scene_contract_id, item.constraint_id),
+                f"scene {scene.scene_contract_id} lists selector {item.constraint_id} as both required and forbidden",
+            )
+            for item in scene.forbidden_events
+            if _event_selector_key(item) in required_keys
+        )
+        return _sorted_report([finding for finding in findings if finding is not None])
+
+    def validate_scene_outcome(
+        self,
+        *,
+        before: ResolvedCanonView,
+        after: ResolvedCanonView,
+        plan: NarrativePlan,
+        scene: SceneContract,
+        audience_reveal_evidence: tuple[AudienceRevealEvidence, ...],
+    ) -> NarrativeValidationReport:
+        _ = plan
+        findings: list[NarrativeValidationFinding | None] = []
+        window = scene.temporal_window
+        events = list(after.content.events_by_id.values())
+
+        for item in scene.required_events:
+            in_window = [
+                event
+                for event in events
+                if _event_matches_selector(event, item)
+                and event.temporal_anchor is not None
+                and window.effective_from <= event.temporal_anchor < window.effective_until
+            ]
+            if not in_window:
+                findings.append(
+                    _mb_finding(
+                        "SCENE_EVENT_REQUIRED_UNMET",
+                        (scene.scene_contract_id, item.constraint_id),
+                        f"required event selector {item.constraint_id} matched no anchored Event in the scene window",
+                    )
+                )
+        for item in scene.forbidden_events:
+            for event in events:
+                if not _event_matches_selector(event, item):
+                    continue
+                if event.temporal_anchor is None:
+                    findings.append(
+                        _mb_finding(
+                            "SCENE_EVENT_FORBIDDEN_INDETERMINATE",
+                            (scene.scene_contract_id, item.constraint_id, event.event_id),
+                            f"forbidden selector {item.constraint_id} matches unanchored Event {event.event_id}",
+                        )
+                    )
+                elif window.effective_from <= event.temporal_anchor < window.effective_until:
+                    findings.append(
+                        _mb_finding(
+                            "SCENE_EVENT_FORBIDDEN_PRESENT",
+                            (scene.scene_contract_id, item.constraint_id, event.event_id),
+                            f"forbidden selector {item.constraint_id} matches Event {event.event_id} in the window",
+                        )
+                    )
+
+        findings.extend(
+            _scene_state_finding(after, item, at=window.effective_until, phase="EXIT")
+            for item in scene.exit_state_targets
+        )
+
+        evidence_by_constraint = {item.reveal_constraint_id for item in audience_reveal_evidence}
+        for reveal in scene.required_reveals:
+            for recipient in reveal.recipients:
+                if isinstance(recipient, CharacterRevealRecipient):
+                    had = _character_has_state(
+                        before,
+                        recipient.subject_entity_id,
+                        reveal.proposition_ref,
+                        recipient.resulting_state,
+                        window.effective_from,
+                    )
+                    has = _character_has_state(
+                        after,
+                        recipient.subject_entity_id,
+                        reveal.proposition_ref,
+                        recipient.resulting_state,
+                        window.effective_until,
+                    )
+                    if had or not has:
+                        findings.append(
+                            _mb_finding(
+                                "SCENE_EXIT_REVEAL_UNMET",
+                                (scene.scene_contract_id, reveal.constraint_id, recipient.subject_entity_id),
+                                f"character reveal {reveal.constraint_id} is not satisfied for "
+                                f"{recipient.subject_entity_id}",
+                            )
+                        )
+                elif reveal.constraint_id not in evidence_by_constraint:
+                    findings.append(
+                        _mb_finding(
+                            "SCENE_EXIT_REVEAL_UNMET",
+                            (scene.scene_contract_id, reveal.constraint_id),
+                            f"audience reveal {reveal.constraint_id} has no AudienceRevealEvidence",
+                        )
+                    )
+
+        return _sorted_report([finding for finding in findings if finding is not None])
+
+
+def _sorted_report(findings: list[NarrativeValidationFinding]) -> NarrativeValidationReport:
+    findings.sort(
+        key=lambda finding: (
+            finding.severity.value,
+            finding.rule_id,
+            finding.affected_refs,
+            "" if finding.story_time is None else finding.story_time.isoformat(),
+        )
+    )
+    return NarrativeValidationReport(findings=tuple(findings))
+
+
+def _event_selector_key(selector: SceneEventConstraint) -> tuple[object, ...]:
+    return (
+        selector.event_ref,
+        selector.event_type,
+        tuple(selector.participant_refs_all),
+        selector.location_ref,
+    )
+
+
+def _event_matches_selector(event: Event, selector: SceneEventConstraint) -> bool:
+    if selector.event_ref is not None:
+        return event.event_id == selector.event_ref
+    if event.event_type != selector.event_type:
+        return False
+    if not set(selector.participant_refs_all).issubset(set(event.participant_refs)):
+        return False
+    return selector.location_ref is None or event.location_ref == selector.location_ref
+
+
+def _active_facts_for(content: CanonContent, subject_ref: str, predicate: str, at: datetime) -> list[Fact]:
+    return [
+        fact
+        for fact in content.facts_by_id.values()
+        if fact.subject_ref == subject_ref
+        and fact.predicate == predicate
+        and _point_in(fact.effective_from, fact.effective_until, at)
+    ]
+
+
+def _fact_constraint_met(content: CanonContent, item: SceneFactConstraint, at: datetime) -> bool:
+    active = _active_facts_for(content, item.subject_ref, item.predicate, at)
+    if item.comparison == "PRESENT":
+        return bool(active)
+    if item.comparison == "ABSENT":
+        return not active
+    if not active:
+        return False
+    target = _canonical_value(item.expected_value)
+    matches = any(_canonical_value(fact.value) == target for fact in active)
+    return matches if item.comparison == "EQUALS" else not matches
+
+
+def _knowledge_constraint_met(content: CanonContent, item: SceneKnowledgeConstraint, at: datetime) -> bool | None:
+    try:
+        view = EpistemicViewResolver().resolve(
+            canon=_view_for(content), subject_entity_id=item.subject_entity_id, at=at
+        )
+    except EpistemicIntegrityError:
+        return None
+    buckets = (
+        (view.known, EpistemicState.KNOWN),
+        (view.suspected, EpistemicState.SUSPECTED),
+        (view.false_beliefs, EpistemicState.FALSE_BELIEF),
+        (view.explicit_unknown, EpistemicState.UNKNOWN),
+    )
+    for bucket, state in buckets:
+        for entry in bucket:
+            if entry.proposition.proposition_ref == item.proposition_ref:
+                return state in item.states
+    return item.include_absent
+
+
+def _view_for(content: CanonContent) -> ResolvedCanonView:
+    return ResolvedCanonView(
+        canon_version_id=None,
+        branch_id="scene-eval",
+        content_hash="scene-eval",
+        content_schema_version="r2-canon-schema-v2",
+        content=content,
+    )
+
+
+def _scene_state_finding(
+    canon: ResolvedCanonView, item: object, *, at: datetime, phase: str
+) -> NarrativeValidationFinding | None:
+    if isinstance(item, SceneFactConstraint):
+        if _fact_constraint_met(canon.content, item, at):
+            return None
+        rule = "SCENE_ENTRY_FACT_UNMET" if phase == "ENTRY" else "SCENE_EXIT_FACT_UNMET"
+        return _mb_finding(
+            rule, (item.constraint_id,), f"{phase.lower()} fact constraint {item.constraint_id} unmet", story_time=at
+        )
+    if isinstance(item, SceneKnowledgeConstraint):
+        met = _knowledge_constraint_met(canon.content, item, at)
+        if met is True:
+            return None
+        if met is None:
+            return _mb_finding(
+                "SCENE_KNOWLEDGE_INTEGRITY",
+                (item.constraint_id,),
+                f"knowledge constraint {item.constraint_id} hit an epistemic integrity error",
+                story_time=at,
+            )
+        rule = "SCENE_ENTRY_KNOWLEDGE_UNMET" if phase == "ENTRY" else "SCENE_EXIT_KNOWLEDGE_UNMET"
+        return _mb_finding(
+            rule,
+            (item.constraint_id,),
+            f"{phase.lower()} knowledge constraint {item.constraint_id} unmet",
+            story_time=at,
+        )
+    return None
+
+
+def _forbidden_knowledge_finding(
+    canon: ResolvedCanonView, item: SceneKnowledgeConstraint, start: datetime, end: datetime
+) -> NarrativeValidationFinding | None:
+    boundaries = {start, end}
+    for state in canon.content.knowledge_states_by_id.values():
+        if state.subject_entity_id != item.subject_entity_id or state.proposition_ref != item.proposition_ref:
+            continue
+        if start < (state.effective_until or end) and state.effective_from < end:
+            boundaries.add(max(state.effective_from, start))
+            if state.effective_until is not None and state.effective_until < end:
+                boundaries.add(state.effective_until)
+    points = sorted(boundaries)
+    for probe_start, probe_end in pairwise(points):
+        probe = probe_start + (probe_end - probe_start) / 2
+        if _knowledge_constraint_met(canon.content, item, probe) is True:
+            return _mb_finding(
+                "SCENE_KNOWLEDGE_FORBIDDEN_MATCH",
+                (item.constraint_id,),
+                f"forbidden knowledge {item.constraint_id} matches inside the scene window",
+                story_time=probe,
+            )
+    return None
+
+
+def _character_has_state(
+    canon: ResolvedCanonView, subject_entity_id: str, proposition_ref: str, resulting_state: str, at: datetime
+) -> bool:
+    item = SceneKnowledgeConstraint(
+        constraint_id="reveal-probe",
+        subject_entity_id=subject_entity_id,
+        proposition_ref=proposition_ref,
+        states=[EpistemicState(resulting_state)],
+    )
+    return _knowledge_constraint_met(canon.content, item, at) is True

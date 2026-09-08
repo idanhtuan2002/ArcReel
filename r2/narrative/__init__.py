@@ -25,6 +25,7 @@ from .hashing import (
     verify_canon_delta_hash,
 )
 from .integrity import CanonIntegrityChecker, CanonIntegrityFinding, CanonIntegrityReport
+from .validation import NarrativeInvariantValidator, validate_knowledge_interval
 
 __all__ = [
     "CanonApprovalError",
@@ -48,6 +49,7 @@ __all__ = [
     "EpistemicView",
     "EpistemicViewItem",
     "EpistemicViewResolver",
+    "NarrativeInvariantValidator",
     "NarrativeSchemaVersionError",
     "ResolvedCanonView",
     "apply_canon_delta",
@@ -56,6 +58,7 @@ __all__ = [
     "compute_proposition_ref",
     "empty_canon_content",
     "seal_canon_delta",
+    "validate_knowledge_interval",
     "verify_canon_content_hash",
     "verify_canon_delta_hash",
 ]
