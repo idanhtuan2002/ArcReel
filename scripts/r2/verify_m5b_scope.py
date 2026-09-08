@@ -32,9 +32,9 @@ DOC_ALLOWLIST: frozenset[str] = frozenset(
     }
 )
 
-# The final-verification doc is written after the pre-review verified head and
-# updated again when the Codex review fixes land, so it is in scope for both the
-# implementation range and the post-verified handoff range.
+# R2_M5B_FINAL_VERIFICATION.md is the only path allowed to change in both the
+# implementation range and the post-verified handoff range; every other
+# allowlisted path may change in the implementation range only.
 IMPLEMENTATION_ALLOWLIST: frozenset[str] = (
     DOC_ALLOWLIST
     | FINAL_ONLY_ALLOWLIST
