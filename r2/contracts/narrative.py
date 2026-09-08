@@ -454,6 +454,30 @@ class CanonValidationReport(R2ContractModel):
         return not self.findings
 
 
+class NarrativeValidationSeverity(StrEnum):
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+
+
+class NarrativeValidationFinding(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    rule_id: NonEmptyStr
+    severity: NarrativeValidationSeverity
+    affected_refs: tuple[NonEmptyStr, ...]
+    story_time: datetime | None = None
+    message: NonEmptyStr
+    evidence_refs: tuple[NonEmptyStr, ...] = ()
+
+
+class NarrativeValidationReport(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    findings: tuple[NarrativeValidationFinding, ...]
+
+    @property
+    def ok(self) -> bool:
+        return not any(finding.severity is NarrativeValidationSeverity.ERROR for finding in self.findings)
+
+
 class CanonCommitResult(R2ContractModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     accepted_delta: AcceptedCanonDeltaSnapshot
