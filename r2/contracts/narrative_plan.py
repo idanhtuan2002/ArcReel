@@ -255,3 +255,53 @@ class NarrativePlanCommitResult(R2ContractModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     plan: NarrativePlan
     plan_revision_id: NonEmptyStr
+
+
+class NarrativePlanHeadSnapshot(R2ContractModel):
+    """The mutable head row of a scoped plan: identity, scope, and current version pointer."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    plan_id: NonEmptyStr
+    user_id: NonEmptyStr
+    project_name: NonEmptyStr
+    head_version: Annotated[int, Field(ge=1)] | None
+    created_at: datetime
+    created_by: NonEmptyStr
+    _created_at_aware = field_validator("created_at")(_aware)
+
+
+class NarrativePlanVersionSnapshot(R2ContractModel):
+    """One immutable accepted plan version plus its commit receipt."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    plan_id: NonEmptyStr
+    version: Annotated[int, Field(ge=1)]
+    user_id: NonEmptyStr
+    project_name: NonEmptyStr
+    plan_revision_id: NonEmptyStr
+    parent_version: Annotated[int, Field(ge=1)] | None
+    canon_branch_id: NonEmptyStr
+    canon_version_id: NonEmptyStr
+    schema_version: Literal["r2-narrative-plan-v1"] = "r2-narrative-plan-v1"
+    content: NarrativePlanContent
+    content_hash: NonEmptyStr
+    content_hash_algorithm: Literal["sha256"] = "sha256"
+    content_hash_version: Literal["r2-narrative-plan-content-v1"] = "r2-narrative-plan-content-v1"
+    approval_ref: NonEmptyStr
+    approved_by: NonEmptyStr
+    approved_at: datetime
+    committed_at: datetime
+    committed_by: NonEmptyStr
+    _approved_at_aware = field_validator("approved_at")(_aware)
+    _committed_at_aware = field_validator("committed_at")(_aware)
+
+    @model_validator(mode="after")
+    def _parent_precedes_version(self) -> NarrativePlanVersionSnapshot:
+        # Structural only: an aggregate-lineage rule (parent == version - 1) is enforced by
+        # NarrativePlanService / NarrativePlanIntegrityChecker, which must still be able to
+        # read a corrupt row in order to report on it.
+        if self.parent_version is not None and self.parent_version >= self.version:
+            raise ValueError("parent_version must be earlier than version")
+        if self.version == 1 and self.parent_version is not None:
+            raise ValueError("version 1 has no parent")
+        return self
