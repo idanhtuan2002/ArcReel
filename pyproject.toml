@@ -248,6 +248,17 @@ forbidden_modules = [
     "r2.production_intelligence.admission",
 ]
 
+# M5A：R2 叙事核心持久化中立，只依赖 Protocol；SQLAlchemy 绑定归 Host 适配器。
+[[tool.importlinter.contracts]]
+name = "R2 narrative core does not depend on Host persistence"
+type = "forbidden"
+source_modules = ["r2.narrative"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+]
+
 [tool.deptry]
 # 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2
 # exclude 是 deptry 默认值去掉 tests（测试的 import 也要参与依赖卫生判定）再补上 worktree 目录。
