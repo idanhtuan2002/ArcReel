@@ -12,6 +12,7 @@ def test_allowed_implementation_paths_pass() -> None:
         RESERVED_MIGRATION,
         "tests/integration/r2/test_m5b_acceptance.py",
         "docs/r2/evidence/R2_M5B_STARTING_STATE.json",
+        "docs/research/2026-09-08-r2-m5b-author-draft-omniscient-gate.md",
     ]
     assert evaluate(paths) == []
 
