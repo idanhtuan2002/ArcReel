@@ -38,6 +38,7 @@ from r2.contracts import (
     UpdateEntityOperation,
 )
 from r2.narrative.canon_state import apply_canon_delta, empty_canon_content
+from r2.narrative.canon_transaction import CanonTransactionService
 from r2.narrative.hashing import compute_canon_content_hash, seal_canon_delta
 
 NOW = datetime(2026, 9, 7, 12, 0, 0, tzinfo=UTC)
@@ -317,6 +318,78 @@ def narrative_branch_command(*, branch_id: str, parent_branch_id: str, parent_ve
         created_at=NOW,
         created_by="showrunner",
     )
+
+
+async def seed_genesis_via_service(factory: Factory, *, version_id: str = "v1") -> str:
+    service = CanonTransactionService(
+        canon_authority_uow_factory(factory), version_id_factory=iter([version_id]).__next__
+    )
+    await service.create_branch(main_branch_command())
+    delta = make_entity_delta("delta-genesis", "main", None, "hero")
+    await service.commit(
+        delta=delta,
+        approval=make_approval(delta, approval_ref="approval-genesis"),
+        project_name=PROJECT,
+        user_id=USER,
+        now=NOW,
+    )
+    return version_id
+
+
+async def local_version_count(factory: Factory, branch_id: str) -> int:
+    async with factory() as session:
+        result = await session.execute(
+            select(func.count()).select_from(CanonVersionModel).where(CanonVersionModel.branch_id == branch_id)
+        )
+        return int(result.scalar_one())
+
+
+async def total_delta_count(factory: Factory) -> int:
+    async with factory() as session:
+        result = await session.execute(select(func.count()).select_from(CanonDeltaModel))
+        return int(result.scalar_one())
+
+
+async def authority_snapshot(factory: Factory) -> dict[str, object]:
+    async with factory() as session:
+        deltas = (
+            (await session.execute(select(CanonDeltaModel.canon_delta_id).order_by(CanonDeltaModel.canon_delta_id)))
+            .scalars()
+            .all()
+        )
+        versions = (
+            (
+                await session.execute(
+                    select(CanonVersionModel.canon_version_id).order_by(CanonVersionModel.canon_version_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        heads = (
+            await session.execute(
+                select(CanonBranchModel.branch_id, CanonBranchModel.head_version_id).order_by(
+                    CanonBranchModel.branch_id
+                )
+            )
+        ).all()
+        projections = (
+            (
+                await session.execute(
+                    select(CanonResolvedProjectionModel.canon_version_id).order_by(
+                        CanonResolvedProjectionModel.canon_version_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    return {
+        "deltas": list(deltas),
+        "versions": list(versions),
+        "heads": [tuple(row) for row in heads],
+        "projections": list(projections),
+    }
 
 
 async def authority_counts(factory: Factory) -> dict[str, int]:

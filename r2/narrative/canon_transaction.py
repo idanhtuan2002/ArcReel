@@ -204,9 +204,13 @@ class CanonTransactionService:
             if delta.base_canon_version_id != current_base:
                 raise CanonBaseVersionConflict(expected=delta.base_canon_version_id, current=current_base)
 
-            base_view = await CanonResolver(repository, clock=lambda: now).resolve(
+            # ``version_id=None`` lets the resolver take the local head, or the pinned
+            # parent for a narrative branch's first commit, without a branch-membership
+            # check on a version that legitimately lives on the parent branch.
+            resolver = CanonResolver(repository, clock=lambda: now)
+            base_view = await resolver.resolve(
                 branch_id=branch.branch_id,
-                version_id=current_base,
+                version_id=branch.head_version_id,
                 project_name=project_name,
                 user_id=user_id,
             )
