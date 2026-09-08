@@ -36,7 +36,7 @@ _RULE_INDEX = {rule_id: index for index, rule_id in enumerate(INTEGRITY_RULE_ORD
 
 _ALGORITHM = "sha256"
 _CONTENT_HASH_VERSION = "r2-canon-content-v1"
-_SCHEMA_VERSION = "r2-canon-schema-v1"
+_SUPPORTED_SCHEMA_VERSIONS = frozenset({"r2-canon-schema-v1", "r2-canon-schema-v2"})
 
 
 class CanonIntegrityFinding(R2ContractModel):
@@ -134,7 +134,7 @@ class CanonIntegrityChecker:
                 )
             )
 
-        running, replay_ok, pinned_base = await self._branch_base(
+        running, replay_ok, pinned_base, running_schema = await self._branch_base(
             branch, content_by_version, findings, project_name=project_name, user_id=user_id
         )
 
@@ -184,7 +184,7 @@ class CanonIntegrityChecker:
             if (
                 version.content_hash_algorithm != _ALGORITHM
                 or version.content_hash_version != _CONTENT_HASH_VERSION
-                or version.content_schema_version != _SCHEMA_VERSION
+                or version.content_schema_version not in _SUPPORTED_SCHEMA_VERSIONS
             ):
                 findings.append(
                     self._finding(
@@ -199,8 +199,8 @@ class CanonIntegrityChecker:
             if replay_ok and accepted is not None:
                 try:
                     verify_canon_delta_hash(accepted.delta)
-                    running = apply_canon_delta(running, accepted.delta)
-                    recomputed = compute_canon_content_hash(running)
+                    running = apply_canon_delta(running, accepted.delta, base_schema_version=running_schema)
+                    recomputed = compute_canon_content_hash(running, schema_version=version.content_schema_version)
                 except (CanonIntegrityError, CanonOperationError):
                     findings.append(
                         self._finding(
@@ -223,6 +223,7 @@ class CanonIntegrityChecker:
                             )
                         )
                     content_by_version[version.canon_version_id] = running
+                    running_schema = version.content_schema_version
 
             previous_local_id = version.canon_version_id
 
@@ -290,9 +291,9 @@ class CanonIntegrityChecker:
         *,
         project_name: str,
         user_id: str,
-    ) -> tuple[CanonContent, bool, str | None]:
+    ) -> tuple[CanonContent, bool, str | None, str | None]:
         if branch.branch_type is CanonBranchType.MAIN:
-            return empty_canon_content(), True, None
+            return empty_canon_content(), True, None, None
 
         pinned_id = branch.parent_version_id
         if pinned_id is None:
@@ -304,7 +305,7 @@ class CanonIntegrityChecker:
                     "narrative branch does not pin a parent version",
                 )
             )
-            return empty_canon_content(), False, None
+            return empty_canon_content(), False, None, None
 
         pinned = await self._repository.get_version(
             canon_version_id=pinned_id, project_name=project_name, user_id=user_id
@@ -318,7 +319,7 @@ class CanonIntegrityChecker:
                     f"pinned parent version {pinned_id!r} does not resolve in scope",
                 )
             )
-            return empty_canon_content(), False, pinned_id
+            return empty_canon_content(), False, pinned_id, None
         if pinned.branch_id != branch.parent_branch_id:
             findings.append(
                 self._finding(
@@ -328,7 +329,7 @@ class CanonIntegrityChecker:
                     f"pinned parent {pinned_id!r} belongs to branch {pinned.branch_id!r}",
                 )
             )
-            return empty_canon_content(), False, pinned_id
+            return empty_canon_content(), False, pinned_id, None
 
         base_content = content_by_version.get(pinned.canon_version_id)
         if base_content is None:
@@ -341,8 +342,8 @@ class CanonIntegrityChecker:
                     "(broken parent lineage or a parent_branch_id cycle)",
                 )
             )
-            return empty_canon_content(), False, pinned_id
-        return base_content, True, pinned_id
+            return empty_canon_content(), False, pinned_id, None
+        return base_content, True, pinned_id, pinned.content_schema_version
 
     async def _check_version_parent(
         self,

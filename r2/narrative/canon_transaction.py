@@ -38,14 +38,14 @@ from .errors import (
     CanonNotFoundError,
     CanonOperationError,
     CanonValidationError,
+    NarrativeSchemaVersionError,
 )
 from .hashing import compute_canon_content_hash, verify_canon_delta_hash
 from .ports import CanonAuthorityUnitOfWorkFactory, CanonWriteRepositoryPort
-from .validation import validate_canon_candidate
+from .validation import NarrativeInvariantValidator
 
 _CONTENT_HASH_ALGORITHM = "sha256"
 _CONTENT_HASH_VERSION = "r2-canon-content-v1"
-_CONTENT_SCHEMA_VERSION = "r2-canon-schema-v1"
 
 
 class CanonCommitStage(StrEnum):
@@ -222,11 +222,22 @@ class CanonTransactionService:
                 user_id=user_id,
             )
             try:
-                candidate = apply_canon_delta(base_view.content, delta)
-            except CanonOperationError as exc:
+                candidate = apply_canon_delta(
+                    base_view.content, delta, base_schema_version=base_view.content_schema_version
+                )
+            except (CanonOperationError, NarrativeSchemaVersionError) as exc:
                 raise CanonValidationError(str(exc)) from exc
 
-            report = validate_canon_candidate(base=base_view.content, delta=delta, candidate=candidate)
+            target_schema_version = delta.content_schema_version
+            candidate_view = ResolvedCanonView(
+                canon_version_id=None,
+                branch_id=branch.branch_id,
+                content_hash=compute_canon_content_hash(candidate, schema_version=target_schema_version),
+                content_hash_version=_CONTENT_HASH_VERSION,
+                content_schema_version=target_schema_version,
+                content=candidate,
+            )
+            report = NarrativeInvariantValidator().validate_canon(base=base_view, delta=delta, candidate=candidate_view)
             if not report.ok:
                 raise CanonValidationError(report)
             if candidate == base_view.content:
@@ -241,7 +252,7 @@ class CanonTransactionService:
                 delta=delta,
                 approval=approval,
                 candidate=candidate,
-                validation_report=report,
+                validation_report=CanonValidationReport(findings=()),
                 project_name=project_name,
                 user_id=user_id,
                 now=now,
@@ -323,7 +334,8 @@ class CanonTransactionService:
                 raise CanonIntegrityError("locked Canon branch head points to a missing version")
             version_number = head_version.version_number + 1
 
-        content_hash = compute_canon_content_hash(candidate)
+        target_schema_version = delta.content_schema_version
+        content_hash = compute_canon_content_hash(candidate, schema_version=target_schema_version)
         version = CanonVersionSnapshot(
             canon_version_id=version_id,
             branch_id=branch.branch_id,
@@ -335,13 +347,15 @@ class CanonTransactionService:
             content_hash=content_hash,
             content_hash_algorithm=_CONTENT_HASH_ALGORITHM,
             content_hash_version=_CONTENT_HASH_VERSION,
-            content_schema_version=_CONTENT_SCHEMA_VERSION,
+            content_schema_version=target_schema_version,
         )
         accepted = AcceptedCanonDeltaSnapshot(delta=delta, approval=approval, committed_version_id=version_id)
         resolved_view = ResolvedCanonView(
             canon_version_id=version_id,
             branch_id=branch.branch_id,
             content_hash=content_hash,
+            content_hash_version=_CONTENT_HASH_VERSION,
+            content_schema_version=target_schema_version,
             content=candidate,
         )
 
