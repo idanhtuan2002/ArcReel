@@ -1,3 +1,5 @@
+from .canon_resolution import CanonResolutionService
+from .canon_resolver import CanonResolver
 from .canon_state import ResolvedCanonView, apply_canon_delta, empty_canon_content
 from .errors import (
     CanonApprovalError,
@@ -25,6 +27,8 @@ __all__ = [
     "CanonIntegrityError",
     "CanonNotFoundError",
     "CanonOperationError",
+    "CanonResolutionService",
+    "CanonResolver",
     "CanonValidationError",
     "ResolvedCanonView",
     "apply_canon_delta",
