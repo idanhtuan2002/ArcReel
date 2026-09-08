@@ -1,6 +1,7 @@
 from .canon_resolution import CanonResolutionService
 from .canon_resolver import CanonResolver
 from .canon_state import ResolvedCanonView, apply_canon_delta, empty_canon_content
+from .canon_transaction import CanonCommitStage, CanonTransactionService
 from .errors import (
     CanonApprovalError,
     CanonBaseVersionConflict,
@@ -22,6 +23,7 @@ from .hashing import (
 __all__ = [
     "CanonApprovalError",
     "CanonBaseVersionConflict",
+    "CanonCommitStage",
     "CanonError",
     "CanonIdentityConflictError",
     "CanonIntegrityError",
@@ -29,6 +31,7 @@ __all__ = [
     "CanonOperationError",
     "CanonResolutionService",
     "CanonResolver",
+    "CanonTransactionService",
     "CanonValidationError",
     "ResolvedCanonView",
     "apply_canon_delta",

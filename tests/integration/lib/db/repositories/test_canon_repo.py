@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.canon_uow import canon_authority_uow_factory, canon_projection_uow_factory
@@ -22,7 +21,12 @@ from r2.contracts import (
     EntityType,
 )
 from r2.narrative.canon_state import ResolvedCanonView, empty_canon_content
-from r2.narrative.errors import CanonIntegrityError, CanonNotFoundError
+from r2.narrative.errors import (
+    CanonApprovalError,
+    CanonIdentityConflictError,
+    CanonIntegrityError,
+    CanonNotFoundError,
+)
 from r2.narrative.hashing import compute_canon_content_hash, seal_canon_delta
 
 NOW = datetime(2026, 9, 7, 12, 0, 0, tzinfo=UTC)
@@ -248,19 +252,21 @@ async def _commit_branch(factory: Factory, branch: CanonBranchSnapshot) -> None:
         await uow.commit()
 
 
-async def test_duplicate_approval_ref_violates_the_database_constraint(session_factory: Factory) -> None:
+async def test_duplicate_approval_ref_is_rejected_by_the_database_constraint(
+    session_factory: Factory,
+) -> None:
     await seed_full_version(session_factory)
     duplicate = accepted_delta(delta_id="delta-2", approval_ref="approval-1", version_id="version-1")
-    with pytest.raises(IntegrityError):
+    with pytest.raises(CanonApprovalError):
         await _commit_delta(session_factory, duplicate)
 
 
-async def test_second_main_branch_in_one_scope_violates_the_partial_unique_index(
+async def test_second_main_branch_in_one_scope_is_rejected_by_the_partial_unique_index(
     session_factory: Factory,
 ) -> None:
     await seed_branch(session_factory, branch_id="main")
     second_main = branch_snapshot(branch_id="main-2", branch_type=CanonBranchType.MAIN)
-    with pytest.raises(IntegrityError):
+    with pytest.raises(CanonIdentityConflictError):
         await _commit_branch(session_factory, second_main)
 
 

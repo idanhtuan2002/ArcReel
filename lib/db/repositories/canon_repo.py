@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.canon import (
@@ -31,7 +32,7 @@ from r2.contracts import (
     CanonVersionSnapshot,
 )
 from r2.narrative.canon_state import ResolvedCanonView
-from r2.narrative.errors import CanonIntegrityError, CanonNotFoundError
+from r2.narrative.errors import CanonApprovalError, CanonIdentityConflictError, CanonIntegrityError, CanonNotFoundError
 
 
 def _stored_aware(value: datetime | None) -> datetime | None:
@@ -325,7 +326,12 @@ class CanonRepository(CanonProjectionRepository):
                 created_by=branch.created_by,
             )
         )
-        await self.session.flush()
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise CanonIdentityConflictError(
+                f"Canon branch {branch.branch_id!r} conflicts with an existing branch in this scope"
+            ) from exc
 
     async def insert_delta(self, accepted: AcceptedCanonDeltaSnapshot) -> None:
         delta = accepted.delta
@@ -354,7 +360,13 @@ class CanonRepository(CanonProjectionRepository):
                 committed_version_id=accepted.committed_version_id,
             )
         )
-        await self.session.flush()
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise CanonApprovalError(
+                f"approval {approval.approval_ref!r} or delta {delta.canon_delta_id!r} "
+                "was already recorded in this scope"
+            ) from exc
 
     async def insert_version(self, version: CanonVersionSnapshot) -> None:
         self.session.add(

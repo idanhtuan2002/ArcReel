@@ -22,14 +22,20 @@ from lib.db.models.canon import (
 from r2.contracts import (
     AcceptedCanonDeltaSnapshot,
     AddEntityOperation,
+    AddEventOperation,
     CanonBranchSnapshot,
     CanonBranchType,
     CanonCommitApproval,
     CanonContent,
+    CanonDelta,
     CanonDeltaPayload,
+    CanonOperation,
     CanonVersionSnapshot,
+    CreateCanonBranch,
     Entity,
     EntityType,
+    Event,
+    UpdateEntityOperation,
 )
 from r2.narrative.canon_state import apply_canon_delta, empty_canon_content
 from r2.narrative.hashing import compute_canon_content_hash, seal_canon_delta
@@ -217,6 +223,110 @@ async def advance_main_to_v2(factory: Factory) -> CanonContent:
         delta_id="delta-main-2",
         approval_ref="approval-main-2",
     )
+
+
+def _entity(entity_id: str) -> Entity:
+    return Entity(
+        entity_id=entity_id,
+        entity_type=EntityType.CHARACTER,
+        canonical_name=entity_id.replace("-", " ").title(),
+        aliases=[],
+    )
+
+
+def _seal(delta_id: str, branch_id: str, base_version_id: str | None, operation: CanonOperation) -> CanonDelta:
+    return seal_canon_delta(
+        CanonDeltaPayload(
+            canon_delta_id=delta_id,
+            target_branch_id=branch_id,
+            base_canon_version_id=base_version_id,
+            operations=[operation],
+            source_change_set_refs=["s-1"],
+            author_decision_refs=["a-1"],
+            validation_report_refs=[],
+            created_at=NOW,
+            created_by="showrunner",
+        )
+    )
+
+
+def make_entity_delta(delta_id: str, branch_id: str, base_version_id: str | None, entity_id: str) -> CanonDelta:
+    operation = AddEntityOperation(operation_id=f"op-{entity_id}", target_id=entity_id, entity=_entity(entity_id))
+    return _seal(delta_id, branch_id, base_version_id, operation)
+
+
+def make_update_noop_delta(delta_id: str, branch_id: str, base_version_id: str | None, entity_id: str) -> CanonDelta:
+    operation = UpdateEntityOperation(
+        operation_id=f"op-update-{entity_id}", target_id=entity_id, entity=_entity(entity_id)
+    )
+    return _seal(delta_id, branch_id, base_version_id, operation)
+
+
+def make_event_delta(
+    delta_id: str, branch_id: str, base_version_id: str | None, *, event_id: str, participant: str
+) -> CanonDelta:
+    operation = AddEventOperation(
+        operation_id=f"op-{event_id}",
+        target_id=event_id,
+        event=Event(event_id=event_id, event_type="ARRIVAL", participant_refs=[participant]),
+    )
+    return _seal(delta_id, branch_id, base_version_id, operation)
+
+
+def make_approval(
+    delta: CanonDelta,
+    *,
+    approval_ref: str,
+    approved_by: str = "approver",
+    approved_at: datetime = NOW,
+) -> CanonCommitApproval:
+    return CanonCommitApproval(
+        approval_ref=approval_ref,
+        canon_delta_id=delta.canon_delta_id,
+        payload_hash=delta.payload_hash,
+        payload_hash_algorithm=delta.payload_hash_algorithm,
+        payload_hash_version=delta.payload_hash_version,
+        content_schema_version=delta.content_schema_version,
+        project_name=PROJECT,
+        user_id=USER,
+        approved_by=approved_by,
+        approved_at=approved_at,
+        status="APPROVED",
+    )
+
+
+def main_branch_command(branch_id: str = "main") -> CreateCanonBranch:
+    return CreateCanonBranch(
+        branch_id=branch_id,
+        user_id=USER,
+        project_name=PROJECT,
+        branch_type=CanonBranchType.MAIN,
+        created_at=NOW,
+        created_by="showrunner",
+    )
+
+
+def narrative_branch_command(*, branch_id: str, parent_branch_id: str, parent_version_id: str) -> CreateCanonBranch:
+    return CreateCanonBranch(
+        branch_id=branch_id,
+        user_id=USER,
+        project_name=PROJECT,
+        branch_type=CanonBranchType.NARRATIVE_BRANCH,
+        parent_branch_id=parent_branch_id,
+        parent_version_id=parent_version_id,
+        created_at=NOW,
+        created_by="showrunner",
+    )
+
+
+async def authority_counts(factory: Factory) -> dict[str, int]:
+    async with factory() as session:
+        deltas = (await session.execute(select(func.count()).select_from(CanonDeltaModel))).scalar_one()
+        versions = (await session.execute(select(func.count()).select_from(CanonVersionModel))).scalar_one()
+        projections = (
+            await session.execute(select(func.count()).select_from(CanonResolvedProjectionModel))
+        ).scalar_one()
+    return {"deltas": int(deltas), "versions": int(versions), "projections": int(projections)}
 
 
 async def delete_projection(factory: Factory, version_id: str) -> None:
