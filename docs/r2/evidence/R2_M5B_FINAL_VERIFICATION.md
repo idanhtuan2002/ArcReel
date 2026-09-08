@@ -13,9 +13,10 @@
 | Accepted M5A integration head (M5B base) | `698c34f6b953bd6c7df3306da253e9827b6d94c0` |
 | M5B document materialization head | `e83ce1a222e22c36ab37dffcf62839efcfe49655` |
 | M5B Task 0 starting-state head | `1c605228c1e9ea4d853d2e356ffce06672a55ad1` |
-| **M5B verified head** | **`223e0c9f4d4defddab41c9603ffe33e112c02d5c`** |
+| M5B pre-review verified head | `223e0c9f4d4defddab41c9603ffe33e112c02d5c` |
+| **M5B verified head (Codex review fixes applied)** | **`3085d14e`** |
 
-Every implementation commit descends from the accepted M5A integration head. `git diff --check 698c34f6...223e0c9f` is clean.
+Every implementation commit descends from the accepted M5A integration head. `git diff --check 698c34f6...3085d14e` is clean.
 
 ## Implementation commits
 
@@ -32,7 +33,8 @@ Every implementation commit descends from the accepted M5A integration head. `gi
 | `3d206f15` | **M5B-2 verified head** | `NarrativePlanService.commit_revision` — the only plan write path: exact retry by `plan_revision_id` before the expected-head check; `expected_version=None` genesis inserts head + version 1 in one transaction; append locks the scoped plan at head N; exact Canon-basis read-only, no head fallback; hierarchy / scene identity / `validate_scene` all gate before writes. Import-linter + AST fitness pin the boundaries |
 | `f6bd935f` | M5B-3 | `r2/contracts/narrative_context.py`: content-addressed `NarrativeSourceDescriptor` (AUTHOR_ONLY forbids subject claims; SUBJECTS requires subjects + propositions + active KnowledgeState refs + exact `canon_basis`; ACCEPTED_NARRATIVE / SUMMARY require both exact bases), NFC/LF prose hash, visibility-tiered `SelectionTrace`; `r2/narrative_context` read-only ports + error taxonomy |
 | `f848c085` | **M5B-3 verified head** | `NarrativeContextCompiler.compile` — one entry point, complete pack or one stable error. Exact Canon/plan/scene reads, plan-basis equality, `validate_scene`, POV epistemic view, then scope / prose-hash / exact-basis / effective-time / visibility filters **before** ranking or budgeting; a secret is `NOT_VISIBLE` with no prose, content hash, or token count in its trace; dedupe on `(source_ref, content_hash)`; mandatory-tier overflow raises `NarrativeContextBudgetError` (no partial pack); deterministic `context_pack_id` / `content_hash` |
-| `223e0c9f` | **M5B verified head** | Compact acceptance corpus built only through the public contracts; all twelve required adversarial mutations run through the real public paths; fail-closed scope allowlist `scripts/r2/verify_m5b_scope.py` |
+| `223e0c9f` | M5B pre-review head | Acceptance corpus built only through the public contracts; all twelve required adversarial mutations run through the real public paths; fail-closed scope allowlist `scripts/r2/verify_m5b_scope.py` |
+| `3085d14e` | **M5B verified head** | All Codex full-review findings resolved across the three checkpoints and acceptance: schema-shape replay guard, evidence-path findings, parent_version / exact-basis service checks, per-version integrity check, compiler exact-identity + SUBJECTS proof-matrix + recent-accepted path, `full_corpus()` (30 scenes / 8 characters / 3 locations / 2 hidden identities / 2 false beliefs / injury supersession / ownership hand-off / presentation-order time jump / unperceived reveal / BEFORE relation) compiled deterministically in both modes, and a hard-exit counter test derived from actual mutation results |
 
 ## Selectors (unchanged hash domains)
 
@@ -50,26 +52,27 @@ M5A v1 golden content hash `56ebc632b669dae6db6c643a56fe1992def05f00af5e1dc5195b
 
 `uv run alembic heads` → `5b7c4a0e0001 (head)` (single). `5a7c4a0e0001 → 5b7c4a0e0001, add narrative plans`. SQLite `upgrade → downgrade → upgrade` round-trips cleanly (`tests/integration/lib/db/migrations/test_alembic_narrative_plan.py`). No operating migration, production data operation, provider/network call, worker start, push, or publish was performed.
 
-## Gates at `223e0c9f`
+## Gates at `3085d14e`
 
 | Command | Result |
 |---|---|
 | `uv run ruff check .` | All checks passed |
-| `uv run ruff format --check .` | 1 file would be reformatted — `docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md` only (see Deviations); all 1792 code files formatted |
+| `uv run ruff format --check r2 tests scripts lib server alembic` | 1297 code files already formatted (the approved plan document is excluded from the code paths and left byte-identical; see Deviations) |
 | `uv run basedpyright --warnings` | 0 errors, 0 warnings, 0 notes |
 | `uv run lint-imports` | 12 kept, 0 broken (adds 3 M5B contracts: `r2.narrative_plan` off Host persistence; `r2.narrative_plan.service` off Canon authoritative writes; `r2.narrative_context` read-only + persistence-neutral) |
 | `uv run deptry lib server alembic scripts tests r2` | Success! No dependency issues found |
 | `uv run python scripts/audit_tests.py --check` | 闸门通过：0 处违规 |
-| `uv run python -m pytest -n 4 --dist loadfile` | **12759 passed, 2 skipped, 0 failed** |
-| `uv run python scripts/r2/verify_m5b_scope.py --base 1c605228 --verified-head 223e0c9f` | exit 0 (every changed path is in the allowlist; the one changed `alembic/versions/` file is the reserved `5b7c4a0e0001`) |
+| `uv run python -m pytest -n 4 --dist loadfile` | **12764 passed, 2 skipped, 0 failed** |
+| `uv run python scripts/r2/verify_m5b_scope.py --base 1c605228 --verified-head 3085d14e` | exit 0 (every changed path is in the allowlist; the one changed `alembic/versions/` file is the reserved `5b7c4a0e0001`) |
 
 ## Required adversarial mutations (`tests/integration/r2/test_m5b_acceptance.py`)
 
 | Mutation | Real path | Observed |
 |---|---|---|
-| MUT-01 remove historical Event backlink, retain authoritative KnowledgeState evidence | `validate_canon` | accepted (no `EPI_EVIDENCE_*` finding) |
-| MUT-02 add a non-reciprocal present Event backlink | `validate_canon` | `EPI_EVIDENCE_NON_RECIPROCAL_BACKLINK` |
+| MUT-01 remove historical Event backlink, retain authoritative KnowledgeState evidence | `validate_canon` | accepted — `report.ok` (no ERROR finding) |
+| MUT-02 add a non-reciprocal present Event backlink | `validate_canon` | `EPI_EVIDENCE_NON_RECIPROCAL_BACKLINK` asserted against the mutated candidate |
 | MUT-03 bootstrap decision absent from the delta `author_decision_refs` | `validate_canon` | `EPI_EVIDENCE_BOOTSTRAP_UNBOUND` |
+| MUT-03 inverse: a delta-level author decision with no operation-local evidence or bootstrap | `validate_canon` | `EPI_EVIDENCE_MISSING` (never inferred as a bootstrap) |
 | MUT-04 retire a supporting Fact mid-interval without same-delta closure | `validate_canon` | `EPI_TRUTH_INCOMPLETE_COVERAGE` |
 | MUT-05 move the evidence Event after the transition (anchored) | `validate_canon` | `EPI_EVIDENCE_FUTURE` |
 | MUT-06 duplicate a normalized temporal relation under another id | `validate_canon` | `TIME_GRAPH_DUPLICATE_NORMALIZED_KEY` |
@@ -80,7 +83,11 @@ M5A v1 golden content hash `56ebc632b669dae6db6c643a56fe1992def05f00af5e1dc5195b
 | MUT-11 entry constraint invalid only on the pinned Canon while the head is valid | `NarrativePlanService.commit_revision` | `NarrativePlanValidationError`; no head fallback |
 | MUT-12 corrupt Canon with two active states for one subject/proposition | `EpistemicViewResolver.resolve` | `EpistemicIntegrityError` |
 
-Hard-exit counters: Canon contradiction 0, epistemic leakage 0, timeline violation 0, rejected-candidate contamination 0, failed-transaction corruption 0, required skips 0.
+`test_every_mutation_leaves_all_hard_exit_counters_at_zero` re-runs every mutation above and derives the six counters from the actual validator findings, compiled-pack contents, `SelectionTrace` fields, and persisted plan-version lists (a rejected write must leave the head untouched; a rejected genesis must persist no row). Result: Canon contradiction 0, epistemic leakage 0, timeline violation 0, rejected-candidate contamination 0, failed-transaction corruption 0, required skips 0.
+
+## Full acceptance corpus (`tests/fixtures/r2/m5b_narrative_corpus.py::full_corpus`)
+
+30 SceneContracts, 8 CHARACTER + 3 LOCATION entities, 2 hidden-identity propositions (`true_name`), 2 FALSE_BELIEF KnowledgeStates, an injury Fact supersession (`healthy` → `injured`, no gap or overlap, `source_event_refs=[ev-fight]`), an object-ownership hand-off (`obj-crown` owner `char-1` → `char-2` via `ev-handover`), a presentation-order time jump (`scene-11.sequence_index < scene-12.sequence_index` while `scene-11` occurs later in story time), an unperceived reveal Event (`ev-reveal`, named by no KnowledgeState evidence), and a `BEFORE` temporal relation. Every instant, id, hash, and token count is fixed. `test_full_corpus_compiles_deterministically_in_both_modes_without_leak` compiles it through `NarrativeContextCompiler.compile` twice per mode: identical `context_pack_id` / `content_hash`; the AUTHOR_ONLY secret is admitted for the author and withheld from the `char-6` simulation (`NOT_VISIBLE`, no hash or token count), while `char-6`'s legitimately KNOWN heir fact still reaches the simulation pack.
 
 ## Graph coverage
 
@@ -93,8 +100,8 @@ Project `home-anhtuan-content-production-os-m5b` re-indexed at `223e0c9f`'s ance
 3. **`operation_kinds_for`** raises a plain `ValueError` for an unknown selector at the contract layer to avoid an `r2.contracts → r2.narrative` import; `NarrativeSchemaVersionError` lives in `r2/narrative/errors.py` and is used by `hashing.py` / `schema_upgrade.py`.
 4. **Schema-v2 replay validation** is done directly with `NarrativeInvariantValidator` over synthetic `ResolvedCanonView`s in `canon_transaction` / `canon_resolver` rather than by rewriting `validate_canon_candidate` as a delegating wrapper; the M5A entry point is left byte-identical and `CanonCommitResult.validation_report` still carries a `CanonValidationReport`.
 5. **v2 integration coverage** is consolidated into one new `tests/integration/r2/narrative/test_canon_v2_replay.py` instead of edits to the three existing canon integration test files.
-6. **The M5A Canon architecture sensor** (`tests/unit/r2/narrative/test_canon_architecture_boundaries.py`) was narrowed to Canon-unique write attrs (`insert_branch` / `insert_delta` / `lock_branch`) so the separate NarrativePlan repository's `insert_version` / `advance_head` method names do not trip it.
-7. **Acceptance corpus is compact**, not the literal 30 SceneContracts / 8 characters / 3 locations: it is a reduced slice that still carries every phenomenon the twelve required mutations exercise (object-ownership + hidden-identity propositions, an unperceived reveal Event, a temporal relation, an author-only secret candidate). All instants, ids, and hashes are fixed and every mutation runs through the real public path.
+6. ~~The M5A Canon architecture sensor was narrowed to Canon-unique write attrs.~~ **Resolved at `3085d14e`.** `tests/unit/r2/narrative/test_canon_architecture_boundaries.py` now asserts the full authority-write attribute set (`insert_branch` / `insert_delta` / `insert_version` / `advance_head` / `lock_branch`), the Canon write callers plus the plan-authority files are the only referencing sites, and a new test asserts the plan-authority files carry no Canon-authority symbol. Mirrored in `tests/unit/r2/test_m5b_architecture_boundaries.py`.
+7. ~~Acceptance corpus is compact.~~ **Resolved at `3085d14e`.** `tests/fixtures/r2/m5b_narrative_corpus.py::full_corpus` builds the literal 30 SceneContracts / 8 characters / 3 locations / 2 hidden identities / 2 false beliefs plus the injury supersession, ownership hand-off, presentation-order time jump, unperceived reveal Event, and `BEFORE` relation, and is compiled through the public compiler in both modes (see Full acceptance corpus above). The original compact corpus helpers are retained for the twelve MUT-* tests.
 8. **`docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md`** is reported by `ruff format --check` as reformattable (Python code fences). This is a pre-existing property of the document as materialized by Codex at `e83ce1a2`, before Task 0; the file is left byte-identical so its SHA-256 (`82a1838fcf027bde5ae3988a9114723e95e6f5e5268492b411370af814a5af62`) still matches `R2_M5B_DOCUMENT_APPROVAL.json`. Same deviation recorded for M5A.
 
 ## Not done
