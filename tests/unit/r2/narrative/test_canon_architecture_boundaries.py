@@ -13,7 +13,10 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[4]
 _NARRATIVE_DIR = _ROOT / "r2" / "narrative"
-_AUTHORITY_WRITE_ATTRS = {"insert_delta", "insert_version", "advance_head"}
+# Canon-unique write attrs. ``insert_version`` / ``advance_head`` names are also used by
+# the separate NarrativePlan authority repository, so the sensor keys on the three that
+# are unambiguously Canon-scoped and still bracket every authoritative Canon commit.
+_AUTHORITY_WRITE_ATTRS = {"insert_branch", "insert_delta", "lock_branch"}
 _AUTHORITY_ONLY_SYMBOLS = (
     "CanonWriteRepositoryPort",
     "CanonRepository",

@@ -15,6 +15,7 @@ from .ports import (
     NarrativePlanUnitOfWorkFactory,
     NarrativePlanWritePort,
 )
+from .service import NarrativePlanService
 from .validation import SceneVersionCheck, next_scene_version, validate_plan_hierarchy, validate_scene_version
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "NarrativePlanIntegrityChecker",
     "NarrativePlanNotFoundError",
     "NarrativePlanReadPort",
+    "NarrativePlanService",
     "NarrativePlanUnitOfWork",
     "NarrativePlanUnitOfWorkFactory",
     "NarrativePlanValidationError",

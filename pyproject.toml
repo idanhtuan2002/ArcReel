@@ -259,6 +259,28 @@ forbidden_modules = [
     "lib.db.repositories",
 ]
 
+# M5B：Authorial Intent 权威同样持久化中立；SQLAlchemy 绑定归 Host 适配器。
+[[tool.importlinter.contracts]]
+name = "R2 narrative plan authority does not depend on Host persistence"
+type = "forbidden"
+source_modules = ["r2.narrative_plan"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+]
+
+# M5B：NarrativePlanService 不是第二个 Canon writer——不得触达 Canon 授权写口 / 事务。
+[[tool.importlinter.contracts]]
+name = "M5B NarrativePlanService cannot reach Canon authoritative writes"
+type = "forbidden"
+source_modules = ["r2.narrative_plan.service"]
+forbidden_modules = [
+    "r2.narrative.canon_transaction",
+    "r2.narrative.ports",
+    "lib.db.canon_uow",
+]
+
 [tool.deptry]
 # 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2
 # exclude 是 deptry 默认值去掉 tests（测试的 import 也要参与依赖卫生判定）再补上 worktree 目录。
