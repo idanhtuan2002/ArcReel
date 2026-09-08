@@ -1,8 +1,9 @@
 # R2-M5B-2 Review — NarrativePlan authority and SceneContract validation
 
-**Review type:** two-axis self-review (`/code-review`: Standards + Spec sub-agents).
-Codex was over its usage limit; this stands in for the per-checkpoint Codex
-review the plan expected (`docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md:995`).
+**Review type:** two-axis self-review (`/code-review`: Standards + Spec sub-agents),
+accepted as the review of record. Codex was over its usage limit and the operator
+waived the per-checkpoint Codex review the plan expected
+(`docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md:995`).
 The self-review ran once against the whole M5B branch (`698c34f6...HEAD`); this
 document extracts the findings that fall in the M5B-2 scope, including the fix
 committed after the frozen head.
@@ -101,6 +102,6 @@ single alembic head `5b7c4a0e0001`.
 
 ## Verdict
 
-**APPROVED (self-review) after the finding-(3) fix at `62b07b4a`.** The frozen
-head `3d206f15` plus the `62b07b4a` `validate_scene` delta are valid targets for
-a later Codex re-review. R9 / R10 remain open follow-ups.
+**APPROVED (self-review, review of record) after the finding-(3) fix at
+`62b07b4a`.** The Codex re-review is waived. R9 / R10 remain open follow-ups
+recorded here.

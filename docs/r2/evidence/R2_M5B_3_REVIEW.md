@@ -1,8 +1,9 @@
 # R2-M5B-3 Review — NarrativeContextCompiler leakage, budget, determinism
 
-**Review type:** two-axis self-review (`/code-review`: Standards + Spec sub-agents).
-Codex was over its usage limit; this stands in for the per-checkpoint Codex
-review the plan expected (`docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md:1161`).
+**Review type:** two-axis self-review (`/code-review`: Standards + Spec sub-agents),
+accepted as the review of record. Codex was over its usage limit and the operator
+waived the per-checkpoint Codex review the plan expected
+(`docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md:1161`).
 The self-review ran once against the whole M5B branch (`698c34f6...HEAD`); this
 document extracts the findings that fall in the M5B-3 scope, including the fix
 and the deferral decided after the frozen head.
@@ -90,6 +91,6 @@ single alembic head `5b7c4a0e0001`.
 
 ## Verdict
 
-**APPROVED (self-review) after the finding-(1) fix at `47850876`.** Finding (2)
-is a recorded deferral, not a blocker. The frozen head `f848c085` plus the
-`47850876` version-pin delta are valid targets for a later Codex re-review.
+**APPROVED (self-review, review of record) after the finding-(1) fix at
+`47850876`.** Finding (2) is a recorded deferral (deviation #9), not a blocker.
+The Codex re-review is waived.

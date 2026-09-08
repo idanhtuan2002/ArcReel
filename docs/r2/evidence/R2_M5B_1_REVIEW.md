@@ -1,8 +1,9 @@
 # R2-M5B-1 Review — Canon schema v2, epistemic state, temporal validation
 
-**Review type:** two-axis self-review (`/code-review`: Standards + Spec sub-agents).
-Codex was over its usage limit; this stands in for the per-checkpoint Codex
-review the plan expected (`docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md:626`).
+**Review type:** two-axis self-review (`/code-review`: Standards + Spec sub-agents),
+accepted as the review of record. Codex was over its usage limit and the operator
+waived the per-checkpoint Codex review the plan expected
+(`docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md:626`).
 The self-review ran once against the whole M5B branch (`698c34f6...HEAD`); this
 document extracts the findings that fall in the M5B-1 scope.
 
@@ -92,6 +93,7 @@ basedpyright 0/0/0 / lint-imports 12 kept / deptry / audit_tests / `pytest -n 4`
 
 ## Verdict
 
-**APPROVED (self-review).** No blocking Spec finding in M5B-1; the Standards
-cross-note is dismissed with analysis; Standards smells are deferred cleanup.
-The frozen head `2a99ede1` remains a valid target for a later Codex re-review.
+**APPROVED (self-review, review of record).** No blocking Spec finding in M5B-1;
+the Standards cross-note is dismissed with analysis; Standards smells are deferred
+cleanup (deviation #10). The Codex re-review is waived; the frozen head `2a99ede1`
+is still available should one be run later.
