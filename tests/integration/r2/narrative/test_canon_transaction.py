@@ -242,6 +242,8 @@ async def test_create_branch_retry_returns_existing_and_conflicts_on_mismatch(
     assert again == first
     with pytest.raises(CanonIdentityConflictError):
         await svc.create_branch(main_branch_command().model_copy(update={"created_by": "different"}))
+    with pytest.raises(CanonIdentityConflictError):
+        await svc.create_branch(main_branch_command().model_copy(update={"created_at": LATER}))
 
 
 async def test_create_narrative_branch_pins_a_parent_version(session_factory: Factory) -> None:

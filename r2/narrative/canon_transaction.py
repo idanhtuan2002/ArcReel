@@ -149,6 +149,8 @@ class CanonTransactionService:
 
     @staticmethod
     def _require_matching_branch(existing: CanonBranchSnapshot, command: CreateCanonBranch) -> None:
+        # datetime equality compares the instant, so a retry in another timezone that
+        # names the same moment still matches; any other mismatch fails closed.
         if (
             existing.branch_type is not command.branch_type
             or existing.parent_branch_id != command.parent_branch_id
@@ -156,6 +158,7 @@ class CanonTransactionService:
             or existing.user_id != command.user_id
             or existing.project_name != command.project_name
             or existing.created_by != command.created_by
+            or existing.created_at != command.created_at
         ):
             raise CanonIdentityConflictError(
                 f"Canon branch {command.branch_id!r} already exists with a different definition"
