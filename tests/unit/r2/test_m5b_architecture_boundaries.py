@@ -145,6 +145,28 @@ def test_narrative_context_has_no_session_or_mutation_call_shapes() -> None:
         assert called.isdisjoint({"commit", "rollback", "flush"}), (path.name, called & _MUTATION_ATTRS)
 
 
+def test_narrative_context_does_not_inspect_prose_with_regexes_or_classifiers() -> None:
+    for path in _py_files(_CONTEXT_DIR):
+        names = _imports(ast.parse(path.read_text(encoding="utf-8")))
+        for name in names:
+            assert name.split(".")[0] not in {"re", "regex"}, (path.name, name)
+            assert "keyword" not in name, (path.name, name)
+            assert "classifier" not in name.lower(), (path.name, name)
+
+
+def test_compiler_exposes_only_the_compile_entry_point() -> None:
+    tree = _tree("r2/narrative_context/compiler.py")
+    compiler_cls = next(
+        node for node in ast.walk(tree) if isinstance(node, ast.ClassDef) and node.name == "NarrativeContextCompiler"
+    )
+    public = {
+        node.name
+        for node in compiler_cls.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith("_")
+    }
+    assert public == {"compile"}
+
+
 def test_import_linter_pins_the_m5b_authority_boundaries() -> None:
     config = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     contracts = config["tool"]["importlinter"]["contracts"]

@@ -1,3 +1,4 @@
+from .compiler import NarrativeContextCompiler
 from .errors import (
     NarrativeContextBudgetError,
     NarrativeContextError,
@@ -19,6 +20,7 @@ __all__ = [
     "CanonVersionReader",
     "CreativePolicyReader",
     "NarrativeContextBudgetError",
+    "NarrativeContextCompiler",
     "NarrativeContextError",
     "NarrativeContextInputError",
     "NarrativeContextValidationError",
