@@ -30,7 +30,13 @@ from .schema_upgrade import (
     require_scene_schema_transition,
 )
 from .service import NarrativePlanService
-from .validation import SceneVersionCheck, next_scene_version, validate_plan_hierarchy, validate_scene_version
+from .validation import (
+    SceneVersionCheck,
+    next_scene_version,
+    validate_plan_hierarchy,
+    validate_plan_thread_lifecycle,
+    validate_scene_version,
+)
 
 __all__ = [
     "CanonVersionReader",
@@ -54,5 +60,6 @@ __all__ = [
     "require_plan_schema_transition",
     "require_scene_schema_transition",
     "validate_plan_hierarchy",
+    "validate_plan_thread_lifecycle",
     "validate_scene_version",
 ]

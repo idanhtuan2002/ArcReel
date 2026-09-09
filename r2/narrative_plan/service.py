@@ -15,9 +15,11 @@ from r2.contracts import (
     NarrativePlanApproval,
     NarrativePlanCommitResult,
     NarrativePlanContent,
+    NarrativePlanContentV2,
     NarrativePlanHeadSnapshot,
     NarrativePlanRevisionProposal,
     NarrativePlanVersionSnapshot,
+    SceneContract,
 )
 from r2.narrative.canon_state import ResolvedCanonView
 from r2.narrative.validation import NarrativeInvariantValidator
@@ -29,9 +31,9 @@ from .errors import (
     NarrativePlanValidationError,
     NarrativePlanVersionConflict,
 )
-from .hashing import compute_plan_content_hash, compute_scene_semantic_hash
+from .hashing import compute_plan_content_hash, compute_scene_semantic_hash_dispatch
 from .ports import CanonVersionReader, NarrativePlanUnitOfWorkFactory
-from .validation import validate_plan_hierarchy, validate_scene_version
+from .validation import validate_plan_hierarchy, validate_plan_thread_lifecycle, validate_scene_version
 
 
 class NarrativePlanService:
@@ -281,7 +283,7 @@ class NarrativePlanService:
     def _validate_content(
         self,
         *,
-        content: NarrativePlanContent,
+        content: NarrativePlanContent | NarrativePlanContentV2,
         plan: NarrativePlan,
         canon_view: ResolvedCanonView,
         history: tuple[NarrativePlanVersionSnapshot, ...],
@@ -290,20 +292,27 @@ class NarrativePlanService:
         if not hierarchy.ok:
             raise NarrativePlanValidationError([finding.rule_id for finding in hierarchy.findings])
 
+        # Plan-wide passes run before the per-scene loop. Thread lifecycle is a v2-only
+        # cross-scene invariant; per-scene validate_scene never claims it.
+        if isinstance(content, NarrativePlanContentV2):
+            lifecycle = validate_plan_thread_lifecycle(content)
+            if not lifecycle.ok:
+                raise NarrativePlanValidationError([finding.rule_id for finding in lifecycle.findings])
+
         previous_scenes: dict[str, list] = {}
         for snapshot in history:
             for scene in snapshot.content.scene_contracts:
                 previous_scenes.setdefault(scene.scene_contract_id, []).append(scene)
 
         for scene in content.scene_contracts:
-            if compute_scene_semantic_hash(scene) != scene.semantic_hash:
+            if compute_scene_semantic_hash_dispatch(scene) != scene.semantic_hash:
                 raise NarrativePlanIdentityConflictError(
                     f"scene {scene.scene_contract_id!r} semantic_hash does not match its content"
                 )
             prior = previous_scenes.get(scene.scene_contract_id)
-            if prior:
+            if prior and isinstance(scene, SceneContract):
                 validate_scene_version(previous=prior[-1], proposed=scene)
-            elif scene.version != 1:
+            elif not prior and scene.version != 1:
                 raise NarrativePlanIdentityConflictError(
                     f"new scene {scene.scene_contract_id!r} must start at version 1"
                 )
