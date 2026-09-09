@@ -44,14 +44,31 @@ _JS_WS_CHARS = "".join(chr(cp) for cp in _JS_WS_CODEPOINTS)
 _W = "[" + _JS_WS_CHARS + "]"
 _N = "[^" + _JS_WS_CHARS + "]"
 
+# ECMAScript ``/m`` anchors ``^`` at input start or immediately after any LineTerminator
+# (LF, CR, U+2028, U+2029). Python ``re.MULTILINE`` only recognises LF, so every JS ``/m``
+# ``^`` is emulated with this explicit prefix (fixed-width lookbehind).
+_BOL = "(?:\\A|(?<=[\\n\\r\u2028\u2029]))"
+# JS ``\S{4,}`` counts UTF-16 code units, not code points; captured non-whitespace runs
+# are re-measured with :func:`_utf16_length`.
+_MIN_CAUSE_UNITS = 4
+
 
 def _js_trim(value: str) -> str:
     return value.strip(_JS_WS_CHARS)
 
 
-_CHANGE_RECORD_RE = re.compile("^【变更记录】", re.MULTILINE)
-_CHANGE_RECORD_SPLIT_RE = re.compile("(?=^【变更记录】)", re.MULTILINE)
-_STRUCTURED_CHANGE_RE = re.compile(rf"(?:^|\n){_W}*[-*]{_W}*[^:：\n]+[:：][^\n]+\n{_W}*因果{_W}*[:：]{_W}*{_N}{{4,}}")
+def _utf16_length(value: str) -> int:
+    """UTF-16 code-unit count of ``value`` -- what a JavaScript string index / quantifier
+    counts. ``surrogatepass`` keeps lone surrogates measurable (Node tolerates them)."""
+    return len(value.encode("utf-16-le", "surrogatepass")) // 2
+
+
+_CHANGE_RECORD_RE = re.compile(_BOL + "【变更记录】")
+_CHANGE_RECORD_SPLIT_RE = re.compile("(?=" + _BOL + "【变更记录】)")
+# Prefix half of the structured-block probe; the trailing ``因果`` value run is captured
+# and re-measured in UTF-16 units so ``\S{4,}`` parity holds for astral characters.
+_STRUCTURED_CHANGE_RE = re.compile(rf"(?:^|\n){_W}*[-*]{_W}*[^:：\n]+[:：][^\n]+\n{_W}*因果{_W}*[:：]{_W}*({_N}+)")
+_CAUSE_MIN_RE = re.compile(rf"因果{_W}*[:：]{_W}*({_N}+)")
 
 _CANONICALIZE_RE = re.compile(
     r"(^|\n)[ \t]*(?:#{1,3}[ \t]*)?(?:\*{1,2}[ \t]*)?【[ \t]*变更记录[ \t]*】(?:[ \t]*\*{1,2})?[ \t]*(?=\r?\n|\Z)"
@@ -59,13 +76,22 @@ _CANONICALIZE_RE = re.compile(
 _META_BULLET_FIELD_RE = re.compile(rf"^[-*]{_W}*[^:：\n]+[:：]")
 _META_NO_CHANGE_RE = re.compile(rf"^[-*]{_W}*.*无状态变化")
 _META_FIELD_LINE_RE = re.compile(rf"^(因果|触发|代价|感知|耗时){_W}*[:：]")
-_CAUSE_MIN_RE = re.compile(rf"因果{_W}*[:：]{_W}*{_N}{{4,}}")
 _NO_STATE_CHANGE_RE = re.compile("无状态变化")
-_HEADER_PREFIX_RE = re.compile(rf"^【变更记录】{_W}*", re.MULTILINE)
+_HEADER_PREFIX_RE = re.compile(_BOL + rf"【变更记录】{_W}*")
 _MULTI_BLANK_RE = re.compile(r"\n{3,}")
-_HARD_WORDCOUNT_RE = re.compile(r"^【硬性字数】[^\n]*\n+", re.MULTILINE)
-_NO_WATER_RE = re.compile(rf"^在原线索上加场面与反应，禁止注水。{_W}*", re.MULTILINE)
+_HARD_WORDCOUNT_RE = re.compile(_BOL + r"【硬性字数】[^\n]*\n+")
+_NO_WATER_RE = re.compile(_BOL + rf"在原线索上加场面与反应，禁止注水。{_W}*")
 _ECHO_MARKER_RE = re.compile("【待补写正文】|【待压缩正文】")
+
+
+def _has_structured_change(text: str) -> bool:
+    """``/(?:^|\\n)...因果[:：]\\S{4,}/.test(text)`` with UTF-16-unit ``\\S{4,}`` semantics."""
+    return any(_utf16_length(m.group(1)) >= _MIN_CAUSE_UNITS for m in _STRUCTURED_CHANGE_RE.finditer(text))
+
+
+def _has_min_cause(text: str) -> bool:
+    """``/因果[:：]\\s*\\S{4,}/.test(text)`` with UTF-16-unit ``\\S{4,}`` semantics."""
+    return any(_utf16_length(m.group(1)) >= _MIN_CAUSE_UNITS for m in _CAUSE_MIN_RE.finditer(text))
 
 
 @dataclass(frozen=True)
@@ -147,9 +173,9 @@ def split_structured_block_and_trailing_prose(block: str | None) -> tuple[str, s
 
 def is_structured_change_record_block(block: str | None) -> bool:
     b = canonicalize_change_record_headers(block or "")
-    if _STRUCTURED_CHANGE_RE.search(b):
+    if _has_structured_change(b):
         return True
-    return bool(_NO_STATE_CHANGE_RE.search(b) and _CAUSE_MIN_RE.search(b))
+    return bool(_NO_STATE_CHANGE_RE.search(b) and _has_min_cause(b))
 
 
 def peel_orphaned_structured_from_prose(prose: str | None) -> tuple[str, list[str]]:
@@ -158,7 +184,7 @@ def peel_orphaned_structured_from_prose(prose: str | None) -> tuple[str, list[st
     raw = _js_trim(prose or "")
     if not raw:
         return "", []
-    if not _STRUCTURED_CHANGE_RE.search(raw) and not (_NO_STATE_CHANGE_RE.search(raw) and _CAUSE_MIN_RE.search(raw)):
+    if not _has_structured_change(raw) and not (_NO_STATE_CHANGE_RE.search(raw) and _has_min_cause(raw)):
         return raw, []
 
     lines = re.split(r"\r?\n", raw)
@@ -246,11 +272,6 @@ def split_prose_and_change_record(full_text: str | None) -> tuple[str, str | Non
     """The persistence/review split: always via ``normalize_change_record_artifacts``."""
     parsed = normalize_change_record_artifacts(full_text)
     return parsed.prose, parsed.change_block
-
-
-def _utf16_length(value: str) -> int:
-    """UTF-16 code-unit count of ``value`` -- what a JavaScript string index counts."""
-    return len(value.encode("utf-16-le")) // 2
 
 
 def strip_length_adjust_instruction_echo(text: str | None) -> str:
