@@ -32,6 +32,7 @@ IMPLEMENTATION_ALLOWLIST: frozenset[str] = HANDOFF_ONLY_ALLOWLIST | frozenset(
         "docs/superpowers/plans/2026-09-09-r2-m5c-narrative-lifecycle.md",
         "docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md",
         # tooling / fitness
+        ".gitattributes",
         "pyproject.toml",
         "uv.lock",
         "scripts/r2/verify_m5c_scope.py",
