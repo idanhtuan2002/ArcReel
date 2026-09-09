@@ -1,0 +1,17 @@
+{
+  "schema_version": "r2-m5c-document-approval-v1",
+  "status": "APPROVED",
+  "m5c_integration_base": "71a96bd606e919d344a7e0c8bcdec6073d862a24",
+  "approved_docs_source_head": "fac8c0473373010dfa51aa2bd50a79cd085549aa",
+  "design_path": "docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md",
+  "design_sha256": "2fe2ac9177ecc7255ac3ed4bab2dfc42776888d61754afb6110aa698b709b68e",
+  "plan_path": "docs/superpowers/plans/2026-09-09-r2-m5c-narrative-lifecycle.md",
+  "plan_sha256": "8adbd40e1a79d308d98153756efee913f5314248fae2ac71ac011c4a5a70eb1b",
+  "adr_path": "docs/adr/0076-narrative-lifecycle-evidence-and-acceptance-authority.md",
+  "adr_sha256": "f94d692c3f5a83fa0b0b749a0212f619f89270d4d8f24985d597586d45bc1f22",
+  "research_path": "docs/research/2026-09-09-r2-m5c-persistence-state-machine-validation.md",
+  "research_sha256": "1cb8a68f6116740db4d84a75c86cf2a51b15578d00c5878f80b2fc3d55ed27e8",
+  "approved_by": "human:anhtuan",
+  "approved_at": "2026-09-09T16:19:46+07:00",
+  "notes": "Design approved in-session by the operator (Human Showrunner). The M5C implementation plan is written by Claude (reassigned from Codex per this session's decision). plan_sha256 covers plan revision r1 (post review-round-1: 6 blockers + 3 HIGH addressed; see the plan's Self-Review section 4). approved_docs_source_head fac8c047 is the parent commit of the single commit that materializes this manifest together with the design spec, plan r1, ADR amendment, and research note; it is the commit immediately preceding the manifest commit, so no hash is self-referential."
+}
