@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+from scripts.r2.verify_m5c_scope import evaluate
+
+
+def test_impl_phase_accepts_allowlisted_paths_and_prefixes() -> None:
+    paths = [
+        "r2/contracts/narrative_plan.py",
+        "r2/narrative_lifecycle/changeset_parser.py",
+        "tests/integration/donor_parity/vendor/huohuo/workbench-server/src/common/novel/novel-change-record.ts",
+        "docs/r2/evidence/R2_M5C_DONOR_BASELINE.json",
+        "pyproject.toml",
+    ]
+    assert evaluate(paths, phase="impl") == []
+
+
+def test_impl_phase_rejects_an_off_allowlist_path() -> None:
+    problems = evaluate(["server/routers/tasks.py"], phase="impl")
+    assert problems == ["unexpected implementation path: server/routers/tasks.py"]
+
+
+def test_impl_phase_rejects_any_migration_change() -> None:
+    problems = evaluate(["alembic/versions/5c7c4a0e0001_add_narrative_lifecycle_evidence.py"], phase="impl")
+    assert any("alembic/versions/" in p for p in problems)
+
+
+def test_handoff_phase_accepts_only_the_review_doc() -> None:
+    assert evaluate(["docs/r2/evidence/R2_M5C_1A_REVIEW.md"], phase="handoff") == []
+
+
+def test_handoff_phase_rejects_anything_else() -> None:
+    problems = evaluate(["r2/contracts/narrative_plan.py"], phase="handoff")
+    assert problems == ["unexpected post-verified path: r2/contracts/narrative_plan.py"]

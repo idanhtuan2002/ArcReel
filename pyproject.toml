@@ -298,6 +298,23 @@ forbidden_modules = [
     "r2.narrative_plan.ports",
 ]
 
+# M5C-1A：narrative_lifecycle 的纯转换模块（Huohuo / Novel Studio 端口）不得依赖任何
+# 权威、持久化、事务、供应商或运行时；只做 proposal-only 证据变换。
+[[tool.importlinter.contracts]]
+name = "R2 narrative lifecycle pure ports are authority- and persistence-free"
+type = "forbidden"
+source_modules = ["r2.narrative_lifecycle"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+    "r2.narrative.canon_transaction",
+    "r2.narrative.ports",
+    "r2.narrative_plan.service",
+    "r2.narrative_plan.ports",
+    "r2.narrative_context.compiler",
+]
+
 [tool.deptry]
 # 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2
 # exclude 是 deptry 默认值去掉 tests（测试的 import 也要参与依赖卫生判定）再补上 worktree 目录。
