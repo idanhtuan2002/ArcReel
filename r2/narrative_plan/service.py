@@ -23,6 +23,7 @@ from r2.contracts import (
     SceneContractV2,
 )
 from r2.narrative.canon_state import ResolvedCanonView
+from r2.narrative.errors import NarrativeThreadLifecycleError
 from r2.narrative.validation import NarrativeInvariantValidator
 
 from .errors import (
@@ -319,7 +320,7 @@ class NarrativePlanService:
         if isinstance(content, NarrativePlanContentV2):
             lifecycle = validate_plan_thread_lifecycle(content)
             if not lifecycle.ok:
-                raise NarrativePlanValidationError([finding.rule_id for finding in lifecycle.findings])
+                raise NarrativeThreadLifecycleError(str([finding.rule_id for finding in lifecycle.findings]))
 
         previous_scenes: dict[str, list] = {}
         for snapshot in history:

@@ -28,18 +28,6 @@ from r2.contracts.narrative_plan import (
 
 from .errors import NarrativePlanIdentityConflictError
 
-THREAD_LIFECYCLE_RULE_ORDER: tuple[str, ...] = (
-    "SCENE_THREAD_LIFECYCLE_REOPENED_RESOLVED",
-    "SCENE_THREAD_LIFECYCLE_ENTRY_OPEN_UNMET",
-    "SCENE_THREAD_LIFECYCLE_ENTRY_RESOLVED_UNMET",
-    "SCENE_THREAD_LIFECYCLE_ENTRY_RESOLVED_PAYOFF_MISMATCH",
-    "SCENE_THREAD_LIFECYCLE_EXIT_OPEN_UNMET",
-    "SCENE_THREAD_LIFECYCLE_RESOLUTION_WITHOUT_THREAD",
-    "SCENE_THREAD_LIFECYCLE_DOUBLE_RESOLUTION",
-    "SCENE_THREAD_LIFECYCLE_ORPHAN_PAYOFF",
-)
-_THREAD_RULE_INDEX = {rule_id: index for index, rule_id in enumerate(THREAD_LIFECYCLE_RULE_ORDER)}
-
 PLAN_HIERARCHY_RULE_ORDER: tuple[str, ...] = (
     "PLAN_HIERARCHY_DUPLICATE_NODE_ID",
     "PLAN_HIERARCHY_MISSING_PARENT",
@@ -334,7 +322,7 @@ def validate_plan_thread_lifecycle(plan_content: NarrativePlanContentV2) -> Narr
             state.resolved = True
             state.resolved_by_payoff = constraint.payoff_ref
 
-    findings.sort(key=lambda finding: (_THREAD_RULE_INDEX[finding.rule_id], finding.affected_refs))
+    findings.sort(key=lambda finding: (finding.rule_id, finding.affected_refs))
     return NarrativeValidationReport(findings=tuple(findings))
 
 
@@ -359,7 +347,6 @@ def _has_cycle(by_id: dict[str, NarrativePlanNode]) -> bool:
 
 __all__ = [
     "PLAN_HIERARCHY_RULE_ORDER",
-    "THREAD_LIFECYCLE_RULE_ORDER",
     "SceneVersionCheck",
     "next_scene_version",
     "validate_plan_hierarchy",

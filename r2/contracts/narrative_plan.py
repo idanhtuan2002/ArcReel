@@ -292,16 +292,17 @@ class SceneContractV2(R2ContractModel):
     _creative_constraints_sorted = field_validator("creative_constraints")(_sorted_unique)
 
 
+def _selector_tag(value: object, *, field: str, default: str) -> str:
+    """Read a version selector from a dict or a model instance for a callable
+    ``Discriminator``. A genuinely absent selector falls back to ``default`` so the
+    accepted v1 input stays as wide as before; any explicit non-default string is
+    returned as-is, so an unknown tag has no matching member and fails closed."""
+    tag = value.get(field) if isinstance(value, Mapping) else getattr(value, field, None)
+    return tag if isinstance(tag, str) else default
+
+
 def _scene_contract_tag(value: object) -> str:
-    """Discriminator for :data:`SceneContractValue`. A genuinely absent
-    ``semantic_hash_version`` falls back to the v1 tag so a compat extension never
-    tightens the accepted v1 input; an explicit unknown tag still fails closed."""
-    tag = (
-        value.get("semantic_hash_version")
-        if isinstance(value, Mapping)
-        else getattr(value, "semantic_hash_version", None)
-    )
-    return tag if isinstance(tag, str) else "r2-scene-contract-content-v1"
+    return _selector_tag(value, field="semantic_hash_version", default="r2-scene-contract-content-v1")
 
 
 SceneContractValue = Annotated[
@@ -346,11 +347,7 @@ class NarrativePlanContentV2(R2ContractModel):
 
 
 def _plan_content_tag(value: object) -> str:
-    """Discriminator for :data:`NarrativePlanContentValue`. A genuinely absent
-    ``schema_version`` falls back to the v1 tag so the accepted v1 input is never
-    tightened; an explicit unknown tag still fails closed."""
-    tag = value.get("schema_version") if isinstance(value, Mapping) else getattr(value, "schema_version", None)
-    return tag if isinstance(tag, str) else "r2-narrative-plan-v1"
+    return _selector_tag(value, field="schema_version", default="r2-narrative-plan-v1")
 
 
 NarrativePlanContentValue = Annotated[

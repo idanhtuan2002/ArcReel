@@ -20,7 +20,7 @@ from r2.contracts import (
     SceneThreadConstraint,
 )
 from r2.narrative.canon_state import ResolvedCanonView
-from r2.narrative.errors import NarrativePlanSchemaVersionError
+from r2.narrative.errors import NarrativePlanSchemaVersionError, NarrativeThreadLifecycleError
 from r2.narrative.hashing import compute_canon_content_hash
 from r2.narrative_plan.errors import (
     NarrativePlanApprovalError,
@@ -327,7 +327,7 @@ async def test_v2_plan_with_a_broken_thread_lineage_is_rejected_with_zero_writes
         ]
     )
     proposal = _proposal_v2(content)
-    with pytest.raises(NarrativePlanValidationError) as exc:
+    with pytest.raises(NarrativeThreadLifecycleError) as exc:
         await service.commit_revision(
             proposal=proposal, approval=_approval(proposal), project_name=PROJECT, user_id=USER, now=NOW
         )

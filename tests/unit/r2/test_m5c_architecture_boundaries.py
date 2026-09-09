@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from r2.contracts.narrative_plan import SceneContract, SceneTemporalWindow
 from r2.narrative_plan.hashing import compute_scene_semantic_hash, compute_scene_semantic_hash_v2
-from tests.unit.r2.narrative_plan.test_hashing_v2 import V1_GOLDEN_SCENE, V1_GOLDEN_SCENE_HASH
+from tests.unit.r2.narrative_plan._helpers import V1_GOLDEN_SCENE, V1_GOLDEN_SCENE_HASH
 
 _ROOT = Path(__file__).resolve().parents[3]
 _PURE_LIFECYCLE_DIR = _ROOT / "r2" / "narrative_lifecycle"

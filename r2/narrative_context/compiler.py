@@ -283,10 +283,10 @@ class NarrativeContextCompiler:
         Only a no-POV ``AUTHOR_DRAFT`` request is gated. It passes the SceneContract half
         solely when the selected scene is v2 with ``scene.pov is None`` and
         ``omniscient_authoring_allowed_by_scene``; a v1 scene is treated as ``False``.
-        Passing the scene half is not overall admission: the typed CreativePolicy
-        conjunct does not exist yet, so such a request still terminates with
-        ``AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE``. ``CHARACTER_SIMULATION`` and any
-        POV'd ``AUTHOR_DRAFT`` request are unaffected here.
+        Passing the scene half is not overall admission: this build carries no typed
+        CreativePolicy capability, so such a request terminates with
+        ``AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE`` and no policy prose can grant it.
+        ``CHARACTER_SIMULATION`` and any POV'd ``AUTHOR_DRAFT`` request are unaffected here.
         """
         if request.mode is not ContextMode.AUTHOR_DRAFT or request.pov_subject_entity_id is not None:
             return

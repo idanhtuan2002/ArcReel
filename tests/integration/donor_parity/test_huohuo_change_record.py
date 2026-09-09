@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -17,7 +18,6 @@ def test_huohuo_baseline_manifest_matches_the_pinned_source() -> None:
     entry = manifest["ports"]["huohuo_change_record"]
     assert entry["revision"] == "f104b853b3563e124d9cde25f9331d323fb483b9"
     assert entry["source_sha256"] == "dd3a310e1d83f80fca132a6ea64380c3d953c780054d0ea93e9f865c09fb5088"
-    import hashlib
 
     vendored = _REPO_ROOT / "tests/integration/donor_parity/vendor" / entry["vendored_path"]
     assert hashlib.sha256(vendored.read_bytes()).hexdigest() == entry["source_sha256"]

@@ -28,7 +28,7 @@ class NarrativeContextBudgetError(NarrativeContextError):
 # Stable finding identifiers carried inside a NarrativeContextValidationError for the
 # scene-side omniscient AUTHOR_DRAFT gate. A no-POV AUTHOR_DRAFT request that fails the
 # SceneContract half raises with SCENE_OMNISCIENT_AUTHORING_FORBIDDEN; one that passes it
-# still terminates with AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE until the typed
-# CreativePolicy authority exists. No policy prose can enable omniscient authoring.
+# terminates with AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE because this build carries no
+# typed CreativePolicy capability, and no policy prose can enable omniscient authoring.
 SCENE_OMNISCIENT_AUTHORING_FORBIDDEN = "SCENE_OMNISCIENT_AUTHORING_FORBIDDEN"
 AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE = "AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE"

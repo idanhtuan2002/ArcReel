@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -209,6 +211,7 @@ def test_narrative_plan_schema_version_error_is_an_exception_type() -> None:
 # --- v2 plan aggregate envelope: discriminator back-compat + selector coherence ----
 
 _NOW = datetime(2026, 3, 1, 12, tzinfo=UTC)
+_V1_PLAN_CONTENT_SCHEMA_SHA = "593f1aeae9678b5de7cb3eedeef34e7486b0df9382ec012dc8dc74e0f905cb57"
 
 
 def test_missing_schema_version_tag_still_resolves_as_v1() -> None:
@@ -291,3 +294,46 @@ def test_version_snapshot_rejects_an_outer_schema_that_disagrees_with_the_conten
         **kwargs,
     )
     assert ok.schema_version == "r2-narrative-plan-v2"
+
+
+def test_v1_narrative_plan_wrapper_bytes_are_stable_after_the_union_widening() -> None:
+    content = NarrativePlanContent(canon_basis=BASIS, story_frame="f")
+    plan = NarrativePlan(
+        plan_id="p1",
+        version=1,
+        content=content,
+        content_hash="np:x",
+        committed_at=_NOW,
+        committed_by="a",
+        approval_ref="ap-1",
+    )
+    dumped = plan.model_dump(mode="json")
+    assert dumped["content_hash_version"] == "r2-narrative-plan-content-v1"
+    assert dumped["content"]["schema_version"] == "r2-narrative-plan-v1"
+    assert "scene_contracts" in dumped["content"]
+    assert type(plan.content) is NarrativePlanContent
+    # The v1 NarrativePlanContent class stays byte-identical to its accepted form.
+    v1_schema = json.dumps(NarrativePlanContent.model_json_schema(), sort_keys=True)
+    assert hashlib.sha256(v1_schema.encode()).hexdigest() == _V1_PLAN_CONTENT_SCHEMA_SHA
+
+
+def test_a_coherent_v1_version_snapshot_still_validates() -> None:
+    snap = NarrativePlanVersionSnapshot(
+        plan_id="p1",
+        version=1,
+        user_id="u1",
+        project_name="proj",
+        plan_revision_id="rev-1",
+        parent_version=None,
+        canon_branch_id="br-1",
+        canon_version_id="cv-1",
+        content=NarrativePlanContent(canon_basis=BASIS, story_frame="f"),
+        content_hash="np:x",
+        approval_ref="ap-1",
+        approved_by="a",
+        approved_at=_NOW,
+        committed_at=_NOW,
+        committed_by="a",
+    )
+    assert snap.schema_version == "r2-narrative-plan-v1"
+    assert snap.content_hash_version == "r2-narrative-plan-content-v1"

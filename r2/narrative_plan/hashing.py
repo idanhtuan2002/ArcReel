@@ -17,6 +17,7 @@ from r2.contracts.narrative_plan import (
     SceneContractV2,
     SceneContractValue,
 )
+from r2.narrative.errors import NarrativePlanSchemaVersionError
 
 _SCENE_HASH_EXCLUDED = {"version", "semantic_hash", "semantic_hash_algorithm", "semantic_hash_version"}
 SCENE_SEMANTIC_HASH_SCHEMA = "r2-scene-contract-content-v1"
@@ -68,17 +69,27 @@ def compute_scene_semantic_hash_v2(scene: SceneContractV2) -> str:
 
 
 def compute_scene_semantic_hash_dispatch(scene: SceneContractValue) -> str:
-    """Route to the v1 or v2 scene hash by the scene's declared ``semantic_hash_version``."""
-    if isinstance(scene, SceneContractV2):
+    """Route to the v1 or v2 scene hash by the scene's declared ``semantic_hash_version``.
+    An unknown selector, or one that disagrees with the concrete contract type, fails
+    closed with ``NarrativePlanSchemaVersionError``."""
+    selector: str = scene.semantic_hash_version
+    if selector == SCENE_SEMANTIC_HASH_SCHEMA_V2 and isinstance(scene, SceneContractV2):
         return compute_scene_semantic_hash_v2(scene)
-    return compute_scene_semantic_hash(scene)
+    if selector == SCENE_SEMANTIC_HASH_SCHEMA and isinstance(scene, SceneContract):
+        return compute_scene_semantic_hash(scene)
+    raise NarrativePlanSchemaVersionError(f"unknown or mismatched scene semantic_hash_version {selector!r}")
 
 
 def compute_plan_content_hash_dispatch(content: NarrativePlanContent | NarrativePlanContentV2) -> str:
-    """Route to the v1 or v2 plan-content hash by the content's declared ``schema_version``."""
-    if isinstance(content, NarrativePlanContentV2):
+    """Route to the v1 or v2 plan-content hash by the content's declared ``schema_version``.
+    An unknown selector, or one that disagrees with the concrete content type, fails
+    closed with ``NarrativePlanSchemaVersionError``."""
+    selector: str = content.schema_version
+    if selector == "r2-narrative-plan-v2" and isinstance(content, NarrativePlanContentV2):
         return compute_plan_content_hash_v2(content)
-    return compute_plan_content_hash(content)
+    if selector == "r2-narrative-plan-v1" and isinstance(content, NarrativePlanContent):
+        return compute_plan_content_hash(content)
+    raise NarrativePlanSchemaVersionError(f"unknown or mismatched plan schema_version {selector!r}")
 
 
 def compute_plan_content_hash_v2(content: NarrativePlanContentV2) -> str:

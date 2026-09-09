@@ -19,6 +19,7 @@ from .errors import (
     NarrativePlanSchemaVersionError,
     NarrativeRelationshipIntegrityError,
     NarrativeSchemaVersionError,
+    NarrativeThreadLifecycleError,
 )
 from .hashing import (
     compute_canon_content_hash,
@@ -59,6 +60,7 @@ __all__ = [
     "NarrativePlanSchemaVersionError",
     "NarrativeRelationshipIntegrityError",
     "NarrativeSchemaVersionError",
+    "NarrativeThreadLifecycleError",
     "ResolvedCanonView",
     "apply_canon_delta",
     "compute_canon_content_hash",

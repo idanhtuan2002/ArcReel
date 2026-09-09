@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
-from r2.contracts import CanonBasis, NarrativePlanContent, SceneContract, SceneFactConstraint, SceneTemporalWindow
+from r2.contracts import CanonBasis, NarrativePlanContent
 from r2.narrative_plan.hashing import (
     compute_plan_content_hash,
     compute_plan_content_hash_v2,
@@ -12,33 +10,15 @@ from r2.narrative_plan.hashing import (
 )
 from r2.narrative_plan.schema_upgrade import minimum_scene_selector
 from tests.unit.r2.narrative_plan._helpers import (
+    V1_GOLDEN_PLAN_HASH,
+    V1_GOLDEN_SCENE,
+    V1_GOLDEN_SCENE_HASH,
     plan_content_v2,
     relationship_constraint,
     scene_contract,
     scene_contract_v2,
     thread_constraint,
 )
-
-_FROM = datetime(2026, 3, 1, 10, tzinfo=UTC)
-_UNTIL = datetime(2026, 3, 1, 12, tzinfo=UTC)
-
-# Regression anchors captured from the frozen v1 implementation. v2 code must not move them.
-V1_GOLDEN_SCENE = SceneContract(
-    scene_contract_id="golden-scene",
-    version=1,
-    semantic_hash="sh:placeholder",
-    sequence_index=0,
-    purpose="discover ring",
-    pov="hero",
-    location_ref="loc-cave",
-    temporal_window=SceneTemporalWindow(effective_from=_FROM, effective_until=_UNTIL),
-    participants=["hero", "mentor"],
-    entry_state_constraints=[
-        SceneFactConstraint(constraint_id="c1", subject_ref="obj-ring", predicate="owner", comparison="PRESENT")
-    ],
-)
-V1_GOLDEN_SCENE_HASH = "sh:66c8077044977a3fa1245bb4db66a803c5ed0da5502f208e99feb0267acafd24"
-V1_GOLDEN_PLAN_HASH = "np:133bf9df6dd1fe175abe1967efa2f657a80bee184100d98c91d9ae26acf28af5"
 
 
 def _v1_golden_plan() -> NarrativePlanContent:

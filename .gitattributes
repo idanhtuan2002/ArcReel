@@ -1,3 +1,3 @@
-# Vendored, SHA-256-pinned third-party donor sources for R2-DEC-031 parity.
-# Kept byte-for-byte: no EOL normalization, no whitespace linting, marked vendored.
+# Vendored third-party donor sources, pinned by SHA-256 and kept byte-for-byte:
+# no EOL normalization, no whitespace linting, marked vendored.
 tests/integration/donor_parity/vendor/** -text -whitespace linguist-vendored
