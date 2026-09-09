@@ -10,7 +10,11 @@ from r2.contracts.narrative_plan import (
     PLAN_SCHEMA_VERSION_V2,
     SCENE_CONTRACT_CONTENT_HASH_VERSION_V2,
     CanonBasis,
+    NarrativePlan,
+    NarrativePlanContent,
     NarrativePlanContentV2,
+    NarrativePlanContentValue,
+    NarrativePlanVersionSnapshot,
     SceneContract,
     SceneContractV2,
     SceneContractValue,
@@ -200,3 +204,90 @@ def test_narrative_plan_schema_version_error_is_an_exception_type() -> None:
     assert issubclass(NarrativePlanSchemaVersionError, Exception)
     with pytest.raises(NarrativePlanSchemaVersionError):
         raise NarrativePlanSchemaVersionError("boom")
+
+
+# --- v2 plan aggregate envelope: discriminator back-compat + selector coherence ----
+
+_NOW = datetime(2026, 3, 1, 12, tzinfo=UTC)
+
+
+def test_missing_schema_version_tag_still_resolves_as_v1() -> None:
+    adapter: TypeAdapter[NarrativePlanContentValue] = TypeAdapter(NarrativePlanContentValue)
+    resolved = adapter.validate_python({"canon_basis": BASIS.model_dump(), "story_frame": "f"})
+    assert type(resolved) is NarrativePlanContent
+    assert resolved.schema_version == "r2-narrative-plan-v1"
+
+
+def test_explicit_unknown_schema_version_tag_fails_closed() -> None:
+    adapter: TypeAdapter[NarrativePlanContentValue] = TypeAdapter(NarrativePlanContentValue)
+    with pytest.raises(ValidationError):
+        adapter.validate_python(
+            {"canon_basis": BASIS.model_dump(), "story_frame": "f", "schema_version": "r2-narrative-plan-v9"}
+        )
+
+
+def test_scene_contract_value_missing_tag_resolves_v1_and_unknown_fails() -> None:
+    adapter: TypeAdapter[SceneContractValue] = TypeAdapter(SceneContractValue)
+    resolved = adapter.validate_python(
+        {
+            "scene_contract_id": "sc",
+            "version": 1,
+            "semantic_hash": "sh:x",
+            "sequence_index": 0,
+            "purpose": "p",
+            "pov": None,
+            "location_ref": None,
+            "temporal_window": {"effective_from": FROM.isoformat(), "effective_until": UNTIL.isoformat()},
+        }
+    )
+    assert type(resolved) is SceneContract
+    with pytest.raises(ValidationError):
+        adapter.validate_python({"scene_contract_id": "sc", "semantic_hash_version": "r2-scene-contract-content-v9"})
+
+
+def _v2_content() -> NarrativePlanContentV2:
+    return NarrativePlanContentV2(canon_basis=BASIS, story_frame="f")
+
+
+def test_narrative_plan_rejects_a_selector_tuple_mismatch() -> None:
+    with pytest.raises(ValidationError):
+        NarrativePlan(
+            plan_id="p1",
+            version=1,
+            content=_v2_content(),
+            content_hash="np:x",
+            content_hash_version="r2-narrative-plan-content-v1",  # v2 content, v1 hash selector
+            committed_at=_NOW,
+            committed_by="a",
+            approval_ref="ap-1",
+        )
+
+
+def test_version_snapshot_rejects_an_outer_schema_that_disagrees_with_the_content() -> None:
+    kwargs = {
+        "plan_id": "p1",
+        "version": 1,
+        "user_id": "u1",
+        "project_name": "proj",
+        "plan_revision_id": "rev-1",
+        "parent_version": None,
+        "canon_branch_id": "br-1",
+        "canon_version_id": "cv-1",
+        "content": _v2_content(),
+        "content_hash": "np:x",
+        "approval_ref": "ap-1",
+        "approved_by": "a",
+        "approved_at": _NOW,
+        "committed_at": _NOW,
+        "committed_by": "a",
+    }
+    with pytest.raises(ValidationError):
+        NarrativePlanVersionSnapshot(
+            schema_version="r2-narrative-plan-v1", content_hash_version="r2-narrative-plan-content-v1", **kwargs
+        )
+    ok = NarrativePlanVersionSnapshot(
+        schema_version="r2-narrative-plan-v2",
+        content_hash_version="r2-narrative-plan-content-v2",
+        **kwargs,
+    )
+    assert ok.schema_version == "r2-narrative-plan-v2"

@@ -7,11 +7,12 @@ cross-authority dependency, never permission to modify Canon.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic import ConfigDict, Discriminator, Field, Tag, field_validator, model_validator
 
 from .common import JSONValue, NonEmptyStr, R2ContractModel
 from .narrative import EpistemicState
@@ -291,9 +292,22 @@ class SceneContractV2(R2ContractModel):
     _creative_constraints_sorted = field_validator("creative_constraints")(_sorted_unique)
 
 
+def _scene_contract_tag(value: object) -> str:
+    """Discriminator for :data:`SceneContractValue`. A genuinely absent
+    ``semantic_hash_version`` falls back to the v1 tag so a compat extension never
+    tightens the accepted v1 input; an explicit unknown tag still fails closed."""
+    tag = (
+        value.get("semantic_hash_version")
+        if isinstance(value, Mapping)
+        else getattr(value, "semantic_hash_version", None)
+    )
+    return tag if isinstance(tag, str) else "r2-scene-contract-content-v1"
+
+
 SceneContractValue = Annotated[
-    SceneContract | SceneContractV2,
-    Field(discriminator="semantic_hash_version"),
+    Annotated[SceneContract, Tag("r2-scene-contract-content-v1")]
+    | Annotated[SceneContractV2, Tag("r2-scene-contract-content-v2")],
+    Discriminator(_scene_contract_tag),
 ]
 
 
@@ -331,10 +345,24 @@ class NarrativePlanContentV2(R2ContractModel):
     scene_contracts: list[SceneContractValue] = Field(default_factory=list)
 
 
+def _plan_content_tag(value: object) -> str:
+    """Discriminator for :data:`NarrativePlanContentValue`. A genuinely absent
+    ``schema_version`` falls back to the v1 tag so the accepted v1 input is never
+    tightened; an explicit unknown tag still fails closed."""
+    tag = value.get("schema_version") if isinstance(value, Mapping) else getattr(value, "schema_version", None)
+    return tag if isinstance(tag, str) else "r2-narrative-plan-v1"
+
+
 NarrativePlanContentValue = Annotated[
-    NarrativePlanContent | NarrativePlanContentV2,
-    Field(discriminator="schema_version"),
+    Annotated[NarrativePlanContent, Tag("r2-narrative-plan-v1")]
+    | Annotated[NarrativePlanContentV2, Tag("r2-narrative-plan-v2")],
+    Discriminator(_plan_content_tag),
 ]
+
+_PLAN_CONTENT_HASH_VERSION_FOR: dict[str, str] = {
+    "r2-narrative-plan-v1": "r2-narrative-plan-content-v1",
+    "r2-narrative-plan-v2": "r2-narrative-plan-content-v2",
+}
 
 
 class NarrativePlan(R2ContractModel):
@@ -351,6 +379,16 @@ class NarrativePlan(R2ContractModel):
     committed_by: NonEmptyStr
     approval_ref: NonEmptyStr
     _committed_at_aware = field_validator("committed_at")(_aware)
+
+    @model_validator(mode="after")
+    def _content_hash_version_matches_schema(self) -> NarrativePlan:
+        expected = _PLAN_CONTENT_HASH_VERSION_FOR[self.content.schema_version]
+        if self.content_hash_version != expected:
+            raise ValueError(
+                f"content_hash_version {self.content_hash_version!r} does not match "
+                f"content schema {self.content.schema_version!r} (expected {expected!r})"
+            )
+        return self
 
 
 class NarrativePlanRevisionProposal(R2ContractModel):
@@ -442,4 +480,21 @@ class NarrativePlanVersionSnapshot(R2ContractModel):
             raise ValueError("parent_version must be earlier than version")
         if self.version == 1 and self.parent_version is not None:
             raise ValueError("version 1 has no parent")
+        return self
+
+    @model_validator(mode="after")
+    def _selector_tuple_is_coherent(self) -> NarrativePlanVersionSnapshot:
+        # The persisted (outer schema_version, content schema, content-hash selector) must
+        # be the one allowed tuple, so a row whose content is v2 can never be read back as
+        # a v1 predecessor and defeat the aggregate downgrade ratchet.
+        if self.schema_version != self.content.schema_version:
+            raise ValueError(
+                f"schema_version {self.schema_version!r} does not match content schema {self.content.schema_version!r}"
+            )
+        expected_hash_version = _PLAN_CONTENT_HASH_VERSION_FOR[self.content.schema_version]
+        if self.content_hash_version != expected_hash_version:
+            raise ValueError(
+                f"content_hash_version {self.content_hash_version!r} does not match content schema "
+                f"{self.content.schema_version!r} (expected {expected_hash_version!r})"
+            )
         return self
