@@ -25,7 +25,8 @@ from r2.contracts import (
     NarrativeContextSegment,
     NarrativePlan,
     NarrativeSourceDescriptor,
-    SceneContract,
+    SceneContractV2,
+    SceneContractValue,
     SelectionTrace,
     SelectionTraceReason,
     SelectionTraceStatus,
@@ -38,6 +39,8 @@ from r2.narrative.errors import EpistemicIntegrityError, NarrativeSchemaVersionE
 from r2.narrative.validation import NarrativeInvariantValidator
 
 from .errors import (
+    AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE,
+    SCENE_OMNISCIENT_AUTHORING_FORBIDDEN,
     NarrativeContextBudgetError,
     NarrativeContextInputError,
     NarrativeContextValidationError,
@@ -111,7 +114,7 @@ def _fact_row(fact: Fact) -> str:
     )
 
 
-def _scene_constraint_digest(scene: SceneContract) -> str:
+def _scene_constraint_digest(scene: SceneContractValue) -> str:
     payload = {
         "forbidden_events": [item.model_dump(mode="json") for item in scene.forbidden_events],
         "forbidden_knowledge": [item.model_dump(mode="json") for item in scene.forbidden_knowledge],
@@ -158,6 +161,7 @@ class NarrativeContextCompiler:
         plan, scene = await self._exact_plan_and_scene(request)
         self._require_basis_equality(request, plan)
         self._run_hard_validation(canon=canon, plan=plan, scene=scene)
+        self._gate_omniscient_author_draft(request, scene)
         pov_view = await self._pov_view(request, canon)
 
         mandatory = self._mandatory_segments(request, canon, scene, pov_view)
@@ -233,7 +237,7 @@ class NarrativeContextCompiler:
             raise NarrativeContextInputError("Canon reader returned a view for a different exact version")
         return view
 
-    async def _exact_plan_and_scene(self, request: NarrativeContextRequest) -> tuple[NarrativePlan, SceneContract]:
+    async def _exact_plan_and_scene(self, request: NarrativeContextRequest) -> tuple[NarrativePlan, SceneContractValue]:
         plan = await self._plan_reader.get_exact_plan(
             plan_id=request.plan_id,
             plan_version=request.plan_version,
@@ -267,10 +271,31 @@ class NarrativeContextCompiler:
         if basis.branch_id != request.canon_branch_id or basis.canon_version_id != request.canon_version_id:
             raise NarrativeContextInputError("plan Canon basis does not equal the requested Canon version")
 
-    def _run_hard_validation(self, *, canon: ResolvedCanonView, plan: NarrativePlan, scene: SceneContract) -> None:
+    def _run_hard_validation(self, *, canon: ResolvedCanonView, plan: NarrativePlan, scene: SceneContractValue) -> None:
         report = self._validator.validate_scene(canon=canon, plan=plan, scene=scene)
         if not report.ok:
             raise NarrativeContextValidationError([finding.rule_id for finding in report.findings])
+
+    @staticmethod
+    def _gate_omniscient_author_draft(request: NarrativeContextRequest, scene: SceneContractValue) -> None:
+        """Scene-side omniscient gate, run before any author-only material is read.
+
+        Only a no-POV ``AUTHOR_DRAFT`` request is gated. It passes the SceneContract half
+        solely when the selected scene is v2 with ``scene.pov is None`` and
+        ``omniscient_authoring_allowed_by_scene``; a v1 scene is treated as ``False``.
+        Passing the scene half is not overall admission: the typed CreativePolicy
+        conjunct does not exist yet, so such a request still terminates with
+        ``AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE``. ``CHARACTER_SIMULATION`` and any
+        POV'd ``AUTHOR_DRAFT`` request are unaffected here.
+        """
+        if request.mode is not ContextMode.AUTHOR_DRAFT or request.pov_subject_entity_id is not None:
+            return
+        scene_half_passes = (
+            isinstance(scene, SceneContractV2) and scene.pov is None and scene.omniscient_authoring_allowed_by_scene
+        )
+        if not scene_half_passes:
+            raise NarrativeContextValidationError([SCENE_OMNISCIENT_AUTHORING_FORBIDDEN])
+        raise NarrativeContextValidationError([AUTHOR_DRAFT_POLICY_CAPABILITY_UNAVAILABLE])
 
     async def _pov_view(self, request: NarrativeContextRequest, canon: ResolvedCanonView) -> EpistemicView | None:
         if request.pov_subject_entity_id is None:
@@ -286,7 +311,7 @@ class NarrativeContextCompiler:
         self,
         request: NarrativeContextRequest,
         canon: ResolvedCanonView,
-        scene: SceneContract,
+        scene: SceneContractValue,
         pov_view: EpistemicView | None,
     ) -> list[NarrativeContextSegment]:
         segments: list[NarrativeContextSegment] = [

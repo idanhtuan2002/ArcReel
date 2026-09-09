@@ -261,7 +261,7 @@ async def test_mut07_falsified_secret_descriptor_leaks_nothing() -> None:
     # The descriptor declares a content hash for one prose; the candidate carries another.
     secret = secret_descriptor(prose="the twist is that char-x is the heir")
     snapshot = retrieval_snapshot((secret, "a completely different body of secret prose"))
-    pack = await _compiler(snapshot).compile(_acc_request(mode="AUTHOR_DRAFT", pov=None))
+    pack = await _compiler(snapshot).compile(_acc_request(mode="AUTHOR_DRAFT", pov="char-a"))
     assert pack.retrieved_context == ()
     trace = next(t for t in pack.selection_trace if t.candidate_id == "secret")
     assert trace.reason.value == "MISSING_SOURCE_METADATA"
@@ -474,14 +474,14 @@ async def test_full_corpus_compiles_deterministically_in_both_modes_without_leak
     corpus = full_corpus()
     secret_prose = _corpus_secret_prose(corpus)
 
-    for mode, pov in (("AUTHOR_DRAFT", None), ("CHARACTER_SIMULATION", "char-6")):
+    for mode, pov in (("AUTHOR_DRAFT", "char-6"), ("CHARACTER_SIMULATION", "char-6")):
         request = _corpus_request(corpus, mode=mode, pov=pov)
         first = await _corpus_compiler(corpus).compile(request)
         second = await _corpus_compiler(corpus).compile(request)
         assert first.context_pack_id == second.context_pack_id
         assert first.content_hash == second.content_hash
 
-    author_pack = await _corpus_compiler(corpus).compile(_corpus_request(corpus, mode="AUTHOR_DRAFT", pov=None))
+    author_pack = await _corpus_compiler(corpus).compile(_corpus_request(corpus, mode="AUTHOR_DRAFT", pov="char-6"))
     sim_pack = await _corpus_compiler(corpus).compile(
         _corpus_request(corpus, mode="CHARACTER_SIMULATION", pov="char-6")
     )
@@ -563,7 +563,7 @@ async def test_every_mutation_leaves_all_hard_exit_counters_at_zero(session_fact
     # MUT-07 / 08: compiler visibility leakage + rejected-candidate contamination.
     secret = secret_descriptor(prose="the twist is that char-x is the heir")
     mut07 = await _compiler(retrieval_snapshot((secret, "a completely different body of secret prose"))).compile(
-        _acc_request(mode="AUTHOR_DRAFT", pov=None)
+        _acc_request(mode="AUTHOR_DRAFT", pov="char-a")
     )
     if "twist" in repr(mut07) or "body of secret prose" in repr(mut07):
         counters["epistemic_leakage"] += 1
