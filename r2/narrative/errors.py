@@ -72,3 +72,7 @@ class NarrativePlanSchemaVersionError(NarrativeError):
 
 class NarrativeRelationshipIntegrityError(NarrativeError):
     """A relationship reference or profile is malformed, or exact active relationship state is ambiguous."""
+
+
+class NarrativeThreadLifecycleError(NarrativeError):
+    """A plan-wide presentation-order thread lifecycle invariant fails."""
