@@ -53,7 +53,9 @@ dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
-    "ruff>=0.16.0",
+    # <0.16: 0.16 起 `ruff format` 会重排 Markdown 内的 Python 代码块，
+    # 会改写 sha256 已固定在 M5B 证据里的 docs/superpowers/plans/ 计划文档。
+    "ruff>=0.15.0,<0.16",
     "pre-commit>=4.0.0",
     "python-docx>=1.2.0",
     "basedpyright>=1.39.4",
@@ -257,6 +259,43 @@ forbidden_modules = [
     "lib.db",
     "lib.db.models",
     "lib.db.repositories",
+]
+
+# M5B：Authorial Intent 权威同样持久化中立；SQLAlchemy 绑定归 Host 适配器。
+[[tool.importlinter.contracts]]
+name = "R2 narrative plan authority does not depend on Host persistence"
+type = "forbidden"
+source_modules = ["r2.narrative_plan"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+]
+
+# M5B：NarrativePlanService 不是第二个 Canon writer——不得触达 Canon 授权写口 / 事务。
+[[tool.importlinter.contracts]]
+name = "M5B NarrativePlanService cannot reach Canon authoritative writes"
+type = "forbidden"
+source_modules = ["r2.narrative_plan.service"]
+forbidden_modules = [
+    "r2.narrative.canon_transaction",
+    "r2.narrative.ports",
+    "lib.db.canon_uow",
+]
+
+# M5B：NarrativeContextCompiler 只读——不得触达任一权威写口 / UoW / Host 持久化。
+[[tool.importlinter.contracts]]
+name = "M5B narrative context is read-only and persistence-neutral"
+type = "forbidden"
+source_modules = ["r2.narrative_context"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+    "r2.narrative.canon_transaction",
+    "r2.narrative.ports",
+    "r2.narrative_plan.service",
+    "r2.narrative_plan.ports",
 ]
 
 [tool.deptry]

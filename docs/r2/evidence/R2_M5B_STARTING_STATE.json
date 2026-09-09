@@ -1,0 +1,136 @@
+{
+  "schema_version": "1",
+  "milestone": "R2-M5B",
+  "recorded_at": "2026-09-08",
+  "m5a_accepted_lineage": {
+    "m5a_verified_head": "2d648546dc971af6cc8072a2765de27fa4e9472a",
+    "m5a_handoff_head": "649bf01ad8db5e89efa9b7fa6e4e9171a061ce90",
+    "m5a_integration_head": "698c34f6b953bd6c7df3306da253e9827b6d94c0",
+    "verified_to_handoff_ancestry": "git merge-base --is-ancestor 2d648546 649bf01a exit 0",
+    "verified_to_handoff_diff": ["docs/r2/evidence/R2_M5A_FINAL_VERIFICATION.md"],
+    "integration_head_parents": [
+      "2173463e88218248d8805e4f20df2102d1d6743a",
+      "649bf01ad8db5e89efa9b7fa6e4e9171a061ce90"
+    ],
+    "m4_handoff_to_verified_whitespace": "git diff --check 2173463e...2d648546 exit 0",
+    "m5a_final_verification_evidence": {
+      "note": "Prerequisite evidence from the accepted M5A chain, not current M5B validation.",
+      "verified_head_line": "- Verified head ...: `2d648546dc971af6cc8072a2765de27fa4e9472a`",
+      "focused_sqlite": "144 passed, 0 failed, exit 0 (SQLite)",
+      "full_sqlite": "12595 passed, 2 skipped, 0 failed, 0 errors, exit 0 (SQLite)",
+      "postgres_focused": ["607 passed, 0 failed, exit 0", "70 passed, 0 failed, exit 0"],
+      "alembic_heads": "5a7c4a0e0001 (head)"
+    }
+  },
+  "document_approval_manifest": {
+    "path": "docs/r2/evidence/R2_M5B_DOCUMENT_APPROVAL.json",
+    "schema_version": "r2-m5b-document-approval-v1",
+    "status": "APPROVED",
+    "m5a_integration_head": "698c34f6b953bd6c7df3306da253e9827b6d94c0",
+    "approved_docs_source_head": "080f9c1eee98dadf13c845b0d10b62794764e6a3",
+    "approved_by": "human:anhtuan",
+    "approved_at": "2026-09-08T16:25:22+07:00",
+    "design_path": "docs/superpowers/specs/2026-09-08-r2-m5b-epistemic-plan-context-design.md",
+    "design_sha256": "cb8059b209ab84e1bf16d28b09bfbcbd92b16845f7b6d96344537bb6b8200ef2",
+    "plan_path": "docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md",
+    "plan_sha256": "82a1838fcf027bde5ae3988a9114723e95e6f5e5268492b411370af814a5af62",
+    "manifest_verification": "uv run python one-liner from plan Task 0 Step 3 exited 0; every asserted field and recomputed SHA-256 matched."
+  },
+  "worktree": {
+    "path": "/home/anhtuan/content-production-os-m5b",
+    "branch": "feat/r2-m5b-epistemic-plan-context",
+    "m5b_document_materialization_head": "e83ce1a222e22c36ab37dffcf62839efcfe49655",
+    "materialization_head_descends_from_integration_head": "git merge-base --is-ancestor 698c34f6 e83ce1a2 exit 0",
+    "materialization_diff_from_integration_head": [
+      "docs/r2/evidence/R2_M5B_DOCUMENT_APPROVAL.json",
+      "docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md",
+      "docs/superpowers/specs/2026-09-08-r2-m5b-epistemic-plan-context-design.md"
+    ],
+    "materialization_commits_in_range": [
+      {
+        "sha": "e83ce1a222e22c36ab37dffcf62839efcfe49655",
+        "parent": "698c34f6b953bd6c7df3306da253e9827b6d94c0",
+        "subject": "docs(r2): materialize approved M5B documents",
+        "changed_paths": [
+          "docs/r2/evidence/R2_M5B_DOCUMENT_APPROVAL.json",
+          "docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md",
+          "docs/superpowers/specs/2026-09-08-r2-m5b-epistemic-plan-context-design.md"
+        ]
+      }
+    ],
+    "clean_tree": "git status --short empty at e83ce1a2",
+    "note": "No implementation file precedes this Task 0 checkpoint. Task 1 starts only from M5B_TASK0_HEAD recorded by the checkpoint commit."
+  },
+  "recomputed_document_hashes": {
+    "algorithm": "sha256",
+    "docs/superpowers/specs/2026-09-08-r2-m5b-epistemic-plan-context-design.md": "cb8059b209ab84e1bf16d28b09bfbcbd92b16845f7b6d96344537bb6b8200ef2",
+    "docs/superpowers/plans/2026-09-08-r2-m5b-epistemic-plan-context.md": "82a1838fcf027bde5ae3988a9114723e95e6f5e5268492b411370af814a5af62",
+    "docs/r2/evidence/R2_M5B_DOCUMENT_APPROVAL.json": "dee7b0de59b2d22e34fdd91a59be13e44579b14c6ba4e342710fddeea2ab1cb2"
+  },
+  "migration": {
+    "alembic_heads": "5a7c4a0e0001 (head)",
+    "parent_revision": "5a7c4a0e0001",
+    "parent_revision_file": "alembic/versions/5a7c4a0e0001_add_canon_authority.py",
+    "reserved_revision": "5b7c4a0e0001",
+    "reserved_revision_free": "rg '5b7c4a0e0001' alembic/versions returned no matches",
+    "v1_selectors_present": {
+      "note": "r2-canon-schema-v1 / r2-canon-content-v1 / r2-canon-delta-v1 remain in place and become explicit compatibility fixtures, not replacements.",
+      "files": [
+        "r2/contracts/narrative.py",
+        "r2/narrative/hashing.py",
+        "r2/narrative/canon_state.py",
+        "r2/narrative/canon_transaction.py",
+        "r2/narrative/integrity.py",
+        "tests/unit/r2/contracts/test_narrative.py",
+        "tests/unit/r2/narrative/test_hashing.py",
+        "tests/integration/r2/narrative/_canon_authority.py"
+      ]
+    }
+  },
+  "graph": {
+    "project": "home-anhtuan-content-production-os-m5b",
+    "generation": "2026-09-08T09:37:11Z",
+    "index_mode": "fast",
+    "indexed_worktree": "/home/anhtuan/content-production-os-m5b",
+    "indexed_head": "e83ce1a222e22c36ab37dffcf62839efcfe49655",
+    "nodes": 25015,
+    "edges": 141440,
+    "reindex_reason": "No index existed for the M5B implementation worktree. The pre-existing home-anhtuan-content-production-os index is pinned to design/r2-m5b-narrative-context and does not contain the accepted M5A integration head. A fresh index of the M5B worktree at the materialization head was required.",
+    "coverage": {
+      "no_recorded_issue": [
+        "r2/contracts/narrative.py",
+        "r2/contracts/__init__.py",
+        "r2/narrative/hashing.py",
+        "r2/narrative/canon_state.py",
+        "r2/narrative/validation.py",
+        "r2/narrative/errors.py",
+        "r2/narrative/canon_transaction.py",
+        "r2/narrative/canon_resolver.py",
+        "r2/narrative/integrity.py",
+        "r2/narrative/__init__.py",
+        "tests/unit/r2/narrative/test_canon_state.py",
+        "tests/unit/r2/narrative/test_hashing.py",
+        "tests/unit/r2/contracts/test_narrative.py"
+      ],
+      "missing_not_yet_created": [
+        "r2/narrative/temporal.py",
+        "r2/narrative/epistemic.py"
+      ],
+      "excluded_by_design_read_directly": [
+        "tests/integration/r2/narrative/_canon_authority.py",
+        "tests/integration/r2/narrative/test_canon_transaction.py",
+        "tests/integration/r2/narrative/test_canon_resolver.py",
+        "tests/integration/r2/narrative/test_canon_integrity.py",
+        "scripts/r2 (whole subtree excluded from fast index)"
+      ]
+    },
+    "fallbacks": "Every existing responsibility-map file was also read directly from source (r2/contracts/narrative.py, r2/contracts/common.py, r2/narrative/hashing.py, canon_state.py, errors.py, validation.py, __init__.py, ports.py). tests/integration and scripts subtrees are excluded from the index by design and are read directly in the tasks that touch them."
+  },
+  "baseline_gates": [
+    {"command": "uv run ruff check r2 lib/db tests/unit/r2 tests/integration/r2", "exit_code": 0, "result": "All checks passed!"},
+    {"command": "uv run basedpyright --warnings", "exit_code": 0, "result": "0 errors, 0 warnings, 0 notes"},
+    {"command": "uv run lint-imports", "exit_code": 0, "result": "9 kept, 0 broken"},
+    {"command": "uv run python -m pytest tests/unit/r2/narrative tests/integration/r2/narrative -q", "exit_code": 0, "result": "98 passed, 1 warning in 6.19s"},
+    {"command": "uv run python scripts/audit_tests.py --check", "exit_code": 0, "result": "0 violations"}
+  ]
+}

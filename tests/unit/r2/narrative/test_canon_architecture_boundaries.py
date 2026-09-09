@@ -13,7 +13,18 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[4]
 _NARRATIVE_DIR = _ROOT / "r2" / "narrative"
-_AUTHORITY_WRITE_ATTRS = {"insert_delta", "insert_version", "advance_head"}
+# Every authoritative Canon write-port method.
+_AUTHORITY_WRITE_ATTRS = {"insert_branch", "insert_delta", "insert_version", "advance_head", "lock_branch"}
+# ``insert_version`` / ``advance_head`` names are also used by the SEPARATE NarrativePlan
+# authority repository. Those three plan files are allowlisted and additionally asserted
+# to carry no Canon authority symbol, so a second Canon writer cannot hide among them.
+_CANON_WRITE_CALLERS = {"r2/narrative/canon_transaction.py", "lib/db/repositories/canon_repo.py"}
+_PLAN_AUTHORITY_FILES = {
+    "r2/narrative_plan/service.py",
+    "lib/db/repositories/narrative_plan.py",
+    "lib/db/narrative_plan_uow.py",
+}
+_CANON_AUTHORITY_SYMBOLS = ("CanonWriteRepositoryPort", "CanonRepository", "CanonAuthorityUnitOfWork")
 _AUTHORITY_ONLY_SYMBOLS = (
     "CanonWriteRepositoryPort",
     "CanonRepository",
@@ -83,15 +94,23 @@ def test_narrative_core_never_imports_sqlalchemy_or_host_db() -> None:
 
 def test_only_the_transaction_service_calls_canon_authority_writes() -> None:
     roots = ("r2", "server", "lib")
+    allowed = _CANON_WRITE_CALLERS | _PLAN_AUTHORITY_FILES
     offenders: set[str] = set()
     for root in roots:
         for path in sorted((_ROOT / root).rglob("*.py")):
             rel = path.relative_to(_ROOT).as_posix()
-            if rel in {"r2/narrative/canon_transaction.py", "lib/db/repositories/canon_repo.py"}:
+            if rel in allowed:
                 continue
             if _AUTHORITY_WRITE_ATTRS & _called_attrs(ast.parse(path.read_text(encoding="utf-8"))):
                 offenders.add(rel)
     assert offenders == set()
+
+
+def test_plan_authority_files_carry_no_canon_authority_symbol() -> None:
+    for rel in _PLAN_AUTHORITY_FILES:
+        text = (_ROOT / rel).read_text(encoding="utf-8")
+        for symbol in _CANON_AUTHORITY_SYMBOLS:
+            assert symbol not in text, (rel, symbol)
 
 
 def test_repository_and_resolver_never_own_a_transaction() -> None:

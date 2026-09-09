@@ -12,13 +12,24 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from r2.contracts import CanonBranchSnapshot, CanonContent, CanonDelta, CanonVersionSnapshot
+from r2.contracts import CANON_SCHEMA_V1, CanonBranchSnapshot, CanonContent, CanonDelta, CanonVersionSnapshot
 
 from .canon_state import ResolvedCanonView, apply_canon_delta, empty_canon_content
 from .errors import CanonIntegrityError, CanonNotFoundError, CanonOperationError
 from .hashing import compute_canon_content_hash, verify_canon_delta_hash
 from .ports import CanonProjectionRepositoryPort
-from .validation import validate_canon_candidate
+from .validation import NarrativeInvariantValidator
+
+_DEFAULT_BASE_SCHEMA_VERSION = "r2-canon-schema-v1"
+
+
+def _content_is_schema_shaped(content: CanonContent, schema_version: str) -> bool:
+    """A v1-labelled view may not carry any schema-v2 content the v1 hash cannot cover."""
+    if schema_version != CANON_SCHEMA_V1:
+        return True
+    return not (
+        content.epistemic_propositions_by_ref or content.knowledge_states_by_id or content.temporal_relations_by_id
+    )
 
 
 def _utc_now() -> datetime:
@@ -103,6 +114,11 @@ class CanonResolver:
             or view.content_schema_version != version.content_schema_version
         ):
             return False
+        if not _content_is_schema_shaped(view.content, view.content_schema_version):
+            # A v1 selector serialization excludes the v2 maps, so a v1 projection carrying
+            # non-empty epistemic/temporal content re-hashes to the same v1 digest. Force a
+            # replay rather than return the injected content as authority.
+            return False
         recomputed = compute_canon_content_hash(
             view.content,
             algorithm=version.content_hash_algorithm,
@@ -137,7 +153,7 @@ class CanonResolver:
         delta = accepted.delta
         verify_canon_delta_hash(delta)
 
-        base_content, expected_base = await self._resolve_semantic_base(
+        base_content, expected_base, base_schema_version = await self._resolve_semantic_base(
             version=version, branch=branch, project_name=project_name, user_id=user_id, visiting=visiting
         )
         if delta.base_canon_version_id != expected_base:
@@ -146,8 +162,25 @@ class CanonResolver:
                 f"{delta.base_canon_version_id!r} does not match expected {expected_base!r}"
             )
 
-        candidate = self._apply_stored_delta(base_content, delta)
-        report = validate_canon_candidate(base=base_content, delta=delta, candidate=candidate)
+        candidate = self._apply_stored_delta(base_content, delta, base_schema_version=base_schema_version)
+        base_view = ResolvedCanonView(
+            canon_version_id=expected_base,
+            branch_id=version.branch_id,
+            content_hash=compute_canon_content_hash(
+                base_content, schema_version=base_schema_version or _DEFAULT_BASE_SCHEMA_VERSION
+            ),
+            content_schema_version=base_schema_version or _DEFAULT_BASE_SCHEMA_VERSION,
+            content=base_content,
+        )
+        candidate_view = ResolvedCanonView(
+            canon_version_id=version.canon_version_id,
+            branch_id=version.branch_id,
+            content_hash=compute_canon_content_hash(candidate, schema_version=version.content_schema_version),
+            content_hash_version=version.content_hash_version,
+            content_schema_version=version.content_schema_version,
+            content=candidate,
+        )
+        report = NarrativeInvariantValidator().validate_canon(base=base_view, delta=delta, candidate=candidate_view)
         if not report.ok:
             raise CanonIntegrityError(
                 f"stored Canon delta {delta.canon_delta_id!r} fails validation: "
@@ -184,23 +217,25 @@ class CanonResolver:
         project_name: str,
         user_id: str,
         visiting: frozenset[str],
-    ) -> tuple[CanonContent, str | None]:
+    ) -> tuple[CanonContent, str | None, str | None]:
         if version.parent_version_id is not None:
             parent = await self._resolve_version(
                 version.parent_version_id, project_name=project_name, user_id=user_id, visiting=visiting
             )
-            return parent.content, version.parent_version_id
+            return parent.content, version.parent_version_id, parent.content_schema_version
         if branch.parent_version_id is not None:
             pinned = await self._resolve_version(
                 branch.parent_version_id, project_name=project_name, user_id=user_id, visiting=visiting
             )
-            return pinned.content, branch.parent_version_id
-        return empty_canon_content(), None
+            return pinned.content, branch.parent_version_id, pinned.content_schema_version
+        return empty_canon_content(), None, None
 
     @staticmethod
-    def _apply_stored_delta(base_content: CanonContent, delta: CanonDelta) -> CanonContent:
+    def _apply_stored_delta(
+        base_content: CanonContent, delta: CanonDelta, *, base_schema_version: str | None
+    ) -> CanonContent:
         try:
-            return apply_canon_delta(base_content, delta)
+            return apply_canon_delta(base_content, delta, base_schema_version=base_schema_version)
         except CanonOperationError as exc:
             raise CanonIntegrityError(
                 f"stored Canon delta {delta.canon_delta_id!r} does not apply to its base: {exc}"

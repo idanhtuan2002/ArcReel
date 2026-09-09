@@ -15,6 +15,7 @@ from lib.db.models.config import ProviderConfig, SystemSetting
 from lib.db.models.credential import ProviderCredential
 from lib.db.models.custom_endpoint import CustomEndpoint
 from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
+from lib.db.models.narrative_plan import NarrativePlanModel, NarrativePlanVersionModel
 from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
 from lib.db.models.session_message_link import AgentSessionUserMessageLink
@@ -41,6 +42,8 @@ __all__ = [
     "CustomProvider",
     "CustomProviderModel",
     "GenerationBatch",
+    "NarrativePlanModel",
+    "NarrativePlanVersionModel",
     "ProviderConfig",
     "ProviderCredential",
     "SystemSetting",

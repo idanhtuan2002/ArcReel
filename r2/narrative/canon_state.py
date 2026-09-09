@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from typing import assert_never
 
 from pydantic import ConfigDict
@@ -9,19 +10,25 @@ from r2.contracts import (
     AddEntityOperation,
     AddEventOperation,
     AddFactOperation,
+    AddTemporalRelationOperation,
     CanonBranchSnapshot,
     CanonContent,
     CanonDelta,
     Entity,
+    EpistemicProposition,
     Event,
     Fact,
+    KnowledgeState,
     RetireFactOperation,
+    TemporalRelation,
     UpdateEntityOperation,
+    UpdateKnowledgeOperation,
 )
 from r2.contracts.common import NonEmptyStr, R2ContractModel
 
-from .errors import CanonOperationError
+from .errors import CanonOperationError, EpistemicValidationError
 from .hashing import compute_canon_content_hash
+from .schema_upgrade import upgrade_canon_content
 
 
 class ResolvedCanonView(R2ContractModel):
@@ -66,10 +73,101 @@ def _require_present[T](mapping: Mapping[str, T], key: str, *, label: str = "ent
         raise CanonOperationError(f"missing {label} {key}") from None
 
 
-def apply_canon_delta(base: CanonContent, delta: CanonDelta) -> CanonContent:
-    entities: dict[str, Entity] = dict(base.entities_by_id)
-    facts: dict[str, Fact] = dict(base.facts_by_id)
-    events: dict[str, Event] = dict(base.events_by_id)
+def _active_at(effective_from: datetime, effective_until: datetime | None, at: datetime) -> bool:
+    return effective_from <= at and (effective_until is None or at < effective_until)
+
+
+def _half_open_overlap(
+    left_from: datetime,
+    left_until: datetime | None,
+    right_from: datetime,
+    right_until: datetime | None,
+) -> bool:
+    return (left_until is None or left_until > right_from) and (right_until is None or right_until > left_from)
+
+
+def _apply_update_knowledge(
+    operation: UpdateKnowledgeOperation,
+    *,
+    entities: Mapping[str, Entity],
+    events: Mapping[str, Event],
+    propositions: dict[str, EpistemicProposition],
+    knowledge_states: dict[str, KnowledgeState],
+) -> None:
+    _require_absent(knowledge_states, operation.target_id, label="knowledge state")
+    _require_present(entities, operation.subject_entity_id, label="knowledge subject entity")
+    _require_present(entities, operation.proposition.subject_ref, label="proposition subject entity")
+    for event_ref in operation.evidence_event_refs:
+        _require_present(events, event_ref, label="knowledge evidence event")
+
+    proposition_ref = operation.proposition.proposition_ref
+    propositions.setdefault(proposition_ref, operation.proposition)
+    key = (operation.subject_entity_id, proposition_ref)
+
+    superseded_id = operation.supersedes_knowledge_state_id
+    if superseded_id is not None:
+        superseded = knowledge_states.get(superseded_id)
+        if superseded is None:
+            raise EpistemicValidationError(f"superseded knowledge state {superseded_id!r} is not present")
+        if (superseded.subject_entity_id, superseded.proposition_ref) != key:
+            raise EpistemicValidationError(
+                f"superseded knowledge state {superseded_id!r} has a different subject/proposition key"
+            )
+        transition_is_inside_prior = superseded.effective_from < operation.effective_from and (
+            superseded.effective_until is None or operation.effective_from < superseded.effective_until
+        )
+        if not transition_is_inside_prior:
+            raise EpistemicValidationError(
+                f"superseded knowledge state {superseded_id!r} is not active at the transition instant"
+            )
+        knowledge_states[superseded_id] = superseded.model_copy(update={"effective_until": operation.effective_from})
+    else:
+        for existing in knowledge_states.values():
+            if (existing.subject_entity_id, existing.proposition_ref) != key:
+                continue
+            if _active_at(existing.effective_from, existing.effective_until, operation.effective_from):
+                raise EpistemicValidationError(
+                    "an active prior knowledge state exists; supersedes_knowledge_state_id is required"
+                )
+
+    for existing in knowledge_states.values():
+        if existing.knowledge_state_id == superseded_id:
+            continue
+        if (existing.subject_entity_id, existing.proposition_ref) != key:
+            continue
+        if _half_open_overlap(
+            operation.effective_from, operation.effective_until, existing.effective_from, existing.effective_until
+        ):
+            raise EpistemicValidationError(
+                "new knowledge state overlaps an existing state for the same subject/proposition"
+            )
+
+    knowledge_states[operation.target_id] = KnowledgeState(
+        knowledge_state_id=operation.target_id,
+        subject_entity_id=operation.subject_entity_id,
+        proposition_ref=proposition_ref,
+        epistemic_state=operation.epistemic_state,
+        effective_from=operation.effective_from,
+        effective_until=operation.effective_until,
+        evidence_event_refs=list(operation.evidence_event_refs),
+    )
+
+
+def apply_canon_delta(base: CanonContent, delta: CanonDelta, *, base_schema_version: str | None = None) -> CanonContent:
+    """Apply an ordered delta to a base view.
+
+    ``base_schema_version`` is the recorded content schema selector of ``base`` (``None`` for
+    genesis). The base view is upgraded to the delta's content schema before any operation
+    runs; ``r2/narrative/schema_upgrade.py`` rejects an illegal transition. The result is
+    serialized under the delta's selector.
+    """
+    upgraded = upgrade_canon_content(base, from_schema=base_schema_version, to_schema=delta.content_schema_version)
+    entities: dict[str, Entity] = dict(upgraded.entities_by_id)
+    facts: dict[str, Fact] = dict(upgraded.facts_by_id)
+    events: dict[str, Event] = dict(upgraded.events_by_id)
+    propositions: dict[str, EpistemicProposition] = dict(upgraded.epistemic_propositions_by_ref)
+    knowledge_states: dict[str, KnowledgeState] = dict(upgraded.knowledge_states_by_id)
+    temporal_relations: dict[str, TemporalRelation] = dict(upgraded.temporal_relations_by_id)
     for operation in delta.operations:
         match operation:
             case AddEntityOperation():
@@ -104,6 +202,30 @@ def apply_canon_delta(base: CanonContent, delta: CanonDelta) -> CanonContent:
                 for event_ref in operation.event.causal_refs:
                     _require_present(events, event_ref, label="causal event")
                 events[operation.target_id] = operation.event
+            case AddTemporalRelationOperation():
+                relation = operation.temporal_relation
+                _require_target(operation.target_id, relation.temporal_relation_id)
+                _require_absent(temporal_relations, operation.target_id, label="temporal relation")
+                for event_ref in (relation.left_event_ref, relation.right_event_ref):
+                    _require_present(events, event_ref, label="temporal relation event")
+                for event_ref in relation.evidence_event_refs:
+                    _require_present(events, event_ref, label="temporal relation evidence event")
+                temporal_relations[operation.target_id] = relation
+            case UpdateKnowledgeOperation():
+                _apply_update_knowledge(
+                    operation,
+                    entities=entities,
+                    events=events,
+                    propositions=propositions,
+                    knowledge_states=knowledge_states,
+                )
             case _:  # pragma: no cover - exhaustiveness guard
                 assert_never(operation)
-    return CanonContent(entities_by_id=entities, facts_by_id=facts, events_by_id=events)
+    return CanonContent(
+        entities_by_id=entities,
+        facts_by_id=facts,
+        events_by_id=events,
+        epistemic_propositions_by_ref=propositions,
+        knowledge_states_by_id=knowledge_states,
+        temporal_relations_by_id=temporal_relations,
+    )
