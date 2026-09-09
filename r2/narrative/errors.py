@@ -68,3 +68,7 @@ class NarrativeError(Exception):
 
 class NarrativePlanSchemaVersionError(NarrativeError):
     """An unknown, below-minimum, or illegal SceneContract / NarrativePlan v1/v2 schema transition."""
+
+
+class NarrativeRelationshipIntegrityError(NarrativeError):
+    """A relationship reference or profile is malformed, or exact active relationship state is ambiguous."""
