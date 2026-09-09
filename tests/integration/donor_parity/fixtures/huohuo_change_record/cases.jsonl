@@ -38,3 +38,11 @@
 {"id": "echo_no_water_line", "input": "在原线索上加场面与反应，禁止注水。\n他握紧拳头，指节发白。"}
 {"id": "echo_marker_past_360", "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx【待补写正文】这段不应被剥离，因为标记出现得太晚。"}
 {"id": "crlf_structured", "input": "【变更记录】\r\n- 状态: CRLF换行\r\n因果: 使用了Windows风格的回车换行符\r\n\r\n后续正文。"}
+{"id": "ws_bom_leading_structured", "input": "﻿【变更记录】\n- 状态: 甲失去右手\n因果: 断刀在雪夜搏斗中被折断，为护少女挡下一击"}
+{"id": "ws_bom_inside_fields", "input": "【变更记录】\n﻿- 状态: 甲﻿中毒\n因果:﻿解药被人偷偷换成了慢性毒药"}
+{"id": "ws_fs_around_bullet", "input": "【变更记录】\n\u001c- 状态: 乙叛变\n因果: 乙收了敌国的金子，在关键一战倒戈"}
+{"id": "ws_fs_leading_text", "input": "\u001c【变更记录】\n- 状态: 甲失去右手\n因果: 断刀在雪夜搏斗中被折断，为护少女挡下一击"}
+{"id": "ws_nbsp_spacers", "input": "【变更记录】\n- 状态: 丙昏迷\n因果: 丙被闷棍打晕后拖走，无人察觉"}
+{"id": "ws_bom_trailing_prose", "input": "【变更记录】\n- 状态: 甲失去右手\n因果: 断刀在雪夜搏斗中被折断，为护少女挡下一击\n\n﻿城门在他面前缓缓合拢。"}
+{"id": "ws_fs_orphan_in_prose", "input": "他站起身。\n- 状态: 丁north上\u001c\n因果: 丁在废墟里找到一封指向北境的信\n路还很长。"}
+{"id": "ws_bom_echo_marker", "input": "﻿﻿﻿﻿﻿【硬性字数】不少于2000字\n【待补写正文】\n他走进房间，看见桌上的信。"}

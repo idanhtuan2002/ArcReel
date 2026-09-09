@@ -34,7 +34,8 @@
         "stripNovelChangeRecord"
       ],
       "excluded_reason": "Calls stripNovelChapterEndMeta from the separate, unselected novel-memory-parser module; M5C does not port chapter-end-meta stripping.",
-      "intentional_deviations": []
+      "intentional_deviations": [],
+      "parity_coverage_notes": "The port replaces every JS regex \\s and String.prototype.trim() with the exact ECMAScript whitespace set (INCLUDES U+FEFF, EXCLUDES U+001C-U+001F and U+0085), and computes the stripLengthAdjustInstructionEcho `< 360` marker check on a UTF-16 code-unit offset. The corpus carries dedicated BOM / U+001C / NBSP adversarial vectors (ws_*). No residual divergence for the selected exports."
     },
     "novel_studio_hard_rules": {
       "repo": "YfengJ/novel-studio-ai",
@@ -55,7 +56,8 @@
       ],
       "excluded_exports": [],
       "excluded_reason": "storyAllowsResurrection / outlineRequiresResurrection are module-private helpers exercised through runHardRuleChecks.",
-      "intentional_deviations": []
+      "intentional_deviations": [],
+      "parity_coverage_notes": "The resurrection regexes use re.IGNORECASE | re.ASCII so case folding is ASCII-only, matching ECMAScript /i without the u flag (does NOT fold U+0130 / U+0131 / U+017F to i / s). The corpus carries casefold_* adversarial vectors. No residual divergence for the selected exports."
     }
   }
 }

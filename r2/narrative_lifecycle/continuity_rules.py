@@ -17,8 +17,11 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-_STORY_RESURRECTION_RE = re.compile(r"复活|亡者|死而复生|undead|resurrection", re.IGNORECASE)
-_OUTLINE_RESURRECTION_RE = re.compile(r"复活|亡者归来|死而复生|undead|resurrection", re.IGNORECASE)
+# ``re.ASCII`` restricts case-insensitive folding to ASCII, matching ECMAScript ``/i``
+# (no ``u`` flag): the donor regex does NOT fold ``İ`` / ``ı`` / ``ſ`` to ``i`` / ``s``,
+# whereas bare Python ``re.IGNORECASE`` would. The Han alternatives still match literally.
+_STORY_RESURRECTION_RE = re.compile(r"复活|亡者|死而复生|undead|resurrection", re.IGNORECASE | re.ASCII)
+_OUTLINE_RESURRECTION_RE = re.compile(r"复活|亡者归来|死而复生|undead|resurrection", re.IGNORECASE | re.ASCII)
 
 _BLOCKING_SEVERITIES = frozenset({"high", "critical"})
 
