@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from r2.narrative.relationship_facts import RELATIONSHIP_FACT_KEY_VERSION, relationship_fact_predicate
 
 from r2.narrative.errors import NarrativeRelationshipIntegrityError
+from r2.narrative.relationship_facts import RELATIONSHIP_FACT_KEY_VERSION, relationship_fact_predicate
 
 # Regression anchor: the exact wire string for the shared mapping. Anything that moves it
 # invalidates every persisted relationship Fact key and must be a deliberate v2 mapping.
