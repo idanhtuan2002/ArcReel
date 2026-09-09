@@ -1,0 +1,10 @@
+{
+  "name": "arcreel-donor-parity-harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Test-only Node harness that runs the unmodified pinned donor TypeScript sources for R2-DEC-031 parity. Never shipped, imported, or started by the ArcReel runtime.",
+  "devDependencies": {
+    "tsx": "4.19.2"
+  }
+}

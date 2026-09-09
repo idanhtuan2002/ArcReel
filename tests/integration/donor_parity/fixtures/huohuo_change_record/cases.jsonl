@@ -1,0 +1,40 @@
+{"id": "empty", "input": ""}
+{"id": "whitespace_only", "input": "   \n\n\t  "}
+{"id": "plain_prose_short", "input": "他推开门，风灌进来。"}
+{"id": "prose_01", "input": "夜色压下来，林远握紧了那把断刀。他知道追兵就在身后，可他没有回头。"}
+{"id": "prose_02", "input": "「你还记得那年的雪吗？」她轻声问。他没有回答，只是把外套披在她肩上。"}
+{"id": "prose_03", "input": "码头空无一人。海水拍打着木桩，发出规律的钝响。他等了整整一夜。"}
+{"id": "prose_04", "input": "会议室里，投影仪的光打在每个人脸上。没有人先开口，直到老陈把文件推到桌子中央。"}
+{"id": "prose_05", "input": "山道很窄，两侧是深不见底的雾。向导停下脚步，指了指前方一块刻着字的石碑。"}
+{"id": "prose_06", "input": "孩子把纸船放进水沟，看它打着转漂远。母亲在楼上喊他吃饭，他假装没听见。"}
+{"id": "prose_07", "input": "老式收音机里传出沙沙的电流声，然后是一段断续的旋律。他忽然红了眼眶。"}
+{"id": "prose_08", "input": "市场收摊了。她蹲下身，把最后几个烂掉的橘子捡进篮子，动作很慢。"}
+{"id": "prose_09", "input": "实验室的灯彻夜未熄。数据一行行滚过屏幕，直到凌晨四点，那个数字终于稳定下来。"}
+{"id": "prose_10", "input": "他站在讲台上，粉笔停在半空。台下的学生等着，可他一个字也说不出来。"}
+{"id": "prose_11_with_colon_line", "input": "备忘：明天记得带伞。\n她把便签贴在门上，出门时却还是忘了。"}
+{"id": "prose_12_dash_list_not_meta", "input": "购物清单：\n- 鸡蛋\n- 牛奶\n- 面包\n他把纸条塞进口袋。"}
+{"id": "struct_canonical", "input": "【变更记录】\n- 状态: 林远失去右手\n因果: 断刀在雪夜的搏斗中被折断，他为护住少女挡下一击"}
+{"id": "struct_with_leading_prose_para", "input": "他倒在雪地里。\n\n【变更记录】\n- 状态: 林远失去右手\n因果: 断刀在雪夜的搏斗中被折断，他为护住少女挡下一击"}
+{"id": "struct_multi_fields", "input": "【变更记录】\n- 关系: 林远与少女结盟\n因果: 共同的敌人让他们暂时放下戒备\n触发: 追兵出现\n代价: 暴露了藏身处\n感知: 少女察觉林远隐瞒了身份\n耗时: 半个时辰"}
+{"id": "struct_no_state_change", "input": "【变更记录】\n- 无状态变化\n因果: 这一章只是铺垫，没有实质推进剧情线"}
+{"id": "struct_then_trailing_prose", "input": "【变更记录】\n- 状态: 城门关闭\n因果: 守将收到了伪造的军令而提前封城\n\n城门在他面前缓缓合拢，铁链的声音刺耳。"}
+{"id": "struct_two_blocks_last_wins", "input": "【变更记录】\n- 状态: A\n因果: 第一块变更记录的因果说明文字\n\n【变更记录】\n- 状态: B\n因果: 第二块变更记录的因果说明文字"}
+{"id": "struct_sandwich_prose_record_prose", "input": "开场的一段正文。\n\n【变更记录】\n- 状态: 中间夹心\n因果: 夹在正文中间的结构化变更记录说明\n\n结尾的一段正文。"}
+{"id": "header_bold", "input": "**【变更记录】**\n- 状态: 林远失去右手\n因果: 断刀在雪夜的搏斗中被折断，他为护住少女挡下一击"}
+{"id": "header_h2", "input": "## 【变更记录】\n- 状态: 林远失去右手\n因果: 断刀在雪夜的搏斗中被折断，他为护住少女挡下一击"}
+{"id": "header_h3_bold", "input": "### **【变更记录】**\n- 状态: 林远失去右手\n因果: 断刀在雪夜的搏斗中被折断，他为护住少女挡下一击"}
+{"id": "header_fullwidth_spaces", "input": "【　变更记录　】\n- 状态: 林远失去右手\n因果: 断刀在雪夜的搏斗中被折断，他为护住少女挡下一击"}
+{"id": "header_tabs_and_hash", "input": "#\t【变更记录】\t\n- 状态: 林远失去右手\n因果: 断刀在雪夜的搏斗中被折断，他为护住少女挡下一击"}
+{"id": "header_only_no_body", "input": "【变更记录】\n"}
+{"id": "header_mid_text", "input": "前面的正文。\n【变更记录】\n后面的正文，但没有结构化条目。"}
+{"id": "fake_bullet_no_cause", "input": "【变更记录】\n- 状态: 看起来像变更记录\n但是这里没有因果字段，只是散文。"}
+{"id": "fake_cause_too_short", "input": "【变更记录】\n- 状态: x\n因果: 短"}
+{"id": "fake_headerless_bullet_prose", "input": "- 他说: 我们该走了\n- 她说: 再等等\n两人沉默地站着。"}
+{"id": "orphan_structured_in_prose", "input": "他终于站起身。\n- 状态: 林远决定north上\n因果: 他在废墟里找到了一封指向北境的信\n路还很长。"}
+{"id": "orphan_no_state_change_in_prose", "input": "这一段没什么大事。\n- 无状态变化\n因果: 纯粹的日常过渡，用来调节节奏\n第二天照常升起。"}
+{"id": "echo_expand_marker", "input": "【硬性字数】不少于2000字\n【待补写正文】\n他走进房间，看见桌上的信。"}
+{"id": "echo_compress_marker_with_prefix", "input": "请压缩以下内容。【待压缩正文】风停了，海面恢复平静。"}
+{"id": "echo_hard_wordcount_lines_only", "input": "【硬性字数】2000-2500\n【硬性字数】重点描写心理\n\n真正的正文从这里开始。"}
+{"id": "echo_no_water_line", "input": "在原线索上加场面与反应，禁止注水。\n他握紧拳头，指节发白。"}
+{"id": "echo_marker_past_360", "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx【待补写正文】这段不应被剥离，因为标记出现得太晚。"}
+{"id": "crlf_structured", "input": "【变更记录】\r\n- 状态: CRLF换行\r\n因果: 使用了Windows风格的回车换行符\r\n\r\n后续正文。"}
