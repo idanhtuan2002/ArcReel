@@ -21,6 +21,7 @@ from r2.contracts.narrative_plan import (
     NarrativePlanContentV2,
     NarrativePlanNode,
     SceneContract,
+    SceneContractV2,
     SceneContractValue,
     SceneThreadConstraint,
 )
@@ -59,8 +60,15 @@ class SceneVersionCheck(R2ContractModel):
     version: int
 
 
-def validate_scene_version(*, previous: SceneContract, proposed: SceneContract) -> SceneVersionCheck:
-    """Prove ``proposed`` legally succeeds ``previous`` for the same ``scene_contract_id``."""
+def validate_scene_version(
+    *, previous: SceneContract | SceneContractV2, proposed: SceneContract | SceneContractV2
+) -> SceneVersionCheck:
+    """Prove ``proposed`` legally succeeds ``previous`` for the same ``scene_contract_id``.
+
+    A v1 -> v2 upgrade of the same scene changes ``semantic_hash`` (a new byte domain), so
+    it is a normal ``version + 1`` succession; the v1/v2 selector ratchet is enforced
+    separately by ``require_scene_schema_transition``.
+    """
     if proposed.scene_contract_id != previous.scene_contract_id:
         raise NarrativePlanIdentityConflictError(
             f"scene {proposed.scene_contract_id!r} is not a revision of {previous.scene_contract_id!r}"

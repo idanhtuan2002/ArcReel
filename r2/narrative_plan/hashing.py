@@ -74,6 +74,13 @@ def compute_scene_semantic_hash_dispatch(scene: SceneContractValue) -> str:
     return compute_scene_semantic_hash(scene)
 
 
+def compute_plan_content_hash_dispatch(content: NarrativePlanContent | NarrativePlanContentV2) -> str:
+    """Route to the v1 or v2 plan-content hash by the content's declared ``schema_version``."""
+    if isinstance(content, NarrativePlanContentV2):
+        return compute_plan_content_hash_v2(content)
+    return compute_plan_content_hash(content)
+
+
 def compute_plan_content_hash_v2(content: NarrativePlanContentV2) -> str:
     """The v2 plan-content hash. Scene identities additionally carry
     ``semantic_hash_version`` so a v1 and a v2 scene of the same id/version/hash never

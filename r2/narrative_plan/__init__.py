@@ -17,6 +17,7 @@ from .errors import (
 )
 from .hashing import (
     compute_plan_content_hash,
+    compute_plan_content_hash_dispatch,
     compute_plan_content_hash_v2,
     compute_scene_semantic_hash,
     compute_scene_semantic_hash_dispatch,
@@ -51,6 +52,7 @@ __all__ = [
     "NarrativePlanVersionConflict",
     "SceneVersionCheck",
     "compute_plan_content_hash",
+    "compute_plan_content_hash_dispatch",
     "compute_plan_content_hash_v2",
     "compute_scene_semantic_hash",
     "compute_scene_semantic_hash_dispatch",

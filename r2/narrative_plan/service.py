@@ -9,17 +9,18 @@ basis is resolved exactly and read-only; approval never falls back to the Canon 
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from r2.contracts import (
     NarrativePlan,
     NarrativePlanApproval,
     NarrativePlanCommitResult,
-    NarrativePlanContent,
     NarrativePlanContentV2,
+    NarrativePlanContentValue,
     NarrativePlanHeadSnapshot,
     NarrativePlanRevisionProposal,
     NarrativePlanVersionSnapshot,
-    SceneContract,
+    SceneContractV2,
 )
 from r2.narrative.canon_state import ResolvedCanonView
 from r2.narrative.validation import NarrativeInvariantValidator
@@ -31,9 +32,18 @@ from .errors import (
     NarrativePlanValidationError,
     NarrativePlanVersionConflict,
 )
-from .hashing import compute_plan_content_hash, compute_scene_semantic_hash_dispatch
+from .hashing import compute_plan_content_hash_dispatch, compute_scene_semantic_hash_dispatch
 from .ports import CanonVersionReader, NarrativePlanUnitOfWorkFactory
+from .schema_upgrade import minimum_scene_selector, require_plan_schema_transition, require_scene_schema_transition
 from .validation import validate_plan_hierarchy, validate_plan_thread_lifecycle, validate_scene_version
+
+_PlanContentHashVersion = Literal["r2-narrative-plan-content-v1", "r2-narrative-plan-content-v2"]
+
+
+def _plan_content_hash_version(content: NarrativePlanContentValue) -> _PlanContentHashVersion:
+    if content.schema_version == "r2-narrative-plan-v2":
+        return "r2-narrative-plan-content-v2"
+    return "r2-narrative-plan-content-v1"
 
 
 class NarrativePlanService:
@@ -59,7 +69,7 @@ class NarrativePlanService:
     ) -> NarrativePlanCommitResult:
         self._require_matching_scope(proposal=proposal, approval=approval, project_name=project_name, user_id=user_id)
         content = proposal.proposed_content
-        recomputed_hash = compute_plan_content_hash(content)
+        recomputed_hash = compute_plan_content_hash_dispatch(content)
         if proposal.content_hash != recomputed_hash:
             raise NarrativePlanValidationError("proposal content_hash does not match its content")
         if approval.content_hash != recomputed_hash:
@@ -153,6 +163,7 @@ class NarrativePlanService:
             version=snapshot.version,
             content=snapshot.content,
             content_hash=snapshot.content_hash,
+            content_hash_version=snapshot.content_hash_version,
             committed_at=snapshot.committed_at,
             committed_by=snapshot.committed_by,
             approval_ref=snapshot.approval_ref,
@@ -204,6 +215,7 @@ class NarrativePlanService:
                 version=existing.version,
                 content=existing.content,
                 content_hash=existing.content_hash,
+                content_hash_version=existing.content_hash_version,
                 committed_at=existing.committed_at,
                 committed_by=existing.committed_by,
                 approval_ref=existing.approval_ref,
@@ -212,7 +224,7 @@ class NarrativePlanService:
         )
 
     async def _resolve_canon_basis(
-        self, content: NarrativePlanContent, *, project_name: str, user_id: str
+        self, content: NarrativePlanContentValue, *, project_name: str, user_id: str
     ) -> ResolvedCanonView:
         view = await self._canon_reader.get_exact(
             branch_id=content.canon_basis.branch_id,
@@ -248,6 +260,7 @@ class NarrativePlanService:
             version=version,
             content=proposal.proposed_content,
             content_hash=proposal.content_hash,
+            content_hash_version=_plan_content_hash_version(proposal.proposed_content),
             committed_at=now,
             committed_by=approval.approved_by,
             approval_ref=approval.approval_ref,
@@ -271,8 +284,10 @@ class NarrativePlanService:
             parent_version=None if plan.version == 1 else plan.version - 1,
             canon_branch_id=proposal.proposed_content.canon_basis.branch_id,
             canon_version_id=proposal.proposed_content.canon_basis.canon_version_id,
+            schema_version=proposal.proposed_content.schema_version,
             content=proposal.proposed_content,
             content_hash=proposal.content_hash,
+            content_hash_version=_plan_content_hash_version(proposal.proposed_content),
             approval_ref=approval.approval_ref,
             approved_by=approval.approved_by,
             approved_at=approval.approved_at,
@@ -283,7 +298,7 @@ class NarrativePlanService:
     def _validate_content(
         self,
         *,
-        content: NarrativePlanContent | NarrativePlanContentV2,
+        content: NarrativePlanContentValue,
         plan: NarrativePlan,
         canon_view: ResolvedCanonView,
         history: tuple[NarrativePlanVersionSnapshot, ...],
@@ -292,8 +307,15 @@ class NarrativePlanService:
         if not hierarchy.ok:
             raise NarrativePlanValidationError([finding.rule_id for finding in hierarchy.findings])
 
-        # Plan-wide passes run before the per-scene loop. Thread lifecycle is a v2-only
-        # cross-scene invariant; per-scene validate_scene never claims it.
+        # Plan-wide passes run before the per-scene loop. The v1/v2 schema ratchet is
+        # enforced against the committed history; thread lifecycle is a v2-only cross-scene
+        # invariant per-scene validate_scene never claims.
+        contains_v2_scene = any(isinstance(scene, SceneContractV2) for scene in content.scene_contracts)
+        require_plan_schema_transition(
+            from_selector=history[-1].schema_version if history else None,
+            to_selector=content.schema_version,
+            contains_v2_scene=contains_v2_scene,
+        )
         if isinstance(content, NarrativePlanContentV2):
             lifecycle = validate_plan_thread_lifecycle(content)
             if not lifecycle.ok:
@@ -310,9 +332,14 @@ class NarrativePlanService:
                     f"scene {scene.scene_contract_id!r} semantic_hash does not match its content"
                 )
             prior = previous_scenes.get(scene.scene_contract_id)
-            if prior and isinstance(scene, SceneContract):
+            require_scene_schema_transition(
+                from_selector=prior[-1].semantic_hash_version if prior else None,
+                to_selector=scene.semantic_hash_version,
+                content_minimum=minimum_scene_selector(scene),
+            )
+            if prior:
                 validate_scene_version(previous=prior[-1], proposed=scene)
-            elif not prior and scene.version != 1:
+            elif scene.version != 1:
                 raise NarrativePlanIdentityConflictError(
                     f"new scene {scene.scene_contract_id!r} must start at version 1"
                 )

@@ -331,14 +331,22 @@ class NarrativePlanContentV2(R2ContractModel):
     scene_contracts: list[SceneContractValue] = Field(default_factory=list)
 
 
+NarrativePlanContentValue = Annotated[
+    NarrativePlanContent | NarrativePlanContentV2,
+    Field(discriminator="schema_version"),
+]
+
+
 class NarrativePlan(R2ContractModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     plan_id: NonEmptyStr
     version: Annotated[int, Field(ge=1)]
-    content: NarrativePlanContent
+    content: NarrativePlanContentValue
     content_hash: NonEmptyStr
     content_hash_algorithm: Literal["sha256"] = "sha256"
-    content_hash_version: Literal["r2-narrative-plan-content-v1"] = "r2-narrative-plan-content-v1"
+    content_hash_version: Literal["r2-narrative-plan-content-v1", "r2-narrative-plan-content-v2"] = (
+        "r2-narrative-plan-content-v1"
+    )
     committed_at: datetime
     committed_by: NonEmptyStr
     approval_ref: NonEmptyStr
@@ -350,7 +358,7 @@ class NarrativePlanRevisionProposal(R2ContractModel):
     plan_revision_id: NonEmptyStr
     plan_id: NonEmptyStr
     expected_version: Annotated[int, Field(ge=1)] | None
-    proposed_content: NarrativePlanContent
+    proposed_content: NarrativePlanContentValue
     content_hash: NonEmptyStr
     created_at: datetime
     created_by: NonEmptyStr
@@ -410,11 +418,13 @@ class NarrativePlanVersionSnapshot(R2ContractModel):
     parent_version: Annotated[int, Field(ge=1)] | None
     canon_branch_id: NonEmptyStr
     canon_version_id: NonEmptyStr
-    schema_version: Literal["r2-narrative-plan-v1"] = "r2-narrative-plan-v1"
-    content: NarrativePlanContent
+    schema_version: Literal["r2-narrative-plan-v1", "r2-narrative-plan-v2"] = "r2-narrative-plan-v1"
+    content: NarrativePlanContentValue
     content_hash: NonEmptyStr
     content_hash_algorithm: Literal["sha256"] = "sha256"
-    content_hash_version: Literal["r2-narrative-plan-content-v1"] = "r2-narrative-plan-content-v1"
+    content_hash_version: Literal["r2-narrative-plan-content-v1", "r2-narrative-plan-content-v2"] = (
+        "r2-narrative-plan-content-v1"
+    )
     approval_ref: NonEmptyStr
     approved_by: NonEmptyStr
     approved_at: datetime

@@ -71,6 +71,7 @@ IMPLEMENTATION_ALLOWLIST: frozenset[str] = HANDOFF_ONLY_ALLOWLIST | frozenset(
         "tests/unit/r2/test_m5c_architecture_boundaries.py",
         "tests/unit/scripts/r2/test_verify_m5c_scope.py",
         "tests/integration/r2/test_m5b_acceptance.py",
+        "tests/integration/r2/narrative_plan/test_service.py",
     }
 )
 
