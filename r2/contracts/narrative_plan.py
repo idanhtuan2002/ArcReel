@@ -20,6 +20,10 @@ PLAN_SCHEMA_VERSION = "r2-narrative-plan-v1"
 PLAN_CONTENT_HASH_VERSION = "r2-narrative-plan-content-v1"
 SCENE_CONTRACT_CONTENT_HASH_VERSION = "r2-scene-contract-content-v1"
 
+PLAN_SCHEMA_VERSION_V2 = "r2-narrative-plan-v2"
+PLAN_CONTENT_HASH_VERSION_V2 = "r2-narrative-plan-content-v2"
+SCENE_CONTRACT_CONTENT_HASH_VERSION_V2 = "r2-scene-contract-content-v2"
+
 
 def _aware(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
@@ -87,6 +91,69 @@ class SceneKnowledgeConstraint(R2ContractModel):
 
 
 SceneStateConstraint = Annotated[SceneFactConstraint | SceneKnowledgeConstraint, Field(discriminator="constraint_kind")]
+
+
+class SceneRelationshipConstraint(R2ContractModel):
+    """A directional relationship expectation over one exact Canon relationship Fact key.
+
+    The only legal mapping to the Fact contract is
+    ``relationship_fact_predicate(target_character_ref, relationship_key)``; symmetry is
+    never inferred. Introduced by the v2 SceneContract; v1 lists never carry it.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    constraint_id: NonEmptyStr
+    constraint_kind: Literal["RELATIONSHIP"] = "RELATIONSHIP"
+    source_character_ref: NonEmptyStr
+    target_character_ref: NonEmptyStr
+    relationship_key: NonEmptyStr
+    comparison: Literal["PRESENT", "ABSENT", "EQUALS", "NOT_EQUALS"]
+    expected_state: NonEmptyStr | None = None
+
+    @model_validator(mode="after")
+    def _state_matches_comparison(self) -> SceneRelationshipConstraint:
+        needs_state = self.comparison in ("EQUALS", "NOT_EQUALS")
+        if needs_state and self.expected_state is None:
+            raise ValueError(f"{self.comparison} SceneRelationshipConstraint requires expected_state")
+        if not needs_state and self.expected_state is not None:
+            raise ValueError(f"{self.comparison} SceneRelationshipConstraint forbids expected_state")
+        return self
+
+    @model_validator(mode="after")
+    def _distinct_endpoints(self) -> SceneRelationshipConstraint:
+        if self.source_character_ref == self.target_character_ref:
+            raise ValueError("SceneRelationshipConstraint source and target must be distinct characters")
+        return self
+
+
+class SceneThreadConstraint(R2ContractModel):
+    """A per-scene expectation about one narrative thread's open/resolved state.
+
+    Plan-wide presentation-order lifecycle consistency is validated separately by
+    ``validate_plan_thread_lifecycle``; this contract only carries the per-scene phase
+    expectation. Introduced by the v2 SceneContract; v1 lists never carry it.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    constraint_id: NonEmptyStr
+    constraint_kind: Literal["THREAD"] = "THREAD"
+    thread_ref: NonEmptyStr
+    required_state: Literal["OPEN", "RESOLVED"]
+    payoff_ref: NonEmptyStr | None = None
+
+    @model_validator(mode="after")
+    def _payoff_ref_matches_state(self) -> SceneThreadConstraint:
+        if self.required_state == "OPEN" and self.payoff_ref is not None:
+            raise ValueError("OPEN SceneThreadConstraint forbids payoff_ref")
+        if self.required_state == "RESOLVED" and self.payoff_ref is None:
+            raise ValueError("RESOLVED SceneThreadConstraint requires payoff_ref")
+        return self
+
+
+SceneStateConstraintV2 = Annotated[
+    SceneFactConstraint | SceneKnowledgeConstraint | SceneRelationshipConstraint | SceneThreadConstraint,
+    Field(discriminator="constraint_kind"),
+]
 
 
 class SceneEventConstraint(R2ContractModel):
@@ -188,6 +255,48 @@ class SceneContract(R2ContractModel):
     _creative_constraints_sorted = field_validator("creative_constraints")(_sorted_unique)
 
 
+class SceneContractV2(R2ContractModel):
+    """The v2 SceneContract: every v1 executable field plus the scene-side omniscient flag
+    and relationship / thread members in ``entry_state_constraints`` / ``exit_state_targets``.
+
+    A v2 lineage never downgrades to v1. v1 members inside a v2 plan keep their exact
+    accepted bytes and hash; this class is only for scenes that carry a v2-only semantic.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    scene_contract_id: NonEmptyStr
+    version: Annotated[int, Field(ge=1)]
+    semantic_hash: NonEmptyStr
+    semantic_hash_algorithm: Literal["sha256"] = "sha256"
+    semantic_hash_version: Literal["r2-scene-contract-content-v2"] = "r2-scene-contract-content-v2"
+    sequence_index: Annotated[int, Field(ge=0)]
+    purpose: NonEmptyStr
+    pov: NonEmptyStr | None
+    location_ref: NonEmptyStr | None
+    temporal_window: SceneTemporalWindow
+    participants: list[NonEmptyStr] = Field(default_factory=list)
+    required_events: list[SceneEventConstraint] = Field(default_factory=list)
+    forbidden_events: list[SceneEventConstraint] = Field(default_factory=list)
+    required_reveals: list[SceneRevealConstraint] = Field(default_factory=list)
+    forbidden_knowledge: list[SceneKnowledgeConstraint] = Field(default_factory=list)
+    entry_state_constraints: list[SceneStateConstraintV2] = Field(default_factory=list)
+    exit_state_targets: list[SceneStateConstraintV2] = Field(default_factory=list)
+    active_threads: list[NonEmptyStr] = Field(default_factory=list)
+    promise_payoff_refs: list[NonEmptyStr] = Field(default_factory=list)
+    creative_constraints: list[NonEmptyStr] = Field(default_factory=list)
+    omniscient_authoring_allowed_by_scene: bool = False
+    _participants_sorted = field_validator("participants")(_sorted_unique)
+    _active_threads_sorted = field_validator("active_threads")(_sorted_unique)
+    _promise_payoff_refs_sorted = field_validator("promise_payoff_refs")(_sorted_unique)
+    _creative_constraints_sorted = field_validator("creative_constraints")(_sorted_unique)
+
+
+SceneContractValue = Annotated[
+    SceneContract | SceneContractV2,
+    Field(discriminator="semantic_hash_version"),
+]
+
+
 class NarrativePlanContent(R2ContractModel):
     """The semantic bytes of a plan revision. Commit-receipt fields live outside it."""
 
@@ -201,6 +310,25 @@ class NarrativePlanContent(R2ContractModel):
     arc_plans: list[NarrativePlanNode] = Field(default_factory=list)
     chapter_plans: list[NarrativePlanNode] = Field(default_factory=list)
     scene_contracts: list[SceneContract] = Field(default_factory=list)
+
+
+class NarrativePlanContentV2(R2ContractModel):
+    """The v2 plan-revision semantic bytes: ``scene_contracts`` may mix v1 and v2 members.
+
+    A plan that contains any v2 scene member is ``r2-narrative-plan-v2``. v1 scene members
+    retained unchanged keep their exact accepted bytes and hash.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    schema_version: Literal["r2-narrative-plan-v2"] = "r2-narrative-plan-v2"
+    parent_version: Annotated[int, Field(ge=1)] | None = None
+    canon_basis: CanonBasis
+    story_frame: NonEmptyStr
+    volume_plans: list[NarrativePlanNode] = Field(default_factory=list)
+    episode_plans: list[NarrativePlanNode] = Field(default_factory=list)
+    arc_plans: list[NarrativePlanNode] = Field(default_factory=list)
+    chapter_plans: list[NarrativePlanNode] = Field(default_factory=list)
+    scene_contracts: list[SceneContractValue] = Field(default_factory=list)
 
 
 class NarrativePlan(R2ContractModel):
