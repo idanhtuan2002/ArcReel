@@ -1,14 +1,15 @@
-"""Append-only M5C Narrative-lifecycle evidence ORM models (design Section 7.1).
+"""Append-only M5C Narrative-lifecycle evidence ORM models.
 
 Every row is immutable evidence: drafts, revisions, extraction attempts / results, and
-proposal change sets are written once and never updated. All authority references use
-``RESTRICT`` so evidence lineage can never be deleted, and cross-row scope FKs carry
-``(user_id, project_name)`` so a bare opaque id cannot join two tenants or bind a
-revision to an incompatible attempt.
+proposal change sets are written once and never updated. Evidence-to-evidence references
+use ``RESTRICT`` so lineage can never be deleted; ``user_id`` ownership follows the
+repo-wide ``UserOwnedMixin`` ``CASCADE``. Cross-row FKs carry ``(user_id, project_name)``
+so a bare opaque id cannot join two tenants, and attempt / change-set FKs also carry the
+exact bases so an evidence row cannot bind to an incompatible revision.
 
 The rule "a SUCCEEDED extraction result owns >=1 ordered change-set association row and a
-non-success result owns none" is a cross-row invariant: it is enforced inside the
-repository transaction (research Section 3.1), not by a DB CHECK.
+non-success result owns none" is a cross-row invariant enforced inside the repository
+transaction, not by a DB CHECK.
 """
 
 from __future__ import annotations
@@ -95,6 +96,18 @@ class NarrativeRevisionModel(UserOwnedMixin, Base):
             "predecessor_revision_id IS NULL OR predecessor_revision_id <> revision_id",
             name="ck_narrative_revisions_predecessor_not_self",
         ),
+        # FK targets: an attempt / change set binds to a revision only when its declared
+        # exact bases match this revision's, so an opaque revision_id cannot bind an
+        # evidence row to an incompatible revision.
+        UniqueConstraint(
+            "revision_id",
+            "base_canon_version_id",
+            "plan_version",
+            "scene_contract_version",
+            "context_pack_id",
+            name="uq_narrative_revisions_full_basis",
+        ),
+        UniqueConstraint("revision_id", "base_canon_version_id", name="uq_narrative_revisions_canon_basis"),
         Index("ix_narrative_revisions_project_name", "project_name"),
     )
 
@@ -131,6 +144,18 @@ class NarrativeExtractionAttemptModel(UserOwnedMixin, Base):
                 "narrative_revisions.revision_id",
             ],
             name="fk_narrative_extraction_attempts_revision",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["revision_id", "base_canon_version_id", "plan_version", "scene_contract_version", "context_pack_id"],
+            [
+                "narrative_revisions.revision_id",
+                "narrative_revisions.base_canon_version_id",
+                "narrative_revisions.plan_version",
+                "narrative_revisions.scene_contract_version",
+                "narrative_revisions.context_pack_id",
+            ],
+            name="fk_narrative_extraction_attempts_revision_basis",
             ondelete="RESTRICT",
         ),
         CheckConstraint("generation >= 0", name="ck_narrative_extraction_attempts_generation"),
@@ -217,6 +242,12 @@ class NarrativeChangeSetModel(UserOwnedMixin, Base):
                 "narrative_revisions.revision_id",
             ],
             name="fk_narrative_change_sets_source_revision",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["source_revision_id", "base_canon_version_id"],
+            ["narrative_revisions.revision_id", "narrative_revisions.base_canon_version_id"],
+            name="fk_narrative_change_sets_revision_basis",
             ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(

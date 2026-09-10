@@ -2,32 +2,27 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.narrative_lifecycle_uow import narrative_lifecycle_uow_factory
 from lib.db.repositories.narrative_lifecycle import NarrativeLifecycleRepository
-from r2.contracts.narrative_lifecycle import (
-    CanonMutationEffectKey,
-    DraftCandidate,
-    ExtractionAttempt,
-    ExtractionResult,
-    NarrativeChangeItem,
-    NarrativeChangeSet,
-    NarrativeRevision,
-    NarrativeWorkScope,
-    SourceSpan,
-)
-from r2.contracts.provenance import Provenance
+from r2.contracts.narrative_lifecycle import ExtractionAttempt, ExtractionResult, NarrativeChangeSet, NarrativeWorkScope
 from r2.narrative_lifecycle.errors import (
     NarrativeAttemptGenerationConflict,
     NarrativeEvidenceIdentityConflictError,
     NarrativeEvidenceIntegrityError,
 )
+from tests.factories import (
+    make_draft_candidate,
+    make_extraction_attempt,
+    make_extraction_result,
+    make_narrative_change_set,
+    make_narrative_revision,
+    make_narrative_work_scope,
+)
 
-NOW = datetime(2026, 9, 9, 12, tzinfo=UTC)
 USER = "u1"
 OTHER_USER = "conformance"
 PROJECT = "project-a"
@@ -36,78 +31,21 @@ type Factory = async_sessionmaker[AsyncSession]
 
 
 def _scope(*, user_id: str = USER) -> NarrativeWorkScope:
-    return NarrativeWorkScope(
-        user_id=user_id,
-        project_name=PROJECT,
-        plan_id="plan-1",
-        scene_contract_id="scene-1",
-        canon_branch_id="branch-1",
-    )
+    return make_narrative_work_scope(user_id=user_id, project_name=PROJECT)
 
 
-def _prov() -> Provenance:
-    return Provenance(created_by="AGENT", created_at=NOW)
+def _candidate(*, candidate_id: str = "cand-1", user_id: str = USER):
+    return make_draft_candidate(candidate_id=candidate_id, work_scope=_scope(user_id=user_id))
 
 
-def _candidate(*, candidate_id: str = "cand-1", user_id: str = USER) -> DraftCandidate:
-    return DraftCandidate(
-        candidate_id=candidate_id,
-        work_scope=_scope(user_id=user_id),
-        base_canon_version_id="cv-1",
-        plan_version=2,
-        scene_contract_version=1,
-        context_pack_id="ctx-1",
-        normalized_content="prose",
-        content_hash="pch:abc",
-        writer_kind="AGENT",
-        writer_version="w-1",
-        provenance=_prov(),
-        created_at=NOW,
-        created_by="who",
-        semantic_fingerprint="esf:1",
-    )
-
-
-def _revision(*, revision_id: str = "rev-1", candidate_id: str = "cand-1", user_id: str = USER) -> NarrativeRevision:
-    return NarrativeRevision(
-        revision_id=revision_id,
-        work_scope=_scope(user_id=user_id),
-        base_candidate_id=candidate_id,
-        predecessor_revision_id=None,
-        base_canon_version_id="cv-1",
-        plan_version=2,
-        scene_contract_version=1,
-        context_pack_id="ctx-1",
-        normalized_content="prose",
-        content_hash="pch:abc",
-        review_refs=["r-1"],
-        provenance=_prov(),
-        created_at=NOW,
-        created_by="who",
-        semantic_fingerprint="esf:2",
+def _revision(*, revision_id: str = "rev-1", candidate_id: str = "cand-1", user_id: str = USER):
+    return make_narrative_revision(
+        revision_id=revision_id, base_candidate_id=candidate_id, work_scope=_scope(user_id=user_id)
     )
 
 
 def _attempt(*, attempt_id: str = "att-1", generation: int = 0, revision_id: str = "rev-1") -> ExtractionAttempt:
-    return ExtractionAttempt(
-        attempt_id=attempt_id,
-        generation=generation,
-        work_scope=_scope(),
-        revision_id=revision_id,
-        revision_acceptance_decision_id="dec-1",
-        observed_revision_effective_generation=0,
-        base_canon_version_id="cv-1",
-        plan_version=2,
-        scene_contract_version=1,
-        context_pack_id="ctx-1",
-        extractor_kind="LOCAL",
-        extractor_version="x-1",
-        policy_ref="pol",
-        policy_version="1",
-        admitted_at=NOW,
-        admitted_by="who",
-        input_fingerprint="if-1",
-    )
+    return make_extraction_attempt(attempt_id=attempt_id, generation=generation, revision_id=revision_id)
 
 
 def _result(
@@ -118,40 +56,18 @@ def _result(
     outcome: str = "ABSTAINED",
     change_set_ids: tuple[str, ...] = (),
 ) -> ExtractionResult:
-    return ExtractionResult(
+    return make_extraction_result(
         result_id=result_id,
         attempt_id=attempt_id,
         generation=generation,
         outcome=outcome,
         change_set_ids=change_set_ids,
-        diagnostics=(),
-        provider_receipt=None,
-        completed_at=NOW,
-        output_fingerprint="of-1",
     )
 
 
 def _change_set(*, change_set_id: str, attempt_id: str = "att-1", generation: int = 0) -> NarrativeChangeSet:
-    key = CanonMutationEffectKey(
-        canon_subject_kind="FACT", subject_ref="hero", effect_descriptor="trust", canon_operation_count=1
-    )
-    span = SourceSpan(start=0, end=4)
-    return NarrativeChangeSet(
-        change_set_id=change_set_id,
-        change_set_lineage_id=f"lin-{change_set_id}",
-        source_revision_id="rev-1",
-        extraction_attempt_id=attempt_id,
-        extraction_generation=generation,
-        base_canon_version_id="cv-1",
-        source_spans=(span,),
-        semantic_effect_keys=(key,),
-        changes=(NarrativeChangeItem(change_id="ch-1", evidence_span=span, effect_keys=(key,), summary="s"),),
-        confidence=0.7,
-        extractor_version="x-1",
-        policy_ref="pol",
-        policy_version="1",
-        created_at=NOW,
-        output_fingerprint="of-cs",
+    return make_narrative_change_set(
+        change_set_id=change_set_id, extraction_attempt_id=attempt_id, extraction_generation=generation
     )
 
 
@@ -250,3 +166,15 @@ async def test_uow_rollback_leaves_no_partial_evidence(session_factory: Factory)
     async with session_factory() as session:
         repo = NarrativeLifecycleRepository(session)
         assert await repo.get_exact_draft_candidate(candidate_id="cand-1", project_name=PROJECT, user_id=USER) is None
+
+
+async def test_composite_basis_fk_rejects_an_incompatible_revision_link(session_factory: Factory) -> None:
+    async with session_factory() as probe:
+        if probe.bind.dialect.name == "sqlite":
+            pytest.skip("the SQLite test engine runs with foreign keys disabled")
+
+    await _seed_attempt(session_factory)  # revision rev-1 has base_canon_version_id 'cv-1'
+    mismatched = _attempt(attempt_id="att-2").model_copy(update={"base_canon_version_id": "cv-DIFFERENT"})
+    async with narrative_lifecycle_uow_factory(session_factory)() as uow:
+        with pytest.raises((IntegrityError, NarrativeEvidenceIdentityConflictError, NarrativeEvidenceIntegrityError)):
+            await uow.repository.insert_extraction_attempt(mismatched)

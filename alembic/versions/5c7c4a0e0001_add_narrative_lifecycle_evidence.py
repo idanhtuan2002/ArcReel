@@ -106,6 +106,15 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("revision_id"),
         sa.UniqueConstraint("user_id", "project_name", "revision_id", name="uq_narrative_revisions_scope"),
+        sa.UniqueConstraint(
+            "revision_id",
+            "base_canon_version_id",
+            "plan_version",
+            "scene_contract_version",
+            "context_pack_id",
+            name="uq_narrative_revisions_full_basis",
+        ),
+        sa.UniqueConstraint("revision_id", "base_canon_version_id", name="uq_narrative_revisions_canon_basis"),
     )
     op.create_index(op.f("ix_narrative_revisions_user_id"), "narrative_revisions", ["user_id"], unique=False)
     op.create_index("ix_narrative_revisions_project_name", "narrative_revisions", ["project_name"], unique=False)
@@ -149,6 +158,18 @@ def upgrade() -> None:
                 "narrative_revisions.revision_id",
             ],
             name="fk_narrative_extraction_attempts_revision",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["revision_id", "base_canon_version_id", "plan_version", "scene_contract_version", "context_pack_id"],
+            [
+                "narrative_revisions.revision_id",
+                "narrative_revisions.base_canon_version_id",
+                "narrative_revisions.plan_version",
+                "narrative_revisions.scene_contract_version",
+                "narrative_revisions.context_pack_id",
+            ],
+            name="fk_narrative_extraction_attempts_revision_basis",
             ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("attempt_id"),
@@ -243,6 +264,12 @@ def upgrade() -> None:
                 "narrative_revisions.revision_id",
             ],
             name="fk_narrative_change_sets_source_revision",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["source_revision_id", "base_canon_version_id"],
+            ["narrative_revisions.revision_id", "narrative_revisions.base_canon_version_id"],
+            name="fk_narrative_change_sets_revision_basis",
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(

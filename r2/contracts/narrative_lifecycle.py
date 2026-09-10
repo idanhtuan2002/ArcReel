@@ -1,10 +1,10 @@
-"""M5C immutable Narrative-lifecycle evidence contracts (design Section 4-5).
+"""M5C immutable Narrative-lifecycle evidence contracts.
 
 Every model is frozen, rejects extra fields, uses timezone-aware UTC timestamps, and
 carries an explicitly versioned canonical hash domain. None of these contracts grants
 acceptance or Canon authority: a writer identity, a predecessor link, a review ref, or
-an extraction outcome is evidence only. Acceptance exists solely in the Section 6
-decision stream (M5C-2). There is no ``accepted`` boolean anywhere in this module.
+an extraction outcome is evidence only. Acceptance lives only in the separate acceptance
+decision stream. There is no ``accepted`` boolean anywhere in this module.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class CanonMutationEffectKey(R2ContractModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     kind: Literal["CANON_MUTATION"] = "CANON_MUTATION"
-    mapping_version: Literal["r2-m5c-semantic-effect-key-v1"] = "r2-m5c-semantic-effect-key-v1"
+    mapping_version: Literal["r2-m5c-semantic-effect-key-v1"] = SEMANTIC_EFFECT_KEY_VERSION
     canon_subject_kind: Literal["ENTITY", "FACT", "EVENT", "KNOWLEDGE", "TEMPORAL_RELATION"]
     subject_ref: NonEmptyStr
     effect_descriptor: NonEmptyStr
@@ -55,14 +55,11 @@ class ThreadPayoffEffectKey(R2ContractModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     kind: Literal["THREAD_PAYOFF"] = "THREAD_PAYOFF"
-    mapping_version: Literal["r2-m5c-semantic-effect-key-v1"] = "r2-m5c-semantic-effect-key-v1"
+    mapping_version: Literal["r2-m5c-semantic-effect-key-v1"] = SEMANTIC_EFFECT_KEY_VERSION
     thread_ref: NonEmptyStr
     payoff_ref: NonEmptyStr
     canon_operation_count: Literal[0] = 0
 
-
-# The Narrative outcome family currently has exactly one member.
-NarrativeOutcomeEffectKey = ThreadPayoffEffectKey
 
 NarrativeSemanticEffectKey = Annotated[
     CanonMutationEffectKey | ThreadPayoffEffectKey,
@@ -83,6 +80,19 @@ class SourceSpan(R2ContractModel):
         if self.end <= self.start:
             raise ValueError("SourceSpan end must be greater than start")
         return self
+
+
+def _span_union_covers(coverage: tuple[SourceSpan, ...], span: SourceSpan) -> bool:
+    """True when ``span`` lies inside the union of ``coverage`` (overlapping or adjacent
+    coverage spans count as one). Swept in ascending order; no merged objects built."""
+    cursor = span.start
+    for covered in sorted(coverage, key=lambda item: item.start):
+        if covered.start > cursor:
+            break
+        cursor = max(cursor, covered.end)
+        if cursor >= span.end:
+            return True
+    return cursor >= span.end
 
 
 class DraftCandidate(R2ContractModel):
@@ -238,4 +248,8 @@ class NarrativeChangeSet(R2ContractModel):
         for item in self.changes:
             if not declared.issuperset(item.effect_keys):
                 raise ValueError(f"change {item.change_id!r} names an effect key that the change set does not declare")
+            if not _span_union_covers(self.source_spans, item.evidence_span):
+                raise ValueError(
+                    f"change {item.change_id!r} evidence span is not contained by the declared source-span coverage"
+                )
         return self

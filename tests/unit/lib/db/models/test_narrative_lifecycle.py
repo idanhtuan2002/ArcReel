@@ -84,6 +84,33 @@ def test_revision_links_use_composite_scope_foreign_keys_with_restrict() -> None
     assert table.columns["predecessor_revision_id"].nullable is True
 
 
+def test_attempt_and_change_set_carry_a_composite_basis_fk_to_the_revision() -> None:
+    revision_uniques = _unique_map(_table("narrative_revisions")).values()
+    assert {"revision_id", "base_canon_version_id", "plan_version", "scene_contract_version", "context_pack_id"} in (
+        revision_uniques
+    )
+    assert {"revision_id", "base_canon_version_id"} in revision_uniques
+
+    attempt_fk = _fk_by_cols(_table("narrative_extraction_attempts"))[
+        ("base_canon_version_id", "context_pack_id", "plan_version", "revision_id", "scene_contract_version")
+    ]
+    assert {e.target_fullname for e in attempt_fk.elements} == {
+        "narrative_revisions.revision_id",
+        "narrative_revisions.base_canon_version_id",
+        "narrative_revisions.plan_version",
+        "narrative_revisions.scene_contract_version",
+        "narrative_revisions.context_pack_id",
+    }
+    assert attempt_fk.ondelete == "RESTRICT"
+
+    cs_fk = _fk_by_cols(_table("narrative_change_sets"))[("base_canon_version_id", "source_revision_id")]
+    assert {e.target_fullname for e in cs_fk.elements} == {
+        "narrative_revisions.revision_id",
+        "narrative_revisions.base_canon_version_id",
+    }
+    assert cs_fk.ondelete == "RESTRICT"
+
+
 def test_no_evidence_foreign_key_cascades() -> None:
     for name in _TABLES:
         for fk in _table(name).foreign_key_constraints:

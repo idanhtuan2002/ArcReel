@@ -1,11 +1,12 @@
 """``NarrativeLifecycleEvidenceService`` — the only public append capability for
-non-authority lifecycle evidence (design Section 8.1).
+non-authority lifecycle evidence.
 
 Every write is immutable and idempotent: an exact retry compares the full stored tuple
 and performs no write; any partial or mismatched retry fails with no write. The service
-holds no head-mutation port. ``admit_extraction`` needs the transaction-bound
-current-decision guard from the M5C-2 authority layer, so until that layer is wired it
-**fails closed** — it never runs an "exists-only" or otherwise relaxed check.
+holds no head-mutation port. ``admit_extraction`` needs a transaction-bound
+current-decision guard that the acceptance-authority layer would provide; that layer
+does not exist, so ``admit_extraction`` **fails closed** — it never runs an
+"exists-only" or otherwise relaxed check.
 """
 
 from __future__ import annotations
@@ -36,8 +37,8 @@ _SHARED_BASIS_FIELDS = ("base_canon_version_id", "plan_version", "scene_contract
 
 
 class ExtractionAdmissionCommand(R2ContractModel):
-    """The request to admit an extraction attempt. Its real currentness guard arrives in
-    M5C-2 Task 20; the shape here is the stable public contract for that call."""
+    """The request to admit an extraction attempt. The currentness guard that consumes it
+    is not implemented; this is the stable request shape for that call."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     work_scope: NarrativeWorkScope
@@ -190,7 +191,7 @@ class NarrativeLifecycleEvidenceService:
     async def admit_extraction(self, command: ExtractionAdmissionCommand) -> ExtractionAttempt:
         _ = command
         raise NarrativeAuthorityUnavailableError(
-            "extraction admission needs the transaction-bound current-decision guard from the M5C-2 authority layer"
+            "extraction admission needs a transaction-bound current-decision guard that is not available"
         )
 
     async def get_exact_draft_candidate(

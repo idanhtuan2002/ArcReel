@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -308,33 +308,42 @@ class NarrativeLifecycleRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def _get(self, model: type[Any], **predicate: object) -> Any | None:
-        stmt = select(model)
-        for column, value in predicate.items():
-            stmt = stmt.where(getattr(model, column) == value)
+    async def _scalar(self, stmt: Select[Any]) -> Any:
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def get_exact_draft_candidate(
         self, *, candidate_id: str, project_name: str, user_id: str
     ) -> DraftCandidate | None:
-        row = await self._get(
-            NarrativeDraftCandidateModel, candidate_id=candidate_id, project_name=project_name, user_id=user_id
+        row = await self._scalar(
+            select(NarrativeDraftCandidateModel).where(
+                NarrativeDraftCandidateModel.candidate_id == candidate_id,
+                NarrativeDraftCandidateModel.project_name == project_name,
+                NarrativeDraftCandidateModel.user_id == user_id,
+            )
         )
         return _candidate_from_row(row) if row is not None else None
 
     async def get_exact_revision(
         self, *, revision_id: str, project_name: str, user_id: str
     ) -> NarrativeRevision | None:
-        row = await self._get(
-            NarrativeRevisionModel, revision_id=revision_id, project_name=project_name, user_id=user_id
+        row = await self._scalar(
+            select(NarrativeRevisionModel).where(
+                NarrativeRevisionModel.revision_id == revision_id,
+                NarrativeRevisionModel.project_name == project_name,
+                NarrativeRevisionModel.user_id == user_id,
+            )
         )
         return _revision_from_row(row) if row is not None else None
 
     async def get_exact_extraction_attempt(
         self, *, attempt_id: str, project_name: str, user_id: str
     ) -> ExtractionAttempt | None:
-        row = await self._get(
-            NarrativeExtractionAttemptModel, attempt_id=attempt_id, project_name=project_name, user_id=user_id
+        row = await self._scalar(
+            select(NarrativeExtractionAttemptModel).where(
+                NarrativeExtractionAttemptModel.attempt_id == attempt_id,
+                NarrativeExtractionAttemptModel.project_name == project_name,
+                NarrativeExtractionAttemptModel.user_id == user_id,
+            )
         )
         return _attempt_from_row(row) if row is not None else None
 
@@ -342,18 +351,21 @@ class NarrativeLifecycleRepository:
         # ``attempt_id`` is database-global (a PK). The lookup is not scope-filtered so a
         # scopeless result / change set can resolve its owning tenant from the admitted
         # attempt; the returned contract carries that ``work_scope``.
-        row = await self._get(NarrativeExtractionAttemptModel, attempt_id=attempt_id)
+        row = await self._scalar(
+            select(NarrativeExtractionAttemptModel).where(NarrativeExtractionAttemptModel.attempt_id == attempt_id)
+        )
         return _attempt_from_row(row) if row is not None else None
 
     async def get_exact_extraction_result(
         self, *, attempt_id: str, generation: int, project_name: str, user_id: str
     ) -> ExtractionResult | None:
-        row = await self._get(
-            NarrativeExtractionResultModel,
-            attempt_id=attempt_id,
-            generation=generation,
-            project_name=project_name,
-            user_id=user_id,
+        row = await self._scalar(
+            select(NarrativeExtractionResultModel).where(
+                NarrativeExtractionResultModel.attempt_id == attempt_id,
+                NarrativeExtractionResultModel.generation == generation,
+                NarrativeExtractionResultModel.project_name == project_name,
+                NarrativeExtractionResultModel.user_id == user_id,
+            )
         )
         if row is None:
             return None
@@ -377,8 +389,12 @@ class NarrativeLifecycleRepository:
     async def get_exact_change_set(
         self, *, change_set_id: str, project_name: str, user_id: str
     ) -> NarrativeChangeSet | None:
-        row = await self._get(
-            NarrativeChangeSetModel, change_set_id=change_set_id, project_name=project_name, user_id=user_id
+        row = await self._scalar(
+            select(NarrativeChangeSetModel).where(
+                NarrativeChangeSetModel.change_set_id == change_set_id,
+                NarrativeChangeSetModel.project_name == project_name,
+                NarrativeChangeSetModel.user_id == user_id,
+            )
         )
         return _change_set_from_row(row) if row is not None else None
 
@@ -407,7 +423,12 @@ class NarrativeLifecycleRepository:
         """The ``(user_id, project_name)`` of the admitted attempt an evidence result or
         change set descends from. An extraction result and change set carry no scope of
         their own — they inherit the attempt's tenant."""
-        row = await self._get(NarrativeExtractionAttemptModel, attempt_id=attempt_id, generation=generation)
+        row = await self._scalar(
+            select(NarrativeExtractionAttemptModel).where(
+                NarrativeExtractionAttemptModel.attempt_id == attempt_id,
+                NarrativeExtractionAttemptModel.generation == generation,
+            )
+        )
         if row is None:
             raise NarrativeEvidenceIntegrityError(
                 f"no admitted extraction attempt {attempt_id!r} generation {generation} for this result"

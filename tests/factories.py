@@ -10,7 +10,21 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from r2.contracts.narrative_lifecycle import (
+    CanonMutationEffectKey,
+    DraftCandidate,
+    ExtractionAttempt,
+    ExtractionResult,
+    NarrativeChangeItem,
+    NarrativeChangeSet,
+    NarrativeRevision,
+    NarrativeWorkScope,
+    SourceSpan,
+)
+from r2.contracts.provenance import Provenance
 from server.agent_runtime.models import SessionMeta
+
+NARRATIVE_LIFECYCLE_NOW = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
 
 
 def make_translator(locale: str = "zh") -> Callable[..., str]:
@@ -207,3 +221,147 @@ def custom_endpoint_definition(**overrides: Any) -> dict[str, Any]:
     }
     definition.update(overrides)
     return definition
+
+
+# --------------------------------------------------------------------------- #
+# M5C Narrative-lifecycle evidence contracts
+#
+# The defaults form one coherent candidate -> revision -> attempt -> result chain
+# (matching ids and exact bases), so a test can seed the chain with no arguments.
+# --------------------------------------------------------------------------- #
+
+_NL_BASES = {
+    "base_canon_version_id": "cv-1",
+    "plan_version": 2,
+    "scene_contract_version": 1,
+    "context_pack_id": "ctx-1",
+}
+
+
+def make_narrative_work_scope(**overrides: Any) -> NarrativeWorkScope:
+    defaults: dict[str, Any] = {
+        "user_id": "u1",
+        "project_name": "project-a",
+        "plan_id": "plan-1",
+        "scene_contract_id": "scene-1",
+        "canon_branch_id": "branch-1",
+    }
+    defaults.update(overrides)
+    return NarrativeWorkScope(**defaults)
+
+
+def make_narrative_provenance(**overrides: Any) -> Provenance:
+    defaults: dict[str, Any] = {"created_by": "AGENT", "created_at": NARRATIVE_LIFECYCLE_NOW}
+    defaults.update(overrides)
+    return Provenance(**defaults)
+
+
+def make_draft_candidate(*, work_scope: NarrativeWorkScope | None = None, **overrides: Any) -> DraftCandidate:
+    defaults: dict[str, Any] = {
+        "candidate_id": "cand-1",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        **_NL_BASES,
+        "normalized_content": "prose",
+        "content_hash": "pch:abc",
+        "writer_kind": "AGENT",
+        "writer_version": "w-1",
+        "provenance": make_narrative_provenance(),
+        "created_at": NARRATIVE_LIFECYCLE_NOW,
+        "created_by": "who",
+        "semantic_fingerprint": "esf:1",
+    }
+    defaults.update(overrides)
+    return DraftCandidate(**defaults)
+
+
+def make_narrative_revision(*, work_scope: NarrativeWorkScope | None = None, **overrides: Any) -> NarrativeRevision:
+    defaults: dict[str, Any] = {
+        "revision_id": "rev-1",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "base_candidate_id": "cand-1",
+        "predecessor_revision_id": None,
+        **_NL_BASES,
+        "normalized_content": "prose",
+        "content_hash": "pch:abc",
+        "review_refs": [],
+        "provenance": make_narrative_provenance(),
+        "created_at": NARRATIVE_LIFECYCLE_NOW,
+        "created_by": "who",
+        "semantic_fingerprint": "esf:2",
+    }
+    defaults.update(overrides)
+    return NarrativeRevision(**defaults)
+
+
+def make_extraction_attempt(*, work_scope: NarrativeWorkScope | None = None, **overrides: Any) -> ExtractionAttempt:
+    defaults: dict[str, Any] = {
+        "attempt_id": "att-1",
+        "generation": 0,
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "revision_id": "rev-1",
+        "revision_acceptance_decision_id": "dec-1",
+        "observed_revision_effective_generation": 0,
+        **_NL_BASES,
+        "extractor_kind": "LOCAL",
+        "extractor_version": "x-1",
+        "policy_ref": "pol",
+        "policy_version": "1",
+        "admitted_at": NARRATIVE_LIFECYCLE_NOW,
+        "admitted_by": "who",
+        "input_fingerprint": "if-1",
+    }
+    defaults.update(overrides)
+    return ExtractionAttempt(**defaults)
+
+
+def make_extraction_result(**overrides: Any) -> ExtractionResult:
+    defaults: dict[str, Any] = {
+        "result_id": "res-1",
+        "attempt_id": "att-1",
+        "generation": 0,
+        "outcome": "ABSTAINED",
+        "change_set_ids": (),
+        "diagnostics": (),
+        "provider_receipt": None,
+        "completed_at": NARRATIVE_LIFECYCLE_NOW,
+        "output_fingerprint": "of-1",
+    }
+    defaults.update(overrides)
+    return ExtractionResult(**defaults)
+
+
+def make_canon_mutation_effect_key(**overrides: Any) -> CanonMutationEffectKey:
+    defaults: dict[str, Any] = {
+        "canon_subject_kind": "FACT",
+        "subject_ref": "hero",
+        "effect_descriptor": "trust",
+        "canon_operation_count": 1,
+    }
+    defaults.update(overrides)
+    return CanonMutationEffectKey(**defaults)
+
+
+def make_narrative_change_set(**overrides: Any) -> NarrativeChangeSet:
+    key = overrides.pop("key", None) or make_canon_mutation_effect_key()
+    span = overrides.pop("span", None) or SourceSpan(start=0, end=4)
+    defaults: dict[str, Any] = {
+        "change_set_id": "cs-1",
+        "change_set_lineage_id": None,
+        "source_revision_id": "rev-1",
+        "extraction_attempt_id": "att-1",
+        "extraction_generation": 0,
+        "base_canon_version_id": "cv-1",
+        "source_spans": (span,),
+        "semantic_effect_keys": (key,),
+        "changes": (NarrativeChangeItem(change_id="ch-1", evidence_span=span, effect_keys=(key,), summary="s"),),
+        "confidence": 0.7,
+        "extractor_version": "x-1",
+        "policy_ref": "pol",
+        "policy_version": "1",
+        "created_at": NARRATIVE_LIFECYCLE_NOW,
+        "output_fingerprint": "of-cs",
+    }
+    defaults.update(overrides)
+    if defaults["change_set_lineage_id"] is None:
+        defaults["change_set_lineage_id"] = f"lin-{defaults['change_set_id']}"
+    return NarrativeChangeSet(**defaults)

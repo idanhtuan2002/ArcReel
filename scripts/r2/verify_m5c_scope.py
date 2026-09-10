@@ -79,6 +79,7 @@ IMPLEMENTATION_ALLOWLIST: frozenset[str] = HANDOFF_ONLY_ALLOWLIST | frozenset(
         "lib/db/narrative_lifecycle_uow.py",
         "alembic/versions/5c7c4a0e0001_add_narrative_lifecycle_evidence.py",
         # tests
+        "tests/factories.py",
         "tests/unit/r2/contracts/test_narrative_lifecycle.py",
         "tests/unit/r2/narrative_lifecycle/test_coverage_rules.py",
         "tests/unit/r2/narrative_lifecycle/test_lifecycle_hashing.py",

@@ -1,4 +1,4 @@
-"""Pure source-span and semantic-effect-key coverage rules (design Section 5.4 / 6.7).
+"""Pure source-span and semantic-effect-key coverage rules.
 
 One normalized coordinate system, one canonical sort order, deterministic adjacent-span
 merge. No import of ``lib.db``, ``server``, providers, clocks, or randomness. These

@@ -1,4 +1,4 @@
-"""M5C Narrative-lifecycle failure taxonomy (design Section 13).
+"""M5C Narrative-lifecycle failure taxonomy.
 
 Every error is a ``NarrativeError`` subclass, so a caller catching ``NarrativeError``
 catches the whole M5 relationship / thread / lifecycle surface. Validation and identity
@@ -81,10 +81,9 @@ class NarrativeThreadPayoffApplicabilityError(NarrativeLifecycleError):
 
 
 class NarrativeAuthorityUnavailableError(NarrativeLifecycleError):
-    """The Narrative acceptance authority layer that a guard needs is not wired yet.
+    """The Narrative acceptance authority layer a guard would consult does not exist.
 
     Distinct from ``NarrativeDecisionAuthorizationError``: this is "no authority layer to
-    consult", not "an authenticated actor was denied a grant". ``admit_extraction`` and
-    ``admit_compilation`` raise it until M5C-2 (extraction) / M5C-3 (compilation) supply
-    the transaction-bound current-decision guard.
+    consult", not "an authenticated actor was denied a grant". ``admit_extraction`` raises
+    it because the transaction-bound current-decision guard it needs is not implemented.
     """

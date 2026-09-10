@@ -1,31 +1,18 @@
-"""Integration coverage for ``NarrativeLifecycleEvidenceService`` (M5C-1B delivery).
+"""Integration coverage for ``NarrativeLifecycleEvidenceService``.
 
-The extraction-admission path is exercised only for its fail-closed behaviour here; the
-real transaction-bound guard lands in M5C-2. Attempt rows are seeded directly through the
-repository by a test-only fixture.
+The extraction-admission path is exercised only for its fail-closed behaviour. Attempt
+rows are seeded directly through the repository by a test-only fixture.
 """
 
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.db.narrative_lifecycle_uow import narrative_lifecycle_uow_factory
-from r2.contracts.narrative_lifecycle import (
-    CanonMutationEffectKey,
-    DraftCandidate,
-    ExtractionAttempt,
-    ExtractionResult,
-    NarrativeChangeItem,
-    NarrativeChangeSet,
-    NarrativeRevision,
-    NarrativeWorkScope,
-    SourceSpan,
-)
-from r2.contracts.provenance import Provenance
+from lib.db.narrative_lifecycle_uow import SqlAlchemyNarrativeLifecycleUnitOfWork, narrative_lifecycle_uow_factory
+from r2.contracts.narrative_lifecycle import ExtractionAttempt, ExtractionResult, NarrativeChangeSet, NarrativeWorkScope
 from r2.narrative_lifecycle.errors import (
     NarrativeAttemptGenerationConflict,
     NarrativeAuthorityUnavailableError,
@@ -33,8 +20,15 @@ from r2.narrative_lifecycle.errors import (
     NarrativeEvidenceIntegrityError,
 )
 from r2.narrative_lifecycle.evidence import ExtractionAdmissionCommand, NarrativeLifecycleEvidenceService
+from tests.factories import (
+    make_draft_candidate,
+    make_extraction_attempt,
+    make_extraction_result,
+    make_narrative_change_set,
+    make_narrative_revision,
+    make_narrative_work_scope,
+)
 
-NOW = datetime(2026, 9, 9, 12, tzinfo=UTC)
 USER = "u1"
 PROJECT = "project-a"
 
@@ -42,36 +36,11 @@ type Factory = async_sessionmaker[AsyncSession]
 
 
 def _scope(*, user_id: str = USER, project_name: str = PROJECT) -> NarrativeWorkScope:
-    return NarrativeWorkScope(
-        user_id=user_id,
-        project_name=project_name,
-        plan_id="plan-1",
-        scene_contract_id="scene-1",
-        canon_branch_id="branch-1",
-    )
+    return make_narrative_work_scope(user_id=user_id, project_name=project_name)
 
 
-def _prov() -> Provenance:
-    return Provenance(created_by="AGENT", created_at=NOW)
-
-
-def _candidate(*, candidate_id: str = "cand-1", scope: NarrativeWorkScope | None = None) -> DraftCandidate:
-    return DraftCandidate(
-        candidate_id=candidate_id,
-        work_scope=scope or _scope(),
-        base_canon_version_id="cv-1",
-        plan_version=2,
-        scene_contract_version=1,
-        context_pack_id="ctx-1",
-        normalized_content="prose",
-        content_hash="pch:abc",
-        writer_kind="AGENT",
-        writer_version="w-1",
-        provenance=_prov(),
-        created_at=NOW,
-        created_by="who",
-        semantic_fingerprint="esf:1",
-    )
+def _candidate(*, candidate_id: str = "cand-1", scope: NarrativeWorkScope | None = None):
+    return make_draft_candidate(candidate_id=candidate_id, work_scope=scope or _scope())
 
 
 def _revision(
@@ -80,91 +49,50 @@ def _revision(
     candidate_id: str = "cand-1",
     predecessor: str | None = None,
     scope: NarrativeWorkScope | None = None,
-) -> NarrativeRevision:
-    return NarrativeRevision(
+):
+    return make_narrative_revision(
         revision_id=revision_id,
-        work_scope=scope or _scope(),
         base_candidate_id=candidate_id,
         predecessor_revision_id=predecessor,
-        base_canon_version_id="cv-1",
-        plan_version=2,
-        scene_contract_version=1,
-        context_pack_id="ctx-1",
-        normalized_content="prose",
-        content_hash="pch:abc",
-        review_refs=[],
-        provenance=_prov(),
-        created_at=NOW,
-        created_by="who",
-        semantic_fingerprint="esf:2",
+        work_scope=scope or _scope(),
     )
 
 
 def _attempt(*, attempt_id: str = "att-1", generation: int = 0) -> ExtractionAttempt:
-    return ExtractionAttempt(
-        attempt_id=attempt_id,
-        generation=generation,
-        work_scope=_scope(),
-        revision_id="rev-1",
-        revision_acceptance_decision_id="dec-1",
-        observed_revision_effective_generation=0,
-        base_canon_version_id="cv-1",
-        plan_version=2,
-        scene_contract_version=1,
-        context_pack_id="ctx-1",
-        extractor_kind="LOCAL",
-        extractor_version="x-1",
-        policy_ref="pol",
-        policy_version="1",
-        admitted_at=NOW,
-        admitted_by="who",
-        input_fingerprint="if-1",
-    )
+    return make_extraction_attempt(attempt_id=attempt_id, generation=generation)
 
 
 def _result(
     *, result_id: str = "res-1", generation: int = 0, outcome: str = "ABSTAINED", change_set_ids: tuple[str, ...] = ()
 ) -> ExtractionResult:
-    return ExtractionResult(
-        result_id=result_id,
-        attempt_id="att-1",
-        generation=generation,
-        outcome=outcome,
-        change_set_ids=change_set_ids,
-        diagnostics=(),
-        provider_receipt=None,
-        completed_at=NOW,
-        output_fingerprint="of-1",
+    return make_extraction_result(
+        result_id=result_id, generation=generation, outcome=outcome, change_set_ids=change_set_ids
     )
 
 
 def _change_set(*, change_set_id: str) -> NarrativeChangeSet:
-    key = CanonMutationEffectKey(
-        canon_subject_kind="FACT", subject_ref="hero", effect_descriptor="trust", canon_operation_count=1
-    )
-    span = SourceSpan(start=0, end=4)
-    return NarrativeChangeSet(
-        change_set_id=change_set_id,
-        change_set_lineage_id=f"lin-{change_set_id}",
-        source_revision_id="rev-1",
-        extraction_attempt_id="att-1",
-        extraction_generation=0,
-        base_canon_version_id="cv-1",
-        source_spans=(span,),
-        semantic_effect_keys=(key,),
-        changes=(NarrativeChangeItem(change_id="ch-1", evidence_span=span, effect_keys=(key,), summary="s"),),
-        confidence=0.7,
-        extractor_version="x-1",
-        policy_ref="pol",
-        policy_version="1",
-        created_at=NOW,
-        output_fingerprint="of-cs",
-    )
+    return make_narrative_change_set(change_set_id=change_set_id)
 
 
 @pytest.fixture
 def evidence_service(session_factory: Factory) -> NarrativeLifecycleEvidenceService:
     return NarrativeLifecycleEvidenceService(narrative_lifecycle_uow_factory(session_factory))
+
+
+class InjectedFault(RuntimeError):
+    pass
+
+
+class _FaultOnCommitUnitOfWork(SqlAlchemyNarrativeLifecycleUnitOfWork):
+    """Flushes normally, then fails the commit — the transaction never reaches the DB."""
+
+    async def commit(self) -> None:
+        raise InjectedFault("injected fault before commit")
+
+
+@pytest.fixture
+def fault_on_commit_service(session_factory: Factory) -> NarrativeLifecycleEvidenceService:
+    return NarrativeLifecycleEvidenceService(lambda: _FaultOnCommitUnitOfWork(session_factory))
 
 
 @pytest.fixture
@@ -289,3 +217,24 @@ async def test_record_non_successful_extraction_rejects_succeeded_or_declared_ch
     await seed_attempt(generation=0)
     with pytest.raises(NarrativeEvidenceIntegrityError):
         await evidence_service.record_non_successful_extraction(_result(outcome="SUCCEEDED", change_set_ids=("cs-1",)))
+
+
+async def test_successful_bundle_is_atomic_when_the_commit_faults(
+    evidence_service: NarrativeLifecycleEvidenceService,
+    fault_on_commit_service: NarrativeLifecycleEvidenceService,
+    seed_attempt: Callable[..., Awaitable[ExtractionAttempt]],
+) -> None:
+    await seed_attempt(generation=0)
+    with pytest.raises(InjectedFault):
+        await fault_on_commit_service.record_successful_extraction(
+            _result(outcome="SUCCEEDED", change_set_ids=("cs-1",)), [_change_set(change_set_id="cs-1")]
+        )
+    # Neither the result nor its proposal evidence is observable after the fault.
+    assert (
+        await evidence_service.get_exact_extraction_result(
+            attempt_id="att-1", generation=0, project_name=PROJECT, user_id=USER
+        )
+    ) is None
+    assert await evidence_service.get_exact_change_set(change_set_id="cs-1", project_name=PROJECT, user_id=USER) is None
+    # The independently-committed attempt row seeded before the fault is still durable.
+    assert await evidence_service.get_exact_extraction_attempt(attempt_id="att-1", project_name=PROJECT, user_id=USER)

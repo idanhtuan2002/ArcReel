@@ -167,6 +167,24 @@ def test_change_item_effect_keys_must_be_declared_on_the_change_set() -> None:
         )
 
 
+def test_change_evidence_span_must_be_contained_by_declared_coverage() -> None:
+    outside = SourceSpan(start=8, end=20)  # SPAN is 0..10; this straddles the gap after it
+    with pytest.raises(ValidationError):
+        _change_set(
+            changes=[NarrativeChangeItem(change_id="ch-1", evidence_span=outside, effect_keys=[MUT_KEY], summary="s")]
+        )
+    # Adjacent declared spans count as one continuous coverage region.
+    ok = _change_set(
+        source_spans=[SourceSpan(start=0, end=10), SourceSpan(start=10, end=30)],
+        changes=[
+            NarrativeChangeItem(
+                change_id="ch-1", evidence_span=SourceSpan(start=5, end=25), effect_keys=[MUT_KEY], summary="s"
+            )
+        ],
+    )
+    assert ok.changes[0].evidence_span.end == 25
+
+
 def test_thread_payoff_effect_key_maps_to_zero_canon_operations() -> None:
     with pytest.raises(ValidationError):
         ThreadPayoffEffectKey(thread_ref="t1", payoff_ref="p1", canon_operation_count=1)
