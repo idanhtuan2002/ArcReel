@@ -298,8 +298,8 @@ forbidden_modules = [
     "r2.narrative_plan.ports",
 ]
 
-# M5C-1A：narrative_lifecycle 的纯转换模块（Huohuo / Novel Studio 端口）不得依赖任何
-# 权威、持久化、事务、供应商或运行时；只做 proposal-only 证据变换。
+# M5C-1A/1B：narrative_lifecycle 只做纯变换、内容寻址与 append-only 证据；依赖结构化
+# 端口，绝不依赖任何具体持久化适配器、Canon 授权写口、Narrative head 写入者或 Host 运行时。
 [[tool.importlinter.contracts]]
 name = "R2 narrative lifecycle pure ports are authority- and persistence-free"
 type = "forbidden"
@@ -313,6 +313,19 @@ forbidden_modules = [
     "r2.narrative_plan.service",
     "r2.narrative_plan.ports",
     "r2.narrative_context.compiler",
+]
+
+# M5C-1B：证据服务是 append-only。它绝不触达 Canon 授权写口，也绝不触达（M5C-2 Task 18
+# 才落地的）Narrative 决策/head 写入者 `r2.narrative_lifecycle.acceptance`——届时把该模块
+# 加入下方 forbidden 列表。
+[[tool.importlinter.contracts]]
+name = "M5C narrative evidence service holds no head-mutation capability"
+type = "forbidden"
+source_modules = ["r2.narrative_lifecycle.evidence"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.repositories",
+    "r2.narrative.canon_transaction",
 ]
 
 [tool.deptry]
