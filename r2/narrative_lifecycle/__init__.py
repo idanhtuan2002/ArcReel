@@ -1,9 +1,10 @@
-"""M5C Narrative lifecycle: pure proposal-evidence helpers and hash domains.
+"""M5C Narrative lifecycle: pure helpers, hash domains, evidence ports, and the
+append-only ``NarrativeLifecycleEvidenceService``.
 
-This package holds only pure code. It imports no repository, unit of work, clock, random
-source, provider, acceptance service, or Canon transaction service, and it never produces
-a ``NarrativeChangeSet`` or Canon state — its output is proposal-only evidence and
-content-addressed identities.
+Nothing here imports a concrete repository, session, ORM row, clock, random source,
+provider, acceptance service, or Canon transaction service. The evidence service depends
+only on the structural ports in ``ports.py``; the SQLAlchemy adapters live under
+``lib.db``. This package never mutates a Narrative head.
 """
 
 from .changeset_parser import (
@@ -31,12 +32,18 @@ from .coverage import (
     normalize_source_spans,
     spans_overlap,
 )
+from .evidence import ExtractionAdmissionCommand, NarrativeLifecycleEvidenceService
 from .hashing import (
     EVIDENCE_SEMANTIC_FINGERPRINT_VERSION,
     PROSE_CONTENT_HASH_VERSION,
     compute_evidence_semantic_fingerprint,
     compute_prose_content_hash,
     normalize_prose,
+)
+from .ports import (
+    NarrativeLifecycleEvidenceRepositoryPort,
+    NarrativeLifecycleUnitOfWork,
+    NarrativeLifecycleUnitOfWorkFactory,
 )
 
 __all__ = [
@@ -45,6 +52,11 @@ __all__ = [
     "ConflictSubject",
     "ContinuityIssue",
     "ContinuityReport",
+    "ExtractionAdmissionCommand",
+    "NarrativeLifecycleEvidenceRepositoryPort",
+    "NarrativeLifecycleEvidenceService",
+    "NarrativeLifecycleUnitOfWork",
+    "NarrativeLifecycleUnitOfWorkFactory",
     "ParsedChangeRecord",
     "canonicalize_change_record_headers",
     "compute_evidence_semantic_fingerprint",

@@ -78,3 +78,13 @@ class NarrativeHandoffConflict(NarrativeLifecycleError):
 
 class NarrativeThreadPayoffApplicabilityError(NarrativeLifecycleError):
     """A thread-payoff proof is absent, stale, rejected, mismatched, or incompletely resolved."""
+
+
+class NarrativeAuthorityUnavailableError(NarrativeLifecycleError):
+    """The Narrative acceptance authority layer that a guard needs is not wired yet.
+
+    Distinct from ``NarrativeDecisionAuthorizationError``: this is "no authority layer to
+    consult", not "an authenticated actor was denied a grant". ``admit_extraction`` and
+    ``admit_compilation`` raise it until M5C-2 (extraction) / M5C-3 (compilation) supply
+    the transaction-bound current-decision guard.
+    """

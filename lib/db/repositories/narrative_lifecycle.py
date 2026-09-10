@@ -338,6 +338,13 @@ class NarrativeLifecycleRepository:
         )
         return _attempt_from_row(row) if row is not None else None
 
+    async def get_extraction_attempt_by_id(self, *, attempt_id: str) -> ExtractionAttempt | None:
+        # ``attempt_id`` is database-global (a PK). The lookup is not scope-filtered so a
+        # scopeless result / change set can resolve its owning tenant from the admitted
+        # attempt; the returned contract carries that ``work_scope``.
+        row = await self._get(NarrativeExtractionAttemptModel, attempt_id=attempt_id)
+        return _attempt_from_row(row) if row is not None else None
+
     async def get_exact_extraction_result(
         self, *, attempt_id: str, generation: int, project_name: str, user_id: str
     ) -> ExtractionResult | None:
