@@ -7,6 +7,10 @@ def test_impl_phase_accepts_allowlisted_paths_and_prefixes() -> None:
     paths = [
         "r2/contracts/narrative_plan.py",
         "r2/narrative_lifecycle/changeset_parser.py",
+        "r2/narrative_lifecycle/evidence.py",
+        "r2/contracts/narrative_lifecycle.py",
+        "lib/db/models/narrative_lifecycle.py",
+        "lib/db/repositories/narrative_lifecycle.py",
         "tests/integration/donor_parity/vendor/huohuo/workbench-server/src/common/novel/novel-change-record.ts",
         "docs/r2/evidence/R2_M5C_DONOR_BASELINE.json",
         "pyproject.toml",
@@ -19,13 +23,15 @@ def test_impl_phase_rejects_an_off_allowlist_path() -> None:
     assert problems == ["unexpected implementation path: server/routers/tasks.py"]
 
 
-def test_impl_phase_rejects_any_migration_change() -> None:
-    problems = evaluate(["alembic/versions/5c7c4a0e0001_add_narrative_lifecycle_evidence.py"], phase="impl")
+def test_impl_phase_allows_only_the_m5c_1b_evidence_migration() -> None:
+    assert evaluate(["alembic/versions/5c7c4a0e0001_add_narrative_lifecycle_evidence.py"], phase="impl") == []
+    problems = evaluate(["alembic/versions/5c7c4a0e0002_add_narrative_decision_authority.py"], phase="impl")
     assert any("alembic/versions/" in p for p in problems)
 
 
-def test_handoff_phase_accepts_only_the_review_doc() -> None:
+def test_handoff_phase_accepts_either_checkpoint_review_doc() -> None:
     assert evaluate(["docs/r2/evidence/R2_M5C_1A_REVIEW.md"], phase="handoff") == []
+    assert evaluate(["docs/r2/evidence/R2_M5C_1_REVIEW.md"], phase="handoff") == []
 
 
 def test_handoff_phase_rejects_anything_else() -> None:
