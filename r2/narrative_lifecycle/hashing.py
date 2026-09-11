@@ -16,10 +16,16 @@ from typing import TYPE_CHECKING
 from r2.contracts import canonical_json_bytes, ensure_json_value
 
 if TYPE_CHECKING:
-    from r2.contracts.narrative_lifecycle import DraftCandidate, NarrativeRevision
+    from r2.contracts.narrative_lifecycle import (
+        DraftCandidate,
+        NarrativeDecisionAuthorization,
+        NarrativeDecisionCommand,
+        NarrativeRevision,
+    )
 
 PROSE_CONTENT_HASH_VERSION = "r2-m5c-prose-content-v1"
 EVIDENCE_SEMANTIC_FINGERPRINT_VERSION = "r2-m5c-evidence-fingerprint-v1"
+DECISION_CANONICAL_IDENTITY_HASH_VERSION = "r2-m5c-decision-identity-v1"
 
 
 def normalize_prose(prose: str) -> str:
@@ -68,3 +74,27 @@ def compute_evidence_semantic_fingerprint(artifact: DraftCandidate | NarrativeRe
         "lineage": lineage,
     }
     return "esf:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()
+
+
+def compute_decision_canonical_identity_hash(
+    command: NarrativeDecisionCommand, authorization: NarrativeDecisionAuthorization
+) -> str:
+    """Content-address one Human decision command together with its original
+    authorization evidence (§6.3). Covers decision family, action, stable subject key,
+    selected evidence IDs, both expected predecessors, exact Canon/Plan/Scene/Context
+    bindings, actor identity, and (for a conflict resolution) conflict coverage, chosen
+    resolution, and referenced resolution decisions — plus the exact original
+    ``NarrativeDecisionAuthorization``, including its ``authenticated_at`` receipt time.
+
+    Excludes a command's own ``retry_authentication``: fresh
+    ``NarrativeDecisionRetryAuthentication`` proves only that the same actor is currently
+    authenticated and is never part of decision identity. Also excludes any server-
+    assigned ``stored_at`` audit metadata, which this function never receives — it is
+    recorded after identity is established and is never compared as identity.
+    """
+    payload = {
+        "schema": DECISION_CANONICAL_IDENTITY_HASH_VERSION,
+        "command": command.model_dump(mode="json", exclude={"retry_authentication"}),
+        "authorization": authorization.model_dump(mode="json"),
+    }
+    return "dci:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()

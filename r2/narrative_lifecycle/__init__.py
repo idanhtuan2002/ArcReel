@@ -34,8 +34,10 @@ from .coverage import (
 )
 from .evidence import ExtractionAdmissionCommand, NarrativeLifecycleEvidenceService
 from .hashing import (
+    DECISION_CANONICAL_IDENTITY_HASH_VERSION,
     EVIDENCE_SEMANTIC_FINGERPRINT_VERSION,
     PROSE_CONTENT_HASH_VERSION,
+    compute_decision_canonical_identity_hash,
     compute_evidence_semantic_fingerprint,
     compute_prose_content_hash,
     normalize_prose,
@@ -44,9 +46,11 @@ from .ports import (
     NarrativeLifecycleEvidenceRepositoryPort,
     NarrativeLifecycleUnitOfWork,
     NarrativeLifecycleUnitOfWorkFactory,
+    NarrativeShowrunnerAuthorityPort,
 )
 
 __all__ = [
+    "DECISION_CANONICAL_IDENTITY_HASH_VERSION",
     "EVIDENCE_SEMANTIC_FINGERPRINT_VERSION",
     "PROSE_CONTENT_HASH_VERSION",
     "ConflictSubject",
@@ -57,8 +61,10 @@ __all__ = [
     "NarrativeLifecycleEvidenceService",
     "NarrativeLifecycleUnitOfWork",
     "NarrativeLifecycleUnitOfWorkFactory",
+    "NarrativeShowrunnerAuthorityPort",
     "ParsedChangeRecord",
     "canonicalize_change_record_headers",
+    "compute_decision_canonical_identity_hash",
     "compute_evidence_semantic_fingerprint",
     "compute_prose_content_hash",
     "coverage_contains",

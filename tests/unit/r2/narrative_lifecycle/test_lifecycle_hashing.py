@@ -7,13 +7,18 @@ import pytest
 from r2.contracts.narrative_context import compute_source_content_hash
 from r2.contracts.narrative_lifecycle import (
     DraftCandidate,
+    NarrativeDecisionAuthorization,
+    NarrativeDecisionRetryAuthentication,
     NarrativeRevision,
     NarrativeWorkScope,
+    RevisionAcceptanceCommand,
 )
 from r2.contracts.provenance import Provenance
 from r2.narrative_lifecycle.hashing import (
+    DECISION_CANONICAL_IDENTITY_HASH_VERSION,
     EVIDENCE_SEMANTIC_FINGERPRINT_VERSION,
     PROSE_CONTENT_HASH_VERSION,
+    compute_decision_canonical_identity_hash,
     compute_evidence_semantic_fingerprint,
     compute_prose_content_hash,
     normalize_prose,
@@ -128,3 +133,90 @@ def test_semantic_fingerprint_covers_bindings_and_artifact_kind() -> None:
     )
     # Same opaque id and bytes, different artifact kind -> different fingerprint.
     assert compute_evidence_semantic_fingerprint(_draft()) != compute_evidence_semantic_fingerprint(_revision())
+
+
+def _authorization(**overrides: object) -> NarrativeDecisionAuthorization:
+    base: dict[str, object] = {
+        "authorization_ref": "auth-1",
+        "user_id": "u-1",
+        "project_name": "proj",
+        "actor_id": "human:1",
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "decision_family": "REVISION_ACCEPTANCE",
+        "action": "ACCEPT",
+        "decision_id": "dec-1",
+        "stable_subject_fingerprint": "ssf:1",
+        "decision_command_fingerprint": "dcf:1",
+        "authenticated_at": NOW,
+        "authenticated_via": "session:abc",
+    }
+    return NarrativeDecisionAuthorization(**(base | overrides))
+
+
+def _retry_authentication(**overrides: object) -> NarrativeDecisionRetryAuthentication:
+    base: dict[str, object] = {
+        "retry_authentication_ref": "retry-1",
+        "user_id": "u-1",
+        "project_name": "proj",
+        "actor_id": "human:1",
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "decision_id": "dec-1",
+        "authenticated_at": NOW,
+        "authenticated_via": "session:xyz",
+    }
+    return NarrativeDecisionRetryAuthentication(**(base | overrides))
+
+
+def _revision_command(
+    *, actor_id: str = "human:1", canon_version_id: str = "cv-1", **overrides: object
+) -> RevisionAcceptanceCommand:
+    base: dict[str, object] = {
+        "decision_id": "dec-1",
+        "action": "ACCEPT",
+        "work_scope": SCOPE,
+        "selected_revision_id": "rev-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        "base_canon_version_id": canon_version_id,
+        "plan_version": 1,
+        "scene_contract_version": 1,
+        "context_pack_id": "ctx-1",
+        "actor_id": actor_id,
+    }
+    return RevisionAcceptanceCommand(**(base | overrides))
+
+
+def test_decision_identity_hash_domain_version_is_pinned() -> None:
+    assert DECISION_CANONICAL_IDENTITY_HASH_VERSION == "r2-m5c-decision-identity-v1"
+
+
+def test_decision_identity_hash_prefix_and_determinism() -> None:
+    h = compute_decision_canonical_identity_hash(_revision_command(), _authorization())
+    assert h.startswith("dci:")
+    assert h == compute_decision_canonical_identity_hash(_revision_command(), _authorization())
+
+
+def test_retry_authentication_is_not_part_of_decision_identity() -> None:
+    cmd, auth = _revision_command(), _authorization()
+    h1 = compute_decision_canonical_identity_hash(cmd, auth)
+    h2 = compute_decision_canonical_identity_hash(
+        cmd.model_copy(update={"retry_authentication": _retry_authentication()}), auth
+    )
+    assert h1 == h2
+
+
+def test_changed_actor_or_basis_is_a_different_identity() -> None:
+    base = compute_decision_canonical_identity_hash(_revision_command(), _authorization())
+    assert base != compute_decision_canonical_identity_hash(
+        _revision_command(actor_id="other"), _authorization(actor_id="other")
+    )
+    assert base != compute_decision_canonical_identity_hash(
+        _revision_command(canon_version_id="cv-2"), _authorization()
+    )
+
+
+def test_original_authorization_receipt_time_is_part_of_decision_identity() -> None:
+    later = _authorization(authenticated_at=NOW.replace(hour=13))
+    assert compute_decision_canonical_identity_hash(_revision_command(), _authorization()) != (
+        compute_decision_canonical_identity_hash(_revision_command(), later)
+    )

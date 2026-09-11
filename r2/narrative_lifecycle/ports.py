@@ -15,7 +15,11 @@ from r2.contracts.narrative_lifecycle import (
     ExtractionAttempt,
     ExtractionResult,
     NarrativeChangeSet,
+    NarrativeDecisionAuthorization,
+    NarrativeDecisionCommand,
+    NarrativeDecisionRetryAuthentication,
     NarrativeRevision,
+    NarrativeWorkScope,
 )
 
 
@@ -79,3 +83,21 @@ class NarrativeLifecycleUnitOfWork(Protocol):
 
 
 NarrativeLifecycleUnitOfWorkFactory = Callable[[], NarrativeLifecycleUnitOfWork]
+
+
+@runtime_checkable
+class NarrativeShowrunnerAuthorityPort(Protocol):
+    """The sole source of Human Showrunner decision authority (§6.2). Its only source of
+    truth is an explicit project-scoped ``HUMAN_SHOWRUNNER`` grant issued by the frozen
+    Governance/Showrunner approval authority: this port may read and verify that grant,
+    but it creates, amends, revokes, or infers none of it. Every production adapter must
+    deny by default until that authority source exists.
+    """
+
+    async def authorize_initial_decision(
+        self, authenticated_principal: str, canonical_command: NarrativeDecisionCommand
+    ) -> NarrativeDecisionAuthorization: ...
+
+    async def authenticate_exact_retry(
+        self, authenticated_principal: str, decision_id: str, exact_scope: NarrativeWorkScope
+    ) -> NarrativeDecisionRetryAuthentication: ...

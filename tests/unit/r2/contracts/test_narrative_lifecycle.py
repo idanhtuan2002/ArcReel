@@ -7,14 +7,25 @@ from pydantic import TypeAdapter, ValidationError
 
 from r2.contracts.narrative_lifecycle import (
     CanonMutationEffectKey,
+    ChangeSetReviewCommand,
+    ChangeSetReviewHead,
+    ConflictResolutionCommand,
+    ConflictResolutionHead,
+    ConflictResolutionLineage,
+    ConflictSubject,
     DraftCandidate,
     ExtractionAttempt,
     ExtractionResult,
     NarrativeChangeItem,
     NarrativeChangeSet,
+    NarrativeDecisionAuthorization,
+    NarrativeDecisionReceipt,
+    NarrativeDecisionRetryAuthentication,
     NarrativeRevision,
     NarrativeSemanticEffectKey,
     NarrativeWorkScope,
+    RevisionAcceptanceCommand,
+    RevisionAcceptanceHead,
     SourceSpan,
     ThreadPayoffEffectKey,
 )
@@ -212,3 +223,300 @@ def test_extraction_attempt_is_frozen() -> None:
     )
     with pytest.raises(ValidationError):
         attempt.generation = 1
+
+
+# --- M5C-2 decision authority contracts ---
+
+
+def _authorization(**overrides: object) -> NarrativeDecisionAuthorization:
+    base: dict[str, object] = {
+        "authorization_ref": "auth-1",
+        "user_id": "u-1",
+        "project_name": "proj",
+        "actor_id": "human:1",
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "decision_family": "REVISION_ACCEPTANCE",
+        "action": "ACCEPT",
+        "decision_id": "dec-1",
+        "stable_subject_fingerprint": "ssf:1",
+        "decision_command_fingerprint": "dcf:1",
+        "authenticated_at": NOW,
+        "authenticated_via": "session:abc",
+    }
+    return NarrativeDecisionAuthorization(**(base | overrides))
+
+
+def _retry_authentication(**overrides: object) -> NarrativeDecisionRetryAuthentication:
+    base: dict[str, object] = {
+        "retry_authentication_ref": "retry-1",
+        "user_id": "u-1",
+        "project_name": "proj",
+        "actor_id": "human:1",
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "decision_id": "dec-1",
+        "authenticated_at": NOW,
+        "authenticated_via": "session:xyz",
+    }
+    return NarrativeDecisionRetryAuthentication(**(base | overrides))
+
+
+def _revision_command(**overrides: object) -> RevisionAcceptanceCommand:
+    base: dict[str, object] = {
+        "decision_id": "dec-1",
+        "action": "ACCEPT",
+        "work_scope": SCOPE,
+        "selected_revision_id": "rev-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        "base_canon_version_id": "cv-1",
+        "plan_version": 1,
+        "scene_contract_version": 1,
+        "context_pack_id": "ctx-1",
+        "actor_id": "human:1",
+    }
+    return RevisionAcceptanceCommand(**(base | overrides))
+
+
+def _change_set_review_command(**overrides: object) -> ChangeSetReviewCommand:
+    base: dict[str, object] = {
+        "decision_id": "dec-2",
+        "action": "ACCEPT",
+        "work_scope": SCOPE,
+        "revision_acceptance_decision_id": "dec-1",
+        "change_set_lineage_id": "lin-1",
+        "selected_change_set_id": "cs-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        "base_canon_version_id": "cv-1",
+        "plan_version": 1,
+        "scene_contract_version": 1,
+        "context_pack_id": "ctx-1",
+        "actor_id": "human:1",
+    }
+    return ChangeSetReviewCommand(**(base | overrides))
+
+
+def _conflict_resolution_command(**overrides: object) -> ConflictResolutionCommand:
+    base: dict[str, object] = {
+        "decision_id": "dec-3",
+        "action": "RESOLVE",
+        "work_scope": SCOPE,
+        "revision_acceptance_decision_id": "dec-1",
+        "conflict_resolution_lineage_id": "conf-1",
+        "competing_change_set_ids": ["cs-1", "cs-2"],
+        "competing_review_decision_ids": ["dec-2", "dec-2b"],
+        "chosen_resolution": "resolution:keep-cs-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        "base_canon_version_id": "cv-1",
+        "plan_version": 1,
+        "scene_contract_version": 1,
+        "context_pack_id": "ctx-1",
+        "actor_id": "human:1",
+    }
+    return ConflictResolutionCommand(**(base | overrides))
+
+
+def _receipt(**overrides: object) -> NarrativeDecisionReceipt:
+    base: dict[str, object] = {
+        "decision_id": "dec-1",
+        "decision_family": "REVISION_ACCEPTANCE",
+        "action": "ACCEPT",
+        "decision_generation": 1,
+        "effective_decision_id": "dec-1",
+        "effective_generation": 1,
+    }
+    return NarrativeDecisionReceipt(**(base | overrides))
+
+
+_HEAD_KEY_KWARGS: dict[type, dict[str, object]] = {
+    RevisionAcceptanceHead: {"work_scope": SCOPE},
+    ChangeSetReviewHead: {"revision_acceptance_decision_id": "dec-1", "change_set_lineage_id": "lin-1"},
+    ConflictResolutionHead: {
+        "revision_acceptance_decision_id": "dec-1",
+        "conflict_resolution_lineage_id": "conf-1",
+    },
+}
+
+
+def _head(head_cls: type, **overrides: object):
+    base: dict[str, object] = {
+        **_HEAD_KEY_KWARGS[head_cls],
+        "latest_decision_id": None,
+        "decision_generation": 0,
+        "effective_decision_id": None,
+        "effective_generation": 0,
+    }
+    return head_cls(**(base | overrides))
+
+
+def _lineage(**overrides: object) -> ConflictResolutionLineage:
+    base: dict[str, object] = {
+        "conflict_resolution_lineage_id": "conf-1",
+        "revision_acceptance_decision_id": "dec-1",
+        "conflict_subject": ConflictSubject(coverage=(SPAN,), effect_key_subjects=("canon:FACT:hero",)),
+        "conflict_subject_fingerprint": "csf:1",
+        "created_at": NOW,
+        "created_by": "human:1",
+    }
+    return ConflictResolutionLineage(**(base | overrides))
+
+
+def test_authority_role_is_fixed_to_human_showrunner() -> None:
+    with pytest.raises(ValidationError):
+        _authorization(authority_role="HUMAN_AUTHOR")
+    with pytest.raises(ValidationError):
+        _retry_authentication(authority_role="HUMAN_AUTHOR")
+
+
+@pytest.mark.parametrize(
+    ("command_factory", "accepting_action"),
+    [
+        (_revision_command, "ACCEPT"),
+        (_change_set_review_command, "ACCEPT"),
+        (_conflict_resolution_command, "RESOLVE"),
+    ],
+)
+def test_genesis_decision_expects_no_predecessors(command_factory, accepting_action: str) -> None:
+    ok = command_factory(action=accepting_action, expected_latest_decision_id=None, expected_effective_decision_id=None)
+    assert ok.expected_latest_decision_id is None
+    assert ok.expected_effective_decision_id is None
+    with pytest.raises(ValidationError):
+        command_factory(
+            action=accepting_action, expected_latest_decision_id=None, expected_effective_decision_id="dec-eff"
+        )
+
+
+@pytest.mark.parametrize(
+    ("command_factory", "accepting_action"),
+    [
+        (_revision_command, "ACCEPT"),
+        (_change_set_review_command, "ACCEPT"),
+        (_conflict_resolution_command, "RESOLVE"),
+    ],
+)
+def test_accepting_action_forbids_an_existing_effective_selection(command_factory, accepting_action: str) -> None:
+    with pytest.raises(ValidationError):
+        command_factory(
+            action=accepting_action,
+            expected_latest_decision_id="dec-0",
+            expected_effective_decision_id="dec-eff",
+        )
+    ok = command_factory(
+        action=accepting_action, expected_latest_decision_id="dec-0", expected_effective_decision_id=None
+    )
+    assert ok.action == accepting_action
+
+
+@pytest.mark.parametrize(
+    "command_factory", [_revision_command, _change_set_review_command, _conflict_resolution_command]
+)
+def test_supersede_requires_the_exact_current_effective_decision(command_factory) -> None:
+    with pytest.raises(ValidationError):
+        command_factory(action="SUPERSEDE", expected_latest_decision_id="dec-0", expected_effective_decision_id=None)
+    with pytest.raises(ValidationError):
+        # Genesis + SUPERSEDE can never be valid: there is no effective decision to supersede.
+        command_factory(action="SUPERSEDE", expected_latest_decision_id=None, expected_effective_decision_id=None)
+    ok = command_factory(
+        action="SUPERSEDE", expected_latest_decision_id="dec-0", expected_effective_decision_id="dec-eff"
+    )
+    assert ok.expected_effective_decision_id == "dec-eff"
+
+
+@pytest.mark.parametrize(
+    "command_factory", [_revision_command, _change_set_review_command, _conflict_resolution_command]
+)
+def test_reject_names_a_candidate_and_preserves_the_effective_pointer(command_factory) -> None:
+    # REJECT is valid whether or not an effective selection already exists, and never
+    # forces that pointer to change or clear.
+    without_effective = command_factory(
+        action="REJECT", expected_latest_decision_id="dec-0", expected_effective_decision_id=None
+    )
+    assert without_effective.expected_effective_decision_id is None
+    with_effective = command_factory(
+        action="REJECT", expected_latest_decision_id="dec-0", expected_effective_decision_id="dec-eff"
+    )
+    assert with_effective.expected_effective_decision_id == "dec-eff"
+
+
+def test_conflict_resolution_command_requires_at_least_two_competing_change_sets() -> None:
+    with pytest.raises(ValidationError):
+        _conflict_resolution_command(competing_change_set_ids=["cs-1"], competing_review_decision_ids=["dec-2"])
+
+
+def test_conflict_resolution_command_pairs_change_sets_with_review_decisions() -> None:
+    with pytest.raises(ValidationError):
+        _conflict_resolution_command(competing_change_set_ids=["cs-1", "cs-2"], competing_review_decision_ids=["dec-2"])
+
+
+def test_conflict_resolution_command_rejects_duplicate_competitors() -> None:
+    with pytest.raises(ValidationError):
+        _conflict_resolution_command(
+            competing_change_set_ids=["cs-1", "cs-1"], competing_review_decision_ids=["dec-2", "dec-2b"]
+        )
+
+
+def test_decision_receipt_has_no_currently_effective_field() -> None:
+    assert "currently_effective" not in NarrativeDecisionReceipt.model_fields
+    receipt = _receipt()
+    assert receipt.decision_id == "dec-1"
+    assert receipt.effective_generation == 1
+
+
+@pytest.mark.parametrize("head_cls", [RevisionAcceptanceHead, ChangeSetReviewHead, ConflictResolutionHead])
+def test_head_genesis_is_a_null_pointer_at_zero_generation(head_cls: type) -> None:
+    head = _head(head_cls)
+    assert head.latest_decision_id is None
+    assert head.decision_generation == 0
+    assert head.effective_decision_id is None
+    assert head.effective_generation == 0
+
+
+@pytest.mark.parametrize("head_cls", [RevisionAcceptanceHead, ChangeSetReviewHead, ConflictResolutionHead])
+def test_head_pointer_and_generation_move_together(head_cls: type) -> None:
+    with pytest.raises(ValidationError):
+        _head(head_cls, latest_decision_id=None, decision_generation=1)
+    with pytest.raises(ValidationError):
+        _head(head_cls, latest_decision_id="dec-1", decision_generation=0)
+    ok = _head(head_cls, latest_decision_id="dec-1", decision_generation=1)
+    assert ok.decision_generation == 1
+
+
+@pytest.mark.parametrize("head_cls", [RevisionAcceptanceHead, ChangeSetReviewHead, ConflictResolutionHead])
+def test_head_effective_generation_cannot_exceed_decision_generation(head_cls: type) -> None:
+    with pytest.raises(ValidationError):
+        _head(
+            head_cls,
+            latest_decision_id="dec-1",
+            decision_generation=1,
+            effective_decision_id="dec-1",
+            effective_generation=2,
+        )
+
+
+def test_conflict_resolution_lineage_reuses_the_shared_conflict_subject_shape() -> None:
+    lineage = _lineage()
+    assert isinstance(lineage.conflict_subject, ConflictSubject)
+    assert lineage.conflict_subject.coverage == (SPAN,)
+
+
+@pytest.mark.parametrize(
+    "make_instance",
+    [
+        _authorization,
+        _retry_authentication,
+        _revision_command,
+        _change_set_review_command,
+        _conflict_resolution_command,
+        _receipt,
+        lambda: _head(RevisionAcceptanceHead),
+        lambda: _head(ChangeSetReviewHead),
+        lambda: _head(ConflictResolutionHead),
+        _lineage,
+    ],
+)
+def test_decision_authority_contracts_forbid_extra_fields(make_instance) -> None:
+    instance = make_instance()
+    payload = instance.model_dump(mode="json") | {"unexpected_field": "nope"}
+    with pytest.raises(ValidationError):
+        type(instance).model_validate(payload)

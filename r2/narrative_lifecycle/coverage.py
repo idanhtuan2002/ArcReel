@@ -10,11 +10,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Literal
 
-from pydantic import ConfigDict
-
-from r2.contracts.common import R2ContractModel
 from r2.contracts.narrative_lifecycle import (
     CanonMutationEffectKey,
+    ConflictSubject,
     NarrativeChangeSet,
     NarrativeSemanticEffectKey,
     SourceSpan,
@@ -22,15 +20,6 @@ from r2.contracts.narrative_lifecycle import (
 from r2.narrative_lifecycle.errors import NarrativeConflictCoverageError
 
 EffectKeyCollisionPolicy = Literal["EXACT", "SAME_SUBJECT"]
-
-
-class ConflictSubject(R2ContractModel):
-    """The minimal canonical intersection of competing reviewed change sets: the spans
-    every competitor covers and the Canon / thread subjects every competitor touches."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    coverage: tuple[SourceSpan, ...]
-    effect_key_subjects: tuple[str, ...]
 
 
 def _effect_key_sort_key(key: NarrativeSemanticEffectKey) -> tuple[object, ...]:
