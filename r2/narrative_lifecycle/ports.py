@@ -115,6 +115,10 @@ class NarrativeAuthorityRepositoryPort(Protocol):
         self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str, user_id: str, project_name: str
     ) -> ChangeSetReviewHead | None: ...
 
+    async def lock_existing_change_set_review_head(
+        self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str, user_id: str, project_name: str
+    ) -> ChangeSetReviewHead | None: ...
+
     async def get_conflict_resolution_head(
         self,
         *,

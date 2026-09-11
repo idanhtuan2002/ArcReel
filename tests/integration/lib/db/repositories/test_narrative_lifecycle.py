@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.narrative_lifecycle_uow import narrative_lifecycle_uow_factory
-from lib.db.repositories.narrative_lifecycle import NarrativeLifecycleRepository, head_lock_sort_key
+from lib.db.repositories.narrative_lifecycle import NarrativeLifecycleRepository
 from r2.contracts.narrative_lifecycle import (
     ConflictResolutionLineage,
     ConflictSubject,
@@ -583,10 +583,3 @@ async def test_head_pointer_fk_rejects_a_decision_from_another_subject(session_f
                 new_effective_decision_id="d-b",
                 new_effective_generation=1,
             )
-
-
-def test_head_lock_sort_key_orders_by_family_then_scope_then_logical_key() -> None:
-    revision_key = head_lock_sort_key("REVISION_ACCEPTANCE", user_id="u1", project_name="p", logical_key=("a",))
-    review_key = head_lock_sort_key("CHANGE_SET_REVIEW", user_id="u1", project_name="p", logical_key=("a",))
-    conflict_key = head_lock_sort_key("CONFLICT_RESOLUTION", user_id="u1", project_name="p", logical_key=("a",))
-    assert revision_key < review_key < conflict_key

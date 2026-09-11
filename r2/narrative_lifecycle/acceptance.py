@@ -28,7 +28,7 @@ from r2.contracts.narrative_lifecycle import (
     RevisionAcceptanceCommand,
     RevisionAcceptanceHead,
 )
-from r2.narrative_lifecycle.authority_kernel import AuthorityKernel
+from r2.narrative_lifecycle.authority_kernel import AuthorityKernel, head_lock_sort_key
 from r2.narrative_lifecycle.coverage import minimal_conflict_subject
 from r2.narrative_lifecycle.errors import NarrativeConflictLineageConflict, NarrativeDecisionApplicabilityError
 from r2.narrative_lifecycle.hashing import compute_conflict_subject_fingerprint
@@ -88,7 +88,12 @@ class NarrativeAcceptanceService:
         self, repo: NarrativeLifecycleRepositoryPort, command: NarrativeDecisionCommand
     ) -> None:
         assert isinstance(command, ConflictResolutionCommand)
-        await self._verify_competitors(repo, command)
+        # Read-only here: the kernel already holds this decision's own conflict-
+        # resolution head (rank 2) by this point (step 4), so taking a fresh lock on
+        # rank-1 change-set-review heads now would lock out of the §7.3 canonical
+        # order and risk a deadlock against a genesis on the same heads. Genesis
+        # (below) runs before any head is locked, so it can safely lock in order.
+        await self._verify_competitors(repo, command, lock=False)
 
     async def _prepare_conflict_genesis(
         self, repo: NarrativeLifecycleRepositoryPort, command: NarrativeDecisionCommand
@@ -100,7 +105,7 @@ class NarrativeAcceptanceService:
             raise NarrativeDecisionApplicabilityError(
                 f"revision acceptance {command.revision_acceptance_decision_id!r} is not the current effective revision"
             )
-        change_sets = await self._verify_competitors(repo, command)
+        change_sets = await self._verify_competitors(repo, command, lock=True)
         subject = minimal_conflict_subject(change_sets)
         fingerprint = compute_conflict_subject_fingerprint(subject)
         proposed = ConflictResolutionLineage(
@@ -118,14 +123,20 @@ class NarrativeAcceptanceService:
             )
 
     async def _verify_competitors(
-        self, repo: NarrativeLifecycleRepositoryPort, command: ConflictResolutionCommand
+        self, repo: NarrativeLifecycleRepositoryPort, command: ConflictResolutionCommand, *, lock: bool
     ) -> list[NarrativeChangeSet]:
         """Resolve and verify every named competitor: its review decision must resolve,
         must select exactly the named change set, and must still be the current
         effective selection for its own lineage. Returns the exact evidence rows so a
-        genesis caller can derive the conflict subject from the same verified read."""
+        genesis caller can derive the conflict subject from the same verified read.
+
+        ``lock=True`` (genesis only) additionally holds each competing change-set-review
+        head for the rest of this transaction, in the §7.3 canonical order — sorted by
+        ``head_lock_sort_key``, never by the caller's own listing order — so two genesis
+        commands naming the same lineages in opposite order cannot deadlock.
+        """
         scope = command.work_scope
-        change_sets: list[NarrativeChangeSet] = []
+        resolved: list[tuple[str, str, str]] = []  # (change_set_id, review_decision_id, change_set_lineage_id)
         for change_set_id, review_decision_id in zip(
             command.competing_change_set_ids, command.competing_review_decision_ids, strict=True
         ):
@@ -142,9 +153,24 @@ class NarrativeAcceptanceService:
                 raise NarrativeDecisionApplicabilityError(
                     f"review decision {review_decision_id!r} does not select change set {change_set_id!r}"
                 )
-            review_head = await repo.get_change_set_review_head(
+            resolved.append((change_set_id, review_decision_id, review_command.change_set_lineage_id))
+
+        order = resolved
+        if lock:
+            order = sorted(
+                resolved,
+                key=lambda item: head_lock_sort_key(
+                    "CHANGE_SET_REVIEW",
+                    user_id=scope.user_id,
+                    project_name=scope.project_name,
+                    logical_key=(command.revision_acceptance_decision_id, item[2]),
+                ),
+            )
+        for _change_set_id, review_decision_id, lineage_id in order:
+            get_head = repo.lock_existing_change_set_review_head if lock else repo.get_change_set_review_head
+            review_head = await get_head(
                 revision_acceptance_decision_id=command.revision_acceptance_decision_id,
-                change_set_lineage_id=review_command.change_set_lineage_id,
+                change_set_lineage_id=lineage_id,
                 user_id=scope.user_id,
                 project_name=scope.project_name,
             )
@@ -152,6 +178,9 @@ class NarrativeAcceptanceService:
                 raise NarrativeDecisionApplicabilityError(
                     f"review decision {review_decision_id!r} is not the current effective selection for its lineage"
                 )
+
+        change_sets: list[NarrativeChangeSet] = []
+        for change_set_id, _review_decision_id, _ in resolved:  # preserve the caller's own order for the subject
             change_set = await repo.get_exact_change_set(
                 change_set_id=change_set_id, project_name=scope.project_name, user_id=scope.user_id
             )

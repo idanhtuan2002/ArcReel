@@ -20,7 +20,7 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeDecisionRetryAuthentication,
     NarrativeWorkScope,
 )
-from r2.narrative_lifecycle.authority_kernel import AuthorityKernel
+from r2.narrative_lifecycle.authority_kernel import AuthorityKernel, head_lock_sort_key
 from r2.narrative_lifecycle.errors import (
     NarrativeAuthorityIntegrityError,
     NarrativeDecisionAuthorizationError,
@@ -430,3 +430,10 @@ async def test_authority_port_denial_is_not_swallowed(
     command = make_revision_acceptance_command(decision_id="d-1", work_scope=SCOPE, action="ACCEPT")
     with pytest.raises(NarrativeDecisionAuthorizationError):
         await _run(kernel, command)
+
+
+def test_head_lock_sort_key_orders_by_family_then_scope_then_logical_key() -> None:
+    revision_key = head_lock_sort_key("REVISION_ACCEPTANCE", user_id="u1", project_name="p", logical_key=("a",))
+    review_key = head_lock_sort_key("CHANGE_SET_REVIEW", user_id="u1", project_name="p", logical_key=("a",))
+    conflict_key = head_lock_sort_key("CONFLICT_RESOLUTION", user_id="u1", project_name="p", logical_key=("a",))
+    assert revision_key < review_key < conflict_key

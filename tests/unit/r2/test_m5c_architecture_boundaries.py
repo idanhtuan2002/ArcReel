@@ -1,24 +1,30 @@
-"""Executable architecture fitness for the M5C-1A blast radius.
+"""Executable architecture fitness for the M5C-1A blast radius, extended in Task 21
+(M5C-2 checkpoint freeze) with the acceptance-authority surface.
 
-Structural sensors only: import graphs, AST shapes, and string-literal scans. Later M5C
-checkpoints extend this module with the evidence / acceptance / compiler boundaries.
+Structural sensors only: import graphs, AST shapes, and string-literal scans. The one
+Task 21 sensor that needs a real PostgreSQL connection (the §7.2 isolation precondition)
+lives in ``tests/integration/r2/test_m5c_architecture_boundaries_db.py`` — unit-tier
+tests may not touch a real database in this repo.
 """
 
 from __future__ import annotations
 
 import ast
+import inspect
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 from r2.contracts.narrative_plan import SceneContract, SceneTemporalWindow
+from r2.narrative_lifecycle.acceptance import NarrativeAcceptanceService
 from r2.narrative_plan.hashing import compute_scene_semantic_hash, compute_scene_semantic_hash_v2
 from tests.unit.r2.narrative_plan._helpers import V1_GOLDEN_SCENE, V1_GOLDEN_SCENE_HASH
 
 _ROOT = Path(__file__).resolve().parents[3]
 _PURE_LIFECYCLE_DIR = _ROOT / "r2" / "narrative_lifecycle"
 _R2_RUNTIME_DIR = _ROOT / "r2"
+_ACCEPTANCE_DECISION_METHODS = ("decide_revision", "review_change_set", "resolve_change_set_conflict")
 _F9_MODULES = (
     "r2/narrative/relationship_facts.py",
     "r2/narrative/validation.py",
@@ -141,3 +147,36 @@ def test_v1_scene_dump_carries_no_v2_only_fields() -> None:
 def test_recomputing_a_v1_golden_hash_with_v2_code_diverges() -> None:
     assert compute_scene_semantic_hash(V1_GOLDEN_SCENE) == V1_GOLDEN_SCENE_HASH
     assert compute_scene_semantic_hash_v2(V1_GOLDEN_SCENE) != V1_GOLDEN_SCENE_HASH
+
+
+# --- M5C-2 (Task 21) acceptance-authority fitness sensors -------------------
+
+
+def test_only_acceptance_module_may_import_acceptance_within_narrative_lifecycle() -> None:
+    owner = "r2/narrative_lifecycle/acceptance.py"
+    reexport_root = "r2/narrative_lifecycle/__init__.py"
+    for path in _py_files(_PURE_LIFECYCLE_DIR):
+        rel = path.relative_to(_ROOT).as_posix()
+        if rel in (owner, reexport_root):
+            continue
+        for name in _imports(_tree(path)):
+            assert not name.startswith("r2.narrative_lifecycle.acceptance"), (rel, name)
+
+
+def test_public_decision_methods_take_only_command_and_authenticated_principal() -> None:
+    for name in _ACCEPTANCE_DECISION_METHODS:
+        method = getattr(NarrativeAcceptanceService, name)
+        params = [p for p in inspect.signature(method).parameters if p != "self"]
+        assert params == ["command", "authenticated_principal"], (name, params)
+        assert "authorization" not in inspect.signature(method).parameters
+
+
+def test_acceptance_service_without_an_authority_port_raises_instead_of_defaulting_open() -> None:
+    with pytest.raises(ValueError, match="NarrativeShowrunnerAuthorityPort"):
+        NarrativeAcceptanceService(lambda: (_ for _ in ()).throw(AssertionError("uow must not be built")), None)
+
+
+def test_db_wiring_never_overrides_the_isolation_level_default() -> None:
+    for rel in ("lib/db/engine.py", "lib/db/narrative_lifecycle_uow.py"):
+        text_ = (_ROOT / rel).read_text(encoding="utf-8")
+        assert "isolation_level" not in text_, rel

@@ -329,6 +329,23 @@ forbidden_modules = [
     "r2.narrative_lifecycle.authority_kernel",
 ]
 
+# M5C-2（Task 21 冻结）：唯一能追加决策/推进 head 的入口是 `acceptance.py`（它是
+# `authority_kernel.py` 的唯一调用者）。包内其余纯变换/证据周边模块一律不得导入
+# `acceptance.py` —— 未来的抽取器/供应商/编排模块加入本包时同样要遵守。
+[[tool.importlinter.contracts]]
+name = "M5C-2 sole head writer: only acceptance.py may append decisions or mutate heads"
+type = "forbidden"
+source_modules = [
+    "r2.narrative_lifecycle.changeset_parser",
+    "r2.narrative_lifecycle.continuity_rules",
+    "r2.narrative_lifecycle.coverage",
+    "r2.narrative_lifecycle.integrity",
+    "r2.narrative_lifecycle.hashing",
+    "r2.narrative_lifecycle.errors",
+    "r2.narrative_lifecycle.ports",
+]
+forbidden_modules = ["r2.narrative_lifecycle.acceptance"]
+
 [tool.deptry]
 # 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2
 # exclude 是 deptry 默认值去掉 tests（测试的 import 也要参与依赖卫生判定）再补上 worktree 目录。

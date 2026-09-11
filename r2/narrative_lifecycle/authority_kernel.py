@@ -64,6 +64,31 @@ ACCEPTING_ACTION: dict[NarrativeDecisionFamily, str] = {
 
 _AnyHead = RevisionAcceptanceHead | ChangeSetReviewHead | ConflictResolutionHead
 
+# §7.3 canonical multi-head lock ordering: revision acceptance heads lock before
+# change-set review heads, which lock before conflict-resolution heads.
+_HEAD_FAMILY_RANK: dict[NarrativeDecisionFamily, int] = {
+    "REVISION_ACCEPTANCE": 0,
+    "CHANGE_SET_REVIEW": 1,
+    "CONFLICT_RESOLUTION": 2,
+}
+
+
+def head_lock_sort_key(
+    family: NarrativeDecisionFamily, *, user_id: str, project_name: str, logical_key: tuple[str, ...]
+) -> tuple[int, bytes, bytes, bytes]:
+    """The §7.3 canonical order for locking multiple heads in one command: family rank,
+    then ``user_id``/``project_name``/the serialized logical key as canonical UTF-8 bytes.
+
+    A caller that sorts every head it must lock by this key before taking any lock, and
+    every other caller does the same, cannot deadlock against a reverse-order request.
+    """
+    return (
+        _HEAD_FAMILY_RANK[family],
+        user_id.encode("utf-8"),
+        project_name.encode("utf-8"),
+        "\x1f".join(logical_key).encode("utf-8"),
+    )
+
 
 def _canonical_tuple_matches(
     command: NarrativeDecisionCommand,
