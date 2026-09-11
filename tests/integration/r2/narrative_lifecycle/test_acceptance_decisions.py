@@ -7,19 +7,11 @@ adapter (that governance boundary is manual/fixture-only per spec §6.2).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.narrative_lifecycle_uow import narrative_lifecycle_uow_factory
-from r2.contracts.narrative_lifecycle import (
-    ChangeSetReviewCommand,
-    NarrativeDecisionAuthorization,
-    NarrativeDecisionCommand,
-    NarrativeDecisionRetryAuthentication,
-    NarrativeWorkScope,
-)
+from r2.contracts.narrative_lifecycle import ChangeSetReviewCommand, NarrativeWorkScope
 from r2.narrative_lifecycle.acceptance import NarrativeAcceptanceService
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError, NarrativeDecisionPredecessorConflict
 from tests.factories import (
@@ -28,65 +20,9 @@ from tests.factories import (
     make_narrative_work_scope,
     make_revision_acceptance_command,
 )
-
-SHOWRUNNER = "showrunner-1"
-_NOW = datetime(2026, 9, 11, 12, 0, tzinfo=UTC)
+from tests.integration.r2.narrative_lifecycle._fakes import SHOWRUNNER, FakeShowrunnerAuthorityPort
 
 type Factory = async_sessionmaker[AsyncSession]
-
-
-class _FakeShowrunnerAuthorityPort:
-    """Denies every principal but ``SHOWRUNNER``. ``next_authorization`` lets a test
-    inject a response bound to a different family/action/scope, so the service (not the
-    caller) must be the one to reject the mismatch."""
-
-    def __init__(self) -> None:
-        self.next_authorization: NarrativeDecisionAuthorization | None = None
-
-    async def authorize_initial_decision(
-        self, authenticated_principal: str, canonical_command: NarrativeDecisionCommand
-    ) -> NarrativeDecisionAuthorization:
-        if authenticated_principal != SHOWRUNNER:
-            raise NarrativeDecisionAuthorizationError(f"{authenticated_principal!r} lacks Human Showrunner capability")
-        if self.next_authorization is not None:
-            override, self.next_authorization = self.next_authorization, None
-            return override
-        scope = canonical_command.work_scope
-        return make_narrative_decision_authorization(
-            decision_id=canonical_command.decision_id,
-            user_id=scope.user_id,
-            project_name=scope.project_name,
-            decision_family=canonical_command.decision_family,
-            action=canonical_command.action,
-        )
-
-    async def authenticate_exact_retry(
-        self, authenticated_principal: str, decision_id: str, exact_scope: NarrativeWorkScope
-    ) -> NarrativeDecisionRetryAuthentication:
-        if authenticated_principal != SHOWRUNNER:
-            raise NarrativeDecisionAuthorizationError(f"{authenticated_principal!r} lacks Human Showrunner capability")
-        return NarrativeDecisionRetryAuthentication(
-            retry_authentication_ref="retry-1",
-            user_id=exact_scope.user_id,
-            project_name=exact_scope.project_name,
-            actor_id=SHOWRUNNER,
-            authority_role="HUMAN_SHOWRUNNER",
-            decision_id=decision_id,
-            authenticated_at=_NOW,
-            authenticated_via="test",
-        )
-
-
-@pytest.fixture
-def fake_showrunner() -> _FakeShowrunnerAuthorityPort:
-    return _FakeShowrunnerAuthorityPort()
-
-
-@pytest.fixture
-def acceptance_service(
-    session_factory: Factory, fake_showrunner: _FakeShowrunnerAuthorityPort
-) -> NarrativeAcceptanceService:
-    return NarrativeAcceptanceService(narrative_lifecycle_uow_factory(session_factory), fake_showrunner)
 
 
 def _scope() -> NarrativeWorkScope:
@@ -113,7 +49,7 @@ async def test_only_human_showrunner_may_decide(acceptance_service: NarrativeAcc
 
 
 async def test_authorization_bound_to_another_family_is_rejected_by_the_service(
-    acceptance_service: NarrativeAcceptanceService, fake_showrunner: _FakeShowrunnerAuthorityPort
+    acceptance_service: NarrativeAcceptanceService, fake_showrunner: FakeShowrunnerAuthorityPort
 ) -> None:
     scope = _scope()
     await acceptance_service.decide_revision(

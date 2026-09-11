@@ -28,6 +28,7 @@ PROSE_CONTENT_HASH_VERSION = "r2-m5c-prose-content-v1"
 EVIDENCE_SEMANTIC_FINGERPRINT_VERSION = "r2-m5c-evidence-fingerprint-v1"
 DECISION_CANONICAL_IDENTITY_HASH_VERSION = "r2-m5c-decision-identity-v1"
 CONFLICT_SUBJECT_FINGERPRINT_VERSION = "r2-m5c-conflict-subject-fingerprint-v1"
+EXTRACTION_INPUT_FINGERPRINT_VERSION = "r2-m5c-extraction-input-fingerprint-v1"
 
 
 def normalize_prose(prose: str) -> str:
@@ -109,3 +110,25 @@ def compute_conflict_subject_fingerprint(subject: ConflictSubject) -> str:
     lineage ID a caller proposed."""
     payload = {"schema": CONFLICT_SUBJECT_FINGERPRINT_VERSION, "subject": subject.model_dump(mode="json")}
     return "csf:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()
+
+
+def compute_extraction_input_fingerprint(
+    *,
+    revision_content_hash: str,
+    extractor_kind: str,
+    extractor_version: str,
+    policy_ref: str,
+    policy_version: str,
+) -> str:
+    """Content-address the exact inputs an admitted extraction attempt commits to: the
+    revision's own content hash plus the extractor/policy identity. Proves determinism
+    of inputs only — it says nothing about the extraction's output."""
+    payload = {
+        "schema": EXTRACTION_INPUT_FINGERPRINT_VERSION,
+        "revision_content_hash": revision_content_hash,
+        "extractor_kind": extractor_kind,
+        "extractor_version": extractor_version,
+        "policy_ref": policy_ref,
+        "policy_version": policy_version,
+    }
+    return "if:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()

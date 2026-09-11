@@ -834,7 +834,14 @@ class NarrativeLifecycleRepository:
         )
         if conflict_row is None:
             raise NarrativeAuthorityIntegrityError(f"decision identity {decision_id!r} has no typed decision row")
-        competitor_rows = (
+        return (
+            _conflict_resolution_command_from_row(conflict_row, competitors=await self._competitors_of(decision_id)),
+            _authorization_from_row(conflict_row),
+            conflict_row.decision_generation,
+        )
+
+    async def _competitors_of(self, decision_id: str) -> tuple[tuple[str, str], ...]:
+        rows = (
             await self.session.execute(
                 select(
                     ConflictResolutionDecisionCompetitorModel.change_set_id,
@@ -844,13 +851,69 @@ class NarrativeLifecycleRepository:
                 .order_by(ConflictResolutionDecisionCompetitorModel.position)
             )
         ).all()
-        return (
-            _conflict_resolution_command_from_row(
-                conflict_row, competitors=tuple((row.change_set_id, row.review_decision_id) for row in competitor_rows)
-            ),
-            _authorization_from_row(conflict_row),
-            conflict_row.decision_generation,
-        )
+        return tuple((row.change_set_id, row.review_decision_id) for row in rows)
+
+    async def list_revision_decisions(
+        self, work_scope: NarrativeWorkScope
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]:
+        """Every ``REVISION_ACCEPTANCE`` decision for this exact subject, in append
+        order — the authoritative chain a head is rebuilt from (§6.5)."""
+        rows = (
+            await self.session.execute(
+                select(RevisionAcceptanceDecisionModel)
+                .where(
+                    RevisionAcceptanceDecisionModel.user_id == work_scope.user_id,
+                    RevisionAcceptanceDecisionModel.project_name == work_scope.project_name,
+                    RevisionAcceptanceDecisionModel.plan_id == work_scope.plan_id,
+                    RevisionAcceptanceDecisionModel.scene_contract_id == work_scope.scene_contract_id,
+                    RevisionAcceptanceDecisionModel.canon_branch_id == work_scope.canon_branch_id,
+                )
+                .order_by(RevisionAcceptanceDecisionModel.decision_generation)
+            )
+        ).scalars()
+        return [
+            (_revision_command_from_row(row), _authorization_from_row(row), row.decision_generation) for row in rows
+        ]
+
+    async def list_change_set_review_decisions(
+        self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]:
+        rows = (
+            await self.session.execute(
+                select(ChangeSetReviewDecisionModel)
+                .where(
+                    ChangeSetReviewDecisionModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                    ChangeSetReviewDecisionModel.change_set_lineage_id == change_set_lineage_id,
+                )
+                .order_by(ChangeSetReviewDecisionModel.decision_generation)
+            )
+        ).scalars()
+        return [
+            (_change_set_review_command_from_row(row), _authorization_from_row(row), row.decision_generation)
+            for row in rows
+        ]
+
+    async def list_conflict_resolution_decisions(
+        self, *, revision_acceptance_decision_id: str, conflict_resolution_lineage_id: str
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]:
+        rows = (
+            await self.session.execute(
+                select(ConflictResolutionDecisionModel)
+                .where(
+                    ConflictResolutionDecisionModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                    ConflictResolutionDecisionModel.conflict_resolution_lineage_id == conflict_resolution_lineage_id,
+                )
+                .order_by(ConflictResolutionDecisionModel.decision_generation)
+            )
+        ).scalars()
+        return [
+            (
+                _conflict_resolution_command_from_row(row, competitors=await self._competitors_of(row.decision_id)),
+                _authorization_from_row(row),
+                row.decision_generation,
+            )
+            for row in rows
+        ]
 
     async def insert_identity_and_decision(
         self,
@@ -929,6 +992,23 @@ class NarrativeLifecycleRepository:
                 RevisionAcceptanceHeadModel.scene_contract_id == work_scope.scene_contract_id,
                 RevisionAcceptanceHeadModel.canon_branch_id == work_scope.canon_branch_id,
             )
+        )
+        return _revision_head_from_row(row) if row is not None else None
+
+    async def lock_existing_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead | None:
+        """``SELECT ... FOR UPDATE``, no insert. For a caller that must hold the head
+        stable across its own transaction (e.g. an extraction-admission currentness
+        guard) without creating a phantom head when none exists yet."""
+        row = await self._scalar(
+            select(RevisionAcceptanceHeadModel)
+            .where(
+                RevisionAcceptanceHeadModel.user_id == work_scope.user_id,
+                RevisionAcceptanceHeadModel.project_name == work_scope.project_name,
+                RevisionAcceptanceHeadModel.plan_id == work_scope.plan_id,
+                RevisionAcceptanceHeadModel.scene_contract_id == work_scope.scene_contract_id,
+                RevisionAcceptanceHeadModel.canon_branch_id == work_scope.canon_branch_id,
+            )
+            .with_for_update()
         )
         return _revision_head_from_row(row) if row is not None else None
 

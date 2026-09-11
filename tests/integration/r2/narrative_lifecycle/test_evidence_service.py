@@ -1,7 +1,8 @@
 """Integration coverage for ``NarrativeLifecycleEvidenceService``.
 
-The extraction-admission path is exercised only for its fail-closed behaviour. Attempt
-rows are seeded directly through the repository by a test-only fixture.
+Attempt rows are seeded directly through the repository by a test-only fixture, except
+for the extraction-admission currentness tests, which seed a real accepted revision
+through ``NarrativeAcceptanceService`` — the guard under test reads that head.
 """
 
 from __future__ import annotations
@@ -13,9 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.narrative_lifecycle_uow import SqlAlchemyNarrativeLifecycleUnitOfWork, narrative_lifecycle_uow_factory
 from r2.contracts.narrative_lifecycle import ExtractionAttempt, ExtractionResult, NarrativeChangeSet, NarrativeWorkScope
+from r2.narrative_lifecycle.acceptance import NarrativeAcceptanceService
 from r2.narrative_lifecycle.errors import (
     NarrativeAttemptGenerationConflict,
-    NarrativeAuthorityUnavailableError,
+    NarrativeDecisionApplicabilityError,
     NarrativeEvidenceIdentityConflictError,
     NarrativeEvidenceIntegrityError,
 )
@@ -27,7 +29,9 @@ from tests.factories import (
     make_narrative_change_set,
     make_narrative_revision,
     make_narrative_work_scope,
+    make_revision_acceptance_command,
 )
+from tests.integration.r2.narrative_lifecycle._fakes import SHOWRUNNER
 
 USER = "u1"
 PROJECT = "project-a"
@@ -63,10 +67,19 @@ def _attempt(*, attempt_id: str = "att-1", generation: int = 0) -> ExtractionAtt
 
 
 def _result(
-    *, result_id: str = "res-1", generation: int = 0, outcome: str = "ABSTAINED", change_set_ids: tuple[str, ...] = ()
+    *,
+    result_id: str = "res-1",
+    attempt_id: str = "att-1",
+    generation: int = 0,
+    outcome: str = "ABSTAINED",
+    change_set_ids: tuple[str, ...] = (),
 ) -> ExtractionResult:
     return make_extraction_result(
-        result_id=result_id, generation=generation, outcome=outcome, change_set_ids=change_set_ids
+        result_id=result_id,
+        attempt_id=attempt_id,
+        generation=generation,
+        outcome=outcome,
+        change_set_ids=change_set_ids,
     )
 
 
@@ -109,12 +122,14 @@ def seed_attempt(session_factory: Factory) -> Callable[..., Awaitable[Extraction
     return _seed
 
 
-def _command(*, generation: int = 0) -> ExtractionAdmissionCommand:
+def _command(
+    *, generation: int = 0, revision_id: str = "rev-1", revision_acceptance_decision_id: str = "dec-1"
+) -> ExtractionAdmissionCommand:
     return ExtractionAdmissionCommand(
         work_scope=_scope(),
-        revision_id="rev-1",
+        revision_id=revision_id,
         generation=generation,
-        revision_acceptance_decision_id="dec-1",
+        revision_acceptance_decision_id=revision_acceptance_decision_id,
         extractor_kind="LOCAL",
         extractor_version="x-1",
         policy_ref="pol",
@@ -123,11 +138,80 @@ def _command(*, generation: int = 0) -> ExtractionAdmissionCommand:
     )
 
 
-async def test_admit_extraction_fails_closed_before_the_authority_layer_exists(
-    evidence_service: NarrativeLifecycleEvidenceService,
+@pytest.fixture
+def accept_revision(
+    session_factory: Factory, acceptance_service: NarrativeAcceptanceService
+) -> Callable[..., Awaitable[None]]:
+    """Seeds a candidate + revision, then a real ``ACCEPT`` decision through the
+    acceptance service — the exact precondition ``admit_extraction``'s currentness
+    guard reads."""
+
+    async def _accept(*, decision_id: str = "dec-1", revision_id: str = "rev-1") -> None:
+        async with narrative_lifecycle_uow_factory(session_factory)() as uow:
+            await uow.repository.insert_draft_candidate(_candidate(candidate_id=f"cand-{revision_id}"))
+            await uow.repository.insert_revision(_revision(revision_id=revision_id, candidate_id=f"cand-{revision_id}"))
+            await uow.commit()
+        await acceptance_service.decide_revision(
+            make_revision_acceptance_command(decision_id=decision_id, work_scope=_scope(), action="ACCEPT"),
+            authenticated_principal=SHOWRUNNER,
+        )
+
+    return _accept
+
+
+async def test_admit_extraction_is_live_after_this_task(
+    evidence_service: NarrativeLifecycleEvidenceService, accept_revision: Callable[..., Awaitable[None]]
 ) -> None:
-    with pytest.raises(NarrativeAuthorityUnavailableError):
-        await evidence_service.admit_extraction(_command(generation=0))
+    await accept_revision(decision_id="dec-1", revision_id="rev-1")
+    attempt = await evidence_service.admit_extraction(_command(generation=0))
+    assert attempt.generation == 0
+    assert attempt.attempt_id == "rev-1:0"
+    assert attempt.observed_revision_effective_generation == 1
+
+
+async def test_admit_extraction_exact_retry_returns_the_original_attempt(
+    evidence_service: NarrativeLifecycleEvidenceService, accept_revision: Callable[..., Awaitable[None]]
+) -> None:
+    await accept_revision(decision_id="dec-1", revision_id="rev-1")
+    first = await evidence_service.admit_extraction(_command(generation=0))
+    again = await evidence_service.admit_extraction(_command(generation=0))
+    assert again == first
+
+
+async def test_extraction_admission_requires_the_current_effective_revision(
+    evidence_service: NarrativeLifecycleEvidenceService,
+    acceptance_service: NarrativeAcceptanceService,
+    accept_revision: Callable[..., Awaitable[None]],
+) -> None:
+    await accept_revision(decision_id="dec-1", revision_id="rev-1")
+    await acceptance_service.decide_revision(
+        make_revision_acceptance_command(
+            decision_id="dec-2",
+            work_scope=_scope(),
+            action="SUPERSEDE",
+            selected_revision_id="rev-2",
+            expected_latest_decision_id="dec-1",
+            expected_effective_decision_id="dec-1",
+        ),
+        authenticated_principal=SHOWRUNNER,
+    )
+    with pytest.raises(NarrativeDecisionApplicabilityError):
+        await evidence_service.admit_extraction(
+            _command(generation=0, revision_id="rev-1", revision_acceptance_decision_id="dec-1")
+        )
+
+
+async def test_continuation_after_outcome_unknown_admits_a_fresh_generation(
+    evidence_service: NarrativeLifecycleEvidenceService, accept_revision: Callable[..., Awaitable[None]]
+) -> None:
+    await accept_revision(decision_id="dec-1", revision_id="rev-1")
+    await evidence_service.admit_extraction(_command(generation=0))
+    await evidence_service.record_non_successful_extraction(_result(attempt_id="rev-1:0", outcome="OUTCOME_UNKNOWN"))
+
+    continuation = await evidence_service.admit_extraction(_command(generation=1))
+    assert continuation.generation == 1
+    assert continuation.attempt_id == "rev-1:1"
+    assert continuation.revision_id == "rev-1"  # names the same revision as the ambiguous generation 0 attempt
 
 
 async def test_outcome_unknown_is_terminal_and_late_success_is_rejected(

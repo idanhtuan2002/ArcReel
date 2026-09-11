@@ -85,6 +85,18 @@ class NarrativeAuthorityRepositoryPort(Protocol):
         self, decision_id: str, *, user_id: str, project_name: str
     ) -> tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int] | None: ...
 
+    async def list_revision_decisions(
+        self, work_scope: NarrativeWorkScope
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]: ...
+
+    async def list_change_set_review_decisions(
+        self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]: ...
+
+    async def list_conflict_resolution_decisions(
+        self, *, revision_acceptance_decision_id: str, conflict_resolution_lineage_id: str
+    ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]: ...
+
     async def insert_identity_and_decision(
         self,
         command: NarrativeDecisionCommand,
@@ -96,6 +108,8 @@ class NarrativeAuthorityRepositoryPort(Protocol):
     ) -> None: ...
 
     async def get_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead | None: ...
+
+    async def lock_existing_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead | None: ...
 
     async def get_change_set_review_head(
         self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str, user_id: str, project_name: str

@@ -27,7 +27,7 @@ from tests.factories import (
     make_narrative_work_scope,
     make_revision_acceptance_command,
 )
-from tests.integration.r2.narrative_lifecycle.test_acceptance_decisions import SHOWRUNNER, _FakeShowrunnerAuthorityPort
+from tests.integration.r2.narrative_lifecycle._fakes import SHOWRUNNER
 from tests.integration.r2.narrative_lifecycle.test_evidence_service import _attempt, _candidate, _result, _revision
 
 type Factory = async_sessionmaker[AsyncSession]
@@ -35,18 +35,6 @@ type Factory = async_sessionmaker[AsyncSession]
 
 def _scope() -> NarrativeWorkScope:
     return make_narrative_work_scope()
-
-
-@pytest.fixture
-def fake_showrunner() -> _FakeShowrunnerAuthorityPort:
-    return _FakeShowrunnerAuthorityPort()
-
-
-@pytest.fixture
-def acceptance_service(
-    session_factory: Factory, fake_showrunner: _FakeShowrunnerAuthorityPort
-) -> NarrativeAcceptanceService:
-    return NarrativeAcceptanceService(narrative_lifecycle_uow_factory(session_factory), fake_showrunner)
 
 
 async def _seed_two_competing_reviews(

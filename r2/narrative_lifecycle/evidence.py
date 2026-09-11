@@ -3,15 +3,15 @@ non-authority lifecycle evidence.
 
 Every write is immutable and idempotent: an exact retry compares the full stored tuple
 and performs no write; any partial or mismatched retry fails with no write. The service
-holds no head-mutation port. ``admit_extraction`` needs a transaction-bound
-current-decision guard that the acceptance-authority layer would provide; that layer
-does not exist, so ``admit_extraction`` **fails closed** — it never runs an
-"exists-only" or otherwise relaxed check.
+holds no head-*mutation* port — but ``admit_extraction`` (Task 20) does read-lock the
+revision head to prove currentness atomically with admitting the attempt, via the same
+transaction-bound repository every other method here already uses.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Annotated
 
 from pydantic import ConfigDict, Field
@@ -27,18 +27,22 @@ from r2.contracts.narrative_lifecycle import (
 )
 from r2.narrative_lifecycle.errors import (
     NarrativeAttemptGenerationConflict,
-    NarrativeAuthorityUnavailableError,
+    NarrativeDecisionApplicabilityError,
     NarrativeEvidenceIdentityConflictError,
     NarrativeEvidenceIntegrityError,
 )
+from r2.narrative_lifecycle.hashing import compute_extraction_input_fingerprint
 from r2.narrative_lifecycle.ports import NarrativeLifecycleEvidenceRepositoryPort, NarrativeLifecycleUnitOfWorkFactory
 
 _SHARED_BASIS_FIELDS = ("base_canon_version_id", "plan_version", "scene_contract_version", "context_pack_id")
 
 
 class ExtractionAdmissionCommand(R2ContractModel):
-    """The request to admit an extraction attempt. The currentness guard that consumes it
-    is not implemented; this is the stable request shape for that call."""
+    """The request to admit an extraction attempt against its exact currently
+    effective revision selection. ``attempt_id`` is deterministically
+    ``f"{revision_id}:{generation}"`` — a revision's extraction attempts are its own
+    generation-numbered sequence, so a continuation after an ``OUTCOME_UNKNOWN`` result
+    is simply a fresh command naming the next generation for the same revision."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     work_scope: NarrativeWorkScope
@@ -189,10 +193,66 @@ class NarrativeLifecycleEvidenceService:
             return result
 
     async def admit_extraction(self, command: ExtractionAdmissionCommand) -> ExtractionAttempt:
-        _ = command
-        raise NarrativeAuthorityUnavailableError(
-            "extraction admission needs a transaction-bound current-decision guard that is not available"
-        )
+        """§7.2/§8: the attempt's admission instant is atomic with its currentness
+        proof. ``revision_acceptance_decision_id`` must be the exact current effective
+        revision selection at lock time — a later supersession blocks new admissions
+        for that revision but never deletes an attempt/result already recorded."""
+        scope = command.work_scope
+        async with self._uow_factory() as uow:
+            repo = uow.repository
+            revision = await repo.get_exact_revision(
+                revision_id=command.revision_id, project_name=scope.project_name, user_id=scope.user_id
+            )
+            if revision is None:
+                raise NarrativeEvidenceIntegrityError(f"revision {command.revision_id!r} does not resolve")
+            if revision.work_scope != scope:
+                raise NarrativeEvidenceIntegrityError("revision belongs to a different work scope")
+
+            head = await repo.lock_existing_revision_head(scope)
+            if head is None or head.effective_decision_id != command.revision_acceptance_decision_id:
+                raise NarrativeDecisionApplicabilityError(
+                    f"revision acceptance {command.revision_acceptance_decision_id!r} "
+                    "is not the current effective revision"
+                )
+
+            attempt_id = f"{command.revision_id}:{command.generation}"
+            existing = await repo.get_exact_extraction_attempt(
+                attempt_id=attempt_id, project_name=scope.project_name, user_id=scope.user_id
+            )
+            candidate = ExtractionAttempt(
+                attempt_id=attempt_id,
+                generation=command.generation,
+                work_scope=scope,
+                revision_id=command.revision_id,
+                revision_acceptance_decision_id=command.revision_acceptance_decision_id,
+                observed_revision_effective_generation=head.effective_generation,
+                base_canon_version_id=revision.base_canon_version_id,
+                plan_version=revision.plan_version,
+                scene_contract_version=revision.scene_contract_version,
+                context_pack_id=revision.context_pack_id,
+                extractor_kind=command.extractor_kind,
+                extractor_version=command.extractor_version,
+                policy_ref=command.policy_ref,
+                policy_version=command.policy_version,
+                admitted_at=existing.admitted_at if existing is not None else datetime.now(UTC),
+                admitted_by=command.authenticated_principal,
+                input_fingerprint=compute_extraction_input_fingerprint(
+                    revision_content_hash=revision.content_hash,
+                    extractor_kind=command.extractor_kind,
+                    extractor_version=command.extractor_version,
+                    policy_ref=command.policy_ref,
+                    policy_version=command.policy_version,
+                ),
+            )
+            if existing is not None:
+                if existing == candidate:
+                    return existing
+                raise NarrativeEvidenceIdentityConflictError(
+                    f"extraction attempt {attempt_id!r} was already admitted with a different tuple"
+                )
+            await repo.insert_extraction_attempt(candidate)
+            await uow.commit()
+            return candidate
 
     async def get_exact_draft_candidate(
         self, *, candidate_id: str, project_name: str, user_id: str

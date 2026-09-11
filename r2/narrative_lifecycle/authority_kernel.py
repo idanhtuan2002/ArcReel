@@ -56,7 +56,7 @@ GenesisPreparation = Callable[[NarrativeLifecycleRepositoryPort, NarrativeDecisi
 
 # §6.4: the family's "select a new effective candidate" action. REJECT is never in this
 # map — it never changes the effective pointer, regardless of family.
-_ACCEPTING_ACTION: dict[NarrativeDecisionFamily, str] = {
+ACCEPTING_ACTION: dict[NarrativeDecisionFamily, str] = {
     "REVISION_ACCEPTANCE": "ACCEPT",
     "CHANGE_SET_REVIEW": "ACCEPT",
     "CONFLICT_RESOLUTION": "RESOLVE",
@@ -205,7 +205,7 @@ class AuthorityKernel:
 
             # Step 9: advance the head. effective_generation bumps only in this same
             # update, and only when the effective selection actually changes.
-            if command.action == _ACCEPTING_ACTION[command.decision_family] or command.action == "SUPERSEDE":
+            if command.action == ACCEPTING_ACTION[command.decision_family] or command.action == "SUPERSEDE":
                 new_effective_decision_id: str | None = command.decision_id
                 new_effective_generation = new_generation
             else:
@@ -270,7 +270,7 @@ class AuthorityKernel:
         stored: an accepting/superseding decision always becomes its own effective
         selection; a rejection leaves whatever it named as ``expected_effective``
         unchanged, and that referenced decision's own generation is one more lookup."""
-        if command.action == _ACCEPTING_ACTION[command.decision_family] or command.action == "SUPERSEDE":
+        if command.action == ACCEPTING_ACTION[command.decision_family] or command.action == "SUPERSEDE":
             return command.decision_id, decision_generation
         if command.expected_effective_decision_id is None:
             return None, 0
