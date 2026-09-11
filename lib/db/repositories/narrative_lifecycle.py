@@ -13,30 +13,82 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import Select, select
+from sqlalchemy import Select, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.narrative_lifecycle import (
+    ChangeSetReviewDecisionModel,
+    ChangeSetReviewHeadModel,
+    ConflictResolutionDecisionCompetitorModel,
+    ConflictResolutionDecisionModel,
+    ConflictResolutionHeadModel,
+    ConflictResolutionLineageModel,
     NarrativeChangeSetModel,
+    NarrativeDecisionIdentityModel,
     NarrativeDraftCandidateModel,
     NarrativeExtractionAttemptModel,
     NarrativeExtractionResultChangeSetModel,
     NarrativeExtractionResultModel,
     NarrativeRevisionModel,
+    RevisionAcceptanceDecisionModel,
+    RevisionAcceptanceHeadModel,
 )
+from lib.db.repositories.base import rowcount
 from r2.contracts.narrative_lifecycle import (
+    ChangeSetReviewCommand,
+    ChangeSetReviewHead,
+    ConflictResolutionCommand,
+    ConflictResolutionHead,
+    ConflictResolutionLineage,
+    ConflictSubject,
     DraftCandidate,
     ExtractionAttempt,
     ExtractionResult,
     NarrativeChangeSet,
+    NarrativeDecisionAuthorization,
+    NarrativeDecisionCommand,
+    NarrativeDecisionFamily,
     NarrativeRevision,
+    NarrativeWorkScope,
+    RevisionAcceptanceCommand,
+    RevisionAcceptanceHead,
 )
 from r2.narrative_lifecycle.errors import (
     NarrativeAttemptGenerationConflict,
+    NarrativeAuthorityIntegrityError,
+    NarrativeDecisionIdentityConflictError,
+    NarrativeDecisionPredecessorConflict,
     NarrativeEvidenceIdentityConflictError,
     NarrativeEvidenceIntegrityError,
 )
+
+# §7.3 canonical multi-head lock ordering: revision acceptance heads lock before
+# change-set review heads, which lock before conflict-resolution heads.
+_HEAD_FAMILY_RANK: dict[NarrativeDecisionFamily, int] = {
+    "REVISION_ACCEPTANCE": 0,
+    "CHANGE_SET_REVIEW": 1,
+    "CONFLICT_RESOLUTION": 2,
+}
+
+
+def head_lock_sort_key(
+    family: NarrativeDecisionFamily, *, user_id: str, project_name: str, logical_key: tuple[str, ...]
+) -> tuple[int, bytes, bytes, bytes]:
+    """The §7.3 canonical order for locking multiple heads in one command: family rank,
+    then ``user_id``/``project_name``/the serialized logical key as canonical UTF-8 bytes.
+
+    A caller that sorts every head it must lock by this key before taking any lock, and
+    every other caller does the same, cannot deadlock against a reverse-order request.
+    """
+    return (
+        _HEAD_FAMILY_RANK[family],
+        user_id.encode("utf-8"),
+        project_name.encode("utf-8"),
+        "\x1f".join(logical_key).encode("utf-8"),
+    )
 
 
 def _mentions(exc: IntegrityError, needle: str) -> bool:
@@ -304,6 +356,247 @@ def _change_set_row(change_set: NarrativeChangeSet, *, user_id: str, project_nam
     )
 
 
+# --- M5C-2 decision authority: identity registry, typed decisions, lineage, heads ---
+
+
+def _authorization_from_row(row: Any) -> NarrativeDecisionAuthorization:
+    try:
+        return NarrativeDecisionAuthorization(
+            authorization_ref=row.authorization_ref,
+            user_id=row.user_id,
+            project_name=row.project_name,
+            actor_id=row.authorization_actor_id,
+            authority_role=row.authorization_authority_role,
+            decision_family=row.decision_family,
+            action=row.action,
+            decision_id=row.decision_id,
+            stable_subject_fingerprint=row.authorization_stable_subject_fingerprint,
+            decision_command_fingerprint=row.authorization_decision_command_fingerprint,
+            authenticated_at=_stored_aware(row.authorization_authenticated_at),
+            authenticated_via=row.authorization_authenticated_via,
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(f"corrupt decision authorization on {row.decision_id!r}: {exc}") from exc
+
+
+def _decision_work_scope(row: Any) -> dict[str, str]:
+    return {
+        "user_id": row.user_id,
+        "project_name": row.project_name,
+        "plan_id": row.plan_id,
+        "scene_contract_id": row.scene_contract_id,
+        "canon_branch_id": row.canon_branch_id,
+    }
+
+
+def _revision_command_from_row(row: RevisionAcceptanceDecisionModel) -> RevisionAcceptanceCommand:
+    try:
+        return RevisionAcceptanceCommand.model_validate(
+            {
+                "decision_id": row.decision_id,
+                "action": row.action,
+                "work_scope": _decision_work_scope(row),
+                "selected_revision_id": row.selected_revision_id,
+                "expected_latest_decision_id": row.expected_latest_decision_id,
+                "expected_effective_decision_id": row.expected_effective_decision_id,
+                "base_canon_version_id": row.base_canon_version_id,
+                "plan_version": row.plan_version,
+                "scene_contract_version": row.scene_contract_version,
+                "context_pack_id": row.context_pack_id,
+                "actor_id": row.actor_id,
+            }
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(
+            f"corrupt revision acceptance decision row {row.decision_id!r}: {exc}"
+        ) from exc
+
+
+def _change_set_review_command_from_row(row: ChangeSetReviewDecisionModel) -> ChangeSetReviewCommand:
+    try:
+        return ChangeSetReviewCommand.model_validate(
+            {
+                "decision_id": row.decision_id,
+                "action": row.action,
+                "work_scope": _decision_work_scope(row),
+                "revision_acceptance_decision_id": row.revision_acceptance_decision_id,
+                "change_set_lineage_id": row.change_set_lineage_id,
+                "selected_change_set_id": row.selected_change_set_id,
+                "expected_latest_decision_id": row.expected_latest_decision_id,
+                "expected_effective_decision_id": row.expected_effective_decision_id,
+                "base_canon_version_id": row.base_canon_version_id,
+                "plan_version": row.plan_version,
+                "scene_contract_version": row.scene_contract_version,
+                "context_pack_id": row.context_pack_id,
+                "actor_id": row.actor_id,
+            }
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(
+            f"corrupt change-set review decision row {row.decision_id!r}: {exc}"
+        ) from exc
+
+
+def _conflict_resolution_command_from_row(
+    row: ConflictResolutionDecisionModel, *, competitors: tuple[tuple[str, str], ...]
+) -> ConflictResolutionCommand:
+    try:
+        return ConflictResolutionCommand.model_validate(
+            {
+                "decision_id": row.decision_id,
+                "action": row.action,
+                "work_scope": _decision_work_scope(row),
+                "revision_acceptance_decision_id": row.revision_acceptance_decision_id,
+                "conflict_resolution_lineage_id": row.conflict_resolution_lineage_id,
+                "competing_change_set_ids": tuple(change_set_id for change_set_id, _ in competitors),
+                "competing_review_decision_ids": tuple(review_decision_id for _, review_decision_id in competitors),
+                "chosen_resolution": row.chosen_resolution,
+                "expected_latest_decision_id": row.expected_latest_decision_id,
+                "expected_effective_decision_id": row.expected_effective_decision_id,
+                "base_canon_version_id": row.base_canon_version_id,
+                "plan_version": row.plan_version,
+                "scene_contract_version": row.scene_contract_version,
+                "context_pack_id": row.context_pack_id,
+                "actor_id": row.actor_id,
+            }
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(
+            f"corrupt conflict resolution decision row {row.decision_id!r}: {exc}"
+        ) from exc
+
+
+def _decision_row_from_command(
+    command: NarrativeDecisionCommand,
+    authorization: NarrativeDecisionAuthorization,
+    *,
+    decision_generation: int,
+    stored_at: datetime,
+) -> RevisionAcceptanceDecisionModel | ChangeSetReviewDecisionModel | ConflictResolutionDecisionModel:
+    common: dict[str, Any] = {
+        "decision_id": command.decision_id,
+        "user_id": authorization.user_id,
+        "project_name": authorization.project_name,
+        "decision_family": command.decision_family,
+        "action": command.action,
+        "expected_latest_decision_id": command.expected_latest_decision_id,
+        "expected_effective_decision_id": command.expected_effective_decision_id,
+        "base_canon_version_id": command.base_canon_version_id,
+        "plan_version": command.plan_version,
+        "scene_contract_version": command.scene_contract_version,
+        "context_pack_id": command.context_pack_id,
+        "actor_id": command.actor_id,
+        "decision_generation": decision_generation,
+        "authorization_ref": authorization.authorization_ref,
+        "authorization_actor_id": authorization.actor_id,
+        "authorization_authority_role": authorization.authority_role,
+        "authorization_stable_subject_fingerprint": authorization.stable_subject_fingerprint,
+        "authorization_decision_command_fingerprint": authorization.decision_command_fingerprint,
+        "authorization_authenticated_at": authorization.authenticated_at,
+        "authorization_authenticated_via": authorization.authenticated_via,
+        "stored_at": stored_at,
+    }
+    if isinstance(command, RevisionAcceptanceCommand):
+        scope = command.work_scope
+        return RevisionAcceptanceDecisionModel(
+            **common,
+            plan_id=scope.plan_id,
+            scene_contract_id=scope.scene_contract_id,
+            canon_branch_id=scope.canon_branch_id,
+            selected_revision_id=command.selected_revision_id,
+        )
+    if isinstance(command, ChangeSetReviewCommand):
+        scope = command.work_scope
+        return ChangeSetReviewDecisionModel(
+            **common,
+            plan_id=scope.plan_id,
+            scene_contract_id=scope.scene_contract_id,
+            canon_branch_id=scope.canon_branch_id,
+            revision_acceptance_decision_id=command.revision_acceptance_decision_id,
+            change_set_lineage_id=command.change_set_lineage_id,
+            selected_change_set_id=command.selected_change_set_id,
+        )
+    scope = command.work_scope
+    return ConflictResolutionDecisionModel(
+        **common,
+        plan_id=scope.plan_id,
+        scene_contract_id=scope.scene_contract_id,
+        canon_branch_id=scope.canon_branch_id,
+        revision_acceptance_decision_id=command.revision_acceptance_decision_id,
+        conflict_resolution_lineage_id=command.conflict_resolution_lineage_id,
+        chosen_resolution=command.chosen_resolution,
+    )
+
+
+def _lineage_row(
+    lineage: ConflictResolutionLineage, *, user_id: str, project_name: str
+) -> ConflictResolutionLineageModel:
+    return ConflictResolutionLineageModel(
+        revision_acceptance_decision_id=lineage.revision_acceptance_decision_id,
+        conflict_resolution_lineage_id=lineage.conflict_resolution_lineage_id,
+        user_id=user_id,
+        project_name=project_name,
+        conflict_subject_json=lineage.conflict_subject.model_dump(mode="json"),
+        conflict_subject_fingerprint=lineage.conflict_subject_fingerprint,
+        created_at=lineage.created_at,
+        created_by=lineage.created_by,
+    )
+
+
+def _lineage_from_row(row: ConflictResolutionLineageModel) -> ConflictResolutionLineage:
+    try:
+        return ConflictResolutionLineage(
+            conflict_resolution_lineage_id=row.conflict_resolution_lineage_id,
+            revision_acceptance_decision_id=row.revision_acceptance_decision_id,
+            conflict_subject=ConflictSubject.model_validate(row.conflict_subject_json),
+            conflict_subject_fingerprint=row.conflict_subject_fingerprint,
+            created_at=_stored_aware(row.created_at),
+            created_by=row.created_by,
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(
+            f"corrupt conflict resolution lineage row {row.conflict_resolution_lineage_id!r}: {exc}"
+        ) from exc
+
+
+def _revision_head_from_row(row: RevisionAcceptanceHeadModel) -> RevisionAcceptanceHead:
+    return RevisionAcceptanceHead(
+        work_scope=NarrativeWorkScope(
+            user_id=row.user_id,
+            project_name=row.project_name,
+            plan_id=row.plan_id,
+            scene_contract_id=row.scene_contract_id,
+            canon_branch_id=row.canon_branch_id,
+        ),
+        latest_decision_id=row.latest_decision_id,
+        decision_generation=row.decision_generation,
+        effective_decision_id=row.effective_decision_id,
+        effective_generation=row.effective_generation,
+    )
+
+
+def _change_set_review_head_from_row(row: ChangeSetReviewHeadModel) -> ChangeSetReviewHead:
+    return ChangeSetReviewHead(
+        revision_acceptance_decision_id=row.revision_acceptance_decision_id,
+        change_set_lineage_id=row.change_set_lineage_id,
+        latest_decision_id=row.latest_decision_id,
+        decision_generation=row.decision_generation,
+        effective_decision_id=row.effective_decision_id,
+        effective_generation=row.effective_generation,
+    )
+
+
+def _conflict_resolution_head_from_row(row: ConflictResolutionHeadModel) -> ConflictResolutionHead:
+    return ConflictResolutionHead(
+        revision_acceptance_decision_id=row.revision_acceptance_decision_id,
+        conflict_resolution_lineage_id=row.conflict_resolution_lineage_id,
+        latest_decision_id=row.latest_decision_id,
+        decision_generation=row.decision_generation,
+        effective_decision_id=row.effective_decision_id,
+        effective_generation=row.effective_generation,
+    )
+
+
 class NarrativeLifecycleRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -489,3 +782,382 @@ class NarrativeLifecycleRepository:
 
     async def flush(self) -> None:
         await self.session.flush()
+
+    # --- M5C-2 decision authority ---
+
+    def _insert(self, table_class: type) -> Any:
+        """Dialect-aware ``INSERT ... ON CONFLICT DO NOTHING`` builder."""
+        return (
+            pg_insert(table_class)
+            if self.session.get_bind().dialect.name == "postgresql"
+            else sqlite_insert(table_class)
+        )
+
+    async def get_decision_by_id(
+        self, decision_id: str, *, user_id: str, project_name: str
+    ) -> tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int] | None:
+        """A plain scoped read: no lock, no insert (the kernel calls this before any head
+        write, per spec §7.2 step 2/step 5). Returns ``None`` for an absent id or one that
+        resolves outside ``(user_id, project_name)`` — the two cases are indistinguishable
+        to the caller, matching every other exact-scope lookup in this repository."""
+        identity = await self._scalar(
+            select(NarrativeDecisionIdentityModel).where(NarrativeDecisionIdentityModel.decision_id == decision_id)
+        )
+        if identity is None or identity.user_id != user_id or identity.project_name != project_name:
+            return None
+        if identity.decision_family == "REVISION_ACCEPTANCE":
+            revision_row = await self._scalar(
+                select(RevisionAcceptanceDecisionModel).where(
+                    RevisionAcceptanceDecisionModel.decision_id == decision_id
+                )
+            )
+            if revision_row is None:
+                raise NarrativeAuthorityIntegrityError(f"decision identity {decision_id!r} has no typed decision row")
+            return (
+                _revision_command_from_row(revision_row),
+                _authorization_from_row(revision_row),
+                revision_row.decision_generation,
+            )
+        if identity.decision_family == "CHANGE_SET_REVIEW":
+            review_row = await self._scalar(
+                select(ChangeSetReviewDecisionModel).where(ChangeSetReviewDecisionModel.decision_id == decision_id)
+            )
+            if review_row is None:
+                raise NarrativeAuthorityIntegrityError(f"decision identity {decision_id!r} has no typed decision row")
+            return (
+                _change_set_review_command_from_row(review_row),
+                _authorization_from_row(review_row),
+                review_row.decision_generation,
+            )
+        conflict_row = await self._scalar(
+            select(ConflictResolutionDecisionModel).where(ConflictResolutionDecisionModel.decision_id == decision_id)
+        )
+        if conflict_row is None:
+            raise NarrativeAuthorityIntegrityError(f"decision identity {decision_id!r} has no typed decision row")
+        competitor_rows = (
+            await self.session.execute(
+                select(
+                    ConflictResolutionDecisionCompetitorModel.change_set_id,
+                    ConflictResolutionDecisionCompetitorModel.review_decision_id,
+                )
+                .where(ConflictResolutionDecisionCompetitorModel.decision_id == decision_id)
+                .order_by(ConflictResolutionDecisionCompetitorModel.position)
+            )
+        ).all()
+        return (
+            _conflict_resolution_command_from_row(
+                conflict_row, competitors=tuple((row.change_set_id, row.review_decision_id) for row in competitor_rows)
+            ),
+            _authorization_from_row(conflict_row),
+            conflict_row.decision_generation,
+        )
+
+    async def insert_identity_and_decision(
+        self,
+        command: NarrativeDecisionCommand,
+        authorization: NarrativeDecisionAuthorization,
+        *,
+        canonical_identity_hash: str,
+        decision_generation: int,
+        stored_at: datetime,
+    ) -> None:
+        """Insert the identity-registry row and the one typed decision row (plus, for a
+        conflict resolution, its ordered competitor rows) in one transaction. Global
+        decision-id reuse — in this family or another — fails closed with no writes.
+
+        The identity row is flushed before the decision row: the decision's composite FK
+        into the registry needs it on the wire first, and the two mapped classes share no
+        ORM ``relationship()`` for SQLAlchemy to infer that ordering on its own.
+        """
+        self.session.add(
+            NarrativeDecisionIdentityModel(
+                decision_id=command.decision_id,
+                user_id=authorization.user_id,
+                project_name=authorization.project_name,
+                decision_family=command.decision_family,
+                canonical_identity_hash=canonical_identity_hash,
+                stored_at=stored_at,
+            )
+        )
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise NarrativeDecisionIdentityConflictError(
+                f"decision {command.decision_id!r} conflicts with an existing decision"
+            ) from exc
+        self.session.add(
+            _decision_row_from_command(
+                command, authorization, decision_generation=decision_generation, stored_at=stored_at
+            )
+        )
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise NarrativeDecisionIdentityConflictError(
+                f"decision {command.decision_id!r} conflicts with an existing decision"
+            ) from exc
+        if isinstance(command, ConflictResolutionCommand):
+            for position, (change_set_id, review_decision_id) in enumerate(
+                zip(command.competing_change_set_ids, command.competing_review_decision_ids, strict=True)
+            ):
+                self.session.add(
+                    ConflictResolutionDecisionCompetitorModel(
+                        decision_id=command.decision_id,
+                        position=position,
+                        user_id=authorization.user_id,
+                        project_name=authorization.project_name,
+                        change_set_id=change_set_id,
+                        review_decision_id=review_decision_id,
+                    )
+                )
+            try:
+                await self.session.flush()
+            except IntegrityError as exc:
+                raise NarrativeDecisionIdentityConflictError(
+                    f"decision {command.decision_id!r} names an invalid competing change set or review"
+                ) from exc
+
+    async def lock_or_insert_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead:
+        """§7.2 step 3-5: ``INSERT ... ON CONFLICT DO NOTHING`` the head by its complete
+        stable key (null pointers, zero generations), then lock and return it. Called only
+        after retry resolution, for a genuinely new decision id."""
+        stmt = self._insert(RevisionAcceptanceHeadModel).values(
+            user_id=work_scope.user_id,
+            project_name=work_scope.project_name,
+            plan_id=work_scope.plan_id,
+            scene_contract_id=work_scope.scene_contract_id,
+            canon_branch_id=work_scope.canon_branch_id,
+            latest_decision_id=None,
+            decision_generation=0,
+            effective_decision_id=None,
+            effective_generation=0,
+        )
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=["user_id", "project_name", "plan_id", "scene_contract_id", "canon_branch_id"]
+        )
+        await self.session.execute(stmt)
+        row = await self._scalar(
+            select(RevisionAcceptanceHeadModel)
+            .where(
+                RevisionAcceptanceHeadModel.user_id == work_scope.user_id,
+                RevisionAcceptanceHeadModel.project_name == work_scope.project_name,
+                RevisionAcceptanceHeadModel.plan_id == work_scope.plan_id,
+                RevisionAcceptanceHeadModel.scene_contract_id == work_scope.scene_contract_id,
+                RevisionAcceptanceHeadModel.canon_branch_id == work_scope.canon_branch_id,
+            )
+            .with_for_update()
+        )
+        if row is None:
+            raise NarrativeAuthorityIntegrityError("revision acceptance head vanished immediately after insert")
+        return _revision_head_from_row(row)
+
+    async def lock_or_insert_change_set_review_head(
+        self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str, user_id: str, project_name: str
+    ) -> ChangeSetReviewHead:
+        stmt = self._insert(ChangeSetReviewHeadModel).values(
+            revision_acceptance_decision_id=revision_acceptance_decision_id,
+            change_set_lineage_id=change_set_lineage_id,
+            user_id=user_id,
+            project_name=project_name,
+            latest_decision_id=None,
+            decision_generation=0,
+            effective_decision_id=None,
+            effective_generation=0,
+        )
+        stmt = stmt.on_conflict_do_nothing(index_elements=["revision_acceptance_decision_id", "change_set_lineage_id"])
+        await self.session.execute(stmt)
+        row = await self._scalar(
+            select(ChangeSetReviewHeadModel)
+            .where(
+                ChangeSetReviewHeadModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                ChangeSetReviewHeadModel.change_set_lineage_id == change_set_lineage_id,
+            )
+            .with_for_update()
+        )
+        if row is None:
+            raise NarrativeAuthorityIntegrityError("change-set review head vanished immediately after insert")
+        return _change_set_review_head_from_row(row)
+
+    async def lock_or_insert_conflict_resolution_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        conflict_resolution_lineage_id: str,
+        user_id: str,
+        project_name: str,
+    ) -> ConflictResolutionHead:
+        stmt = self._insert(ConflictResolutionHeadModel).values(
+            revision_acceptance_decision_id=revision_acceptance_decision_id,
+            conflict_resolution_lineage_id=conflict_resolution_lineage_id,
+            user_id=user_id,
+            project_name=project_name,
+            latest_decision_id=None,
+            decision_generation=0,
+            effective_decision_id=None,
+            effective_generation=0,
+        )
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=["revision_acceptance_decision_id", "conflict_resolution_lineage_id"]
+        )
+        await self.session.execute(stmt)
+        row = await self._scalar(
+            select(ConflictResolutionHeadModel)
+            .where(
+                ConflictResolutionHeadModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                ConflictResolutionHeadModel.conflict_resolution_lineage_id == conflict_resolution_lineage_id,
+            )
+            .with_for_update()
+        )
+        if row is None:
+            raise NarrativeAuthorityIntegrityError("conflict resolution head vanished immediately after insert")
+        return _conflict_resolution_head_from_row(row)
+
+    async def advance_revision_head(
+        self,
+        work_scope: NarrativeWorkScope,
+        *,
+        expected_latest_decision_id: str | None,
+        expected_effective_decision_id: str | None,
+        new_latest_decision_id: str,
+        new_decision_generation: int,
+        new_effective_decision_id: str | None,
+        new_effective_generation: int,
+    ) -> None:
+        """Update the head with its expected pointers in the predicate; affects exactly
+        one row or raises. ``effective_generation`` only advances in the same update that
+        changes ``effective_decision_id`` (the caller passes both together)."""
+        latest_predicate = (
+            RevisionAcceptanceHeadModel.latest_decision_id.is_(None)
+            if expected_latest_decision_id is None
+            else RevisionAcceptanceHeadModel.latest_decision_id == expected_latest_decision_id
+        )
+        effective_predicate = (
+            RevisionAcceptanceHeadModel.effective_decision_id.is_(None)
+            if expected_effective_decision_id is None
+            else RevisionAcceptanceHeadModel.effective_decision_id == expected_effective_decision_id
+        )
+        result = await self.session.execute(
+            update(RevisionAcceptanceHeadModel)
+            .where(
+                RevisionAcceptanceHeadModel.user_id == work_scope.user_id,
+                RevisionAcceptanceHeadModel.project_name == work_scope.project_name,
+                RevisionAcceptanceHeadModel.plan_id == work_scope.plan_id,
+                RevisionAcceptanceHeadModel.scene_contract_id == work_scope.scene_contract_id,
+                RevisionAcceptanceHeadModel.canon_branch_id == work_scope.canon_branch_id,
+                latest_predicate,
+                effective_predicate,
+            )
+            .values(
+                latest_decision_id=new_latest_decision_id,
+                decision_generation=new_decision_generation,
+                effective_decision_id=new_effective_decision_id,
+                effective_generation=new_effective_generation,
+            )
+        )
+        if rowcount(result) != 1:
+            raise NarrativeDecisionPredecessorConflict("expected revision acceptance head predecessor is stale")
+
+    async def advance_change_set_review_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        change_set_lineage_id: str,
+        expected_latest_decision_id: str | None,
+        expected_effective_decision_id: str | None,
+        new_latest_decision_id: str,
+        new_decision_generation: int,
+        new_effective_decision_id: str | None,
+        new_effective_generation: int,
+    ) -> None:
+        latest_predicate = (
+            ChangeSetReviewHeadModel.latest_decision_id.is_(None)
+            if expected_latest_decision_id is None
+            else ChangeSetReviewHeadModel.latest_decision_id == expected_latest_decision_id
+        )
+        effective_predicate = (
+            ChangeSetReviewHeadModel.effective_decision_id.is_(None)
+            if expected_effective_decision_id is None
+            else ChangeSetReviewHeadModel.effective_decision_id == expected_effective_decision_id
+        )
+        result = await self.session.execute(
+            update(ChangeSetReviewHeadModel)
+            .where(
+                ChangeSetReviewHeadModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                ChangeSetReviewHeadModel.change_set_lineage_id == change_set_lineage_id,
+                latest_predicate,
+                effective_predicate,
+            )
+            .values(
+                latest_decision_id=new_latest_decision_id,
+                decision_generation=new_decision_generation,
+                effective_decision_id=new_effective_decision_id,
+                effective_generation=new_effective_generation,
+            )
+        )
+        if rowcount(result) != 1:
+            raise NarrativeDecisionPredecessorConflict("expected change-set review head predecessor is stale")
+
+    async def advance_conflict_resolution_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        conflict_resolution_lineage_id: str,
+        expected_latest_decision_id: str | None,
+        expected_effective_decision_id: str | None,
+        new_latest_decision_id: str,
+        new_decision_generation: int,
+        new_effective_decision_id: str | None,
+        new_effective_generation: int,
+    ) -> None:
+        latest_predicate = (
+            ConflictResolutionHeadModel.latest_decision_id.is_(None)
+            if expected_latest_decision_id is None
+            else ConflictResolutionHeadModel.latest_decision_id == expected_latest_decision_id
+        )
+        effective_predicate = (
+            ConflictResolutionHeadModel.effective_decision_id.is_(None)
+            if expected_effective_decision_id is None
+            else ConflictResolutionHeadModel.effective_decision_id == expected_effective_decision_id
+        )
+        result = await self.session.execute(
+            update(ConflictResolutionHeadModel)
+            .where(
+                ConflictResolutionHeadModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                ConflictResolutionHeadModel.conflict_resolution_lineage_id == conflict_resolution_lineage_id,
+                latest_predicate,
+                effective_predicate,
+            )
+            .values(
+                latest_decision_id=new_latest_decision_id,
+                decision_generation=new_decision_generation,
+                effective_decision_id=new_effective_decision_id,
+                effective_generation=new_effective_generation,
+            )
+        )
+        if rowcount(result) != 1:
+            raise NarrativeDecisionPredecessorConflict("expected conflict resolution head predecessor is stale")
+
+    async def insert_conflict_lineage(
+        self, lineage: ConflictResolutionLineage, *, user_id: str, project_name: str
+    ) -> ConflictResolutionLineage:
+        """``INSERT ... ON CONFLICT DO NOTHING`` by the subject-unique constraint, then
+        read back whichever lineage now owns that ``(revision_acceptance_decision_id,
+        conflict_subject_fingerprint)`` pair — the caller's own insert, or a competitor's
+        that landed first. The caller compares the returned lineage id against its
+        proposed one to detect that race; this method never raises on a losing insert."""
+        try:
+            async with self.session.begin_nested():
+                self.session.add(_lineage_row(lineage, user_id=user_id, project_name=project_name))
+                await self.session.flush()
+            return lineage
+        except IntegrityError:
+            existing = await self._scalar(
+                select(ConflictResolutionLineageModel).where(
+                    ConflictResolutionLineageModel.revision_acceptance_decision_id
+                    == lineage.revision_acceptance_decision_id,
+                    ConflictResolutionLineageModel.conflict_subject_fingerprint == lineage.conflict_subject_fingerprint,
+                )
+            )
+            if existing is None:
+                raise
+            return _lineage_from_row(existing)

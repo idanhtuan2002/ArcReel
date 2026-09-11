@@ -12,13 +12,17 @@ from typing import Any
 
 from r2.contracts.narrative_lifecycle import (
     CanonMutationEffectKey,
+    ChangeSetReviewCommand,
+    ConflictResolutionCommand,
     DraftCandidate,
     ExtractionAttempt,
     ExtractionResult,
     NarrativeChangeItem,
     NarrativeChangeSet,
+    NarrativeDecisionAuthorization,
     NarrativeRevision,
     NarrativeWorkScope,
+    RevisionAcceptanceCommand,
     SourceSpan,
 )
 from r2.contracts.provenance import Provenance
@@ -365,3 +369,79 @@ def make_narrative_change_set(**overrides: Any) -> NarrativeChangeSet:
     if defaults["change_set_lineage_id"] is None:
         defaults["change_set_lineage_id"] = f"lin-{defaults['change_set_id']}"
     return NarrativeChangeSet(**defaults)
+
+
+def make_narrative_decision_authorization(**overrides: Any) -> NarrativeDecisionAuthorization:
+    defaults: dict[str, Any] = {
+        "authorization_ref": "auth-1",
+        "user_id": "u1",
+        "project_name": "project-a",
+        "actor_id": "showrunner-1",
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "decision_family": "REVISION_ACCEPTANCE",
+        "action": "ACCEPT",
+        "decision_id": "d-1",
+        "stable_subject_fingerprint": "ssf:1",
+        "decision_command_fingerprint": "dcf:1",
+        "authenticated_at": NARRATIVE_LIFECYCLE_NOW,
+        "authenticated_via": "test-fixture",
+    }
+    defaults.update(overrides)
+    return NarrativeDecisionAuthorization(**defaults)
+
+
+def make_revision_acceptance_command(
+    *, work_scope: NarrativeWorkScope | None = None, **overrides: Any
+) -> RevisionAcceptanceCommand:
+    defaults: dict[str, Any] = {
+        "decision_id": "d-1",
+        "action": "ACCEPT",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "selected_revision_id": "rev-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        **_NL_BASES,
+        "actor_id": "showrunner-1",
+    }
+    defaults.update(overrides)
+    return RevisionAcceptanceCommand(**defaults)
+
+
+def make_change_set_review_command(
+    *, work_scope: NarrativeWorkScope | None = None, **overrides: Any
+) -> ChangeSetReviewCommand:
+    defaults: dict[str, Any] = {
+        "decision_id": "d-2",
+        "action": "ACCEPT",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "revision_acceptance_decision_id": "d-1",
+        "change_set_lineage_id": "lin-cs-1",
+        "selected_change_set_id": "cs-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        **_NL_BASES,
+        "actor_id": "showrunner-1",
+    }
+    defaults.update(overrides)
+    return ChangeSetReviewCommand(**defaults)
+
+
+def make_conflict_resolution_command(
+    *, work_scope: NarrativeWorkScope | None = None, **overrides: Any
+) -> ConflictResolutionCommand:
+    defaults: dict[str, Any] = {
+        "decision_id": "d-3",
+        "action": "RESOLVE",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "revision_acceptance_decision_id": "d-1",
+        "conflict_resolution_lineage_id": "lin-conflict-1",
+        "competing_change_set_ids": ("cs-1", "cs-2"),
+        "competing_review_decision_ids": ("d-2", "d-2b"),
+        "chosen_resolution": "keep cs-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        **_NL_BASES,
+        "actor_id": "showrunner-1",
+    }
+    defaults.update(overrides)
+    return ConflictResolutionCommand(**defaults)
