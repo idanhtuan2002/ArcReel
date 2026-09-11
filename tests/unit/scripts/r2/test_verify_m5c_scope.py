@@ -37,3 +37,32 @@ def test_handoff_phase_accepts_either_checkpoint_review_doc() -> None:
 def test_handoff_phase_rejects_anything_else() -> None:
     problems = evaluate(["r2/contracts/narrative_plan.py"], phase="handoff")
     assert problems == ["unexpected post-verified path: r2/contracts/narrative_plan.py"]
+
+
+def test_m5c2_impl_phase_accepts_the_decision_authority_paths() -> None:
+    paths = [
+        "r2/narrative_lifecycle/acceptance.py",
+        "r2/narrative_lifecycle/authority_kernel.py",
+        "lib/db/repositories/narrative_lifecycle.py",
+        "alembic/versions/5c7c4a0e0002_add_narrative_decision_authority.py",
+        "pyproject.toml",
+    ]
+    assert evaluate(paths, phase="impl", checkpoint="m5c2") == []
+
+
+def test_m5c2_impl_phase_rejects_the_m5c1_only_evidence_migration() -> None:
+    problems = evaluate(
+        ["alembic/versions/5c7c4a0e0001_add_narrative_lifecycle_evidence.py"], phase="impl", checkpoint="m5c2"
+    )
+    assert any("alembic/versions/" in p for p in problems)
+
+
+def test_m5c2_impl_phase_rejects_an_off_allowlist_path() -> None:
+    problems = evaluate(["server/routers/tasks.py"], phase="impl", checkpoint="m5c2")
+    assert problems == ["unexpected implementation path: server/routers/tasks.py"]
+
+
+def test_m5c2_handoff_phase_accepts_only_its_own_review_doc() -> None:
+    assert evaluate(["docs/r2/evidence/R2_M5C_2_REVIEW.md"], phase="handoff", checkpoint="m5c2") == []
+    problems = evaluate(["docs/r2/evidence/R2_M5C_1_REVIEW.md"], phase="handoff", checkpoint="m5c2")
+    assert problems == ["unexpected post-verified path: docs/r2/evidence/R2_M5C_1_REVIEW.md"]

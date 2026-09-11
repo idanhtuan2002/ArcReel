@@ -1,14 +1,13 @@
-"""Machine-checkable M5C-1A / M5C-1B implementation / handoff scope allowlist.
+"""Machine-checkable per-checkpoint implementation / handoff scope allowlist for M5C.
 
 Fail-closed: any changed path (``git diff --name-only base...head``) outside the
-allowlist exits non-zero. The only ``alembic/versions/`` file the implementation range
-may touch is the M5C-1B evidence migration ``5c7c4a0e0001_add_narrative_lifecycle_evidence``;
-every other migration file is rejected (later decision/compilation/handoff migrations
-land in their own checkpoints). The evidence-only handoff range may touch exactly one
-checkpoint review doc (``R2_M5C_1A_REVIEW.md`` or ``R2_M5C_1_REVIEW.md``).
+allowlist for the selected ``--checkpoint`` exits non-zero. Each checkpoint may touch
+only its own migration file(s); every other migration file is rejected (each
+checkpoint's decision/compilation/handoff migration lands in its own alembic revision).
+The handoff range for a checkpoint may touch exactly its own review doc(s).
 
-    uv run python scripts/r2/verify_m5c_scope.py --base <sha> --head <sha> --phase impl
-    uv run python scripts/r2/verify_m5c_scope.py --base <sha> --head <sha> --phase handoff
+    uv run python scripts/r2/verify_m5c_scope.py --base <sha> --head <sha> --phase impl --checkpoint m5c1
+    uv run python scripts/r2/verify_m5c_scope.py --base <sha> --head <sha> --phase handoff --checkpoint m5c2
 """
 
 from __future__ import annotations
@@ -103,6 +102,66 @@ IMPLEMENTATION_ALLOWLIST: frozenset[str] = HANDOFF_ONLY_ALLOWLIST | frozenset(
     }
 )
 
+# --- M5C-2 (Tasks 15-21: decision authority — kernel, acceptance service, conflict
+# lineage, currentness/integrity, checkpoint fitness) -------------------------------
+
+ALLOWED_MIGRATIONS_M5C2: frozenset[str] = frozenset(
+    {"alembic/versions/5c7c4a0e0002_add_narrative_decision_authority.py"}
+)
+
+HANDOFF_ONLY_ALLOWLIST_M5C2: frozenset[str] = frozenset({"docs/r2/evidence/R2_M5C_2_REVIEW.md"})
+
+IMPLEMENTATION_ALLOWLIST_M5C2: frozenset[str] = HANDOFF_ONLY_ALLOWLIST_M5C2 | frozenset(
+    {
+        # amended in-flight to record real M5C-2 deviations (kernel hook signatures,
+        # the §7.3 lock-ordering fix, test-file renames — see the task commits)
+        "docs/superpowers/plans/2026-09-09-r2-m5c-narrative-lifecycle.md",
+        "docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md",
+        # tooling / fitness
+        "pyproject.toml",
+        "scripts/r2/verify_m5c_scope.py",
+        # contracts + migration
+        "r2/contracts/narrative_lifecycle.py",
+        "alembic/versions/5c7c4a0e0002_add_narrative_decision_authority.py",
+        # decision authority: kernel, acceptance service, conflict/currentness support
+        "r2/narrative_lifecycle/__init__.py",
+        "r2/narrative_lifecycle/acceptance.py",
+        "r2/narrative_lifecycle/authority_kernel.py",
+        "r2/narrative_lifecycle/coverage.py",
+        "r2/narrative_lifecycle/evidence.py",
+        "r2/narrative_lifecycle/hashing.py",
+        "r2/narrative_lifecycle/integrity.py",
+        "r2/narrative_lifecycle/ports.py",
+        # Host persistence for the decision/head/lineage tables
+        "lib/db/models/narrative_lifecycle.py",
+        "lib/db/repositories/narrative_lifecycle.py",
+        # tests
+        "tests/factories.py",
+        "tests/unit/r2/contracts/test_narrative_lifecycle.py",
+        "tests/unit/r2/narrative_lifecycle/test_authority_kernel.py",
+        "tests/unit/r2/narrative_lifecycle/test_lifecycle_hashing.py",
+        "tests/unit/r2/test_m5c_architecture_boundaries.py",
+        "tests/unit/lib/db/models/test_narrative_lifecycle.py",
+        "tests/integration/lib/db/migrations/test_alembic_narrative_decision_authority.py",
+        "tests/integration/lib/db/repositories/test_narrative_lifecycle.py",
+        "tests/integration/r2/narrative_lifecycle/_fakes.py",
+        "tests/integration/r2/narrative_lifecycle/conftest.py",
+        "tests/integration/r2/narrative_lifecycle/test_acceptance_decisions.py",
+        "tests/integration/r2/narrative_lifecycle/test_conflict_lineage.py",
+        "tests/integration/r2/narrative_lifecycle/test_evidence_service.py",
+        "tests/integration/r2/narrative_lifecycle/test_lifecycle_concurrency.py",
+        "tests/integration/r2/narrative_lifecycle/test_lifecycle_integrity.py",
+        "tests/integration/r2/test_m5c_architecture_boundaries_db.py",
+        "tests/unit/scripts/r2/test_verify_m5c_scope.py",
+    }
+)
+
+CHECKPOINTS: dict[str, tuple[frozenset[str], frozenset[str], frozenset[str]]] = {
+    # name -> (implementation_allowlist, handoff_only_allowlist, allowed_migrations)
+    "m5c1": (IMPLEMENTATION_ALLOWLIST, HANDOFF_ONLY_ALLOWLIST, ALLOWED_MIGRATIONS),
+    "m5c2": (IMPLEMENTATION_ALLOWLIST_M5C2, HANDOFF_ONLY_ALLOWLIST_M5C2, ALLOWED_MIGRATIONS_M5C2),
+}
+
 
 def _git_diff_names(base: str, head: str) -> list[str]:
     output = subprocess.run(
@@ -122,23 +181,24 @@ def unexpected_paths(paths: Iterable[str], *, allowlist: frozenset[str], prefixe
     return sorted(p for p in paths if p and not _allowed(p, allowlist=allowlist, prefixes=prefixes))
 
 
-def migration_violations(paths: Iterable[str]) -> list[str]:
-    stray = sorted(p for p in paths if p.startswith("alembic/versions/") and p not in ALLOWED_MIGRATIONS)
-    return [f"M5C-1 may touch only {sorted(ALLOWED_MIGRATIONS)}, found {stray}"] if stray else []
+def migration_violations(paths: Iterable[str], *, allowed_migrations: frozenset[str], checkpoint: str) -> list[str]:
+    stray = sorted(p for p in paths if p.startswith("alembic/versions/") and p not in allowed_migrations)
+    return [f"{checkpoint} may touch only {sorted(allowed_migrations)}, found {stray}"] if stray else []
 
 
-def evaluate(paths: Iterable[str], *, phase: str) -> list[str]:
+def evaluate(paths: Iterable[str], *, phase: str, checkpoint: str = "m5c1") -> list[str]:
+    implementation_allowlist, handoff_only_allowlist, allowed_migrations = CHECKPOINTS[checkpoint]
     changed = list(paths)
     if phase == "handoff":
         return [
             f"unexpected post-verified path: {item}"
-            for item in unexpected_paths(changed, allowlist=HANDOFF_ONLY_ALLOWLIST, prefixes=())
+            for item in unexpected_paths(changed, allowlist=handoff_only_allowlist, prefixes=())
         ]
     problems = [
         f"unexpected implementation path: {item}"
-        for item in unexpected_paths(changed, allowlist=IMPLEMENTATION_ALLOWLIST, prefixes=ALLOWED_PREFIXES)
+        for item in unexpected_paths(changed, allowlist=implementation_allowlist, prefixes=ALLOWED_PREFIXES)
     ]
-    problems += migration_violations(changed)
+    problems += migration_violations(changed, allowed_migrations=allowed_migrations, checkpoint=checkpoint)
     return problems
 
 
@@ -147,9 +207,10 @@ def main() -> int:
     parser.add_argument("--base", required=True)
     parser.add_argument("--head", required=True)
     parser.add_argument("--phase", required=True, choices=("impl", "handoff"))
+    parser.add_argument("--checkpoint", default="m5c1", choices=sorted(CHECKPOINTS))
     args = parser.parse_args()
 
-    problems = evaluate(_git_diff_names(args.base, args.head), phase=args.phase)
+    problems = evaluate(_git_diff_names(args.base, args.head), phase=args.phase, checkpoint=args.checkpoint)
     for problem in problems:
         print(problem, file=sys.stderr)
     return 1 if problems else 0
