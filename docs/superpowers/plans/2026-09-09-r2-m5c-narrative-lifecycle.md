@@ -1163,6 +1163,7 @@ git commit -m "feat(db): add narrative decision authority tables"
 
 **Interfaces:**
 - `authority_kernel.py` holds the shared per-command transaction body used by all three families (contracts + DB tables stay typed): canonical identity computation, exact-retry resolution, locking, OCC, append, commit. Not public API — only `NarrativeAcceptanceService` calls it.
+- **Isolation precondition (spec §7.2).** Every kernel transaction must run at `READ COMMITTED`. The step-2/step-5 double `get_decision_by_id` lookup is correct only under a fresh per-statement snapshot; the kernel must not open its transaction through any session/engine configuration that raises the isolation level. This is asserted in Task 21, not re-derived here.
 - **Retry before any head write.** Per-command order, matching spec §7.2 exactly:
   1. begin one fresh short authority transaction;
   2. `get_decision_by_id(decision_id, exact_scope)` — **before any head INSERT or `FOR UPDATE`**;
@@ -1396,7 +1397,7 @@ async def test_two_concurrent_genesis_decisions_yield_one_accepted_and_one_confl
 
 - [ ] **Step 2: Add the authority-surface fitness assertions**
 
-In `tests/unit/r2/test_m5c_architecture_boundaries.py`, add: (a) `inspect.signature` of every public `NarrativeAcceptanceService` decision method has parameters `{command, authenticated_principal}` (plus `canon_commit_approval` for `admit_canon_handoff`) and **no `authorization` parameter**; (b) `NarrativeAcceptanceService.__init__` requires a `NarrativeShowrunnerAuthorityPort` and, constructed without one, raises rather than defaulting to a permissive stub; (c) import-linter: only `r2.narrative_lifecycle.acceptance` appends decisions or mutates heads; `r2.narrative_lifecycle.evidence`, `.compiler`, `.changeset_parser`, `.continuity_rules`, and extractor/provider/orchestration modules cannot import the acceptance repository or head-mutation symbols.
+In `tests/unit/r2/test_m5c_architecture_boundaries.py`, add: (a) `inspect.signature` of every public `NarrativeAcceptanceService` decision method has parameters `{command, authenticated_principal}` (plus `canon_commit_approval` for `admit_canon_handoff`) and **no `authorization` parameter**; (b) `NarrativeAcceptanceService.__init__` requires a `NarrativeShowrunnerAuthorityPort` and, constructed without one, raises rather than defaulting to a permissive stub; (c) import-linter: only `r2.narrative_lifecycle.acceptance` appends decisions or mutates heads; `r2.narrative_lifecycle.evidence`, `.compiler`, `.changeset_parser`, `.continuity_rules`, and extractor/provider/orchestration modules cannot import the acceptance repository or head-mutation symbols; (d) spec §7.2 isolation precondition — against `concurrent_session_factory`, assert the authority kernel's transaction reports `READ COMMITTED` (e.g. `SHOW TRANSACTION ISOLATION LEVEL` / driver equivalent) and that no engine/session/pool default in the wiring path raises it for these sessions.
 
 - [ ] **Step 3: Run RED → Step 4: Implement remaining guards → Step 5: GREEN**
 

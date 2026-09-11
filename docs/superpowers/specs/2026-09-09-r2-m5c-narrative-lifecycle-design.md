@@ -1145,6 +1145,19 @@ predecessor or integrity failure. The service state machine increments
 
 ### 7.2 First-head serialization
 
+Every authority kernel transaction runs at `READ COMMITTED`. The two-phase retry check
+below (an early lookup, then a second lookup after the head row is locked) is correct
+only because `READ COMMITTED` takes a fresh snapshot per statement: the second lookup
+observes a concurrent decision that committed in between. A stricter isolation level
+(`REPEATABLE READ`, `SERIALIZABLE`) would keep the transaction's original snapshot across
+both lookups, so the second lookup could miss that concurrent decision and the identity-
+registry `INSERT` would instead fail on the raw unique constraint (or, under
+`SERIALIZABLE`, abort the whole transaction with a `40001 serialization_failure` outside
+the §13 error taxonomy) rather than resolving cleanly into exact retry or
+`NarrativeDecisionIdentityConflictError`. `READ COMMITTED` is therefore a correctness
+precondition of this section, not an incidental default, and no session, pool, or ORM
+configuration may raise it for authority kernel transactions.
+
 `SELECT FOR UPDATE` cannot serialize an absent row. Revision/change-set heads and commands
 for an already-existing conflict lineage therefore use the Human-approved genesis
 strategy:
