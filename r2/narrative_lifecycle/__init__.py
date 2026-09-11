@@ -1,12 +1,15 @@
-"""M5C Narrative lifecycle: pure helpers, hash domains, evidence ports, and the
-append-only ``NarrativeLifecycleEvidenceService``.
+"""M5C Narrative lifecycle: pure helpers, hash domains, evidence ports, the
+append-only ``NarrativeLifecycleEvidenceService``, and the internal decision-authority
+kernel.
 
-Nothing here imports a concrete repository, session, ORM row, clock, random source,
-provider, acceptance service, or Canon transaction service. The evidence service depends
-only on the structural ports in ``ports.py``; the SQLAlchemy adapters live under
-``lib.db``. This package never mutates a Narrative head.
+Nothing here imports a concrete repository, session, ORM row, random source, provider,
+or Canon transaction service — every adapter lives under ``lib.db`` and every dependency
+is a structural port from ``ports.py``. ``authority_kernel.py`` is the one module that
+reads the wall clock (for decision ``stored_at`` audit metadata) and mutates a Narrative
+head; every other module in this package is read-only / append-only evidence.
 """
 
+from .authority_kernel import ApplicabilityCheck, AuthorityKernel
 from .changeset_parser import (
     ParsedChangeRecord,
     canonicalize_change_record_headers,
@@ -43,7 +46,9 @@ from .hashing import (
     normalize_prose,
 )
 from .ports import (
+    NarrativeAuthorityRepositoryPort,
     NarrativeLifecycleEvidenceRepositoryPort,
+    NarrativeLifecycleRepositoryPort,
     NarrativeLifecycleUnitOfWork,
     NarrativeLifecycleUnitOfWorkFactory,
     NarrativeShowrunnerAuthorityPort,
@@ -53,12 +58,16 @@ __all__ = [
     "DECISION_CANONICAL_IDENTITY_HASH_VERSION",
     "EVIDENCE_SEMANTIC_FINGERPRINT_VERSION",
     "PROSE_CONTENT_HASH_VERSION",
+    "ApplicabilityCheck",
+    "AuthorityKernel",
     "ConflictSubject",
     "ContinuityIssue",
     "ContinuityReport",
     "ExtractionAdmissionCommand",
+    "NarrativeAuthorityRepositoryPort",
     "NarrativeLifecycleEvidenceRepositoryPort",
     "NarrativeLifecycleEvidenceService",
+    "NarrativeLifecycleRepositoryPort",
     "NarrativeLifecycleUnitOfWork",
     "NarrativeLifecycleUnitOfWorkFactory",
     "NarrativeShowrunnerAuthorityPort",

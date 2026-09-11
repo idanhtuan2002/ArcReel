@@ -8,9 +8,13 @@ repository, session, ORM row, clock, or provider. The concrete adapters live und
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from r2.contracts.narrative_lifecycle import (
+    ChangeSetReviewHead,
+    ConflictResolutionHead,
+    ConflictResolutionLineage,
     DraftCandidate,
     ExtractionAttempt,
     ExtractionResult,
@@ -20,6 +24,7 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeDecisionRetryAuthentication,
     NarrativeRevision,
     NarrativeWorkScope,
+    RevisionAcceptanceHead,
 )
 
 
@@ -69,11 +74,101 @@ class NarrativeLifecycleEvidenceRepositoryPort(Protocol):
 
 
 @runtime_checkable
+class NarrativeAuthorityRepositoryPort(Protocol):
+    """Scoped, transaction-bound decision-authority adapter (§7.1/§7.2): the shared
+    identity registry, the three typed decision tables, the conflict-resolution
+    lineage table, and the three logical heads. Never commits, rolls back, or
+    constructs a session — the unit of work owns that lifecycle.
+    """
+
+    async def get_decision_by_id(
+        self, decision_id: str, *, user_id: str, project_name: str
+    ) -> tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int] | None: ...
+
+    async def insert_identity_and_decision(
+        self,
+        command: NarrativeDecisionCommand,
+        authorization: NarrativeDecisionAuthorization,
+        *,
+        canonical_identity_hash: str,
+        decision_generation: int,
+        stored_at: datetime,
+    ) -> None: ...
+
+    async def lock_or_insert_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead: ...
+
+    async def lock_or_insert_change_set_review_head(
+        self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str, user_id: str, project_name: str
+    ) -> ChangeSetReviewHead: ...
+
+    async def lock_or_insert_conflict_resolution_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        conflict_resolution_lineage_id: str,
+        user_id: str,
+        project_name: str,
+    ) -> ConflictResolutionHead: ...
+
+    async def advance_revision_head(
+        self,
+        work_scope: NarrativeWorkScope,
+        *,
+        expected_latest_decision_id: str | None,
+        expected_effective_decision_id: str | None,
+        new_latest_decision_id: str,
+        new_decision_generation: int,
+        new_effective_decision_id: str | None,
+        new_effective_generation: int,
+    ) -> None: ...
+
+    async def advance_change_set_review_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        change_set_lineage_id: str,
+        expected_latest_decision_id: str | None,
+        expected_effective_decision_id: str | None,
+        new_latest_decision_id: str,
+        new_decision_generation: int,
+        new_effective_decision_id: str | None,
+        new_effective_generation: int,
+    ) -> None: ...
+
+    async def advance_conflict_resolution_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        conflict_resolution_lineage_id: str,
+        expected_latest_decision_id: str | None,
+        expected_effective_decision_id: str | None,
+        new_latest_decision_id: str,
+        new_decision_generation: int,
+        new_effective_decision_id: str | None,
+        new_effective_generation: int,
+    ) -> None: ...
+
+    async def insert_conflict_lineage(
+        self, lineage: ConflictResolutionLineage, *, user_id: str, project_name: str
+    ) -> ConflictResolutionLineage: ...
+
+
+@runtime_checkable
+class NarrativeLifecycleRepositoryPort(
+    NarrativeLifecycleEvidenceRepositoryPort, NarrativeAuthorityRepositoryPort, Protocol
+):
+    """The full transaction-bound adapter surface the authority kernel needs: evidence
+    reads (to resolve a command's referenced revision/change-set evidence) plus every
+    decision-authority method above. ``NarrativeLifecycleRepository`` (``lib.db``)
+    satisfies this structurally; this module never imports it."""
+
+
+@runtime_checkable
 class NarrativeLifecycleUnitOfWork(Protocol):
     """One fresh authority transaction. Owns commit / rollback; exposes one repository."""
 
     @property
-    def repository(self) -> NarrativeLifecycleEvidenceRepositoryPort: ...
+    def repository(self) -> NarrativeLifecycleRepositoryPort: ...
 
     async def __aenter__(self) -> NarrativeLifecycleUnitOfWork: ...
 
