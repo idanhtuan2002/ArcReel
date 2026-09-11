@@ -95,6 +95,21 @@ class NarrativeAuthorityRepositoryPort(Protocol):
         stored_at: datetime,
     ) -> None: ...
 
+    async def get_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead | None: ...
+
+    async def get_change_set_review_head(
+        self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str, user_id: str, project_name: str
+    ) -> ChangeSetReviewHead | None: ...
+
+    async def get_conflict_resolution_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        conflict_resolution_lineage_id: str,
+        user_id: str,
+        project_name: str,
+    ) -> ConflictResolutionHead | None: ...
+
     async def lock_or_insert_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead: ...
 
     async def lock_or_insert_change_set_review_head(

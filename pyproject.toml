@@ -315,9 +315,8 @@ forbidden_modules = [
     "r2.narrative_context.compiler",
 ]
 
-# M5C：证据服务是 append-only，绝不触达 Canon 授权写口或任何具体持久化适配器。
-# 一旦 `r2.narrative_lifecycle.acceptance`（Narrative 决策/head 写入者）存在，须把它
-# 加入下方 forbidden 列表。
+# M5C：证据服务是 append-only，绝不触达 Canon 授权写口、任何具体持久化适配器，或
+# Narrative 决策/head 写入层（`acceptance.py` + 其唯一调用者 `authority_kernel.py`）。
 [[tool.importlinter.contracts]]
 name = "M5C narrative evidence service holds no head-mutation capability"
 type = "forbidden"
@@ -326,6 +325,8 @@ forbidden_modules = [
     "lib.db",
     "lib.db.repositories",
     "r2.narrative.canon_transaction",
+    "r2.narrative_lifecycle.acceptance",
+    "r2.narrative_lifecycle.authority_kernel",
 ]
 
 [tool.deptry]

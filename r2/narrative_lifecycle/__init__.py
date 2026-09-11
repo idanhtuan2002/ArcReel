@@ -9,6 +9,7 @@ reads the wall clock (for decision ``stored_at`` audit metadata) and mutates a N
 head; every other module in this package is read-only / append-only evidence.
 """
 
+from .acceptance import NarrativeAcceptanceService
 from .authority_kernel import ApplicabilityCheck, AuthorityKernel
 from .changeset_parser import (
     ParsedChangeRecord,
@@ -64,6 +65,7 @@ __all__ = [
     "ContinuityIssue",
     "ContinuityReport",
     "ExtractionAdmissionCommand",
+    "NarrativeAcceptanceService",
     "NarrativeAuthorityRepositoryPort",
     "NarrativeLifecycleEvidenceRepositoryPort",
     "NarrativeLifecycleEvidenceService",

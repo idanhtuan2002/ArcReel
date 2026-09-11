@@ -917,6 +917,52 @@ class NarrativeLifecycleRepository:
                     f"decision {command.decision_id!r} names an invalid competing change set or review"
                 ) from exc
 
+    async def get_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead | None:
+        """A plain scoped read: no lock, no insert. For observation reads
+        (``get_current_revision_selection``), never for a command in progress — those
+        take ``lock_or_insert_revision_head`` instead."""
+        row = await self._scalar(
+            select(RevisionAcceptanceHeadModel).where(
+                RevisionAcceptanceHeadModel.user_id == work_scope.user_id,
+                RevisionAcceptanceHeadModel.project_name == work_scope.project_name,
+                RevisionAcceptanceHeadModel.plan_id == work_scope.plan_id,
+                RevisionAcceptanceHeadModel.scene_contract_id == work_scope.scene_contract_id,
+                RevisionAcceptanceHeadModel.canon_branch_id == work_scope.canon_branch_id,
+            )
+        )
+        return _revision_head_from_row(row) if row is not None else None
+
+    async def get_change_set_review_head(
+        self, *, revision_acceptance_decision_id: str, change_set_lineage_id: str, user_id: str, project_name: str
+    ) -> ChangeSetReviewHead | None:
+        row = await self._scalar(
+            select(ChangeSetReviewHeadModel).where(
+                ChangeSetReviewHeadModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                ChangeSetReviewHeadModel.change_set_lineage_id == change_set_lineage_id,
+            )
+        )
+        if row is None or row.user_id != user_id or row.project_name != project_name:
+            return None
+        return _change_set_review_head_from_row(row)
+
+    async def get_conflict_resolution_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        conflict_resolution_lineage_id: str,
+        user_id: str,
+        project_name: str,
+    ) -> ConflictResolutionHead | None:
+        row = await self._scalar(
+            select(ConflictResolutionHeadModel).where(
+                ConflictResolutionHeadModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                ConflictResolutionHeadModel.conflict_resolution_lineage_id == conflict_resolution_lineage_id,
+            )
+        )
+        if row is None or row.user_id != user_id or row.project_name != project_name:
+            return None
+        return _conflict_resolution_head_from_row(row)
+
     async def lock_or_insert_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead:
         """§7.2 step 3-5: ``INSERT ... ON CONFLICT DO NOTHING`` the head by its complete
         stable key (null pointers, zero generations), then lock and return it. Called only
