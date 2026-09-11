@@ -4,13 +4,14 @@ kernel.
 
 Nothing here imports a concrete repository, session, ORM row, random source, provider,
 or Canon transaction service — every adapter lives under ``lib.db`` and every dependency
-is a structural port from ``ports.py``. ``authority_kernel.py`` is the one module that
-reads the wall clock (for decision ``stored_at`` audit metadata) and mutates a Narrative
-head; every other module in this package is read-only / append-only evidence.
+is a structural port from ``ports.py``. ``authority_kernel.py`` and ``acceptance.py`` are
+the two modules that read the wall clock (decision ``stored_at`` / lineage ``created_at``
+audit metadata) and mutate a Narrative head or create a conflict-resolution lineage;
+every other module in this package is read-only / append-only evidence.
 """
 
 from .acceptance import NarrativeAcceptanceService
-from .authority_kernel import ApplicabilityCheck, AuthorityKernel
+from .authority_kernel import ApplicabilityCheck, AuthorityKernel, GenesisPreparation
 from .changeset_parser import (
     ParsedChangeRecord,
     canonicalize_change_record_headers,
@@ -38,9 +39,11 @@ from .coverage import (
 )
 from .evidence import ExtractionAdmissionCommand, NarrativeLifecycleEvidenceService
 from .hashing import (
+    CONFLICT_SUBJECT_FINGERPRINT_VERSION,
     DECISION_CANONICAL_IDENTITY_HASH_VERSION,
     EVIDENCE_SEMANTIC_FINGERPRINT_VERSION,
     PROSE_CONTENT_HASH_VERSION,
+    compute_conflict_subject_fingerprint,
     compute_decision_canonical_identity_hash,
     compute_evidence_semantic_fingerprint,
     compute_prose_content_hash,
@@ -56,6 +59,7 @@ from .ports import (
 )
 
 __all__ = [
+    "CONFLICT_SUBJECT_FINGERPRINT_VERSION",
     "DECISION_CANONICAL_IDENTITY_HASH_VERSION",
     "EVIDENCE_SEMANTIC_FINGERPRINT_VERSION",
     "PROSE_CONTENT_HASH_VERSION",
@@ -65,6 +69,7 @@ __all__ = [
     "ContinuityIssue",
     "ContinuityReport",
     "ExtractionAdmissionCommand",
+    "GenesisPreparation",
     "NarrativeAcceptanceService",
     "NarrativeAuthorityRepositoryPort",
     "NarrativeLifecycleEvidenceRepositoryPort",
@@ -75,6 +80,7 @@ __all__ = [
     "NarrativeShowrunnerAuthorityPort",
     "ParsedChangeRecord",
     "canonicalize_change_record_headers",
+    "compute_conflict_subject_fingerprint",
     "compute_decision_canonical_identity_hash",
     "compute_evidence_semantic_fingerprint",
     "compute_prose_content_hash",

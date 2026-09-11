@@ -17,6 +17,7 @@ from r2.contracts import canonical_json_bytes, ensure_json_value
 
 if TYPE_CHECKING:
     from r2.contracts.narrative_lifecycle import (
+        ConflictSubject,
         DraftCandidate,
         NarrativeDecisionAuthorization,
         NarrativeDecisionCommand,
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 PROSE_CONTENT_HASH_VERSION = "r2-m5c-prose-content-v1"
 EVIDENCE_SEMANTIC_FINGERPRINT_VERSION = "r2-m5c-evidence-fingerprint-v1"
 DECISION_CANONICAL_IDENTITY_HASH_VERSION = "r2-m5c-decision-identity-v1"
+CONFLICT_SUBJECT_FINGERPRINT_VERSION = "r2-m5c-conflict-subject-fingerprint-v1"
 
 
 def normalize_prose(prose: str) -> str:
@@ -98,3 +100,12 @@ def compute_decision_canonical_identity_hash(
         "authorization": authorization.model_dump(mode="json"),
     }
     return "dci:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()
+
+
+def compute_conflict_subject_fingerprint(subject: ConflictSubject) -> str:
+    """Content-address the minimal canonical conflict subject (§6.7): the same accepted
+    revision plus the same canonical span coverage and effect-key subjects always
+    produces the same fingerprint, regardless of which competing change sets or opaque
+    lineage ID a caller proposed."""
+    payload = {"schema": CONFLICT_SUBJECT_FINGERPRINT_VERSION, "subject": subject.model_dump(mode="json")}
+    return "csf:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()

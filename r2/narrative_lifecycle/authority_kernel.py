@@ -51,7 +51,8 @@ from r2.narrative_lifecycle.ports import (
     NarrativeShowrunnerAuthorityPort,
 )
 
-ApplicabilityCheck = Callable[[NarrativeDecisionCommand], Awaitable[None]]
+ApplicabilityCheck = Callable[[NarrativeLifecycleRepositoryPort, NarrativeDecisionCommand], Awaitable[None]]
+GenesisPreparation = Callable[[NarrativeLifecycleRepositoryPort, NarrativeDecisionCommand], Awaitable[None]]
 
 # §6.4: the family's "select a new effective candidate" action. REJECT is never in this
 # map — it never changes the effective pointer, regardless of family.
@@ -133,7 +134,16 @@ class AuthorityKernel:
         *,
         authenticated_principal: str,
         verify_applicability: ApplicabilityCheck | None = None,
+        prepare_genesis: GenesisPreparation | None = None,
     ) -> NarrativeDecisionReceipt:
+        """``prepare_genesis`` (Task 19) runs only on the genuinely-new-id path, before
+        the head is locked or inserted — the conflict-resolution genesis composes here:
+        it locks whatever heads it needs to derive a subject, and inserts the immutable
+        lineage the conflict head's own composite FK requires to exist first. It never
+        runs on a retry (exact or concurrently-landed), matching spec §7.2's conflict-
+        genesis order exactly: lineage/head creation happens strictly after retry
+        resolution, never before it.
+        """
         scope = command.work_scope
         async with self._uow_factory() as uow:
             repo = uow.repository
@@ -146,6 +156,9 @@ class AuthorityKernel:
                 receipt = await self._resolve_exact_retry(repo, command, stored, authenticated_principal)
                 await uow.commit()
                 return receipt
+
+            if prepare_genesis is not None:
+                await prepare_genesis(repo, command)
 
             # Step 4: a genuinely new id -- lock or insert the typed head by its
             # complete stable key (null pointers, zero generations).
@@ -174,7 +187,7 @@ class AuthorityKernel:
             # Step 7: family-specific applicability (evidence existence, basis,
             # current-effectiveness, mutual applicability). Never re-derived here.
             if verify_applicability is not None:
-                await verify_applicability(command)
+                await verify_applicability(repo, command)
 
             # Step 8: obtain and verify the one original authorization, then insert
             # the identity registry row and the typed decision atomically.

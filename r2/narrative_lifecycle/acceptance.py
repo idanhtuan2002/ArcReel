@@ -1,23 +1,27 @@
 """``NarrativeAcceptanceService`` — the authenticated public facade for the M5C-2
 Narrative decision authority (spec §6, §8.1).
 
-Exposes exactly: ``decide_revision``, ``review_change_set`` (this task);
-``resolve_change_set_conflict`` (Task 19); ``admit_canon_handoff`` (Task 28); and the
-read-only ``get_current_*`` / ``verify_exact_current_selection`` observations. No
-generic ``save_decision``, ``set_head``, ``approve``, ``latest``, or raw repository
-method is public. The public decision surface never accepts a caller-supplied
-``NarrativeDecisionAuthorization`` — every command takes only ``command`` and
-``authenticated_principal``; the injected ``NarrativeShowrunnerAuthorityPort`` decides
-who may act, and the ``AuthorityKernel`` (Task 17) calls it.
+Exposes exactly: ``decide_revision``, ``review_change_set``, ``resolve_change_set_conflict``
+(this task); ``admit_canon_handoff`` (Task 28); and the read-only ``get_current_*`` /
+``verify_exact_current_selection`` observations. No generic ``save_decision``,
+``set_head``, ``approve``, ``latest``, or raw repository method is public. The public
+decision surface never accepts a caller-supplied ``NarrativeDecisionAuthorization`` —
+every command takes only ``command`` and ``authenticated_principal``; the injected
+``NarrativeShowrunnerAuthorityPort`` decides who may act, and the ``AuthorityKernel``
+(Task 17) calls it.
 """
 
 from __future__ import annotations
+
+from datetime import UTC, datetime
 
 from r2.contracts.narrative_lifecycle import (
     ChangeSetReviewCommand,
     ChangeSetReviewHead,
     ConflictResolutionCommand,
     ConflictResolutionHead,
+    ConflictResolutionLineage,
+    NarrativeChangeSet,
     NarrativeDecisionCommand,
     NarrativeDecisionReceipt,
     NarrativeWorkScope,
@@ -25,6 +29,9 @@ from r2.contracts.narrative_lifecycle import (
     RevisionAcceptanceHead,
 )
 from r2.narrative_lifecycle.authority_kernel import AuthorityKernel
+from r2.narrative_lifecycle.coverage import minimal_conflict_subject
+from r2.narrative_lifecycle.errors import NarrativeConflictLineageConflict, NarrativeDecisionApplicabilityError
+from r2.narrative_lifecycle.hashing import compute_conflict_subject_fingerprint
 from r2.narrative_lifecycle.ports import (
     NarrativeLifecycleRepositoryPort,
     NarrativeLifecycleUnitOfWorkFactory,
@@ -60,6 +67,138 @@ class NarrativeAcceptanceService:
         self, command: ChangeSetReviewCommand, *, authenticated_principal: str
     ) -> NarrativeDecisionReceipt:
         return await self._kernel.run(command, authenticated_principal=authenticated_principal)
+
+    async def resolve_change_set_conflict(
+        self, command: ConflictResolutionCommand, *, authenticated_principal: str
+    ) -> NarrativeDecisionReceipt:
+        """The only conflict-lineage creation interface (§6.7). A genesis command
+        (``expected_latest_decision_id is None``) atomically derives the canonical
+        conflict subject from the exact currently-effective competing change-set
+        reviews, creates the lineage + its zero-generation head, and appends the first
+        decision; a non-genesis command acts on an already-existing lineage/head."""
+        prepare_genesis = self._prepare_conflict_genesis if command.expected_latest_decision_id is None else None
+        return await self._kernel.run(
+            command,
+            authenticated_principal=authenticated_principal,
+            verify_applicability=self._verify_conflict_applicability,
+            prepare_genesis=prepare_genesis,
+        )
+
+    async def _verify_conflict_applicability(
+        self, repo: NarrativeLifecycleRepositoryPort, command: NarrativeDecisionCommand
+    ) -> None:
+        assert isinstance(command, ConflictResolutionCommand)
+        await self._verify_competitors(repo, command)
+
+    async def _prepare_conflict_genesis(
+        self, repo: NarrativeLifecycleRepositoryPort, command: NarrativeDecisionCommand
+    ) -> None:
+        assert isinstance(command, ConflictResolutionCommand)
+        scope = command.work_scope
+        revision_head = await repo.lock_or_insert_revision_head(scope)
+        if revision_head.effective_decision_id != command.revision_acceptance_decision_id:
+            raise NarrativeDecisionApplicabilityError(
+                f"revision acceptance {command.revision_acceptance_decision_id!r} is not the current effective revision"
+            )
+        change_sets = await self._verify_competitors(repo, command)
+        subject = minimal_conflict_subject(change_sets)
+        fingerprint = compute_conflict_subject_fingerprint(subject)
+        proposed = ConflictResolutionLineage(
+            conflict_resolution_lineage_id=command.conflict_resolution_lineage_id,
+            revision_acceptance_decision_id=command.revision_acceptance_decision_id,
+            conflict_subject=subject,
+            conflict_subject_fingerprint=fingerprint,
+            created_at=datetime.now(UTC),
+            created_by=command.actor_id,
+        )
+        winner = await repo.insert_conflict_lineage(proposed, user_id=scope.user_id, project_name=scope.project_name)
+        if winner.conflict_resolution_lineage_id != command.conflict_resolution_lineage_id:
+            raise NarrativeConflictLineageConflict(
+                f"this conflict subject already belongs to lineage {winner.conflict_resolution_lineage_id!r}"
+            )
+
+    async def _verify_competitors(
+        self, repo: NarrativeLifecycleRepositoryPort, command: ConflictResolutionCommand
+    ) -> list[NarrativeChangeSet]:
+        """Resolve and verify every named competitor: its review decision must resolve,
+        must select exactly the named change set, and must still be the current
+        effective selection for its own lineage. Returns the exact evidence rows so a
+        genesis caller can derive the conflict subject from the same verified read."""
+        scope = command.work_scope
+        change_sets: list[NarrativeChangeSet] = []
+        for change_set_id, review_decision_id in zip(
+            command.competing_change_set_ids, command.competing_review_decision_ids, strict=True
+        ):
+            stored = await repo.get_decision_by_id(
+                review_decision_id, user_id=scope.user_id, project_name=scope.project_name
+            )
+            if stored is None:
+                raise NarrativeDecisionApplicabilityError(f"review decision {review_decision_id!r} does not resolve")
+            review_command, _, _ = stored
+            if (
+                not isinstance(review_command, ChangeSetReviewCommand)
+                or review_command.selected_change_set_id != change_set_id
+            ):
+                raise NarrativeDecisionApplicabilityError(
+                    f"review decision {review_decision_id!r} does not select change set {change_set_id!r}"
+                )
+            review_head = await repo.get_change_set_review_head(
+                revision_acceptance_decision_id=command.revision_acceptance_decision_id,
+                change_set_lineage_id=review_command.change_set_lineage_id,
+                user_id=scope.user_id,
+                project_name=scope.project_name,
+            )
+            if review_head is None or review_head.effective_decision_id != review_decision_id:
+                raise NarrativeDecisionApplicabilityError(
+                    f"review decision {review_decision_id!r} is not the current effective selection for its lineage"
+                )
+            change_set = await repo.get_exact_change_set(
+                change_set_id=change_set_id, project_name=scope.project_name, user_id=scope.user_id
+            )
+            if change_set is None:
+                raise NarrativeDecisionApplicabilityError(f"change set {change_set_id!r} does not resolve")
+            change_sets.append(change_set)
+        return change_sets
+
+    async def is_conflict_resolution_applicable(self, decision_id: str, *, user_id: str, project_name: str) -> bool:
+        """§6.7: a resolution is applicable only while it is the effective resolution
+        for its own head *and* every review decision it named remains effective for
+        its own lineage. Returns ``False`` — never raises — the moment either
+        condition fails, including for an absent or non-conflict-resolution id."""
+        async with self._uow_factory() as uow:
+            repo = uow.repository
+            stored = await repo.get_decision_by_id(decision_id, user_id=user_id, project_name=project_name)
+            if stored is None:
+                return False
+            command, _, _ = stored
+            if not isinstance(command, ConflictResolutionCommand):
+                return False
+            head = await repo.get_conflict_resolution_head(
+                revision_acceptance_decision_id=command.revision_acceptance_decision_id,
+                conflict_resolution_lineage_id=command.conflict_resolution_lineage_id,
+                user_id=user_id,
+                project_name=project_name,
+            )
+            if head is None or head.effective_decision_id != decision_id:
+                return False
+            for review_decision_id in command.competing_review_decision_ids:
+                review_stored = await repo.get_decision_by_id(
+                    review_decision_id, user_id=user_id, project_name=project_name
+                )
+                if review_stored is None:
+                    return False
+                review_command, _, _ = review_stored
+                if not isinstance(review_command, ChangeSetReviewCommand):
+                    return False
+                review_head = await repo.get_change_set_review_head(
+                    revision_acceptance_decision_id=command.revision_acceptance_decision_id,
+                    change_set_lineage_id=review_command.change_set_lineage_id,
+                    user_id=user_id,
+                    project_name=project_name,
+                )
+                if review_head is None or review_head.effective_decision_id != review_decision_id:
+                    return False
+            return True
 
     async def get_current_revision_selection(self, exact_scope: NarrativeWorkScope) -> RevisionAcceptanceHead | None:
         async with self._uow_factory() as uow:
