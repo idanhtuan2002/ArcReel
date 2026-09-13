@@ -1410,11 +1410,11 @@ uv run lint-imports
 
 ```bash
 git status --short
-git add pyproject.toml tests/unit/r2/test_m5c_architecture_boundaries.py tests/integration/r2/narrative_lifecycle/test_concurrency.py
+git add pyproject.toml tests/unit/r2/test_m5c_architecture_boundaries.py tests/integration/r2/narrative_lifecycle/test_lifecycle_concurrency.py tests/integration/r2/test_m5c_architecture_boundaries_db.py
 git commit -m "test(r2): fence and stress the narrative acceptance authority"
 M5C_2_VERIFIED_HEAD="$(git rev-parse HEAD)"
-uv run python -m pytest -n 4 --dist loadfile tests/unit/r2 tests/unit/lib/db tests/integration/r2/narrative_lifecycle tests/integration/lib/db tests/donor_parity -q
-DATABASE_URL="$POSTGRES_TEST_URL" uv run python -m pytest tests/integration/r2/narrative_lifecycle/test_concurrency.py -q
+uv run python -m pytest -n 4 --dist loadfile tests/unit/r2 tests/unit/lib/db tests/integration/r2 tests/integration/lib/db tests/integration/donor_parity -q
+DATABASE_URL="$POSTGRES_TEST_URL" uv run python -m pytest tests/integration/r2/narrative_lifecycle/test_lifecycle_concurrency.py tests/integration/r2/test_m5c_architecture_boundaries_db.py -q
 uv run ruff check . && uv run ruff format --check . && uv run basedpyright --warnings && uv run lint-imports && uv run deptry lib server alembic scripts tests r2
 uv run python scripts/audit_tests.py --check
 uv run python scripts/r2/verify_m5c_scope.py --base "$M5C_1_HANDOFF_HEAD" --head "$M5C_2_VERIFIED_HEAD" --phase impl

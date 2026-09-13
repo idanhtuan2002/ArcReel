@@ -159,12 +159,17 @@ class AuthorityKernel:
         verify_applicability: ApplicabilityCheck | None = None,
         prepare_genesis: GenesisPreparation | None = None,
     ) -> NarrativeDecisionReceipt:
-        """``prepare_genesis`` runs only on the genuinely-new-id path, before the head is
-        locked or inserted — the conflict-resolution genesis composes here: it locks
-        whatever heads it needs to derive a subject, and inserts the immutable lineage
-        the conflict head's own composite FK requires to exist first. It never runs on a
-        retry (exact or concurrently-landed): lineage/head creation happens strictly
-        after retry resolution, never before it.
+        """``prepare_genesis`` is skipped outright only when the id is already stored at
+        the very first lookup (an exact retry, resolved before any write). Otherwise it
+        always runs, before the head is locked or inserted — the conflict-resolution
+        genesis composes here: it locks whatever heads it needs to derive a subject, and
+        inserts the immutable lineage the conflict head's own composite FK requires to
+        exist first. If the id turns out to be a concurrently-landed retry (visible only
+        at the second lookup, after another transaction committed it first),
+        ``prepare_genesis`` has already run — its effects must therefore be safe to run
+        redundantly: the lineage insert is idempotent by its own DB-level uniqueness (a
+        losing insert reads back the winner instead of raising), so the redundant run
+        converges to the same persisted state the winner already committed.
         """
         scope = command.work_scope
         async with self._uow_factory() as uow:

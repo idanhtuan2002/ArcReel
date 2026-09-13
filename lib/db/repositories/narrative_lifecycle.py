@@ -1258,11 +1258,15 @@ class NarrativeLifecycleRepository:
     async def insert_conflict_lineage(
         self, lineage: ConflictResolutionLineage, *, user_id: str, project_name: str
     ) -> ConflictResolutionLineage:
-        """``INSERT ... ON CONFLICT DO NOTHING`` by the subject-unique constraint, then
-        read back whichever lineage now owns that ``(revision_acceptance_decision_id,
-        conflict_subject_fingerprint)`` pair — the caller's own insert, or a competitor's
-        that landed first. The caller compares the returned lineage id against its
-        proposed one to detect that race; this method never raises on a losing insert."""
+        """Insert inside a ``SAVEPOINT`` (``session.begin_nested()``) so a losing insert's
+        ``IntegrityError`` against the subject-unique constraint rolls back only this
+        savepoint, not the enclosing transaction's earlier work (the head lock already
+        held in the same transaction). On that error, read back whichever lineage now
+        owns the ``(revision_acceptance_decision_id, conflict_subject_fingerprint)`` pair
+        — the caller's own insert, or a competitor's that landed first (blocking on the
+        unique index until that competitor's transaction resolves). The caller compares
+        the returned lineage id against its proposed one to detect that race; this method
+        never raises on a losing insert."""
         try:
             async with self.session.begin_nested():
                 self.session.add(_lineage_row(lineage, user_id=user_id, project_name=project_name))
