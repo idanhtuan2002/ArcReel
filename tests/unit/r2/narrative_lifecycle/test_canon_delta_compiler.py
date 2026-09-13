@@ -108,6 +108,12 @@ POLICY = CompilerPolicy(
         ),
         CanonMutationRule(
             canon_subject_kind="FACT",
+            subject_ref="villain",
+            effect_descriptor="rage",
+            operations=(_fact_operation("fact-rage", "villain", "rage", "boiling"),),
+        ),
+        CanonMutationRule(
+            canon_subject_kind="FACT",
             subject_ref="mentor",
             effect_descriptor="warning",
             operations=(_fact_operation("fact-warning", "mentor", "warning", "spoken"),),
@@ -306,6 +312,35 @@ def test_a_caller_supplied_payload_hash_mismatch_fails() -> None:
     result = COMPILER.compile(mismatched, REVISION, reviewed, [], BASE, POLICY)
     assert isinstance(result, CompilationFailed)
     assert [finding.code for finding in result.findings] == ["PAYLOAD_HASH_MISMATCH"]
+
+
+def test_an_output_identity_that_contradicts_the_admitted_attempt_fails() -> None:
+    reviewed = [_reviewed(_mutation_change_set("cs-1"), "d-2")]
+    honest = _identity(reviewed)
+    forgeries = [
+        {"canon_delta_id": "delta-invented-by-the-caller"},
+        {"created_at": datetime(2030, 1, 1, tzinfo=UTC)},
+        {"created_by": "someone-else"},
+    ]
+    outcomes = []
+    for forgery in forgeries:
+        arguments: dict[str, object] = {
+            "attempt": honest.attempt,
+            "canon_delta_id": honest.canon_delta_id,
+            "created_at": honest.created_at,
+            "created_by": honest.created_by,
+        }
+        arguments.update(forgery)
+        result = COMPILER.compile(
+            CompilationOutputIdentity(**arguments),
+            REVISION,
+            reviewed,
+            [],
+            BASE,
+            POLICY,
+        )
+        outcomes.append((type(result), tuple(finding.code for finding in result.findings)))
+    assert outcomes == [(CompilationFailed, ("OUTPUT_IDENTITY_MISMATCH",))] * 3
 
 
 # --- §9.4 / 5.5 outcome-only and unsupported effects --------------------------
@@ -519,6 +554,23 @@ def test_a_replace_resolution_substitutes_the_typed_effect_the_policy_supports()
     result = COMPILER.compile(_identity(reviewed, [resolution]), REVISION, reviewed, [resolution], BASE, POLICY)
     assert isinstance(result, CompilationSucceeded)
     assert [operation.target_id for operation in result.canon_delta.operations] == ["fact-mood"]
+
+
+def test_a_replace_resolution_that_reintroduces_a_same_subject_collision_stays_a_conflict() -> None:
+    first = _mutation_change_set("cs-1", subject_ref="villain", effect_descriptor="fear", span=(0, 4))
+    second = _mutation_change_set("cs-2", subject_ref="villain", effect_descriptor="rage", span=(10, 14))
+    untouched = _mutation_change_set("cs-3", subject_ref="hero", effect_descriptor="trust", span=(20, 24))
+    reviewed = [_reviewed(first, "d-2"), _reviewed(second, "d-3"), _reviewed(untouched, "d-4")]
+    resolution = make_conflict_resolution_command(
+        decision_id="d-10",
+        competing_change_set_ids=("cs-1", "cs-2"),
+        competing_review_decision_ids=("d-2", "d-3"),
+        chosen_resolution=_instruction("REPLACE", "merged-mood"),
+    )
+    result = COMPILER.compile(_identity(reviewed, [resolution]), REVISION, reviewed, [resolution], BASE, POLICY)
+    assert isinstance(result, CompilationConflict)
+    assert [finding.code for finding in result.findings] == ["REPLACEMENT_EFFECTS_COLLIDE"]
+    assert result.findings[0].refs == ("d-10", "cs-3")
 
 
 def test_a_replacement_reference_the_policy_does_not_support_abstains() -> None:

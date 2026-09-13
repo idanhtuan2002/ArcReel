@@ -42,7 +42,10 @@ Two opaque free-text fields become exact here for the first time. Both are versi
     collision policy; a still-colliding combine stays a ``CONFLICT``. ``REPLACE`` drops every
     competitor and substitutes the typed effect keys of the policy's ``ReplacementEffectRule``
     with that ``replacement_ref``; an unknown ref ``ABSTAINS`` (the policy does not support
-    it). Any other version prefix, kind, shape, or argument fails closed.
+    it). A substituted effect then faces the same collision rule every change set faces —
+    against each retained change set and against every other substitution — so a replacement
+    that reintroduces a collision stays a ``CONFLICT``. Any other version prefix, kind, shape,
+    or argument fails closed.
 
 Operation ids are content-addressed under ``OPERATION_ID_DERIVATION_VERSION`` from the
 effect key, the rule ordinal, and the operation body — the one derived-id rule §9.5 allows.
@@ -201,8 +204,11 @@ class CompilationOutputIdentity:
     """The attempt-bound output identity. It carries the admitted ``CompilationAttempt`` —
     the immutable snapshot the compiler validates its inputs against — plus the
     ``canon_delta_id``, ``created_at``, and ``created_by`` the attempt already fixed, so the
-    compiler generates no id and reads no clock. ``expected_payload_hash``, when supplied,
-    must equal the recomputed M5A hash or the compilation fails."""
+    compiler generates no id and reads no clock. ``from_attempt`` is a convenience, not the
+    gate: validation step 2 compares all three against ``requested_canon_delta_id`` /
+    ``delta_created_at`` / ``delta_created_by``, so a directly constructed identity that
+    contradicts its own attempt is ``FAILED``. ``expected_payload_hash``, when supplied, must
+    equal the recomputed M5A hash or the compilation fails."""
 
     attempt: CompilationAttempt
     canon_delta_id: str
@@ -368,7 +374,7 @@ class CanonDeltaCompiler:
         if versions is not None:
             return CompilationFailed(findings=(versions,))
 
-        identity = self._validate_identity(attempt, revision, exact_canon_base, ordered_change_sets)
+        identity = self._validate_identity(output_identity, revision, exact_canon_base, ordered_change_sets)
         if identity is not None:
             return CompilationFailed(findings=(identity,))
 
@@ -472,11 +478,23 @@ class CanonDeltaCompiler:
 
     def _validate_identity(
         self,
-        attempt: CompilationAttempt,
+        output_identity: CompilationOutputIdentity,
         revision: NarrativeRevision,
         exact_canon_base: ExactCanonBase,
         ordered_change_sets: Sequence[ReviewedChangeSet],
     ) -> CompilerFinding | None:
+        attempt = output_identity.attempt
+        # Step 2 owns the output identity too: §9.5 fixes the opaque delta id and the output
+        # timestamp in the admitted attempt, so a directly constructed identity that
+        # contradicts its own attempt is rejected rather than silently preferred.
+        supplied_identity = (output_identity.canon_delta_id, output_identity.created_at, output_identity.created_by)
+        admitted_identity = (attempt.requested_canon_delta_id, attempt.delta_created_at, attempt.delta_created_by)
+        if supplied_identity != admitted_identity:
+            return _finding(
+                "OUTPUT_IDENTITY_MISMATCH",
+                "the output identity's delta id, created_at, or created_by is not the admitted attempt's",
+                attempt.attempt_id,
+            )
         if revision.work_scope != attempt.work_scope:
             return _finding("WORK_SCOPE_MISMATCH", "the revision's work scope is not the attempt's work scope")
         if revision.revision_id != attempt.revision_id:
@@ -681,7 +699,7 @@ class CanonDeltaCompiler:
 
         replacements = {rule.replacement_ref: rule for rule in compiler_policy.replacement_rules}
         dropped: set[str] = set()
-        replacement_keys: list[NarrativeSemanticEffectKey] = []
+        substitutions: list[tuple[str, tuple[NarrativeSemanticEffectKey, ...]]] = []
         for resolution in ordered_resolutions:
             instruction = instructions[resolution.decision_id]
             competitors = sorted(resolution.competing_change_set_ids)
@@ -711,10 +729,52 @@ class CanonDeltaCompiler:
                         resolution.decision_id,
                     )
                 dropped.update(competitors)
-                replacement_keys.extend(rule.effect_keys)
+                substitutions.append((resolution.decision_id, normalize_effect_keys(rule.effect_keys)))
 
         retained = [item for item in ordered_change_sets if item.change_set.change_set_id not in dropped]
-        return retained, tuple(replacement_keys)
+        residual = self._residual_replacement_collision(retained, substitutions, compiler_policy)
+        if residual is not None:
+            return residual
+        return retained, tuple(key for _, keys in substitutions for key in keys)
+
+    def _residual_replacement_collision(
+        self,
+        retained: Sequence[ReviewedChangeSet],
+        substitutions: Sequence[tuple[str, tuple[NarrativeSemanticEffectKey, ...]]],
+        compiler_policy: CompilerPolicy,
+    ) -> CompilationConflict | None:
+        """Step 7 re-run over the post-resolution effective selection.
+
+        A ``REPLACE`` substitution enters the effective key set after the original pairwise
+        analysis, so it must face the same collision rule every change set faces: against each
+        untouched retained change set, and against every other substitution. A substitution's
+        own keys are one authored unit and are not compared with each other, exactly as one
+        change set's declared keys are not."""
+        for decision_id, keys in substitutions:
+            for item in retained:
+                if _effect_keys_collide_across(
+                    keys,
+                    normalize_effect_keys(item.change_set.semantic_effect_keys),
+                    collision_policy=compiler_policy.collision_policy,
+                ):
+                    return _conflict(
+                        "REPLACEMENT_EFFECTS_COLLIDE",
+                        "a REPLACE resolution substitutes typed effects that collide with a retained change set",
+                        decision_id,
+                        item.change_set.change_set_id,
+                    )
+        for index, (left_decision, left_keys) in enumerate(substitutions):
+            for right_decision, right_keys in substitutions[index + 1 :]:
+                if _effect_keys_collide_across(
+                    left_keys, right_keys, collision_policy=compiler_policy.collision_policy
+                ):
+                    return _conflict(
+                        "REPLACEMENT_EFFECTS_COLLIDE",
+                        "two REPLACE resolutions substitute typed effects that collide with each other",
+                        left_decision,
+                        right_decision,
+                    )
+        return None
 
     # --- §9.2 step 9 / §9.4: effect key -> M5A Canon operations ---------------
 
