@@ -38,6 +38,7 @@ from lib.db.base import DEFAULT_USER_ID, Base, UserOwnedMixin
 _ID = String(255)
 _SHORT = String(64)
 _EXTRACTION_OUTCOMES = "('SUCCEEDED','ABSTAINED','CONFLICT','FAILED','OUTCOME_UNKNOWN')"
+_COMPILATION_OUTCOMES = "('SUCCEEDED','NO_CANON_MUTATION','ABSTAINED','CONFLICT','FAILED')"
 _DECISION_FAMILIES = "('REVISION_ACCEPTANCE','CHANGE_SET_REVIEW','CONFLICT_RESOLUTION')"
 _REVISION_ACTIONS = "('ACCEPT','REJECT','SUPERSEDE')"
 _CHANGE_SET_ACTIONS = "('ACCEPT','REJECT','SUPERSEDE')"
@@ -904,3 +905,275 @@ class ConflictResolutionHeadModel(UserOwnedMixin, Base):
     decision_generation: Mapped[int] = mapped_column(Integer, nullable=False)
     effective_decision_id: Mapped[str | None] = mapped_column(_ID)
     effective_generation: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+# --- M5C-3 CanonDelta compilation: attempt/result/compiled-delta evidence ---
+#
+# The rule "a SUCCEEDED compilation result owns exactly one one-to-one compiled-delta
+# row and every other outcome owns none" is a cross-row invariant enforced inside the
+# repository transaction, not by a DB CHECK — mirroring the extraction-evidence rule
+# above. The delta-field/outcome pairing itself (SUCCEEDED names both, everything else
+# names neither) IS a DB CHECK here, in addition to the contract-level validator,
+# because both fields live on the same row.
+
+
+class NarrativeCompilationAttemptModel(UserOwnedMixin, Base):
+    __tablename__ = "narrative_compilation_attempts"
+    __table_args__ = (
+        UniqueConstraint("attempt_id", "generation", name="uq_narrative_compilation_attempts_generation"),
+        UniqueConstraint("user_id", "project_name", "attempt_id", name="uq_narrative_compilation_attempts_scope"),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "revision_id"],
+            [
+                "narrative_revisions.user_id",
+                "narrative_revisions.project_name",
+                "narrative_revisions.revision_id",
+            ],
+            name="fk_narrative_compilation_attempts_revision",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["revision_id", "base_canon_version_id", "plan_version", "scene_contract_version", "context_pack_id"],
+            [
+                "narrative_revisions.revision_id",
+                "narrative_revisions.base_canon_version_id",
+                "narrative_revisions.plan_version",
+                "narrative_revisions.scene_contract_version",
+                "narrative_revisions.context_pack_id",
+            ],
+            name="fk_narrative_compilation_attempts_revision_basis",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "revision_acceptance_decision_id"],
+            [
+                "revision_acceptance_decisions.user_id",
+                "revision_acceptance_decisions.project_name",
+                "revision_acceptance_decisions.decision_id",
+            ],
+            name="fk_narrative_compilation_attempts_revision_acceptance",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("generation >= 0", name="ck_narrative_compilation_attempts_generation"),
+        CheckConstraint("plan_version >= 1", name="ck_narrative_compilation_attempts_plan_version"),
+        CheckConstraint("scene_contract_version >= 1", name="ck_narrative_compilation_attempts_scene_version"),
+        Index("ix_narrative_compilation_attempts_project_name", "project_name"),
+    )
+
+    attempt_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    plan_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    scene_contract_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    canon_branch_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    revision_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    revision_acceptance_decision_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    base_canon_version_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    plan_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    scene_contract_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    context_pack_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    creative_policy_ref: Mapped[str] = mapped_column(_ID, nullable=False)
+    creative_policy_version: Mapped[str] = mapped_column(_SHORT, nullable=False)
+    compiler_version: Mapped[str] = mapped_column(String(255), nullable=False)
+    requested_canon_delta_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    delta_created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    delta_created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    admitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    admitted_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    input_fingerprint: Mapped[str] = mapped_column(_ID, nullable=False)
+
+
+class NarrativeCompilationSelectedChangeSetModel(UserOwnedMixin, Base):
+    """Ordered proof that a compilation attempt selects exactly this paired set of
+    accepted change sets and the review decision that selected each one, in this order."""
+
+    __tablename__ = "narrative_compilation_selected_change_sets"
+    __table_args__ = (
+        PrimaryKeyConstraint("attempt_id", "position", name="pk_narrative_compilation_selected_change_sets"),
+        ForeignKeyConstraint(
+            ["attempt_id"],
+            ["narrative_compilation_attempts.attempt_id"],
+            name="fk_narrative_compilation_selected_change_sets_attempt",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "change_set_id"],
+            [
+                "narrative_change_sets.user_id",
+                "narrative_change_sets.project_name",
+                "narrative_change_sets.change_set_id",
+            ],
+            name="fk_narrative_compilation_selected_change_sets_change_set",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["review_decision_id"],
+            ["change_set_review_decisions.decision_id"],
+            name="fk_narrative_compilation_selected_change_sets_review",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("position >= 0", name="ck_narrative_compilation_selected_change_sets_position"),
+        Index("ix_narrative_compilation_selected_change_sets_change_set", "change_set_id"),
+        Index("ix_narrative_compilation_selected_change_sets_review", "review_decision_id"),
+    )
+
+    attempt_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    change_set_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    review_decision_id: Mapped[str] = mapped_column(_ID, nullable=False)
+
+
+class NarrativeCompilationConflictResolutionModel(UserOwnedMixin, Base):
+    """Ordered proof that a compilation attempt names exactly this set of accepted
+    conflict-resolution decisions, in this order. Empty when no competing lineage
+    needed resolution."""
+
+    __tablename__ = "narrative_compilation_conflict_resolutions"
+    __table_args__ = (
+        PrimaryKeyConstraint("attempt_id", "position", name="pk_narrative_compilation_conflict_resolutions"),
+        ForeignKeyConstraint(
+            ["attempt_id"],
+            ["narrative_compilation_attempts.attempt_id"],
+            name="fk_narrative_compilation_conflict_resolutions_attempt",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["conflict_resolution_decision_id"],
+            ["conflict_resolution_decisions.decision_id"],
+            name="fk_narrative_compilation_conflict_resolutions_decision",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("position >= 0", name="ck_narrative_compilation_conflict_resolutions_position"),
+        Index("ix_narrative_compilation_conflict_resolutions_decision", "conflict_resolution_decision_id"),
+    )
+
+    attempt_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    conflict_resolution_decision_id: Mapped[str] = mapped_column(_ID, nullable=False)
+
+
+class NarrativeCompilationObservedHeadModel(UserOwnedMixin, Base):
+    """Ordered durable proof of the exact decision every head named in this attempt's
+    scope was observed as currently effective at admission time. ``decision_id`` FKs
+    into the shared identity registry (globally unique regardless of decision family),
+    not into any one typed decision table, since a compilation attempt observes heads
+    from all three decision families."""
+
+    __tablename__ = "narrative_compilation_observed_heads"
+    __table_args__ = (
+        PrimaryKeyConstraint("attempt_id", "position", name="pk_narrative_compilation_observed_heads"),
+        ForeignKeyConstraint(
+            ["attempt_id"],
+            ["narrative_compilation_attempts.attempt_id"],
+            name="fk_narrative_compilation_observed_heads_attempt",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["decision_id"],
+            ["narrative_decision_identities.decision_id"],
+            name="fk_narrative_compilation_observed_heads_identity",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("position >= 0", name="ck_narrative_compilation_observed_heads_position"),
+        CheckConstraint("effective_generation >= 1", name="ck_narrative_compilation_observed_heads_generation"),
+        Index("ix_narrative_compilation_observed_heads_decision", "decision_id"),
+    )
+
+    attempt_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    decision_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    effective_generation: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class NarrativeCompilationResultModel(UserOwnedMixin, Base):
+    __tablename__ = "narrative_compilation_results"
+    __table_args__ = (
+        UniqueConstraint("attempt_id", "generation", name="uq_narrative_compilation_results_generation"),
+        UniqueConstraint("user_id", "project_name", "result_id", name="uq_narrative_compilation_results_scope"),
+        ForeignKeyConstraint(
+            ["attempt_id", "generation"],
+            [
+                "narrative_compilation_attempts.attempt_id",
+                "narrative_compilation_attempts.generation",
+            ],
+            name="fk_narrative_compilation_results_attempt_generation",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "attempt_id"],
+            [
+                "narrative_compilation_attempts.user_id",
+                "narrative_compilation_attempts.project_name",
+                "narrative_compilation_attempts.attempt_id",
+            ],
+            name="fk_narrative_compilation_results_attempt_scope",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("generation >= 0", name="ck_narrative_compilation_results_generation"),
+        CheckConstraint(f"outcome IN {_COMPILATION_OUTCOMES}", name="ck_narrative_compilation_results_outcome"),
+        CheckConstraint(
+            "(outcome = 'SUCCEEDED' AND canon_delta_id IS NOT NULL AND canon_delta_payload_hash IS NOT NULL) "
+            "OR (outcome != 'SUCCEEDED' AND canon_delta_id IS NULL AND canon_delta_payload_hash IS NULL)",
+            name="ck_narrative_compilation_results_delta_matches_outcome",
+        ),
+        Index("ix_narrative_compilation_results_project_name", "project_name"),
+    )
+
+    result_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    attempt_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    canon_delta_id: Mapped[str | None] = mapped_column(_ID)
+    canon_delta_payload_hash: Mapped[str | None] = mapped_column(_ID)
+    diagnostics_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    output_fingerprint: Mapped[str] = mapped_column(_ID, nullable=False)
+
+
+class NarrativeCompiledCanonDeltaModel(UserOwnedMixin, Base):
+    """The durable, lossless copy of a SUCCEEDED compilation's exact immutable M5A
+    ``CanonDelta`` payload, keyed one-to-one by ``compilation_result_id`` (its primary
+    key is also the sole FK target, so at most one row can ever exist per result)."""
+
+    __tablename__ = "narrative_compiled_canon_deltas"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["compilation_result_id"],
+            ["narrative_compilation_results.result_id"],
+            name="fk_narrative_compiled_canon_deltas_result",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["compilation_attempt_id", "generation"],
+            [
+                "narrative_compilation_attempts.attempt_id",
+                "narrative_compilation_attempts.generation",
+            ],
+            name="fk_narrative_compiled_canon_deltas_attempt_generation",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "compilation_result_id"],
+            [
+                "narrative_compilation_results.user_id",
+                "narrative_compilation_results.project_name",
+                "narrative_compilation_results.result_id",
+            ],
+            name="fk_narrative_compiled_canon_deltas_result_scope",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("generation >= 0", name="ck_narrative_compiled_canon_deltas_generation"),
+        Index("ix_narrative_compiled_canon_deltas_project_name", "project_name"),
+    )
+
+    compilation_result_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    compilation_attempt_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    canon_delta_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    canon_delta_payload_hash: Mapped[str] = mapped_column(_ID, nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

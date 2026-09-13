@@ -5,10 +5,15 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
+from r2.contracts.narrative import AddFactOperation, CanonDeltaPayload, Fact
 from r2.contracts.narrative_lifecycle import (
     CanonMutationEffectKey,
     ChangeSetReviewCommand,
     ChangeSetReviewHead,
+    CompilationAttempt,
+    CompilationResult,
+    CompilationSelectedChangeSet,
+    CompiledCanonDeltaEvidence,
     ConflictResolutionCommand,
     ConflictResolutionHead,
     ConflictResolutionLineage,
@@ -24,12 +29,15 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeRevision,
     NarrativeSemanticEffectKey,
     NarrativeWorkScope,
+    ObservedEffectiveHead,
     RevisionAcceptanceCommand,
     RevisionAcceptanceHead,
     SourceSpan,
     ThreadPayoffEffectKey,
 )
 from r2.contracts.provenance import Provenance
+from r2.narrative.hashing import seal_canon_delta
+from r2.narrative_lifecycle.hashing import compute_compilation_input_fingerprint
 
 NOW = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
 NAIVE = datetime(2026, 9, 9, 12, 0)
@@ -520,3 +528,169 @@ def test_decision_authority_contracts_forbid_extra_fields(make_instance) -> None
     payload = instance.model_dump(mode="json") | {"unexpected_field": "nope"}
     with pytest.raises(ValidationError):
         type(instance).model_validate(payload)
+
+
+# --- M5C-3 CanonDelta compilation: attempt/result/compiled-delta evidence ---
+
+
+def _selected_change_sets(*pairs: tuple[str, str]) -> list[CompilationSelectedChangeSet]:
+    return [CompilationSelectedChangeSet(change_set_id=cs, review_decision_id=rd) for cs, rd in pairs]
+
+
+def _observed_heads(*pairs: tuple[str, int]) -> list[ObservedEffectiveHead]:
+    return [ObservedEffectiveHead(decision_id=d, effective_generation=g) for d, g in pairs]
+
+
+def _attempt(**overrides: object) -> CompilationAttempt:
+    base: dict[str, object] = {
+        "attempt_id": "cattempt-1",
+        "generation": 0,
+        "work_scope": SCOPE,
+        "revision_id": "rev-1",
+        "revision_acceptance_decision_id": "dec-rev-1",
+        "selected_change_sets": _selected_change_sets(("cs-1", "dec-rev-1-review")),
+        "conflict_resolution_decision_ids": [],
+        "observed_effective_heads": _observed_heads(("dec-rev-1", 1)),
+        "base_canon_version_id": "cv-1",
+        "plan_version": 1,
+        "scene_contract_version": 1,
+        "context_pack_id": "ctx-1",
+        "creative_policy_ref": "policy-1",
+        "creative_policy_version": "1",
+        "compiler_version": "compiler-1",
+        "requested_canon_delta_id": "delta-1",
+        "delta_created_at": NOW,
+        "delta_created_by": "showrunner",
+        "admitted_at": NOW,
+        "admitted_by": "showrunner",
+        "input_fingerprint": "cif:x",
+    }
+    return CompilationAttempt(**(base | overrides))
+
+
+def _compilation_result(**overrides: object) -> CompilationResult:
+    base: dict[str, object] = {
+        "result_id": "cres-1",
+        "attempt_id": "cattempt-1",
+        "generation": 0,
+        "outcome": "ABSTAINED",
+        "canon_delta_id": None,
+        "canon_delta_payload_hash": None,
+        "diagnostics": [],
+        "completed_at": NOW,
+        "output_fingerprint": "of-1",
+    }
+    return CompilationResult(**(base | overrides))
+
+
+def _canon_delta():
+    fact = Fact(fact_id="fact-1", subject_ref="hero", predicate="mood", value="calm", effective_from=NOW)
+    return seal_canon_delta(
+        CanonDeltaPayload(
+            canon_delta_id="delta-1",
+            target_branch_id="branch-1",
+            base_canon_version_id="cv-1",
+            operations=[AddFactOperation(operation_id="op-1", target_id="fact-1", fact=fact)],
+            source_change_set_refs=["cs-1"],
+            author_decision_refs=["dec-rev-1"],
+            validation_report_refs=[],
+            created_at=NOW,
+            created_by="showrunner",
+        )
+    )
+
+
+def test_compilation_attempt_requires_at_least_one_selected_change_set() -> None:
+    with pytest.raises(ValidationError):
+        _attempt(selected_change_sets=[])
+
+
+def test_compilation_attempt_rejects_duplicate_selected_change_set_ids() -> None:
+    with pytest.raises(ValidationError):
+        _attempt(selected_change_sets=_selected_change_sets(("cs-1", "r-1"), ("cs-1", "r-2")))
+
+
+def test_compilation_attempt_rejects_duplicate_review_decision_ids() -> None:
+    with pytest.raises(ValidationError):
+        _attempt(selected_change_sets=_selected_change_sets(("cs-1", "r-1"), ("cs-2", "r-1")))
+
+
+def test_compilation_attempt_rejects_duplicate_conflict_resolution_decision_ids() -> None:
+    with pytest.raises(ValidationError):
+        _attempt(conflict_resolution_decision_ids=["res-1", "res-1"])
+
+
+def test_compilation_attempt_requires_at_least_one_observed_effective_head() -> None:
+    with pytest.raises(ValidationError):
+        _attempt(observed_effective_heads=[])
+
+
+def test_compilation_attempt_rejects_duplicate_observed_head_decision_ids() -> None:
+    with pytest.raises(ValidationError):
+        _attempt(observed_effective_heads=_observed_heads(("dec-rev-1", 1), ("dec-rev-1", 2)))
+
+
+def test_successful_compilation_result_requires_delta_id_and_hash() -> None:
+    with pytest.raises(ValidationError):
+        _compilation_result(outcome="SUCCEEDED")
+    with pytest.raises(ValidationError):
+        _compilation_result(outcome="SUCCEEDED", canon_delta_id="delta-1")
+    ok = _compilation_result(outcome="SUCCEEDED", canon_delta_id="delta-1", canon_delta_payload_hash="h:1")
+    assert ok.canon_delta_id == "delta-1"
+
+
+@pytest.mark.parametrize("outcome", ["NO_CANON_MUTATION", "ABSTAINED", "CONFLICT", "FAILED"])
+def test_non_succeeded_compilation_result_must_name_no_delta(outcome: str) -> None:
+    with pytest.raises(ValidationError):
+        _compilation_result(outcome=outcome, canon_delta_id="delta-1", canon_delta_payload_hash="h:1")
+    assert _compilation_result(outcome=outcome).canon_delta_id is None
+
+
+def test_compiled_canon_delta_evidence_hash_must_match_the_embedded_delta() -> None:
+    delta = _canon_delta()
+    ok = CompiledCanonDeltaEvidence(
+        compilation_result_id="cres-1",
+        compilation_attempt_id="cattempt-1",
+        generation=0,
+        canon_delta=delta,
+        canon_delta_payload_hash=delta.payload_hash,
+        stored_at=NOW,
+    )
+    assert ok.canon_delta_payload_hash == delta.payload_hash
+    with pytest.raises(ValidationError):
+        CompiledCanonDeltaEvidence(
+            compilation_result_id="cres-1",
+            compilation_attempt_id="cattempt-1",
+            generation=0,
+            canon_delta=delta,
+            canon_delta_payload_hash="wrong-hash",
+            stored_at=NOW,
+        )
+
+
+def test_compilation_input_fingerprint_is_deterministic() -> None:
+    assert compute_compilation_input_fingerprint(_attempt()) == compute_compilation_input_fingerprint(_attempt())
+
+
+def test_compilation_input_fingerprint_changes_with_semantic_input() -> None:
+    baseline = compute_compilation_input_fingerprint(_attempt())
+    changed = compute_compilation_input_fingerprint(
+        _attempt(selected_change_sets=_selected_change_sets(("cs-2", "dec-rev-1-review")))
+    )
+    assert baseline != changed
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"attempt_id": "cattempt-2"},
+        {"generation": 5},
+        {"requested_canon_delta_id": "delta-2"},
+        {"delta_created_by": "someone-else"},
+        {"admitted_by": "someone-else"},
+    ],
+)
+def test_compilation_input_fingerprint_ignores_workflow_metadata(override: dict[str, object]) -> None:
+    assert compute_compilation_input_fingerprint(_attempt()) == compute_compilation_input_fingerprint(
+        _attempt(**override)
+    )

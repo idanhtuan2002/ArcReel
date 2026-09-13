@@ -11,6 +11,12 @@ from lib.db.models.narrative_lifecycle import (
     ConflictResolutionHeadModel,
     ConflictResolutionLineageModel,
     NarrativeChangeSetModel,
+    NarrativeCompilationAttemptModel,
+    NarrativeCompilationConflictResolutionModel,
+    NarrativeCompilationObservedHeadModel,
+    NarrativeCompilationResultModel,
+    NarrativeCompilationSelectedChangeSetModel,
+    NarrativeCompiledCanonDeltaModel,
     NarrativeDecisionIdentityModel,
     NarrativeDraftCandidateModel,
     NarrativeExtractionAttemptModel,
@@ -300,6 +306,125 @@ def test_head_pointers_carry_a_composite_fk_back_to_a_decision_of_the_same_subje
 
 def test_no_authority_foreign_key_cascades() -> None:
     for name in _AUTHORITY_TABLES:
+        for fk in _table(name).foreign_key_constraints:
+            targets = {element.target_fullname for element in fk.elements}
+            if targets == {"users.id"}:
+                continue
+            assert (fk.ondelete or "").upper() == "RESTRICT", (name, fk.name)
+
+
+# --- M5C-3 CanonDelta compilation (attempt/result/compiled-delta evidence) ---
+
+_COMPILATION_TABLES = {
+    "narrative_compilation_attempts",
+    "narrative_compilation_selected_change_sets",
+    "narrative_compilation_conflict_resolutions",
+    "narrative_compilation_observed_heads",
+    "narrative_compilation_results",
+    "narrative_compiled_canon_deltas",
+}
+
+
+def test_all_compilation_models_are_registered() -> None:
+    for model in (
+        NarrativeCompilationAttemptModel,
+        NarrativeCompilationSelectedChangeSetModel,
+        NarrativeCompilationConflictResolutionModel,
+        NarrativeCompilationObservedHeadModel,
+        NarrativeCompilationResultModel,
+        NarrativeCompiledCanonDeltaModel,
+    ):
+        assert model.__tablename__ in Base.metadata.tables
+    assert set(Base.metadata.tables) >= _COMPILATION_TABLES
+
+
+def test_compilation_attempt_has_unique_generation_key_for_the_result_foreign_key() -> None:
+    table = _table("narrative_compilation_attempts")
+    assert {"attempt_id", "generation"} in _unique_map(table).values()
+
+
+def test_compilation_attempt_carries_a_composite_basis_fk_to_the_revision() -> None:
+    fk = _fk_by_cols(_table("narrative_compilation_attempts"))[
+        ("base_canon_version_id", "context_pack_id", "plan_version", "revision_id", "scene_contract_version")
+    ]
+    assert {e.target_fullname for e in fk.elements} == {
+        "narrative_revisions.revision_id",
+        "narrative_revisions.base_canon_version_id",
+        "narrative_revisions.plan_version",
+        "narrative_revisions.scene_contract_version",
+        "narrative_revisions.context_pack_id",
+    }
+    assert fk.ondelete == "RESTRICT"
+
+
+def test_compilation_attempt_carries_a_scoped_fk_to_its_accepted_revision_decision() -> None:
+    fk = _fk_by_cols(_table("narrative_compilation_attempts"))[
+        ("project_name", "revision_acceptance_decision_id", "user_id")
+    ]
+    assert {e.target_fullname for e in fk.elements} == {
+        "revision_acceptance_decisions.user_id",
+        "revision_acceptance_decisions.project_name",
+        "revision_acceptance_decisions.decision_id",
+    }
+    assert fk.ondelete == "RESTRICT"
+
+
+def test_one_compilation_result_per_attempt_generation() -> None:
+    table = _table("narrative_compilation_results")
+    assert {"attempt_id", "generation"} in _unique_map(table).values()
+    fk = _fk_by_cols(table)[("attempt_id", "generation")]
+    assert {e.target_fullname for e in fk.elements} == {
+        "narrative_compilation_attempts.attempt_id",
+        "narrative_compilation_attempts.generation",
+    }
+    assert fk.ondelete == "RESTRICT"
+
+
+def test_compilation_result_delta_fields_are_db_checked_against_outcome() -> None:
+    checks = {
+        c.name for c in _table("narrative_compilation_results").constraints if type(c).__name__ == "CheckConstraint"
+    }
+    assert "ck_narrative_compilation_results_delta_matches_outcome" in checks
+    assert "ck_narrative_compilation_results_outcome" in checks
+
+
+def test_compilation_selected_change_sets_are_ordered_and_reference_review_decisions() -> None:
+    table = _table("narrative_compilation_selected_change_sets")
+    assert {c.name for c in table.primary_key} == {"attempt_id", "position"}
+    fks = _fk_by_cols(table)
+    assert fks[("change_set_id", "project_name", "user_id")].ondelete == "RESTRICT"
+    assert fks[("review_decision_id",)].ondelete == "RESTRICT"
+    checks = {c.name for c in table.constraints if type(c).__name__ == "CheckConstraint"}
+    assert "ck_narrative_compilation_selected_change_sets_position" in checks
+
+
+def test_compilation_conflict_resolutions_are_ordered_and_may_be_empty() -> None:
+    table = _table("narrative_compilation_conflict_resolutions")
+    assert {c.name for c in table.primary_key} == {"attempt_id", "position"}
+    fk = _fk_by_cols(table)[("conflict_resolution_decision_id",)]
+    assert fk.ondelete == "RESTRICT"
+
+
+def test_compilation_observed_heads_reference_the_shared_identity_registry() -> None:
+    table = _table("narrative_compilation_observed_heads")
+    assert {c.name for c in table.primary_key} == {"attempt_id", "position"}
+    fk = _fk_by_cols(table)[("decision_id",)]
+    assert fk.elements[0].target_fullname == "narrative_decision_identities.decision_id"
+    assert fk.ondelete == "RESTRICT"
+    checks = {c.name for c in table.constraints if type(c).__name__ == "CheckConstraint"}
+    assert "ck_narrative_compilation_observed_heads_generation" in checks
+
+
+def test_compiled_canon_delta_is_one_to_one_with_its_result() -> None:
+    table = _table("narrative_compiled_canon_deltas")
+    assert {c.name for c in table.primary_key} == {"compilation_result_id"}
+    fk = _fk_by_cols(table)[("compilation_result_id",)]
+    assert fk.elements[0].target_fullname == "narrative_compilation_results.result_id"
+    assert fk.ondelete == "RESTRICT"
+
+
+def test_no_compilation_foreign_key_cascades() -> None:
+    for name in _COMPILATION_TABLES:
         for fk in _table(name).foreign_key_constraints:
             targets = {element.target_fullname for element in fk.elements}
             if targets == {"users.id"}:

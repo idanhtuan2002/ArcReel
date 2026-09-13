@@ -17,6 +17,7 @@ from r2.contracts import canonical_json_bytes, ensure_json_value
 
 if TYPE_CHECKING:
     from r2.contracts.narrative_lifecycle import (
+        CompilationAttempt,
         ConflictSubject,
         DraftCandidate,
         NarrativeDecisionAuthorization,
@@ -29,6 +30,7 @@ EVIDENCE_SEMANTIC_FINGERPRINT_VERSION = "r2-m5c-evidence-fingerprint-v1"
 DECISION_CANONICAL_IDENTITY_HASH_VERSION = "r2-m5c-decision-identity-v1"
 CONFLICT_SUBJECT_FINGERPRINT_VERSION = "r2-m5c-conflict-subject-fingerprint-v1"
 EXTRACTION_INPUT_FINGERPRINT_VERSION = "r2-m5c-extraction-input-fingerprint-v1"
+COMPILATION_INPUT_FINGERPRINT_VERSION = "r2-m5c-compilation-input-fingerprint-v1"
 
 
 def normalize_prose(prose: str) -> str:
@@ -132,3 +134,34 @@ def compute_extraction_input_fingerprint(
         "policy_version": policy_version,
     }
     return "if:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()
+
+
+def compute_compilation_input_fingerprint(attempt: CompilationAttempt) -> str:
+    """Content-address the exact semantic inputs a compilation attempt commits to: the
+    accepted revision, its exact bases, every selected change set paired with the review
+    decision that selected it, every named conflict resolution, and the exact heads
+    observed as currently effective at admission — plus the creative-policy and
+    compiler-version identity.
+
+    Excludes the attempt's own opaque ``attempt_id`` / ``generation``, its
+    ``requested_canon_delta_id`` (output identity, not input), and all admission/delta
+    workflow metadata (``admitted_at`` / ``admitted_by``, ``delta_created_at`` /
+    ``delta_created_by``) — none of these change what the compiler is asked to compile.
+    """
+    payload = {
+        "schema": COMPILATION_INPUT_FINGERPRINT_VERSION,
+        "work_scope": attempt.work_scope.model_dump(mode="json"),
+        "revision_id": attempt.revision_id,
+        "revision_acceptance_decision_id": attempt.revision_acceptance_decision_id,
+        "selected_change_sets": [item.model_dump(mode="json") for item in attempt.selected_change_sets],
+        "conflict_resolution_decision_ids": list(attempt.conflict_resolution_decision_ids),
+        "observed_effective_heads": [item.model_dump(mode="json") for item in attempt.observed_effective_heads],
+        "base_canon_version_id": attempt.base_canon_version_id,
+        "plan_version": attempt.plan_version,
+        "scene_contract_version": attempt.scene_contract_version,
+        "context_pack_id": attempt.context_pack_id,
+        "creative_policy_ref": attempt.creative_policy_ref,
+        "creative_policy_version": attempt.creative_policy_version,
+        "compiler_version": attempt.compiler_version,
+    }
+    return "cif:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()

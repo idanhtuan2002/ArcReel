@@ -27,6 +27,12 @@ from lib.db.models.narrative_lifecycle import (
     ConflictResolutionHeadModel,
     ConflictResolutionLineageModel,
     NarrativeChangeSetModel,
+    NarrativeCompilationAttemptModel,
+    NarrativeCompilationConflictResolutionModel,
+    NarrativeCompilationObservedHeadModel,
+    NarrativeCompilationResultModel,
+    NarrativeCompilationSelectedChangeSetModel,
+    NarrativeCompiledCanonDeltaModel,
     NarrativeDecisionIdentityModel,
     NarrativeDraftCandidateModel,
     NarrativeExtractionAttemptModel,
@@ -40,6 +46,10 @@ from lib.db.repositories.base import rowcount
 from r2.contracts.narrative_lifecycle import (
     ChangeSetReviewCommand,
     ChangeSetReviewHead,
+    CompilationAttempt,
+    CompilationResult,
+    CompilationSelectedChangeSet,
+    CompiledCanonDeltaEvidence,
     ConflictResolutionCommand,
     ConflictResolutionHead,
     ConflictResolutionLineage,
@@ -52,6 +62,7 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeDecisionCommand,
     NarrativeRevision,
     NarrativeWorkScope,
+    ObservedEffectiveHead,
     RevisionAcceptanceCommand,
     RevisionAcceptanceHead,
 )
@@ -327,6 +338,150 @@ def _change_set_row(change_set: NarrativeChangeSet, *, user_id: str, project_nam
         policy_version=change_set.policy_version,
         created_at=change_set.created_at,
         output_fingerprint=change_set.output_fingerprint,
+    )
+
+
+# --- M5C-3 CanonDelta compilation: attempt/result/compiled-delta evidence ---
+
+
+def _compilation_attempt_from_row(
+    row: NarrativeCompilationAttemptModel,
+    *,
+    selected_change_sets: tuple[CompilationSelectedChangeSet, ...],
+    conflict_resolution_decision_ids: tuple[str, ...],
+    observed_effective_heads: tuple[ObservedEffectiveHead, ...],
+) -> CompilationAttempt:
+    try:
+        return CompilationAttempt.model_validate(
+            {
+                "attempt_id": row.attempt_id,
+                "generation": row.generation,
+                "work_scope": {
+                    "user_id": row.user_id,
+                    "project_name": row.project_name,
+                    "plan_id": row.plan_id,
+                    "scene_contract_id": row.scene_contract_id,
+                    "canon_branch_id": row.canon_branch_id,
+                },
+                "revision_id": row.revision_id,
+                "revision_acceptance_decision_id": row.revision_acceptance_decision_id,
+                "selected_change_sets": [item.model_dump(mode="json") for item in selected_change_sets],
+                "conflict_resolution_decision_ids": conflict_resolution_decision_ids,
+                "observed_effective_heads": [item.model_dump(mode="json") for item in observed_effective_heads],
+                "base_canon_version_id": row.base_canon_version_id,
+                "plan_version": row.plan_version,
+                "scene_contract_version": row.scene_contract_version,
+                "context_pack_id": row.context_pack_id,
+                "creative_policy_ref": row.creative_policy_ref,
+                "creative_policy_version": row.creative_policy_version,
+                "compiler_version": row.compiler_version,
+                "requested_canon_delta_id": row.requested_canon_delta_id,
+                "delta_created_at": _stored_aware(row.delta_created_at),
+                "delta_created_by": row.delta_created_by,
+                "admitted_at": _stored_aware(row.admitted_at),
+                "admitted_by": row.admitted_by,
+                "input_fingerprint": row.input_fingerprint,
+            }
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(f"corrupt compilation attempt row {row.attempt_id!r}: {exc}") from exc
+
+
+def _compilation_result_from_row(row: NarrativeCompilationResultModel) -> CompilationResult:
+    try:
+        return CompilationResult.model_validate(
+            {
+                "result_id": row.result_id,
+                "attempt_id": row.attempt_id,
+                "generation": row.generation,
+                "outcome": row.outcome,
+                "canon_delta_id": row.canon_delta_id,
+                "canon_delta_payload_hash": row.canon_delta_payload_hash,
+                "diagnostics": row.diagnostics_json,
+                "completed_at": _stored_aware(row.completed_at),
+                "output_fingerprint": row.output_fingerprint,
+            }
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(f"corrupt compilation result row {row.result_id!r}: {exc}") from exc
+
+
+def _compiled_delta_from_row(row: NarrativeCompiledCanonDeltaModel) -> CompiledCanonDeltaEvidence:
+    try:
+        return CompiledCanonDeltaEvidence.model_validate(
+            {
+                "compilation_result_id": row.compilation_result_id,
+                "compilation_attempt_id": row.compilation_attempt_id,
+                "generation": row.generation,
+                "canon_delta": row.canon_delta_json,
+                "canon_delta_payload_hash": row.canon_delta_payload_hash,
+                "stored_at": _stored_aware(row.stored_at),
+            }
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(
+            f"corrupt compiled canon delta row {row.compilation_result_id!r}: {exc}"
+        ) from exc
+
+
+def _compilation_attempt_row(attempt: CompilationAttempt) -> NarrativeCompilationAttemptModel:
+    scope = attempt.work_scope
+    return NarrativeCompilationAttemptModel(
+        attempt_id=attempt.attempt_id,
+        generation=attempt.generation,
+        user_id=scope.user_id,
+        project_name=scope.project_name,
+        plan_id=scope.plan_id,
+        scene_contract_id=scope.scene_contract_id,
+        canon_branch_id=scope.canon_branch_id,
+        revision_id=attempt.revision_id,
+        revision_acceptance_decision_id=attempt.revision_acceptance_decision_id,
+        base_canon_version_id=attempt.base_canon_version_id,
+        plan_version=attempt.plan_version,
+        scene_contract_version=attempt.scene_contract_version,
+        context_pack_id=attempt.context_pack_id,
+        creative_policy_ref=attempt.creative_policy_ref,
+        creative_policy_version=attempt.creative_policy_version,
+        compiler_version=attempt.compiler_version,
+        requested_canon_delta_id=attempt.requested_canon_delta_id,
+        delta_created_at=attempt.delta_created_at,
+        delta_created_by=attempt.delta_created_by,
+        admitted_at=attempt.admitted_at,
+        admitted_by=attempt.admitted_by,
+        input_fingerprint=attempt.input_fingerprint,
+    )
+
+
+def _compilation_result_row(
+    result: CompilationResult, *, user_id: str, project_name: str
+) -> NarrativeCompilationResultModel:
+    return NarrativeCompilationResultModel(
+        result_id=result.result_id,
+        user_id=user_id,
+        project_name=project_name,
+        attempt_id=result.attempt_id,
+        generation=result.generation,
+        outcome=result.outcome,
+        canon_delta_id=result.canon_delta_id,
+        canon_delta_payload_hash=result.canon_delta_payload_hash,
+        diagnostics_json=list(result.diagnostics),
+        completed_at=result.completed_at,
+        output_fingerprint=result.output_fingerprint,
+    )
+
+
+def _compiled_delta_row(
+    evidence: CompiledCanonDeltaEvidence, *, user_id: str, project_name: str
+) -> NarrativeCompiledCanonDeltaModel:
+    return NarrativeCompiledCanonDeltaModel(
+        compilation_result_id=evidence.compilation_result_id,
+        user_id=user_id,
+        project_name=project_name,
+        compilation_attempt_id=evidence.compilation_attempt_id,
+        generation=evidence.generation,
+        canon_delta_json=evidence.canon_delta.model_dump(mode="json"),
+        canon_delta_payload_hash=evidence.canon_delta_payload_hash,
+        stored_at=evidence.stored_at,
     )
 
 
@@ -1283,3 +1438,179 @@ class NarrativeLifecycleRepository:
             if existing is None:
                 raise
             return _lineage_from_row(existing)
+
+    # --- M5C-3 CanonDelta compilation ---
+
+    async def get_exact_compilation_attempt(
+        self, *, attempt_id: str, project_name: str, user_id: str
+    ) -> CompilationAttempt | None:
+        row = await self._scalar(
+            select(NarrativeCompilationAttemptModel).where(
+                NarrativeCompilationAttemptModel.attempt_id == attempt_id,
+                NarrativeCompilationAttemptModel.project_name == project_name,
+                NarrativeCompilationAttemptModel.user_id == user_id,
+            )
+        )
+        if row is None:
+            return None
+        selected_change_sets = tuple(
+            CompilationSelectedChangeSet(change_set_id=cs, review_decision_id=rd)
+            for cs, rd in (
+                await self.session.execute(
+                    select(
+                        NarrativeCompilationSelectedChangeSetModel.change_set_id,
+                        NarrativeCompilationSelectedChangeSetModel.review_decision_id,
+                    )
+                    .where(NarrativeCompilationSelectedChangeSetModel.attempt_id == attempt_id)
+                    .order_by(NarrativeCompilationSelectedChangeSetModel.position)
+                )
+            ).all()
+        )
+        conflict_resolution_decision_ids = tuple(
+            (
+                await self.session.execute(
+                    select(NarrativeCompilationConflictResolutionModel.conflict_resolution_decision_id)
+                    .where(NarrativeCompilationConflictResolutionModel.attempt_id == attempt_id)
+                    .order_by(NarrativeCompilationConflictResolutionModel.position)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        observed_effective_heads = tuple(
+            ObservedEffectiveHead(decision_id=decision_id, effective_generation=generation)
+            for decision_id, generation in (
+                await self.session.execute(
+                    select(
+                        NarrativeCompilationObservedHeadModel.decision_id,
+                        NarrativeCompilationObservedHeadModel.effective_generation,
+                    )
+                    .where(NarrativeCompilationObservedHeadModel.attempt_id == attempt_id)
+                    .order_by(NarrativeCompilationObservedHeadModel.position)
+                )
+            ).all()
+        )
+        return _compilation_attempt_from_row(
+            row,
+            selected_change_sets=selected_change_sets,
+            conflict_resolution_decision_ids=conflict_resolution_decision_ids,
+            observed_effective_heads=observed_effective_heads,
+        )
+
+    async def insert_compilation_attempt(self, attempt: CompilationAttempt) -> None:
+        self.session.add(_compilation_attempt_row(attempt))
+        for position, item in enumerate(attempt.selected_change_sets):
+            self.session.add(
+                NarrativeCompilationSelectedChangeSetModel(
+                    attempt_id=attempt.attempt_id,
+                    position=position,
+                    user_id=attempt.work_scope.user_id,
+                    project_name=attempt.work_scope.project_name,
+                    change_set_id=item.change_set_id,
+                    review_decision_id=item.review_decision_id,
+                )
+            )
+        for position, decision_id in enumerate(attempt.conflict_resolution_decision_ids):
+            self.session.add(
+                NarrativeCompilationConflictResolutionModel(
+                    attempt_id=attempt.attempt_id,
+                    position=position,
+                    user_id=attempt.work_scope.user_id,
+                    project_name=attempt.work_scope.project_name,
+                    conflict_resolution_decision_id=decision_id,
+                )
+            )
+        for position, head in enumerate(attempt.observed_effective_heads):
+            self.session.add(
+                NarrativeCompilationObservedHeadModel(
+                    attempt_id=attempt.attempt_id,
+                    position=position,
+                    user_id=attempt.work_scope.user_id,
+                    project_name=attempt.work_scope.project_name,
+                    decision_id=head.decision_id,
+                    effective_generation=head.effective_generation,
+                )
+            )
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise _identity_conflict(exc, f"compilation attempt {attempt.attempt_id!r}") from exc
+
+    async def _compilation_attempt_scope(self, *, attempt_id: str, generation: int) -> tuple[str, str]:
+        """The ``(user_id, project_name)`` of the admitted compilation attempt a result
+        or compiled-delta evidence row descends from. Neither carries a scope of its
+        own — both inherit the attempt's tenant."""
+        row = await self._scalar(
+            select(NarrativeCompilationAttemptModel).where(
+                NarrativeCompilationAttemptModel.attempt_id == attempt_id,
+                NarrativeCompilationAttemptModel.generation == generation,
+            )
+        )
+        if row is None:
+            raise NarrativeEvidenceIntegrityError(
+                f"no admitted compilation attempt {attempt_id!r} generation {generation} for this result"
+            )
+        return row.user_id, row.project_name
+
+    async def get_exact_compilation_result(
+        self, *, attempt_id: str, generation: int, project_name: str, user_id: str
+    ) -> CompilationResult | None:
+        row = await self._scalar(
+            select(NarrativeCompilationResultModel).where(
+                NarrativeCompilationResultModel.attempt_id == attempt_id,
+                NarrativeCompilationResultModel.generation == generation,
+                NarrativeCompilationResultModel.project_name == project_name,
+                NarrativeCompilationResultModel.user_id == user_id,
+            )
+        )
+        return _compilation_result_from_row(row) if row is not None else None
+
+    async def get_exact_compiled_canon_delta(
+        self, *, compilation_result_id: str, project_name: str, user_id: str
+    ) -> CompiledCanonDeltaEvidence | None:
+        row = await self._scalar(
+            select(NarrativeCompiledCanonDeltaModel).where(
+                NarrativeCompiledCanonDeltaModel.compilation_result_id == compilation_result_id,
+                NarrativeCompiledCanonDeltaModel.project_name == project_name,
+                NarrativeCompiledCanonDeltaModel.user_id == user_id,
+            )
+        )
+        return _compiled_delta_from_row(row) if row is not None else None
+
+    async def insert_successful_compilation(
+        self, result: CompilationResult, evidence: CompiledCanonDeltaEvidence
+    ) -> None:
+        if result.outcome != "SUCCEEDED":
+            raise NarrativeEvidenceIntegrityError("insert_successful_compilation requires a SUCCEEDED result")
+        if (
+            evidence.compilation_result_id != result.result_id
+            or evidence.compilation_attempt_id != result.attempt_id
+            or evidence.generation != result.generation
+            or evidence.canon_delta_payload_hash != result.canon_delta_payload_hash
+        ):
+            raise NarrativeEvidenceIntegrityError(
+                "the compiled-delta evidence must name the exact result, attempt generation, and payload hash"
+            )
+        user_id, project_name = await self._compilation_attempt_scope(
+            attempt_id=result.attempt_id, generation=result.generation
+        )
+        self.session.add(_compilation_result_row(result, user_id=user_id, project_name=project_name))
+        self.session.add(_compiled_delta_row(evidence, user_id=user_id, project_name=project_name))
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise _identity_conflict(exc, f"successful compilation result {result.result_id!r}") from exc
+
+    async def insert_non_successful_compilation(self, result: CompilationResult) -> None:
+        if result.outcome == "SUCCEEDED":
+            raise NarrativeEvidenceIntegrityError("insert_non_successful_compilation rejects a SUCCEEDED result")
+        if result.canon_delta_id is not None or result.canon_delta_payload_hash is not None:
+            raise NarrativeEvidenceIntegrityError("a non-success compilation result names no canon delta")
+        user_id, project_name = await self._compilation_attempt_scope(
+            attempt_id=result.attempt_id, generation=result.generation
+        )
+        self.session.add(_compilation_result_row(result, user_id=user_id, project_name=project_name))
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise _identity_conflict(exc, f"compilation result {result.result_id!r}") from exc

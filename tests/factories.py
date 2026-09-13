@@ -13,6 +13,10 @@ from typing import Any
 from r2.contracts.narrative_lifecycle import (
     CanonMutationEffectKey,
     ChangeSetReviewCommand,
+    CompilationAttempt,
+    CompilationResult,
+    CompilationSelectedChangeSet,
+    CompiledCanonDeltaEvidence,
     ConflictResolutionCommand,
     DraftCandidate,
     ExtractionAttempt,
@@ -22,6 +26,7 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeDecisionAuthorization,
     NarrativeRevision,
     NarrativeWorkScope,
+    ObservedEffectiveHead,
     RevisionAcceptanceCommand,
     SourceSpan,
 )
@@ -445,3 +450,88 @@ def make_conflict_resolution_command(
     }
     defaults.update(overrides)
     return ConflictResolutionCommand(**defaults)
+
+
+def make_compilation_attempt(*, work_scope: NarrativeWorkScope | None = None, **overrides: Any) -> CompilationAttempt:
+    defaults: dict[str, Any] = {
+        "attempt_id": "cattempt-1",
+        "generation": 0,
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "revision_id": "rev-1",
+        "revision_acceptance_decision_id": "d-1",
+        "selected_change_sets": (CompilationSelectedChangeSet(change_set_id="cs-1", review_decision_id="d-2"),),
+        "conflict_resolution_decision_ids": (),
+        "observed_effective_heads": (ObservedEffectiveHead(decision_id="d-1", effective_generation=1),),
+        **_NL_BASES,
+        "creative_policy_ref": "policy-1",
+        "creative_policy_version": "1",
+        "compiler_version": "compiler-1",
+        "requested_canon_delta_id": "delta-1",
+        "delta_created_at": NARRATIVE_LIFECYCLE_NOW,
+        "delta_created_by": "showrunner-1",
+        "admitted_at": NARRATIVE_LIFECYCLE_NOW,
+        "admitted_by": "showrunner-1",
+        "input_fingerprint": "cif-1",
+    }
+    defaults.update(overrides)
+    return CompilationAttempt(**defaults)
+
+
+def make_compilation_result(**overrides: Any) -> CompilationResult:
+    defaults: dict[str, Any] = {
+        "result_id": "cres-1",
+        "attempt_id": "cattempt-1",
+        "generation": 0,
+        "outcome": "ABSTAINED",
+        "canon_delta_id": None,
+        "canon_delta_payload_hash": None,
+        "diagnostics": (),
+        "completed_at": NARRATIVE_LIFECYCLE_NOW,
+        "output_fingerprint": "of-cres",
+    }
+    defaults.update(overrides)
+    return CompilationResult(**defaults)
+
+
+def make_compiled_canon_delta_evidence(**overrides: Any) -> CompiledCanonDeltaEvidence:
+    from r2.narrative.hashing import seal_canon_delta
+
+    canon_delta = overrides.pop("canon_delta", None)
+    if canon_delta is None:
+        from r2.contracts.narrative import AddFactOperation, CanonDeltaPayload, Fact
+
+        canon_delta = seal_canon_delta(
+            CanonDeltaPayload(
+                canon_delta_id="delta-1",
+                target_branch_id="branch-1",
+                base_canon_version_id="cv-1",
+                operations=[
+                    AddFactOperation(
+                        operation_id="op-1",
+                        target_id="fact-1",
+                        fact=Fact(
+                            fact_id="fact-1",
+                            subject_ref="hero",
+                            predicate="mood",
+                            value="calm",
+                            effective_from=NARRATIVE_LIFECYCLE_NOW,
+                        ),
+                    )
+                ],
+                source_change_set_refs=["cs-1"],
+                author_decision_refs=["d-1"],
+                validation_report_refs=[],
+                created_at=NARRATIVE_LIFECYCLE_NOW,
+                created_by="showrunner-1",
+            )
+        )
+    defaults: dict[str, Any] = {
+        "compilation_result_id": "cres-1",
+        "compilation_attempt_id": "cattempt-1",
+        "generation": 0,
+        "canon_delta": canon_delta,
+        "canon_delta_payload_hash": canon_delta.payload_hash,
+        "stored_at": NARRATIVE_LIFECYCLE_NOW,
+    }
+    defaults.update(overrides)
+    return CompiledCanonDeltaEvidence(**defaults)

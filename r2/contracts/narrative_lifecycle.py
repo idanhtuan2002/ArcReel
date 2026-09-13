@@ -14,6 +14,7 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
 from .common import JSONValue, NonEmptyStr, R2ContractModel
+from .narrative import CanonDelta
 from .provenance import Provenance
 
 SEMANTIC_EFFECT_KEY_VERSION = "r2-m5c-semantic-effect-key-v1"
@@ -581,3 +582,142 @@ class ConflictResolutionLineage(R2ContractModel):
     conflict_subject_fingerprint: NonEmptyStr
     created_at: AwareDatetime
     created_by: NonEmptyStr
+
+
+# --- M5C-3 CanonDelta compilation: attempt/result/compiled-delta evidence ---
+#
+# The pure compiler (a later task) consumes a CompilationAttempt's exact immutable
+# inputs by reference — decision IDs and observed head generations, never re-reading
+# currentness itself. None of these contracts grants Canon authority: a SUCCEEDED
+# CompilationResult only proposes a CanonDelta for the separate M5A handoff/approval
+# path to admit.
+
+_COMPILATION_OUTCOMES = Literal["SUCCEEDED", "NO_CANON_MUTATION", "ABSTAINED", "CONFLICT", "FAILED"]
+
+
+class CompilationSelectedChangeSet(R2ContractModel):
+    """One accepted change set entering a compilation attempt, paired with the exact
+    review decision that selected it — never re-derived from the change set alone."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    change_set_id: NonEmptyStr
+    review_decision_id: NonEmptyStr
+
+
+class ObservedEffectiveHead(R2ContractModel):
+    """One head's effective decision as observed at admission time: the revision head,
+    or one change-set-review / conflict-resolution lineage head. Durable proof of what
+    was current when the attempt was admitted — a head can move on afterward without
+    invalidating an attempt already admitted against it."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    decision_id: NonEmptyStr
+    effective_generation: Annotated[int, Field(ge=1)]
+
+
+class CompilationAttempt(R2ContractModel):
+    """Persisted before the pure compiler runs. Names its exact immutable inputs by
+    reference — decision IDs and observed head generations, not their content — so
+    recomputing the same exact ``(attempt_id, generation)`` always compiles the same
+    snapshot, even after currentness has since moved on."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    attempt_id: NonEmptyStr
+    generation: Annotated[int, Field(ge=0)]
+    work_scope: NarrativeWorkScope
+    revision_id: NonEmptyStr
+    revision_acceptance_decision_id: NonEmptyStr
+    selected_change_sets: tuple[CompilationSelectedChangeSet, ...]
+    conflict_resolution_decision_ids: tuple[NonEmptyStr, ...] = ()
+    observed_effective_heads: tuple[ObservedEffectiveHead, ...]
+    base_canon_version_id: NonEmptyStr
+    plan_version: Annotated[int, Field(ge=1)]
+    scene_contract_version: Annotated[int, Field(ge=1)]
+    context_pack_id: NonEmptyStr
+    creative_policy_ref: NonEmptyStr
+    creative_policy_version: NonEmptyStr
+    compiler_version: NonEmptyStr
+    requested_canon_delta_id: NonEmptyStr
+    delta_created_at: AwareDatetime
+    delta_created_by: NonEmptyStr
+    admitted_at: AwareDatetime
+    admitted_by: NonEmptyStr
+    input_fingerprint: NonEmptyStr
+
+    @model_validator(mode="after")
+    def _selected_change_sets_are_present_and_unique(self) -> CompilationAttempt:
+        if not self.selected_change_sets:
+            raise ValueError("a compilation attempt must select at least one change set")
+        change_set_ids = [item.change_set_id for item in self.selected_change_sets]
+        if len(set(change_set_ids)) != len(change_set_ids):
+            raise ValueError("selected_change_sets change_set_id values must be unique")
+        review_decision_ids = [item.review_decision_id for item in self.selected_change_sets]
+        if len(set(review_decision_ids)) != len(review_decision_ids):
+            raise ValueError("selected_change_sets review_decision_id values must be unique")
+        return self
+
+    @model_validator(mode="after")
+    def _conflict_resolution_decision_ids_are_unique(self) -> CompilationAttempt:
+        if len(set(self.conflict_resolution_decision_ids)) != len(self.conflict_resolution_decision_ids):
+            raise ValueError("conflict_resolution_decision_ids must be unique")
+        return self
+
+    @model_validator(mode="after")
+    def _observed_effective_heads_are_present_and_unique(self) -> CompilationAttempt:
+        if not self.observed_effective_heads:
+            raise ValueError("a compilation attempt must observe at least the revision head")
+        decision_ids = [item.decision_id for item in self.observed_effective_heads]
+        if len(set(decision_ids)) != len(decision_ids):
+            raise ValueError("observed_effective_heads decision_id values must be unique")
+        return self
+
+
+class CompilationResult(R2ContractModel):
+    """At most one result exists for ``(attempt_id, generation)``. A ``SUCCEEDED`` result
+    names a non-null delta id and payload hash; every other outcome names neither.
+    ``NO_CANON_MUTATION`` is a valid deterministic terminal result, not an abstention or
+    failure: it means the complete valid selection is outcome-only and names no delta."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    result_id: NonEmptyStr
+    attempt_id: NonEmptyStr
+    generation: Annotated[int, Field(ge=0)]
+    outcome: _COMPILATION_OUTCOMES
+    canon_delta_id: NonEmptyStr | None = None
+    canon_delta_payload_hash: NonEmptyStr | None = None
+    diagnostics: tuple[NonEmptyStr, ...] = ()
+    completed_at: AwareDatetime
+    output_fingerprint: NonEmptyStr
+
+    @model_validator(mode="after")
+    def _delta_fields_match_outcome(self) -> CompilationResult:
+        has_delta = self.canon_delta_id is not None or self.canon_delta_payload_hash is not None
+        if self.outcome == "SUCCEEDED":
+            if self.canon_delta_id is None or self.canon_delta_payload_hash is None:
+                raise ValueError(
+                    "a SUCCEEDED CompilationResult must name both canon_delta_id and canon_delta_payload_hash"
+                )
+        elif has_delta:
+            raise ValueError(f"a {self.outcome} CompilationResult must name no canon delta")
+        return self
+
+
+class CompiledCanonDeltaEvidence(R2ContractModel):
+    """The durable, lossless copy of a ``SUCCEEDED`` compilation's exact immutable M5A
+    ``CanonDelta`` payload, keyed one-to-one by ``compilation_result_id``. Handoff and
+    recovery reload this persisted payload; rerunning the compiler is an integrity
+    check, never the normative path for obtaining the proposal."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    compilation_result_id: NonEmptyStr
+    compilation_attempt_id: NonEmptyStr
+    generation: Annotated[int, Field(ge=0)]
+    canon_delta: CanonDelta
+    canon_delta_payload_hash: NonEmptyStr
+    stored_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def _payload_hash_matches_the_embedded_delta(self) -> CompiledCanonDeltaEvidence:
+        if self.canon_delta_payload_hash != self.canon_delta.payload_hash:
+            raise ValueError("canon_delta_payload_hash must equal the embedded CanonDelta's own payload_hash")
+        return self
