@@ -3,8 +3,8 @@ non-authority lifecycle evidence.
 
 Every write is immutable and idempotent: an exact retry compares the full stored tuple
 and performs no write; any partial or mismatched retry fails with no write. The service
-holds no head-*mutation* port — but ``admit_extraction`` (Task 20) does read-lock the
-revision head to prove currentness atomically with admitting the attempt, via the same
+holds no head-*mutation* port — but ``admit_extraction`` does read-lock the revision
+head to prove currentness atomically with admitting the attempt, via the same
 transaction-bound repository every other method here already uses.
 """
 
@@ -193,8 +193,8 @@ class NarrativeLifecycleEvidenceService:
             return result
 
     async def admit_extraction(self, command: ExtractionAdmissionCommand) -> ExtractionAttempt:
-        """§7.2/§8: the attempt's admission instant is atomic with its currentness
-        proof. ``revision_acceptance_decision_id`` must be the exact current effective
+        """The attempt's admission instant is atomic with its currentness proof.
+        ``revision_acceptance_decision_id`` must be the exact current effective
         revision selection at lock time — a later supersession blocks new admissions
         for that revision but never deletes an attempt/result already recorded."""
         scope = command.work_scope

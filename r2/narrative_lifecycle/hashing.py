@@ -83,7 +83,7 @@ def compute_decision_canonical_identity_hash(
     command: NarrativeDecisionCommand, authorization: NarrativeDecisionAuthorization
 ) -> str:
     """Content-address one Human decision command together with its original
-    authorization evidence (§6.3). Covers decision family, action, stable subject key,
+    authorization evidence. Covers decision family, action, stable subject key,
     selected evidence IDs, both expected predecessors, exact Canon/Plan/Scene/Context
     bindings, actor identity, and (for a conflict resolution) conflict coverage, chosen
     resolution, and referenced resolution decisions — plus the exact original
@@ -104,7 +104,7 @@ def compute_decision_canonical_identity_hash(
 
 
 def compute_conflict_subject_fingerprint(subject: ConflictSubject) -> str:
-    """Content-address the minimal canonical conflict subject (§6.7): the same accepted
+    """Content-address the minimal canonical conflict subject: the same accepted
     revision plus the same canonical span coverage and effect-key subjects always
     produces the same fingerprint, regardless of which competing change sets or opaque
     lineage ID a caller proposed."""

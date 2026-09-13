@@ -75,8 +75,8 @@ class NarrativeLifecycleEvidenceRepositoryPort(Protocol):
 
 @runtime_checkable
 class NarrativeAuthorityRepositoryPort(Protocol):
-    """Scoped, transaction-bound decision-authority adapter (§7.1/§7.2): the shared
-    identity registry, the three typed decision tables, the conflict-resolution
+    """Scoped, transaction-bound decision-authority adapter: the shared identity
+    registry, the three typed decision tables, the conflict-resolution
     lineage table, and the three logical heads. Never commits, rolls back, or
     constructs a session — the unit of work owns that lifecycle.
     """
@@ -215,7 +215,7 @@ NarrativeLifecycleUnitOfWorkFactory = Callable[[], NarrativeLifecycleUnitOfWork]
 
 @runtime_checkable
 class NarrativeShowrunnerAuthorityPort(Protocol):
-    """The sole source of Human Showrunner decision authority (§6.2). Its only source of
+    """The sole source of Human Showrunner decision authority. Its only source of
     truth is an explicit project-scoped ``HUMAN_SHOWRUNNER`` grant issued by the frozen
     Governance/Showrunner approval authority: this port may read and verify that grant,
     but it creates, amends, revokes, or infers none of it. Every production adapter must

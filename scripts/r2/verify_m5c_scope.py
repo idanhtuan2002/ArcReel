@@ -114,7 +114,7 @@ HANDOFF_ONLY_ALLOWLIST_M5C2: frozenset[str] = frozenset({"docs/r2/evidence/R2_M5
 IMPLEMENTATION_ALLOWLIST_M5C2: frozenset[str] = HANDOFF_ONLY_ALLOWLIST_M5C2 | frozenset(
     {
         # amended in-flight to record real M5C-2 deviations (kernel hook signatures,
-        # the §7.3 lock-ordering fix, test-file renames — see the task commits)
+        # a lock-ordering fix, test-file renames — see the task commits)
         "docs/superpowers/plans/2026-09-09-r2-m5c-narrative-lifecycle.md",
         "docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md",
         # tooling / fitness

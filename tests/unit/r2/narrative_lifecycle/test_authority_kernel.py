@@ -1,9 +1,9 @@
-"""Unit coverage for the internal authority-kernel transaction body (spec §7.2).
+"""Unit coverage for the internal authority-kernel transaction body.
 
 Exercised against a fake repository + fake authority port, never a real database:
 this module tests orchestration (retry-before-write ordering, predecessor OCC, REJECT
 semantics), not persistence. Real-DB composite-FK / CHECK enforcement is covered by the
-Task 16 repository/migration tests instead.
+repository/migration integration tests instead.
 """
 
 from __future__ import annotations
@@ -61,8 +61,8 @@ class _FakeRevisionHead:
 class _FakeRepository:
     """An in-memory double for the subset of ``NarrativeLifecycleRepositoryPort`` the
     kernel actually calls. Only the ``REVISION_ACCEPTANCE`` family is modeled — the
-    kernel's family dispatch is exercised end-to-end in the Task 16 integration tests
-    against the real repository for the other two families."""
+    kernel's family dispatch is exercised end-to-end in the integration tests against
+    the real repository for the other two families."""
 
     def __init__(self) -> None:
         self.decisions: dict[str, tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]] = {}
@@ -328,7 +328,7 @@ async def test_retry_that_only_becomes_visible_under_the_serialized_lookup_is_st
     assert receipt.decision_id == "d-1"
     assert receipt.decision_generation == 1
     # the one head-insert write is from the genesis probe itself (lock_or_insert_head is
-    # called before the second lookup, per spec §7.2 step 4); no decision write happened.
+    # called before the second lookup); no decision write happened.
     assert "decision:d-1" not in fake_repo.writes
 
 
@@ -370,8 +370,8 @@ async def test_retry_naming_a_vanished_effective_predecessor_is_an_integrity_err
     kernel: AuthorityKernel, fake_repo: _FakeRepository
 ) -> None:
     """Reconstructing an exact-retry receipt for a past REJECT walks one hop to the
-    decision it named as ``expected_effective`` (§6.6 — REJECT itself stores no
-    generation number, only the reference). If that referenced decision no longer
+    decision it named as ``expected_effective`` (REJECT itself stores no generation
+    number, only the reference). If that referenced decision no longer
     resolves, retry reconstruction fails closed rather than guessing."""
     fake_repo.seed_decision("d-1", generation=1)  # latest=d-1, effective=d-1
     reject = make_revision_acceptance_command(

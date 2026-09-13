@@ -1,8 +1,8 @@
-"""``NarrativeLifecycleIntegrityChecker`` — rebuild-only, for now (Task 20; Task 30
-completes it with the read-side wiring for extraction currentness).
+"""``NarrativeLifecycleIntegrityChecker`` — rebuild-only for now; read-side wiring for
+extraction currentness is a separate concern layered on top of it.
 
-A current-selection guard never trusts a head pointer alone (spec §6.5). This module
-recomputes candidate head rows from the append-only typed decision chains into a
+A current-selection guard never trusts a head pointer alone. This module recomputes
+candidate head rows from the append-only typed decision chains into a
 *separate* projection and compares that projection against the stored (mutable) head
 before anything downstream is allowed to treat the stored head as authoritative. Every
 ``verify_*`` method raises ``NarrativeAuthorityIntegrityError`` — never silently repairs,

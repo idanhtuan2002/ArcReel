@@ -329,7 +329,7 @@ forbidden_modules = [
     "r2.narrative_lifecycle.authority_kernel",
 ]
 
-# M5C-2（Task 21 冻结）：唯一能追加决策/推进 head 的入口是 `acceptance.py`（它是
+# narrative_lifecycle：唯一能追加决策/推进 head 的入口是 `acceptance.py`（它是
 # `authority_kernel.py` 的唯一调用者）。包内其余纯变换/证据周边模块一律不得导入
 # `acceptance.py` —— 未来的抽取器/供应商/编排模块加入本包时同样要遵守。
 [[tool.importlinter.contracts]]

@@ -11,7 +11,7 @@ every other module in this package is read-only / append-only evidence.
 """
 
 from .acceptance import NarrativeAcceptanceService
-from .authority_kernel import ApplicabilityCheck, AuthorityKernel, GenesisPreparation
+from .authority_kernel import AuthorityKernel
 from .changeset_parser import (
     ParsedChangeRecord,
     canonicalize_change_record_headers,
@@ -67,13 +67,11 @@ __all__ = [
     "EVIDENCE_SEMANTIC_FINGERPRINT_VERSION",
     "EXTRACTION_INPUT_FINGERPRINT_VERSION",
     "PROSE_CONTENT_HASH_VERSION",
-    "ApplicabilityCheck",
     "AuthorityKernel",
     "ConflictSubject",
     "ContinuityIssue",
     "ContinuityReport",
     "ExtractionAdmissionCommand",
-    "GenesisPreparation",
     "NarrativeAcceptanceService",
     "NarrativeAuthorityRepositoryPort",
     "NarrativeLifecycleEvidenceRepositoryPort",

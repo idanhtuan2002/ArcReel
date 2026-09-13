@@ -771,7 +771,7 @@ class NarrativeLifecycleRepository:
         self, decision_id: str, *, user_id: str, project_name: str
     ) -> tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int] | None:
         """A plain scoped read: no lock, no insert (the kernel calls this before any head
-        write, per spec §7.2 step 2/step 5). Returns ``None`` for an absent id or one that
+        write). Returns ``None`` for an absent id or one that
         resolves outside ``(user_id, project_name)`` — the two cases are indistinguishable
         to the caller, matching every other exact-scope lookup in this repository."""
         identity = await self._scalar(
@@ -831,7 +831,7 @@ class NarrativeLifecycleRepository:
         self, work_scope: NarrativeWorkScope
     ) -> list[tuple[NarrativeDecisionCommand, NarrativeDecisionAuthorization, int]]:
         """Every ``REVISION_ACCEPTANCE`` decision for this exact subject, in append
-        order — the authoritative chain a head is rebuilt from (§6.5)."""
+        order — the authoritative chain a head is rebuilt from."""
         rows = (
             await self.session.execute(
                 select(RevisionAcceptanceDecisionModel)
@@ -1036,9 +1036,9 @@ class NarrativeLifecycleRepository:
         return _conflict_resolution_head_from_row(row)
 
     async def lock_or_insert_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead:
-        """§7.2 step 3-5: ``INSERT ... ON CONFLICT DO NOTHING`` the head by its complete
-        stable key (null pointers, zero generations), then lock and return it. Called only
-        after retry resolution, for a genuinely new decision id."""
+        """``INSERT ... ON CONFLICT DO NOTHING`` the head by its complete stable key
+        (null pointers, zero generations), then lock and return it. Called only after
+        retry resolution, for a genuinely new decision id."""
         stmt = self._insert(RevisionAcceptanceHeadModel).values(
             user_id=work_scope.user_id,
             project_name=work_scope.project_name,

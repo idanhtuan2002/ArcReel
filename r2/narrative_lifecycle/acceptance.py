@@ -1,14 +1,13 @@
-"""``NarrativeAcceptanceService`` — the authenticated public facade for the M5C-2
-Narrative decision authority (spec §6, §8.1).
+"""``NarrativeAcceptanceService`` — the authenticated public facade for the Narrative
+decision authority.
 
-Exposes exactly: ``decide_revision``, ``review_change_set``, ``resolve_change_set_conflict``
-(this task); ``admit_canon_handoff`` (Task 28); and the read-only ``get_current_*`` /
-``verify_exact_current_selection`` observations. No generic ``save_decision``,
-``set_head``, ``approve``, ``latest``, or raw repository method is public. The public
-decision surface never accepts a caller-supplied ``NarrativeDecisionAuthorization`` —
-every command takes only ``command`` and ``authenticated_principal``; the injected
-``NarrativeShowrunnerAuthorityPort`` decides who may act, and the ``AuthorityKernel``
-(Task 17) calls it.
+Exposes exactly: ``decide_revision``, ``review_change_set``, ``resolve_change_set_conflict``,
+and the read-only ``get_current_*`` / ``verify_exact_current_selection`` observations. No
+generic ``save_decision``, ``set_head``, ``approve``, ``latest``, or raw repository
+method is public. The public decision surface never accepts a caller-supplied
+``NarrativeDecisionAuthorization`` — every command takes only ``command`` and
+``authenticated_principal``; the injected ``NarrativeShowrunnerAuthorityPort`` decides
+who may act, and the ``AuthorityKernel`` calls it.
 """
 
 from __future__ import annotations
@@ -43,7 +42,7 @@ _AnyHead = RevisionAcceptanceHead | ChangeSetReviewHead | ConflictResolutionHead
 
 class NarrativeAcceptanceService:
     """One authority adapter per service instance; constructed without one, it raises
-    rather than defaulting to a permissive stub (Task 21 asserts this)."""
+    rather than defaulting to a permissive stub."""
 
     def __init__(
         self,
@@ -71,7 +70,7 @@ class NarrativeAcceptanceService:
     async def resolve_change_set_conflict(
         self, command: ConflictResolutionCommand, *, authenticated_principal: str
     ) -> NarrativeDecisionReceipt:
-        """The only conflict-lineage creation interface (§6.7). A genesis command
+        """The only conflict-lineage creation interface. A genesis command
         (``expected_latest_decision_id is None``) atomically derives the canonical
         conflict subject from the exact currently-effective competing change-set
         reviews, creates the lineage + its zero-generation head, and appends the first
@@ -89,10 +88,10 @@ class NarrativeAcceptanceService:
     ) -> None:
         assert isinstance(command, ConflictResolutionCommand)
         # Read-only here: the kernel already holds this decision's own conflict-
-        # resolution head (rank 2) by this point (step 4), so taking a fresh lock on
-        # rank-1 change-set-review heads now would lock out of the §7.3 canonical
-        # order and risk a deadlock against a genesis on the same heads. Genesis
-        # (below) runs before any head is locked, so it can safely lock in order.
+        # resolution head (rank 2) by this point, so taking a fresh lock on rank-1
+        # change-set-review heads now would violate the canonical lock order and risk a
+        # deadlock against a genesis on the same heads. Genesis (below) runs before any
+        # head is locked, so it can safely lock in order.
         await self._verify_competitors(repo, command, lock=False)
 
     async def _prepare_conflict_genesis(
@@ -131,7 +130,7 @@ class NarrativeAcceptanceService:
         genesis caller can derive the conflict subject from the same verified read.
 
         ``lock=True`` (genesis only) additionally holds each competing change-set-review
-        head for the rest of this transaction, in the §7.3 canonical order — sorted by
+        head for the rest of this transaction, in the canonical order — sorted by
         ``head_lock_sort_key``, never by the caller's own listing order — so two genesis
         commands naming the same lineages in opposite order cannot deadlock.
         """
@@ -190,9 +189,9 @@ class NarrativeAcceptanceService:
         return change_sets
 
     async def is_conflict_resolution_applicable(self, decision_id: str, *, user_id: str, project_name: str) -> bool:
-        """§6.7: a resolution is applicable only while it is the effective resolution
-        for its own head *and* every review decision it named remains effective for
-        its own lineage. Returns ``False`` — never raises — the moment either
+        """A resolution is applicable only while it is the effective resolution for its
+        own head *and* every review decision it named remains effective for its own
+        lineage. Returns ``False`` — never raises — the moment either
         condition fails, including for an absent or non-conflict-resolution id."""
         async with self._uow_factory() as uow:
             repo = uow.repository

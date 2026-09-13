@@ -326,8 +326,7 @@ class NarrativeExtractionResultChangeSetModel(UserOwnedMixin, Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
-# --- M5C-2 Narrative decision authority: identity registry, typed decisions, lineage,
-# heads (spec §6, §7.1) ---
+# --- Narrative decision authority: identity registry, typed decisions, lineage, heads --
 #
 # Every typed decision row durably owns its exact original Human authorization
 # (``authorization_*`` columns) — never the fresh per-request retry authentication, which
@@ -336,12 +335,12 @@ class NarrativeExtractionResultChangeSetModel(UserOwnedMixin, Base):
 # ``expected_latest_decision_id`` / ``expected_effective_decision_id`` to a prior decision
 # of the *same* typed logical subject, and a composite FK ties each head pointer back to a
 # decision of that same subject — a decision from a different subject cannot be linked in
-# either direction (§7.1 "composite self-FKs" / "composite FKs from head pointers").
+# either direction.
 
 
 class NarrativeDecisionIdentityModel(UserOwnedMixin, Base):
     """The shared registry enforcing ``decision_id`` uniqueness across all three typed
-    decision tables (§6.3). Every typed decision row's ``(decision_id, decision_family)``
+    decision tables. Every typed decision row's ``(decision_id, decision_family)``
     is a composite FK into this table, so an ID cannot be reused in another family."""
 
     __tablename__ = "narrative_decision_identities"
@@ -360,7 +359,7 @@ class NarrativeDecisionIdentityModel(UserOwnedMixin, Base):
 
 class RevisionAcceptanceDecisionModel(UserOwnedMixin, Base):
     """One typed ``decide_revision`` decision. Its logical subject key is exactly
-    ``NarrativeWorkScope`` (§6.5); ``expected_latest_decision_id`` /
+    ``NarrativeWorkScope``; ``expected_latest_decision_id`` /
     ``expected_effective_decision_id`` are composite self-FKs to a prior decision of that
     same subject, never a bare opaque-ID reference."""
 
@@ -462,7 +461,7 @@ class RevisionAcceptanceDecisionModel(UserOwnedMixin, Base):
 
 class ChangeSetReviewDecisionModel(UserOwnedMixin, Base):
     """One typed ``review_change_set`` decision. Its logical subject key is
-    ``(revision_acceptance_decision_id, change_set_lineage_id)`` (§6.5)."""
+    ``(revision_acceptance_decision_id, change_set_lineage_id)``."""
 
     __tablename__ = "change_set_review_decisions"
     __table_args__ = (
@@ -523,9 +522,9 @@ class ChangeSetReviewDecisionModel(UserOwnedMixin, Base):
     project_name: Mapped[str] = mapped_column(String(255), nullable=False)
     decision_family: Mapped[str] = mapped_column(String(32), nullable=False)
     action: Mapped[str] = mapped_column(String(16), nullable=False)
-    # The command's ``work_scope`` (§6.3) — the current plan/scene/canon-branch context
-    # this decision was made under. Not the head key (see the class docstring), but part
-    # of the exact canonical command and required to reconstruct it byte-for-byte.
+    # The command's ``work_scope`` — the current plan/scene/canon-branch context this
+    # decision was made under. Not the head key (see the class docstring), but part of
+    # the exact canonical command and required to reconstruct it byte-for-byte.
     plan_id: Mapped[str] = mapped_column(_ID, nullable=False)
     scene_contract_id: Mapped[str] = mapped_column(_ID, nullable=False)
     canon_branch_id: Mapped[str] = mapped_column(_ID, nullable=False)
@@ -552,7 +551,7 @@ class ChangeSetReviewDecisionModel(UserOwnedMixin, Base):
 
 class ConflictResolutionLineageModel(UserOwnedMixin, Base):
     """The opaque conflict-resolution lineage allocated by the genesis form of
-    ``resolve_change_set_conflict()`` (§6.7). ``UNIQUE(revision_acceptance_decision_id,
+    ``resolve_change_set_conflict()``. ``UNIQUE(revision_acceptance_decision_id,
     conflict_subject_fingerprint)`` makes the same accepted revision + the same canonical
     conflict subject denote one lineage; reuse of ``conflict_resolution_lineage_id`` for a
     different subject is a separate identity conflict, not enforced by this constraint."""
@@ -591,9 +590,9 @@ class ConflictResolutionLineageModel(UserOwnedMixin, Base):
 
 class ConflictResolutionDecisionModel(UserOwnedMixin, Base):
     """One typed ``resolve_change_set_conflict`` decision. Its logical subject key is
-    ``(revision_acceptance_decision_id, conflict_resolution_lineage_id)`` (§6.5); its
-    genesis form is created atomically with the lineage and head it belongs to (§6.7,
-    §7.2 — enforced by the service, not this row alone)."""
+    ``(revision_acceptance_decision_id, conflict_resolution_lineage_id)``; its genesis
+    form is created atomically with the lineage and head it belongs to (enforced by the
+    service, not this row alone)."""
 
     __tablename__ = "conflict_resolution_decisions"
     __table_args__ = (
@@ -680,7 +679,7 @@ class ConflictResolutionDecisionModel(UserOwnedMixin, Base):
 
 class ConflictResolutionDecisionCompetitorModel(UserOwnedMixin, Base):
     """Ordered proof that one conflict-resolution decision names exactly this paired set
-    of competing change sets and their review decisions, in this order (§6.7)."""
+    of competing change sets and their review decisions, in this order."""
 
     __tablename__ = "conflict_resolution_decision_competitors"
     __table_args__ = (
@@ -724,7 +723,7 @@ class ConflictResolutionDecisionCompetitorModel(UserOwnedMixin, Base):
 
 
 def _head_generation_checks(prefix: str) -> tuple[CheckConstraint, ...]:
-    """The §7.1 null-pointer/zero-generation genesis invariant, shared by every head."""
+    """The null-pointer/zero-generation genesis invariant, shared by every head."""
     return (
         CheckConstraint(
             "(latest_decision_id IS NULL AND decision_generation = 0) "
@@ -741,8 +740,8 @@ def _head_generation_checks(prefix: str) -> tuple[CheckConstraint, ...]:
 
 
 class RevisionAcceptanceHeadModel(UserOwnedMixin, Base):
-    """The rebuildable lock/index projection keyed by exactly ``NarrativeWorkScope``
-    (§6.5). The only mutable row family in the M5C-2 authority schema."""
+    """The rebuildable lock/index projection keyed by exactly ``NarrativeWorkScope``.
+    The only mutable row family in the Narrative decision-authority schema."""
 
     __tablename__ = "revision_acceptance_heads"
     __table_args__ = (
@@ -806,7 +805,7 @@ class RevisionAcceptanceHeadModel(UserOwnedMixin, Base):
 
 class ChangeSetReviewHeadModel(UserOwnedMixin, Base):
     """The rebuildable lock/index projection keyed by
-    ``(revision_acceptance_decision_id, change_set_lineage_id)`` (§6.5)."""
+    ``(revision_acceptance_decision_id, change_set_lineage_id)``."""
 
     __tablename__ = "change_set_review_heads"
     __table_args__ = (
@@ -858,7 +857,7 @@ class ChangeSetReviewHeadModel(UserOwnedMixin, Base):
 
 class ConflictResolutionHeadModel(UserOwnedMixin, Base):
     """The rebuildable lock/index projection keyed by
-    ``(revision_acceptance_decision_id, conflict_resolution_lineage_id)`` (§6.5)."""
+    ``(revision_acceptance_decision_id, conflict_resolution_lineage_id)``."""
 
     __tablename__ = "conflict_resolution_heads"
     __table_args__ = (

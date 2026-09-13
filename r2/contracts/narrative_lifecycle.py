@@ -286,8 +286,8 @@ NarrativeDecisionActionAny = Literal["ACCEPT", "REJECT", "SUPERSEDE", "RESOLVE"]
 
 class NarrativeDecisionAuthorization(R2ContractModel):
     """The original, immutable Human Showrunner approval evidence for one exact canonical
-    command (§6.2). Persisted with its typed decision and included in stored decision
-    identity, including its own ``authenticated_at`` receipt time. Reuse for a different
+    command. Persisted with its typed decision and included in stored decision identity,
+    including its own ``authenticated_at`` receipt time. Reuse for a different
     family, action, scope, decision ID, or command fingerprint is a kernel-enforced
     identity conflict, not something this shape can reject on its own."""
 
@@ -308,7 +308,7 @@ class NarrativeDecisionAuthorization(R2ContractModel):
 
 class NarrativeDecisionRetryAuthentication(R2ContractModel):
     """Proves only that the original ``actor_id`` is currently authenticated and may
-    request replay in this exact scope (§6.2). Never persisted as decision identity and
+    request replay in this exact scope. Never persisted as decision identity and
     never substitutes for the original ``NarrativeDecisionAuthorization``."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -329,13 +329,13 @@ def _validate_decision_predecessors(
     expected_latest_decision_id: str | None,
     expected_effective_decision_id: str | None,
 ) -> None:
-    """The §6.4 predecessor rules shared by all three decision families.
+    """The predecessor rules shared by all three decision families.
 
     Genesis (no expected latest decision) must also expect no effective decision. The
     family's "select a new effective candidate" action (``ACCEPT`` or ``RESOLVE``)
     forbids an existing effective selection; ``SUPERSEDE`` requires one. ``REJECT`` is
     unconstrained here: it may name a candidate whether or not an effective selection
-    already exists, and never changes the effective pointer (§6.6).
+    already exists, and never changes the effective pointer.
     """
     if expected_latest_decision_id is None and expected_effective_decision_id is not None:
         raise ValueError("a genesis decision (no expected latest decision) must also expect no effective decision")
@@ -350,7 +350,7 @@ class RevisionAcceptanceCommand(R2ContractModel):
     ``RevisionAcceptanceHead`` this decision targets; ``selected_revision_id`` is the
     exact ``NarrativeRevision`` this decision names. ``retry_authentication`` is supplied
     only when this request may be an exact retry of an already-stored ``decision_id``; it
-    is excluded from canonical decision identity (§6.3)."""
+    is excluded from canonical decision identity."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     decision_id: NonEmptyStr
@@ -412,12 +412,12 @@ class ChangeSetReviewCommand(R2ContractModel):
 
 
 class ConflictResolutionCommand(R2ContractModel):
-    """One ``resolve_change_set_conflict`` request (§6.7). Its genesis form both
-    allocates the ``ConflictResolutionLineage`` and appends the first decision to its
-    head; its stable subject key is
+    """One ``resolve_change_set_conflict`` request. Its genesis form both allocates the
+    ``ConflictResolutionLineage`` and appends the first decision to its head; its stable
+    subject key is
     ``(revision_acceptance_decision_id, conflict_resolution_lineage_id)``.
     ``chosen_resolution`` is the typed semantic instruction the compiler understands, or
-    (for ``REJECT``) the proposed resolution being named and rejected (§6.6)."""
+    (for ``REJECT``) the proposed resolution being named and rejected."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     decision_id: NonEmptyStr
@@ -469,7 +469,7 @@ NarrativeDecisionCommand = RevisionAcceptanceCommand | ChangeSetReviewCommand | 
 class NarrativeDecisionReceipt(R2ContractModel):
     """Returned by all three decision commands. Names the exact decision made and the
     resulting head generations. ``currently_effective`` is deliberately absent: exact
-    retry can return this receipt long after currentness has changed (§6.3, §6.5)."""
+    retry can return this receipt long after currentness has changed."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     decision_id: NonEmptyStr
@@ -487,7 +487,7 @@ def _validate_head_generations(
     effective_decision_id: str | None,
     effective_generation: int,
 ) -> None:
-    """The §7.1 "null-pointer/zero-generation genesis" invariant shared by every logical
+    """The "null-pointer/zero-generation genesis" invariant shared by every logical
     head: a pointer is absent exactly when its generation is zero, and the effective
     generation can never run ahead of the decision generation that produced it."""
     if (latest_decision_id is None) != (decision_generation == 0):
@@ -501,7 +501,7 @@ def _validate_head_generations(
 class RevisionAcceptanceHead(R2ContractModel):
     """The rebuildable lock/index projection keyed by
     ``(user_id, project_name, plan_id, scene_contract_id, canon_branch_id)`` — exactly
-    ``NarrativeWorkScope`` (§6.5)."""
+    ``NarrativeWorkScope``."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     work_scope: NarrativeWorkScope
@@ -523,7 +523,7 @@ class RevisionAcceptanceHead(R2ContractModel):
 
 class ChangeSetReviewHead(R2ContractModel):
     """The rebuildable lock/index projection keyed by
-    ``(revision_acceptance_decision_id, change_set_lineage_id)`` (§6.5)."""
+    ``(revision_acceptance_decision_id, change_set_lineage_id)``."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     revision_acceptance_decision_id: NonEmptyStr
@@ -546,7 +546,7 @@ class ChangeSetReviewHead(R2ContractModel):
 
 class ConflictResolutionHead(R2ContractModel):
     """The rebuildable lock/index projection keyed by
-    ``(revision_acceptance_decision_id, conflict_resolution_lineage_id)`` (§6.5)."""
+    ``(revision_acceptance_decision_id, conflict_resolution_lineage_id)``."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     revision_acceptance_decision_id: NonEmptyStr
@@ -569,7 +569,7 @@ class ConflictResolutionHead(R2ContractModel):
 
 class ConflictResolutionLineage(R2ContractModel):
     """The opaque conflict-resolution lineage allocated by the genesis form of
-    ``resolve_change_set_conflict()`` (§6.7). Its revision and conflict subject are
+    ``resolve_change_set_conflict()``. Its revision and conflict subject are
     immutable; the service derives ``conflict_subject_fingerprint`` from the minimal
     canonical intersection of the exact currently effective competing reviewed change
     sets, never from caller-supplied widened, partial, reordered, or free-form coverage."""
