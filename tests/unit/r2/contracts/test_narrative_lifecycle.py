@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from r2.contracts.narrative import AddFactOperation, CanonDeltaPayload, Fact
+from r2.contracts import canonical_json_bytes, ensure_json_value
+from r2.contracts.narrative import AddFactOperation, CanonCommitApproval, CanonDeltaPayload, Fact
 from r2.contracts.narrative_lifecycle import (
     CanonMutationEffectKey,
     ChangeSetReviewCommand,
@@ -26,10 +27,12 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeDecisionAuthorization,
     NarrativeDecisionReceipt,
     NarrativeDecisionRetryAuthentication,
+    NarrativeHandoffAdmission,
     NarrativeRevision,
     NarrativeSemanticEffectKey,
     NarrativeWorkScope,
     ObservedEffectiveHead,
+    ObservedNarrativeHead,
     RevisionAcceptanceCommand,
     RevisionAcceptanceHead,
     SourceSpan,
@@ -37,7 +40,11 @@ from r2.contracts.narrative_lifecycle import (
 )
 from r2.contracts.provenance import Provenance
 from r2.narrative.hashing import seal_canon_delta
-from r2.narrative_lifecycle.hashing import compute_compilation_input_fingerprint
+from r2.narrative_lifecycle.hashing import (
+    CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
+    compute_canon_approval_binding_fingerprint,
+    compute_compilation_input_fingerprint,
+)
 
 NOW = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
 NAIVE = datetime(2026, 9, 9, 12, 0)
@@ -694,3 +701,189 @@ def test_compilation_input_fingerprint_ignores_workflow_metadata(override: dict[
     assert compute_compilation_input_fingerprint(_attempt()) == compute_compilation_input_fingerprint(
         _attempt(**override)
     )
+
+
+# --- M5C-4 atomic M5A handoff admission (spec section 11.1) ---
+
+APPROVAL = CanonCommitApproval(
+    approval_ref="approval-1",
+    canon_delta_id="delta-1",
+    payload_hash="sha256:deadbeef",
+    payload_hash_algorithm="sha256",
+    payload_hash_version="r2-canon-delta-v1",
+    content_schema_version="r2-canon-schema-v1",
+    project_name="proj",
+    user_id="u-1",
+    approved_by="showrunner-1",
+    approved_at=NOW,
+    status="APPROVED",
+)
+
+MUTATED: dict[str, object] = {
+    "approval_ref": "approval-2",
+    "canon_delta_id": "delta-2",
+    "payload_hash": "sha256:other",
+    "content_schema_version": "r2-canon-schema-v2",
+    "project_name": "other-proj",
+    "user_id": "u-2",
+    "approved_by": "someone-else",
+    "status": "REJECTED",
+}
+
+
+def _observed_narrative_head(**overrides: object) -> ObservedNarrativeHead:
+    base: dict[str, object] = {
+        "head_family": "REVISION_ACCEPTANCE",
+        "logical_key": ("plan-1", "scene-1", "branch-1"),
+        "effective_decision_id": "dec-rev-1",
+        "effective_generation": 1,
+        "decision_generation": 1,
+    }
+    return ObservedNarrativeHead(**(base | overrides))
+
+
+def _handoff_admission(**overrides: object) -> NarrativeHandoffAdmission:
+    approval = overrides.pop("canon_commit_approval", APPROVAL)
+    assert isinstance(approval, CanonCommitApproval)
+    base: dict[str, object] = {
+        "admission_id": "adm-1",
+        "work_scope": SCOPE,
+        "compilation_attempt_id": "cattempt-1",
+        "generation": 0,
+        "compilation_result_id": "cres-1",
+        "canon_delta_id": approval.canon_delta_id,
+        "canon_delta_payload_hash": approval.payload_hash,
+        "canon_commit_approval_ref": approval.approval_ref,
+        "canon_commit_approval": approval,
+        "canon_commit_approval_fingerprint": compute_canon_approval_binding_fingerprint(approval),
+        "canon_commit_approval_fingerprint_algorithm": "sha256",
+        "canon_commit_approval_fingerprint_version": CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
+        "revision_acceptance_decision_id": "dec-rev-1",
+        "review_decision_ids": ["dec-rev-1-review"],
+        "conflict_resolution_decision_ids": [],
+        "observed_heads": [_observed_narrative_head()],
+        "base_canon_version_id": "cv-1",
+        "actor_id": "showrunner-1",
+        "admitted_at": NOW,
+        "canonical_identity_hash": "hai:1",
+    }
+    return NarrativeHandoffAdmission(**(base | overrides))
+
+
+def test_approval_binding_fingerprint_covers_every_m5a_field() -> None:
+    base = compute_canon_approval_binding_fingerprint(APPROVAL)
+    for field in (
+        "approval_ref",
+        "canon_delta_id",
+        "payload_hash",
+        "content_schema_version",
+        "project_name",
+        "user_id",
+        "approved_by",
+        "status",
+    ):
+        assert base != compute_canon_approval_binding_fingerprint(APPROVAL.model_copy(update={field: MUTATED[field]}))
+    assert base != compute_canon_approval_binding_fingerprint(
+        APPROVAL.model_copy(update={"approved_at": APPROVAL.approved_at + timedelta(seconds=1)})
+    )
+
+
+def test_approval_binding_fingerprint_prefix_version_and_determinism() -> None:
+    fp = compute_canon_approval_binding_fingerprint(APPROVAL)
+    assert fp.startswith("cab:")
+    assert fp == compute_canon_approval_binding_fingerprint(APPROVAL)
+    assert (
+        NarrativeHandoffAdmission.model_fields["canon_commit_approval_fingerprint_version"].default
+        == CANON_APPROVAL_BINDING_FINGERPRINT_VERSION
+    )
+
+
+def test_approval_binding_fingerprint_algorithm_or_version_change_fails_closed() -> None:
+    fp = compute_canon_approval_binding_fingerprint(APPROVAL)
+    changed_algorithm = APPROVAL.model_copy(update={"payload_hash_algorithm": "sha512"})
+    assert fp != compute_canon_approval_binding_fingerprint(changed_algorithm)
+    changed_version = APPROVAL.model_copy(update={"payload_hash_version": "r2-canon-delta-v2"})
+    assert fp != compute_canon_approval_binding_fingerprint(changed_version)
+
+
+def test_inline_approval_round_trips_to_identical_canonical_bytes() -> None:
+    admission = _handoff_admission()
+    round_tripped = CanonCommitApproval.model_validate(admission.canon_commit_approval.model_dump(mode="json"))
+    assert canonical_json_bytes(ensure_json_value(round_tripped.model_dump(mode="json"))) == canonical_json_bytes(
+        ensure_json_value(admission.canon_commit_approval.model_dump(mode="json"))
+    )
+    assert compute_canon_approval_binding_fingerprint(round_tripped) == admission.canon_commit_approval_fingerprint
+
+
+def test_handoff_admission_rejects_naive_timestamps() -> None:
+    with pytest.raises(ValidationError):
+        _handoff_admission(admitted_at=NAIVE)
+    with pytest.raises(ValidationError):
+        CanonCommitApproval(**(APPROVAL.model_dump(mode="python") | {"approved_at": NAIVE}))
+
+
+def test_handoff_admission_approval_ref_must_match_the_embedded_approval() -> None:
+    with pytest.raises(ValidationError):
+        _handoff_admission(canon_commit_approval_ref="mismatched-ref")
+
+
+def test_handoff_admission_canon_delta_id_must_match_the_embedded_approval() -> None:
+    with pytest.raises(ValidationError):
+        _handoff_admission(canon_delta_id="mismatched-delta")
+
+
+def test_handoff_admission_canon_delta_payload_hash_must_match_the_embedded_approval() -> None:
+    with pytest.raises(ValidationError):
+        _handoff_admission(canon_delta_payload_hash="mismatched-hash")
+
+
+def test_handoff_admission_rejects_duplicate_review_decision_ids() -> None:
+    with pytest.raises(ValidationError):
+        _handoff_admission(review_decision_ids=["d-1", "d-1"])
+
+
+def test_handoff_admission_rejects_duplicate_conflict_resolution_decision_ids() -> None:
+    with pytest.raises(ValidationError):
+        _handoff_admission(conflict_resolution_decision_ids=["d-1", "d-1"])
+
+
+def test_handoff_admission_requires_at_least_one_observed_head() -> None:
+    with pytest.raises(ValidationError):
+        _handoff_admission(observed_heads=[])
+
+
+def test_handoff_admission_rejects_duplicate_observed_head_keys() -> None:
+    with pytest.raises(ValidationError):
+        _handoff_admission(
+            observed_heads=[
+                _observed_narrative_head(),
+                _observed_narrative_head(),
+            ]
+        )
+
+
+def test_observed_narrative_head_requires_a_non_empty_logical_key() -> None:
+    with pytest.raises(ValidationError):
+        _observed_narrative_head(logical_key=())
+
+
+def test_observed_narrative_head_null_pointer_matches_zero_generation() -> None:
+    with pytest.raises(ValidationError):
+        _observed_narrative_head(effective_decision_id=None, effective_generation=1)
+    with pytest.raises(ValidationError):
+        _observed_narrative_head(effective_decision_id="dec-1", effective_generation=0)
+    ok = _observed_narrative_head(effective_decision_id=None, effective_generation=0, decision_generation=0)
+    assert ok.effective_generation == 0
+
+
+def test_observed_narrative_head_effective_generation_cannot_exceed_decision_generation() -> None:
+    with pytest.raises(ValidationError):
+        _observed_narrative_head(effective_generation=2, decision_generation=1)
+
+
+@pytest.mark.parametrize("make_instance", [_handoff_admission, _observed_narrative_head])
+def test_handoff_admission_contracts_forbid_extra_fields(make_instance) -> None:
+    instance = make_instance()
+    payload = instance.model_dump(mode="json") | {"unexpected_field": "nope"}
+    with pytest.raises(ValidationError):
+        type(instance).model_validate(payload)

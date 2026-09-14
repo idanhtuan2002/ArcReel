@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
 from .common import JSONValue, NonEmptyStr, R2ContractModel
-from .narrative import CanonDelta
+from .narrative import CanonCommitApproval, CanonDelta
 from .provenance import Provenance
 
 SEMANTIC_EFFECT_KEY_VERSION = "r2-m5c-semantic-effect-key-v1"
@@ -752,4 +752,110 @@ class CompiledCanonDeltaEvidence(R2ContractModel):
     def _payload_hash_matches_the_embedded_delta(self) -> CompiledCanonDeltaEvidence:
         if self.canon_delta_payload_hash != self.canon_delta.payload_hash:
             raise ValueError("canon_delta_payload_hash must equal the embedded CanonDelta's own payload_hash")
+        return self
+
+
+# --- M5C-4 Atomic M5A handoff admission (spec section 11.1) ---
+#
+# The admission is the sole boundary-crossing receipt binding a SUCCEEDED compilation
+# result to the exact existing M5A ``CanonCommitApproval`` that authorizes committing its
+# delta. It owns a lossless immutable inline copy of that approval — never a reference, an
+# ephemeral cache, or a caller-resubmitted reconstruction — plus the exact heads observed
+# as currently effective at the admission instant. The approval remains M5A authority: its
+# M5C copy can prove and recover the admitted tuple but cannot approve, replace, validate,
+# or commit Canon.
+
+CANON_APPROVAL_BINDING_FINGERPRINT_VERSION = "r2-m5c-canon-approval-binding-v1"
+
+
+class ObservedNarrativeHead(R2ContractModel):
+    """One head's authoritative pointer as observed at handoff-admission time: which
+    typed decision family and logical subject key, the effective decision (or none) and
+    its generation, and the total decision generation reached at that head. Durable proof
+    of what was current when the admission was appended — a head can move on afterward
+    without invalidating an admission already appended against it."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    head_family: NarrativeDecisionFamily
+    logical_key: tuple[NonEmptyStr, ...]
+    effective_decision_id: NonEmptyStr | None = None
+    effective_generation: Annotated[int, Field(ge=0)]
+    decision_generation: Annotated[int, Field(ge=0)]
+
+    @model_validator(mode="after")
+    def _logical_key_non_empty(self) -> ObservedNarrativeHead:
+        if not self.logical_key:
+            raise ValueError("ObservedNarrativeHead logical_key must be non-empty")
+        return self
+
+    @model_validator(mode="after")
+    def _generation_invariant(self) -> ObservedNarrativeHead:
+        if (self.effective_decision_id is None) != (self.effective_generation == 0):
+            raise ValueError("effective_generation must be zero exactly when effective_decision_id is absent")
+        if self.effective_generation > self.decision_generation:
+            raise ValueError("effective_generation cannot exceed decision_generation")
+        return self
+
+
+class NarrativeHandoffAdmission(R2ContractModel):
+    """The immutable receipt of one atomic M5A handoff admission (spec section 11.1). The
+    admission ID is opaque and idempotent: the same ID with the exact same full tuple
+    returns the original receipt, even after a later Narrative supersession; the same ID
+    with any different field is an identity conflict. This contract carries no
+    ``currently_effective`` flag: currentness is checked once, at the atomic admission
+    instant (section 11.3), never re-derived from this receipt afterward."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    admission_id: NonEmptyStr
+    work_scope: NarrativeWorkScope
+    compilation_attempt_id: NonEmptyStr
+    generation: Annotated[int, Field(ge=0)]
+    compilation_result_id: NonEmptyStr
+    canon_delta_id: NonEmptyStr
+    canon_delta_payload_hash: NonEmptyStr
+    canon_commit_approval_ref: NonEmptyStr
+    canon_commit_approval: CanonCommitApproval
+    canon_commit_approval_fingerprint: NonEmptyStr
+    canon_commit_approval_fingerprint_algorithm: Literal["sha256"]
+    canon_commit_approval_fingerprint_version: Literal["r2-m5c-canon-approval-binding-v1"] = (
+        CANON_APPROVAL_BINDING_FINGERPRINT_VERSION
+    )
+    revision_acceptance_decision_id: NonEmptyStr
+    review_decision_ids: tuple[NonEmptyStr, ...] = ()
+    conflict_resolution_decision_ids: tuple[NonEmptyStr, ...] = ()
+    observed_heads: tuple[ObservedNarrativeHead, ...]
+    base_canon_version_id: NonEmptyStr
+    actor_id: NonEmptyStr
+    admitted_at: AwareDatetime
+    canonical_identity_hash: NonEmptyStr
+
+    @model_validator(mode="after")
+    def _approval_binding_matches_the_embedded_approval(self) -> NarrativeHandoffAdmission:
+        if self.canon_commit_approval_ref != self.canon_commit_approval.approval_ref:
+            raise ValueError("canon_commit_approval_ref must equal the embedded approval's own approval_ref")
+        if self.canon_delta_id != self.canon_commit_approval.canon_delta_id:
+            raise ValueError("canon_delta_id must equal the embedded approval's own canon_delta_id")
+        if self.canon_delta_payload_hash != self.canon_commit_approval.payload_hash:
+            raise ValueError("canon_delta_payload_hash must equal the embedded approval's own payload_hash")
+        return self
+
+    @model_validator(mode="after")
+    def _review_decision_ids_are_unique(self) -> NarrativeHandoffAdmission:
+        if len(set(self.review_decision_ids)) != len(self.review_decision_ids):
+            raise ValueError("review_decision_ids must be unique")
+        return self
+
+    @model_validator(mode="after")
+    def _conflict_resolution_decision_ids_are_unique(self) -> NarrativeHandoffAdmission:
+        if len(set(self.conflict_resolution_decision_ids)) != len(self.conflict_resolution_decision_ids):
+            raise ValueError("conflict_resolution_decision_ids must be unique")
+        return self
+
+    @model_validator(mode="after")
+    def _observed_heads_are_present_and_unique(self) -> NarrativeHandoffAdmission:
+        if not self.observed_heads:
+            raise ValueError("a handoff admission must observe at least one head")
+        keys = [(head.head_family, head.logical_key) for head in self.observed_heads]
+        if len(set(keys)) != len(keys):
+            raise ValueError("observed_heads (head_family, logical_key) pairs must be unique")
         return self

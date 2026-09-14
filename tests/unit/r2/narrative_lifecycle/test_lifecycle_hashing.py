@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from r2.contracts.narrative import CanonCommitApproval
 from r2.contracts.narrative_context import compute_source_content_hash
 from r2.contracts.narrative_lifecycle import (
     DraftCandidate,
@@ -15,9 +16,11 @@ from r2.contracts.narrative_lifecycle import (
 )
 from r2.contracts.provenance import Provenance
 from r2.narrative_lifecycle.hashing import (
+    CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
     DECISION_CANONICAL_IDENTITY_HASH_VERSION,
     EVIDENCE_SEMANTIC_FINGERPRINT_VERSION,
     PROSE_CONTENT_HASH_VERSION,
+    compute_canon_approval_binding_fingerprint,
     compute_decision_canonical_identity_hash,
     compute_evidence_semantic_fingerprint,
     compute_prose_content_hash,
@@ -82,6 +85,30 @@ def _draft(*, base_canon_version_id: str = "cv-1") -> DraftCandidate:
 def test_hash_domain_versions_are_pinned() -> None:
     assert PROSE_CONTENT_HASH_VERSION == "r2-m5c-prose-content-v1"
     assert EVIDENCE_SEMANTIC_FINGERPRINT_VERSION == "r2-m5c-evidence-fingerprint-v1"
+    assert CANON_APPROVAL_BINDING_FINGERPRINT_VERSION == "r2-m5c-canon-approval-binding-v1"
+
+
+def _approval(**overrides: object) -> CanonCommitApproval:
+    base: dict[str, object] = {
+        "approval_ref": "approval-1",
+        "canon_delta_id": "delta-1",
+        "payload_hash": "sha256:deadbeef",
+        "payload_hash_algorithm": "sha256",
+        "payload_hash_version": "r2-canon-delta-v1",
+        "content_schema_version": "r2-canon-schema-v1",
+        "project_name": "proj",
+        "user_id": "u-1",
+        "approved_by": "showrunner-1",
+        "approved_at": NOW,
+        "status": "APPROVED",
+    }
+    return CanonCommitApproval(**(base | overrides))
+
+
+def test_canon_approval_binding_fingerprint_prefix_and_determinism() -> None:
+    fp = compute_canon_approval_binding_fingerprint(_approval())
+    assert fp.startswith("cab:")
+    assert fp == compute_canon_approval_binding_fingerprint(_approval())
 
 
 @pytest.mark.parametrize(

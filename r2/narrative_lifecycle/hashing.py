@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import hashlib
 import unicodedata
+from datetime import UTC
 from typing import TYPE_CHECKING
 
 from r2.contracts import canonical_json_bytes, ensure_json_value
 
 if TYPE_CHECKING:
+    from r2.contracts.narrative import CanonCommitApproval
     from r2.contracts.narrative_lifecycle import (
         CompilationAttempt,
         ConflictSubject,
@@ -31,6 +33,7 @@ DECISION_CANONICAL_IDENTITY_HASH_VERSION = "r2-m5c-decision-identity-v1"
 CONFLICT_SUBJECT_FINGERPRINT_VERSION = "r2-m5c-conflict-subject-fingerprint-v1"
 EXTRACTION_INPUT_FINGERPRINT_VERSION = "r2-m5c-extraction-input-fingerprint-v1"
 COMPILATION_INPUT_FINGERPRINT_VERSION = "r2-m5c-compilation-input-fingerprint-v1"
+CANON_APPROVAL_BINDING_FINGERPRINT_VERSION = "r2-m5c-canon-approval-binding-v1"
 
 
 def normalize_prose(prose: str) -> str:
@@ -165,3 +168,30 @@ def compute_compilation_input_fingerprint(attempt: CompilationAttempt) -> str:
         "compiler_version": attempt.compiler_version,
     }
     return "cif:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()
+
+
+def compute_canon_approval_binding_fingerprint(approval: CanonCommitApproval) -> str:
+    """Content-address every existing M5A ``CanonCommitApproval`` field: ``approval_ref``,
+    ``canon_delta_id``, ``payload_hash`` and its algorithm/version, ``content_schema_version``,
+    ``project_name``, ``user_id``, ``approved_by``, ``approved_at``, and ``status``.
+
+    ``approved_at`` is normalized to an aware-UTC ISO-8601 string so a change of even one
+    second changes the fingerprint; changing the hash algorithm or schema version changes
+    the payload (and so the fingerprint) because both are covered fields, never silently
+    ignored — a stale binding fails closed rather than matching by coincidence.
+    """
+    payload = {
+        "schema": CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
+        "approval_ref": approval.approval_ref,
+        "canon_delta_id": approval.canon_delta_id,
+        "payload_hash": approval.payload_hash,
+        "payload_hash_algorithm": approval.payload_hash_algorithm,
+        "payload_hash_version": approval.payload_hash_version,
+        "content_schema_version": approval.content_schema_version,
+        "project_name": approval.project_name,
+        "user_id": approval.user_id,
+        "approved_by": approval.approved_by,
+        "approved_at": approval.approved_at.astimezone(UTC).isoformat(),
+        "status": approval.status,
+    }
+    return "cab:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()

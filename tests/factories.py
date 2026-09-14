@@ -10,6 +10,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from r2.contracts.narrative import CanonCommitApproval
 from r2.contracts.narrative_lifecycle import (
     CanonMutationEffectKey,
     ChangeSetReviewCommand,
@@ -24,13 +25,19 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeChangeItem,
     NarrativeChangeSet,
     NarrativeDecisionAuthorization,
+    NarrativeHandoffAdmission,
     NarrativeRevision,
     NarrativeWorkScope,
     ObservedEffectiveHead,
+    ObservedNarrativeHead,
     RevisionAcceptanceCommand,
     SourceSpan,
 )
 from r2.contracts.provenance import Provenance
+from r2.narrative_lifecycle.hashing import (
+    CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
+    compute_canon_approval_binding_fingerprint,
+)
 from server.agent_runtime.models import SessionMeta
 
 NARRATIVE_LIFECYCLE_NOW = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
@@ -535,3 +542,66 @@ def make_compiled_canon_delta_evidence(**overrides: Any) -> CompiledCanonDeltaEv
     }
     defaults.update(overrides)
     return CompiledCanonDeltaEvidence(**defaults)
+
+
+def make_canon_commit_approval(**overrides: Any) -> CanonCommitApproval:
+    defaults: dict[str, Any] = {
+        "approval_ref": "approval-1",
+        "canon_delta_id": "delta-1",
+        "payload_hash": "sha256:deadbeef",
+        "payload_hash_algorithm": "sha256",
+        "payload_hash_version": "r2-canon-delta-v1",
+        "content_schema_version": "r2-canon-schema-v1",
+        "project_name": "project-a",
+        "user_id": "u1",
+        "approved_by": "showrunner-1",
+        "approved_at": NARRATIVE_LIFECYCLE_NOW,
+        "status": "APPROVED",
+    }
+    defaults.update(overrides)
+    return CanonCommitApproval(**defaults)
+
+
+def make_observed_narrative_head(**overrides: Any) -> ObservedNarrativeHead:
+    defaults: dict[str, Any] = {
+        "head_family": "REVISION_ACCEPTANCE",
+        "logical_key": ("plan-1", "scene-1", "branch-1"),
+        "effective_decision_id": "d-1",
+        "effective_generation": 1,
+        "decision_generation": 1,
+    }
+    defaults.update(overrides)
+    return ObservedNarrativeHead(**defaults)
+
+
+def make_narrative_handoff_admission(
+    *,
+    work_scope: NarrativeWorkScope | None = None,
+    canon_commit_approval: CanonCommitApproval | None = None,
+    **overrides: Any,
+) -> NarrativeHandoffAdmission:
+    approval = canon_commit_approval or make_canon_commit_approval()
+    defaults: dict[str, Any] = {
+        "admission_id": "adm-1",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "compilation_attempt_id": "cattempt-1",
+        "generation": 0,
+        "compilation_result_id": "cres-1",
+        "canon_delta_id": approval.canon_delta_id,
+        "canon_delta_payload_hash": approval.payload_hash,
+        "canon_commit_approval_ref": approval.approval_ref,
+        "canon_commit_approval": approval,
+        "canon_commit_approval_fingerprint": compute_canon_approval_binding_fingerprint(approval),
+        "canon_commit_approval_fingerprint_algorithm": "sha256",
+        "canon_commit_approval_fingerprint_version": CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
+        "revision_acceptance_decision_id": "d-1",
+        "review_decision_ids": ("d-2",),
+        "conflict_resolution_decision_ids": (),
+        "observed_heads": (make_observed_narrative_head(),),
+        "base_canon_version_id": "cv-1",
+        "actor_id": "showrunner-1",
+        "admitted_at": NARRATIVE_LIFECYCLE_NOW,
+        "canonical_identity_hash": "hai:placeholder",
+    }
+    defaults.update(overrides)
+    return NarrativeHandoffAdmission(**defaults)

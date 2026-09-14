@@ -43,6 +43,8 @@ _DECISION_FAMILIES = "('REVISION_ACCEPTANCE','CHANGE_SET_REVIEW','CONFLICT_RESOL
 _REVISION_ACTIONS = "('ACCEPT','REJECT','SUPERSEDE')"
 _CHANGE_SET_ACTIONS = "('ACCEPT','REJECT','SUPERSEDE')"
 _CONFLICT_ACTIONS = "('RESOLVE','REJECT','SUPERSEDE')"
+_HASH_ALGORITHMS = "('sha256')"
+_APPROVAL_BINDING_FINGERPRINT_VERSIONS = "('r2-m5c-canon-approval-binding-v1')"
 
 
 class NarrativeDraftCandidateModel(UserOwnedMixin, Base):
@@ -1177,3 +1179,142 @@ class NarrativeCompiledCanonDeltaModel(UserOwnedMixin, Base):
     canon_delta_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     canon_delta_payload_hash: Mapped[str] = mapped_column(_ID, nullable=False)
     stored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# --- M5C-4 Atomic M5A handoff admission (spec section 11.1) ---
+#
+# The admission row owns a lossless immutable inline copy of the exact existing M5A
+# ``CanonCommitApproval`` (JSON round-trip proven by a dedicated test) plus its
+# recomputable binding fingerprint, in the same immutable row. ``admission_id`` is a
+# globally opaque PK; the repository always attempts a plain insert here — the
+# idempotent "same ID/full tuple returns the original receipt" resolution is the
+# service layer's job (it reads before it writes), never this table's.
+
+
+class NarrativeHandoffAdmissionModel(UserOwnedMixin, Base):
+    __tablename__ = "narrative_handoff_admissions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "project_name", "admission_id", name="uq_narrative_handoff_admissions_scope"),
+        ForeignKeyConstraint(
+            ["compilation_attempt_id", "generation"],
+            [
+                "narrative_compilation_attempts.attempt_id",
+                "narrative_compilation_attempts.generation",
+            ],
+            name="fk_narrative_handoff_admissions_attempt_generation",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "compilation_attempt_id"],
+            [
+                "narrative_compilation_attempts.user_id",
+                "narrative_compilation_attempts.project_name",
+                "narrative_compilation_attempts.attempt_id",
+            ],
+            name="fk_narrative_handoff_admissions_attempt_scope",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "compilation_result_id"],
+            [
+                "narrative_compilation_results.user_id",
+                "narrative_compilation_results.project_name",
+                "narrative_compilation_results.result_id",
+            ],
+            name="fk_narrative_handoff_admissions_result_scope",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "revision_acceptance_decision_id"],
+            [
+                "revision_acceptance_decisions.user_id",
+                "revision_acceptance_decisions.project_name",
+                "revision_acceptance_decisions.decision_id",
+            ],
+            name="fk_narrative_handoff_admissions_revision_acceptance",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("generation >= 0", name="ck_narrative_handoff_admissions_generation"),
+        CheckConstraint(
+            f"canon_commit_approval_fingerprint_algorithm IN {_HASH_ALGORITHMS}",
+            name="ck_narrative_handoff_admissions_fingerprint_algorithm",
+        ),
+        CheckConstraint(
+            f"canon_commit_approval_fingerprint_version IN {_APPROVAL_BINDING_FINGERPRINT_VERSIONS}",
+            name="ck_narrative_handoff_admissions_fingerprint_version",
+        ),
+        Index("ix_narrative_handoff_admissions_project_name", "project_name"),
+        Index("ix_narrative_handoff_admissions_compilation_result", "compilation_result_id"),
+        Index("ix_narrative_handoff_admissions_revision_acceptance", "revision_acceptance_decision_id"),
+    )
+
+    admission_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    plan_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    scene_contract_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    canon_branch_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    compilation_attempt_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    compilation_result_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    canon_delta_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    canon_delta_payload_hash: Mapped[str] = mapped_column(_ID, nullable=False)
+    canon_commit_approval_ref: Mapped[str] = mapped_column(_ID, nullable=False)
+    canon_commit_approval_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    canon_commit_approval_fingerprint: Mapped[str] = mapped_column(_ID, nullable=False)
+    canon_commit_approval_fingerprint_algorithm: Mapped[str] = mapped_column(_SHORT, nullable=False)
+    canon_commit_approval_fingerprint_version: Mapped[str] = mapped_column(_SHORT, nullable=False)
+    revision_acceptance_decision_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    review_decision_ids_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+    conflict_resolution_decision_ids_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+    base_canon_version_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    admitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    canonical_identity_hash: Mapped[str] = mapped_column(_ID, nullable=False)
+
+
+class NarrativeHandoffAdmissionObservedHeadModel(UserOwnedMixin, Base):
+    """Ordered durable proof of the exact head pointer observed as currently effective —
+    typed decision family, logical subject key, effective decision (or none), effective
+    generation, and total decision generation — for every head this admission's currentness
+    check locked, in the order they were locked."""
+
+    __tablename__ = "narrative_handoff_admission_observed_heads"
+    __table_args__ = (
+        PrimaryKeyConstraint("admission_id", "position", name="pk_narrative_handoff_admission_observed_heads"),
+        ForeignKeyConstraint(
+            ["admission_id"],
+            ["narrative_handoff_admissions.admission_id"],
+            name="fk_narrative_handoff_admission_observed_heads_admission",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["effective_decision_id"],
+            ["narrative_decision_identities.decision_id"],
+            name="fk_narrative_handoff_admission_observed_heads_identity",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("position >= 0", name="ck_narrative_handoff_admission_observed_heads_position"),
+        CheckConstraint(
+            f"head_family IN {_DECISION_FAMILIES}", name="ck_narrative_handoff_admission_observed_heads_family"
+        ),
+        CheckConstraint(
+            "(effective_decision_id IS NULL AND effective_generation = 0) "
+            "OR (effective_decision_id IS NOT NULL AND effective_generation > 0)",
+            name="ck_narrative_handoff_admission_observed_heads_effective_zero",
+        ),
+        CheckConstraint("decision_generation >= 0", name="ck_narrative_handoff_admission_observed_heads_decision_gen"),
+        CheckConstraint(
+            "effective_generation <= decision_generation",
+            name="ck_narrative_handoff_admission_observed_heads_not_ahead",
+        ),
+        Index("ix_narrative_handoff_admission_observed_heads_identity", "effective_decision_id"),
+    )
+
+    admission_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    head_family: Mapped[str] = mapped_column(String(32), nullable=False)
+    logical_key_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+    effective_decision_id: Mapped[str | None] = mapped_column(_ID)
+    effective_generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    decision_generation: Mapped[int] = mapped_column(Integer, nullable=False)

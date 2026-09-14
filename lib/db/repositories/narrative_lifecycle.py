@@ -38,11 +38,14 @@ from lib.db.models.narrative_lifecycle import (
     NarrativeExtractionAttemptModel,
     NarrativeExtractionResultChangeSetModel,
     NarrativeExtractionResultModel,
+    NarrativeHandoffAdmissionModel,
+    NarrativeHandoffAdmissionObservedHeadModel,
     NarrativeRevisionModel,
     RevisionAcceptanceDecisionModel,
     RevisionAcceptanceHeadModel,
 )
 from lib.db.repositories.base import rowcount
+from r2.contracts.narrative import CanonCommitApproval
 from r2.contracts.narrative_lifecycle import (
     ChangeSetReviewCommand,
     ChangeSetReviewHead,
@@ -60,9 +63,11 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeChangeSet,
     NarrativeDecisionAuthorization,
     NarrativeDecisionCommand,
+    NarrativeHandoffAdmission,
     NarrativeRevision,
     NarrativeWorkScope,
     ObservedEffectiveHead,
+    ObservedNarrativeHead,
     RevisionAcceptanceCommand,
     RevisionAcceptanceHead,
 )
@@ -482,6 +487,74 @@ def _compiled_delta_row(
         canon_delta_json=evidence.canon_delta.model_dump(mode="json"),
         canon_delta_payload_hash=evidence.canon_delta_payload_hash,
         stored_at=evidence.stored_at,
+    )
+
+
+def _handoff_admission_from_row(
+    row: NarrativeHandoffAdmissionModel, *, observed_heads: tuple[ObservedNarrativeHead, ...]
+) -> NarrativeHandoffAdmission:
+    try:
+        return NarrativeHandoffAdmission.model_validate(
+            {
+                "admission_id": row.admission_id,
+                "work_scope": {
+                    "user_id": row.user_id,
+                    "project_name": row.project_name,
+                    "plan_id": row.plan_id,
+                    "scene_contract_id": row.scene_contract_id,
+                    "canon_branch_id": row.canon_branch_id,
+                },
+                "compilation_attempt_id": row.compilation_attempt_id,
+                "generation": row.generation,
+                "compilation_result_id": row.compilation_result_id,
+                "canon_delta_id": row.canon_delta_id,
+                "canon_delta_payload_hash": row.canon_delta_payload_hash,
+                "canon_commit_approval_ref": row.canon_commit_approval_ref,
+                "canon_commit_approval": row.canon_commit_approval_json,
+                "canon_commit_approval_fingerprint": row.canon_commit_approval_fingerprint,
+                "canon_commit_approval_fingerprint_algorithm": row.canon_commit_approval_fingerprint_algorithm,
+                "canon_commit_approval_fingerprint_version": row.canon_commit_approval_fingerprint_version,
+                "revision_acceptance_decision_id": row.revision_acceptance_decision_id,
+                "review_decision_ids": row.review_decision_ids_json,
+                "conflict_resolution_decision_ids": row.conflict_resolution_decision_ids_json,
+                "observed_heads": [item.model_dump(mode="json") for item in observed_heads],
+                "base_canon_version_id": row.base_canon_version_id,
+                "actor_id": row.actor_id,
+                "admitted_at": _stored_aware(row.admitted_at),
+                "canonical_identity_hash": row.canonical_identity_hash,
+            }
+        )
+    except ValidationError as exc:
+        raise NarrativeEvidenceIntegrityError(f"corrupt handoff admission row {row.admission_id!r}: {exc}") from exc
+
+
+def _handoff_admission_row(admission: NarrativeHandoffAdmission) -> NarrativeHandoffAdmissionModel:
+    scope = admission.work_scope
+    approval: CanonCommitApproval = admission.canon_commit_approval
+    return NarrativeHandoffAdmissionModel(
+        admission_id=admission.admission_id,
+        user_id=scope.user_id,
+        project_name=scope.project_name,
+        plan_id=scope.plan_id,
+        scene_contract_id=scope.scene_contract_id,
+        canon_branch_id=scope.canon_branch_id,
+        compilation_attempt_id=admission.compilation_attempt_id,
+        generation=admission.generation,
+        compilation_result_id=admission.compilation_result_id,
+        canon_delta_id=admission.canon_delta_id,
+        canon_delta_payload_hash=admission.canon_delta_payload_hash,
+        canon_commit_approval_ref=admission.canon_commit_approval_ref,
+        canon_commit_approval_json=approval.model_dump(mode="json"),
+        canon_commit_approval_fingerprint=admission.canon_commit_approval_fingerprint,
+        canon_commit_approval_fingerprint_algorithm=admission.canon_commit_approval_fingerprint_algorithm,
+        canon_commit_approval_fingerprint_version=admission.canon_commit_approval_fingerprint_version,
+        revision_acceptance_decision_id=admission.revision_acceptance_decision_id,
+        review_decision_ids_json=list(admission.review_decision_ids),
+        conflict_resolution_decision_ids_json=list(admission.conflict_resolution_decision_ids),
+        base_canon_version_id=admission.base_canon_version_id,
+        actor_id=admission.actor_id,
+        admitted_at=admission.admitted_at,
+        canonical_identity_hash=admission.canonical_identity_hash,
     )
 
 
@@ -1655,3 +1728,85 @@ class NarrativeLifecycleRepository:
             await self.session.flush()
         except IntegrityError as exc:
             raise _identity_conflict(exc, f"compilation result {result.result_id!r}") from exc
+
+    # --- M5C-4 atomic M5A handoff admission ---
+
+    async def _hydrate_handoff_admission(self, row: NarrativeHandoffAdmissionModel) -> NarrativeHandoffAdmission:
+        observed_heads = tuple(
+            ObservedNarrativeHead(
+                head_family=head_family,
+                logical_key=tuple(logical_key_json),
+                effective_decision_id=effective_decision_id,
+                effective_generation=effective_generation,
+                decision_generation=decision_generation,
+            )
+            for head_family, logical_key_json, effective_decision_id, effective_generation, decision_generation in (
+                await self.session.execute(
+                    select(
+                        NarrativeHandoffAdmissionObservedHeadModel.head_family,
+                        NarrativeHandoffAdmissionObservedHeadModel.logical_key_json,
+                        NarrativeHandoffAdmissionObservedHeadModel.effective_decision_id,
+                        NarrativeHandoffAdmissionObservedHeadModel.effective_generation,
+                        NarrativeHandoffAdmissionObservedHeadModel.decision_generation,
+                    )
+                    .where(NarrativeHandoffAdmissionObservedHeadModel.admission_id == row.admission_id)
+                    .order_by(NarrativeHandoffAdmissionObservedHeadModel.position)
+                )
+            ).all()
+        )
+        return _handoff_admission_from_row(row, observed_heads=observed_heads)
+
+    async def get_exact_handoff_admission(
+        self, *, admission_id: str, project_name: str, user_id: str
+    ) -> NarrativeHandoffAdmission | None:
+        row = await self._scalar(
+            select(NarrativeHandoffAdmissionModel).where(
+                NarrativeHandoffAdmissionModel.admission_id == admission_id,
+                NarrativeHandoffAdmissionModel.project_name == project_name,
+                NarrativeHandoffAdmissionModel.user_id == user_id,
+            )
+        )
+        if row is None:
+            return None
+        return await self._hydrate_handoff_admission(row)
+
+    async def get_handoff_admission_by_id(self, *, admission_id: str) -> NarrativeHandoffAdmission | None:
+        # ``admission_id`` is database-global (a PK). The lookup is not scope-filtered so
+        # an exact-retry resolution (Task 28) can recover the owning tenant from the
+        # admitted receipt itself, before it has any other scoped handle on it.
+        row = await self._scalar(
+            select(NarrativeHandoffAdmissionModel).where(NarrativeHandoffAdmissionModel.admission_id == admission_id)
+        )
+        if row is None:
+            return None
+        return await self._hydrate_handoff_admission(row)
+
+    async def insert_handoff_admission(self, admission: NarrativeHandoffAdmission) -> None:
+        """Append-only insert. ``admission_id`` reuse — whether the full tuple is
+        identical or different — always fails closed here with
+        ``NarrativeDecisionIdentityConflictError``: resolving an exact-retry into the
+        original receipt before ever calling this is the caller's (Task 28's) job, not
+        this repository's, mirroring how ``insert_identity_and_decision`` never itself
+        distinguishes a retry from a genuine conflict.
+        """
+        self.session.add(_handoff_admission_row(admission))
+        for position, head in enumerate(admission.observed_heads):
+            self.session.add(
+                NarrativeHandoffAdmissionObservedHeadModel(
+                    admission_id=admission.admission_id,
+                    position=position,
+                    user_id=admission.work_scope.user_id,
+                    project_name=admission.work_scope.project_name,
+                    head_family=head.head_family,
+                    logical_key_json=list(head.logical_key),
+                    effective_decision_id=head.effective_decision_id,
+                    effective_generation=head.effective_generation,
+                    decision_generation=head.decision_generation,
+                )
+            )
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            raise NarrativeDecisionIdentityConflictError(
+                f"handoff admission {admission.admission_id!r} conflicts with an existing admission"
+            ) from exc
