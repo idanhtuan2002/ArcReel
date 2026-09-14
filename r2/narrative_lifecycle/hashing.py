@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         DraftCandidate,
         NarrativeDecisionAuthorization,
         NarrativeDecisionCommand,
+        NarrativeHandoffAdmission,
         NarrativeRevision,
     )
 
@@ -34,6 +35,7 @@ CONFLICT_SUBJECT_FINGERPRINT_VERSION = "r2-m5c-conflict-subject-fingerprint-v1"
 EXTRACTION_INPUT_FINGERPRINT_VERSION = "r2-m5c-extraction-input-fingerprint-v1"
 COMPILATION_INPUT_FINGERPRINT_VERSION = "r2-m5c-compilation-input-fingerprint-v1"
 CANON_APPROVAL_BINDING_FINGERPRINT_VERSION = "r2-m5c-canon-approval-binding-v1"
+HANDOFF_ADMISSION_IDENTITY_HASH_VERSION = "r2-m5c-handoff-admission-identity-v1"
 
 
 def normalize_prose(prose: str) -> str:
@@ -195,3 +197,24 @@ def compute_canon_approval_binding_fingerprint(approval: CanonCommitApproval) ->
         "status": approval.status,
     }
     return "cab:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()
+
+
+def compute_handoff_admission_identity_hash(admission: NarrativeHandoffAdmission) -> str:
+    """Content-address one atomic M5A handoff admission: its opaque id and scope, the
+    exact compilation attempt/generation/result it admits, the delta id and payload hash,
+    the complete inline M5A approval together with its binding fingerprint and that
+    fingerprint's algorithm/version, every named revision/review/resolution decision, the
+    exact heads observed as currently effective at the admission instant, the Canon base,
+    and the admitting actor.
+
+    Excludes only ``admitted_at`` (server-assigned audit metadata, exactly as
+    ``compute_decision_canonical_identity_hash`` excludes ``stored_at``) and the
+    ``canonical_identity_hash`` field this function produces. Changing the fingerprint
+    algorithm or version therefore changes the identity hash too: a stale binding fails
+    closed rather than matching by coincidence.
+    """
+    payload = {
+        "schema": HANDOFF_ADMISSION_IDENTITY_HASH_VERSION,
+        "admission": admission.model_dump(mode="json", exclude={"admitted_at", "canonical_identity_hash"}),
+    }
+    return "hai:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()

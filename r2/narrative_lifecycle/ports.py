@@ -25,6 +25,7 @@ from r2.contracts.narrative_lifecycle import (
     NarrativeDecisionAuthorization,
     NarrativeDecisionCommand,
     NarrativeDecisionRetryAuthentication,
+    NarrativeHandoffAdmission,
     NarrativeRevision,
     NarrativeWorkScope,
     RevisionAcceptanceHead,
@@ -219,6 +220,20 @@ class NarrativeAuthorityRepositoryPort(Protocol):
         self, lineage: ConflictResolutionLineage, *, user_id: str, project_name: str
     ) -> ConflictResolutionLineage: ...
 
+    # --- M5C-4 atomic M5A handoff admission ---
+    #
+    # The admission receipt is append-only and advances no head, but it is only ever
+    # written under the same locked heads a decision would take, so it belongs to the
+    # authority adapter rather than the evidence one.
+
+    async def get_exact_handoff_admission(
+        self, *, admission_id: str, project_name: str, user_id: str
+    ) -> NarrativeHandoffAdmission | None: ...
+
+    async def get_handoff_admission_by_id(self, *, admission_id: str) -> NarrativeHandoffAdmission | None: ...
+
+    async def insert_handoff_admission(self, admission: NarrativeHandoffAdmission) -> None: ...
+
 
 @runtime_checkable
 class NarrativeLifecycleRepositoryPort(
@@ -254,6 +269,18 @@ class NarrativeShowrunnerAuthorityPort(Protocol):
     Governance/Showrunner approval authority: this port may read and verify that grant,
     but it creates, amends, revokes, or infers none of it. Every production adapter must
     deny by default until that authority source exists.
+
+    ``authorize_initial_decision`` mints the one original, persisted authorization for a
+    typed decision command, so it is bound to a ``NarrativeDecisionFamily`` — spec
+    section 6.1 fixes those at exactly three. ``authenticate_exact_retry`` is
+    family-agnostic by construction: it names only an id and a scope and returns no
+    ``decision_family``/``action``. An M5A handoff admission is therefore served by the
+    latter alone — it is not a typed decision family, advances no head, and its receipt
+    persists no ``NarrativeDecisionAuthorization`` — so
+    ``NarrativeAcceptanceService.admit_canon_handoff`` resolves the admitting Human
+    Showrunner's project-scoped grant, and their ``actor_id``, through
+    ``authenticate_exact_retry`` keyed by ``admission_id``, on the initial admission as
+    well as on a retry.
     """
 
     async def authorize_initial_decision(
