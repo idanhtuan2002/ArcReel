@@ -1625,13 +1625,15 @@ M5C_3_VERIFIED_HEAD="$(git rev-parse HEAD)"
 - [ ] **Step 2: Run fresh M5C-3 gates**
 
 ```bash
-PYTHONHASHSEED=0 uv run python -m pytest -n 4 --dist loadfile tests/unit/r2 tests/unit/lib/db tests/integration/r2/narrative_lifecycle tests/integration/lib/db tests/donor_parity -q
+PYTHONHASHSEED=0 uv run python -m pytest -n 4 --dist loadfile tests/unit/r2 tests/unit/lib/db tests/integration/r2/narrative_lifecycle tests/integration/lib/db tests/integration/donor_parity -q
 uv run ruff check . && uv run ruff format --check . && uv run basedpyright --warnings && uv run lint-imports && uv run deptry lib server alembic scripts tests r2
 uv run python scripts/audit_tests.py --check
-uv run python scripts/r2/verify_m5c_scope.py --base "$M5C_2_HANDOFF_HEAD" --head "$M5C_3_VERIFIED_HEAD" --phase impl
+uv run python scripts/r2/verify_m5c_scope.py --base "$M5C_2_HANDOFF_HEAD" --head "$M5C_3_VERIFIED_HEAD" --phase impl --checkpoint m5c3
 git diff --check "$M5C_2_HANDOFF_HEAD".."$M5C_3_VERIFIED_HEAD"
 git status --short
 ```
+
+`$M5C_2_HANDOFF_HEAD` here means the practical M5C-2/M5C-3 code boundary (`3970f024`, Task 21's last commit — M5C-2's own Codex-review handoff never happened, so no `R2_M5C_2_REVIEW.md` commit exists to name instead; see the M5C-2 status note in checkpoint M5C-2's header). `tests/donor_parity` was renamed `tests/integration/donor_parity` before Task 21; this step never picked up that rename until Task 26. `verify_m5c_scope.py` needed a fresh `m5c3` checkpoint entry (mirroring `m5c2`'s) before this step could run at all — added in Task 26 alongside the `pyproject.toml` contracts, both amendments on the same amendable-tooling basis as Task 21's.
 
 - [ ] **Step 3: Codex review + evidence-only handoff**
 

@@ -343,8 +343,44 @@ source_modules = [
     "r2.narrative_lifecycle.hashing",
     "r2.narrative_lifecycle.errors",
     "r2.narrative_lifecycle.ports",
+    "r2.narrative_lifecycle.compiler",
+    "r2.narrative_lifecycle.accepted_narrative_adapter",
 ]
 forbidden_modules = ["r2.narrative_lifecycle.acceptance"]
+
+# M5C-3 checkpoint freeze: the pure CanonDeltaCompiler carries no authority write port,
+# repository, UoW, or Canon transaction/read service of its own — every input is an
+# exact immutable value already resolved by its caller.
+[[tool.importlinter.contracts]]
+name = "M5C-3 compiler purity: no authority write port, repository, UoW, or Canon service"
+type = "forbidden"
+source_modules = ["r2.narrative_lifecycle.compiler"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+    "r2.narrative.canon_transaction",
+    "r2.narrative.ports",
+    "r2.narrative_lifecycle.acceptance",
+    "r2.narrative_lifecycle.authority_kernel",
+    "r2.narrative_lifecycle.evidence",
+    "r2.narrative_lifecycle.ports",
+]
+
+# M5C-3 checkpoint freeze: M5C's own persistence adapters propose a CanonDelta but never
+# read or write the M5A Canon ORM tables themselves — CanonTransactionService remains the
+# sole Canon writer.
+[[tool.importlinter.contracts]]
+name = "M5C repositories cannot import or write M5A Canon ORM models"
+type = "forbidden"
+source_modules = [
+    "lib.db.models.narrative_lifecycle",
+    "lib.db.repositories.narrative_lifecycle",
+]
+forbidden_modules = [
+    "lib.db.models.canon",
+    "lib.db.repositories.canon_repo",
+]
 
 [tool.deptry]
 # 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2

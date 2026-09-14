@@ -156,10 +156,55 @@ IMPLEMENTATION_ALLOWLIST_M5C2: frozenset[str] = HANDOFF_ONLY_ALLOWLIST_M5C2 | fr
     }
 )
 
+# --- M5C-3 (Tasks 22-26: CanonDelta compilation — pure compiler, compilation
+# admission/recording, thread-payoff proof, M5B read adapter, checkpoint fitness) -----
+
+ALLOWED_MIGRATIONS_M5C3: frozenset[str] = frozenset({"alembic/versions/5c7c4a0e0003_add_narrative_compilation.py"})
+
+HANDOFF_ONLY_ALLOWLIST_M5C3: frozenset[str] = frozenset({"docs/r2/evidence/R2_M5C_3_REVIEW.md"})
+
+IMPLEMENTATION_ALLOWLIST_M5C3: frozenset[str] = HANDOFF_ONLY_ALLOWLIST_M5C3 | frozenset(
+    {
+        # amended in-flight to record real M5C-3 deviations and this checkpoint's own
+        # tooling/fitness extension — see the task commits
+        "docs/superpowers/plans/2026-09-09-r2-m5c-narrative-lifecycle.md",
+        "docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md",
+        # tooling / fitness
+        "pyproject.toml",
+        "scripts/r2/verify_m5c_scope.py",
+        # contracts + migration
+        "r2/contracts/narrative_lifecycle.py",
+        "alembic/versions/5c7c4a0e0003_add_narrative_compilation.py",
+        # pure compiler, compilation admission/recording, thread-payoff proof, M5B adapter
+        "r2/narrative/validation.py",
+        "r2/narrative_lifecycle/__init__.py",
+        "r2/narrative_lifecycle/accepted_narrative_adapter.py",
+        "r2/narrative_lifecycle/compiler.py",
+        "r2/narrative_lifecycle/evidence.py",
+        "r2/narrative_lifecycle/hashing.py",
+        "r2/narrative_lifecycle/ports.py",
+        # Host persistence for the compilation/compiled-delta tables
+        "lib/db/models/narrative_lifecycle.py",
+        "lib/db/repositories/narrative_lifecycle.py",
+        # tests
+        "tests/factories.py",
+        "tests/integration/lib/db/migrations/test_alembic_narrative_compilation.py",
+        "tests/integration/r2/narrative_lifecycle/test_accepted_narrative_adapter.py",
+        "tests/integration/r2/narrative_lifecycle/test_compilation_repository.py",
+        "tests/integration/r2/narrative_lifecycle/test_compilation_service.py",
+        "tests/integration/r2/narrative_lifecycle/test_thread_payoff_outcome.py",
+        "tests/unit/lib/db/models/test_narrative_lifecycle.py",
+        "tests/unit/r2/contracts/test_narrative_lifecycle.py",
+        "tests/unit/r2/narrative_lifecycle/test_canon_delta_compiler.py",
+        "tests/unit/r2/test_m5c_architecture_boundaries.py",
+    }
+)
+
 CHECKPOINTS: dict[str, tuple[frozenset[str], frozenset[str], frozenset[str]]] = {
     # name -> (implementation_allowlist, handoff_only_allowlist, allowed_migrations)
     "m5c1": (IMPLEMENTATION_ALLOWLIST, HANDOFF_ONLY_ALLOWLIST, ALLOWED_MIGRATIONS),
     "m5c2": (IMPLEMENTATION_ALLOWLIST_M5C2, HANDOFF_ONLY_ALLOWLIST_M5C2, ALLOWED_MIGRATIONS_M5C2),
+    "m5c3": (IMPLEMENTATION_ALLOWLIST_M5C3, HANDOFF_ONLY_ALLOWLIST_M5C3, ALLOWED_MIGRATIONS_M5C3),
 }
 
 
