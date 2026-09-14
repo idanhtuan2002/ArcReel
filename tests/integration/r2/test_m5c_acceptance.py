@@ -704,6 +704,12 @@ async def _m24_compilation_id_and_hash_without_the_payload(pipeline: M5CPipeline
 
 
 async def _m25_currentness_released_before_the_receipt(pipeline: M5CPipeline) -> MutationResult:
+    """Sequential form only: the concurrent race (a competing supersession landing between
+    the naked read and the locked re-check) is proven by
+    ``tests/integration/r2/narrative_lifecycle/test_handoff_admission.py::
+    test_a_supersession_concurrent_with_validation_cannot_land_invisibly`` (PostgreSQL-only,
+    ``-k concurrent``). This row cannot itself distinguish a locked read from a naked one;
+    it only proves the same currentness guard rejects a *sequentially* stale review."""
     await pipeline.seed_admissible_handoff()
     await _supersede_the_review(pipeline.acceptance, pipeline.session_factory)
     await pipeline.snapshot_rows()
@@ -712,9 +718,18 @@ async def _m25_currentness_released_before_the_receipt(pipeline: M5CPipeline) ->
 
 
 async def _m26_narrative_currentness_through_m5a(pipeline: M5CPipeline) -> MutationResult:
-    """M5A must not learn about Narrative currentness. Structurally the commit path
-    imports nothing from the acceptance surface; behaviourally a Narrative supersession
-    committed *after* admission does not stop the frozen receipt from landing on Canon."""
+    """M5A must not learn about Narrative currentness. Adversarially, a commit-path module
+    that imports the acceptance surface or names one of its currentness/admission APIs must
+    trip the sensor; on the real, unmutated tree the same sensor must stay clean, and a
+    Narrative supersession committed *after* admission must not stop the frozen receipt from
+    landing on Canon."""
+    mutated_sources = {relative: _read(relative) for relative in M5A_COMMIT_PATH_MODULES}
+    mutated_sources["server/services/narrative_canon_handoff.py"] += (
+        "\nfrom r2.narrative_lifecycle.acceptance import NarrativeAcceptanceService  # noqa: F401\n"
+    )
+    injected = narrative_currentness_dependency_offenders(mutated_sources)
+    sensor_fired = {rel for rel, _ in injected} == {"server/services/narrative_canon_handoff.py"}
+
     leaked = narrative_currentness_dependency_offenders(
         {relative: _read(relative) for relative in M5A_COMMIT_PATH_MODULES}
     )
@@ -725,7 +740,9 @@ async def _m26_narrative_currentness_through_m5a(pipeline: M5CPipeline) -> Mutat
     committed = await pipeline.handoff.commit_from_admission(admission_id=admitted.admission_id, now=NOW)
     landed = committed.version.committed_delta_id == admitted.canon_delta.canon_delta_id
     return MutationResult(
-        outcome="COMMITTED_WITHOUT_NARRATIVE_CURRENTNESS" if landed and not leaked else f"LEAKED:{leaked}"
+        outcome="COMMITTED_WITHOUT_NARRATIVE_CURRENTNESS"
+        if landed and not leaked and sensor_fired
+        else f"LEAKED:{leaked}:SENSOR_FIRED:{sensor_fired}"
     )
 
 
