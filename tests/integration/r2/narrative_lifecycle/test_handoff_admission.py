@@ -24,7 +24,9 @@ from r2.contracts.narrative import CanonCommitApproval, CanonDelta
 from r2.contracts.narrative_lifecycle import (
     CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
     ChangeSetReviewHead,
+    NarrativeDecisionRetryAuthentication,
     NarrativeWorkScope,
+    RevisionAcceptanceHead,
 )
 from r2.narrative_lifecycle.acceptance import (
     AdmittedNarrativeHandoff,
@@ -566,3 +568,134 @@ async def test_a_supersession_concurrent_with_validation_cannot_land_invisibly(
         assert (
             await uow.repository.get_exact_handoff_admission(admission_id="adm-1", project_name=PROJECT, user_id=USER)
         ) is None
+
+
+class _HookBeforeRevisionHeadLockRepository(NarrativeLifecycleRepository):
+    """Fires one injected coroutine before the very first lock this admission takes, so
+    the hook can run a whole competing transaction on another connection without
+    contending for anything the hooked transaction already holds."""
+
+    def __init__(self, session: AsyncSession, hook: Callable[[], Awaitable[None]]) -> None:
+        super().__init__(session)
+        self._hook: Callable[[], Awaitable[None]] | None = hook
+
+    async def lock_existing_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead | None:
+        if self._hook is not None:
+            hook, self._hook = self._hook, None
+            await hook()
+        return await super().lock_existing_revision_head(work_scope)
+
+
+class _HookBeforeRevisionHeadLockUnitOfWork(SqlAlchemyNarrativeLifecycleUnitOfWork):
+    def __init__(self, session_factory: Factory, hook: Callable[[], Awaitable[None]]) -> None:
+        super().__init__(session_factory)
+        self._hook = hook
+
+    async def __aenter__(self) -> _HookBeforeRevisionHeadLockUnitOfWork:
+        await super().__aenter__()
+        self.repository = _HookBeforeRevisionHeadLockRepository(self.session, self._hook)
+        return self
+
+
+async def test_a_concurrent_duplicate_admission_replays_the_original_receipt(
+    concurrent_session_factory: Factory, fake_showrunner: FakeShowrunnerAuthorityPort
+) -> None:
+    """Two transactions submitting the identical admission serialize on these locks. The
+    loser's pre-lock retry lookup ran before the winner committed, so it must re-resolve
+    the retry once it holds the locks and replay the winner's receipt — never fall through
+    to a unique violation, which would contradict ``NarrativeHandoffAdmission``'s own
+    "same ID with the exact same full tuple returns the original receipt" contract in
+    exactly the response-lost-retry scenario section 11.3 calls out."""
+    async with concurrent_session_factory() as probe:
+        if probe.bind.dialect.name == "sqlite":
+            pytest.skip("this race needs two real connections and row-level locking (PostgreSQL only)")
+
+    setup_service = NarrativeAcceptanceService(
+        lambda: SqlAlchemyNarrativeLifecycleUnitOfWork(concurrent_session_factory), fake_showrunner
+    )
+    await _seed_admissible_handoff(setup_service, concurrent_session_factory)
+    winner: list[AdmittedNarrativeHandoff] = []
+
+    async def admit_the_same_thing_on_another_connection() -> None:
+        winner.append(
+            await asyncio.wait_for(
+                setup_service.admit_canon_handoff(
+                    _handoff_command(), authenticated_principal=SHOWRUNNER, canon_commit_approval=_approval()
+                ),
+                timeout=_DEADLOCK_TIMEOUT_S,
+            )
+        )
+
+    racing_service = NarrativeAcceptanceService(
+        lambda: _HookBeforeRevisionHeadLockUnitOfWork(
+            concurrent_session_factory, admit_the_same_thing_on_another_connection
+        ),
+        fake_showrunner,
+    )
+    loser = await asyncio.wait_for(
+        racing_service.admit_canon_handoff(
+            _handoff_command(), authenticated_principal=SHOWRUNNER, canon_commit_approval=_approval()
+        ),
+        timeout=_DEADLOCK_TIMEOUT_S,
+    )
+    assert len(winner) == 1
+    assert loser.admission == winner[0].admission
+    assert loser.canon_delta == winner[0].canon_delta
+    async with SqlAlchemyNarrativeLifecycleUnitOfWork(concurrent_session_factory) as uow:
+        stored = await uow.repository.get_exact_handoff_admission(
+            admission_id="adm-1", project_name=PROJECT, user_id=USER
+        )
+        assert stored == loser.admission
+
+
+# --- the authority-port surface an admission is allowed to use -----------------------
+
+
+class _NoRetryPathAuthorityPort(FakeShowrunnerAuthorityPort):
+    """A production-shaped adapter: ``authenticate_exact_retry``'s stated precondition is
+    that ``decision_id`` names an already-stored decision, so a conforming adapter
+    resolves it against stored authority records and fails closed otherwise. An admission
+    must never reach that method — ``admission_id`` is a different id space and, on an
+    initial admission, names no record at all."""
+
+    async def authenticate_exact_retry(
+        self, authenticated_principal: str, decision_id: str, exact_scope: NarrativeWorkScope
+    ) -> NarrativeDecisionRetryAuthentication:
+        raise NarrativeDecisionAuthorizationError(
+            f"{decision_id!r} names no stored decision; the decision-retry path cannot serve it"
+        )
+
+
+async def test_the_admission_never_authenticates_through_the_decision_retry_path(
+    session_factory: Factory,
+) -> None:
+    service = NarrativeAcceptanceService(narrative_lifecycle_uow_factory(session_factory), _NoRetryPathAuthorityPort())
+    await _seed_admissible_handoff(service, session_factory)
+    admitted = await service.admit_canon_handoff(
+        _handoff_command(), authenticated_principal=SHOWRUNNER, canon_commit_approval=_approval()
+    )
+    assert admitted.admission_id == "adm-1"
+    assert admitted.admission.actor_id == SHOWRUNNER
+    # The exact retry goes through the same capability method, not the decision one.
+    again = await service.admit_canon_handoff(
+        _handoff_command(), authenticated_principal=SHOWRUNNER, canon_commit_approval=_approval()
+    )
+    assert again.admission == admitted.admission
+
+
+async def test_an_admission_id_colliding_with_a_decision_id_is_not_resolved_as_that_decision(
+    session_factory: Factory,
+) -> None:
+    """``admission_id`` and ``decision_id`` are separate id spaces with independent primary
+    keys, so nothing stops a caller choosing an admission id that also names a real
+    decision. The capability check must not resolve it as one."""
+    service = NarrativeAcceptanceService(narrative_lifecycle_uow_factory(session_factory), _NoRetryPathAuthorityPort())
+    await _seed_admissible_handoff(service, session_factory)
+    admitted = await service.admit_canon_handoff(
+        _handoff_command(admission_id="d-1"),  # also the revision-acceptance decision id
+        authenticated_principal=SHOWRUNNER,
+        canon_commit_approval=_approval(),
+    )
+    assert admitted.admission_id == "d-1"
+    assert admitted.admission.revision_acceptance_decision_id == "d-1"
+    assert admitted.admission.actor_id == SHOWRUNNER

@@ -270,17 +270,27 @@ class NarrativeShowrunnerAuthorityPort(Protocol):
     but it creates, amends, revokes, or infers none of it. Every production adapter must
     deny by default until that authority source exists.
 
-    ``authorize_initial_decision`` mints the one original, persisted authorization for a
-    typed decision command, so it is bound to a ``NarrativeDecisionFamily`` — spec
-    section 6.1 fixes those at exactly three. ``authenticate_exact_retry`` is
-    family-agnostic by construction: it names only an id and a scope and returns no
-    ``decision_family``/``action``. An M5A handoff admission is therefore served by the
-    latter alone — it is not a typed decision family, advances no head, and its receipt
-    persists no ``NarrativeDecisionAuthorization`` — so
-    ``NarrativeAcceptanceService.admit_canon_handoff`` resolves the admitting Human
-    Showrunner's project-scoped grant, and their ``actor_id``, through
-    ``authenticate_exact_retry`` keyed by ``admission_id``, on the initial admission as
-    well as on a retry.
+    The three methods answer three different questions and carry three different
+    preconditions:
+
+    - ``authorize_initial_decision`` mints the one original, persisted authorization for a
+      typed decision command, so it is bound to a ``NarrativeDecisionFamily`` — spec
+      section 6.1 fixes those at exactly three.
+    - ``authenticate_exact_retry`` re-authenticates the **original** actor of an
+      already-stored decision so that actor may request replay. Its precondition is that
+      ``decision_id`` names an existing decision, so an adapter may resolve it against
+      stored authority records.
+    - ``authenticate_scoped_showrunner`` asks the capability question alone, about a
+      subject that need not exist yet.
+
+    An M5A handoff admission is served by the last one only. It is not a typed decision
+    family, advances no head, and its receipt persists no
+    ``NarrativeDecisionAuthorization``, so there is nothing for
+    ``authorize_initial_decision`` to mint; and on a fresh ``admission_id`` there is no
+    original actor and no replay, so ``authenticate_exact_retry``'s precondition does not
+    hold. ``admission_id`` also lives in its own table under its own primary key and is
+    deliberately kept out of ``decision_id``'s id space here, so an adapter that resolves
+    decision ids can never authenticate an admission against an unrelated decision's actor.
     """
 
     async def authorize_initial_decision(
@@ -290,3 +300,18 @@ class NarrativeShowrunnerAuthorityPort(Protocol):
     async def authenticate_exact_retry(
         self, authenticated_principal: str, decision_id: str, exact_scope: NarrativeWorkScope
     ) -> NarrativeDecisionRetryAuthentication: ...
+
+    async def authenticate_scoped_showrunner(
+        self, authenticated_principal: str, subject_id: str, exact_scope: NarrativeWorkScope
+    ) -> NarrativeDecisionRetryAuthentication:
+        """Prove this principal currently holds the project-scoped ``HUMAN_SHOWRUNNER``
+        grant in this exact scope, and resolve their ``actor_id``.
+
+        ``subject_id`` names what the capability is being exercised on — an
+        ``admission_id``, say. It **need not name an existing record** and is never
+        resolved against stored authority records; it is echoed back in the returned
+        ``decision_id`` field purely so the caller can verify the response is bound to the
+        request it made. Mints nothing durable and grants no decision authority; every
+        production adapter denies by default, exactly like the other two methods.
+        """
+        ...

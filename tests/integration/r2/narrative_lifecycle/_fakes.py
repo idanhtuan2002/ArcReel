@@ -48,15 +48,28 @@ class FakeShowrunnerAuthorityPort:
     async def authenticate_exact_retry(
         self, authenticated_principal: str, decision_id: str, exact_scope: NarrativeWorkScope
     ) -> NarrativeDecisionRetryAuthentication:
+        return self._authenticate(authenticated_principal, decision_id, exact_scope, ref="retry-1")
+
+    async def authenticate_scoped_showrunner(
+        self, authenticated_principal: str, subject_id: str, exact_scope: NarrativeWorkScope
+    ) -> NarrativeDecisionRetryAuthentication:
+        """The capability question alone. ``subject_id`` is echoed back and never resolved
+        against a stored decision — the port's contract says it need not name an existing
+        record."""
+        return self._authenticate(authenticated_principal, subject_id, exact_scope, ref="scoped-1")
+
+    def _authenticate(
+        self, authenticated_principal: str, subject_id: str, exact_scope: NarrativeWorkScope, *, ref: str
+    ) -> NarrativeDecisionRetryAuthentication:
         if authenticated_principal != SHOWRUNNER:
             raise NarrativeDecisionAuthorizationError(f"{authenticated_principal!r} lacks Human Showrunner capability")
         return NarrativeDecisionRetryAuthentication(
-            retry_authentication_ref="retry-1",
+            retry_authentication_ref=ref,
             user_id=exact_scope.user_id,
             project_name=exact_scope.project_name,
             actor_id=SHOWRUNNER,
             authority_role="HUMAN_SHOWRUNNER",
-            decision_id=decision_id,
+            decision_id=subject_id,
             authenticated_at=_NOW,
             authenticated_via="test",
         )

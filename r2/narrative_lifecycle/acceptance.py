@@ -74,6 +74,9 @@ type _HandoffLockTarget = tuple[NarrativeDecisionFamily, tuple[str, ...], str]
 # One selected change set as the attempt named it, resolved to its own review lineage.
 type _ResolvedReview = tuple[str, str, str]  # (review_decision_id, change_set_lineage_id, change_set_id)
 
+# One lock target paired with whatever the locked read found for it.
+type _LockedHead = tuple[_HandoffLockTarget, _AnyHead | None]
+
 
 class CanonHandoffAdmissionCommand(R2ContractModel):
     """The request to admit one ``SUCCEEDED`` compilation result for the existing M5A
@@ -222,6 +225,29 @@ def _handoff_lock_targets(
             target[0], user_id=scope.user_id, project_name=scope.project_name, logical_key=target[1]
         ),
     )
+
+
+def _observe_locked_heads(locked: list[_LockedHead]) -> tuple[ObservedNarrativeHead, ...]:
+    """Judge the already-locked projections: each must exist and must still name the exact
+    decision the compilation attempt recorded as effective. Separate from the locking pass
+    so an exact admission that landed concurrently can replay first."""
+    observed: list[ObservedNarrativeHead] = []
+    for (family, logical_key, expected_decision_id), head in locked:
+        if head is None or head.effective_decision_id != expected_decision_id:
+            raise NarrativeHandoffConflict(
+                f"decision {expected_decision_id!r} is no longer the current effective selection "
+                "for its head at the admission instant"
+            )
+        observed.append(
+            ObservedNarrativeHead(
+                head_family=family,
+                logical_key=logical_key,
+                effective_decision_id=head.effective_decision_id,
+                effective_generation=head.effective_generation,
+                decision_generation=head.decision_generation,
+            )
+        )
+    return tuple(observed)
 
 
 async def _require_resolutions_remain_applicable(
@@ -411,10 +437,14 @@ class NarrativeAcceptanceService:
         async with self._uow_factory() as uow:
             repo = uow.repository
             # The Human Showrunner capability check fails closed before anything is read
-            # or locked. Unlike the kernel's initial authorization it mints nothing
-            # durable and binds to no decision family, so it can run first — and both the
-            # retry and the initial path need the ``actor_id`` it resolves.
-            authentication = await self._authority.authenticate_exact_retry(
+            # or locked. ``authenticate_scoped_showrunner``, deliberately: not
+            # ``authorize_initial_decision``, which mints a typed family's persisted
+            # authorization this receipt has nowhere to store, and not
+            # ``authenticate_exact_retry``, whose precondition is an already-stored
+            # decision and whose ``decision_id`` is a different id space from
+            # ``admission_id``. It resolves a capability rather than a decision, so it can
+            # run first, and both the retry and the initial path need its ``actor_id``.
+            authentication = await self._authority.authenticate_scoped_showrunner(
                 authenticated_principal, command.admission_id, scope
             )
             if (
@@ -459,11 +489,32 @@ class NarrativeAcceptanceService:
             reviews = await _resolve_admission_reviews(repo, attempt)
             resolutions = await _resolve_admission_resolutions(repo, attempt)
 
-            # (4) Lock every head this admission depends on, in canonical order, and
-            # require each to still name the exact decision the attempt recorded.
-            observed_heads = await self._lock_admission_heads(
+            # (4) Lock every head this admission depends on, in canonical order.
+            locked = await self._lock_admission_heads(
                 repo, attempt, _handoff_lock_targets(attempt, reviews, resolutions)
             )
+
+            # Resolve a concurrently-landed exact admission before any currentness
+            # rejection — the same second lookup ``AuthorityKernel.run`` performs after
+            # locking its head. Two identical admissions serialize on these locks; the
+            # loser's step-3 lookup ran before the winner committed, so without this it
+            # would fall through to a unique violation instead of replaying the original
+            # receipt. Placed before the rejection below, not after, because section 11.3
+            # forbids a supersession from retroactively invalidating a receipt that is
+            # already committed.
+            landed = await repo.get_exact_handoff_admission(
+                admission_id=command.admission_id, project_name=scope.project_name, user_id=scope.user_id
+            )
+            if landed is not None:
+                replay = await self._replay_exact_admission(
+                    repo, command, landed, approval, approval_fingerprint, actor_id
+                )
+                await uow.commit()
+                return replay
+
+            # Every locked projection must still name the exact decision the attempt
+            # recorded as effective.
+            observed_heads = _observe_locked_heads(locked)
 
             # (5) + (6) The persisted compiled delta, then the approval that binds it.
             delta, completed_at = await self._load_admitted_delta(repo, command, attempt, reviews)
@@ -576,26 +627,14 @@ class NarrativeAcceptanceService:
         repo: NarrativeLifecycleRepositoryPort,
         attempt: CompilationAttempt,
         targets: list[_HandoffLockTarget],
-    ) -> tuple[ObservedNarrativeHead, ...]:
+    ) -> list[_LockedHead]:
+        """Acquire every lock, reject nothing. Judging what the locked heads say is
+        ``_observe_locked_heads``' job, and it must not run until a concurrently-landed
+        exact admission has had its chance to replay."""
         scope = attempt.work_scope
-        observed: list[ObservedNarrativeHead] = []
-        for family, logical_key, expected_decision_id in targets:
-            head = await self._lock_existing_head(repo, family, logical_key, scope)
-            if head is None or head.effective_decision_id != expected_decision_id:
-                raise NarrativeHandoffConflict(
-                    f"decision {expected_decision_id!r} is no longer the current effective selection "
-                    "for its head at the admission instant"
-                )
-            observed.append(
-                ObservedNarrativeHead(
-                    head_family=family,
-                    logical_key=logical_key,
-                    effective_decision_id=head.effective_decision_id,
-                    effective_generation=head.effective_generation,
-                    decision_generation=head.decision_generation,
-                )
-            )
-        return tuple(observed)
+        # A comprehension, but a strictly sequential one: ``targets`` is already in the
+        # canonical order and this is the order the locks are actually taken in.
+        return [(target, await self._lock_existing_head(repo, target[0], target[1], scope)) for target in targets]
 
     async def _lock_existing_head(
         self,
