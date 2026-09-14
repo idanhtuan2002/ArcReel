@@ -1190,6 +1190,29 @@ class NarrativeLifecycleRepository:
             return None
         return _conflict_resolution_head_from_row(row)
 
+    async def lock_existing_conflict_resolution_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        conflict_resolution_lineage_id: str,
+        user_id: str,
+        project_name: str,
+    ) -> ConflictResolutionHead | None:
+        """``SELECT ... FOR UPDATE``, no insert — locks an already-existing conflict-
+        resolution lineage head so a concurrent decision on it cannot land between this
+        read and a compilation admission's own currentness proof."""
+        row = await self._scalar(
+            select(ConflictResolutionHeadModel)
+            .where(
+                ConflictResolutionHeadModel.revision_acceptance_decision_id == revision_acceptance_decision_id,
+                ConflictResolutionHeadModel.conflict_resolution_lineage_id == conflict_resolution_lineage_id,
+            )
+            .with_for_update()
+        )
+        if row is None or row.user_id != user_id or row.project_name != project_name:
+            return None
+        return _conflict_resolution_head_from_row(row)
+
     async def lock_or_insert_revision_head(self, work_scope: NarrativeWorkScope) -> RevisionAcceptanceHead:
         """``INSERT ... ON CONFLICT DO NOTHING`` the head by its complete stable key
         (null pointers, zero generations), then lock and return it. Called only after
@@ -1441,18 +1464,11 @@ class NarrativeLifecycleRepository:
 
     # --- M5C-3 CanonDelta compilation ---
 
-    async def get_exact_compilation_attempt(
-        self, *, attempt_id: str, project_name: str, user_id: str
-    ) -> CompilationAttempt | None:
-        row = await self._scalar(
-            select(NarrativeCompilationAttemptModel).where(
-                NarrativeCompilationAttemptModel.attempt_id == attempt_id,
-                NarrativeCompilationAttemptModel.project_name == project_name,
-                NarrativeCompilationAttemptModel.user_id == user_id,
-            )
-        )
-        if row is None:
-            return None
+    async def _hydrate_compilation_attempt(self, row: NarrativeCompilationAttemptModel) -> CompilationAttempt:
+        """Load the three attempt-owned child sequences and assemble the full contract.
+        Shared by every attempt read path so a scope-filtered and a global-by-id lookup
+        never diverge in how they reconstruct the same row."""
+        attempt_id = row.attempt_id
         selected_change_sets = tuple(
             CompilationSelectedChangeSet(change_set_id=cs, review_decision_id=rd)
             for cs, rd in (
@@ -1496,6 +1512,31 @@ class NarrativeLifecycleRepository:
             conflict_resolution_decision_ids=conflict_resolution_decision_ids,
             observed_effective_heads=observed_effective_heads,
         )
+
+    async def get_exact_compilation_attempt(
+        self, *, attempt_id: str, project_name: str, user_id: str
+    ) -> CompilationAttempt | None:
+        row = await self._scalar(
+            select(NarrativeCompilationAttemptModel).where(
+                NarrativeCompilationAttemptModel.attempt_id == attempt_id,
+                NarrativeCompilationAttemptModel.project_name == project_name,
+                NarrativeCompilationAttemptModel.user_id == user_id,
+            )
+        )
+        if row is None:
+            return None
+        return await self._hydrate_compilation_attempt(row)
+
+    async def get_compilation_attempt_by_id(self, *, attempt_id: str) -> CompilationAttempt | None:
+        # ``attempt_id`` is database-global (a PK). The lookup is not scope-filtered so a
+        # scopeless result / compiled-delta row can resolve its owning tenant from the
+        # admitted attempt; the returned contract carries that ``work_scope``.
+        row = await self._scalar(
+            select(NarrativeCompilationAttemptModel).where(NarrativeCompilationAttemptModel.attempt_id == attempt_id)
+        )
+        if row is None:
+            return None
+        return await self._hydrate_compilation_attempt(row)
 
     async def insert_compilation_attempt(self, attempt: CompilationAttempt) -> None:
         self.session.add(_compilation_attempt_row(attempt))

@@ -13,6 +13,9 @@ from typing import Protocol, runtime_checkable
 
 from r2.contracts.narrative_lifecycle import (
     ChangeSetReviewHead,
+    CompilationAttempt,
+    CompilationResult,
+    CompiledCanonDeltaEvidence,
     ConflictResolutionHead,
     ConflictResolutionLineage,
     DraftCandidate,
@@ -58,6 +61,20 @@ class NarrativeLifecycleEvidenceRepositoryPort(Protocol):
         self, *, change_set_id: str, project_name: str, user_id: str
     ) -> NarrativeChangeSet | None: ...
 
+    async def get_exact_compilation_attempt(
+        self, *, attempt_id: str, project_name: str, user_id: str
+    ) -> CompilationAttempt | None: ...
+
+    async def get_compilation_attempt_by_id(self, *, attempt_id: str) -> CompilationAttempt | None: ...
+
+    async def get_exact_compilation_result(
+        self, *, attempt_id: str, generation: int, project_name: str, user_id: str
+    ) -> CompilationResult | None: ...
+
+    async def get_exact_compiled_canon_delta(
+        self, *, compilation_result_id: str, project_name: str, user_id: str
+    ) -> CompiledCanonDeltaEvidence | None: ...
+
     async def insert_draft_candidate(self, candidate: DraftCandidate) -> None: ...
 
     async def insert_revision(self, revision: NarrativeRevision) -> None: ...
@@ -69,6 +86,14 @@ class NarrativeLifecycleEvidenceRepositoryPort(Protocol):
     ) -> None: ...
 
     async def insert_non_successful_extraction(self, result: ExtractionResult) -> None: ...
+
+    async def insert_compilation_attempt(self, attempt: CompilationAttempt) -> None: ...
+
+    async def insert_successful_compilation(
+        self, result: CompilationResult, evidence: CompiledCanonDeltaEvidence
+    ) -> None: ...
+
+    async def insert_non_successful_compilation(self, result: CompilationResult) -> None: ...
 
     async def flush(self) -> None: ...
 
@@ -120,6 +145,15 @@ class NarrativeAuthorityRepositoryPort(Protocol):
     ) -> ChangeSetReviewHead | None: ...
 
     async def get_conflict_resolution_head(
+        self,
+        *,
+        revision_acceptance_decision_id: str,
+        conflict_resolution_lineage_id: str,
+        user_id: str,
+        project_name: str,
+    ) -> ConflictResolutionHead | None: ...
+
+    async def lock_existing_conflict_resolution_head(
         self,
         *,
         revision_acceptance_decision_id: str,
