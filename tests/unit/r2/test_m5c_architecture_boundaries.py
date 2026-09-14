@@ -1,16 +1,24 @@
 """Executable architecture fitness for the M5C-1A blast radius, extended in Task 21
-(M5C-2 checkpoint freeze) with the acceptance-authority surface.
+(M5C-2 checkpoint freeze) with the acceptance-authority surface and in Task 31 with the
+three §16.8 mutation rows whose required result is an architecture / import fitness
+failure.
 
 Structural sensors only: import graphs, AST shapes, and string-literal scans. The one
 Task 21 sensor that needs a real PostgreSQL connection (the §7.2 isolation precondition)
 lives in ``tests/integration/r2/test_m5c_architecture_boundaries_db.py`` — unit-tier
 tests may not touch a real database in this repo.
+
+The three structural sensors the §16.8 matrix reuses are exposed as plain functions over
+a ``{repository-relative path: source text}`` mapping: the tests below run them over the
+real tree, and ``tests/integration/r2/test_m5c_acceptance.py`` runs them over the real
+tree plus one mutated source, so each sensor is proven to fire as well as to pass.
 """
 
 from __future__ import annotations
 
 import ast
 import inspect
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -32,6 +40,7 @@ _F9_MODULES = (
     "r2/narrative_plan/validation.py",
 )
 _DONOR_NEEDLES = ("donor_parity", "novel-change-record", "novel-memory-parser", "hardRules")
+M5A_COMMIT_PATH_MODULES = ("server/services/narrative_canon_handoff.py", "r2/narrative/canon_transaction.py")
 _FORBIDDEN_PURE_IMPORT_ROOTS = {"sqlalchemy", "server", "httpx", "fastapi", "asyncpg", "aiosqlite"}
 _FORBIDDEN_PURE_IMPORT_NEEDLES = (
     "lib.db",
@@ -44,10 +53,6 @@ _FORBIDDEN_PURE_IMPORT_NEEDLES = (
     "r2.production",
     "agent_runtime",
 )
-
-
-def _tree(path: Path) -> ast.Module:
-    return ast.parse(path.read_text(encoding="utf-8"))
 
 
 def _imports(tree: ast.Module) -> list[str]:
@@ -65,12 +70,137 @@ def _py_files(base: Path) -> list[Path]:
     return sorted(base.rglob("*.py"))
 
 
-def test_pure_lifecycle_ports_import_no_authority_persistence_or_runtime() -> None:
-    for path in _py_files(_PURE_LIFECYCLE_DIR):
-        for name in _imports(_tree(path)):
+def _sources(base: Path) -> dict[str, str]:
+    return {path.relative_to(_ROOT).as_posix(): path.read_text(encoding="utf-8") for path in _py_files(base)}
+
+
+# --- reusable structural sensors (also driven by the §16.8 mutation matrix) ------
+
+
+def pure_lifecycle_sources() -> dict[str, str]:
+    """Every module of the pure ``r2/narrative_lifecycle`` package, by repo-relative path."""
+    return _sources(_PURE_LIFECYCLE_DIR)
+
+
+def r2_runtime_sources() -> dict[str, str]:
+    """Every module under ``r2/``, by repo-relative path."""
+    return _sources(_R2_RUNTIME_DIR)
+
+
+def forbidden_pure_import_offenders(sources: Mapping[str, str]) -> list[tuple[str, str]]:
+    """``(module, imported name)`` for every authority / persistence / runtime import a
+    pure lifecycle module must never carry — a direct Canon repository, unit of work,
+    session, ORM, transaction service, or server import included."""
+    offenders: list[tuple[str, str]] = []
+    for rel, text_ in sorted(sources.items()):
+        for name in _imports(ast.parse(text_)):
             root = name.split(".")[0]
-            assert root not in _FORBIDDEN_PURE_IMPORT_ROOTS, (path.name, name)
-            assert not any(needle in name for needle in _FORBIDDEN_PURE_IMPORT_NEEDLES), (path.name, name)
+            if root in _FORBIDDEN_PURE_IMPORT_ROOTS or any(needle in name for needle in _FORBIDDEN_PURE_IMPORT_NEEDLES):
+                offenders.append((rel, name))
+    return offenders
+
+
+def relationship_predicate_literal_offenders(sources: Mapping[str, str]) -> list[str]:
+    """Modules other than the shared versioned helper that build an ``r2rel:`` predicate
+    string of their own."""
+    owner = "r2/narrative/relationship_facts.py"
+    return sorted(
+        rel for rel, text_ in sources.items() if rel != owner and ('"r2rel:"' in text_ or "'r2rel:'" in text_)
+    )
+
+
+_CURRENTNESS_APIS = (
+    "verify_exact_current_selection",
+    "get_current_revision_selection",
+    "get_current_change_set_selection",
+    "get_current_conflict_resolution",
+    "admit_canon_handoff",
+)
+
+
+def narrative_currentness_dependency_offenders(sources: Mapping[str, str]) -> list[tuple[str, str]]:
+    """``(module, dependency)`` for every module on the M5A commit path that imports the
+    Narrative acceptance surface or names one of its currentness / admission APIs.
+
+    Structural, not textual: a module docstring may *describe* the boundary (and the
+    handoff facade's does), but an import or an attribute access would make M5A depend on
+    Narrative currentness, which spec §11.4 forbids.
+    """
+    offenders: list[tuple[str, str]] = []
+    for rel, text_ in sorted(sources.items()):
+        tree = ast.parse(text_)
+        offenders += [(rel, name) for name in _imports(tree) if name.startswith("r2.narrative_lifecycle.acceptance")]
+        offenders += [
+            (rel, node.attr)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Attribute) and node.attr in _CURRENTNESS_APIS
+        ]
+    return offenders
+
+
+def acceptance_import_offenders(sources: Mapping[str, str]) -> list[tuple[str, str]]:
+    """``(module, imported name)`` for every lifecycle module that reaches into the
+    decision-authority surface — the extractor / parser / compiler side must not be able
+    to invoke ``review_change_set`` at all."""
+    allowed = {"r2/narrative_lifecycle/acceptance.py", "r2/narrative_lifecycle/__init__.py"}
+    offenders: list[tuple[str, str]] = []
+    for rel, text_ in sorted(sources.items()):
+        if rel in allowed:
+            continue
+        offenders += [
+            (rel, name) for name in _imports(ast.parse(text_)) if name.startswith("r2.narrative_lifecycle.acceptance")
+        ]
+    return offenders
+
+
+def test_pure_lifecycle_ports_import_no_authority_persistence_or_runtime() -> None:
+    assert forbidden_pure_import_offenders(pure_lifecycle_sources()) == []
+
+
+def test_the_pure_import_sensor_catches_a_direct_canon_repository_call_from_m5c() -> None:
+    mutated = {
+        **pure_lifecycle_sources(),
+        "r2/narrative_lifecycle/compiler.py": "from lib.db.repositories.canon import CanonRepository\n",
+    }
+    assert forbidden_pure_import_offenders(mutated) == [
+        ("r2/narrative_lifecycle/compiler.py", "lib.db.repositories.canon"),
+        ("r2/narrative_lifecycle/compiler.py", "lib.db.repositories.canon.CanonRepository"),
+    ]
+
+
+def test_the_acceptance_import_sensor_catches_an_extractor_reaching_for_review_change_set() -> None:
+    mutated = {
+        **pure_lifecycle_sources(),
+        "r2/narrative_lifecycle/changeset_parser.py": (
+            "from r2.narrative_lifecycle.acceptance import NarrativeAcceptanceService\n"
+        ),
+    }
+    assert sorted({rel for rel, _ in acceptance_import_offenders(mutated)}) == [
+        "r2/narrative_lifecycle/changeset_parser.py"
+    ]
+
+
+def test_the_m5a_commit_path_never_depends_on_narrative_currentness() -> None:
+    m5a_path = {rel: (_ROOT / rel).read_text(encoding="utf-8") for rel in M5A_COMMIT_PATH_MODULES}
+    assert narrative_currentness_dependency_offenders(m5a_path) == []
+
+
+def test_the_currentness_dependency_sensor_catches_an_implicit_narrative_check() -> None:
+    mutated = {
+        "server/services/narrative_canon_handoff.py": (
+            "async def commit(self, admission_id):\n"
+            "    if not await self._acceptance.verify_exact_current_selection(admission_id):\n"
+            "        return None\n"
+        )
+    }
+    assert narrative_currentness_dependency_offenders(mutated) == [
+        ("server/services/narrative_canon_handoff.py", "verify_exact_current_selection")
+    ]
+
+
+def test_the_r2rel_literal_sensor_catches_a_predicate_built_outside_the_shared_helper() -> None:
+    mutated = {**r2_runtime_sources(), "r2/narrative_lifecycle/changeset_parser.py": 'PREDICATE = "r2rel:" + key\n'}
+    assert relationship_predicate_literal_offenders(mutated) == ["r2/narrative_lifecycle/changeset_parser.py"]
 
 
 def test_no_r2_runtime_module_imports_the_donor_parity_harness() -> None:
@@ -89,13 +219,7 @@ def test_f9_modules_reference_no_donor_source() -> None:
 
 
 def test_relationship_fact_predicate_string_is_produced_only_in_one_module() -> None:
-    owner = "r2/narrative/relationship_facts.py"
-    for path in _py_files(_R2_RUNTIME_DIR):
-        rel = path.relative_to(_ROOT).as_posix()
-        if rel == owner:
-            continue
-        assert '"r2rel:"' not in path.read_text(encoding="utf-8"), rel
-        assert "'r2rel:'" not in path.read_text(encoding="utf-8"), rel
+    assert relationship_predicate_literal_offenders(r2_runtime_sources()) == []
 
 
 def test_cross_scene_thread_lifecycle_lives_only_in_the_plan_wide_pass() -> None:
@@ -153,14 +277,7 @@ def test_recomputing_a_v1_golden_hash_with_v2_code_diverges() -> None:
 
 
 def test_only_acceptance_module_may_import_acceptance_within_narrative_lifecycle() -> None:
-    owner = "r2/narrative_lifecycle/acceptance.py"
-    reexport_root = "r2/narrative_lifecycle/__init__.py"
-    for path in _py_files(_PURE_LIFECYCLE_DIR):
-        rel = path.relative_to(_ROOT).as_posix()
-        if rel in (owner, reexport_root):
-            continue
-        for name in _imports(_tree(path)):
-            assert not name.startswith("r2.narrative_lifecycle.acceptance"), (rel, name)
+    assert acceptance_import_offenders(pure_lifecycle_sources()) == []
 
 
 def test_public_decision_methods_take_only_command_and_authenticated_principal() -> None:
