@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
+from collections.abc import Set as AbstractSet
 from datetime import datetime
 from itertools import pairwise
 from typing import Literal
@@ -16,16 +17,20 @@ from r2.contracts import (
     Event,
     Fact,
     KnowledgeState,
+    NarrativeChangeSet,
     NarrativePlan,
     NarrativeValidationFinding,
     NarrativeValidationReport,
     NarrativeValidationSeverity,
     RetireFactOperation,
     SceneContract,
+    SourceSpan,
+    ThreadPayoffEffectKey,
     UpdateKnowledgeOperation,
     canonical_json_bytes,
     ensure_json_value,
 )
+from r2.contracts.narrative_lifecycle import AcceptedThreadPayoffProof
 from r2.contracts.narrative_plan import (
     AudienceRevealEvidence,
     CharacterRevealRecipient,
@@ -418,6 +423,79 @@ def validate_scene_relationship(
     return _sorted_report(
         [_mb_finding(rule, refs, f"{phase} relationship constraint {constraint.constraint_id} unmet", story_time=at)]
     )
+
+
+# --- M5C F9 (spec §4.3.4): accepted thread-payoff outcome proof -------------------
+
+_SCENE_EXIT_THREAD_UNMET = "SCENE_EXIT_THREAD_UNMET"
+
+
+def _thread_payoff_unmet(proof: AcceptedThreadPayoffProof, message: str) -> NarrativeValidationReport:
+    return _sorted_report([_mb_finding(_SCENE_EXIT_THREAD_UNMET, (proof.thread_ref, proof.payoff_ref), message)])
+
+
+def _covered_by_spans(spans: tuple[SourceSpan, ...], span: SourceSpan) -> bool:
+    """True when ``span`` lies inside the union of ``spans`` (overlapping or adjacent
+    spans count as one). Mirrors ``NarrativeChangeSet``'s own coverage rule (spec §5) —
+    duplicated here, not imported, because it is a private helper of the contracts
+    module and this validator lives in a different layer."""
+    cursor = span.start
+    for covered in sorted(spans, key=lambda item: item.start):
+        if covered.start > cursor:
+            break
+        cursor = max(cursor, covered.end)
+        if cursor >= span.end:
+            return True
+    return cursor >= span.end
+
+
+def validate_thread_payoff_outcome(
+    proof: AcceptedThreadPayoffProof,
+    *,
+    change_set: NarrativeChangeSet,
+    effective_decisions: AbstractSet[str],
+) -> NarrativeValidationReport:
+    """Pure exact-input validator (spec §4.3.4): a planned thread resolution is proven
+    only when ``change_set`` is the exact change set ``proof`` names and declares the
+    exact typed ``THREAD_PAYOFF(thread_ref, payoff_ref)`` effect key, every one of
+    ``proof.source_spans`` is covered by that change set's declared coverage, and every
+    decision id ``proof`` names — the revision acceptance, the change-set review, and
+    every conflict resolution — is a member of ``effective_decisions``.
+
+    A ``promise_payoff_refs`` entry, active-thread tag, model claim, or prose substring
+    without this accepted proof yields ``SCENE_EXIT_THREAD_UNMET``, and so does any
+    mismatch between the proof and the named change set. Whether ``effective_decisions``
+    reflects live currentness or a historical snapshot is the caller's concern: this
+    function is exact-input and pure, so replaying the same proof against the same
+    historical set reproduces the same report without asserting current authority.
+    """
+    if change_set.change_set_id != proof.change_set_id:
+        return _thread_payoff_unmet(
+            proof, f"proof names change set {proof.change_set_id!r} but {change_set.change_set_id!r} was supplied"
+        )
+
+    expected_key = ThreadPayoffEffectKey(thread_ref=proof.thread_ref, payoff_ref=proof.payoff_ref)
+    if expected_key not in change_set.semantic_effect_keys:
+        return _thread_payoff_unmet(
+            proof,
+            f"change set {change_set.change_set_id!r} does not declare "
+            f"THREAD_PAYOFF({proof.thread_ref!r}, {proof.payoff_ref!r})",
+        )
+
+    if not all(_covered_by_spans(change_set.source_spans, span) for span in proof.source_spans):
+        return _thread_payoff_unmet(
+            proof, f"change set {change_set.change_set_id!r} does not cover every proof source span"
+        )
+
+    named_decisions = (
+        proof.revision_acceptance_decision_id,
+        proof.review_decision_id,
+        *proof.conflict_resolution_decision_ids,
+    )
+    if not all(decision_id in effective_decisions for decision_id in named_decisions):
+        return _thread_payoff_unmet(proof, "not every decision named by the proof is currently effective")
+
+    return NarrativeValidationReport(findings=())
 
 
 def _present_state_ref_findings(

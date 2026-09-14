@@ -584,6 +584,38 @@ class ConflictResolutionLineage(R2ContractModel):
     created_by: NonEmptyStr
 
 
+# --- F9 (spec §4.3.4): accepted thread-payoff outcome proof ---
+#
+# A typed read view assembled from existing evidence and decisions, never a new write
+# authority or a mutable payoff row. It names the exact NarrativeChangeSet that must
+# declare the THREAD_PAYOFF(thread_ref, payoff_ref) effect key and the exact decisions
+# that must be applicable and currently effective for `validate_thread_payoff_outcome()`
+# (`r2.narrative.validation`) to treat the payoff as proven, never a promise tag, model
+# claim, or prose substring on its own.
+
+
+class AcceptedThreadPayoffProof(R2ContractModel):
+    """Exact-input evidence for one planned thread resolution: the revision, change set,
+    and decisions that must all resolve and be currently effective for a
+    ``THREAD_PAYOFF(thread_ref, payoff_ref)`` outcome to be provably accepted."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    thread_ref: NonEmptyStr
+    payoff_ref: NonEmptyStr
+    revision_id: NonEmptyStr
+    revision_acceptance_decision_id: NonEmptyStr
+    change_set_id: NonEmptyStr
+    review_decision_id: NonEmptyStr
+    conflict_resolution_decision_ids: tuple[NonEmptyStr, ...] = ()
+    source_spans: tuple[SourceSpan, ...]
+
+    @model_validator(mode="after")
+    def _source_spans_non_empty(self) -> AcceptedThreadPayoffProof:
+        if not self.source_spans:
+            raise ValueError("AcceptedThreadPayoffProof must declare at least one source span")
+        return self
+
+
 # --- M5C-3 CanonDelta compilation: attempt/result/compiled-delta evidence ---
 #
 # The pure compiler (a later task) consumes a CompilationAttempt's exact immutable

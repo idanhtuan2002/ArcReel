@@ -11,6 +11,7 @@ every other module in this package is read-only / append-only evidence.
 """
 
 from .acceptance import NarrativeAcceptanceService
+from .accepted_narrative_adapter import AcceptedNarrativeAdapter
 from .authority_kernel import AuthorityKernel
 from .changeset_parser import (
     ParsedChangeRecord,
@@ -101,6 +102,7 @@ __all__ = [
     "SUPPORTED_COMPILER_POLICY_VERSIONS",
     "SUPPORTED_COMPILER_VERSIONS",
     "SUPPORTED_SEMANTIC_EFFECT_KEY_VERSIONS",
+    "AcceptedNarrativeAdapter",
     "AuthorityKernel",
     "CanonDeltaCompilation",
     "CanonDeltaCompiler",
