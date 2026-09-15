@@ -2,6 +2,8 @@
 
 from lib.db.models.adaptation import (
     AdaptationBranchModel,
+    AdaptationDecisionModel,
+    AdaptationHeadModel,
     AdaptationMapEntryModel,
     AdaptationMapModel,
     AdaptationMapProfileAnalysisRefModel,
@@ -41,6 +43,8 @@ from lib.db.models.user import User
 
 __all__ = [
     "AdaptationBranchModel",
+    "AdaptationDecisionModel",
+    "AdaptationHeadModel",
     "AdaptationMapEntryModel",
     "AdaptationMapModel",
     "AdaptationMapProfileAnalysisRefModel",

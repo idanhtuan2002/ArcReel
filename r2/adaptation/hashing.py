@@ -33,6 +33,7 @@ WESTERN_ANALYSIS_HASH_VERSION = "r2-m6-western-analysis-hash-v1"
 SHUANGWEN_ANALYSIS_HASH_VERSION = "r2-m6-shuangwen-analysis-hash-v1"
 PROFILE_EVALUATION_REPORT_HASH_VERSION = "r2-m6-profile-evaluation-report-hash-v1"
 DECISION_IDENTITY_HASH_VERSION = "r2-m6-decision-identity-hash-v1"
+COMMAND_IDENTITY_HASH_VERSION = "r2-m6-command-identity-hash-v1"
 
 AdaptationEvidenceArtifact = AdaptationMapV2 | ScreenplayArtifactV2 | WesternDramaAnalysis | ShuangwenAnalysis
 AdaptationDecisionCommand = MapApprovalCommand | ProfileWaiverCommand | ScreenplayAdmissionCommand
@@ -137,8 +138,21 @@ def compute_decision_identity_hash(
     return "adi:" + _sha256_hex(payload)
 
 
+def compute_command_identity_hash(command: AdaptationDecisionCommand) -> str:
+    """Content-address one decision command alone, with no authorization — the value
+    ``AdaptationShowrunnerAuthorityPort.authorize`` binds its minted authorization to
+    (plan Task 7). Distinct from ``compute_decision_identity_hash``, which additionally
+    covers the authorization and so cannot exist before one is minted; this hash is
+    computed first, from the command alone, precisely so the authority port can prove
+    the authorization it mints is bound to this exact command content before either
+    exists as a stored decision."""
+    payload = {"schema": COMMAND_IDENTITY_HASH_VERSION, "command": command.model_dump(mode="json")}
+    return "cid:" + _sha256_hex(payload)
+
+
 __all__ = [
     "ADAPTATION_MAP_HASH_VERSION",
+    "COMMAND_IDENTITY_HASH_VERSION",
     "DECISION_IDENTITY_HASH_VERSION",
     "PROFILE_EVALUATION_REPORT_HASH_VERSION",
     "SCREENPLAY_ARTIFACT_HASH_VERSION",
@@ -146,6 +160,7 @@ __all__ = [
     "WESTERN_ANALYSIS_HASH_VERSION",
     "canonical_adaptation_bytes",
     "compute_adaptation_hash",
+    "compute_command_identity_hash",
     "compute_decision_identity_hash",
     "compute_profile_evaluation_report_digest",
 ]

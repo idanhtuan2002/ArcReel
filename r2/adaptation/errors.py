@@ -43,13 +43,39 @@ class AdaptationStaleDependencyError(AdaptationError):
 
 class AdaptationProfileMismatchError(AdaptationError):
     """A branch changed its bound profile mid-lineage; a profile change requires a new
-    branch id, never a new version of an existing one."""
+    branch id, never a new version of an existing one. Also raised (Task 7) when a
+    decision command's ``profile_ref.profile_id`` disagrees with its branch's bound
+    profile."""
+
+
+class AdaptationPolicyDigestMismatchError(AdaptationError):
+    """A decision command's ``profile_ref`` names the branch's correct ``profile_id``
+    but a stale or wrong ``profile_version``/``policy_pack_digest`` (Task 7)."""
+
+
+class AdaptationAuthorityDeniedError(AdaptationError):
+    """The authenticated principal does not hold the Human Showrunner grant this
+    decision action requires (Task 7). Raised by a concrete
+    ``AdaptationShowrunnerAuthorityPort`` implementation, never fabricated by the
+    kernel or service."""
+
+
+class AdaptationAuthorityIntegrityError(AdaptationError):
+    """The stored ``AdaptationHead`` projection disagrees with the pure fold of its own
+    complete decision chain (Task 7): a stale/ghost predecessor, a generation that does
+    not equal the chain's length, an effective selection that does not name an
+    accepting decision, or a selected artifact that does not match the accepting
+    decision's own command. Never repaired automatically — the online guard that raises
+    this stops the write; only a Human-directed correction fixes the stored row."""
 
 
 __all__ = [
+    "AdaptationAuthorityDeniedError",
+    "AdaptationAuthorityIntegrityError",
     "AdaptationError",
     "AdaptationIdentityConflictError",
     "AdaptationNotFoundError",
+    "AdaptationPolicyDigestMismatchError",
     "AdaptationProfileMismatchError",
     "AdaptationStaleDependencyError",
     "AdaptationStaleHeadError",

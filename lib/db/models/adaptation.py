@@ -29,6 +29,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Float,
+    ForeignKey,
     ForeignKeyConstraint,
     Index,
     Integer,
@@ -38,7 +39,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from lib.db.base import Base, UserOwnedMixin
+from lib.db.base import DEFAULT_USER_ID, Base, UserOwnedMixin
 
 _ID = String(255)
 _SHORT = String(64)
@@ -46,6 +47,8 @@ _ADAPTATION_OPERATIONS = (
     "('PRESERVE','EXTERNALIZE','CONDENSE','COMBINE','SPLIT','OMIT','REORDER','REFRAME_POV','MODIFY_FOR_MEDIUM')"
 )
 _APPROVAL_STATUSES = "('DRAFT','PROPOSED','REVIEW_REQUIRED','APPROVED','REJECTED')"
+_AUTHORITY_FAMILIES = "('MAP_APPROVAL','PROFILE_WAIVER','SCREENPLAY_ADMISSION')"
+_DECISION_KINDS = "('MAP_APPROVAL','PROFILE_WAIVER','SCREENPLAY_ADMISSION')"
 
 
 class AdaptationBranchModel(UserOwnedMixin, Base):
@@ -303,3 +306,94 @@ class AdaptationScreenplaySceneModel(UserOwnedMixin, Base):
     character_refs_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
     source_mapping_refs_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
     dramatic_text: Mapped[str] = mapped_column(String(8000), nullable=False)
+
+
+class AdaptationDecisionModel(UserOwnedMixin, Base):
+    """Append-only decision log entry (plan Task 7). ``decision_id`` is a single global
+    identity registry per ``(user_id, project_name)`` across every family, matching
+    ``AdaptationAuthorityRepositoryPort.get_decision_by_id``'s family-agnostic lookup.
+    Carries no FK to ``adaptation_heads``: the head row is always prepared before any
+    decision referencing it is inserted (enforced by ``AdaptationAuthorityService``'s
+    call order, mirroring M5C's own decision/head table pair), and a decision->head FK
+    alongside the head->decision FK below would be circular.
+    """
+
+    __tablename__ = "adaptation_decisions"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "decision_id", name="pk_adaptation_decisions"),
+        UniqueConstraint(
+            "user_id", "project_name", "family", "head_key", "sequence", name="uq_adaptation_decisions_chain_position"
+        ),
+        CheckConstraint(f"family IN {_AUTHORITY_FAMILIES}", name="ck_adaptation_decisions_family"),
+        CheckConstraint(f"decision_kind IN {_DECISION_KINDS}", name="ck_adaptation_decisions_kind"),
+        CheckConstraint("sequence >= 1", name="ck_adaptation_decisions_sequence"),
+        Index("ix_adaptation_decisions_project_name", "project_name"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        server_default=DEFAULT_USER_ID,
+        primary_key=True,
+    )
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    decision_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+
+    family: Mapped[str] = mapped_column(String(32), nullable=False)
+    head_key: Mapped[str] = mapped_column(_ID, nullable=False)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    decision_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    command_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    authorization_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    decision_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AdaptationHeadModel(UserOwnedMixin, Base):
+    """The one mutable, rebuildable lock/index projection per ``(user_id, project_name,
+    family, head_key)`` (plan Task 7). ``generation = 0`` is an internal-only genesis
+    sentinel — the repository translates it to the public ``None`` (no decisions yet);
+    a real ``AdaptationHead`` never has ``generation < 1``. Created via ``INSERT ...
+    ON CONFLICT DO NOTHING`` at genesis, then always read back through ``SELECT ...
+    FOR UPDATE`` before its columns are trusted (plan global constraint: "genesis uses
+    unique insert plus lock/reread, never absent-row FOR UPDATE").
+    """
+
+    __tablename__ = "adaptation_heads"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "family", "head_key", name="pk_adaptation_heads"),
+        ForeignKeyConstraint(
+            ["latest_decision_id", "user_id", "project_name"],
+            ["adaptation_decisions.decision_id", "adaptation_decisions.user_id", "adaptation_decisions.project_name"],
+            name="fk_adaptation_heads_latest",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["effective_decision_id", "user_id", "project_name"],
+            ["adaptation_decisions.decision_id", "adaptation_decisions.user_id", "adaptation_decisions.project_name"],
+            name="fk_adaptation_heads_effective",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(f"family IN {_AUTHORITY_FAMILIES}", name="ck_adaptation_heads_family"),
+        CheckConstraint("generation >= 0", name="ck_adaptation_heads_generation"),
+        Index("ix_adaptation_heads_project_name", "project_name"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        server_default=DEFAULT_USER_ID,
+        primary_key=True,
+    )
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    family: Mapped[str] = mapped_column(String(32), primary_key=True)
+    head_key: Mapped[str] = mapped_column(_ID, primary_key=True)
+
+    generation: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    latest_decision_id: Mapped[str | None] = mapped_column(_ID)
+    effective_decision_id: Mapped[str | None] = mapped_column(_ID)
+    selected_artifact_id: Mapped[str | None] = mapped_column(_ID)
+    selected_artifact_version: Mapped[int | None] = mapped_column(Integer)
+    selected_artifact_hash: Mapped[str | None] = mapped_column(_ID)

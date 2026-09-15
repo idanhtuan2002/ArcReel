@@ -13,14 +13,20 @@ proves the constraint exists.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from pydantic import TypeAdapter
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.adaptation import (
     AdaptationBranchModel,
+    AdaptationDecisionModel,
+    AdaptationHeadModel,
     AdaptationMapEntryModel,
     AdaptationMapModel,
     AdaptationMapProfileAnalysisRefModel,
@@ -28,11 +34,32 @@ from lib.db.models.adaptation import (
     AdaptationScreenplayProfileAnalysisRefModel,
     AdaptationScreenplaySceneModel,
 )
+from lib.db.repositories.base import rowcount
+from r2.adaptation.errors import AdaptationAuthorityIntegrityError
 from r2.contracts.adaptation import (
+    AdaptationAuthorityFamily,
     AdaptationBranchV2,
+    AdaptationDecision,
+    AdaptationHead,
     AdaptationMapV2,
+    ArtifactVersionRef,
+    MapApprovalDecision,
     ScreenplayArtifactV2,
 )
+
+_decision_adapter: TypeAdapter[AdaptationDecision] = TypeAdapter(AdaptationDecision)
+
+# The family's "select a new effective candidate" action, keyed by the shared
+# decision_kind/family string (the two are 1:1 by construction). Mirrors
+# ``r2.adaptation.authority_kernel``'s own mapping; duplicated rather than imported so
+# this persistence-layer module never depends on the domain authority module (only the
+# reverse dependency is permitted) — the same controlled duplication this file's ORM
+# ``CheckConstraint`` string tuples already use against the Pydantic contract enums.
+_ACCEPTING_ACTION_BY_KIND = {
+    "MAP_APPROVAL": "APPROVE",
+    "PROFILE_WAIVER": "WAIVE",
+    "SCREENPLAY_ADMISSION": "ADMIT",
+}
 
 
 def _stored_aware(value: datetime) -> datetime:
@@ -282,6 +309,70 @@ def _screenplay_from_rows(
     )
 
 
+def _head_key_of(decision: AdaptationDecision) -> str:
+    if isinstance(decision, MapApprovalDecision):
+        return decision.command.branch_id
+    raise NotImplementedError(
+        "adaptation repository: PROFILE_WAIVER/SCREENPLAY_ADMISSION head_key derivation is added by Task 11/12, "
+        "once their decisions are persisted for the first time"
+    )
+
+
+def _artifact_ref_from_columns(
+    artifact_id: str | None, version: int | None, content_hash: str | None
+) -> ArtifactVersionRef | None:
+    if artifact_id is None:
+        return None
+    assert version is not None
+    assert content_hash is not None
+    return ArtifactVersionRef(artifact_id=artifact_id, version=version, content_hash=content_hash)
+
+
+def _head_from_row(row: AdaptationHeadModel) -> AdaptationHead:
+    """Only ever called for ``row.generation >= 1`` (the caller translates
+    ``generation == 0`` to the public ``None``), so ``latest_decision_id`` is always
+    set — ``AdaptationHead.latest_decision_id`` is not itself optional."""
+    assert row.latest_decision_id is not None
+    return AdaptationHead(
+        user_id=row.user_id,
+        project_name=row.project_name,
+        family=AdaptationAuthorityFamily(row.family),
+        head_key=row.head_key,
+        latest_decision_id=row.latest_decision_id,
+        effective_decision_id=row.effective_decision_id,
+        selected_artifact_ref=_artifact_ref_from_columns(
+            row.selected_artifact_id, row.selected_artifact_version, row.selected_artifact_hash
+        ),
+        generation=row.generation,
+    )
+
+
+def _decision_from_row(row: AdaptationDecisionModel) -> AdaptationDecision:
+    return _decision_adapter.validate_python(
+        {
+            "decision_kind": row.decision_kind,
+            "command": row.command_json,
+            "authorization": row.authorization_json,
+            "sequence": row.sequence,
+            "decision_digest": row.decision_digest,
+            "created_at": _stored_aware(row.created_at),
+        }
+    )
+
+
+def _new_effective_selection(
+    decision: AdaptationDecision, *, current_effective_id: str | None, current_artifact: ArtifactVersionRef | None
+) -> tuple[str | None, ArtifactVersionRef | None]:
+    """The new ``(effective_decision_id, selected_artifact_ref)`` pair after appending
+    ``decision``: an accepting action (``APPROVE``/``WAIVE``/``ADMIT``) always becomes
+    its own effective selection; any other action (``REJECT``/``DENY_WAIVER``/
+    ``REVOKE``) leaves the previous selection unchanged."""
+    if decision.command.action.value != _ACCEPTING_ACTION_BY_KIND[decision.decision_kind]:
+        return current_effective_id, current_artifact
+    assert isinstance(decision, MapApprovalDecision)
+    return decision.command.decision_id, decision.command.map_ref
+
+
 class AdaptationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -429,4 +520,146 @@ class AdaptationRepository:
             self.session.add(row)
         for row in _screenplay_profile_analysis_ref_rows(screenplay, user_id=user_id, project_name=project_name):
             self.session.add(row)
+        await self.session.flush()
+
+    # --- authority: decisions and heads (plan Task 7) -------------------------------
+
+    def _insert(self, table_class: type) -> Any:
+        """Dialect-aware ``INSERT ... ON CONFLICT DO NOTHING`` builder, mirroring
+        ``NarrativeLifecycleRepository``'s own helper of the same name."""
+        return (
+            pg_insert(table_class)
+            if self.session.get_bind().dialect.name == "postgresql"
+            else sqlite_insert(table_class)
+        )
+
+    async def get_decision_by_id(
+        self, *, user_id: str, project_name: str, decision_id: str
+    ) -> AdaptationDecision | None:
+        row = await self._scalar(
+            select(AdaptationDecisionModel).where(
+                AdaptationDecisionModel.user_id == user_id,
+                AdaptationDecisionModel.project_name == project_name,
+                AdaptationDecisionModel.decision_id == decision_id,
+            )
+        )
+        return _decision_from_row(row) if row is not None else None
+
+    async def prepare_or_lock_head(
+        self, *, user_id: str, project_name: str, family: AdaptationAuthorityFamily, head_key: str
+    ) -> AdaptationHead | None:
+        stmt = self._insert(AdaptationHeadModel).values(
+            user_id=user_id,
+            project_name=project_name,
+            family=family.value,
+            head_key=head_key,
+            generation=0,
+            latest_decision_id=None,
+            effective_decision_id=None,
+            selected_artifact_id=None,
+            selected_artifact_version=None,
+            selected_artifact_hash=None,
+        )
+        stmt = stmt.on_conflict_do_nothing(index_elements=["user_id", "project_name", "family", "head_key"])
+        await self.session.execute(stmt)
+        row = await self._scalar(
+            select(AdaptationHeadModel)
+            .where(
+                AdaptationHeadModel.user_id == user_id,
+                AdaptationHeadModel.project_name == project_name,
+                AdaptationHeadModel.family == family.value,
+                AdaptationHeadModel.head_key == head_key,
+            )
+            .with_for_update()
+        )
+        if row is None:
+            raise AdaptationAuthorityIntegrityError("adaptation head vanished immediately after insert")
+        return None if row.generation == 0 else _head_from_row(row)
+
+    async def list_decisions_for_locked_head(
+        self, *, user_id: str, project_name: str, family: AdaptationAuthorityFamily, head_key: str
+    ) -> Sequence[AdaptationDecision]:
+        rows = (
+            (
+                await self.session.execute(
+                    select(AdaptationDecisionModel)
+                    .where(
+                        AdaptationDecisionModel.user_id == user_id,
+                        AdaptationDecisionModel.project_name == project_name,
+                        AdaptationDecisionModel.family == family.value,
+                        AdaptationDecisionModel.head_key == head_key,
+                    )
+                    .order_by(AdaptationDecisionModel.sequence)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [_decision_from_row(row) for row in rows]
+
+    async def append_decision_and_advance_head(self, decision: AdaptationDecision, *, expected_generation: int) -> None:
+        command = decision.command
+        family_value = decision.decision_kind
+        head_key = _head_key_of(decision)
+
+        self.session.add(
+            AdaptationDecisionModel(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                decision_id=command.decision_id,
+                family=family_value,
+                head_key=head_key,
+                sequence=decision.sequence,
+                decision_kind=decision.decision_kind,
+                command_json=command.model_dump(mode="json"),
+                authorization_json=decision.authorization.model_dump(mode="json"),
+                decision_digest=decision.decision_digest,
+                created_at=decision.created_at,
+            )
+        )
+        await self.session.flush()
+
+        current = await self._scalar(
+            select(AdaptationHeadModel).where(
+                AdaptationHeadModel.user_id == command.user_id,
+                AdaptationHeadModel.project_name == command.project_name,
+                AdaptationHeadModel.family == family_value,
+                AdaptationHeadModel.head_key == head_key,
+            )
+        )
+        if current is None:
+            raise AdaptationAuthorityIntegrityError(
+                f"adaptation head for {family_value}/{head_key!r} does not exist; prepare_or_lock_head must "
+                "run in this same transaction before appending its first decision"
+            )
+        current_artifact = _artifact_ref_from_columns(
+            current.selected_artifact_id, current.selected_artifact_version, current.selected_artifact_hash
+        )
+        new_effective_id, new_artifact = _new_effective_selection(
+            decision, current_effective_id=current.effective_decision_id, current_artifact=current_artifact
+        )
+
+        result = await self.session.execute(
+            update(AdaptationHeadModel)
+            .where(
+                AdaptationHeadModel.user_id == command.user_id,
+                AdaptationHeadModel.project_name == command.project_name,
+                AdaptationHeadModel.family == family_value,
+                AdaptationHeadModel.head_key == head_key,
+                AdaptationHeadModel.generation == expected_generation,
+            )
+            .values(
+                generation=expected_generation + 1,
+                latest_decision_id=command.decision_id,
+                effective_decision_id=new_effective_id,
+                selected_artifact_id=new_artifact.artifact_id if new_artifact is not None else None,
+                selected_artifact_version=new_artifact.version if new_artifact is not None else None,
+                selected_artifact_hash=new_artifact.content_hash if new_artifact is not None else None,
+            )
+        )
+        if rowcount(result) != 1:
+            raise AdaptationAuthorityIntegrityError(
+                f"adaptation head for {family_value}/{head_key!r} was not at the expected generation "
+                f"{expected_generation} when its decision was appended"
+            )
         await self.session.flush()
