@@ -200,11 +200,57 @@ IMPLEMENTATION_ALLOWLIST_M5C3: frozenset[str] = HANDOFF_ONLY_ALLOWLIST_M5C3 | fr
     }
 )
 
+# --- M5C-4 (Tasks 27-31: handoff admission, integrity checker completion, combined
+# acceptance corpus — plus Task 32's own pre-existing-Postgres-FK test fixes) --------
+
+ALLOWED_MIGRATIONS_M5C4: frozenset[str] = frozenset(
+    {"alembic/versions/5c7c4a0e0004_add_narrative_handoff_admission.py"}
+)
+
+HANDOFF_ONLY_ALLOWLIST_M5C4: frozenset[str] = frozenset({"docs/r2/evidence/R2_M5C_4_REVIEW.md"})
+
+IMPLEMENTATION_ALLOWLIST_M5C4: frozenset[str] = HANDOFF_ONLY_ALLOWLIST_M5C4 | frozenset(
+    {
+        # amended in-flight for this checkpoint's own tooling/fitness extension
+        "pyproject.toml",
+        "scripts/r2/verify_m5c_scope.py",
+        # contracts + migration
+        "r2/contracts/narrative_lifecycle.py",
+        "alembic/versions/5c7c4a0e0004_add_narrative_handoff_admission.py",
+        # handoff admission, integrity checker completion
+        "r2/narrative_lifecycle/acceptance.py",
+        "r2/narrative_lifecycle/hashing.py",
+        "r2/narrative_lifecycle/integrity.py",
+        "r2/narrative_lifecycle/ports.py",
+        # authenticated M5A handoff facade
+        "server/services/narrative_canon_handoff.py",
+        # Host persistence for the handoff admission tables
+        "lib/db/models/narrative_lifecycle.py",
+        "lib/db/repositories/narrative_lifecycle.py",
+        # tests
+        "tests/factories.py",
+        "tests/fixtures/r2/__init__.py",
+        "tests/fixtures/r2/m5c_narrative_corpus.py",
+        "tests/integration/lib/db/migrations/test_alembic_narrative_handoff_admission.py",
+        "tests/integration/lib/db/repositories/test_narrative_handoff_admission.py",
+        "tests/integration/r2/narrative_lifecycle/_fakes.py",
+        "tests/integration/r2/narrative_lifecycle/test_compilation_service.py",
+        "tests/integration/r2/narrative_lifecycle/test_handoff_admission.py",
+        "tests/integration/r2/narrative_lifecycle/test_lifecycle_integrity.py",
+        "tests/integration/r2/test_m5c_acceptance.py",
+        "tests/integration/server/services/test_narrative_canon_handoff.py",
+        "tests/unit/r2/contracts/test_narrative_lifecycle.py",
+        "tests/unit/r2/narrative_lifecycle/test_lifecycle_hashing.py",
+        "tests/unit/r2/test_m5c_architecture_boundaries.py",
+    }
+)
+
 CHECKPOINTS: dict[str, tuple[frozenset[str], frozenset[str], frozenset[str]]] = {
     # name -> (implementation_allowlist, handoff_only_allowlist, allowed_migrations)
     "m5c1": (IMPLEMENTATION_ALLOWLIST, HANDOFF_ONLY_ALLOWLIST, ALLOWED_MIGRATIONS),
     "m5c2": (IMPLEMENTATION_ALLOWLIST_M5C2, HANDOFF_ONLY_ALLOWLIST_M5C2, ALLOWED_MIGRATIONS_M5C2),
     "m5c3": (IMPLEMENTATION_ALLOWLIST_M5C3, HANDOFF_ONLY_ALLOWLIST_M5C3, ALLOWED_MIGRATIONS_M5C3),
+    "m5c4": (IMPLEMENTATION_ALLOWLIST_M5C4, HANDOFF_ONLY_ALLOWLIST_M5C4, ALLOWED_MIGRATIONS_M5C4),
 }
 
 
