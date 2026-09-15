@@ -1,0 +1,27 @@
+{
+  "schema_version": "r2-m6-donor-baseline-v1",
+  "generated_for": "R2-M6-A",
+  "gate": "R2-DEC-031",
+  "note": "M6 pins exactly one Take vocabulary source (plan Task 4). The vendored source is the unmodified pinned donor file; the Node parity harness verifies source_sha256 before executing it and runs the shared fixture corpus through both the pinned TS source and the Python v2 vocabulary. The harness is test-only: never shipped, imported, or started by the ArcReel runtime.",
+  "ports": {
+    "take_shot_vocabulary": {
+      "repo": "XucroYuri/take",
+      "revision": "47c17216b5ad74ee7dd376e8508266e29aefae2c",
+      "source_path": "packages/core/src/models/enums.ts",
+      "source_sha256": "a068c66b20a364ebff19d6d0ec407b499d0e0f1f1d34559e42af5344b6649bbc",
+      "url": "https://github.com/XucroYuri/take/blob/47c17216b5ad74ee7dd376e8508266e29aefae2c/packages/core/src/models/enums.ts",
+      "vendored_path": "take/packages/core/src/models/enums.ts",
+      "python_port": "r2/contracts/production.py",
+      "node_runner": "tests/integration/donor_parity/take_shot_vocabulary_runner.mjs",
+      "fixtures": "tests/integration/donor_parity/fixtures/take_shot_vocabulary/cases.json",
+      "import_resolution_dependency": {
+        "note": "enums.ts has no imports at all (self-contained module-level `as const` arrays); needs no @/ path resolution and no other vendored file."
+      },
+      "selected_exports": ["SHOT_SIZES", "CAMERA_ANGLES", "CAMERA_MOVEMENTS"],
+      "excluded_exports": ["SHOT_STATUSES", "ASPECT_RATIOS", "ANALYSIS_SOURCES"],
+      "excluded_reason": "Lifecycle (SHOT_STATUSES), rendered-asset (ASPECT_RATIOS) and provenance (ANALYSIS_SOURCES) vocabularies are out of scope for M6's ShotSpecV2 (plan Fixed Implementation Contract: \"lifecycle/provider/rendered-asset enums are excluded\").",
+      "intentional_deviations": [],
+      "parity_coverage_notes": "Pure string-literal const arrays, no regex/locale/Unicode parity concerns unlike the M5C ports. Parity is exact set-and-order equality between each TS array and its Python StrEnum's member order, plus per-case validity checks for known-invalid and compound-string candidates. No residual divergence."
+    }
+  }
+}
