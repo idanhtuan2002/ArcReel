@@ -153,12 +153,17 @@ async def _seed_one_reviewed_change_set(
         await uow.repository.insert_draft_candidate(_candidate())
         await uow.repository.insert_revision(_revision())
         await uow.repository.insert_extraction_attempt(_attempt())
-        await _set_fk_triggers(uow.repository.session, "narrative_change_sets", enabled=False)
+        if change_set_overrides:
+            # Only the deliberate-mismatch caller needs the FK suspended (see
+            # _set_fk_triggers) — every other caller's change set genuinely satisfies
+            # fk_narrative_change_sets_revision_basis and should stay covered by it.
+            await _set_fk_triggers(uow.repository.session, "narrative_change_sets", enabled=False)
         await uow.repository.insert_successful_extraction(
             _result(outcome="SUCCEEDED", change_set_ids=("cs-1",)),
             [make_narrative_change_set(change_set_id="cs-1", **(change_set_overrides or {}))],
         )
-        await _set_fk_triggers(uow.repository.session, "narrative_change_sets", enabled=True)
+        if change_set_overrides:
+            await _set_fk_triggers(uow.repository.session, "narrative_change_sets", enabled=True)
         await uow.commit()
 
     await acceptance_service.decide_revision(

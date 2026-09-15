@@ -212,7 +212,6 @@ HANDOFF_ONLY_ALLOWLIST_M5C4: frozenset[str] = frozenset({"docs/r2/evidence/R2_M5
 IMPLEMENTATION_ALLOWLIST_M5C4: frozenset[str] = HANDOFF_ONLY_ALLOWLIST_M5C4 | frozenset(
     {
         # amended in-flight for this checkpoint's own tooling/fitness extension
-        "pyproject.toml",
         "scripts/r2/verify_m5c_scope.py",
         # contracts + migration
         "r2/contracts/narrative_lifecycle.py",
