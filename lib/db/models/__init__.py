@@ -1,5 +1,14 @@
 """ORM model exports."""
 
+from lib.db.models.adaptation import (
+    AdaptationBranchModel,
+    AdaptationMapEntryModel,
+    AdaptationMapModel,
+    AdaptationMapProfileAnalysisRefModel,
+    AdaptationScreenplayModel,
+    AdaptationScreenplayProfileAnalysisRefModel,
+    AdaptationScreenplaySceneModel,
+)
 from lib.db.models.agent_credential import AgentAnthropicCredential
 from lib.db.models.api_call import ApiCall
 from lib.db.models.api_key import ApiKey
@@ -31,6 +40,13 @@ from lib.db.models.task import BatchTask, GenerationBatch, Task, WorkerLease
 from lib.db.models.user import User
 
 __all__ = [
+    "AdaptationBranchModel",
+    "AdaptationMapEntryModel",
+    "AdaptationMapModel",
+    "AdaptationMapProfileAnalysisRefModel",
+    "AdaptationScreenplayModel",
+    "AdaptationScreenplayProfileAnalysisRefModel",
+    "AdaptationScreenplaySceneModel",
     "AgentAnthropicCredential",
     "AgentSession",
     "AgentSessionEventLogEntry",
