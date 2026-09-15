@@ -54,6 +54,22 @@ def _scope() -> NarrativeWorkScope:
     return make_narrative_work_scope()
 
 
+async def _set_fk_triggers(session: AsyncSession, table: str, *, enabled: bool) -> None:
+    """Toggle Postgres's referential-integrity triggers on ``table``.
+
+    A few tests below corrupt state a live system's own FKs would never allow (a decision
+    vanishing from under a head, a change set deleted while still referenced) specifically
+    to prove the integrity checker catches it independently of the DB. SQLite already runs
+    these suites with ``foreign_keys=OFF`` (see ``tests/conftest.py``); on Postgres the FK
+    itself would block the corrupting statement before the checker ever saw it, so it must
+    be suspended around that one statement — a no-op on SQLite.
+    """
+    if session.get_bind().dialect.name != "postgresql":
+        return
+    state = "ENABLE" if enabled else "DISABLE"
+    await session.execute(text(f'ALTER TABLE "{table}" {state} TRIGGER ALL'))
+
+
 @pytest.fixture
 def integrity_checker(session_factory: Factory) -> NarrativeLifecycleIntegrityChecker:
     return NarrativeLifecycleIntegrityChecker(narrative_lifecycle_uow_factory(session_factory))
@@ -315,7 +331,9 @@ async def test_verify_conflict_resolution_historical_validity_raises_when_a_name
     )
     async with session_factory() as session:
         await session.execute(text("DELETE FROM narrative_extraction_result_change_sets WHERE change_set_id = 'cs-a'"))
+        await _set_fk_triggers(session, "narrative_change_sets", enabled=False)
         await session.execute(text("DELETE FROM narrative_change_sets WHERE change_set_id = 'cs-a'"))
+        await _set_fk_triggers(session, "narrative_change_sets", enabled=True)
         await session.commit()
 
     with pytest.raises(NarrativeEvidenceIntegrityError):
@@ -358,6 +376,7 @@ async def test_verify_revision_head_references_raises_when_the_head_points_to_a_
     await integrity_checker.verify_revision_head_references(scope)  # intact: no raise
 
     async with session_factory() as session:
+        await _set_fk_triggers(session, "revision_acceptance_heads", enabled=False)
         await session.execute(
             text(
                 "UPDATE revision_acceptance_heads SET latest_decision_id = 'ghost-decision', "
@@ -366,6 +385,7 @@ async def test_verify_revision_head_references_raises_when_the_head_points_to_a_
             ),
             {"user_id": scope.user_id, "project_name": scope.project_name},
         )
+        await _set_fk_triggers(session, "revision_acceptance_heads", enabled=True)
         await session.commit()
 
     with pytest.raises(NarrativeAuthorityIntegrityError):

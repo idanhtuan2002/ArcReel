@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.narrative_lifecycle_uow import SqlAlchemyNarrativeLifecycleUnitOfWork, narrative_lifecycle_uow_factory
@@ -124,6 +125,22 @@ def _compilation_command(
     )
 
 
+async def _set_fk_triggers(session: AsyncSession, table: str, *, enabled: bool) -> None:
+    """Toggle Postgres's referential-integrity triggers on ``table``.
+
+    ``test_compilation_admission_fails_when_a_selected_change_set_basis_mismatches`` needs
+    to seed a change set whose ``base_canon_version_id`` disagrees with its own
+    ``source_revision_id``'s revision — the exact state
+    ``fk_narrative_change_sets_revision_basis`` exists to forbid, so that the service's own
+    mutual-basis check (not the DB) is what's under test. SQLite already runs these suites
+    with ``foreign_keys=OFF`` (see ``tests/conftest.py``); this is a no-op there.
+    """
+    if session.get_bind().dialect.name != "postgresql":
+        return
+    state = "ENABLE" if enabled else "DISABLE"
+    await session.execute(text(f'ALTER TABLE "{table}" {state} TRIGGER ALL'))
+
+
 async def _seed_one_reviewed_change_set(
     acceptance_service: NarrativeAcceptanceService,
     session_factory: Factory,
@@ -136,10 +153,12 @@ async def _seed_one_reviewed_change_set(
         await uow.repository.insert_draft_candidate(_candidate())
         await uow.repository.insert_revision(_revision())
         await uow.repository.insert_extraction_attempt(_attempt())
+        await _set_fk_triggers(uow.repository.session, "narrative_change_sets", enabled=False)
         await uow.repository.insert_successful_extraction(
             _result(outcome="SUCCEEDED", change_set_ids=("cs-1",)),
             [make_narrative_change_set(change_set_id="cs-1", **(change_set_overrides or {}))],
         )
+        await _set_fk_triggers(uow.repository.session, "narrative_change_sets", enabled=True)
         await uow.commit()
 
     await acceptance_service.decide_revision(
@@ -204,12 +223,19 @@ async def _seed_two_overlapping_reviewed_change_sets(
 
 
 @pytest.fixture
-def seed_compilation_attempt(session_factory: Factory) -> Callable[..., Awaitable[CompilationAttempt]]:
+def seed_compilation_attempt(
+    session_factory: Factory, acceptance_service: NarrativeAcceptanceService
+) -> Callable[..., Awaitable[CompilationAttempt]]:
+    """Seeds a ``CompilationAttempt`` row alongside the revision-acceptance and
+    change-set-review decisions its default fields (``revision_acceptance_decision_id``,
+    ``selected_change_sets``, ``observed_effective_heads``) actually reference — Postgres
+    enforces those as real FKs (``fk_narrative_compilation_attempts_revision_acceptance``
+    and friends), unlike SQLite's ``foreign_keys=OFF``."""
+
     async def _seed(*, generation: int = 0) -> CompilationAttempt:
         attempt = make_compilation_attempt(generation=generation, work_scope=_scope())
+        await _seed_one_reviewed_change_set(acceptance_service, session_factory)
         async with narrative_lifecycle_uow_factory(session_factory)() as uow:
-            await uow.repository.insert_draft_candidate(_candidate())
-            await uow.repository.insert_revision(_revision())
             await uow.repository.insert_compilation_attempt(attempt)
             await uow.commit()
         return attempt
