@@ -47,6 +47,28 @@ IMPLEMENTATION_ALLOWLIST_M6A: frozenset[str] = HANDOFF_ONLY_ALLOWLIST_M6A | froz
         "docs/r2/evidence/R2_M6_STARTING_STATE.json",
         "scripts/r2/verify_m6_scope.py",
         "tests/unit/scripts/r2/test_verify_m6_scope.py",
+        # Task 1: adaptation and profile contracts
+        "r2/contracts/adaptation.py",
+        "r2/adaptation/__init__.py",
+        "tests/unit/r2/contracts/test_adaptation.py",
+        # Task 2: canonical serialization, hashing, and schema ratchets
+        "r2/adaptation/hashing.py",
+        "r2/adaptation/schema_upgrade.py",
+        "tests/unit/r2/adaptation/test_adaptation_hashing.py",
+        "tests/unit/r2/adaptation/test_adaptation_schema_upgrade.py",
+        # Task 3: ShotSpecV2 without changing v1 bytes
+        "r2/contracts/production.py",
+        "r2/contracts/fingerprints.py",
+        "r2/production/shot_schema_upgrade.py",
+        "tests/unit/r2/contracts/test_shot_spec_v2.py",
+        "tests/unit/r2/production/test_shot_schema_upgrade.py",
+        # Task 4: pin and parity-test Take vocabulary
+        "docs/r2/evidence/reuse-map-2026-09-07/source-manifest.json",
+        "docs/r2/evidence/R2_M6_DONOR_BASELINE.json",
+        "tests/integration/donor_parity/take_shot_vocabulary_runner.mjs",
+        "tests/integration/donor_parity/test_take_shot_vocabulary.py",
+        "tests/integration/donor_parity/fixtures/take_shot_vocabulary/cases.json",
+        "tests/integration/donor_parity/vendor/take/packages/core/src/models/enums.ts",
     }
 )
 
