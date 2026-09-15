@@ -87,6 +87,13 @@
       "disposition": "PROFILE_BLOCK",
       "applicability": "CN_SHORT_DRAMA_SHUANGWEN",
       "description": "hen/shuang/ji/pan and shuang_type apply only under the pinned chapter 1-8 scope; chapter 9+ records these rules as NOT_APPLICABLE, and a Golden B slice is never assumed to equal a chapter."
+    },
+    {
+      "rule_id": "SHUANGWEN_STAKES_COMMON_SENSE",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "CN_SHORT_DRAMA_SHUANGWEN",
+      "description": "Under chapter 1-8 scope, the pinned stakes-common-sense check requires any active demand named in the hen/ji/stakesShift/obstacle/catalyst evidence to meet or exceed the declared or inferred common-sense anchor times twenty."
     }
   ]
 }

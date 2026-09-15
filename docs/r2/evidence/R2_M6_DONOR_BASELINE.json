@@ -22,6 +22,58 @@
       "excluded_reason": "Lifecycle (SHOT_STATUSES), rendered-asset (ASPECT_RATIOS) and provenance (ANALYSIS_SOURCES) vocabularies are out of scope for M6's ShotSpecV2 (plan Fixed Implementation Contract: \"lifecycle/provider/rendered-asset enums are excluded\").",
       "intentional_deviations": [],
       "parity_coverage_notes": "Pure string-literal const arrays, no regex/locale/Unicode parity concerns unlike the M5C ports. Parity is exact set-and-order equality between each TS array and its Python StrEnum's member order, plus per-case validity checks for known-invalid and compound-string candidates. No residual divergence."
+    },
+    "huohuo_drama_fields": {
+      "repo": "appolloqin/huohuo-drama",
+      "revision": "f104b853b3563e124d9cde25f9331d323fb483b9",
+      "entry_vendored_path": "huohuo_drama_fields/workbench-server/src/services/novel/novel-outline-drama-fields.ts",
+      "url": "https://github.com/appolloqin/huohuo-drama/blob/f104b853b3563e124d9cde25f9331d323fb483b9/workbench-server/src/services/novel/novel-outline-drama-fields.ts",
+      "vendored_files": [
+        {
+          "vendored_path": "huohuo_drama_fields/workbench-server/src/services/novel/novel-outline-drama-fields.ts",
+          "sha256": "7a7db8a7674445d8352beb7a165fb5fe40bf02c1d526a89c31a6c74fa9029c67"
+        },
+        {
+          "vendored_path": "huohuo_drama_fields/workbench-server/src/services/novel/novel-commercial-appeal-isomorph.ts",
+          "sha256": "6a979528365baba269009835b932baf064e187910ac84335d4e395afe2593286"
+        },
+        {
+          "vendored_path": "huohuo_drama_fields/workbench-server/src/services/novel/novel-commercial-appeal-audit.ts",
+          "sha256": "df51fc3403bf39a784aed661dbbefa49b3b0e99250703feb9177590c03f46ba6"
+        },
+        {
+          "vendored_path": "huohuo_drama_fields/workbench-server/src/services/novel/novel-stakes-common-sense.ts",
+          "sha256": "ea763cd0ebc6038a9473fd6a9361080189671817a28ad4836ca02a2d60f36c2b"
+        },
+        {
+          "vendored_path": "huohuo_drama_fields/workbench-server/src/services/novel/novel-emotion-core-contract.ts",
+          "sha256": "415803deb2be4f9f635401b0b42791463cd1d68d999d29e618aa8b9008f2420d"
+        }
+      ],
+      "python_port": "r2/adaptation/shuangwen_profile.py",
+      "node_runner": "tests/integration/donor_parity/huohuo_drama_fields_runner.mjs",
+      "fixtures": "tests/integration/donor_parity/fixtures/huohuo_drama_fields/cases.jsonl",
+      "import_resolution_dependency": {
+        "note": "novel-outline-drama-fields.ts imports SHUANG_TYPE_SET from novel-commercial-appeal-isomorph.ts (self-contained), detectStakesMismatchText from novel-commercial-appeal-audit.ts (which re-exports it from novel-stakes-common-sense.ts, self-contained; audit.ts's only other runtime import is novel-commercial-appeal-isomorph.ts, already vendored, plus a type-only import of novel-chapter-craft-check.ts that is erased at compile time and needs no vendoring), and OUTLINE_DRAMA_PRIORITY_LINE_SSOT from novel-emotion-core-contract.ts (self-contained). All five files are vendored with their exact upstream relative paths preserved so tsx resolves the real relative imports unmodified."
+      },
+      "selected_exports": [
+        "extractTagBlock",
+        "sliceOutlineChapterSection",
+        "OUTLINE_SHUANG_TYPE_SET",
+        "assertOutlineChapterFields (missing/invalid/fields subset for 恨/爽/急/盼/爽型 and the 赌注错位 stakes check only)"
+      ],
+      "excluded_exports": [
+        "parseOutlineBookFields / assertOutlineBookFields (book-level fields: theme, worldRules, desireExternal, desireInternal, protagonistFlaw, castCores, arcEnd, emotionPalette)",
+        "the non-Shuangwen chapter fields inside parseOutlineChapterFields/assertOutlineChapterFields (time, place, cast, catalyst, desire, obstacle, stakesShift, choice, conflictLayers, emotionCraft, endingQuestion, infoDelta, themeEcho)",
+        "buildChapterOutlineDramaPromptBlock / buildOutlineBookPromptBlock (full narrative prompt blocks)",
+        "resolveWritingChapterOutline / upgradePromptToDramaOutline (completion/repair orchestration helpers)",
+        "detectAppealShuangIsomorph (body-text cross-chapter isomorph detection — operates on rendered prose, not outline field parsing)"
+      ],
+      "excluded_reason": "M6 v1's ShuangwenAnalysis contract (plan Fixed Implementation Contract) carries only chapter_start/chapter_end, hen/shuang/ji/pan evidence, an optional shuang_type, and findings — no book-level fields, no non-Shuangwen chapter narrative fields, and no prompt-block or completion/repair orchestration surface has any R2 consumer (spec section 5.3: \"Completion/repair orchestration, LLM calls, donor persistence, and donor authority are excluded\").",
+      "intentional_deviations": [
+        "The Python port re-derives the same missing/invalid signal assertOutlineChapterFields computes for the five Shuangwen-relevant labels, rather than reimplementing the donor's own 13-field non-Shuangwen chapter contract, which R2 does not need. Parity fixtures therefore supply complete boilerplate values for every non-Shuangwen required label so assertOutlineChapterFields's real, unmodified, fully-composed output is directly comparable on the Shuangwen-relevant subset."
+      ],
+      "parity_coverage_notes": "Branch-complete corpus covers all six pinned shuang_type values, a missing beat, a too-short beat, an unrecognized type, an ambiguous/compound type (first-token-invalid and first-token-valid), chapter 9+ non-applicability (with and without beats present), a stakes mismatch, an explicit-anchor stakes pass, a no-signal stakes skip, translated (English) beat text, non-keyword filler beat text, cross-episode chapter slicing from one shared outline, and empty semantic content."
     }
   }
 }
