@@ -69,6 +69,15 @@ class AdaptationAuthorityIntegrityError(AdaptationError):
     this stops the write; only a Human-directed correction fixes the stored row."""
 
 
+class AdaptationPolicyPackIntegrityError(AdaptationError):
+    """An immutable policy-pack manifest is structurally invalid (Task 8): malformed
+    JSON, an unrecognized disposition/applicability value, a duplicate rule ID, or a
+    rule whose declared applicability names a different profile than the pack it lives
+    in. Never raised for a digest mismatch alone — that is
+    ``AdaptationPolicyDigestMismatchError``, checked only after structural validation
+    passes."""
+
+
 __all__ = [
     "AdaptationAuthorityDeniedError",
     "AdaptationAuthorityIntegrityError",
@@ -76,6 +85,7 @@ __all__ = [
     "AdaptationIdentityConflictError",
     "AdaptationNotFoundError",
     "AdaptationPolicyDigestMismatchError",
+    "AdaptationPolicyPackIntegrityError",
     "AdaptationProfileMismatchError",
     "AdaptationStaleDependencyError",
     "AdaptationStaleHeadError",

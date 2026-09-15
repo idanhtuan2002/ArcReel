@@ -1,0 +1,92 @@
+{
+  "profile_id": "CN_SHORT_DRAMA_SHUANGWEN",
+  "profile_version": "v1",
+  "evaluator_version": "r2-m6-shuangwen-evaluator-v1",
+  "source_identity": "R2 M6 CN_SHORT_DRAMA_SHUANGWEN policy pack v1 (spec section 5.1, 5.3; donor-derived surface pinned to XucroYuri/huohuo)",
+  "rules": [
+    {
+      "rule_id": "SHARED_CANON_LINEAGE",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Exact Canon/branch/map lineage must hold; no runtime latest substitution."
+    },
+    {
+      "rule_id": "SHARED_REFERENCE_CLOSURE",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Every source/target reference in the map and screenplay closes over real evidence."
+    },
+    {
+      "rule_id": "SHARED_ALLOWED_OPERATIONS",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Every map entry uses one of the nine frozen adaptation operations."
+    },
+    {
+      "rule_id": "SHARED_ORDERED_IDENTITY",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Scene and shot identity is exact and ordered; no silent reorder or duplicate."
+    },
+    {
+      "rule_id": "SHARED_KNOWLEDGE_SECRET",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "KnowledgeState and secret constraints from Canon are never disclosed early or leaked."
+    },
+    {
+      "rule_id": "SHARED_CONTINUITY",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "State, prop, and location continuity holds across every adapted scene."
+    },
+    {
+      "rule_id": "SHARED_SCREENPLAY_APPROVAL_LOCK",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Direction requires approval_status=APPROVED and locked_for_direction=true."
+    },
+    {
+      "rule_id": "SHARED_CONTENT_PROFILE_DIGESTS",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Content and profile digests bind exactly; no unverified reference is trusted."
+    },
+    {
+      "rule_id": "SHARED_CANDIDATE_MASTER_CURRENTNESS",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Production candidate and master selection is exact-current, never stale."
+    },
+    {
+      "rule_id": "SHUANGWEN_FIELD_PARSING",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "CN_SHORT_DRAMA_SHUANGWEN",
+      "description": "hen/shuang/ji/pan fields parse and validate per the pinned Huohuo field grammar."
+    },
+    {
+      "rule_id": "SHUANGWEN_TYPE_VOCABULARY",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "CN_SHORT_DRAMA_SHUANGWEN",
+      "description": "shuang_type, when present, is one of the six pinned closed values."
+    },
+    {
+      "rule_id": "SHUANGWEN_CHAPTER_1_8_SCOPE",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "CN_SHORT_DRAMA_SHUANGWEN",
+      "description": "hen/shuang/ji/pan and shuang_type apply only under the pinned chapter 1-8 scope; chapter 9+ records these rules as NOT_APPLICABLE, and a Golden B slice is never assumed to equal a chapter."
+    }
+  ]
+}

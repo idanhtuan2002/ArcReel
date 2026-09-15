@@ -1,0 +1,113 @@
+{
+  "profile_id": "WESTERN_GENERIC",
+  "profile_version": "v1",
+  "evaluator_version": "r2-m6-western-evaluator-v1",
+  "source_identity": "R2 M6 WESTERN_GENERIC policy pack v1 (spec section 5.1-5.2)",
+  "rules": [
+    {
+      "rule_id": "SHARED_CANON_LINEAGE",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Exact Canon/branch/map lineage must hold; no runtime latest substitution."
+    },
+    {
+      "rule_id": "SHARED_REFERENCE_CLOSURE",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Every source/target reference in the map and screenplay closes over real evidence."
+    },
+    {
+      "rule_id": "SHARED_ALLOWED_OPERATIONS",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Every map entry uses one of the nine frozen adaptation operations."
+    },
+    {
+      "rule_id": "SHARED_ORDERED_IDENTITY",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Scene and shot identity is exact and ordered; no silent reorder or duplicate."
+    },
+    {
+      "rule_id": "SHARED_KNOWLEDGE_SECRET",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "KnowledgeState and secret constraints from Canon are never disclosed early or leaked."
+    },
+    {
+      "rule_id": "SHARED_CONTINUITY",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "State, prop, and location continuity holds across every adapted scene."
+    },
+    {
+      "rule_id": "SHARED_SCREENPLAY_APPROVAL_LOCK",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Direction requires approval_status=APPROVED and locked_for_direction=true."
+    },
+    {
+      "rule_id": "SHARED_CONTENT_PROFILE_DIGESTS",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Content and profile digests bind exactly; no unverified reference is trusted."
+    },
+    {
+      "rule_id": "SHARED_CANDIDATE_MASTER_CURRENTNESS",
+      "rule_version": "v1",
+      "disposition": "INTEGRITY_BLOCK",
+      "applicability": "ALWAYS",
+      "description": "Production candidate and master selection is exact-current, never stale."
+    },
+    {
+      "rule_id": "WESTERN_SCENE_HEADING_STRUCTURE",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "WESTERN_GENERIC",
+      "description": "Every scene declares a well-formed INT./EXT. heading with location and time-of-day."
+    },
+    {
+      "rule_id": "WESTERN_ACTION_DIALOGUE_SEPARABILITY",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "WESTERN_GENERIC",
+      "description": "Action description and dialogue are structurally separable per scene."
+    },
+    {
+      "rule_id": "WESTERN_ACTION_SURFACE_VISIBILITY",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "WESTERN_GENERIC",
+      "description": "Action description names only what a camera could see or a microphone could hear."
+    },
+    {
+      "rule_id": "WESTERN_SCREENPLAY_REFERENCE_INTEGRITY",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "WESTERN_GENERIC",
+      "description": "Every scene's source_mapping_refs resolves against the map's own entries."
+    },
+    {
+      "rule_id": "WESTERN_DELIVERY_CONSTRAINTS",
+      "rule_version": "v1",
+      "disposition": "PROFILE_BLOCK",
+      "applicability": "WESTERN_GENERIC",
+      "description": "Delivery constraints explicitly selected by this versioned pack are met."
+    },
+    {
+      "rule_id": "WESTERN_RUBRIC_DRAMATIC_STRUCTURE",
+      "rule_version": "v1",
+      "disposition": "ADVISORY",
+      "applicability": "WESTERN_GENERIC",
+      "description": "Problem, goal/action, opposition, stakes, cause/effect, escalation, revelation, reversal, and resolution are evidence-backed observations, never a universal numeric score or fixed beat timestamp, and never auto-reject a valid slow-burn, tragic, or unresolved excerpt."
+    }
+  ]
+}
