@@ -78,9 +78,29 @@ class AdaptationPolicyPackIntegrityError(AdaptationError):
     passes."""
 
 
+class AdaptationWaiverNotApplicableError(AdaptationError):
+    """A waiver decision does not apply (Task 11): it names a finding whose
+    disposition is ``INTEGRITY_BLOCK`` (never waivable), a finding id/rule version
+    the referenced report does not actually contain, or a report whose own
+    ``artifact_hash``/``profile_ref`` no longer matches the exact artifact/profile the
+    waiver command names — the "semantic change launders an old waiver" case. Also
+    raised (Task 12) when a screenplay admission command names a waiver decision that
+    does not resolve, is not itself a ``WAIVE`` decision, is not the currently
+    effective decision for its own head, or does not target the exact admitted
+    proposal's content/profile."""
+
+
+class AdaptationBlockingFindingUnresolvedError(AdaptationError):
+    """A screenplay admission's dependency reports carry a blocking finding that
+    admission cannot proceed past (Task 12): any ``INTEGRITY_BLOCK`` finding (never
+    waivable, regardless of ``waiver_refs``), or a ``PROFILE_BLOCK`` finding with no
+    currently effective waiver covering its exact finding id."""
+
+
 __all__ = [
     "AdaptationAuthorityDeniedError",
     "AdaptationAuthorityIntegrityError",
+    "AdaptationBlockingFindingUnresolvedError",
     "AdaptationError",
     "AdaptationIdentityConflictError",
     "AdaptationNotFoundError",
@@ -89,4 +109,5 @@ __all__ = [
     "AdaptationProfileMismatchError",
     "AdaptationStaleDependencyError",
     "AdaptationStaleHeadError",
+    "AdaptationWaiverNotApplicableError",
 ]

@@ -26,10 +26,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lib.db.models.adaptation import (
     AdaptationBranchModel,
     AdaptationDecisionModel,
+    AdaptationEvaluationFindingModel,
+    AdaptationEvaluationReportModel,
     AdaptationHeadModel,
     AdaptationMapEntryModel,
     AdaptationMapModel,
     AdaptationMapProfileAnalysisRefModel,
+    AdaptationProfileSidecarModel,
+    AdaptationScreenplayAdmissionModel,
     AdaptationScreenplayModel,
     AdaptationScreenplayProfileAnalysisRefModel,
     AdaptationScreenplaySceneModel,
@@ -42,10 +46,24 @@ from r2.contracts.adaptation import (
     AdaptationDecision,
     AdaptationHead,
     AdaptationMapV2,
+    AdaptationProfileId,
+    AdaptationProfileRef,
+    AdmittedScreenplayRef,
     ArtifactVersionRef,
+    DecisionRef,
     MapApprovalDecision,
+    ProfileEvaluationReport,
+    ProfileWaiverDecision,
+    ScreenplayAdmissionDecision,
     ScreenplayArtifactV2,
+    ShuangwenAnalysis,
+    WesternDramaAnalysis,
 )
+
+_SIDECAR_KIND_BY_TYPE: dict[type, str] = {
+    WesternDramaAnalysis: "WESTERN_DRAMA_ANALYSIS",
+    ShuangwenAnalysis: "SHUANGWEN_ANALYSIS",
+}
 
 _decision_adapter: TypeAdapter[AdaptationDecision] = TypeAdapter(AdaptationDecision)
 
@@ -309,13 +327,156 @@ def _screenplay_from_rows(
     )
 
 
+def _sidecar_row(
+    sidecar_id: str, version: int, sidecar: WesternDramaAnalysis | ShuangwenAnalysis, *, user_id: str, project_name: str
+) -> AdaptationProfileSidecarModel:
+    return AdaptationProfileSidecarModel(
+        sidecar_id=sidecar_id,
+        version=version,
+        user_id=user_id,
+        project_name=project_name,
+        kind=_SIDECAR_KIND_BY_TYPE[type(sidecar)],
+        content_hash=sidecar.content_hash,
+        payload_json=sidecar.model_dump(mode="json"),
+    )
+
+
+def _sidecar_from_row(row: AdaptationProfileSidecarModel) -> WesternDramaAnalysis | ShuangwenAnalysis:
+    if row.kind == "WESTERN_DRAMA_ANALYSIS":
+        return WesternDramaAnalysis.model_validate(row.payload_json)
+    return ShuangwenAnalysis.model_validate(row.payload_json)
+
+
+def _report_row(report: ProfileEvaluationReport, *, user_id: str, project_name: str) -> AdaptationEvaluationReportModel:
+    return AdaptationEvaluationReportModel(
+        user_id=user_id,
+        project_name=project_name,
+        report_digest=report.report_digest,
+        schema_version=report.schema_version,
+        artifact_hash=report.artifact_hash,
+        profile_id=report.profile_ref.profile_id.value,
+        profile_version=report.profile_ref.profile_version,
+        policy_pack_digest=report.profile_ref.policy_pack_digest,
+        evaluator_version=report.evaluator_version,
+        sidecar_ref_id=report.sidecar_ref.artifact_id,
+        sidecar_ref_version=report.sidecar_ref.version,
+        sidecar_ref_hash=report.sidecar_ref.content_hash,
+        sidecar_digest=report.sidecar_digest,
+        created_at=report.created_at,
+    )
+
+
+def _finding_rows(
+    report: ProfileEvaluationReport, *, user_id: str, project_name: str
+) -> list[AdaptationEvaluationFindingModel]:
+    return [
+        AdaptationEvaluationFindingModel(
+            user_id=user_id,
+            project_name=project_name,
+            report_digest=report.report_digest,
+            finding_id=finding.finding_id,
+            position=position,
+            rule_id=finding.rule_id,
+            rule_version=finding.rule_version,
+            disposition=finding.disposition.value,
+            applicability=finding.applicability,
+            severity=finding.severity,
+            target_path=finding.target_path,
+            source_span=finding.source_span,
+            evidence_refs_json=list(finding.evidence_refs),
+            message_params_json=dict(finding.message_params),
+        )
+        for position, finding in enumerate(report.findings)
+    ]
+
+
+def _report_from_rows(
+    row: AdaptationEvaluationReportModel, finding_rows: list[AdaptationEvaluationFindingModel]
+) -> ProfileEvaluationReport:
+    return ProfileEvaluationReport.model_validate(
+        {
+            "schema_version": row.schema_version,
+            "artifact_hash": row.artifact_hash,
+            "profile_ref": {
+                "profile_id": row.profile_id,
+                "profile_version": row.profile_version,
+                "policy_pack_digest": row.policy_pack_digest,
+            },
+            "evaluator_version": row.evaluator_version,
+            "sidecar_ref": {
+                "artifact_id": row.sidecar_ref_id,
+                "version": row.sidecar_ref_version,
+                "content_hash": row.sidecar_ref_hash,
+            },
+            "sidecar_digest": row.sidecar_digest,
+            "findings": [
+                {
+                    "finding_id": finding.finding_id,
+                    "rule_id": finding.rule_id,
+                    "rule_version": finding.rule_version,
+                    "disposition": finding.disposition,
+                    "applicability": finding.applicability,
+                    "severity": finding.severity,
+                    "target_path": finding.target_path,
+                    "source_span": finding.source_span,
+                    "evidence_refs": finding.evidence_refs_json,
+                    "message_params": finding.message_params_json,
+                }
+                for finding in sorted(finding_rows, key=lambda item: item.position)
+            ],
+            "report_digest": row.report_digest,
+            "created_at": _stored_aware(row.created_at),
+        }
+    )
+
+
+def _admission_row(
+    *,
+    screenplay_ref: ArtifactVersionRef,
+    user_id: str,
+    project_name: str,
+    admission_decision_id: str,
+    admission_decision_digest: str,
+    profile_ref: AdaptationProfileRef,
+    created_at: datetime,
+) -> AdaptationScreenplayAdmissionModel:
+    return AdaptationScreenplayAdmissionModel(
+        screenplay_id=screenplay_ref.artifact_id,
+        screenplay_version=screenplay_ref.version,
+        user_id=user_id,
+        project_name=project_name,
+        screenplay_content_hash=screenplay_ref.content_hash,
+        admission_decision_id=admission_decision_id,
+        admission_decision_digest=admission_decision_digest,
+        profile_id=profile_ref.profile_id.value,
+        profile_version=profile_ref.profile_version,
+        policy_pack_digest=profile_ref.policy_pack_digest,
+        created_at=created_at,
+    )
+
+
+def _admission_from_row(row: AdaptationScreenplayAdmissionModel) -> AdmittedScreenplayRef:
+    return AdmittedScreenplayRef(
+        screenplay_ref=ArtifactVersionRef(
+            artifact_id=row.screenplay_id, version=row.screenplay_version, content_hash=row.screenplay_content_hash
+        ),
+        admission_ref=DecisionRef(decision_id=row.admission_decision_id, decision_digest=row.admission_decision_digest),
+        profile_ref=AdaptationProfileRef(
+            profile_id=AdaptationProfileId(row.profile_id),
+            profile_version=row.profile_version,
+            policy_pack_digest=row.policy_pack_digest,
+        ),
+    )
+
+
 def _head_key_of(decision: AdaptationDecision) -> str:
     if isinstance(decision, MapApprovalDecision):
         return decision.command.branch_id
-    raise NotImplementedError(
-        "adaptation repository: PROFILE_WAIVER/SCREENPLAY_ADMISSION head_key derivation is added by Task 11/12, "
-        "once their decisions are persisted for the first time"
-    )
+    if isinstance(decision, ProfileWaiverDecision):
+        ref = decision.command.artifact_ref
+        return f"{ref.artifact_id}:{ref.version}"
+    assert isinstance(decision, ScreenplayAdmissionDecision)
+    return decision.command.admitted_screenplay.screenplay_id
 
 
 def _artifact_ref_from_columns(
@@ -369,8 +530,16 @@ def _new_effective_selection(
     ``REVOKE``) leaves the previous selection unchanged."""
     if decision.command.action.value != _ACCEPTING_ACTION_BY_KIND[decision.decision_kind]:
         return current_effective_id, current_artifact
-    assert isinstance(decision, MapApprovalDecision)
-    return decision.command.decision_id, decision.command.map_ref
+    if isinstance(decision, MapApprovalDecision):
+        return decision.command.decision_id, decision.command.map_ref
+    if isinstance(decision, ProfileWaiverDecision):
+        return decision.command.decision_id, decision.command.artifact_ref
+    assert isinstance(decision, ScreenplayAdmissionDecision)
+    admitted = decision.command.admitted_screenplay
+    admitted_ref = ArtifactVersionRef(
+        artifact_id=admitted.screenplay_id, version=admitted.version, content_hash=admitted.content_hash
+    )
+    return decision.command.decision_id, admitted_ref
 
 
 class AdaptationRepository:
@@ -520,6 +689,106 @@ class AdaptationRepository:
             self.session.add(row)
         for row in _screenplay_profile_analysis_ref_rows(screenplay, user_id=user_id, project_name=project_name):
             self.session.add(row)
+        await self.session.flush()
+
+    # --- profile sidecars and evaluation reports (plan Task 11) ---------------------
+
+    async def get_exact_sidecar(
+        self, *, sidecar_id: str, version: int, project_name: str, user_id: str
+    ) -> WesternDramaAnalysis | ShuangwenAnalysis | None:
+        row = await self._scalar(
+            select(AdaptationProfileSidecarModel).where(
+                AdaptationProfileSidecarModel.sidecar_id == sidecar_id,
+                AdaptationProfileSidecarModel.version == version,
+                AdaptationProfileSidecarModel.project_name == project_name,
+                AdaptationProfileSidecarModel.user_id == user_id,
+            )
+        )
+        return _sidecar_from_row(row) if row is not None else None
+
+    async def insert_sidecar(
+        self,
+        sidecar_id: str,
+        version: int,
+        sidecar: WesternDramaAnalysis | ShuangwenAnalysis,
+        *,
+        user_id: str,
+        project_name: str,
+    ) -> None:
+        self.session.add(_sidecar_row(sidecar_id, version, sidecar, user_id=user_id, project_name=project_name))
+        await self.session.flush()
+
+    async def get_exact_report(
+        self, *, report_digest: str, project_name: str, user_id: str
+    ) -> ProfileEvaluationReport | None:
+        row = await self._scalar(
+            select(AdaptationEvaluationReportModel).where(
+                AdaptationEvaluationReportModel.report_digest == report_digest,
+                AdaptationEvaluationReportModel.project_name == project_name,
+                AdaptationEvaluationReportModel.user_id == user_id,
+            )
+        )
+        if row is None:
+            return None
+        finding_rows = list(
+            (
+                await self.session.execute(
+                    select(AdaptationEvaluationFindingModel).where(
+                        AdaptationEvaluationFindingModel.report_digest == report_digest,
+                        AdaptationEvaluationFindingModel.project_name == project_name,
+                        AdaptationEvaluationFindingModel.user_id == user_id,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return _report_from_rows(row, finding_rows)
+
+    async def insert_report(self, report: ProfileEvaluationReport, *, user_id: str, project_name: str) -> None:
+        self.session.add(_report_row(report, user_id=user_id, project_name=project_name))
+        await self.session.flush()
+        for row in _finding_rows(report, user_id=user_id, project_name=project_name):
+            self.session.add(row)
+        await self.session.flush()
+
+    # --- screenplay admission projection (plan Task 12) ------------------------------
+
+    async def get_exact_screenplay_admission(
+        self, *, screenplay_id: str, version: int, project_name: str, user_id: str
+    ) -> AdmittedScreenplayRef | None:
+        row = await self._scalar(
+            select(AdaptationScreenplayAdmissionModel).where(
+                AdaptationScreenplayAdmissionModel.screenplay_id == screenplay_id,
+                AdaptationScreenplayAdmissionModel.screenplay_version == version,
+                AdaptationScreenplayAdmissionModel.project_name == project_name,
+                AdaptationScreenplayAdmissionModel.user_id == user_id,
+            )
+        )
+        return _admission_from_row(row) if row is not None else None
+
+    async def insert_screenplay_admission(
+        self,
+        *,
+        screenplay_ref: ArtifactVersionRef,
+        admission_decision_id: str,
+        admission_decision_digest: str,
+        profile_ref: AdaptationProfileRef,
+        created_at: datetime,
+        user_id: str,
+        project_name: str,
+    ) -> None:
+        self.session.add(
+            _admission_row(
+                screenplay_ref=screenplay_ref,
+                user_id=user_id,
+                project_name=project_name,
+                admission_decision_id=admission_decision_id,
+                admission_decision_digest=admission_decision_digest,
+                profile_ref=profile_ref,
+                created_at=created_at,
+            )
+        )
         await self.session.flush()
 
     # --- authority: decisions and heads (plan Task 7) -------------------------------

@@ -49,6 +49,8 @@ _ADAPTATION_OPERATIONS = (
 _APPROVAL_STATUSES = "('DRAFT','PROPOSED','REVIEW_REQUIRED','APPROVED','REJECTED')"
 _AUTHORITY_FAMILIES = "('MAP_APPROVAL','PROFILE_WAIVER','SCREENPLAY_ADMISSION')"
 _DECISION_KINDS = "('MAP_APPROVAL','PROFILE_WAIVER','SCREENPLAY_ADMISSION')"
+_SIDECAR_KINDS = "('WESTERN_DRAMA_ANALYSIS','SHUANGWEN_ANALYSIS')"
+_FINDING_DISPOSITIONS = "('INTEGRITY_BLOCK','PROFILE_BLOCK','ADVISORY','NOT_APPLICABLE')"
 
 
 class AdaptationBranchModel(UserOwnedMixin, Base):
@@ -397,3 +399,200 @@ class AdaptationHeadModel(UserOwnedMixin, Base):
     selected_artifact_id: Mapped[str | None] = mapped_column(_ID)
     selected_artifact_version: Mapped[int | None] = mapped_column(Integer)
     selected_artifact_hash: Mapped[str | None] = mapped_column(_ID)
+
+
+class AdaptationProfileSidecarModel(UserOwnedMixin, Base):
+    """One versioned profile-analysis sidecar (``WesternDramaAnalysis`` or
+    ``ShuangwenAnalysis``, plan Task 11). ``sidecar_id`` is minted deterministically by
+    ``ProfileEvaluationService`` from the evaluated artifact id and the profile id
+    (``f"{artifact_id}:{profile_id}"``), so the same artifact evaluated under two
+    different profiles never collides, and ``version`` mirrors the evaluated artifact's
+    own version — re-evaluating unchanged content under the same profile is a pure,
+    deterministic, byte-identical exact retry; a different tuple at the same
+    ``(sidecar_id, version)`` is a real identity conflict (an evaluator regression),
+    never silently overwritten. The full sidecar payload is stored as JSON (its shape is
+    a closed Pydantic contract, not a queryable relation) with a ``kind`` discriminator
+    to reconstruct the exact model.
+    """
+
+    __tablename__ = "adaptation_profile_sidecars"
+    __table_args__ = (
+        PrimaryKeyConstraint("sidecar_id", "version", name="pk_adaptation_profile_sidecars"),
+        UniqueConstraint(
+            "user_id", "project_name", "sidecar_id", "version", name="uq_adaptation_profile_sidecars_scope"
+        ),
+        CheckConstraint("version >= 1", name="ck_adaptation_profile_sidecars_version"),
+        CheckConstraint(f"kind IN {_SIDECAR_KINDS}", name="ck_adaptation_profile_sidecars_kind"),
+        Index("ix_adaptation_profile_sidecars_project_name", "project_name"),
+    )
+
+    sidecar_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    content_hash: Mapped[str] = mapped_column(_ID, nullable=False)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class AdaptationEvaluationReportModel(UserOwnedMixin, Base):
+    """One immutable ``ProfileEvaluationReport`` (plan Task 11). Content-addressed by
+    its own ``report_digest`` (``compute_profile_evaluation_report_digest``) — a report
+    has no separate opaque id, so an exact retry with byte-identical content always
+    lands on the same primary-key row, and there is no tuple-mismatch case to detect: a
+    colliding digest can only carry identical content by construction of the hash. A
+    ``ProfileWaiverCommand.report_ref``/``MapApprovalCommand.relied_report_refs`` entry
+    names this row by ``decision_id=decision_digest=report_digest``, the same generic
+    ``DecisionRef`` shape used for real authority decisions.
+    """
+
+    __tablename__ = "adaptation_evaluation_reports"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "report_digest", name="pk_adaptation_evaluation_reports"),
+        Index("ix_adaptation_evaluation_reports_project_name", "project_name"),
+        Index(
+            "ix_adaptation_evaluation_reports_artifact",
+            "user_id",
+            "project_name",
+            "artifact_hash",
+            "profile_id",
+        ),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        server_default=DEFAULT_USER_ID,
+        primary_key=True,
+    )
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    report_digest: Mapped[str] = mapped_column(_ID, primary_key=True)
+
+    schema_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    artifact_hash: Mapped[str] = mapped_column(_ID, nullable=False)
+
+    profile_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    profile_version: Mapped[str] = mapped_column(_SHORT, nullable=False)
+    policy_pack_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+
+    evaluator_version: Mapped[str] = mapped_column(_SHORT, nullable=False)
+
+    sidecar_ref_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    sidecar_ref_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    sidecar_ref_hash: Mapped[str] = mapped_column(_ID, nullable=False)
+    sidecar_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AdaptationEvaluationFindingModel(UserOwnedMixin, Base):
+    """Ordered ``findings`` on one evaluation report. One row per finding (plan Task 11),
+    mirroring ``AdaptationMapEntryModel``'s ordered-child-row pattern."""
+
+    __tablename__ = "adaptation_evaluation_findings"
+    __table_args__ = (
+        PrimaryKeyConstraint(
+            "user_id", "project_name", "report_digest", "finding_id", name="pk_adaptation_evaluation_findings"
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "report_digest"],
+            [
+                "adaptation_evaluation_reports.user_id",
+                "adaptation_evaluation_reports.project_name",
+                "adaptation_evaluation_reports.report_digest",
+            ],
+            name="fk_adaptation_evaluation_findings_report",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "project_name",
+            "report_digest",
+            "position",
+            name="uq_adaptation_evaluation_findings_position",
+        ),
+        CheckConstraint(
+            f"disposition IN {_FINDING_DISPOSITIONS}", name="ck_adaptation_evaluation_findings_disposition"
+        ),
+        CheckConstraint("position >= 0", name="ck_adaptation_evaluation_findings_position"),
+        Index("ix_adaptation_evaluation_findings_project_name", "project_name"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        server_default=DEFAULT_USER_ID,
+        primary_key=True,
+    )
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    report_digest: Mapped[str] = mapped_column(_ID, primary_key=True)
+    finding_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    rule_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    rule_version: Mapped[str] = mapped_column(_SHORT, nullable=False)
+    disposition: Mapped[str] = mapped_column(String(32), nullable=False)
+    applicability: Mapped[str] = mapped_column(String(64), nullable=False)
+    severity: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_path: Mapped[str] = mapped_column(String(2000), nullable=False)
+    source_span: Mapped[str] = mapped_column(String(2000), nullable=False)
+    evidence_refs_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+    message_params_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class AdaptationScreenplayAdmissionModel(UserOwnedMixin, Base):
+    """A dedicated read-optimized projection: which exact screenplay version is
+    currently admitted (``APPROVED`` + ``locked_for_direction``) for direction, and by
+    which decision (plan Task 12). One row per admitted screenplay version, inserted
+    atomically alongside its ``adaptation_screenplays`` row and its
+    ``SCREENPLAY_ADMISSION`` decision, in the same transaction as the authority
+    write — never inserted for a ``REVOKE`` decision. This is what
+    ``ApprovedScreenplayReader`` reads; it never joins the generic decision chain, and
+    nothing outside ``AdaptationAuthorityService`` ever writes it.
+    """
+
+    __tablename__ = "adaptation_screenplay_admissions"
+    __table_args__ = (
+        PrimaryKeyConstraint("screenplay_id", "screenplay_version", name="pk_adaptation_screenplay_admissions"),
+        UniqueConstraint(
+            "user_id",
+            "project_name",
+            "screenplay_id",
+            "screenplay_version",
+            name="uq_adaptation_screenplay_admissions_scope",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "screenplay_id", "screenplay_version"],
+            [
+                "adaptation_screenplays.user_id",
+                "adaptation_screenplays.project_name",
+                "adaptation_screenplays.screenplay_id",
+                "adaptation_screenplays.version",
+            ],
+            name="fk_adaptation_screenplay_admissions_screenplay",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["admission_decision_id", "user_id", "project_name"],
+            ["adaptation_decisions.decision_id", "adaptation_decisions.user_id", "adaptation_decisions.project_name"],
+            name="fk_adaptation_screenplay_admissions_decision",
+            ondelete="RESTRICT",
+        ),
+        Index("ix_adaptation_screenplay_admissions_project_name", "project_name"),
+    )
+
+    screenplay_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    screenplay_version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    screenplay_content_hash: Mapped[str] = mapped_column(_ID, nullable=False)
+    admission_decision_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    admission_decision_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+
+    profile_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    profile_version: Mapped[str] = mapped_column(_SHORT, nullable=False)
+    policy_pack_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

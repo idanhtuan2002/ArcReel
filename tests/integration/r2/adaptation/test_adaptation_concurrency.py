@@ -25,6 +25,7 @@ from lib.db.repositories.adaptation import AdaptationRepository
 from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.evidence import AdaptationEvidenceService
 from r2.contracts.adaptation import AdaptationAuthorityFamily, AdaptationHead
+from tests.integration.r2.adaptation._fakes import FakeAuthority
 from tests.integration.r2.adaptation.test_map_approval import (
     _PRINCIPAL,
     PROJECT,
@@ -32,7 +33,6 @@ from tests.integration.r2.adaptation.test_map_approval import (
     _approve_command,
     _branch,
     _branch_ref,
-    _FakeAuthority,
     _map,
     _map_ref,
 )
@@ -101,7 +101,7 @@ async def test_two_concurrent_genesis_map_approvals_on_one_branch_yield_one_winn
 
     barrier = asyncio.Barrier(2)
     service = AdaptationAuthorityService(
-        lambda: _BarrierBeforeHeadLockUnitOfWork(concurrent_session_factory, barrier), _FakeAuthority()
+        lambda: _BarrierBeforeHeadLockUnitOfWork(concurrent_session_factory, barrier), FakeAuthority()
     )
 
     async def run(decision_id: str) -> object:
@@ -132,7 +132,7 @@ async def test_two_concurrent_genesis_map_approvals_on_distinct_branches_do_not_
 
     barrier = asyncio.Barrier(2)
     service = AdaptationAuthorityService(
-        lambda: _BarrierBeforeHeadLockUnitOfWork(concurrent_session_factory, barrier), _FakeAuthority()
+        lambda: _BarrierBeforeHeadLockUnitOfWork(concurrent_session_factory, barrier), FakeAuthority()
     )
 
     async def run(decision_id: str, branch, map_) -> object:

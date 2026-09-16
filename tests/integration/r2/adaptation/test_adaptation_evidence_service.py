@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.db.adaptation_uow import SqlAlchemyAdaptationUnitOfWork, adaptation_uow_factory
+from lib.db.adaptation_uow import SqlAlchemyAdaptationUnitOfWork
 from r2.adaptation.errors import (
     AdaptationIdentityConflictError,
     AdaptationNotFoundError,
@@ -142,11 +142,6 @@ def _screenplay(
         profile_analysis_refs=[],
     )
     return draft.model_copy(update={"content_hash": compute_adaptation_hash(draft)})
-
-
-@pytest.fixture
-def adaptation_evidence_service(session_factory: Factory) -> AdaptationEvidenceService:
-    return AdaptationEvidenceService(adaptation_uow_factory(session_factory))
 
 
 class InjectedFault(RuntimeError):

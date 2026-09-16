@@ -34,7 +34,6 @@ from r2.contracts.adaptation import (
     AdaptationAuthorityFamily,
     AdaptationBranchV2,
     AdaptationDecisionAction,
-    AdaptationDecisionAuthorization,
     AdaptationMapEntry,
     AdaptationMapV2,
     AdaptationOperation,
@@ -148,43 +147,6 @@ class InjectedFault(RuntimeError):
     pass
 
 
-class _FakeAuthority:
-    def __init__(self, *, deny: bool = False, principal: str = _PRINCIPAL) -> None:
-        self.deny = deny
-        self.principal = principal
-        self.calls: list[tuple[str, str]] = []
-
-    async def authorize(
-        self, *, authenticated_principal, action, command_identity_hash
-    ) -> AdaptationDecisionAuthorization:
-        self.calls.append((authenticated_principal, command_identity_hash))
-        if self.deny or authenticated_principal != self.principal:
-            raise AdaptationAuthorityDeniedError("Human Showrunner grant is absent for this principal")
-        return AdaptationDecisionAuthorization(
-            authenticated_principal=authenticated_principal,
-            authority_role="HUMAN_SHOWRUNNER",
-            action=action,
-            command_identity_hash=command_identity_hash,
-            approval_receipt=f"receipt:{command_identity_hash}",
-            authorized_at=datetime.now(UTC),
-        )
-
-
-@pytest.fixture
-def adaptation_evidence_service(session_factory: Factory) -> AdaptationEvidenceService:
-    return AdaptationEvidenceService(adaptation_uow_factory(session_factory))
-
-
-@pytest.fixture
-def fake_authority() -> _FakeAuthority:
-    return _FakeAuthority()
-
-
-@pytest.fixture
-def authority_service(session_factory: Factory, fake_authority: _FakeAuthority) -> AdaptationAuthorityService:
-    return AdaptationAuthorityService(adaptation_uow_factory(session_factory), fake_authority)
-
-
 @pytest.fixture
 def corrupt_head(session_factory: Factory):
     async def _corrupt(*, branch_id: str = "branch-1", **updates: object) -> None:
@@ -269,13 +231,14 @@ async def test_decide_map_second_approval_advances_generation_after_reject(
 
 
 async def test_decide_map_denial_grants_nothing(
-    session_factory: Factory, adaptation_evidence_service: AdaptationEvidenceService
+    session_factory: Factory,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    denying_authority_service: AdaptationAuthorityService,
 ) -> None:
     branch, map_ = await _seed_branch_and_map(adaptation_evidence_service)
-    denying = AdaptationAuthorityService(adaptation_uow_factory(session_factory), _FakeAuthority(deny=True))
     command = _approve_command(map_ref=_map_ref(map_), profile_ref=branch.profile_ref)
     with pytest.raises(AdaptationAuthorityDeniedError):
-        await denying.decide_map(command, authenticated_principal=_PRINCIPAL)
+        await denying_authority_service.decide_map(command, authenticated_principal=_PRINCIPAL)
     stored = await adaptation_evidence_service.get_exact_branch(
         branch_id=branch.branch_id, version=1, project_name=PROJECT, user_id=USER
     )

@@ -10,6 +10,7 @@ only on the narrower protocol they actually use.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from r2.contracts.adaptation import (
@@ -20,7 +21,13 @@ from r2.contracts.adaptation import (
     AdaptationDecisionAuthorization,
     AdaptationHead,
     AdaptationMapV2,
+    AdaptationProfileRef,
+    AdmittedScreenplayRef,
+    ArtifactVersionRef,
+    ProfileEvaluationReport,
     ScreenplayArtifactV2,
+    ShuangwenAnalysis,
+    WesternDramaAnalysis,
 )
 
 
@@ -53,6 +60,42 @@ class AdaptationEvidenceRepositoryPort(Protocol):
     ) -> ScreenplayArtifactV2 | None: ...
 
     async def insert_screenplay(self, screenplay: ScreenplayArtifactV2, *, user_id: str, project_name: str) -> None: ...
+
+    async def get_exact_sidecar(
+        self, *, sidecar_id: str, version: int, project_name: str, user_id: str
+    ) -> WesternDramaAnalysis | ShuangwenAnalysis | None: ...
+
+    async def insert_sidecar(
+        self,
+        sidecar_id: str,
+        version: int,
+        sidecar: WesternDramaAnalysis | ShuangwenAnalysis,
+        *,
+        user_id: str,
+        project_name: str,
+    ) -> None: ...
+
+    async def get_exact_report(
+        self, *, report_digest: str, project_name: str, user_id: str
+    ) -> ProfileEvaluationReport | None: ...
+
+    async def insert_report(self, report: ProfileEvaluationReport, *, user_id: str, project_name: str) -> None: ...
+
+    async def get_exact_screenplay_admission(
+        self, *, screenplay_id: str, version: int, project_name: str, user_id: str
+    ) -> AdmittedScreenplayRef | None: ...
+
+    async def insert_screenplay_admission(
+        self,
+        *,
+        screenplay_ref: ArtifactVersionRef,
+        admission_decision_id: str,
+        admission_decision_digest: str,
+        profile_ref: AdaptationProfileRef,
+        created_at: datetime,
+        user_id: str,
+        project_name: str,
+    ) -> None: ...
 
 
 @runtime_checkable

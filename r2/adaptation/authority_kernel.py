@@ -42,6 +42,44 @@ _ACCEPTING_ACTION: dict[AdaptationAuthorityFamily, AdaptationDecisionAction] = {
 }
 
 
+_REJECTING_ACTION: dict[AdaptationAuthorityFamily, AdaptationDecisionAction] = {
+    AdaptationAuthorityFamily.MAP_APPROVAL: AdaptationDecisionAction.REJECT,
+    AdaptationAuthorityFamily.PROFILE_WAIVER: AdaptationDecisionAction.DENY_WAIVER,
+    AdaptationAuthorityFamily.SCREENPLAY_ADMISSION: AdaptationDecisionAction.REVOKE,
+}
+
+
+def _family_of(decision: AdaptationDecision) -> AdaptationAuthorityFamily:
+    if isinstance(decision, MapApprovalDecision):
+        return AdaptationAuthorityFamily.MAP_APPROVAL
+    if isinstance(decision, ProfileWaiverDecision):
+        return AdaptationAuthorityFamily.PROFILE_WAIVER
+    assert isinstance(decision, ScreenplayAdmissionDecision)
+    return AdaptationAuthorityFamily.SCREENPLAY_ADMISSION
+
+
+def _head_key_of(decision: AdaptationDecision) -> str:
+    if isinstance(decision, MapApprovalDecision):
+        return decision.command.branch_id
+    if isinstance(decision, ProfileWaiverDecision):
+        ref = decision.command.artifact_ref
+        return f"{ref.artifact_id}:{ref.version}"
+    assert isinstance(decision, ScreenplayAdmissionDecision)
+    return decision.command.admitted_screenplay.screenplay_id
+
+
+def _selected_artifact_ref_of(decision: AdaptationDecision) -> ArtifactVersionRef:
+    if isinstance(decision, MapApprovalDecision):
+        return decision.command.map_ref
+    if isinstance(decision, ProfileWaiverDecision):
+        return decision.command.artifact_ref
+    assert isinstance(decision, ScreenplayAdmissionDecision)
+    admitted = decision.command.admitted_screenplay
+    return ArtifactVersionRef(
+        artifact_id=admitted.screenplay_id, version=admitted.version, content_hash=admitted.content_hash
+    )
+
+
 def fold_adaptation_head(decisions: Sequence[AdaptationDecision]) -> AdaptationHead:
     """Re-derive one family's complete ``AdaptationHead`` from its ordered decision
     chain alone. Raises ``ValueError`` for an empty chain (``AdaptationHead.generation``
@@ -61,20 +99,9 @@ def fold_adaptation_head(decisions: Sequence[AdaptationDecision]) -> AdaptationH
             )
 
     first = ordered[0]
-    if isinstance(first, MapApprovalDecision):
-        family = AdaptationAuthorityFamily.MAP_APPROVAL
-        head_key = first.command.branch_id
-    elif isinstance(first, ProfileWaiverDecision):
-        raise NotImplementedError(
-            "fold_adaptation_head: PROFILE_WAIVER folding is implemented by Task 11, once waiver decisions "
-            "are persisted for the first time"
-        )
-    else:
-        assert isinstance(first, ScreenplayAdmissionDecision)
-        raise NotImplementedError(
-            "fold_adaptation_head: SCREENPLAY_ADMISSION folding is implemented by Task 12, once admission "
-            "decisions are persisted for the first time"
-        )
+    family = _family_of(first)
+    rejecting_action = _REJECTING_ACTION[family]
+    head_key = _head_key_of(first)
 
     user_id = first.command.user_id
     project_name = first.command.project_name
@@ -83,17 +110,16 @@ def fold_adaptation_head(decisions: Sequence[AdaptationDecision]) -> AdaptationH
     effective_decision_id: str | None = None
     selected_artifact_ref: ArtifactVersionRef | None = None
     for decision in ordered:
-        assert isinstance(decision, MapApprovalDecision)
         command = decision.command
         if command.user_id != user_id or command.project_name != project_name:
             raise AdaptationAuthorityIntegrityError("decision chain mixes commands from different scopes")
-        if command.branch_id != head_key:
+        if _head_key_of(decision) != head_key:
             raise AdaptationAuthorityIntegrityError("decision chain mixes commands from different head keys")
         if command.action == accepting_action:
             effective_decision_id = command.decision_id
-            selected_artifact_ref = command.map_ref
-        elif command.action != AdaptationDecisionAction.REJECT:
-            raise AdaptationAuthorityIntegrityError(f"unexpected MAP_APPROVAL action {command.action!r} in chain")
+            selected_artifact_ref = _selected_artifact_ref_of(decision)
+        elif command.action != rejecting_action:
+            raise AdaptationAuthorityIntegrityError(f"unexpected {family.value} action {command.action!r} in chain")
 
     return AdaptationHead(
         user_id=user_id,
