@@ -365,6 +365,7 @@ MESSAGES = {
     "video_request_conflicts_with_active_task": "单元「{resource_id}」已有使用不同旁白交付方式或确认时长的视频任务在处理中；请等待完成或取消任务后重试",
     "tts_conflicts_with_active_narrated_video": "单元「{resource_id}」已有使用当前 TTS 的视频任务在处理中；请等待完成或取消任务后再重新生成旁白配音",
     "audio_restore_conflicts_with_active_task": "单元「{resource_id}」的旁白正在生成或被视频任务使用；请等待完成或取消任务后再切换音频版本",
+    "idempotency_key_reused_with_different_request": "幂等键「{command_id}」已被用于另一个不同的请求；不同请求请换用新的幂等键，安全重试请原样重发同一请求",
     # Agent 凭证
     "agent_preset_unknown": "未知预设供应商: {preset_id}",
     "agent_base_url_required_custom": "自定义配置需要填写 base_url",

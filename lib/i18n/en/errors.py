@@ -417,6 +417,7 @@ MESSAGES = {
     "video_request_conflicts_with_active_task": "Unit '{resource_id}' already has a video task using different narration delivery options; wait for it to finish or cancel it before retrying.",
     "tts_conflicts_with_active_narrated_video": "Unit '{resource_id}' has an active video task using the current TTS; wait for it to finish or cancel it before regenerating narration.",
     "audio_restore_conflicts_with_active_task": "Unit '{resource_id}' has narration being generated or consumed by a video task; wait for it to finish or cancel it before switching audio versions.",
+    "idempotency_key_reused_with_different_request": "Idempotency key '{command_id}' was already used for a different request; use a new key for a different request, or resend the exact same request to retry safely.",
     # Agent credentials
     "agent_preset_unknown": "Unknown preset provider: {preset_id}",
     "agent_base_url_required_custom": "base_url is required for custom configuration",

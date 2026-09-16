@@ -15,12 +15,16 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from lib.api_errors import ConflictError
+from lib.content_digest import canonical_json_digest
 from lib.db.base import DEFAULT_USER_ID, dt_to_iso, utc_now
 from lib.db.models.api_call import ApiCall
 from lib.db.models.task import BatchTask, GenerationBatch, Task, WorkerLease
 from lib.db.repositories.base import BaseRepository, rowcount
+from lib.db.repositories.host_hardening import CommandReceiptRepository
 from lib.task_failure import bound_reason, collapse_cascade_reason, encode_failure, parse_failure
 from lib.task_terminal_events import TERMINAL_TASK_STATUSES
+from r2.contracts.host_hardening import CommandReceipt, command_receipt_result_envelope
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +206,24 @@ class TaskRepository(BaseRepository):
         batch_unit_id: str | None = None,
         batch_unit_ids: tuple[str, ...] = (),
         dedupe_guard: Callable[[dict[str, Any], str], None] | None = None,
+        command_id: str | None = None,
+        actor_scope: str | None = None,
+        command_digest: str | None = None,
     ) -> dict[str, Any]:
+        # M7-A idempotent command layer (spec section 4.1): opt-in, independent of the
+        # resource-based active-task dedup below. All three or none -- a partial set
+        # would silently disable the exact-replay guarantee instead of failing loudly.
+        if len({command_id is None, actor_scope is None, command_digest is None}) != 1:
+            raise ValueError("command_id, actor_scope and command_digest must all be provided together")
+        if command_id is not None:
+            assert actor_scope is not None
+            assert command_digest is not None
+            existing_receipt = await CommandReceiptRepository(self.session).get_exact(
+                user_id=user_id, project_name=project_name, actor_scope=actor_scope, command_id=command_id
+            )
+            if existing_receipt is not None:
+                return await self._replay_command_receipt(existing_receipt, command_digest=command_digest)
+
         unit_ids = tuple(dict.fromkeys((*(batch_unit_ids or ()), *((batch_unit_id,) if batch_unit_id else ()))))
         if unit_ids and batch_id is None:
             raise ValueError("batch_id and at least one batch unit id must be provided together")
@@ -283,6 +304,36 @@ class TaskRepository(BaseRepository):
             )
             await self.session.flush()
 
+        if command_id is not None:
+            assert actor_scope is not None
+            assert command_digest is not None
+            result_envelope = command_receipt_result_envelope(
+                task_id=task_id, result={"status": status, "deduped": deduped}
+            )
+            receipt = CommandReceipt(
+                actor_scope=actor_scope,
+                command_id=command_id,
+                command_digest=command_digest,
+                task_id=task_id,
+                result_digest="sha256:" + canonical_json_digest(result_envelope, allow_nan=False),
+                created_at=now,
+            )
+            try:
+                await CommandReceiptRepository(self.session).add(
+                    user_id=user_id, project_name=project_name, receipt=receipt
+                )
+            except IntegrityError:
+                # A concurrent caller with the identical command_id committed first.
+                # Discard this transaction's task/receipt attempt and replay theirs --
+                # never two tasks for one command_id.
+                await self.session.rollback()
+                winner = await CommandReceiptRepository(self.session).get_exact(
+                    user_id=user_id, project_name=project_name, actor_scope=actor_scope, command_id=command_id
+                )
+                if winner is None:
+                    raise
+                return await self._replay_command_receipt(winner, command_digest=command_digest)
+
         await self.session.commit()
 
         return {
@@ -291,6 +342,20 @@ class TaskRepository(BaseRepository):
             "deduped": deduped,
             "existing_task_id": existing_task_id,
             "_existing_payload": existing_payload,
+            "replayed": False,
+        }
+
+    async def _replay_command_receipt(self, receipt: CommandReceipt, *, command_digest: str) -> dict[str, Any]:
+        if receipt.command_digest != command_digest:
+            raise ConflictError("idempotency_key_reused_with_different_request", command_id=receipt.command_id)
+        task = await self.session.get(Task, receipt.task_id)
+        return {
+            "task_id": receipt.task_id,
+            "status": task.status if task is not None else "unknown",
+            "deduped": True,
+            "existing_task_id": receipt.task_id,
+            "_existing_payload": None,
+            "replayed": True,
         }
 
     async def create_batch(

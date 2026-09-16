@@ -417,6 +417,7 @@ MESSAGES = {
     "video_request_conflicts_with_active_task": "Đơn vị '{resource_id}' đã có tác vụ video đang xử lý với lựa chọn bàn giao lời dẫn hoặc thời lượng xác nhận khác; hãy đợi tác vụ hoàn tất hoặc hủy rồi thử lại.",
     "tts_conflicts_with_active_narrated_video": "Đơn vị '{resource_id}' có tác vụ video đang dùng TTS hiện tại; hãy đợi tác vụ hoàn tất hoặc hủy trước khi tạo lại lời dẫn.",
     "audio_restore_conflicts_with_active_task": "Đơn vị '{resource_id}' đang tạo lời dẫn hoặc lời dẫn đang được tác vụ video sử dụng; hãy đợi hoàn tất hoặc hủy trước khi chuyển phiên bản âm thanh.",
+    "idempotency_key_reused_with_different_request": "Khóa idempotency '{command_id}' đã được dùng cho một yêu cầu khác; hãy dùng khóa mới cho yêu cầu khác, hoặc gửi lại đúng yêu cầu cũ để thử lại an toàn.",
     # Agent credentials
     "agent_preset_unknown": "Nhà cung cấp đặt sẵn không xác định: {preset_id}",
     "agent_base_url_required_custom": "Cấu hình tuỳ chỉnh yêu cầu base_url",

@@ -27,6 +27,7 @@ from lib.artifact_manifest import ArtifactKey
 from lib.asset_derivatives import DERIVATIVE_TASK_TYPE, DerivativeSheetSource, resolve_derivative_sheet_source
 from lib.asset_types import ASSET_SPECS, resolve_asset_key, validate_asset_name
 from lib.config.resolver import ConfigResolver, video_bucket_for_generation_mode
+from lib.content_digest import canonical_json_digest
 from lib.generation_queue import get_generation_queue
 from lib.generation_queue_client import TaskSpec
 from lib.i18n import Translator
@@ -110,6 +111,11 @@ class GenerateVideoRequest(BaseModel):
     # 时长基准的批量入口与由模型推断参数的 Agent 视频工具上。
     narration_delivery: NarrationDelivery = POST_PRODUCTION
     confirmed_request_duration_seconds: int | None = Field(default=None, gt=0)
+    # M7-A actor-scoped idempotency key (spec section 4.1). Absent (the default) keeps
+    # this route's pre-M7 at-most-active-task-per-resource behavior unchanged; a
+    # present key makes an exact retry return the original task receipt instead of a
+    # second submission.
+    idempotency_key: str | None = None
 
 
 class GenerateTtsRequest(BaseModel):
@@ -388,6 +394,25 @@ async def generate_video(
         extra_payload=extra_payload,
     )
 
+    # M7-A idempotent command (spec section 4.1): absent idempotency_key keeps this
+    # route's pre-M7 behavior unchanged. command_digest covers exactly the fields
+    # that define "the same command" -- everything TaskSpec itself validated.
+    command_id = req.idempotency_key
+    actor_scope: str | None = None
+    command_digest: str | None = None
+    if command_id is not None:
+        actor_scope = f"user:{user.id}"
+        command_digest = "sha256:" + canonical_json_digest(
+            {
+                "task_type": spec.task_type,
+                "media_type": spec.media_type,
+                "resource_id": spec.resource_id,
+                "script_file": spec.script_file,
+                "payload": spec.payload,
+            },
+            allow_nan=False,
+        )
+
     # 入队（provider 由服务层根据配置自动解析，调用方无需传递）
     result = await queue.enqueue_task(
         project_name=project_name,
@@ -398,6 +423,9 @@ async def generate_video(
         payload=spec.payload,
         source="webui",
         user_id=user.id,
+        command_id=command_id,
+        actor_scope=actor_scope,
+        command_digest=command_digest,
     )
 
     response = {

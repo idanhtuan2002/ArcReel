@@ -406,6 +406,9 @@ class GenerationQueue:
         batch_id: str | None = None,
         batch_unit_id: str | None = None,
         batch_unit_ids: tuple[str, ...] = (),
+        command_id: str | None = None,
+        actor_scope: str | None = None,
+        command_digest: str | None = None,
     ) -> dict[str, Any]:
         # Every Web, Agent and batch generation entry reaches the queue through this
         # method, so a project whose migration failed is refused here once instead of
@@ -464,6 +467,9 @@ class GenerationQueue:
                     batch_unit_id=batch_unit_id,
                     batch_unit_ids=batch_unit_ids,
                     dedupe_guard=_guard_deduped,
+                    command_id=command_id,
+                    actor_scope=actor_scope,
+                    command_digest=command_digest,
                 )
 
         # Audio restoration observes active TTS/video consumers while holding the
