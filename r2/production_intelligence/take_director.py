@@ -85,7 +85,7 @@ def _scene_spec(scene: ScreenplayScene, *, screenplay: ScreenplayArtifactV2) -> 
 
 def _shot_spec(scene: ScreenplayScene, *, screenplay: ScreenplayArtifactV2) -> ShotSpecV2:
     return ShotSpecV2(
-        id=f"{scene.scene_id}:TAKE-1",
+        id=f"{scene.scene_id}-TAKE-1",
         schema_version=_SHOT_SPEC_SCHEMA_VERSION,
         version=1,
         scene_id=scene.scene_id,
