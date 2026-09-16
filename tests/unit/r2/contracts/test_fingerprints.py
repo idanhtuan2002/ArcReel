@@ -3,6 +3,8 @@ import math
 import pytest
 
 from r2.contracts import (
+    CameraAngle,
+    CameraMovement,
     ContentBasis,
     ContentBasisType,
     CreativeApprovalStatus,
@@ -10,7 +12,9 @@ from r2.contracts import (
     ProductionBindingRole,
     ProductionBindingTarget,
     ProductionMethod,
+    ShotSize,
     ShotSpec,
+    ShotSpecV2,
     canonical_json_bytes,
     compute_content_fingerprint,
     compute_execution_fingerprint,
@@ -32,6 +36,33 @@ def _shot(purpose="Reaction close-up", basis_version="canon-v7"):
         target_duration=4.0,
         framing="close-up",
         camera="locked",
+        entity_refs=["character:maya"],
+        required_continuity=["costume:v3"],
+        required_reference_roles=[ProductionBindingRole.CHARACTER],
+        allowed_methods=[ProductionMethod.GENERATED_VIDEO],
+        quality_tier=3,
+        approval_status=CreativeApprovalStatus.APPROVED,
+    )
+
+
+def _shot_v2(purpose="Reaction close-up", basis_version="canon-v7"):
+    return ShotSpecV2(
+        id="SH042",
+        schema_version="r2-shot-spec-v2",
+        version=1,
+        scene_id="SC001",
+        content_basis=ContentBasis(
+            basis_type=ContentBasisType.NARRATIVE,
+            basis_version=basis_version,
+            refs=["event:1"],
+        ),
+        purpose=purpose,
+        target_duration=4.0,
+        framing="close-up",
+        camera="locked",
+        shot_size=ShotSize.CLOSE,
+        camera_angle=CameraAngle.EYE_LEVEL,
+        camera_movement=CameraMovement.STATIC,
         entity_refs=["character:maya"],
         required_continuity=["costume:v3"],
         required_reference_roles=[ProductionBindingRole.CHARACTER],
@@ -148,6 +179,38 @@ def test_semantic_changes_change_content_fingerprint():
         approved_source_asset_refs=["src:a"],
     )
     assert len({original, changed_shot, changed_basis, changed_binding}) == 4
+
+
+def test_upgrading_a_shot_to_v2_changes_the_content_fingerprint() -> None:
+    """Dual-read (plan Task 14): the same shot upgraded from v1 to v2 shape (identical
+    semantic fields, plus the pinned Take vocabulary) is different *content* and must
+    fingerprint differently — this is what naturally invalidates any readiness/
+    candidate keyed by the stale v1 fingerprint. A historical ApprovedMaster keyed by
+    the original v1 fingerprint is untouched by this: it is never recomputed, only a
+    fresh evaluation for the same target would observe the new fingerprint."""
+    v1_fingerprint = compute_content_fingerprint(
+        shot_spec=_shot(),
+        bindings=[_binding()],
+        visual_identity_refs=["vip:a"],
+        approved_source_asset_refs=["src:a"],
+    )
+    v2_fingerprint = compute_content_fingerprint(
+        shot_spec=_shot_v2(),
+        bindings=[_binding()],
+        visual_identity_refs=["vip:a"],
+        approved_source_asset_refs=["src:a"],
+    )
+    assert v1_fingerprint != v2_fingerprint
+
+    # The v1 fingerprint itself is stable and reproducible regardless of ShotSpecV2's
+    # existence elsewhere in the schema — a historical v1 master's own fingerprint
+    # never shifts underneath it.
+    assert v1_fingerprint == compute_content_fingerprint(
+        shot_spec=_shot(),
+        bindings=[_binding()],
+        visual_identity_refs=["vip:a"],
+        approved_source_asset_refs=["src:a"],
+    )
 
 
 def test_execution_fingerprint_is_mapping_order_stable():

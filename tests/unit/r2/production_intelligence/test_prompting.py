@@ -7,6 +7,8 @@ import json
 import pytest
 
 from r2.contracts import (
+    CameraAngle,
+    CameraMovement,
     ContentBasis,
     ContentBasisType,
     CreativeApprovalStatus,
@@ -16,7 +18,9 @@ from r2.contracts import (
     ResolvedIdentityConstraint,
     ResolvedIdentityStatus,
     ResolvedVisualIdentity,
+    ShotSize,
     ShotSpec,
+    ShotSpecV2,
 )
 from r2.production_intelligence.prompting import PromptPlanner
 
@@ -34,6 +38,28 @@ def _shot() -> ShotSpec:
         target_duration=4.0,
         framing="close-up",
         camera="locked",
+        audio_intent="narration",
+        required_reference_roles=["CHARACTER"],
+        allowed_methods=["GENERATED_VIDEO"],
+        quality_tier=2,
+        approval_status=CreativeApprovalStatus.APPROVED,
+    )
+
+
+def _shot_v2() -> ShotSpecV2:
+    return ShotSpecV2(
+        id="SH01",
+        schema_version="r2-shot-spec-v2",
+        version=1,
+        scene_id="SC01",
+        content_basis=ContentBasis(basis_type=ContentBasisType.FACTUAL, basis_version="v1", refs=["research:RP-1"]),
+        purpose="Maya reacts to the reveal",
+        target_duration=4.0,
+        framing="close-up",
+        camera="locked",
+        shot_size=ShotSize.CLOSE,
+        camera_angle=CameraAngle.EYE_LEVEL,
+        camera_movement=CameraMovement.STATIC,
         audio_intent="narration",
         required_reference_roles=["CHARACTER"],
         allowed_methods=["GENERATED_VIDEO"],
@@ -85,6 +111,15 @@ def test_prompt_plan_round_trips() -> None:
     from r2.contracts import PromptPlan
 
     assert PromptPlan.model_validate(json.loads(raw)) == plan
+
+
+def test_prompt_plan_accepts_a_shot_spec_v2_identically_to_v1() -> None:
+    """Dual-read (plan Task 14): the planner reads only v1 semantic fields (framing,
+    camera, purpose, ...), so a v2 shot with the same semantic content produces the
+    exact same PromptPlan — the pinned Take vocabulary fields are ignored here."""
+    v1_plan = PromptPlanner().build(shot=_shot(), method_decision=_method(), identity=_identity())
+    v2_plan = PromptPlanner().build(shot=_shot_v2(), method_decision=_method(), identity=_identity())
+    assert v2_plan.model_dump(mode="json") == v1_plan.model_dump(mode="json")
 
 
 def test_prompt_plan_is_deterministic() -> None:

@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from r2.contracts import (
+    AnyShotSpec,
     CapabilityAvailability,
     CapabilityDescriptor,
     CapabilityObservation,
@@ -41,7 +42,7 @@ _EPOCH = datetime(2026, 9, 7, 12, 0, tzinfo=UTC)
 
 @dataclass(frozen=True)
 class M4ShotCase:
-    shot: ShotSpec
+    shot: AnyShotSpec
     scene: SceneSpec
     director: DirectorKind
     method: ProductionMethod

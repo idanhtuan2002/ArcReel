@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from r2.contracts import (
+    CameraAngle,
+    CameraMovement,
     ContentBasis,
     ContentBasisType,
     CreativeApprovalStatus,
@@ -14,7 +16,9 @@ from r2.contracts import (
     ReadinessState,
     ResolvedIdentityStatus,
     ResolvedVisualIdentity,
+    ShotSize,
     ShotSpec,
+    ShotSpecV2,
 )
 from r2.production_intelligence.readiness import ProductionReadinessEvaluator
 
@@ -37,6 +41,28 @@ def _shot(roles: list[ProductionBindingRole]) -> ShotSpec:
         target_duration=4.0,
         framing="close-up",
         camera="locked",
+        audio_intent="narration",
+        required_reference_roles=roles,
+        allowed_methods=["GENERATED_VIDEO"],
+        quality_tier=2,
+        approval_status=CreativeApprovalStatus.APPROVED,
+    )
+
+
+def _shot_v2(roles: list[ProductionBindingRole]) -> ShotSpecV2:
+    return ShotSpecV2(
+        id="SH01",
+        schema_version="r2-shot-spec-v2",
+        version=1,
+        scene_id="SC01",
+        content_basis=_basis(),
+        purpose="Reaction",
+        target_duration=4.0,
+        framing="close-up",
+        camera="locked",
+        shot_size=ShotSize.CLOSE,
+        camera_angle=CameraAngle.EYE_LEVEL,
+        camera_movement=CameraMovement.STATIC,
         audio_intent="narration",
         required_reference_roles=roles,
         allowed_methods=["GENERATED_VIDEO"],
@@ -134,6 +160,16 @@ def test_is_current_false_when_binding_snapshot_changed() -> None:
     assert (
         _evaluator().is_current(readiness, target_version=_TARGET_VERSION, binding_snapshot_ref="snapshot@9") is False
     )
+
+
+def test_evaluate_accepts_a_shot_spec_v2_identically_to_v1() -> None:
+    """Dual-read (plan Task 14): a v2 shot carrying the same semantic fields as its v1
+    counterpart evaluates to the exact same readiness state and requirement shape —
+    the pinned Take vocabulary fields are additional metadata Gate 1 never inspects."""
+    v1_readiness = _evaluate(_shot([ProductionBindingRole.CHARACTER]), [_binding(ProductionBindingRole.CHARACTER)])
+    v2_readiness = _evaluate(_shot_v2([ProductionBindingRole.CHARACTER]), [_binding(ProductionBindingRole.CHARACTER)])
+    assert v2_readiness.state is ReadinessState.READY
+    assert v2_readiness.model_dump(mode="json") == v1_readiness.model_dump(mode="json")
 
 
 def test_readiness_records_freshness_anchors() -> None:

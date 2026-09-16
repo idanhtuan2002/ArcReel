@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Protocol, cast
 
 from r2.contracts import (
+    AnyShotSpec,
     CapabilityDescriptor,
     ExecutionDecision,
     IdentityStrength,
@@ -19,7 +20,6 @@ from r2.contracts import (
     PromptPlan,
     ProviderRequest,
     ResolvedVisualIdentity,
-    ShotSpec,
     ensure_json_value,
 )
 
@@ -43,7 +43,7 @@ class PromptPlanner:
     def build(
         self,
         *,
-        shot: ShotSpec,
+        shot: AnyShotSpec,
         method_decision: MethodDecision,
         identity: ResolvedVisualIdentity,
     ) -> PromptPlan:

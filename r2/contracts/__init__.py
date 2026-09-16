@@ -159,7 +159,16 @@ from .preparation import (
     ResolvedVisualIdentity,
     VisualIdentityProfile,
 )
-from .production import SceneSpec, ShotSpec
+from .production import (
+    AnyShotSpec,
+    CameraAngle,
+    CameraMovement,
+    SceneSpec,
+    ShotSize,
+    ShotSpec,
+    ShotSpecV1,
+    ShotSpecV2,
+)
 from .provenance import Provenance
 from .results import ApprovedMaster, GenerationCandidate, QualityFinding, QualityReport
 from .script import ScriptArtifact, ScriptSection
@@ -174,10 +183,13 @@ __all__ = [
     "AddFactOperation",
     "AddTemporalRelationOperation",
     "AdmissionOutcome",
+    "AnyShotSpec",
     "ApprovedMaster",
     "ArtifactCurrencyStatus",
     "AudienceRevealEvidence",
     "AudienceRevealRecipient",
+    "CameraAngle",
+    "CameraMovement",
     "CandidateSelectionStatus",
     "CanonBasis",
     "CanonBranchSnapshot",
@@ -317,7 +329,10 @@ __all__ = [
     "SelectionTrace",
     "SelectionTraceReason",
     "SelectionTraceStatus",
+    "ShotSize",
     "ShotSpec",
+    "ShotSpecV1",
+    "ShotSpecV2",
     "SourceRecord",
     "SourceSpan",
     "TemporalRelation",

@@ -26,6 +26,7 @@ from r2.contracts import (
     ResolvedVisualIdentity,
     SceneSpec,
     ShotSpec,
+    ShotSpecV2,
     VisualIdentityProfile,
 )
 
@@ -121,6 +122,7 @@ def test_stable_semantic_contracts_carry_no_provider_fields_recursively() -> Non
     for root in (
         SceneSpec,
         ShotSpec,
+        ShotSpecV2,
         MethodDecision,
         PromptPlan,
         VisualIdentityProfile,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from r2.contracts import ShotSpec
+from r2.contracts import AnyShotSpec
 from r2.contracts.enums import (
     ProductionBindingRole,
     ProductionBindingTarget,
@@ -26,7 +26,7 @@ class GoldenAMethodAssignment:
 
 @dataclass(frozen=True)
 class GoldenAPreparedShot:
-    shot: ShotSpec
+    shot: AnyShotSpec
     bindings: tuple[ProductionBinding, ...]
     readiness: ProductionReadiness
     method: GoldenAMethodAssignment
@@ -39,7 +39,7 @@ class GoldenAPreparedShot:
 class GoldenAProductionPreparation:
     def prepare(
         self,
-        shots: Sequence[ShotSpec],
+        shots: Sequence[AnyShotSpec],
         *,
         reused_asset_ref: str | None,
     ) -> tuple[GoldenAPreparedShot, ...]:
