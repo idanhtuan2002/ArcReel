@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arcreel.dev/schemas/r2/provider-capabilities/1.json",
+  "title": "R2 M7 Provider Capability Registry",
+  "description": "Structural gate only. Semantic rules (token scope/value consistency, NOT_FOUND settling-window requirement, ref/provider/adapter match, entry_digest self-consistency, qualification/release-mode gating) are checked by r2.host_hardening.provider_capabilities, not by this schema.",
+  "type": "object",
+  "required": ["schema_version", "profiles"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "profiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "sha256_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "provider_id",
+        "api_version",
+        "adapter_version",
+        "idempotency_mode",
+        "token_scope",
+        "token_scope_value",
+        "token_ttl_seconds",
+        "not_found_semantics",
+        "lookup_settling_window_seconds",
+        "supports_poll",
+        "supports_cancel",
+        "supports_webhook",
+        "supports_lookup",
+        "provider_sequence_is_monotonic",
+        "evidence_digest",
+        "qualification_status",
+        "evidence_recorded_at",
+        "evidence_expires_at",
+        "entry_digest"
+      ],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "provider_id": { "type": "string", "minLength": 1 },
+        "api_version": { "type": "string", "minLength": 1 },
+        "adapter_version": { "type": "string", "minLength": 1 },
+        "idempotency_mode": { "enum": ["NATIVE_TOKEN", "LOOKUP_BY_METADATA", "NONE"] },
+        "token_scope": {
+          "enum": ["PROVIDER_ACCOUNT", "PROVIDER_ACCOUNT_REGION", "PROVIDER_ACCOUNT_ENDPOINT", null]
+        },
+        "token_scope_value": { "type": ["string", "null"], "minLength": 1 },
+        "token_ttl_seconds": { "type": ["integer", "null"], "minimum": 1 },
+        "not_found_semantics": { "enum": ["NON_AUTHORITATIVE", "AUTHORITATIVE_AFTER_SETTLING_WINDOW"] },
+        "lookup_settling_window_seconds": { "type": ["integer", "null"], "minimum": 0 },
+        "supports_poll": { "type": "boolean" },
+        "supports_cancel": { "type": "boolean" },
+        "supports_webhook": { "const": false },
+        "supports_lookup": { "type": "boolean" },
+        "provider_sequence_is_monotonic": { "type": "boolean" },
+        "evidence_digest": { "$ref": "#/$defs/sha256_digest" },
+        "qualification_status": {
+          "enum": ["UNQUALIFIED", "OFFLINE_VERIFIED", "SANDBOX_VERIFIED", "QUALIFIED"]
+        },
+        "evidence_recorded_at": { "type": "string", "format": "date-time" },
+        "evidence_expires_at": { "type": ["string", "null"], "format": "date-time" },
+        "entry_digest": { "$ref": "#/$defs/sha256_digest" }
+      }
+    }
+  }
+}
