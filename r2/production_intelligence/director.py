@@ -45,8 +45,14 @@ def _utc_now() -> datetime:
 class DirectorAdapter(Protocol):
     director_kind: DirectorKind
 
-    def direct(self, artifact: object) -> object:
-        """Accept one already-validated R2 script-like contract at the boundary."""
+    async def direct(self, artifact: object) -> object:
+        """Accept one already-validated R2 script-like contract at the boundary.
+
+        Async (plan Task 13): ``TakeDirectorAdapter`` resolves its input through the
+        async ``ApprovedScreenplayReader`` port, and no M4 caller of
+        ``DirectorExecutionService.execute`` exists yet to break — the boundary was
+        only ever sync because no earlier adapter needed I/O.
+        """
         ...
 
 
@@ -246,7 +252,7 @@ class DirectorExecutionService:
         self._clock: _Clock = clock or _utc_now
         self._validator = validator or DirectorValidator(clock=self._clock)
 
-    def execute(
+    async def execute(
         self,
         *,
         routing: RoutingDecision,
@@ -255,7 +261,7 @@ class DirectorExecutionService:
         transient_retry_budget: int = 1,
     ) -> DirectorResult:
         primary = routing.selected_director
-        result = self._attempt(primary, adapters, artifact, routing, transient_retry_budget)
+        result = await self._attempt(primary, adapters, artifact, routing, transient_retry_budget)
         if isinstance(result, DirectorSuccess):
             return result
         if result.failure_class in _FAIL_CLOSED:
@@ -265,10 +271,10 @@ class DirectorExecutionService:
             and primary is not DirectorKind.ARCREEL_NATIVE
             and DirectorKind.ARCREEL_NATIVE in adapters
         ):
-            return self._attempt(DirectorKind.ARCREEL_NATIVE, adapters, artifact, routing, transient_retry_budget)
+            return await self._attempt(DirectorKind.ARCREEL_NATIVE, adapters, artifact, routing, transient_retry_budget)
         return result
 
-    def _attempt(
+    async def _attempt(
         self,
         kind: DirectorKind,
         adapters: Mapping[DirectorKind, DirectorAdapter],
@@ -292,7 +298,7 @@ class DirectorExecutionService:
         while True:
             attempts += 1
             try:
-                raw = adapter.direct(artifact)
+                raw = await adapter.direct(artifact)
             except DirectorRouteUnavailable as exc:
                 return self._failure(
                     routing,
@@ -362,12 +368,17 @@ class _ScriptDirectorBackend(Protocol):
 
 
 class OpenMontageDirectorAdapter:
-    """Wrap an M3 ``GoldenAOpenMontageAdapter``-shaped backend as a DirectorAdapter."""
+    """Wrap an M3 ``GoldenAOpenMontageAdapter``-shaped backend as a DirectorAdapter.
+
+    The M3 backend itself stays synchronous (no M3 modification, plan Task 13) — this
+    adapter's own ``direct`` is ``async`` only to satisfy the shared ``DirectorAdapter``
+    boundary; the wrapped call does no I/O of its own.
+    """
 
     director_kind: DirectorKind = DirectorKind.OPENMONTAGE
 
     def __init__(self, backend: _ScriptDirectorBackend) -> None:
         self._backend = backend
 
-    def direct(self, artifact: object) -> object:
+    async def direct(self, artifact: object) -> object:
         return self._backend.direct(artifact)

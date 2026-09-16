@@ -43,7 +43,7 @@ class FixtureDirectorAdapter:
         self._shots = shots
         self._mode = mode
 
-    def direct(self, artifact: object) -> object:
+    async def direct(self, artifact: object) -> object:
         if self._mode is DirectorDoubleMode.ROUTE_UNAVAILABLE:
             raise DirectorRouteUnavailable(f"{self.director_kind.value} donor unavailable")
         if self._mode is DirectorDoubleMode.MALFORMED:

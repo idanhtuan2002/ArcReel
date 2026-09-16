@@ -135,7 +135,7 @@ async def run_pipeline(
         director_kind=routing.selected_director, scenes=[case.scene], shots=[case.shot], mode=director_mode
     )
     native = FixtureDirectorAdapter(director_kind=DirectorKind.ARCREEL_NATIVE, scenes=[case.scene], shots=[case.shot])
-    director_result = DirectorExecutionService(clock=lambda: _NOW).execute(
+    director_result = await DirectorExecutionService(clock=lambda: _NOW).execute(
         routing=routing,
         adapters={routing.selected_director: adapter, DirectorKind.ARCREEL_NATIVE: native},
         artifact=case.shot,
