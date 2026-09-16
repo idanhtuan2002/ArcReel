@@ -30,6 +30,14 @@ from lib.db.models.config import ProviderConfig, SystemSetting
 from lib.db.models.credential import ProviderCredential
 from lib.db.models.custom_endpoint import CustomEndpoint
 from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
+from lib.db.models.host_hardening import (
+    AttemptIntegrityIncidentModel,
+    CommandReceiptModel,
+    ExecutionAttemptModel,
+    OperatorResolutionReceiptModel,
+    ProjectEventModel,
+    ProviderObservationModel,
+)
 from lib.db.models.narrative_lifecycle import (
     NarrativeChangeSetModel,
     NarrativeDraftCandidateModel,
@@ -67,6 +75,7 @@ __all__ = [
     "ApiKey",
     "Asset",
     "AssetDerivative",
+    "AttemptIntegrityIncidentModel",
     "BatchTask",
     "BudgetReservationModel",
     "BudgetScopeModel",
@@ -74,9 +83,11 @@ __all__ = [
     "CanonDeltaModel",
     "CanonResolvedProjectionModel",
     "CanonVersionModel",
+    "CommandReceiptModel",
     "CustomEndpoint",
     "CustomProvider",
     "CustomProviderModel",
+    "ExecutionAttemptModel",
     "GenerationBatch",
     "NarrativeChangeSetModel",
     "NarrativeDraftCandidateModel",
@@ -86,8 +97,11 @@ __all__ = [
     "NarrativePlanModel",
     "NarrativePlanVersionModel",
     "NarrativeRevisionModel",
+    "OperatorResolutionReceiptModel",
+    "ProjectEventModel",
     "ProviderConfig",
     "ProviderCredential",
+    "ProviderObservationModel",
     "SystemSetting",
     "Task",
     "User",
