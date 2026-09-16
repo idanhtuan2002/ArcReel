@@ -1,0 +1,135 @@
+{
+  "schema_version": "r2-m6-implementation-handoff-v1",
+  "status": "ACCEPTED",
+  "status_note": "ACCEPTED BY HUMAN OVERRIDE on 2026-09-16 (operator human:anhtuan), not by an independent Codex standards and spec review, which was never requested or run against this HEAD. Mirrors the M5C-2/M5C-3/M5C-4 precedent (R2_M5C_FINAL_VERIFICATION.md) where the operator waived the same requirement each time Codex was unavailable. See docs/r2/evidence/R2_M6_FINAL_VERIFICATION.md Status section for full rationale.",
+  "head": {
+    "sha": "636c86d85c126000dee6ecda34e53460895f6e93",
+    "branch": "feat/r2-m6-dual-profile-adaptation",
+    "worktree": "/home/anhtuan/content-production-os-m6",
+    "parent_base": "8b1959e7ae882716a9d531f459d8289c83968fbb",
+    "parent_base_note": "M5C's own M5C_FINAL_VERIFIED_HEAD, per R2_M6_DOCUMENT_APPROVAL.json's m6_integration_base_intent",
+    "commits_since_base": 21,
+    "clean_tree": true
+  },
+  "reviews": {
+    "standards_review": null,
+    "spec_review": null,
+    "checkpoint_review_lineage": {
+      "M6-A": "no separate R2_M6_A_REVIEW.md; Task 0 prerequisite gate satisfied inline",
+      "M6-B": "deferred to this combined Task 17 pass, per operator instruction",
+      "M6-C": "deferred to this combined Task 17 pass, per operator instruction",
+      "M6-D": "deferred to this combined Task 17 pass, per operator instruction",
+      "M6-E_Task17": "this file; independent Codex review never run, closed by explicit human override on 2026-09-16"
+    }
+  },
+  "migration": {
+    "chain": [
+      "5c7c4a0e0004",
+      "6a7c4a0e0001",
+      "6b7c4a0e0001",
+      "6c7c4a0e0001",
+      "6c7c4a0e0002"
+    ],
+    "current_head": "6c7c4a0e0002",
+    "roundtrip": "alembic upgrade head -> downgrade 6c7c4a0e0001 -> upgrade head against POSTGRES_TEST_URL: clean"
+  },
+  "postgres_identity": {
+    "provisioning": "docker run postgres:18 (container m6-pg18-test), isolated, not the shared pios2-postgres dev container",
+    "host": "127.0.0.1",
+    "port": 54330,
+    "database": "r2_m6_isolated",
+    "user": "m6_test",
+    "reported_version": "PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "clean_ownership_marker": "pg_tables empty before first alembic upgrade"
+  },
+  "gate_results": {
+    "ruff_check": "pass",
+    "ruff_format_check": "pass (1422 files already formatted)",
+    "basedpyright": "0 errors, 0 warnings, 0 notes",
+    "lint_imports": "20 kept, 0 broken",
+    "deptry": "no dependency issues found",
+    "pytest_full": {"passed": 13683, "skipped": 17, "failed": 0, "workers": 4},
+    "audit_tests": "0 violations",
+    "frontend_pnpm_check": "pass (typecheck + lint + knip + vitest: 183 test files / 2145 tests passed)",
+    "website_pnpm_check": "pass (typecheck + lint + format:check)",
+    "git_diff_check": "clean",
+    "git_status_short": "empty",
+    "verify_frozen_registries": "pass",
+    "verify_m6_scope_M6_FINAL": {
+      "m5c_accepted": "pass",
+      "clean_tree": "pass",
+      "base_sha": "pass",
+      "document_hashes": "pass (4 documents match R2_M6_DOCUMENT_APPROVAL.json)",
+      "scope": "pass (101 changed paths, all within the M6-FINAL allowlist)"
+    },
+    "postgres_only_suites": {
+      "selection": "tests/integration/r2/adaptation/ tests/integration/r2/test_m5c_architecture_boundaries_db.py tests/integration/r2/narrative_lifecycle/test_lifecycle_concurrency.py tests/integration/r2/narrative_lifecycle/test_handoff_admission.py",
+      "passed": 107,
+      "failed": 0,
+      "skipped": 0,
+      "note": "genuinely executed against real PostgreSQL 18.6, not structurally reviewed only; surfaced and fixed 3 real bugs (see bugs_found_and_fixed)"
+    }
+  },
+  "skip_accounting": {
+    "total_skips_full_suite": 17,
+    "unique_locations": 12,
+    "all_environment_conditional_by_design": true,
+    "required_skips_unexercised": 0,
+    "breakdown": [
+      {"reason": "concurrency races need real row-level locking (PostgreSQL only)", "count": 7, "postgres_evidence": "all 7 corresponding tests ran and passed against real PostgreSQL in postgres_only_suites above"},
+      {"reason": "isolation level is a PostgreSQL-only precondition (spec section 7.2)", "count": 1, "postgres_evidence": "ran and passed against real PostgreSQL in postgres_only_suites above"},
+      {"reason": "the SQLite test engine runs with foreign keys disabled", "count": 3, "postgres_evidence": "not M6-scoped FK-enforcement assertions; pre-existing M5C/M6 repository-test pattern"},
+      {"reason": "_scproxy only exists on macOS", "count": 1, "postgres_evidence": "unrelated, macOS-only mutmut fork isolation check"},
+      {"reason": "drama script planning has no draft model; both sides consume the raw file", "count": 1, "postgres_evidence": "unrelated, pre-dates M6"}
+    ]
+  },
+  "bugs_found_and_fixed": [
+    {
+      "commit": "82adf15c",
+      "kind": "production",
+      "file": "r2/adaptation/authority.py",
+      "summary": "admit_screenplay_for_direction inserted the adaptation_screenplay_admissions projection row before its own referenced adaptation_decisions row existed, violating fk_adaptation_screenplay_admissions_decision under PostgreSQL's immediate FK enforcement (silently passed under SQLite's disabled FK checks). Fixed by reordering: append_decision_and_advance_head now runs first."
+    },
+    {
+      "commit": "82adf15c",
+      "kind": "test_fixture",
+      "file": "tests/integration/r2/adaptation/test_m6_postgres_concurrency.py",
+      "summary": "_profile_ref fabricated a policy_pack_digest that never matched a real profile pack, causing ProfilePackRegistry.resolve to fail closed. Fixed by computing the real digest from the pinned pack JSON."
+    },
+    {
+      "commit": "82adf15c",
+      "kind": "test_harness",
+      "file": "tests/integration/r2/adaptation/test_m6_postgres_concurrency.py",
+      "summary": "_BarrierBeforeHeadLockRepository barriered every prepare_or_lock_head call including the branch's MAP_APPROVAL lock, deadlocking the harness once real Postgres row-level locking serialized the two racers at their shared SCREENPLAY_ADMISSION head. Fixed by narrowing the barrier to the SCREENPLAY_ADMISSION lock only."
+    }
+  ],
+  "donor_parity_and_golden_evidence": {
+    "donor_parity": {"passed": 142, "skipped": 0, "failed": 0, "note": "real node --import tsx subprocess runs against pinned TypeScript donor source, not mocked"},
+    "m4_golden_a_regression": {"passed": 292, "skipped": 0, "failed": 0, "selection": "tests/integration/r2/m4/ tests/unit/r2/production_intelligence/"},
+    "m6_golden_b_dual_profile_acceptance": {"passed": 10, "skipped": 0, "failed": 0, "selection": "tests/integration/r2/test_m6_dual_profile_acceptance.py", "note": "2 baseline shared-Canon slice tests (Task 15) + 8 adversarial mutation tests (Task 16), each asserting failure at the owning boundary, no partial write, sibling branch/profile slice unaffected"},
+    "v1_v2_fingerprint_invalidation_proof": "tests/unit/r2/contracts/test_fingerprints.py::test_upgrading_a_shot_to_v2_changes_the_content_fingerprint"
+  },
+  "graph_evidence": {
+    "project": "home-anhtuan-content-production-os-m6",
+    "status": "ready",
+    "indexed_head_sha": "636c86d85c126000dee6ecda34e53460895f6e93",
+    "nodes": 26743,
+    "edges": 151706,
+    "skipped_files": 0,
+    "parse_partial_files": 3,
+    "parse_partial_note": "3 frontend CSS files, unrelated to the M6 backend surface"
+  },
+  "document_approval": {
+    "manifest": "docs/r2/evidence/R2_M6_DOCUMENT_APPROVAL.json",
+    "document_hashes_match": true,
+    "design_path": "docs/superpowers/specs/2026-09-12-r2-m6-dual-profile-adaptation-design.md",
+    "plan_path": "docs/superpowers/plans/2026-09-12-r2-m6-dual-profile-adaptation.md",
+    "adr_path": "docs/adr/0077-dual-profile-adaptation-lineage-and-policy-evidence.md",
+    "research_path": "docs/research/2026-09-12-r2-m6-dual-profile-adaptation-research.md"
+  },
+  "next_steps": [
+    "If Codex capacity returns, running the standards and spec review this file describes on head.sha above is still valuable and may be done retroactively.",
+    "M7 may treat this head (636c86d8) as its accepted upstream base per the operator's override recorded above and in R2_M6_FINAL_VERIFICATION.md.",
+    "No push, merge, migration against a non-isolated database, provider call, worker start, or deploy follows from ACCEPTED status without separate explicit Human approval."
+  ]
+}
