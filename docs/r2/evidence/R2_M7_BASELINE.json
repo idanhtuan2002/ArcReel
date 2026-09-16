@@ -1,0 +1,28 @@
+{
+  "schema_version": "r2-m7-baseline-v1",
+  "m6_accepted_head": "814761e3a40a0f2b7c694aaf56a51302ca24eaa8",
+  "m6_accepted_head_note": "feat/r2-m6-dual-profile-adaptation @ 814761e3, the 'docs(r2): accept M6 final handoff by explicit human override' commit whose docs/r2/evidence/R2_M6_IMPLEMENTATION_HANDOFF.json records status ACCEPTED. Its parent 636c86d8 is M6_FINAL_HANDOFF_HEAD and carries Alembic head 6c7c4a0e0002.",
+  "alembic_required_head": "6c7c4a0e0002",
+  "alembic_graph_digest": "sha256:caa8ec4d51af4c39eb1e6a01de0051c393244dc8e3c3e45df02459c43a10c8ab",
+  "documents": {
+    "docs/research/2026-09-12-r2-m7-host-production-hardening-research.md": "169949d4ade528fd750f14326b9dfe7af3fd827dddc5be09b32fb64b616f1c96",
+    "docs/adr/0078-durable-execution-evidence-and-recoverable-production-boundaries.md": "9fa6f3540f759ab641a03e43866c0587420cc3f84dafade5eb348c8abaee2617",
+    "docs/superpowers/specs/2026-09-12-r2-m7-host-production-hardening-design.md": "c2199446edb3412e4af2f150c87e59efa12303d18ac68488807cd9e186831cff",
+    "docs/superpowers/plans/2026-09-12-r2-m7-host-production-hardening.md": "b725ec0f83f02c95c3ab61ccaad292e440278611521ab703c185f8ca920cee78",
+    "docs/superpowers/plans/2026-09-12-r2-m7a-execution-identity-idempotency.md": "ef27ce04f75fac9ba5f4fe2de8889c48a79f4fc4c74260401a37348b37468f29",
+    "docs/superpowers/plans/2026-09-12-r2-m7b-atomic-promotion.md": "4642a8b8fbbc76576b56a64d940b4dfdbe2671ee86baf207661ded05ab7bc359",
+    "docs/superpowers/plans/2026-09-12-r2-m7c-restart-event-recovery.md": "933d2d0ec9e08507a9df8c0f33557fde28c7251b8285fff2c58443df650189bf",
+    "docs/superpowers/plans/2026-09-12-r2-m7d-backup-observability.md": "abe19eb3ed0ff68040f40c759457d10f373d29974df1f8664df1cb4b529f9d02",
+    "docs/superpowers/plans/2026-09-12-r2-m7e-production-candidate.md": "e7fdd34664373b753d3263ef6fb055a3979132d6b806d6397b17fe5f4be14c6f"
+  },
+  "legacy_seams": {
+    "lib/db/repositories/task_repo.py": "76ad676e225a54f4e522f99b2cdac9008e0a3e06efd1eb5e3c9a122d754f9b98",
+    "lib/video_backends/base.py": "10d55642b63fe5c92c5a58fb316230d6aac446310a092145b6106fdcf9824d25",
+    "lib/reference_video/execution_checkpoint.py": "f69ad8813a2a3fb302187266bceb8a8045f725df17b69c3cd91a6b90ddf7ac69",
+    "lib/generation_queue.py": "11b91cbda5328280fcbdc0ff6ea7a11082de44ebbdbbe8df48e468adc40512c7",
+    "r2/production/approval_service.py": "2866c7eb2232e975a85a149b3da3bdae5d0dbe4225cc847a9f3af59c0789555a",
+    "r2/production/artifact_bridge.py": "5079c3805e068dea75a748e74bfc0cd9a851257927cd8a7de8dad93e6e7ceb32",
+    "server/sse_channel.py": "36f0731af83f98a00e970fc7fc2c8c500ac9547e141b872b1ef86d0af465ef0b"
+  },
+  "legacy_seams_note": "Positive source findings cited by spec section 2 (TaskRepository.persist_provider_job_id, ProviderJobIdPersistenceMixin._persist_provider_job_id, VideoSubmissionCheckpoint/classify_video_resume_state, GenerationQueue's active-task dedup and worker lease, ProductionApprovalService, ArcReelVersionRestorePromoter, SseChannel.broadcast). A hash change here stops with M7_BASE_SEAM_CHANGED -- the spec's positive findings no longer describe the accepted base and require a design amendment, not a silent reinterpretation."
+}
