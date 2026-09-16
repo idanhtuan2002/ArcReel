@@ -666,6 +666,13 @@ class AdaptationAuthorityService:
             if command.action == AdaptationDecisionAction.ADMIT:
                 admitted = command.admitted_screenplay
                 await repo.insert_screenplay(admitted, user_id=command.user_id, project_name=command.project_name)
+
+            await repo.append_decision_and_advance_head(
+                decision, expected_generation=head.generation if head is not None else 0
+            )
+
+            if command.action == AdaptationDecisionAction.ADMIT:
+                admitted = command.admitted_screenplay
                 await repo.insert_screenplay_admission(
                     screenplay_ref=ArtifactVersionRef(
                         artifact_id=admitted.screenplay_id, version=admitted.version, content_hash=admitted.content_hash
@@ -678,9 +685,6 @@ class AdaptationAuthorityService:
                     project_name=command.project_name,
                 )
 
-            await repo.append_decision_and_advance_head(
-                decision, expected_generation=head.generation if head is not None else 0
-            )
             await uow.commit()
 
             return AdaptationDecisionReceipt(

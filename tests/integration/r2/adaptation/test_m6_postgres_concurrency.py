@@ -14,6 +14,7 @@ SQLite has no real row-level locking, so there is nothing to race against.
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -25,6 +26,8 @@ from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.evaluation import ProfileEvaluationService, report_ref_of
 from r2.adaptation.evidence import AdaptationEvidenceService
 from r2.adaptation.hashing import compute_adaptation_hash
+from r2.adaptation.profiles import _PACKS_DIR, _compute_policy_pack_digest
+from r2.adaptation.shuangwen_profile import ShuangwenSourceScope
 from r2.contracts.adaptation import (
     AdaptationAuthorityFamily,
     AdaptationBranchV2,
@@ -36,6 +39,7 @@ from r2.contracts.adaptation import (
     AdaptationProfileId,
     AdaptationProfileRef,
     ArtifactVersionRef,
+    FindingDisposition,
     MapApprovalCommand,
     ScreenplayAdmissionCommand,
     ScreenplayArtifactV2,
@@ -60,9 +64,16 @@ async def _skip_unless_postgres(session_factory: Factory) -> None:
             pytest.skip("concurrency races need real row-level locking (PostgreSQL only)")
 
 
-def _profile_ref(profile_id: AdaptationProfileId, *, digest_seed: str) -> AdaptationProfileRef:
+_PACK_FILENAMES = {
+    AdaptationProfileId.WESTERN_GENERIC: "western_generic_v1.json",
+    AdaptationProfileId.CN_SHORT_DRAMA_SHUANGWEN: "cn_short_drama_shuangwen_v1.json",
+}
+
+
+def _profile_ref(profile_id: AdaptationProfileId) -> AdaptationProfileRef:
+    raw = json.loads((_PACKS_DIR / _PACK_FILENAMES[profile_id]).read_bytes())
     return AdaptationProfileRef(
-        profile_id=profile_id, profile_version="v1", policy_pack_digest="sha256:" + digest_seed * 64
+        profile_id=profile_id, profile_version="v1", policy_pack_digest=_compute_policy_pack_digest(raw)
     )
 
 
@@ -159,9 +170,14 @@ async def _seed_admissible_proposal(
     map_id: str,
     screenplay_id: str,
     profile_ref: AdaptationProfileRef,
+    source_scope: ShuangwenSourceScope | None = None,
 ):
-    """Branch -> approved map -> screenplay proposal -> clean evaluation report,
-    entirely on one (non-racing) connection, ahead of the barrier-guarded race."""
+    """Branch -> approved map -> screenplay proposal -> admissible (no unwaived
+    blocking finding) evaluation report, entirely on one (non-racing) connection,
+    ahead of the barrier-guarded race. ``source_scope`` is required for
+    ``CN_SHORT_DRAMA_SHUANGWEN`` (mirrors ``evaluation.evaluate``'s own per-profile
+    signature) and always yields exactly one ``NOT_APPLICABLE`` finding for a
+    plain, un-tagged screenplay -- admissible, not zero-finding."""
     uow_factory = adaptation_uow_factory(session_factory)
     evidence = AdaptationEvidenceService(uow_factory)
     authority = AdaptationAuthorityService(uow_factory, FakeAuthority())
@@ -204,9 +220,16 @@ async def _seed_admissible_proposal(
         project_name=PROJECT,
     )
     report = await evaluation.evaluate(
-        artifact_ref=_screenplay_ref(proposal), profile_ref=profile_ref, user_id=USER, project_name=PROJECT
+        artifact_ref=_screenplay_ref(proposal),
+        profile_ref=profile_ref,
+        user_id=USER,
+        project_name=PROJECT,
+        source_scope=source_scope,
     )
-    assert report.findings == []
+    assert not any(
+        finding.disposition in (FindingDisposition.INTEGRITY_BLOCK, FindingDisposition.PROFILE_BLOCK)
+        for finding in report.findings
+    )
     return branch, map_receipt, proposal, report
 
 
@@ -236,10 +259,13 @@ def _admit_command(
 
 
 class _BarrierBeforeHeadLockRepository(AdaptationRepository):
-    """Barriers every ``prepare_or_lock_head`` call regardless of family -- the exact
-    point ``admit_screenplay_for_direction`` visits for its own admission head *and*
-    (inside ``_verify_admission_applicability``) the branch's MAP_APPROVAL head, so a
-    single admission command's real lock-order is preserved under contention."""
+    """Barriers only the ``SCREENPLAY_ADMISSION`` ``prepare_or_lock_head`` call --
+    each admission command's *own* first lock point -- mirroring
+    ``test_screenplay_admission.py``'s own same-shaped race harness. Barriering the
+    second, ``MAP_APPROVAL`` lock too would deadlock the harness itself: once real
+    Postgres row-level locking serializes the two racers at the first (shared) head,
+    the loser never reaches the second barrier point until the winner's transaction
+    completes, but the winner cannot complete without a second party at that barrier."""
 
     def __init__(self, session: AsyncSession, barrier: asyncio.Barrier) -> None:
         super().__init__(session)
@@ -248,7 +274,8 @@ class _BarrierBeforeHeadLockRepository(AdaptationRepository):
     async def prepare_or_lock_head(
         self, *, user_id: str, project_name: str, family: AdaptationAuthorityFamily, head_key: str
     ):
-        await self._barrier.wait()
+        if family == AdaptationAuthorityFamily.SCREENPLAY_ADMISSION:
+            await self._barrier.wait()
         return await super().prepare_or_lock_head(
             user_id=user_id, project_name=project_name, family=family, head_key=head_key
         )
@@ -280,8 +307,8 @@ async def test_two_different_profile_branches_admit_concurrently_without_content
     let both proceed -- one never blocks on the other's lock."""
     await _skip_unless_postgres(concurrent_session_factory)
 
-    western_profile = _profile_ref(AdaptationProfileId.WESTERN_GENERIC, digest_seed="c3")
-    shuangwen_profile = _profile_ref(AdaptationProfileId.CN_SHORT_DRAMA_SHUANGWEN, digest_seed="d4")
+    western_profile = _profile_ref(AdaptationProfileId.WESTERN_GENERIC)
+    shuangwen_profile = _profile_ref(AdaptationProfileId.CN_SHORT_DRAMA_SHUANGWEN)
     _, western_map_receipt, western_proposal, western_report = await _seed_admissible_proposal(
         concurrent_session_factory,
         branch_id="branch-race-w",
@@ -295,6 +322,7 @@ async def test_two_different_profile_branches_admit_concurrently_without_content
         map_id="map-race-s",
         screenplay_id="sp-race-s",
         profile_ref=shuangwen_profile,
+        source_scope=ShuangwenSourceScope(chapter_start=9, chapter_end=9, source_refs=["src-1"]),
     )
 
     barrier = asyncio.Barrier(2)
@@ -340,7 +368,7 @@ async def test_two_concurrent_admissions_of_the_same_screenplay_yield_one_winner
     exactly one winner with no deadlock and no partial write."""
     await _skip_unless_postgres(concurrent_session_factory)
 
-    profile_ref = _profile_ref(AdaptationProfileId.WESTERN_GENERIC, digest_seed="e5")
+    profile_ref = _profile_ref(AdaptationProfileId.WESTERN_GENERIC)
     _, map_receipt, proposal, report = await _seed_admissible_proposal(
         concurrent_session_factory,
         branch_id="branch-race-same",
