@@ -13,9 +13,14 @@ from r2.contracts import (
     CanonContent,
     NarrativePlanApproval,
     NarrativePlanContent,
+    NarrativePlanContentV2,
     NarrativePlanRevisionProposal,
+    SceneContractV2,
+    SceneTemporalWindow,
+    SceneThreadConstraint,
 )
 from r2.narrative.canon_state import ResolvedCanonView
+from r2.narrative.errors import NarrativePlanSchemaVersionError, NarrativeThreadLifecycleError
 from r2.narrative.hashing import compute_canon_content_hash
 from r2.narrative_plan.errors import (
     NarrativePlanApprovalError,
@@ -23,7 +28,11 @@ from r2.narrative_plan.errors import (
     NarrativePlanValidationError,
     NarrativePlanVersionConflict,
 )
-from r2.narrative_plan.hashing import compute_plan_content_hash
+from r2.narrative_plan.hashing import (
+    compute_plan_content_hash,
+    compute_plan_content_hash_v2,
+    compute_scene_semantic_hash_v2,
+)
 from r2.narrative_plan.service import NarrativePlanService
 
 NOW = datetime(2026, 3, 1, 12, tzinfo=UTC)
@@ -225,3 +234,120 @@ async def test_commit_validates_only_the_exact_canon_basis(session_factory: Fact
             proposal=genesis, approval=_approval(genesis), project_name=PROJECT, user_id=USER, now=NOW
         )
     assert reader.requested == ["canon-missing"]
+
+
+# --- v2 NarrativePlan commit path (Task 5 service wiring) -----------------------
+
+_WIN = SceneTemporalWindow(
+    effective_from=datetime(2026, 3, 1, 10, tzinfo=UTC), effective_until=datetime(2026, 3, 1, 12, tzinfo=UTC)
+)
+
+
+def _thread(
+    constraint_id: str, thread_ref: str, state: str = "OPEN", payoff: str | None = None
+) -> SceneThreadConstraint:
+    return SceneThreadConstraint(
+        constraint_id=constraint_id, thread_ref=thread_ref, required_state=state, payoff_ref=payoff
+    )
+
+
+def _v2_scene(scene_id: str, sequence_index: int, **overrides: object) -> SceneContractV2:
+    draft = SceneContractV2(
+        scene_contract_id=scene_id,
+        version=1,
+        semantic_hash="sh:placeholder",
+        semantic_hash_version="r2-scene-contract-content-v2",
+        sequence_index=sequence_index,
+        purpose="p",
+        pov=None,
+        location_ref=None,
+        temporal_window=_WIN,
+        **overrides,
+    )
+    return draft.model_copy(update={"semantic_hash": compute_scene_semantic_hash_v2(draft)})
+
+
+def _content_v2(*, scenes: list[SceneContractV2], parent_version: int | None = None) -> NarrativePlanContentV2:
+    return NarrativePlanContentV2(
+        parent_version=parent_version,
+        canon_basis=CanonBasis(branch_id="main", canon_version_id="canon-v1"),
+        story_frame="frame",
+        scene_contracts=scenes,
+    )
+
+
+def _proposal_v2(
+    content: NarrativePlanContentV2, *, expected_version: int | None = None, revision: str = "rev-1"
+) -> NarrativePlanRevisionProposal:
+    return NarrativePlanRevisionProposal(
+        plan_revision_id=revision,
+        plan_id="plan-1",
+        expected_version=expected_version,
+        proposed_content=content,
+        content_hash=compute_plan_content_hash_v2(content),
+        created_at=NOW,
+        created_by="lead",
+    )
+
+
+async def test_v2_plan_commits_and_runs_the_thread_lifecycle_pass(session_factory: Factory) -> None:
+    service, _ = _service(session_factory)
+    content = _content_v2(
+        scenes=[
+            _v2_scene("sc-open", 0, active_threads=["t1"], exit_state_targets=[_thread("e0", "t1")]),
+            _v2_scene(
+                "sc-resolve",
+                1,
+                active_threads=["t1"],
+                promise_payoff_refs=["p1"],
+                exit_state_targets=[_thread("r1", "t1", "RESOLVED", "p1")],
+            ),
+        ]
+    )
+    proposal = _proposal_v2(content)
+    result = await service.commit_revision(
+        proposal=proposal, approval=_approval(proposal), project_name=PROJECT, user_id=USER, now=NOW
+    )
+    assert result.plan.version == 1
+    assert result.plan.content_hash_version == "r2-narrative-plan-content-v2"
+    stored = await service.get_version(plan_id="plan-1", version=1, project_name=PROJECT, user_id=USER)
+    assert stored.content.schema_version == "r2-narrative-plan-v2"
+
+
+async def test_v2_plan_with_a_broken_thread_lineage_is_rejected_with_zero_writes(session_factory: Factory) -> None:
+    service, _ = _service(session_factory)
+    content = _content_v2(
+        scenes=[
+            _v2_scene(
+                "sc-bad",
+                0,
+                promise_payoff_refs=["p1"],
+                exit_state_targets=[_thread("r", "ghost", "RESOLVED", "p1")],
+            )
+        ]
+    )
+    proposal = _proposal_v2(content)
+    with pytest.raises(NarrativeThreadLifecycleError) as exc:
+        await service.commit_revision(
+            proposal=proposal, approval=_approval(proposal), project_name=PROJECT, user_id=USER, now=NOW
+        )
+    assert "SCENE_THREAD_LIFECYCLE_RESOLUTION_WITHOUT_THREAD" in str(exc.value)
+    with pytest.raises(NarrativePlanNotFoundError):
+        await service.get_version(plan_id="plan-1", version=1, project_name=PROJECT, user_id=USER)
+
+
+async def test_a_v2_plan_lineage_cannot_downgrade_to_v1(session_factory: Factory) -> None:
+    service, _ = _service(session_factory)
+    v2_genesis = _proposal_v2(_content_v2(scenes=[_v2_scene("sc-1", 0, omniscient_authoring_allowed_by_scene=True)]))
+    await service.commit_revision(
+        proposal=v2_genesis, approval=_approval(v2_genesis), project_name=PROJECT, user_id=USER, now=NOW
+    )
+    v1_append = _proposal(expected_version=1, revision="rev-2", frame="frame-2")
+    with pytest.raises(NarrativePlanSchemaVersionError):
+        await service.commit_revision(
+            proposal=v1_append,
+            approval=_approval(v1_append, approval_ref="ap-2"),
+            project_name=PROJECT,
+            user_id=USER,
+            now=NOW,
+        )

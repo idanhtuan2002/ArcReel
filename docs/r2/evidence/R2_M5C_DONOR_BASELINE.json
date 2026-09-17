@@ -1,0 +1,63 @@
+{
+  "schema_version": "r2-m5c-donor-baseline-v1",
+  "generated_for": "R2-M5C-1A",
+  "gate": "R2-DEC-031",
+  "note": "M5C v1 selects exactly two Python ports (spec 2.4). Each vendored source is the unmodified pinned donor file; the Node parity harness verifies source_sha256 before executing it and runs the same canonical fixtures through the Python port. The harness is test-only: never shipped, imported, or started by the ArcReel runtime.",
+  "ports": {
+    "huohuo_change_record": {
+      "repo": "appolloqin/huohuo-drama",
+      "revision": "f104b853b3563e124d9cde25f9331d323fb483b9",
+      "source_path": "workbench-server/src/common/novel/novel-change-record.ts",
+      "source_sha256": "dd3a310e1d83f80fca132a6ea64380c3d953c780054d0ea93e9f865c09fb5088",
+      "url": "https://github.com/appolloqin/huohuo-drama/blob/f104b853b3563e124d9cde25f9331d323fb483b9/workbench-server/src/common/novel/novel-change-record.ts",
+      "vendored_path": "huohuo/workbench-server/src/common/novel/novel-change-record.ts",
+      "python_port": "r2/narrative_lifecycle/changeset_parser.py",
+      "node_runner": "tests/integration/donor_parity/huohuo_change_record_runner.mjs",
+      "fixtures": "tests/integration/donor_parity/fixtures/huohuo_change_record/cases.jsonl",
+      "import_resolution_dependency": {
+        "source_path": "workbench-server/src/services/novel/novel-memory/novel-memory-parser.ts",
+        "vendored_path": "huohuo/workbench-server/src/services/novel/novel-memory/novel-memory-parser.ts",
+        "vendored_sha256": "245ac53336abc14bb65e0f861675d57a7223b28a10ade72cbfc0d9fd7cd4e88c",
+        "fetched_from": "https://raw.githubusercontent.com/appolloqin/huohuo-drama/f104b853b3563e124d9cde25f9331d323fb483b9/workbench-server/src/services/novel/novel-memory/novel-memory-parser.ts",
+        "note": "Vendored only so the unmodified change-record module import()s in its source-tree context. stripNovelChapterEndMeta is NOT a selected port and is not parity-tested."
+      },
+      "selected_exports": [
+        "canonicalizeChangeRecordHeaders",
+        "splitStructuredBlockAndTrailingProse",
+        "isStructuredChangeRecordBlock",
+        "peelOrphanedStructuredFromProse",
+        "normalizeChangeRecordArtifacts",
+        "splitProseAndChangeRecord",
+        "stripLengthAdjustInstructionEcho"
+      ],
+      "excluded_exports": [
+        "stripNovelChangeRecord"
+      ],
+      "excluded_reason": "Calls stripNovelChapterEndMeta from the separate, unselected novel-memory-parser module; M5C does not port chapter-end-meta stripping.",
+      "intentional_deviations": [],
+      "parity_coverage_notes": "Regex-engine parity with ECMAScript (no `u` flag): (1) every `\\s` uses the explicit JS whitespace class `_W` and every trim() uses `_js_trim` over the exact WhiteSpace+LineTerminator set (INCLUDES U+FEFF; EXCLUDES U+001C-U+001F and U+0085); (2) `\\S{4,}` on the 因果 value is measured in UTF-16 code units via `_utf16_length` (surrogatepass), not code points; (3) every `/m` `^` is emulated with `_BOL` so it anchors after LF, CR, U+2028 and U+2029 like ECMAScript, not LF-only like Python `re.MULTILINE`; (4) the stripLengthAdjustInstructionEcho `< 360` check is a UTF-16 code-unit offset. Adversarial corpus vectors: ws_* (BOM/U+001C/NBSP), u16_* (astral 因果), lone_surrogate_*, header_after_* (CR/LS/PS). No residual divergence for the selected exports."
+    },
+    "novel_studio_hard_rules": {
+      "repo": "YfengJ/novel-studio-ai",
+      "revision": "9b690ae2e2f6921f9bd2782b42cef53c1662ad3b",
+      "source_path": "src/lib/continuity/hardRules.ts",
+      "source_sha256": "7756c4093b52e11e3f591c58af1719887428fd5e437f4ade0828533ac3663954",
+      "url": "https://github.com/YfengJ/novel-studio-ai/blob/9b690ae2e2f6921f9bd2782b42cef53c1662ad3b/src/lib/continuity/hardRules.ts",
+      "vendored_path": "novel_studio/src/lib/continuity/hardRules.ts",
+      "python_port": "r2/narrative_lifecycle/continuity_rules.py",
+      "node_runner": "tests/integration/donor_parity/novel_hard_rules_runner.mjs",
+      "fixtures": "tests/integration/donor_parity/fixtures/novel_hard_rules/cases.jsonl",
+      "import_resolution_dependency": {
+        "note": "hardRules.ts has only `import type` statements (ContextPack, ContinuityReport); after type-stripping it has no runtime imports and needs no @/ path resolution."
+      },
+      "selected_exports": [
+        "runHardRuleChecks",
+        "mergeContinuityReports"
+      ],
+      "excluded_exports": [],
+      "excluded_reason": "storyAllowsResurrection / outlineRequiresResurrection are module-private helpers exercised through runHardRuleChecks.",
+      "intentional_deviations": [],
+      "parity_coverage_notes": "The resurrection regexes use re.IGNORECASE | re.ASCII so case folding is ASCII-only, matching ECMAScript /i without the u flag (does NOT fold U+0130 / U+0131 / U+017F to i / s). The corpus carries casefold_* adversarial vectors. No residual divergence for the selected exports."
+    }
+  }
+}

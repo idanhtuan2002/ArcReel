@@ -15,11 +15,29 @@ from .errors import (
     NarrativePlanValidationError,
     NarrativePlanVersionConflict,
 )
-from .hashing import compute_plan_content_hash, compute_scene_semantic_hash
+from .hashing import (
+    compute_plan_content_hash,
+    compute_plan_content_hash_dispatch,
+    compute_plan_content_hash_v2,
+    compute_scene_semantic_hash,
+    compute_scene_semantic_hash_dispatch,
+    compute_scene_semantic_hash_v2,
+)
 from .integrity import NarrativePlanIntegrityChecker
 from .ports import CanonVersionReader, NarrativePlanReadPort
+from .schema_upgrade import (
+    minimum_scene_selector,
+    require_plan_schema_transition,
+    require_scene_schema_transition,
+)
 from .service import NarrativePlanService
-from .validation import SceneVersionCheck, next_scene_version, validate_plan_hierarchy, validate_scene_version
+from .validation import (
+    SceneVersionCheck,
+    next_scene_version,
+    validate_plan_hierarchy,
+    validate_plan_thread_lifecycle,
+    validate_scene_version,
+)
 
 __all__ = [
     "CanonVersionReader",
@@ -34,8 +52,16 @@ __all__ = [
     "NarrativePlanVersionConflict",
     "SceneVersionCheck",
     "compute_plan_content_hash",
+    "compute_plan_content_hash_dispatch",
+    "compute_plan_content_hash_v2",
     "compute_scene_semantic_hash",
+    "compute_scene_semantic_hash_dispatch",
+    "compute_scene_semantic_hash_v2",
+    "minimum_scene_selector",
     "next_scene_version",
+    "require_plan_schema_transition",
+    "require_scene_schema_transition",
     "validate_plan_hierarchy",
+    "validate_plan_thread_lifecycle",
     "validate_scene_version",
 ]

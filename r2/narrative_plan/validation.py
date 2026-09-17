@@ -6,7 +6,7 @@ against immutable plan history; approved content is never silently renumbered.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
 from pydantic import ConfigDict
 
@@ -16,7 +16,15 @@ from r2.contracts import (
     NarrativeValidationSeverity,
 )
 from r2.contracts.common import R2ContractModel
-from r2.contracts.narrative_plan import NarrativePlanContent, NarrativePlanNode, SceneContract
+from r2.contracts.narrative_plan import (
+    NarrativePlanContent,
+    NarrativePlanContentV2,
+    NarrativePlanNode,
+    SceneContract,
+    SceneContractV2,
+    SceneContractValue,
+    SceneThreadConstraint,
+)
 
 from .errors import NarrativePlanIdentityConflictError
 
@@ -40,8 +48,15 @@ class SceneVersionCheck(R2ContractModel):
     version: int
 
 
-def validate_scene_version(*, previous: SceneContract, proposed: SceneContract) -> SceneVersionCheck:
-    """Prove ``proposed`` legally succeeds ``previous`` for the same ``scene_contract_id``."""
+def validate_scene_version(
+    *, previous: SceneContract | SceneContractV2, proposed: SceneContract | SceneContractV2
+) -> SceneVersionCheck:
+    """Prove ``proposed`` legally succeeds ``previous`` for the same ``scene_contract_id``.
+
+    A v1 -> v2 upgrade of the same scene changes ``semantic_hash`` (a new byte domain), so
+    it is a normal ``version + 1`` succession; the v1/v2 selector ratchet is enforced
+    separately by ``require_scene_schema_transition``.
+    """
     if proposed.scene_contract_id != previous.scene_contract_id:
         raise NarrativePlanIdentityConflictError(
             f"scene {proposed.scene_contract_id!r} is not a revision of {previous.scene_contract_id!r}"
@@ -81,7 +96,7 @@ def _finding(rule_id: str, refs: tuple[str, ...], message: str) -> NarrativeVali
     )
 
 
-def validate_plan_hierarchy(content: NarrativePlanContent) -> NarrativeValidationReport:
+def validate_plan_hierarchy(content: NarrativePlanContent | NarrativePlanContentV2) -> NarrativeValidationReport:
     nodes: list[NarrativePlanNode] = [
         *content.volume_plans,
         *content.episode_plans,
@@ -184,6 +199,133 @@ def validate_plan_hierarchy(content: NarrativePlanContent) -> NarrativeValidatio
     return NarrativeValidationReport(findings=tuple(findings))
 
 
+class _ThreadState:
+    __slots__ = ("opened", "resolved", "resolved_by_payoff")
+
+    def __init__(self) -> None:
+        self.opened = True
+        self.resolved = False
+        self.resolved_by_payoff: str | None = None
+
+
+def _thread_constraints(items: Iterable[object]) -> list[SceneThreadConstraint]:
+    return [item for item in items if isinstance(item, SceneThreadConstraint)]
+
+
+def validate_plan_thread_lifecycle(plan_content: NarrativePlanContentV2) -> NarrativeValidationReport:
+    """Pure plan-wide presentation-order thread lifecycle pass.
+
+    Lives beside ``validate_plan_hierarchy`` and is never folded into per-scene
+    ``validate_scene``. Scenes are ordered by their already-unique ``sequence_index``
+    (presentation order, not story time). It proves the plan is internally consistent;
+    it does not prove that accepted prose delivered a payoff.
+    """
+    findings: list[NarrativeValidationFinding] = []
+    threads: dict[str, _ThreadState] = {}
+    scenes: list[SceneContractValue] = sorted(plan_content.scene_contracts, key=lambda scene: scene.sequence_index)
+
+    for scene in scenes:
+        sid = scene.scene_contract_id
+        active = set(scene.active_threads)
+        payoffs = set(scene.promise_payoff_refs)
+
+        # Rule 1 / Rule 5: active_threads establishes a thread open at first appearance;
+        # a resolved thread that reappears is a closed re-open.
+        for thread_ref in sorted(active):
+            state = threads.get(thread_ref)
+            if state is None:
+                threads[thread_ref] = _ThreadState()
+            elif state.resolved:
+                findings.append(
+                    _finding(
+                        "SCENE_THREAD_LIFECYCLE_REOPENED_RESOLVED",
+                        (sid, thread_ref),
+                        f"scene {sid} re-opens already-resolved thread {thread_ref}",
+                    )
+                )
+
+        # Rule 2: entry expectations.
+        for constraint in _thread_constraints(scene.entry_state_constraints):
+            state = threads.get(constraint.thread_ref)
+            if constraint.required_state == "OPEN":
+                if state is None or state.resolved or constraint.thread_ref not in active:
+                    findings.append(
+                        _finding(
+                            "SCENE_THREAD_LIFECYCLE_ENTRY_OPEN_UNMET",
+                            (sid, constraint.constraint_id, constraint.thread_ref),
+                            f"scene {sid} entry expects thread {constraint.thread_ref} open and in active_threads",
+                        )
+                    )
+            elif state is None or not state.resolved or constraint.thread_ref in active:
+                findings.append(
+                    _finding(
+                        "SCENE_THREAD_LIFECYCLE_ENTRY_RESOLVED_UNMET",
+                        (sid, constraint.constraint_id, constraint.thread_ref),
+                        f"scene {sid} entry expects thread {constraint.thread_ref} already resolved and absent "
+                        "from active_threads",
+                    )
+                )
+            elif constraint.payoff_ref != state.resolved_by_payoff:
+                findings.append(
+                    _finding(
+                        "SCENE_THREAD_LIFECYCLE_ENTRY_RESOLVED_PAYOFF_MISMATCH",
+                        (sid, constraint.constraint_id, constraint.thread_ref),
+                        f"scene {sid} entry payoff_ref {constraint.payoff_ref!r} does not match the payoff that "
+                        f"resolved thread {constraint.thread_ref}",
+                    )
+                )
+
+        # Rule 3 / Rule 4 / Rule 5: exit targets, applying resolutions after their checks.
+        exit_constraints = _thread_constraints(scene.exit_state_targets)
+        resolves_in_scene = {c.thread_ref for c in exit_constraints if c.required_state == "RESOLVED"}
+        for constraint in exit_constraints:
+            state = threads.get(constraint.thread_ref)
+            if constraint.required_state == "OPEN":
+                if state is None or state.resolved or constraint.thread_ref in resolves_in_scene:
+                    findings.append(
+                        _finding(
+                            "SCENE_THREAD_LIFECYCLE_EXIT_OPEN_UNMET",
+                            (sid, constraint.constraint_id, constraint.thread_ref),
+                            f"scene {sid} exit expects thread {constraint.thread_ref} still open with no "
+                            "resolution in this scene",
+                        )
+                    )
+                continue
+            if state is None:
+                findings.append(
+                    _finding(
+                        "SCENE_THREAD_LIFECYCLE_RESOLUTION_WITHOUT_THREAD",
+                        (sid, constraint.constraint_id, constraint.thread_ref),
+                        f"scene {sid} resolves thread {constraint.thread_ref} which was never opened",
+                    )
+                )
+                continue
+            if state.resolved:
+                findings.append(
+                    _finding(
+                        "SCENE_THREAD_LIFECYCLE_DOUBLE_RESOLUTION",
+                        (sid, constraint.constraint_id, constraint.thread_ref),
+                        f"scene {sid} resolves thread {constraint.thread_ref} a second time",
+                    )
+                )
+                continue
+            if constraint.payoff_ref not in payoffs:
+                findings.append(
+                    _finding(
+                        "SCENE_THREAD_LIFECYCLE_ORPHAN_PAYOFF",
+                        (sid, constraint.constraint_id, constraint.thread_ref),
+                        f"scene {sid} exit payoff_ref {constraint.payoff_ref!r} is not in this scene's "
+                        "promise_payoff_refs",
+                    )
+                )
+                continue
+            state.resolved = True
+            state.resolved_by_payoff = constraint.payoff_ref
+
+    findings.sort(key=lambda finding: (finding.rule_id, finding.affected_refs))
+    return NarrativeValidationReport(findings=tuple(findings))
+
+
 def _has_cycle(by_id: dict[str, NarrativePlanNode]) -> bool:
     state: dict[str, int] = {}
 
@@ -208,5 +350,6 @@ __all__ = [
     "SceneVersionCheck",
     "next_scene_version",
     "validate_plan_hierarchy",
+    "validate_plan_thread_lifecycle",
     "validate_scene_version",
 ]

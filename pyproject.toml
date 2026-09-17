@@ -298,6 +298,90 @@ forbidden_modules = [
     "r2.narrative_plan.ports",
 ]
 
+# M5C-1A/1B：narrative_lifecycle 只做纯变换、内容寻址与 append-only 证据；依赖结构化
+# 端口，绝不依赖任何具体持久化适配器、Canon 授权写口、Narrative head 写入者或 Host 运行时。
+[[tool.importlinter.contracts]]
+name = "R2 narrative lifecycle pure ports are authority- and persistence-free"
+type = "forbidden"
+source_modules = ["r2.narrative_lifecycle"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+    "r2.narrative.canon_transaction",
+    "r2.narrative.ports",
+    "r2.narrative_plan.service",
+    "r2.narrative_plan.ports",
+    "r2.narrative_context.compiler",
+]
+
+# M5C：证据服务是 append-only，绝不触达 Canon 授权写口、任何具体持久化适配器，或
+# Narrative 决策/head 写入层（`acceptance.py` + 其唯一调用者 `authority_kernel.py`）。
+[[tool.importlinter.contracts]]
+name = "M5C narrative evidence service holds no head-mutation capability"
+type = "forbidden"
+source_modules = ["r2.narrative_lifecycle.evidence"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.repositories",
+    "r2.narrative.canon_transaction",
+    "r2.narrative_lifecycle.acceptance",
+    "r2.narrative_lifecycle.authority_kernel",
+]
+
+# narrative_lifecycle：唯一能追加决策/推进 head 的入口是 `acceptance.py`（它是
+# `authority_kernel.py` 的唯一调用者）。包内其余纯变换/证据周边模块一律不得导入
+# `acceptance.py` —— 未来的抽取器/供应商/编排模块加入本包时同样要遵守。
+[[tool.importlinter.contracts]]
+name = "M5C-2 sole head writer: only acceptance.py may append decisions or mutate heads"
+type = "forbidden"
+source_modules = [
+    "r2.narrative_lifecycle.changeset_parser",
+    "r2.narrative_lifecycle.continuity_rules",
+    "r2.narrative_lifecycle.coverage",
+    "r2.narrative_lifecycle.integrity",
+    "r2.narrative_lifecycle.hashing",
+    "r2.narrative_lifecycle.errors",
+    "r2.narrative_lifecycle.ports",
+    "r2.narrative_lifecycle.compiler",
+    "r2.narrative_lifecycle.accepted_narrative_adapter",
+]
+forbidden_modules = ["r2.narrative_lifecycle.acceptance"]
+
+# M5C-3 checkpoint freeze: the pure CanonDeltaCompiler carries no authority write port,
+# repository, UoW, or Canon transaction/read service of its own — every input is an
+# exact immutable value already resolved by its caller.
+[[tool.importlinter.contracts]]
+name = "M5C-3 compiler purity: no authority write port, repository, UoW, or Canon service"
+type = "forbidden"
+source_modules = ["r2.narrative_lifecycle.compiler"]
+forbidden_modules = [
+    "lib.db",
+    "lib.db.models",
+    "lib.db.repositories",
+    "r2.narrative.canon_transaction",
+    "r2.narrative.ports",
+    "r2.narrative_lifecycle.acceptance",
+    "r2.narrative_lifecycle.authority_kernel",
+    "r2.narrative_lifecycle.evidence",
+    "r2.narrative_lifecycle.ports",
+]
+
+# M5C-3 checkpoint freeze: M5C's own persistence adapters propose a CanonDelta but never
+# read or write the M5A Canon ORM tables themselves — CanonTransactionService remains the
+# sole Canon writer.
+[[tool.importlinter.contracts]]
+name = "M5C repositories cannot import or write M5A Canon ORM models"
+type = "forbidden"
+source_modules = [
+    "lib.db.models.narrative_lifecycle",
+    "lib.db.repositories.narrative_lifecycle",
+]
+forbidden_modules = [
+    "lib.db.models.canon",
+    "lib.db.repositories.canon_repo",
+]
+
 [tool.deptry]
 # 扫描范围与 basedpyright 对齐：lib server alembic scripts tests r2
 # exclude 是 deptry 默认值去掉 tests（测试的 import 也要参与依赖卫生判定）再补上 worktree 目录。

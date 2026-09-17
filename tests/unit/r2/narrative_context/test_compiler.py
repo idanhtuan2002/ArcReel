@@ -299,7 +299,7 @@ async def test_secret_candidate_is_rejected_before_score_and_budget() -> None:
 async def test_author_draft_includes_author_truth_but_simulation_does_not() -> None:
     canon = _canon_view(with_pov_knowledge=True)
     draft_pack = await _compiler(canon=canon, snapshot=None).compile(
-        _request(mode="AUTHOR_DRAFT", pov=None, snapshot_ref=None)
+        _request(mode="AUTHOR_DRAFT", pov="char-a", snapshot_ref=None)
     )
     sim_pack = await _compiler(canon=canon, snapshot=None).compile(_request(snapshot_ref=None))
     assert ContextChannel.AUTHOR_TRUTH in {seg.channel for seg in draft_pack.segments}
@@ -320,7 +320,7 @@ async def test_wrong_scope_and_hash_and_time_are_pre_visibility_rejections() -> 
         _candidate("tampered", bad_hash, score=1, prose="actual different prose"),
         _candidate("stale", stale, score=1, prose="opaque prose"),
     )
-    pack = await _compiler(canon=canon, snapshot=snapshot).compile(_request(mode="AUTHOR_DRAFT", pov=None))
+    pack = await _compiler(canon=canon, snapshot=snapshot).compile(_request(mode="AUTHOR_DRAFT", pov="char-a"))
     assert _trace_for(pack, "foreign").reason.value == "WRONG_SCOPE"
     assert _trace_for(pack, "tampered").reason.value == "MISSING_SOURCE_METADATA"
     assert _trace_for(pack, "stale").reason.value == "OUT_OF_TIME"
@@ -335,7 +335,7 @@ async def test_duplicate_is_omitted_after_visibility_with_a_hash() -> None:
         _candidate("a", descriptor, score=2, prose="same prose"),
         _candidate("b", descriptor, score=1, prose="same prose"),
     )
-    pack = await _compiler(canon=canon, snapshot=snapshot).compile(_request(mode="AUTHOR_DRAFT", pov=None))
+    pack = await _compiler(canon=canon, snapshot=snapshot).compile(_request(mode="AUTHOR_DRAFT", pov="char-a"))
     reasons = {_trace_for(pack, "a").reason.value, _trace_for(pack, "b").reason.value}
     assert reasons == {"INCLUDED", "DUPLICATE"}
     dup_trace = next(t for t in pack.selection_trace if t.reason.value == "DUPLICATE")

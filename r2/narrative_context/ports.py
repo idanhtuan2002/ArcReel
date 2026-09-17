@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from r2.contracts import NarrativePlan, SceneContract
+from r2.contracts import NarrativePlan, SceneContractValue
 from r2.contracts.narrative_context import NarrativeSourceDescriptor, RetrievalSnapshot
 from r2.narrative.canon_state import ResolvedCanonView
 
@@ -34,7 +34,7 @@ class NarrativePlanReader(Protocol):
         scene_contract_version: int,
         project_name: str,
         user_id: str,
-    ) -> SceneContract | None: ...
+    ) -> SceneContractValue | None: ...
 
 
 class CreativePolicySegment(Protocol):

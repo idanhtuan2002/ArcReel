@@ -1,40 +1,52 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
+from collections.abc import Set as AbstractSet
 from datetime import datetime
 from itertools import pairwise
+from typing import Literal
 
 from r2.contracts import (
     CanonContent,
     CanonDelta,
     CanonValidationFinding,
     CanonValidationReport,
+    EntityType,
     EpistemicProposition,
     EpistemicState,
     Event,
     Fact,
     KnowledgeState,
+    NarrativeChangeSet,
     NarrativePlan,
     NarrativeValidationFinding,
     NarrativeValidationReport,
     NarrativeValidationSeverity,
     RetireFactOperation,
     SceneContract,
+    SourceSpan,
+    ThreadPayoffEffectKey,
     UpdateKnowledgeOperation,
     canonical_json_bytes,
     ensure_json_value,
 )
+from r2.contracts.narrative_lifecycle import AcceptedThreadPayoffProof
 from r2.contracts.narrative_plan import (
     AudienceRevealEvidence,
     CharacterRevealRecipient,
+    SceneContractValue,
     SceneEventConstraint,
     SceneFactConstraint,
     SceneKnowledgeConstraint,
+    SceneRelationshipConstraint,
+    SceneRevealConstraint,
+    SceneThreadConstraint,
 )
 
 from .canon_state import ResolvedCanonView
 from .epistemic import EpistemicViewResolver
 from .errors import EpistemicIntegrityError
+from .relationship_facts import relationship_fact_predicate
 from .temporal import TemporalGraph, TemporalOrder, validate_relations
 
 RULES = (
@@ -326,6 +338,251 @@ def _provably_later(
     return None
 
 
+# --- M5C F9: exact-instant relationship comparison + R9 / R10 --------------------
+
+_RELATIONSHIP_INTEGRITY = "RELATIONSHIP_INTEGRITY"
+
+
+def _is_character(content: CanonContent, ref: str) -> bool:
+    entity = content.entities_by_id.get(ref)
+    return entity is not None and entity.entity_type is EntityType.CHARACTER
+
+
+def _relationship_comparison_met(constraint: SceneRelationshipConstraint, active: list[Fact]) -> bool:
+    present = len(active) == 1
+    if constraint.comparison == "PRESENT":
+        return present
+    if constraint.comparison == "ABSENT":
+        return not active
+    if not present:
+        return False  # EQUALS / NOT_EQUALS: absence is neither equality nor inequality
+    equal = active[0].value == constraint.expected_state
+    return equal if constraint.comparison == "EQUALS" else not equal
+
+
+def validate_scene_relationship(
+    *,
+    canon: ResolvedCanonView,
+    constraint: SceneRelationshipConstraint,
+    at: datetime,
+    phase: Literal["entry", "exit"],
+) -> NarrativeValidationReport:
+    """Compare one directional relationship constraint against active Canon Facts at the
+    exact instant ``at``. Ambiguous or malformed Canon state yields ``RELATIONSHIP_INTEGRITY``;
+    an unmet comparison yields ``SCENE_ENTRY_RELATIONSHIP_UNMET`` / ``SCENE_EXIT_RELATIONSHIP_UNMET``.
+    """
+    content = canon.content
+    refs = (constraint.constraint_id,)
+    unresolved = [
+        ref
+        for ref in (constraint.source_character_ref, constraint.target_character_ref)
+        if not _is_character(content, ref)
+    ]
+    if unresolved:
+        return _sorted_report(
+            [
+                _mb_finding(
+                    _RELATIONSHIP_INTEGRITY,
+                    (constraint.constraint_id, *unresolved),
+                    f"relationship constraint {constraint.constraint_id} names non-character or unknown entities "
+                    f"{unresolved}",
+                    story_time=at,
+                )
+            ]
+        )
+
+    predicate = relationship_fact_predicate(constraint.target_character_ref, constraint.relationship_key)
+    active = _active_facts_for(content, constraint.source_character_ref, predicate, at)
+    if len(active) > 1:
+        return _sorted_report(
+            [
+                _mb_finding(
+                    _RELATIONSHIP_INTEGRITY,
+                    refs,
+                    f"relationship constraint {constraint.constraint_id} has {len(active)} active facts for the "
+                    "exact relationship key; the selector never chooses one",
+                    story_time=at,
+                )
+            ]
+        )
+    if active and (not isinstance(active[0].value, str) or not active[0].value):
+        return _sorted_report(
+            [
+                _mb_finding(
+                    _RELATIONSHIP_INTEGRITY,
+                    refs,
+                    f"relationship constraint {constraint.constraint_id} active fact state is not a non-empty string",
+                    story_time=at,
+                )
+            ]
+        )
+
+    if _relationship_comparison_met(constraint, active):
+        return NarrativeValidationReport(findings=())
+    rule = "SCENE_ENTRY_RELATIONSHIP_UNMET" if phase == "entry" else "SCENE_EXIT_RELATIONSHIP_UNMET"
+    return _sorted_report(
+        [_mb_finding(rule, refs, f"{phase} relationship constraint {constraint.constraint_id} unmet", story_time=at)]
+    )
+
+
+# --- M5C F9 (spec §4.3.4): accepted thread-payoff outcome proof -------------------
+
+_SCENE_EXIT_THREAD_UNMET = "SCENE_EXIT_THREAD_UNMET"
+
+
+def _thread_payoff_unmet(proof: AcceptedThreadPayoffProof, message: str) -> NarrativeValidationReport:
+    return _sorted_report([_mb_finding(_SCENE_EXIT_THREAD_UNMET, (proof.thread_ref, proof.payoff_ref), message)])
+
+
+def _covered_by_spans(spans: tuple[SourceSpan, ...], span: SourceSpan) -> bool:
+    """True when ``span`` lies inside the union of ``spans`` (overlapping or adjacent
+    spans count as one). Mirrors ``NarrativeChangeSet``'s own coverage rule (spec §5) —
+    duplicated here, not imported, because it is a private helper of the contracts
+    module and this validator lives in a different layer."""
+    cursor = span.start
+    for covered in sorted(spans, key=lambda item: item.start):
+        if covered.start > cursor:
+            break
+        cursor = max(cursor, covered.end)
+        if cursor >= span.end:
+            return True
+    return cursor >= span.end
+
+
+def validate_thread_payoff_outcome(
+    proof: AcceptedThreadPayoffProof,
+    *,
+    change_set: NarrativeChangeSet,
+    effective_decisions: AbstractSet[str],
+) -> NarrativeValidationReport:
+    """Pure exact-input validator (spec §4.3.4): a planned thread resolution is proven
+    only when ``change_set`` is the exact change set ``proof`` names and declares the
+    exact typed ``THREAD_PAYOFF(thread_ref, payoff_ref)`` effect key, every one of
+    ``proof.source_spans`` is covered by that change set's declared coverage, and every
+    decision id ``proof`` names — the revision acceptance, the change-set review, and
+    every conflict resolution — is a member of ``effective_decisions``.
+
+    A ``promise_payoff_refs`` entry, active-thread tag, model claim, or prose substring
+    without this accepted proof yields ``SCENE_EXIT_THREAD_UNMET``, and so does any
+    mismatch between the proof and the named change set. Whether ``effective_decisions``
+    reflects live currentness or a historical snapshot is the caller's concern: this
+    function is exact-input and pure, so replaying the same proof against the same
+    historical set reproduces the same report without asserting current authority.
+    """
+    if change_set.change_set_id != proof.change_set_id:
+        return _thread_payoff_unmet(
+            proof, f"proof names change set {proof.change_set_id!r} but {change_set.change_set_id!r} was supplied"
+        )
+
+    expected_key = ThreadPayoffEffectKey(thread_ref=proof.thread_ref, payoff_ref=proof.payoff_ref)
+    if expected_key not in change_set.semantic_effect_keys:
+        return _thread_payoff_unmet(
+            proof,
+            f"change set {change_set.change_set_id!r} does not declare "
+            f"THREAD_PAYOFF({proof.thread_ref!r}, {proof.payoff_ref!r})",
+        )
+
+    if not all(_covered_by_spans(change_set.source_spans, span) for span in proof.source_spans):
+        return _thread_payoff_unmet(
+            proof, f"change set {change_set.change_set_id!r} does not cover every proof source span"
+        )
+
+    named_decisions = (
+        proof.revision_acceptance_decision_id,
+        proof.review_decision_id,
+        *proof.conflict_resolution_decision_ids,
+    )
+    if not all(decision_id in effective_decisions for decision_id in named_decisions):
+        return _thread_payoff_unmet(proof, "not every decision named by the proof is currently effective")
+
+    return NarrativeValidationReport(findings=())
+
+
+def _present_state_ref_findings(
+    canon: ResolvedCanonView, scene: SceneContractValue
+) -> Iterator[NarrativeValidationFinding]:
+    """R9: entity / proposition references that describe present Canon state must resolve
+    against the exact plan Canon basis. A future ``event_ref`` obligation is exempt here
+    and is checked during post-scene outcome validation instead."""
+    content = canon.content
+    for item in scene.entry_state_constraints:
+        if isinstance(item, SceneFactConstraint):
+            if item.subject_ref not in content.entities_by_id:
+                yield _mb_finding(
+                    "SCENE_PRESENT_REF_UNRESOLVED",
+                    (scene.scene_contract_id, item.constraint_id, item.subject_ref),
+                    f"entry fact constraint {item.constraint_id} subject {item.subject_ref} is absent from the "
+                    "plan Canon basis",
+                )
+        elif isinstance(item, SceneKnowledgeConstraint):
+            if item.subject_entity_id not in content.entities_by_id:
+                yield _mb_finding(
+                    "SCENE_PRESENT_REF_UNRESOLVED",
+                    (scene.scene_contract_id, item.constraint_id, item.subject_entity_id),
+                    f"entry knowledge constraint {item.constraint_id} subject {item.subject_entity_id} is absent "
+                    "from the plan Canon basis",
+                )
+            if item.proposition_ref not in content.epistemic_propositions_by_ref:
+                yield _mb_finding(
+                    "SCENE_PRESENT_REF_UNRESOLVED",
+                    (scene.scene_contract_id, item.constraint_id, item.proposition_ref),
+                    f"entry knowledge constraint {item.constraint_id} proposition {item.proposition_ref} is absent "
+                    "from the plan Canon basis",
+                )
+
+
+_IdConstraint = (
+    SceneEventConstraint
+    | SceneRevealConstraint
+    | SceneKnowledgeConstraint
+    | SceneFactConstraint
+    | SceneRelationshipConstraint
+    | SceneThreadConstraint
+)
+
+
+def _constraint_uniqueness_findings(scene: SceneContractValue) -> Iterator[NarrativeValidationFinding]:
+    """R10: ``constraint_id`` is unique within one SceneContract, and no list holds two
+    normalized-identical constraints under different IDs. Required/forbidden and
+    entry/exit collisions keep their own dedicated findings."""
+    id_bearing_lists: list[tuple[str, list[_IdConstraint]]] = [
+        ("required_events", [*scene.required_events]),
+        ("forbidden_events", [*scene.forbidden_events]),
+        ("required_reveals", [*scene.required_reveals]),
+        ("forbidden_knowledge", [*scene.forbidden_knowledge]),
+        ("entry_state_constraints", [*scene.entry_state_constraints]),
+        ("exit_state_targets", [*scene.exit_state_targets]),
+    ]
+    seen_ids: set[str] = set()
+    reported_ids: set[str] = set()
+    for _, items in id_bearing_lists:
+        for item in items:
+            constraint_id = item.constraint_id
+            if constraint_id in seen_ids and constraint_id not in reported_ids:
+                reported_ids.add(constraint_id)
+                yield _mb_finding(
+                    "SCENE_CONSTRAINT_DUPLICATE_ID",
+                    (scene.scene_contract_id, constraint_id),
+                    f"scene {scene.scene_contract_id} reuses constraint id {constraint_id}",
+                )
+            seen_ids.add(constraint_id)
+
+    for list_name, items in id_bearing_lists:
+        seen_normal: dict[bytes, str] = {}
+        for item in items:
+            normal = _canonical_value(item.model_dump(mode="json", exclude={"constraint_id"}))
+            first = seen_normal.get(normal)
+            if first is not None:
+                yield _mb_finding(
+                    "SCENE_CONSTRAINT_DUPLICATE_SEMANTIC",
+                    (scene.scene_contract_id, first, item.constraint_id),
+                    f"scene {scene.scene_contract_id} list {list_name} holds semantically identical constraints "
+                    f"{first} and {item.constraint_id}",
+                )
+            else:
+                seen_normal[normal] = item.constraint_id
+
+
 class NarrativeInvariantValidator:
     """Deep pure validator over immutable ``base`` / ``delta`` / ``candidate`` values."""
 
@@ -511,7 +768,7 @@ class NarrativeInvariantValidator:
     # --- SceneContract validation (spec Section 8.2) -----------------------------
 
     def validate_scene(
-        self, *, canon: ResolvedCanonView, plan: NarrativePlan, scene: SceneContract
+        self, *, canon: ResolvedCanonView, plan: NarrativePlan, scene: SceneContractValue
     ) -> NarrativeValidationReport:
         findings: list[NarrativeValidationFinding | None] = []
         window = scene.temporal_window
@@ -589,6 +846,27 @@ class NarrativeInvariantValidator:
             for item in scene.forbidden_events
             if _event_selector_key(item) in required_keys
         )
+
+        # M5C F9: exact-instant relationship comparison over entry constraints and exit targets.
+        for item in scene.entry_state_constraints:
+            if isinstance(item, SceneRelationshipConstraint):
+                findings.extend(
+                    validate_scene_relationship(
+                        canon=canon, constraint=item, at=window.effective_from, phase="entry"
+                    ).findings
+                )
+        for item in scene.exit_state_targets:
+            if isinstance(item, SceneRelationshipConstraint):
+                findings.extend(
+                    validate_scene_relationship(
+                        canon=canon, constraint=item, at=window.effective_until, phase="exit"
+                    ).findings
+                )
+
+        # M5C R9 / R10 new-work eligibility closures (run on v1 and v2 scenes alike).
+        findings.extend(_present_state_ref_findings(canon, scene))
+        findings.extend(_constraint_uniqueness_findings(scene))
+
         return _sorted_report([finding for finding in findings if finding is not None])
 
     def validate_scene_outcome(

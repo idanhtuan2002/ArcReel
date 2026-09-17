@@ -15,6 +15,14 @@ from lib.db.models.config import ProviderConfig, SystemSetting
 from lib.db.models.credential import ProviderCredential
 from lib.db.models.custom_endpoint import CustomEndpoint
 from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
+from lib.db.models.narrative_lifecycle import (
+    NarrativeChangeSetModel,
+    NarrativeDraftCandidateModel,
+    NarrativeExtractionAttemptModel,
+    NarrativeExtractionResultChangeSetModel,
+    NarrativeExtractionResultModel,
+    NarrativeRevisionModel,
+)
 from lib.db.models.narrative_plan import NarrativePlanModel, NarrativePlanVersionModel
 from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
@@ -42,8 +50,14 @@ __all__ = [
     "CustomProvider",
     "CustomProviderModel",
     "GenerationBatch",
+    "NarrativeChangeSetModel",
+    "NarrativeDraftCandidateModel",
+    "NarrativeExtractionAttemptModel",
+    "NarrativeExtractionResultChangeSetModel",
+    "NarrativeExtractionResultModel",
     "NarrativePlanModel",
     "NarrativePlanVersionModel",
+    "NarrativeRevisionModel",
     "ProviderConfig",
     "ProviderCredential",
     "SystemSetting",

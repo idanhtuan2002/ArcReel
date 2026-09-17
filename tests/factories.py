@@ -10,7 +10,37 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from r2.contracts.narrative import CanonCommitApproval
+from r2.contracts.narrative_lifecycle import (
+    CanonMutationEffectKey,
+    ChangeSetReviewCommand,
+    CompilationAttempt,
+    CompilationResult,
+    CompilationSelectedChangeSet,
+    CompiledCanonDeltaEvidence,
+    ConflictResolutionCommand,
+    DraftCandidate,
+    ExtractionAttempt,
+    ExtractionResult,
+    NarrativeChangeItem,
+    NarrativeChangeSet,
+    NarrativeDecisionAuthorization,
+    NarrativeHandoffAdmission,
+    NarrativeRevision,
+    NarrativeWorkScope,
+    ObservedEffectiveHead,
+    ObservedNarrativeHead,
+    RevisionAcceptanceCommand,
+    SourceSpan,
+)
+from r2.contracts.provenance import Provenance
+from r2.narrative_lifecycle.hashing import (
+    CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
+    compute_canon_approval_binding_fingerprint,
+)
 from server.agent_runtime.models import SessionMeta
+
+NARRATIVE_LIFECYCLE_NOW = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
 
 
 def make_translator(locale: str = "zh") -> Callable[..., str]:
@@ -207,3 +237,371 @@ def custom_endpoint_definition(**overrides: Any) -> dict[str, Any]:
     }
     definition.update(overrides)
     return definition
+
+
+# --------------------------------------------------------------------------- #
+# M5C Narrative-lifecycle evidence contracts
+#
+# The defaults form one coherent candidate -> revision -> attempt -> result chain
+# (matching ids and exact bases), so a test can seed the chain with no arguments.
+# --------------------------------------------------------------------------- #
+
+_NL_BASES = {
+    "base_canon_version_id": "cv-1",
+    "plan_version": 2,
+    "scene_contract_version": 1,
+    "context_pack_id": "ctx-1",
+}
+
+
+def make_narrative_work_scope(**overrides: Any) -> NarrativeWorkScope:
+    defaults: dict[str, Any] = {
+        "user_id": "u1",
+        "project_name": "project-a",
+        "plan_id": "plan-1",
+        "scene_contract_id": "scene-1",
+        "canon_branch_id": "branch-1",
+    }
+    defaults.update(overrides)
+    return NarrativeWorkScope(**defaults)
+
+
+def make_narrative_provenance(**overrides: Any) -> Provenance:
+    defaults: dict[str, Any] = {"created_by": "AGENT", "created_at": NARRATIVE_LIFECYCLE_NOW}
+    defaults.update(overrides)
+    return Provenance(**defaults)
+
+
+def make_draft_candidate(*, work_scope: NarrativeWorkScope | None = None, **overrides: Any) -> DraftCandidate:
+    defaults: dict[str, Any] = {
+        "candidate_id": "cand-1",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        **_NL_BASES,
+        "normalized_content": "prose",
+        "content_hash": "pch:abc",
+        "writer_kind": "AGENT",
+        "writer_version": "w-1",
+        "provenance": make_narrative_provenance(),
+        "created_at": NARRATIVE_LIFECYCLE_NOW,
+        "created_by": "who",
+        "semantic_fingerprint": "esf:1",
+    }
+    defaults.update(overrides)
+    return DraftCandidate(**defaults)
+
+
+def make_narrative_revision(*, work_scope: NarrativeWorkScope | None = None, **overrides: Any) -> NarrativeRevision:
+    defaults: dict[str, Any] = {
+        "revision_id": "rev-1",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "base_candidate_id": "cand-1",
+        "predecessor_revision_id": None,
+        **_NL_BASES,
+        "normalized_content": "prose",
+        "content_hash": "pch:abc",
+        "review_refs": [],
+        "provenance": make_narrative_provenance(),
+        "created_at": NARRATIVE_LIFECYCLE_NOW,
+        "created_by": "who",
+        "semantic_fingerprint": "esf:2",
+    }
+    defaults.update(overrides)
+    return NarrativeRevision(**defaults)
+
+
+def make_extraction_attempt(*, work_scope: NarrativeWorkScope | None = None, **overrides: Any) -> ExtractionAttempt:
+    defaults: dict[str, Any] = {
+        "attempt_id": "att-1",
+        "generation": 0,
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "revision_id": "rev-1",
+        "revision_acceptance_decision_id": "dec-1",
+        "observed_revision_effective_generation": 0,
+        **_NL_BASES,
+        "extractor_kind": "LOCAL",
+        "extractor_version": "x-1",
+        "policy_ref": "pol",
+        "policy_version": "1",
+        "admitted_at": NARRATIVE_LIFECYCLE_NOW,
+        "admitted_by": "who",
+        "input_fingerprint": "if-1",
+    }
+    defaults.update(overrides)
+    return ExtractionAttempt(**defaults)
+
+
+def make_extraction_result(**overrides: Any) -> ExtractionResult:
+    defaults: dict[str, Any] = {
+        "result_id": "res-1",
+        "attempt_id": "att-1",
+        "generation": 0,
+        "outcome": "ABSTAINED",
+        "change_set_ids": (),
+        "diagnostics": (),
+        "provider_receipt": None,
+        "completed_at": NARRATIVE_LIFECYCLE_NOW,
+        "output_fingerprint": "of-1",
+    }
+    defaults.update(overrides)
+    return ExtractionResult(**defaults)
+
+
+def make_canon_mutation_effect_key(**overrides: Any) -> CanonMutationEffectKey:
+    defaults: dict[str, Any] = {
+        "canon_subject_kind": "FACT",
+        "subject_ref": "hero",
+        "effect_descriptor": "trust",
+        "canon_operation_count": 1,
+    }
+    defaults.update(overrides)
+    return CanonMutationEffectKey(**defaults)
+
+
+def make_narrative_change_set(**overrides: Any) -> NarrativeChangeSet:
+    key = overrides.pop("key", None) or make_canon_mutation_effect_key()
+    span = overrides.pop("span", None) or SourceSpan(start=0, end=4)
+    defaults: dict[str, Any] = {
+        "change_set_id": "cs-1",
+        "change_set_lineage_id": None,
+        "source_revision_id": "rev-1",
+        "extraction_attempt_id": "att-1",
+        "extraction_generation": 0,
+        "base_canon_version_id": "cv-1",
+        "source_spans": (span,),
+        "semantic_effect_keys": (key,),
+        "changes": (NarrativeChangeItem(change_id="ch-1", evidence_span=span, effect_keys=(key,), summary="s"),),
+        "confidence": 0.7,
+        "extractor_version": "x-1",
+        "policy_ref": "pol",
+        "policy_version": "1",
+        "created_at": NARRATIVE_LIFECYCLE_NOW,
+        "output_fingerprint": "of-cs",
+    }
+    defaults.update(overrides)
+    if defaults["change_set_lineage_id"] is None:
+        defaults["change_set_lineage_id"] = f"lin-{defaults['change_set_id']}"
+    return NarrativeChangeSet(**defaults)
+
+
+def make_narrative_decision_authorization(**overrides: Any) -> NarrativeDecisionAuthorization:
+    defaults: dict[str, Any] = {
+        "authorization_ref": "auth-1",
+        "user_id": "u1",
+        "project_name": "project-a",
+        "actor_id": "showrunner-1",
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "decision_family": "REVISION_ACCEPTANCE",
+        "action": "ACCEPT",
+        "decision_id": "d-1",
+        "stable_subject_fingerprint": "ssf:1",
+        "decision_command_fingerprint": "dcf:1",
+        "authenticated_at": NARRATIVE_LIFECYCLE_NOW,
+        "authenticated_via": "test-fixture",
+    }
+    defaults.update(overrides)
+    return NarrativeDecisionAuthorization(**defaults)
+
+
+def make_revision_acceptance_command(
+    *, work_scope: NarrativeWorkScope | None = None, **overrides: Any
+) -> RevisionAcceptanceCommand:
+    defaults: dict[str, Any] = {
+        "decision_id": "d-1",
+        "action": "ACCEPT",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "selected_revision_id": "rev-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        **_NL_BASES,
+        "actor_id": "showrunner-1",
+    }
+    defaults.update(overrides)
+    return RevisionAcceptanceCommand(**defaults)
+
+
+def make_change_set_review_command(
+    *, work_scope: NarrativeWorkScope | None = None, **overrides: Any
+) -> ChangeSetReviewCommand:
+    defaults: dict[str, Any] = {
+        "decision_id": "d-2",
+        "action": "ACCEPT",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "revision_acceptance_decision_id": "d-1",
+        "change_set_lineage_id": "lin-cs-1",
+        "selected_change_set_id": "cs-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        **_NL_BASES,
+        "actor_id": "showrunner-1",
+    }
+    defaults.update(overrides)
+    return ChangeSetReviewCommand(**defaults)
+
+
+def make_conflict_resolution_command(
+    *, work_scope: NarrativeWorkScope | None = None, **overrides: Any
+) -> ConflictResolutionCommand:
+    defaults: dict[str, Any] = {
+        "decision_id": "d-3",
+        "action": "RESOLVE",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "revision_acceptance_decision_id": "d-1",
+        "conflict_resolution_lineage_id": "lin-conflict-1",
+        "competing_change_set_ids": ("cs-1", "cs-2"),
+        "competing_review_decision_ids": ("d-2", "d-2b"),
+        "chosen_resolution": "keep cs-1",
+        "expected_latest_decision_id": None,
+        "expected_effective_decision_id": None,
+        **_NL_BASES,
+        "actor_id": "showrunner-1",
+    }
+    defaults.update(overrides)
+    return ConflictResolutionCommand(**defaults)
+
+
+def make_compilation_attempt(*, work_scope: NarrativeWorkScope | None = None, **overrides: Any) -> CompilationAttempt:
+    defaults: dict[str, Any] = {
+        "attempt_id": "cattempt-1",
+        "generation": 0,
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "revision_id": "rev-1",
+        "revision_acceptance_decision_id": "d-1",
+        "selected_change_sets": (CompilationSelectedChangeSet(change_set_id="cs-1", review_decision_id="d-2"),),
+        "conflict_resolution_decision_ids": (),
+        "observed_effective_heads": (ObservedEffectiveHead(decision_id="d-1", effective_generation=1),),
+        **_NL_BASES,
+        "creative_policy_ref": "policy-1",
+        "creative_policy_version": "1",
+        "compiler_version": "compiler-1",
+        "requested_canon_delta_id": "delta-1",
+        "delta_created_at": NARRATIVE_LIFECYCLE_NOW,
+        "delta_created_by": "showrunner-1",
+        "admitted_at": NARRATIVE_LIFECYCLE_NOW,
+        "admitted_by": "showrunner-1",
+        "input_fingerprint": "cif-1",
+    }
+    defaults.update(overrides)
+    return CompilationAttempt(**defaults)
+
+
+def make_compilation_result(**overrides: Any) -> CompilationResult:
+    defaults: dict[str, Any] = {
+        "result_id": "cres-1",
+        "attempt_id": "cattempt-1",
+        "generation": 0,
+        "outcome": "ABSTAINED",
+        "canon_delta_id": None,
+        "canon_delta_payload_hash": None,
+        "diagnostics": (),
+        "completed_at": NARRATIVE_LIFECYCLE_NOW,
+        "output_fingerprint": "of-cres",
+    }
+    defaults.update(overrides)
+    return CompilationResult(**defaults)
+
+
+def make_compiled_canon_delta_evidence(**overrides: Any) -> CompiledCanonDeltaEvidence:
+    from r2.narrative.hashing import seal_canon_delta
+
+    canon_delta = overrides.pop("canon_delta", None)
+    if canon_delta is None:
+        from r2.contracts.narrative import AddFactOperation, CanonDeltaPayload, Fact
+
+        canon_delta = seal_canon_delta(
+            CanonDeltaPayload(
+                canon_delta_id="delta-1",
+                target_branch_id="branch-1",
+                base_canon_version_id="cv-1",
+                operations=[
+                    AddFactOperation(
+                        operation_id="op-1",
+                        target_id="fact-1",
+                        fact=Fact(
+                            fact_id="fact-1",
+                            subject_ref="hero",
+                            predicate="mood",
+                            value="calm",
+                            effective_from=NARRATIVE_LIFECYCLE_NOW,
+                        ),
+                    )
+                ],
+                source_change_set_refs=["cs-1"],
+                author_decision_refs=["d-1"],
+                validation_report_refs=[],
+                created_at=NARRATIVE_LIFECYCLE_NOW,
+                created_by="showrunner-1",
+            )
+        )
+    defaults: dict[str, Any] = {
+        "compilation_result_id": "cres-1",
+        "compilation_attempt_id": "cattempt-1",
+        "generation": 0,
+        "canon_delta": canon_delta,
+        "canon_delta_payload_hash": canon_delta.payload_hash,
+        "stored_at": NARRATIVE_LIFECYCLE_NOW,
+    }
+    defaults.update(overrides)
+    return CompiledCanonDeltaEvidence(**defaults)
+
+
+def make_canon_commit_approval(**overrides: Any) -> CanonCommitApproval:
+    defaults: dict[str, Any] = {
+        "approval_ref": "approval-1",
+        "canon_delta_id": "delta-1",
+        "payload_hash": "sha256:deadbeef",
+        "payload_hash_algorithm": "sha256",
+        "payload_hash_version": "r2-canon-delta-v1",
+        "content_schema_version": "r2-canon-schema-v1",
+        "project_name": "project-a",
+        "user_id": "u1",
+        "approved_by": "showrunner-1",
+        "approved_at": NARRATIVE_LIFECYCLE_NOW,
+        "status": "APPROVED",
+    }
+    defaults.update(overrides)
+    return CanonCommitApproval(**defaults)
+
+
+def make_observed_narrative_head(**overrides: Any) -> ObservedNarrativeHead:
+    defaults: dict[str, Any] = {
+        "head_family": "REVISION_ACCEPTANCE",
+        "logical_key": ("plan-1", "scene-1", "branch-1"),
+        "effective_decision_id": "d-1",
+        "effective_generation": 1,
+        "decision_generation": 1,
+    }
+    defaults.update(overrides)
+    return ObservedNarrativeHead(**defaults)
+
+
+def make_narrative_handoff_admission(
+    *,
+    work_scope: NarrativeWorkScope | None = None,
+    canon_commit_approval: CanonCommitApproval | None = None,
+    **overrides: Any,
+) -> NarrativeHandoffAdmission:
+    approval = canon_commit_approval or make_canon_commit_approval()
+    defaults: dict[str, Any] = {
+        "admission_id": "adm-1",
+        "work_scope": work_scope or make_narrative_work_scope(),
+        "compilation_attempt_id": "cattempt-1",
+        "generation": 0,
+        "compilation_result_id": "cres-1",
+        "canon_delta_id": approval.canon_delta_id,
+        "canon_delta_payload_hash": approval.payload_hash,
+        "canon_commit_approval_ref": approval.approval_ref,
+        "canon_commit_approval": approval,
+        "canon_commit_approval_fingerprint": compute_canon_approval_binding_fingerprint(approval),
+        "canon_commit_approval_fingerprint_algorithm": "sha256",
+        "canon_commit_approval_fingerprint_version": CANON_APPROVAL_BINDING_FINGERPRINT_VERSION,
+        "revision_acceptance_decision_id": "d-1",
+        "review_decision_ids": ("d-2",),
+        "conflict_resolution_decision_ids": (),
+        "observed_heads": (make_observed_narrative_head(),),
+        "base_canon_version_id": "cv-1",
+        "actor_id": "showrunner-1",
+        "admitted_at": NARRATIVE_LIFECYCLE_NOW,
+        "canonical_identity_hash": "hai:placeholder",
+    }
+    defaults.update(overrides)
+    return NarrativeHandoffAdmission(**defaults)

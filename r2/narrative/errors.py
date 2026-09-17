@@ -56,3 +56,23 @@ class EpistemicIntegrityError(CanonError):
 
 class EpistemicValidationError(CanonError):
     """An invalid epistemic interval, evidence link, or knowledge-state transition."""
+
+
+class NarrativeError(Exception):
+    """Base class for the M5C NarrativePlan schema / relationship / thread error taxonomy.
+
+    Distinct from ``CanonError``: these errors concern authorial-plan schema versioning and
+    the v2 relationship / thread semantics, not the Canon authority write path.
+    """
+
+
+class NarrativePlanSchemaVersionError(NarrativeError):
+    """An unknown, below-minimum, or illegal SceneContract / NarrativePlan v1/v2 schema transition."""
+
+
+class NarrativeRelationshipIntegrityError(NarrativeError):
+    """A relationship reference or profile is malformed, or exact active relationship state is ambiguous."""
+
+
+class NarrativeThreadLifecycleError(NarrativeError):
+    """A plan-wide presentation-order thread lifecycle invariant fails."""

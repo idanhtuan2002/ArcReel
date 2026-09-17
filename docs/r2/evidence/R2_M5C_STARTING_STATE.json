@@ -1,0 +1,161 @@
+{
+  "schema_version": "1",
+  "milestone": "R2-M5C",
+  "recorded_at": "2026-09-09",
+  "m5c_integration_base": "71a96bd606e919d344a7e0c8bcdec6073d862a24",
+  "m5c_alembic_base": "5b7c4a0e0001",
+  "accepted_m5b_lineage": {
+    "m5c_integration_base": "71a96bd606e919d344a7e0c8bcdec6073d862a24",
+    "integration_base_subject": "merge(r2): integrate M5B epistemic plan context into r2/main",
+    "integration_base_parents": [
+      "698c34f6b953bd6c7df3306da253e9827b6d94c0",
+      "a2dc1c141c77ce1365eea8360a3593b55567c5af"
+    ],
+    "m5b_accepted_head": "a2dc1c141c77ce1365eea8360a3593b55567c5af",
+    "m5b_head_is_ancestor_of_base": "git merge-base --is-ancestor a2dc1c14 71a96bd6 exit 0",
+    "base_equals_origin_r2_main": "git rev-parse origin/r2/main == 71a96bd6...  (confirmed)",
+    "base_matches_project_decision_docs": "PROJECT_DECISIONS_2026-09-09.md / PROJECT_STATUS_REVIEW_2026-09-09.md record r2/main == origin/r2/main == 71a96bd6",
+    "m5a_final_verification_present": "docs/r2/evidence/R2_M5A_FINAL_VERIFICATION.md",
+    "m5b_final_verification_present": "docs/r2/evidence/R2_M5B_FINAL_VERIFICATION.md",
+    "note": "Prerequisite evidence from the accepted M5A/M5B chain, not current M5C validation."
+  },
+  "document_approval_manifest": {
+    "path": "docs/r2/evidence/R2_M5C_DOCUMENT_APPROVAL.json",
+    "schema_version": "r2-m5c-document-approval-v1",
+    "status": "APPROVED",
+    "m5c_integration_base": "71a96bd606e919d344a7e0c8bcdec6073d862a24",
+    "approved_docs_source_head": "fac8c0473373010dfa51aa2bd50a79cd085549aa",
+    "approved_by": "human:anhtuan",
+    "approved_at": "2026-09-09T16:19:46+07:00",
+    "manifest_self_sha256": "3e28afe93824a52560d31eb8abb89b02d37b30316f042fb97b84630f7bb09b28",
+    "manifest_verification": "plan Task 0 Step 2 one-liner exited 0; schema_version/status/base/source-head/approver/timestamp asserted; all four recomputed doc SHA-256 matched."
+  },
+  "recomputed_document_hashes": {
+    "algorithm": "sha256",
+    "docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md": "2fe2ac9177ecc7255ac3ed4bab2dfc42776888d61754afb6110aa698b709b68e",
+    "docs/superpowers/plans/2026-09-09-r2-m5c-narrative-lifecycle.md": "8adbd40e1a79d308d98153756efee913f5314248fae2ac71ac011c4a5a70eb1b",
+    "docs/adr/0076-narrative-lifecycle-evidence-and-acceptance-authority.md": "f94d692c3f5a83fa0b0b749a0212f619f89270d4d8f24985d597586d45bc1f22",
+    "docs/research/2026-09-09-r2-m5c-persistence-state-machine-validation.md": "1cb8a68f6116740db4d84a75c86cf2a51b15578d00c5878f80b2fc3d55ed27e8"
+  },
+  "worktree": {
+    "path": "/home/anhtuan/content-production-os-m5c",
+    "branch": "feat/r2-m5c-narrative-lifecycle",
+    "m5c_document_materialization_head": "ab9cbae07d82b7d2b1283f8973593f093efc84a6",
+    "materialization_head_descends_from_base": "git merge-base --is-ancestor 71a96bd6 ab9cbae0 exit 0",
+    "materialization_diff_from_base": [
+      "docs/adr/0076-narrative-lifecycle-evidence-and-acceptance-authority.md",
+      "docs/r2/evidence/R2_M5C_DOCUMENT_APPROVAL.json",
+      "docs/research/2026-09-09-r2-m5c-persistence-state-machine-validation.md",
+      "docs/superpowers/plans/2026-09-09-r2-m5c-narrative-lifecycle.md",
+      "docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md"
+    ],
+    "materialization_whitespace_check": "git diff --check 71a96bd6..ab9cbae0 exit 0",
+    "materialization_commits_in_range": [
+      {
+        "sha": "ab9cbae07d82b7d2b1283f8973593f093efc84a6",
+        "parent": "71a96bd606e919d344a7e0c8bcdec6073d862a24",
+        "subject": "docs(r2): materialize approved M5C design documents on implementation base",
+        "changed_paths": [
+          "docs/adr/0076-narrative-lifecycle-evidence-and-acceptance-authority.md",
+          "docs/r2/evidence/R2_M5C_DOCUMENT_APPROVAL.json",
+          "docs/research/2026-09-09-r2-m5c-persistence-state-machine-validation.md",
+          "docs/superpowers/plans/2026-09-09-r2-m5c-narrative-lifecycle.md",
+          "docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md"
+        ]
+      }
+    ],
+    "clean_tree": "git status --short empty at ab9cbae0",
+    "note": "No implementation file precedes this Task 0 checkpoint. Task 1 starts only from the Task 0 checkpoint commit HEAD."
+  },
+  "migration": {
+    "alembic_heads": "5b7c4a0e0001 (head)",
+    "parent_revision": "5b7c4a0e0001",
+    "parent_revision_file": "alembic/versions/5b7c4a0e0001_add_narrative_plans.py",
+    "reserved_revisions": [
+      "5c7c4a0e0001",
+      "5c7c4a0e0002",
+      "5c7c4a0e0003",
+      "5c7c4a0e0004"
+    ],
+    "reserved_revisions_free": "rg '5c7c4a0e000[1234]' alembic/versions returned no matches",
+    "m5c_alembic_base": "5b7c4a0e0001",
+    "downgrade_target_for_every_roundtrip": "5b7c4a0e0001",
+    "v1_selectors_present": {
+      "note": "v1 scene/plan/canon-delta selectors remain in place and become explicit compatibility fixtures, not replacements.",
+      "selectors": [
+        "r2-scene-contract-content-v1 (r2/narrative_plan/hashing.py, r2/contracts/narrative_plan.py)",
+        "r2-narrative-plan-v1 (r2/contracts/narrative_plan.py)",
+        "r2-narrative-plan-content-v1 (r2/contracts/narrative_plan.py, r2/narrative_plan/hashing.py)",
+        "r2-canon-delta-v1 (r2/narrative/hashing.py — sole M5A payload-hash version M5C reuses)"
+      ]
+    }
+  },
+  "postgres_test_instance": {
+    "provisioning": "docker run postgres:18 (container m5c-pg18-test), isolated, not the developer DB and not the implicit Alembic default",
+    "host": "127.0.0.1",
+    "port": 54329,
+    "database": "r2_m5c_isolated",
+    "user": "m5c_test",
+    "password_recorded": false,
+    "url_env_var": "POSTGRES_TEST_URL",
+    "reported_version": "PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "clean_ownership_marker": "SELECT * pg_tables empty before first alembic upgrade (fresh container, no prior schema)",
+    "roundtrip": "DATABASE_URL=$POSTGRES_TEST_URL uv run alembic upgrade head && alembic downgrade 5b7c4a0e0001 -> exit 0 (upgrade ran c04b7d93e5a1 -> 5a7c4a0e0001 -> 5b7c4a0e0001; downgrade target == current head, no-op)",
+    "note": "Every later 'alembic upgrade head' / round-trip in this plan runs with DATABASE_URL=$POSTGRES_TEST_URL. SQLite migration tests under tests/integration/lib/db/migrations/ keep their own alembic_cfg per CONTRIBUTING.md."
+  },
+  "graph": {
+    "project": "home-anhtuan-content-production-os-m5c",
+    "generation": "2026-09-09T10:22:57Z",
+    "index_mode": "fast",
+    "indexed_worktree": "/home/anhtuan/content-production-os-m5c",
+    "indexed_head": "ab9cbae07d82b7d2b1283f8973593f093efc84a6",
+    "nodes": 25644,
+    "edges": 145322,
+    "logfile": "/home/anhtuan/.cache/codebase-memory-mcp/logs/home-anhtuan-content-production-os-m5c-1788949376.log",
+    "reindex_reason": "No index existed for the M5C implementation worktree. The pre-existing home-anhtuan-content-production-os index is pinned to design/r2-m5b-narrative-context (a docs-only branch parallel to r2/main that does NOT contain the M5A/M5B implementation). A fresh index of the M5C worktree at the materialization head was required. Design discovery on the home-anhtuan-content-production-os-m5b generation is not execution evidence.",
+    "parse_partial": [
+      "frontend/src/index.css",
+      "frontend/src/css/app.css",
+      "frontend/src/css/studio.css"
+    ],
+    "coverage_note": "scripts/ subtree is excluded from the fast index by design; scripts/r2/verify_m5c_scope.py and its test are authored/read directly in Task 9. tests/integration and donor-parity harnesses are read directly in the tasks that touch them. Every existing responsibility-map source file is read directly from source in its task regardless of graph coverage."
+  },
+  "baseline_gates": [
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "result": "All checks passed!"
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 0,
+      "result": "1299 files already formatted"
+    },
+    {
+      "command": "uv run lint-imports",
+      "exit_code": 0,
+      "result": "12 kept, 0 broken"
+    },
+    {
+      "command": "uv run deptry lib server alembic scripts tests r2",
+      "exit_code": 0,
+      "result": "Success! No dependency issues found."
+    },
+    {
+      "command": "uv run basedpyright --warnings",
+      "exit_code": 0,
+      "result": "0 errors, 0 warnings, 0 notes"
+    },
+    {
+      "command": "uv run python -m pytest -n 4 --dist loadfile -q tests/unit/r2 tests/integration/r2/narrative tests/integration/r2/narrative_plan",
+      "exit_code": 0,
+      "result": "612 passed, 4 warnings in 11.20s"
+    },
+    {
+      "command": "uv run python scripts/audit_tests.py --check",
+      "exit_code": 0,
+      "result": "0 violations (闸门通过：0 处违规)"
+    }
+  ],
+  "baseline_gates_note": "Prerequisite baseline for the M5C implementation branch, not M5C validation."
+}
