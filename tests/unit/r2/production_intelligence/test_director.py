@@ -62,7 +62,7 @@ class _FakeAdapter:
         self._error_times = error_times
         self.calls = 0
 
-    def direct(self, artifact):
+    async def direct(self, artifact):
         self.calls += 1
         if self._error is not None and (self._error_times is None or self.calls <= self._error_times):
             raise self._error
@@ -131,11 +131,11 @@ def test_routing_decision_carries_no_provider_fields() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_route_unavailable_falls_back_to_arcreel_native_when_policy_allows() -> None:
+async def test_route_unavailable_falls_back_to_arcreel_native_when_policy_allows() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     primary = _FakeAdapter(DirectorKind.OPENMONTAGE, error=DirectorRouteUnavailable("donor down"))
     native = _FakeAdapter(DirectorKind.ARCREEL_NATIVE, result=_FakeRaw(*_split(_golden_raw())))
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: primary, DirectorKind.ARCREEL_NATIVE: native},
         artifact=object(),
@@ -145,7 +145,7 @@ def test_route_unavailable_falls_back_to_arcreel_native_when_policy_allows() -> 
     assert native.calls == 1
 
 
-def test_route_unavailable_fails_when_fallback_disabled() -> None:
+async def test_route_unavailable_fails_when_fallback_disabled() -> None:
     routing = _policy().decide(
         input_profile_ref="p",
         content_basis=_factual_basis(),
@@ -155,7 +155,7 @@ def test_route_unavailable_fails_when_fallback_disabled() -> None:
     )
     primary = _FakeAdapter(DirectorKind.OPENMONTAGE, error=DirectorRouteUnavailable("donor down"))
     native = _FakeAdapter(DirectorKind.ARCREEL_NATIVE, result=_FakeRaw(*_split(_golden_raw())))
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: primary, DirectorKind.ARCREEL_NATIVE: native},
         artifact=object(),
@@ -165,7 +165,7 @@ def test_route_unavailable_fails_when_fallback_disabled() -> None:
     assert native.calls == 0
 
 
-def test_transient_retries_same_director_before_any_fallback() -> None:
+async def test_transient_retries_same_director_before_any_fallback() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     primary = _FakeAdapter(
         DirectorKind.OPENMONTAGE,
@@ -174,7 +174,7 @@ def test_transient_retries_same_director_before_any_fallback() -> None:
         error_times=1,
     )
     native = _FakeAdapter(DirectorKind.ARCREEL_NATIVE, result=_FakeRaw(*_split(_golden_raw())))
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: primary, DirectorKind.ARCREEL_NATIVE: native},
         artifact=object(),
@@ -186,11 +186,11 @@ def test_transient_retries_same_director_before_any_fallback() -> None:
     assert native.calls == 0
 
 
-def test_transient_exhausted_falls_back_to_arcreel_native() -> None:
+async def test_transient_exhausted_falls_back_to_arcreel_native() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     primary = _FakeAdapter(DirectorKind.OPENMONTAGE, error=DirectorTransientError("still down"))
     native = _FakeAdapter(DirectorKind.ARCREEL_NATIVE, result=_FakeRaw(*_split(_golden_raw())))
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: primary, DirectorKind.ARCREEL_NATIVE: native},
         artifact=object(),
@@ -202,11 +202,11 @@ def test_transient_exhausted_falls_back_to_arcreel_native() -> None:
     assert native.calls == 1
 
 
-def test_contract_or_semantic_failure_fails_closed_without_fallback() -> None:
+async def test_contract_or_semantic_failure_fails_closed_without_fallback() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     primary = _FakeAdapter(DirectorKind.OPENMONTAGE, result=_FakeRaw([], [{"id": "SH-broken"}]))
     native = _FakeAdapter(DirectorKind.ARCREEL_NATIVE, result=_FakeRaw(*_split(_golden_raw())))
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: primary, DirectorKind.ARCREEL_NATIVE: native},
         artifact=object(),
@@ -217,14 +217,14 @@ def test_contract_or_semantic_failure_fails_closed_without_fallback() -> None:
     assert native.calls == 0
 
 
-def test_partial_or_ambiguous_execution_fails_closed() -> None:
+async def test_partial_or_ambiguous_execution_fails_closed() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     primary = _FakeAdapter(
         DirectorKind.OPENMONTAGE,
         error=DirectorPartialOutput("crashed after 2 of 5 shots", diagnostic_ref="diag:quarantine/1"),
     )
     native = _FakeAdapter(DirectorKind.ARCREEL_NATIVE, result=_FakeRaw(*_split(_golden_raw())))
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: primary, DirectorKind.ARCREEL_NATIVE: native},
         artifact=object(),
@@ -235,11 +235,11 @@ def test_partial_or_ambiguous_execution_fails_closed() -> None:
     assert native.calls == 0
 
 
-def test_no_automatic_cross_route_between_openmontage_and_take() -> None:
+async def test_no_automatic_cross_route_between_openmontage_and_take() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     primary = _FakeAdapter(DirectorKind.OPENMONTAGE, error=DirectorRouteUnavailable("down"))
     take = _FakeAdapter(DirectorKind.TAKE, result=_FakeRaw(*_split(_golden_raw())))
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: primary, DirectorKind.TAKE: take},
         artifact=object(),
@@ -253,13 +253,13 @@ def test_no_automatic_cross_route_between_openmontage_and_take() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_wraps_m3_golden_a_openmontage_adapter_without_modifying_m3() -> None:
+async def test_wraps_m3_golden_a_openmontage_adapter_without_modifying_m3() -> None:
     bundle = load_golden_a_factual_bundle()
     routing = _policy().decide(input_profile_ref="profile:golden-a", content_basis=bundle.script.content_basis)
     adapter = OpenMontageDirectorAdapter(GoldenAOpenMontageAdapter(FixtureOpenMontageBackend()))
     assert adapter.director_kind is DirectorKind.OPENMONTAGE
 
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: adapter},
         artifact=bundle.script,
@@ -272,11 +272,11 @@ def test_wraps_m3_golden_a_openmontage_adapter_without_modifying_m3() -> None:
     assert result.routing_decision_ref == routing.routing_decision_id
 
 
-def test_validator_rejects_shot_referencing_unknown_scene() -> None:
+async def test_validator_rejects_shot_referencing_unknown_scene() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     scenes, shots = _split(_golden_raw())
     orphan = shots[0].model_copy(update={"scene_id": "SC-DOES-NOT-EXIST"})
-    result = _service().execute(
+    result = await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: _FakeAdapter(DirectorKind.OPENMONTAGE, result=_FakeRaw(scenes, [orphan]))},
         artifact=object(),
@@ -306,56 +306,56 @@ def _prebuilt_success(routing, director, *, scenes=None, shots=None) -> Director
     )
 
 
-def _run_with_prebuilt(prebuilt, routing):
-    return _service().execute(
+async def _run_with_prebuilt(prebuilt, routing):
+    return await _service().execute(
         routing=routing,
         adapters={DirectorKind.OPENMONTAGE: _FakeAdapter(DirectorKind.OPENMONTAGE, result=prebuilt)},
         artifact=object(),
     )
 
 
-def test_prebuilt_director_success_with_orphan_shot_is_rejected() -> None:
+async def test_prebuilt_director_success_with_orphan_shot_is_rejected() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     _, shots = _split(_golden_raw())
     orphan = shots[0].model_copy(update={"scene_id": "SC-NOWHERE"})
-    result = _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE, shots=[orphan]), routing)
+    result = await _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE, shots=[orphan]), routing)
     assert isinstance(result, DirectorFailure)
     assert result.failure_class is DirectorFailureClass.CONTRACT_OR_SEMANTIC_FAILURE
 
 
-def test_prebuilt_director_success_citing_a_foreign_routing_ref_is_rejected() -> None:
+async def test_prebuilt_director_success_citing_a_foreign_routing_ref_is_rejected() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     prebuilt = _prebuilt_success(routing, DirectorKind.OPENMONTAGE).model_copy(
         update={"routing_decision_ref": "RD:some-other-run"}
     )
-    result = _run_with_prebuilt(prebuilt, routing)
+    result = await _run_with_prebuilt(prebuilt, routing)
     assert isinstance(result, DirectorFailure)
     assert result.failure_class is DirectorFailureClass.CONTRACT_OR_SEMANTIC_FAILURE
 
 
-def test_prebuilt_director_success_reporting_a_different_director_is_rejected() -> None:
+async def test_prebuilt_director_success_reporting_a_different_director_is_rejected() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     prebuilt = _prebuilt_success(routing, DirectorKind.TAKE)  # attempted is OPENMONTAGE
-    result = _run_with_prebuilt(prebuilt, routing)
+    result = await _run_with_prebuilt(prebuilt, routing)
     assert isinstance(result, DirectorFailure)
     assert result.failure_class is DirectorFailureClass.CONTRACT_OR_SEMANTIC_FAILURE
 
 
-def test_prebuilt_director_success_with_no_shots_is_rejected() -> None:
+async def test_prebuilt_director_success_with_no_shots_is_rejected() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
-    result = _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE, shots=[]), routing)
+    result = await _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE, shots=[]), routing)
     assert isinstance(result, DirectorFailure)
     assert result.failure_class is DirectorFailureClass.CONTRACT_OR_SEMANTIC_FAILURE
 
 
-def test_a_coherent_prebuilt_director_success_still_passes() -> None:
+async def test_a_coherent_prebuilt_director_success_still_passes() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
-    result = _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE), routing)
+    result = await _run_with_prebuilt(_prebuilt_success(routing, DirectorKind.OPENMONTAGE), routing)
     assert isinstance(result, DirectorSuccess)
     assert result.actual_director is DirectorKind.OPENMONTAGE
 
 
-def test_a_prebuilt_director_failure_passes_through_untouched() -> None:
+async def test_a_prebuilt_director_failure_passes_through_untouched() -> None:
     routing = _policy().decide(input_profile_ref="p", content_basis=_factual_basis())
     failure = DirectorFailure(
         routing_decision_ref="RD:whatever",
@@ -366,7 +366,7 @@ def test_a_prebuilt_director_failure_passes_through_untouched() -> None:
         error_code="ROUTE_UNAVAILABLE",
         message="donor down",
     )
-    result = _run_with_prebuilt(failure, routing)
+    result = await _run_with_prebuilt(failure, routing)
     assert result is failure
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from r2.contracts import (
+    AnyShotSpec,
     ProductionBinding,
     ProductionBindingRole,
     ProductionReadiness,
@@ -18,7 +19,6 @@ from r2.contracts import (
     ReadinessState,
     ResolvedIdentityStatus,
     ResolvedVisualIdentity,
-    ShotSpec,
 )
 
 EVALUATION_POLICY_VERSION = "m4-readiness-v1"
@@ -28,7 +28,7 @@ class ProductionReadinessEvaluator:
     def evaluate(
         self,
         *,
-        shot: ShotSpec,
+        shot: AnyShotSpec,
         bindings: Sequence[ProductionBinding],
         resolved_identity: ResolvedVisualIdentity,
         observed_target_version: str,

@@ -16,11 +16,11 @@ from lib.artifact_manifest import (
 )
 from lib.version_manager import VersionManager
 from r2.contracts import (
+    AnyShotSpec,
     CandidateSelectionStatus,
     ContentBasis,
     GenerationCandidate,
     GenerationLifecycleStatus,
-    ShotSpec,
 )
 from r2.contracts.enums import ArtifactCurrencyStatus
 from r2.production import (
@@ -52,7 +52,7 @@ def _metadata_schema_version():
 
 
 def compute_content_fingerprint(
-    shot: ShotSpec,
+    shot: AnyShotSpec,
     direct_dependencies: Sequence[DependencySnapshot],
 ) -> str:
     payload = {

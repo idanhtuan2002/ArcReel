@@ -198,5 +198,13 @@
     "sha256": "966ec07ae7d5bdca62ab5bf96d1c513df882bba37b2750901f271322a4819f23",
     "url": "https://github.com/dramaclaw/dramaclaw-gateway/blob/0a608d458739226584702943e682da269bf90027/dc-media-protocol.en.md",
     "inspection": "acquired; depth varies, see research report"
+  },
+  {
+    "repo": "XucroYuri/take",
+    "revision": "47c17216b5ad74ee7dd376e8508266e29aefae2c",
+    "path": "packages/core/src/models/enums.ts",
+    "sha256": "a068c66b20a364ebff19d6d0ec407b499d0e0f1f1d34559e42af5344b6649bbc",
+    "url": "https://github.com/XucroYuri/take/blob/47c17216b5ad74ee7dd376e8508266e29aefae2c/packages/core/src/models/enums.ts",
+    "inspection": "acquired; vendored and parity-tested for R2-DEC-031 (M6 Task 4); see docs/r2/evidence/R2_M6_DONOR_BASELINE.json"
   }
 ]

@@ -11,6 +11,7 @@ from r2.contracts import (
     ResolvedVisualIdentity,
     SceneSpec,
     ShotSpec,
+    ShotSpecV2,
     VisualIdentityProfile,
 )
 
@@ -36,6 +37,7 @@ def test_provider_neutral_contracts_have_no_provider_runtime_fields():
     for model in (
         SceneSpec,
         ShotSpec,
+        ShotSpecV2,
         MethodDecision,
         PromptPlan,
         VisualIdentityProfile,

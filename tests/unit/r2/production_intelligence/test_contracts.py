@@ -15,6 +15,8 @@ from pydantic import ValidationError
 
 from r2.contracts import (
     AdmissionOutcome,
+    CameraAngle,
+    CameraMovement,
     CapabilityAvailability,
     CapabilityDescriptor,
     CapabilityFreshnessPolicy,
@@ -56,7 +58,9 @@ from r2.contracts import (
     RetryDisposition,
     RoutingDecision,
     SceneSpec,
+    ShotSize,
     ShotSpec,
+    ShotSpecV2,
     VisualIdentityProfile,
 )
 from r2.contracts.enums import FailureClassification, FailureDomain
@@ -75,6 +79,7 @@ FORBIDDEN_PROVIDER_FIELDS = {
 PROVIDER_NEUTRAL_MODELS = (
     SceneSpec,
     ShotSpec,
+    ShotSpecV2,
     MethodDecision,
     PromptPlan,
     VisualIdentityProfile,
@@ -115,6 +120,29 @@ def _shot(**overrides: object) -> ShotSpec:
     }
     data.update(overrides)
     return ShotSpec.model_validate(data)
+
+
+def _shot_v2(**overrides: object) -> ShotSpecV2:
+    data: dict[str, object] = {
+        "id": "SH01",
+        "schema_version": "r2-shot-spec-v2",
+        "version": 1,
+        "scene_id": "SC01",
+        "content_basis": _basis(),
+        "purpose": "Visualize SH01",
+        "target_duration": 8.0,
+        "framing": "graphic",
+        "camera": "static",
+        "shot_size": ShotSize.WIDE,
+        "camera_angle": CameraAngle.EYE_LEVEL,
+        "camera_movement": CameraMovement.STATIC,
+        "audio_intent": "narration",
+        "allowed_methods": [ProductionMethod.REUSE],
+        "quality_tier": 1,
+        "approval_status": CreativeApprovalStatus.APPROVED,
+    }
+    data.update(overrides)
+    return ShotSpecV2.model_validate(data)
 
 
 def _roundtrip(model):
@@ -191,6 +219,37 @@ def test_director_success_requires_normalized_specs() -> None:
     )
     assert isinstance(success, DirectorSuccess)
     assert success.result_kind == "SUCCESS"
+    assert _roundtrip(success) == success
+
+
+def test_director_success_accepts_a_shot_spec_v2() -> None:
+    """Dual-read (plan Task 14): DirectorSuccess.shots accepts AnyShotSpec, so a
+    TakeDirectorAdapter-style v2 payload round-trips and discriminates back to the
+    exact ShotSpecV2 type — not silently coerced/truncated to v1."""
+    scene = SceneSpec.model_validate(
+        {
+            "id": "SC01",
+            "schema_version": "1",
+            "version": 1,
+            "source_artifact_ref": "SCRIPT-1",
+            "source_unit_refs": ["SEC-01"],
+            "content_basis": _basis().model_dump(mode="json"),
+            "purpose": "Explain SEC-01",
+            "duration_target": 8.0,
+            "required_beats": ["beat:SEC-01"],
+            "allowed_methods": [ProductionMethod.REUSE],
+            "approval_status": "APPROVED",
+        }
+    )
+    success = DirectorSuccess(
+        routing_decision_ref="RD-1",
+        actual_director=DirectorKind.TAKE,
+        scenes=[scene],
+        shots=[_shot_v2()],
+        validation_summary="contract+semantic PASS",
+        provenance=_provenance(),
+    )
+    assert isinstance(success.shots[0], ShotSpecV2)
     assert _roundtrip(success) == success
 
 

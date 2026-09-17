@@ -12,7 +12,7 @@ from pydantic import AwareDatetime, Field
 
 from .common import NonEmptyStr, R2ContractModel
 from .enums import DirectorFailureClass, DirectorKind
-from .production import SceneSpec, ShotSpec
+from .production import AnyShotSpec, SceneSpec
 from .provenance import Provenance
 
 
@@ -37,7 +37,12 @@ class DirectorSuccess(R2ContractModel):
     routing_decision_ref: NonEmptyStr
     actual_director: DirectorKind
     scenes: list[SceneSpec] = Field(default_factory=list)
-    shots: list[ShotSpec] = Field(default_factory=list)
+    # ``AnyShotSpec`` (v1 or v2, plan Task 3) — pulled forward from Task 14's dual-read
+    # retrofit because ``TakeDirectorAdapter`` (Task 13) must be able to construct a
+    # ``DirectorSuccess`` whose shots use the pinned Take v2 vocabulary; every existing
+    # v1 producer/consumer is unaffected (v1 payloads still validate and discriminate
+    # to the "v1" arm).
+    shots: list[AnyShotSpec] = Field(default_factory=list)
     diagnostics: list[NonEmptyStr] = Field(default_factory=list)
     validation_summary: NonEmptyStr
     provenance: Provenance

@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from r2.contracts import SceneSpec, ScriptArtifact, ShotSpec
+from r2.contracts import AnyShotSpec, SceneSpec, ScriptArtifact, ShotSpec
 
 
 @dataclass(frozen=True)
 class GoldenADirectionResult:
     scenes: tuple[SceneSpec, ...]
-    shots: tuple[ShotSpec, ...]
+    shots: tuple[AnyShotSpec, ...]
 
 
 class GoldenAOpenMontageBackend(Protocol):

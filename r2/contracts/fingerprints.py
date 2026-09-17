@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 
 from .common import JSONValue, ensure_json_value
 from .preparation import ProductionBinding
-from .production import ShotSpec
+from .production import AnyShotSpec
 
 
 def canonical_json_bytes(value: JSONValue) -> bytes:
@@ -26,7 +26,7 @@ def _sha256(value: JSONValue) -> str:
 
 def compute_content_fingerprint(
     *,
-    shot_spec: ShotSpec,
+    shot_spec: AnyShotSpec,
     bindings: Sequence[ProductionBinding],
     visual_identity_refs: Sequence[str],
     approved_source_asset_refs: Sequence[str],

@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from r2.contracts import (
+    AnyShotSpec,
     CapabilityAvailability,
     CapabilityDescriptor,
     CapabilityFreshnessPolicy,
@@ -31,7 +32,6 @@ from r2.contracts import (
     ProvenanceActor,
     RejectedCapabilityCandidate,
     ResolvedVisualIdentity,
-    ShotSpec,
     ensure_json_value,
 )
 from r2.contracts.fingerprints import canonical_json_bytes
@@ -124,7 +124,7 @@ class CapabilityRequirementBuilder:
         *,
         method_decision: MethodDecision,
         identity: ResolvedVisualIdentity,
-        shot: ShotSpec,
+        shot: AnyShotSpec,
         required_execution_types: Sequence[ExecutionType] = (),
     ) -> CapabilityRequirements:
         hard = [METHOD_HARD_FEATURE[method_decision.method]]

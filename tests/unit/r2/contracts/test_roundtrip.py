@@ -1,8 +1,13 @@
 import json
 from datetime import UTC, datetime
 
+from pydantic import TypeAdapter
+
 from r2.contracts import (
+    AnyShotSpec,
     ApprovedMaster,
+    CameraAngle,
+    CameraMovement,
     CandidateSelectionStatus,
     ContentBasis,
     ContentBasisType,
@@ -25,7 +30,9 @@ from r2.contracts import (
     ReadinessState,
     ReviewerType,
     SceneSpec,
+    ShotSize,
     ShotSpec,
+    ShotSpecV2,
     VisualIdentityProfile,
 )
 
@@ -88,6 +95,55 @@ def test_scene_and_shot_round_trip():
         approval_status=CreativeApprovalStatus.APPROVED,
     )
     assert _roundtrip(shot) == shot
+
+
+def test_shot_spec_v2_round_trips_and_discriminates_from_v1():
+    """Dual-read (plan Task 14): ``AnyShotSpec`` round-trips a v2 payload back to the
+    exact ``ShotSpecV2`` type, and a v1 payload back to ``ShotSpec`` — the discriminator
+    never conflates the two arms."""
+    shot_v2 = ShotSpecV2(
+        id="SH001",
+        schema_version="r2-shot-spec-v2",
+        version=1,
+        scene_id="SC001",
+        content_basis=_basis(),
+        purpose="Reaction",
+        target_duration=4.0,
+        framing="close-up",
+        camera="locked",
+        shot_size=ShotSize.CLOSE,
+        camera_angle=CameraAngle.EYE_LEVEL,
+        camera_movement=CameraMovement.STATIC,
+        required_reference_roles=[ProductionBindingRole.CHARACTER],
+        allowed_methods=[ProductionMethod.GENERATED_VIDEO],
+        quality_tier=3,
+        approval_status=CreativeApprovalStatus.APPROVED,
+    )
+    assert _roundtrip(shot_v2) == shot_v2
+
+    shot_v1 = ShotSpec(
+        id="SH002",
+        schema_version="2.1",
+        version=1,
+        scene_id="SC001",
+        content_basis=_basis(),
+        purpose="Reaction",
+        target_duration=4.0,
+        framing="close-up",
+        camera="locked",
+        required_reference_roles=[ProductionBindingRole.CHARACTER],
+        allowed_methods=[ProductionMethod.GENERATED_VIDEO],
+        quality_tier=3,
+        approval_status=CreativeApprovalStatus.APPROVED,
+    )
+
+    adapter: TypeAdapter[AnyShotSpec] = TypeAdapter(AnyShotSpec)
+    raw_v1 = json.dumps(shot_v1.model_dump(mode="json"), sort_keys=True)
+    raw_v2 = json.dumps(shot_v2.model_dump(mode="json"), sort_keys=True)
+    assert adapter.validate_python(json.loads(raw_v1)) == shot_v1
+    assert adapter.validate_python(json.loads(raw_v2)) == shot_v2
+    assert type(adapter.validate_python(json.loads(raw_v1))) is ShotSpec
+    assert type(adapter.validate_python(json.loads(raw_v2))) is ShotSpecV2
 
 
 def test_preparation_contracts_round_trip():
