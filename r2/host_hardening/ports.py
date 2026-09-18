@@ -29,6 +29,15 @@ class ExecutionAttemptRepository(Protocol):
 
     async def get_exact(self, *, user_id: str, project_name: str, execution_id: str) -> AttemptSnapshot | None: ...
 
+    async def get_for_task_attempt(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        task_id: str,
+        attempt_no: int,
+    ) -> AttemptSnapshot | None: ...
+
     async def transition_worker(
         self,
         *,

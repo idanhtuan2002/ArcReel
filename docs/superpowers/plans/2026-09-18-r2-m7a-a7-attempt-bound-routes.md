@@ -116,7 +116,7 @@ git commit -m "feat(r2): admit host task provider requests"
 - Produces: `ProviderSubmitReceipt[T](observation: ProviderObservation, value: T)`
 - Produces: `AttemptSubmitter.submit(*, task_id: str, api_call_id: int | None,
   route: ProviderRouteSnapshot, request: ProviderRequest,
-  submit: Callable[[], Awaitable[ProviderSubmitReceipt[T]]]) -> AttemptSubmitResult[T]`
+  submit: Callable[[AttemptSnapshot], Awaitable[ProviderSubmitReceipt[T]]]) -> AttemptSubmitResult[T]`
 - Attempt 1 is the only automatic attempt for a queue task. A later paid retry
   requires a new explicit attempt number and is outside this automatic path.
 - Consumes an optional `UsageExecutionBinder`; Task 3 supplies the production
@@ -172,7 +172,7 @@ class AttemptSubmitter:
 
         async def submit_observation(_attempt, _request):
             nonlocal captured
-            captured = await submit()
+            captured = await submit(_attempt)
             return captured.observation
 
         snapshot = await self._service.plan_and_submit(

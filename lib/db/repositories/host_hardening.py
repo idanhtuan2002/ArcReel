@@ -215,6 +215,24 @@ class ExecutionAttemptRepository:
         )
         return None if row is None else _snapshot_from_row(row)
 
+    async def get_for_task_attempt(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        task_id: str,
+        attempt_no: int,
+    ) -> AttemptSnapshot | None:
+        row = await self._scalar(
+            select(ExecutionAttemptModel).where(
+                ExecutionAttemptModel.user_id == user_id,
+                ExecutionAttemptModel.project_name == project_name,
+                ExecutionAttemptModel.task_id == task_id,
+                ExecutionAttemptModel.attempt_no == attempt_no,
+            )
+        )
+        return None if row is None else _snapshot_from_row(row)
+
     # --- worker authority -----------------------------------------------------------
 
     async def transition_worker(

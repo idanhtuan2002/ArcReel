@@ -149,6 +149,32 @@ async def test_get_exact_is_none_for_a_foreign_project_scope(session_factory: Fa
         assert await repo.get_exact(user_id=USER, project_name=PROJECT, execution_id="unknown") is None
 
 
+async def test_get_for_task_attempt_is_scoped_and_exact(session_factory: Factory) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        expected = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt())
+        await session.commit()
+
+        assert (
+            await repo.get_for_task_attempt(
+                user_id=USER,
+                project_name=PROJECT,
+                task_id=expected.task_id,
+                attempt_no=expected.attempt_no,
+            )
+            == expected
+        )
+        assert (
+            await repo.get_for_task_attempt(
+                user_id=OTHER_USER,
+                project_name=PROJECT,
+                task_id=expected.task_id,
+                attempt_no=expected.attempt_no,
+            )
+            is None
+        )
+
+
 # --- lease fencing ----------------------------------------------------------------------
 
 
