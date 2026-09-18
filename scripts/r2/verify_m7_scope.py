@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from r2.host_hardening.route_inventory import submit_route_inventory_problems
+
 if TYPE_CHECKING:
     from alembic.script import ScriptDirectory
 
@@ -41,6 +43,7 @@ PREREQUISITE_CHECK_NAMES = frozenset(
     {"m6_accepted", "clean_tree", "base_sha", "alembic_head", "revision_graph_digest", "documents"}
 )
 SEAM_CHANGED_CHECK_NAMES = frozenset({"legacy_seams"})
+SUBMIT_ROUTE_CHECK_NAMES = frozenset({"submit_routes"})
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,13 @@ def check_file_hashes(*, recorded: Mapping[str, str], actual: Mapping[str, str],
     if problems:
         return CheckResult(label, False, f"missing or mismatched {label}: {problems}")
     return CheckResult(label, True, f"{len(recorded)} {label} match the baseline")
+
+
+def check_submit_route_inventory() -> CheckResult:
+    problems = submit_route_inventory_problems()
+    if problems:
+        return CheckResult("submit_routes", False, "; ".join(problems))
+    return CheckResult("submit_routes", True, "all paid asynchronous submit families are bound")
 
 
 # --- real-world wiring ---------------------------------------------------------------
@@ -188,6 +198,7 @@ def run_all_checks(*, repo: Path, baseline: Mapping[str, object]) -> list[CheckR
         check_revision_graph_digest(actual_digest=actual_digest, expected_digest=str(baseline["alembic_graph_digest"])),
         check_file_hashes(recorded=documents, actual=actual_documents, label="documents"),
         check_file_hashes(recorded=legacy_seams, actual=actual_seams, label="legacy_seams"),
+        check_submit_route_inventory(),
     ]
 
 
@@ -220,6 +231,9 @@ def main() -> int:
         return 2
     if failed_names & SEAM_CHANGED_CHECK_NAMES:
         print("M7_BASE_SEAM_CHANGED", file=sys.stderr)
+        return 2
+    if failed_names & SUBMIT_ROUTE_CHECK_NAMES:
+        print("M7_SUBMIT_ROUTE_UNBOUND", file=sys.stderr)
         return 2
     return 1 if failed_names else 0
 

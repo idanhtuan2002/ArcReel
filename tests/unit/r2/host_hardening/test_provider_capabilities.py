@@ -213,10 +213,15 @@ def test_unexpired_evidence_passes_the_freshness_check(tmp_path: Path) -> None:
     assert profile.ref == REF
 
 
-# --- empty seeded registry.json claims no real provider support ----------------------------
+# --- real registry contains only fail-closed, unqualified route profiles -------------------
 
 
-def test_the_real_registry_seeds_zero_profiles() -> None:
+def test_the_real_registry_seeds_only_unqualified_route_profiles() -> None:
     real_registry = Path(__file__).resolve().parents[4] / "r2" / "provider_capabilities" / "registry.json"
     document = json.loads(real_registry.read_text())
-    assert document == {"schema_version": 1, "profiles": []}
+    assert document["schema_version"] == 1
+    assert len(document["profiles"]) == 9
+    assert {entry["qualification_status"] for entry in document["profiles"]} == {"UNQUALIFIED"}
+    assert {entry["idempotency_mode"] for entry in document["profiles"]} == {"NONE"}
+    for entry in document["profiles"]:
+        assert load_capability_profile(entry["ref"], registry_path=real_registry).ref == entry["ref"]

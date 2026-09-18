@@ -7,8 +7,8 @@ token scope/value consistency, the ``NOT_FOUND`` settling-window requirement,
 ``ref``/provider/adapter match, ``entry_digest`` tamper detection, and
 qualification/release-mode gating. Both must pass.
 
-``registry.json`` seeds zero profiles because no real provider evidence is
-bundled. No route is enabled by this
+``registry.json`` inventories the Host paid asynchronous submit families as
+``UNQUALIFIED`` profiles. No production-candidate route is enabled by this
 file alone. ``ProviderCapabilityProfile.supports_webhook`` being
 ``Literal[False]`` already makes ``supports_webhook: true`` a Pydantic
 construction failure -- this module does not re-check it, only surfaces that

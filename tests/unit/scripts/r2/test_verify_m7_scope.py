@@ -10,8 +10,19 @@ from scripts.r2.verify_m7_scope import (
     check_file_hashes,
     check_m6_accepted,
     check_revision_graph_digest,
+    check_submit_route_inventory,
     verify_m7_scope,
 )
+
+
+def test_submit_route_inventory_reports_unbound_symbols(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "scripts.r2.verify_m7_scope.submit_route_inventory_problems",
+        lambda: ["M7_SUBMIT_ROUTE_UNBOUND:lib.example:Backend.submit"],
+    )
+    result = check_submit_route_inventory()
+    assert result.ok is False
+    assert result.detail == "M7_SUBMIT_ROUTE_UNBOUND:lib.example:Backend.submit"
 
 
 def test_clean_tree_fails_on_a_dirty_checkpoint() -> None:
