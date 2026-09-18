@@ -1,7 +1,8 @@
 {
   "schema_version": "r2-v1-m5c-m6-authority-remediation-v1",
   "status": "READY_FOR_INDEPENDENT_REVIEW",
-  "candidate_code_head": "8ed493322c378b40bf0ae40f2ccca2a2f1d45f0b",
+  "candidate_code_head": "42bfba2c8efe46e611dcf46ae9ec767cfdbb2328",
+  "behavioral_remediation_head": "8ed493322c378b40bf0ae40f2ccca2a2f1d45f0b",
   "parent_candidate_head": "cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3",
   "scope": {
     "milestones": ["M5C", "M6"],
@@ -48,7 +49,16 @@
       "skipped": 17,
       "warnings": 103,
       "command": "env -u DATABASE_URL uv run python -m pytest -n 4 --dist loadfile -q --tb=short",
-      "database_mode": "worker-owned SQLite test databases"
+      "database_mode": "worker-owned SQLite test databases",
+      "verified_at_head": "8ed493322c378b40bf0ae40f2ccca2a2f1d45f0b"
+    },
+    "post_gate_doc_only_review_fix": {
+      "status": "PASS",
+      "head": "42bfba2c8efe46e611dcf46ae9ec767cfdbb2328",
+      "change": "Corrected one test docstring so the retry contract names admission id, authenticated principal, and exact scope.",
+      "targeted_pytest": "6 passed",
+      "ruff": "PASS",
+      "diff_check": "PASS"
     },
     "diff_check": "PASS"
   },
