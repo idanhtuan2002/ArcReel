@@ -1,8 +1,8 @@
 {
   "schema_version": "r2-v1-m5c-m6-authority-remediation-v1",
-  "status": "READY_FOR_INDEPENDENT_REVIEW",
-  "candidate_code_head": "42bfba2c8efe46e611dcf46ae9ec767cfdbb2328",
-  "behavioral_remediation_head": "8ed493322c378b40bf0ae40f2ccca2a2f1d45f0b",
+  "status": "READY_FOR_INDEPENDENT_REREVIEW",
+  "candidate_code_head": "f5c85e3cad1abe297f6e408f66ed7743f9aabf11",
+  "behavioral_remediation_head": "f5c85e3cad1abe297f6e408f66ed7743f9aabf11",
   "parent_candidate_head": "cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3",
   "scope": {
     "milestones": ["M5C", "M6"],
@@ -60,16 +60,40 @@
       "ruff": "PASS",
       "diff_check": "PASS"
     },
+    "round_2_remediation": {
+      "status": "PASS",
+      "head": "f5c85e3cad1abe297f6e408f66ed7743f9aabf11",
+      "red_regressions": "3 failed as expected before implementation",
+      "new_adversarial_cases": "5 passed",
+      "sqlite_adaptation": "151 passed, 5 skipped",
+      "postgres_18_adaptation": "95 passed",
+      "full_backend_pytest": "13699 passed, 17 skipped, 102 warnings",
+      "ruff_format_basedpyright_imports_deptry_audit": "PASS",
+      "diff_check": "PASS"
+    },
     "diff_check": "PASS"
   },
+  "review_history": [
+    {
+      "reviewed_head": "dffa78c7c7688e2196886eafe9179c718068bb0d",
+      "verdict": "CHANGES_REQUIRED",
+      "blocking_findings": [
+        "cross-artifact and cross-report waiver laundering",
+        "incomplete map report and resolved-sidecar binding",
+        "REVOKE blocked by historical dependency supersession",
+        "evidence overstated closure"
+      ],
+      "record": "docs/r2/evidence/R2_V1_M5C_M6_AUTHORITY_INDEPENDENT_REVIEW_2026-09-18.md"
+    }
+  ],
   "environment_notes": [
     "Sandboxed test attempts were discarded because the sandbox denied local sockets and stream primitives; authoritative test results above were rerun outside the sandbox.",
     "The first full-suite PostgreSQL attempt was discarded because one external database was incorrectly shared across four xdist workers; the authoritative PostgreSQL affected suite ran serially, and the authoritative full suite used worker-owned SQLite databases."
   ],
   "known_limits": [
-    "No background reviewer was used at the sponsor's request to conserve quota.",
-    "Independent review of this exact candidate remains outstanding; this evidence is not an acceptance decision.",
+    "Exactly one independent reviewer was used; no parallel or nested reviewer agents were opened.",
+    "Independent re-review of this remediated exact candidate remains outstanding; this evidence is not an acceptance decision.",
     "M7 remains closed and no production provider call, deployment, publication, or media-product acceptance is authorized."
   ],
-  "next_authority": "independent review of the exact evidence commit that contains this file"
+  "next_authority": "independent re-review of the exact evidence commit that contains this file"
 }
