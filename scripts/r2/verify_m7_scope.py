@@ -15,6 +15,7 @@ what the baseline recorded.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import subprocess
@@ -124,11 +125,17 @@ def _run(cmd: list[str], *, cwd: Path) -> str:
 
 
 def _git_dirty_paths(repo: Path) -> list[str]:
-    out = _run(["git", "status", "--porcelain"], cwd=repo)
+    out = subprocess.run(
+        ["git", "status", "--porcelain=v1"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
     return [line[3:] for line in out.splitlines() if line.strip()]
 
 
-def _worktree_base(repo: Path) -> str:
+def _materialization_commit(repo: Path) -> str:
     # The materialization commit adds the umbrella plan alongside every other
     # planning document; its parent is the exact M6-accepted head this worktree
     # is rooted on (mirrors verify_m6_scope.py's own doc_commit^ pattern).
@@ -136,12 +143,12 @@ def _worktree_base(repo: Path) -> str:
     lines = out.splitlines()
     if not lines:
         return ""
-    materialization_commit = lines[-1]
-    return _run(["git", "rev-parse", f"{materialization_commit}^"], cwd=repo)
+    return lines[-1]
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _worktree_base(repo: Path) -> str:
+    materialization_commit = _materialization_commit(repo)
+    return "" if not materialization_commit else _run(["git", "rev-parse", f"{materialization_commit}^"], cwd=repo)
 
 
 def _m6_handoff_status(repo: Path) -> str | None:
@@ -153,15 +160,6 @@ def _m6_handoff_status(repo: Path) -> str | None:
     return status if isinstance(status, str) else None
 
 
-def _alembic_script_directory(repo: Path) -> ScriptDirectory:
-    from alembic.config import Config
-    from alembic.script import ScriptDirectory
-
-    cfg = Config()
-    cfg.set_main_option("script_location", str(repo / "alembic"))
-    return ScriptDirectory.from_config(cfg)
-
-
 def alembic_revision_graph_digest(script_dir: ScriptDirectory) -> str:
     """Hash of every ordered (revision, down_revision) pair in the complete graph."""
     pairs: list[dict[str, object]] = []
@@ -169,26 +167,85 @@ def alembic_revision_graph_digest(script_dir: ScriptDirectory) -> str:
         down = rev.down_revision
         down_norm: object = down if down is None or isinstance(down, str) else sorted(down)
         pairs.append({"revision": rev.revision, "down_revision": down_norm})
+    return _revision_pairs_digest(pairs)
+
+
+def _revision_pairs_digest(pairs: list[dict[str, object]]) -> str:
     pairs.sort(key=lambda p: str(p["revision"]))
     canonical = json.dumps(pairs, sort_keys=True, separators=(",", ":"))
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _git_blob(repo: Path, ref: str, path: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{ref}:{path}"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    ).stdout
+
+
+def _git_blob_hashes(repo: Path, ref: str, paths: Iterable[str]) -> dict[str, str]:
+    hashes: dict[str, str] = {}
+    for path in paths:
+        try:
+            hashes[path] = hashlib.sha256(_git_blob(repo, ref, path)).hexdigest()
+        except subprocess.CalledProcessError:
+            continue
+    return hashes
+
+
+def _literal_assignment(source: bytes, name: str) -> object:
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+            return ast.literal_eval(node.value)
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == name for target in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise ValueError(f"missing {name!r} assignment")
+
+
+def _alembic_revision_metadata_at_ref(repo: Path, ref: str) -> tuple[tuple[str, ...], str]:
+    listed = _run(["git", "ls-tree", "-r", "--name-only", ref, "--", "alembic/versions"], cwd=repo)
+    pairs: list[dict[str, object]] = []
+    revisions: set[str] = set()
+    parents: set[str] = set()
+    for path in listed.splitlines():
+        if not path.endswith(".py") or path.endswith("/__init__.py"):
+            continue
+        source = _git_blob(repo, ref, path)
+        revision = str(_literal_assignment(source, "revision"))
+        raw_down = _literal_assignment(source, "down_revision")
+        down_revisions = () if raw_down is None else (raw_down,) if isinstance(raw_down, str) else tuple(raw_down)
+        down_norm: object = (
+            None if not down_revisions else down_revisions[0] if len(down_revisions) == 1 else sorted(down_revisions)
+        )
+        pairs.append({"revision": revision, "down_revision": down_norm})
+        revisions.add(revision)
+        parents.update(str(parent) for parent in down_revisions)
+    return tuple(sorted(revisions - parents)), _revision_pairs_digest(pairs)
+
+
 def run_all_checks(*, repo: Path, baseline: Mapping[str, object]) -> list[CheckResult]:
     dirty = _git_dirty_paths(repo)
+    materialization_commit = _materialization_commit(repo)
     actual_base = _worktree_base(repo)
     expected_base = str(baseline["m6_accepted_head"])
 
     m6_status = _m6_handoff_status(repo)
 
-    script_dir = _alembic_script_directory(repo)
-    actual_heads = tuple(sorted(script_dir.get_heads()))
-    actual_digest = alembic_revision_graph_digest(script_dir)
-
     documents = dict(baseline["documents"])
     legacy_seams = dict(baseline["legacy_seams"])
-    actual_documents = {path: _sha256(repo / path) for path in documents if (repo / path).is_file()}
-    actual_seams = {path: _sha256(repo / path) for path in legacy_seams if (repo / path).is_file()}
+    if actual_base:
+        actual_heads, actual_digest = _alembic_revision_metadata_at_ref(repo, actual_base)
+        actual_documents = _git_blob_hashes(repo, materialization_commit, documents)
+        actual_seams = _git_blob_hashes(repo, actual_base, legacy_seams)
+    else:
+        actual_heads, actual_digest = (), ""
+        actual_documents = {}
+        actual_seams = {}
 
     return [
         check_m6_accepted(status=m6_status),
