@@ -1,6 +1,6 @@
 {
   "schema_version": "r2-v1-m5c-m6-authority-remediation-v1",
-  "status": "READY_FOR_INDEPENDENT_REREVIEW",
+  "status": "APPROVED",
   "candidate_code_head": "54acf51948ef0fdc21da7d868778483cebd230ed",
   "behavioral_remediation_head": "54acf51948ef0fdc21da7d868778483cebd230ed",
   "parent_candidate_head": "cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3",
@@ -106,6 +106,16 @@
         "stored evaluation-report content was not recomputed against its content-addressed report_digest"
       ],
       "resolved_by": "54acf51948ef0fdc21da7d868778483cebd230ed"
+    },
+    {
+      "reviewed_head": "aaa4eb7eeabbab81650dcbe1fde02ef02103067d",
+      "fixed_point": "cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3",
+      "verdict": "APPROVED",
+      "reviewer": "independent read-only reviewer",
+      "blocking_findings": [],
+      "fresh_targeted_verification": "8 passed, 1 warning",
+      "standards": "PASS",
+      "diff_check": "PASS"
     }
   ],
   "environment_notes": [
@@ -114,8 +124,8 @@
   ],
   "known_limits": [
     "Exactly one independent reviewer was used; no parallel or nested reviewer agents were opened.",
-    "Independent re-review of this remediated exact candidate remains outstanding; this evidence is not an acceptance decision.",
-    "M7 remains closed and no production provider call, deployment, publication, or media-product acceptance is authorized."
+    "The graph index was stale for the candidate worktree; the independent reviewer used exact Git/source and fresh targeted tests.",
+    "No production provider call, deployment, publication, or media-product acceptance is authorized by this design-and-code acceptance."
   ],
-  "next_authority": "independent re-review of the exact evidence commit that contains this file"
+  "next_authority": "begin M7 from the accepted M5C/M6 candidate reviewed at aaa4eb7eeabbab81650dcbe1fde02ef02103067d"
 }

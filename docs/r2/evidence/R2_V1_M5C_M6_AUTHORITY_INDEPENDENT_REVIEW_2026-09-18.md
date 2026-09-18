@@ -58,3 +58,17 @@ Commit `f5c85e3cad1abe297f6e408f66ed7743f9aabf11` addresses the blocking finding
 This checkpoint is `READY_FOR_INDEPENDENT_REREVIEW`, not accepted. A fresh reviewer
 verdict must bind the exact evidence commit containing this record and the updated
 machine-readable evidence.
+
+## Final re-review
+
+- Reviewed HEAD: `aaa4eb7eeabbab81650dcbe1fde02ef02103067d`
+- Fixed point: `cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3`
+- Mode: independent, read-only, exact Git/source review because graph freshness was missing for the worktree
+- Fresh targeted verification: `8 passed, 1 warning`
+- `git diff --check`: pass
+- Verdict: **APPROVED**
+- Blocking findings: none
+
+The reviewer confirmed the shared semantic report-digest guard at all three authority consumption boundaries,
+exact artifact/sidecar binding, report-scoped waiver tuples, REVOKE behavior after dependency supersession,
+read-time reader authority, adversarial metadata/finding-row corruption coverage, and evidence consistency.

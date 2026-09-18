@@ -77,3 +77,15 @@ Fresh gates on the remediation:
 
 Status returns to `READY_FOR_INDEPENDENT_REREVIEW`; this remediation is not accepted until one independent
 reviewer issues an explicit verdict on the exact evidence commit containing this section.
+
+## Final independent verdict
+
+An independent read-only reviewer reviewed exact candidate HEAD
+`aaa4eb7eeabbab81650dcbe1fde02ef02103067d` against fixed point
+`cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3` and returned `APPROVED` with no blocking
+findings. The reviewer independently ran a focused eight-test corruption, binding, waiver, revocation, and
+reader set: `8 passed, 1 warning`; `git diff --check` passed and the reviewed worktree was clean.
+
+M5C/M6 authority remediation is accepted at that exact reviewed candidate. The commit recording this verdict
+is administrative evidence only. The next session may begin M7 from this accepted lineage; it must still run
+M7's own research/design/implementation gates and does not inherit production or publication authority.
