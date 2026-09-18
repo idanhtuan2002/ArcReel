@@ -193,8 +193,9 @@ async def test_a_retry_after_a_lost_response_replays_the_exact_persisted_commit(
     facade: NarrativeCanonHandoffFacade, admitted_handoff: AdmittedNarrativeHandoff
 ) -> None:
     """A caller that never saw the first response — a dropped reply, or a crash between
-    the M5A commit and recording success — retries by admission id alone. M5A's own
-    exact-retry governs the outcome: the same version is returned, not a second one."""
+    the M5A commit and recording success — retries with the same admission id,
+    authenticated principal, and exact scope. M5A's own exact-retry governs the
+    outcome: the same version is returned, not a second one."""
     first = await facade.commit_from_admission(
         admission_id=admitted_handoff.admission_id,
         scope=admitted_handoff.admission.work_scope,
