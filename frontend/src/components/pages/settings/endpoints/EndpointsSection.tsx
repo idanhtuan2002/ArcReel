@@ -44,6 +44,18 @@ interface ListEntry {
 const COMFYUI_DRAFT_KEY = "comfyui-new";
 
 /**
+ * 详情组件的实例身份。定义、绑定与推断结果都是详情里的 `useState`，只在挂载那一刻取自 props，
+ * 换一份定义就得换一个实例，否则屏幕上还是旧的那份、保存下去的也是旧的。
+ *
+ * 端点键之外还有一处会在键不变的情况下换定义：重新导入产生一份新草稿（自带一次性 token）。
+ */
+function detailInstanceKey(selectedKey: string | null, selection: EndpointSelection): string {
+  const key = selectedKey ?? "";
+  if (selection.mode === "comfyui-draft") return `${key}:draft-${selection.draft.token}`;
+  return `${key}:`;
+}
+
+/**
  * 调用端点小节：左侧按归属分组的端点列表，右侧生命周期表单。
  * 选中项写进 URL 的 endpoint 参数，刷新与外部跳转都能落回同一个端点。
  */
@@ -77,6 +89,8 @@ export function EndpointsSection() {
     definition: ComfyuiEndpointDefinition;
   } | null>(null);
   const [comfyuiDraft, setComfyuiDraft] = useState<ComfyuiImportDraft | null>(null);
+  // 草稿的一次性身份发号器；只进详情的 React key，不参与渲染。
+  const draftSeq = useRef(0);
 
   const selectedKey = new URLSearchParams(search).get("endpoint");
 
@@ -287,6 +301,9 @@ export function EndpointsSection() {
    */
   const handleImportBindings = useCallback(async () => {
     if (!importDefinition || !isComfyuiDefinition(importDefinition) || !importValidation) return;
+    // 推断期间用户可以取消弹窗，也可以再交一份载荷；两者都递增这个号，回来发现号变了就整份丢弃
+    // ——迟到的那一份会把一个已经被放弃的 workflow 装进详情并跳过去。
+    const run = importRunRef.current;
     setImportBusy(true);
     try {
       const base = reimportBase
@@ -297,16 +314,32 @@ export function EndpointsSection() {
           )
         : importDefinition;
       const inference = await API.inferComfyuiBindings(base, { mediaType: base.media_type });
+      if (importRunRef.current !== run) return;
       const record = reimportBase?.record ?? null;
-      setComfyuiDraft({ record, definition: base, fileName: importFileName, inference });
+      draftSeq.current += 1;
+      setComfyuiDraft({
+        token: String(draftSeq.current),
+        record,
+        definition: base,
+        fileName: importFileName,
+        inference,
+      });
       setImportOpen(false);
       select(record ? record.key : COMFYUI_DRAFT_KEY);
     } catch (e) {
-      pushToast(errMsg(e, t("ce_import_failed")), "error");
+      if (importRunRef.current === run) pushToast(errMsg(e, t("ce_import_failed")), "error");
     } finally {
-      setImportBusy(false);
+      if (importRunRef.current === run) setImportBusy(false);
     }
   }, [importDefinition, importValidation, importFileName, reimportBase, select, pushToast, t]);
+
+  /** 关掉导入弹窗：在途的识别与推断一并作废，回来的那一份不再装进详情。 */
+  const closeImport = useCallback(() => {
+    importRunRef.current += 1;
+    setImportBusy(false);
+    setImportPending(false);
+    setImportOpen(false);
+  }, []);
 
   const openImport = useCallback(() => {
     setReimportBase(null);
@@ -318,8 +351,10 @@ export function EndpointsSection() {
   /** 为当前这个 ComfyUI 端点换一份 workflow：身份与已确认的节点绑定沿用手上这一份。 */
   const startComfyuiReimport = useCallback(
     (current: ComfyuiEndpointDefinition) => {
-      const record =
-        comfyuiDraft?.record ?? customEndpoints.find((endpoint) => endpoint.key === selectedKey) ?? null;
+      // 草稿的身份只在它就是当前选中的那一个时才算数：手上留着端点 A 的未保存草稿、人却走到
+      // 端点 B 上点了重新导入时，沿用 A 的 record 会把 B 的 workflow 存到 A 身上。
+      const draftRecord = comfyuiDraft?.record?.key === selectedKey ? comfyuiDraft.record : null;
+      const record = draftRecord ?? customEndpoints.find((endpoint) => endpoint.key === selectedKey) ?? null;
       setReimportBase({ record, definition: current });
       setImportMediaType(current.media_type);
       resetImportSource();
@@ -500,7 +535,7 @@ export function EndpointsSection() {
       <div className="min-w-0 flex-1">
         {selection ? (
           <EndpointDetail
-            key={selectedKey ?? ""}
+            key={detailInstanceKey(selectedKey, selection)}
             selection={selection}
             providers={providers}
             referenceCount={selectedKey ? (referenceCounts[selectedKey] ?? 0) : 0}
@@ -538,7 +573,7 @@ export function EndpointsSection() {
         onCreateCopy={() => void handleImportCreate()}
         onOverwrite={(id) => void handleImportOverwrite(id)}
         onBindNodes={() => void handleImportBindings()}
-        onCancel={() => setImportOpen(false)}
+        onCancel={closeImport}
       />
     </div>
   );
