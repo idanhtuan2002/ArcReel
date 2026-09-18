@@ -35,7 +35,7 @@ from r2.adaptation.errors import (
 )
 from r2.adaptation.evaluation import ProfileEvaluationService, report_ref_of
 from r2.adaptation.evidence import AdaptationEvidenceService
-from r2.adaptation.hashing import compute_adaptation_hash
+from r2.adaptation.hashing import compute_adaptation_hash, compute_profile_evaluation_report_digest
 from r2.adaptation.profiles import _PACKS_DIR, _compute_policy_pack_digest
 from r2.adaptation.screenplay_reader import ApprovedScreenplayReader
 from r2.contracts.adaptation import (
@@ -349,6 +349,55 @@ async def test_reader_rejects_an_admission_after_it_is_revoked(
         )
 
 
+async def test_revoke_succeeds_after_the_original_map_approval_is_superseded(
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    branch, map_receipt, proposal, report = await _seed_admissible_proposal(
+        adaptation_evidence_service, authority_service, evaluation_service
+    )
+    admit = _admit_command(
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+    )
+    await authority_service.admit_screenplay_for_direction(admit, authenticated_principal=_PRINCIPAL)
+
+    replacement_map = await adaptation_evidence_service.append_map(
+        _map(adaptation_map_id=proposal.adaptation_map_ref.artifact_id, branch_ref=_branch_ref(branch), version=2),
+        user_id=USER,
+        project_name=PROJECT,
+    )
+    replacement_approval = MapApprovalCommand(
+        user_id=USER,
+        project_name=PROJECT,
+        decision_id="d-map-replacement",
+        branch_id=branch.branch_id,
+        map_ref=_map_ref(replacement_map),
+        profile_ref=branch.profile_ref,
+        relied_report_refs=[],
+        expected_predecessor_id=map_receipt.decision_ref.decision_id,
+        action=AdaptationDecisionAction.APPROVE,
+    )
+    await authority_service.decide_map(replacement_approval, authenticated_principal=_PRINCIPAL)
+
+    revoke = _admit_command(
+        decision_id="d-admit-revoke-after-map-supersession",
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+        expected_predecessor_id=admit.decision_id,
+        action=AdaptationDecisionAction.REVOKE,
+    )
+    receipt = await authority_service.admit_screenplay_for_direction(revoke, authenticated_principal=_PRINCIPAL)
+
+    assert receipt.outcome == "RECORDED"
+    assert receipt.current_at_return is False
+
+
 async def test_admit_exact_retry_returns_the_same_receipt(
     authority_service: AdaptationAuthorityService,
     adaptation_evidence_service: AdaptationEvidenceService,
@@ -652,6 +701,57 @@ async def test_admit_rejects_a_waiver_for_another_artifact_with_matching_bytes(
     )
 
     with pytest.raises(AdaptationWaiverNotApplicableError):
+        await authority_service.admit_screenplay_for_direction(command, authenticated_principal=_PRINCIPAL)
+
+
+async def test_admit_does_not_let_one_report_waiver_cover_same_named_finding_in_another_report(
+    session_factory: Factory,
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    branch, map_receipt, proposal, first_report = await _seed_admissible_proposal(
+        adaptation_evidence_service,
+        authority_service,
+        evaluation_service,
+        dramatic_text="Something happens.\nMore happens.",
+    )
+    finding = first_report.findings[0]
+    waiver = await authority_service.decide_waiver(
+        ProfileWaiverCommand(
+            user_id=USER,
+            project_name=PROJECT,
+            decision_id="d-waive-first-report-only",
+            branch_id=branch.branch_id,
+            artifact_ref=_screenplay_ref(proposal),
+            profile_ref=branch.profile_ref,
+            report_ref=report_ref_of(first_report),
+            finding_ids=[finding.finding_id],
+            rule_versions=[finding.rule_version],
+            rationale="this review applies only to the first exact report",
+            expected_predecessor_id=None,
+            action=AdaptationDecisionAction.WAIVE,
+        ),
+        authenticated_principal=_PRINCIPAL,
+    )
+    second_draft = first_report.model_copy(
+        update={"evaluator_version": "second-evaluator-v1", "report_digest": "pending"}
+    )
+    second_report = second_draft.model_copy(
+        update={"report_digest": compute_profile_evaluation_report_digest(second_draft)}
+    )
+    async with adaptation_uow_factory(session_factory)() as uow:
+        await uow.repository.insert_report(second_report, user_id=USER, project_name=PROJECT)
+        await uow.commit()
+
+    command = _admit_command(
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(first_report), report_ref_of(second_report)],
+        waiver_refs=[waiver.decision_ref],
+    )
+    with pytest.raises(AdaptationBlockingFindingUnresolvedError):
         await authority_service.admit_screenplay_for_direction(command, authenticated_principal=_PRINCIPAL)
 
 

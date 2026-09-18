@@ -48,17 +48,23 @@ providers, directors, or projections.
    change is rejected for review rather than mislabeled.
 6. One Human Showrunner map-approval decision binds the exact complete map
    version/hash after all entry review evidence is present. Every relied-on
-   report resolves in scope and its ordered sidecar ref/digest exactly matches
-   the map's ordered `profile_analysis_refs`.
+   report resolves in scope, binds the exact map hash, and its ordered sidecar
+   ref/digest exactly matches the map's ordered `profile_analysis_refs`. Each
+   sidecar identity is derived from exact artifact ID/version plus profile, resolves
+   in scope, and passes semantic hash recomputation.
 7. One Human Showrunner screenplay-admission command atomically appends the
    approval decision and advances the locked screenplay head for the exact
    screenplay/map/profile/evaluation tuple.
 8. Shared integrity findings are never waivable. A Human Showrunner may waive a
-   profile finding only with an exact rule/finding/artifact/policy binding and
-   rationale. Semantic or policy change invalidates applicability.
+   profile finding only with an exact report/rule/finding/artifact/policy binding
+   and rationale. Matching bytes or a same-named finding in another report is not
+   identity. Semantic or policy change invalidates applicability.
 9. Every Human authorization binds the canonical command hash. A screenplay
    `REVOKE` clears effective use authority, and every approved-screenplay read
-   revalidates the locked authoritative head and complete decision fold.
+   revalidates the locked authoritative head and complete decision fold. `REVOKE`
+   targets the current effective ADMIT's exact immutable context without requiring
+   its historical dependencies to remain current. Reader authorization is checked
+   at read time; it is not an in-flight execution-cancellation lease.
 10. `ShotSpecV2` adds Take-derived typed shot vocabulary. v1 remains byte/hash
    stable; reads accept v1 and v2, new Take output writes v2, and unknown legacy
    strings require explicit Human mapping.

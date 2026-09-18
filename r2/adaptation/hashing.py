@@ -18,6 +18,7 @@ from r2.contracts import canonical_json_bytes, ensure_json_value
 from r2.contracts.adaptation import (
     AdaptationDecisionAuthorization,
     AdaptationMapV2,
+    AdaptationProfileRef,
     MapApprovalCommand,
     ProfileEvaluationReport,
     ProfileWaiverCommand,
@@ -123,6 +124,12 @@ def compute_profile_evaluation_report_digest(report: ProfileEvaluationReport) ->
     return "sha256:" + _sha256_hex(payload)
 
 
+def compute_profile_sidecar_id(artifact_id: str, profile_ref: AdaptationProfileRef) -> str:
+    """Return the deterministic sidecar identity for one exact artifact identity
+    namespace and profile. The artifact version remains the sidecar ref's version."""
+    return f"{artifact_id}:{profile_ref.profile_id.value}"
+
+
 def compute_decision_identity_hash(
     command: AdaptationDecisionCommand, authorization: AdaptationDecisionAuthorization
 ) -> str:
@@ -163,4 +170,5 @@ __all__ = [
     "compute_command_identity_hash",
     "compute_decision_identity_hash",
     "compute_profile_evaluation_report_digest",
+    "compute_profile_sidecar_id",
 ]

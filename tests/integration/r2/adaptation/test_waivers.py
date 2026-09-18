@@ -380,6 +380,38 @@ async def test_decide_waiver_rejects_an_unresolved_artifact_with_matching_bytes(
         await authority_service.decide_waiver(command, authenticated_principal=_PRINCIPAL)
 
 
+async def test_decide_waiver_rejects_a_report_for_another_resolved_artifact_with_matching_bytes(
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    first, first_report = await _seed_screenplay_with_a_profile_block_finding(
+        adaptation_evidence_service, evaluation_service
+    )
+    second = await adaptation_evidence_service.append_screenplay(
+        _screenplay(
+            screenplay_id="sp-2",
+            branch_ref=first.adaptation_branch_ref,
+            map_ref=first.adaptation_map_ref,
+            dramatic_text="Something happens.\nMore happens.",
+        ),
+        user_id=USER,
+        project_name=PROJECT,
+    )
+    assert second.content_hash == first.content_hash
+    finding = first_report.findings[0]
+    command = _waive_command(
+        artifact_ref=_screenplay_ref(second),
+        profile_ref=first_report.profile_ref,
+        report_ref=report_ref_of(first_report),
+        finding_ids=[finding.finding_id],
+        rule_versions=[finding.rule_version],
+    )
+
+    with pytest.raises(AdaptationWaiverNotApplicableError):
+        await authority_service.decide_waiver(command, authenticated_principal=_PRINCIPAL)
+
+
 async def test_decide_waiver_rejects_an_unrecognized_finding(
     authority_service: AdaptationAuthorityService,
     adaptation_evidence_service: AdaptationEvidenceService,

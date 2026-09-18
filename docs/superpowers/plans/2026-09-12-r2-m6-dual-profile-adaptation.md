@@ -744,8 +744,10 @@ scan finds no authority/provider import.
 - [ ] Reject an authorization whose `command_identity_hash` differs from the
   canonical command. Resolve every `relied_report_refs` entry and require the
   reports' ordered exact sidecar refs/digests to equal the map's ordered
-  `profile_analysis_refs`; dangling, extra, missing, reordered, or cross-profile
-  report evidence writes nothing.
+  `profile_analysis_refs`; also bind the exact map hash, derive sidecar identity
+  from artifact ID/version plus profile, resolve the sidecar and recompute its
+  semantic hash. Dangling, extra, missing, reordered, cross-artifact or
+  cross-profile report evidence writes nothing.
 - [ ] Reuse the M5C transaction protocol as a pattern while keeping a separate
   adaptation authority type and repository surface.
 - [ ] Implement one pure chain-fold/validation helper used by both the standalone
@@ -901,7 +903,9 @@ migration `revision = "6c7c4a0e0001"`, `down_revision =
 - [ ] At issuance and admission, prove the waiver's full artifact ref, branch,
   report ref, finding ids, rule versions and profile against the exact proposal
   and the exact reports consumed by that admission; matching bytes alone are
-  insufficient identity.
+  insufficient identity, and coverage keys include exact report digest, finding
+  ID and rule version so one report cannot cover another report's same-named
+  finding.
 - [ ] Run `uv run python -m pytest
   tests/integration/r2/adaptation/test_evaluation.py
   tests/integration/r2/adaptation/test_waivers.py
@@ -945,7 +949,11 @@ cannot be waived, and semantic/profile changes invalidate applicability.
 - [ ] Expose an exact approved/locked screenplay reader for Director; expose no
   mutation through that port. The reader locks and rebuilds the admission head
   and returns only the current effective admission. `REVOKE` clears the effective
-  decision and selected artifact, so old admission refs become unusable.
+  decision and selected artifact, so old admission refs become unusable. A
+  revocation repeats and proves the current ADMIT's immutable context but does not
+  re-run positive dependency currentness; superseding an old map/report/waiver
+  must not prevent revocation. The reader provides read-time authority, not an
+  in-flight cancellation lease.
 - [ ] Run `uv run python -m pytest
   tests/integration/r2/adaptation/test_screenplay_admission.py
   tests/integration/lib/db/migrations/test_alembic_screenplay_admission.py

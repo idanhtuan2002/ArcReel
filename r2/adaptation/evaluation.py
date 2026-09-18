@@ -28,7 +28,7 @@ from r2.adaptation.errors import (
     AdaptationNotFoundError,
     AdaptationStaleDependencyError,
 )
-from r2.adaptation.hashing import compute_profile_evaluation_report_digest
+from r2.adaptation.hashing import compute_profile_evaluation_report_digest, compute_profile_sidecar_id
 from r2.adaptation.ports import AdaptationUnitOfWorkFactory
 from r2.adaptation.profiles import ProfilePackRegistry
 from r2.adaptation.shuangwen_profile import ShuangwenSourceScope, evaluate_shuangwen
@@ -49,10 +49,6 @@ def _sidecar_findings(sidecar: WesternDramaAnalysis | ShuangwenAnalysis) -> list
     if isinstance(sidecar, WesternDramaAnalysis):
         return list(sidecar.format_findings)
     return list(sidecar.findings)
-
-
-def _sidecar_id(artifact_id: str, profile_ref: AdaptationProfileRef) -> str:
-    return f"{artifact_id}:{profile_ref.profile_id.value}"
 
 
 def report_ref_of(report: ProfileEvaluationReport) -> DecisionRef:
@@ -125,7 +121,7 @@ class ProfileEvaluationService:
                     raise ValueError("source_scope is required for the CN_SHORT_DRAMA_SHUANGWEN profile")
                 sidecar = evaluate_shuangwen(screenplay, source_scope=source_scope, profile_pack=profile_pack)
 
-            sidecar_id = _sidecar_id(artifact_ref.artifact_id, profile_pack.ref)
+            sidecar_id = compute_profile_sidecar_id(artifact_ref.artifact_id, profile_pack.ref)
             sidecar_ref = ArtifactVersionRef(
                 artifact_id=sidecar_id, version=artifact_ref.version, content_hash=sidecar.content_hash
             )
