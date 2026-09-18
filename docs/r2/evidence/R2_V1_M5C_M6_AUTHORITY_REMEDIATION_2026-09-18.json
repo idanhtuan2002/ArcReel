@@ -1,0 +1,65 @@
+{
+  "schema_version": "r2-v1-m5c-m6-authority-remediation-v1",
+  "status": "READY_FOR_INDEPENDENT_REVIEW",
+  "candidate_code_head": "8ed493322c378b40bf0ae40f2ccca2a2f1d45f0b",
+  "parent_candidate_head": "cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3",
+  "scope": {
+    "milestones": ["M5C", "M6"],
+    "m7_opened": false,
+    "schema_or_migration_changed": false,
+    "findings_closed": [
+      "authorization binds the exact command_identity_hash",
+      "map approval resolves and binds exact ordered report sidecars",
+      "screenplay admission binds the exact map artifact version and hash",
+      "waivers bind the exact artifact, branch, profile, report, findings, and rule versions",
+      "REVOKE clears effective screenplay authority and the approved reader checks the locked fold",
+      "Canon handoff authenticates the principal and resolves the admission inside the exact scope",
+      "new or touched suppressions were replaced with typed code or ordinary functions"
+    ]
+  },
+  "gates": {
+    "ruff_check": "PASS",
+    "ruff_format_check": "PASS",
+    "basedpyright": {
+      "status": "PASS",
+      "errors": 0,
+      "warnings": 0,
+      "notes": 0
+    },
+    "lint_imports": {
+      "status": "PASS",
+      "kept": 20,
+      "broken": 0
+    },
+    "deptry": "PASS",
+    "test_audit": {
+      "status": "PASS",
+      "violations": 0
+    },
+    "affected_postgres_suite": {
+      "status": "PASS",
+      "passed": 256,
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55439/r2_v1_integration uv run python -m pytest tests/integration/r2/adaptation tests/integration/server/services/test_narrative_canon_handoff.py tests/integration/r2/test_m5c_acceptance.py tests/unit/r2/adaptation tests/unit/r2/narrative_lifecycle/test_canon_delta_compiler.py tests/unit/r2/production_intelligence/test_take_director.py -q --tb=short",
+      "postgres": "PostgreSQL 18, isolated database r2_v1_integration"
+    },
+    "full_backend_pytest": {
+      "status": "PASS",
+      "passed": 13694,
+      "skipped": 17,
+      "warnings": 103,
+      "command": "env -u DATABASE_URL uv run python -m pytest -n 4 --dist loadfile -q --tb=short",
+      "database_mode": "worker-owned SQLite test databases"
+    },
+    "diff_check": "PASS"
+  },
+  "environment_notes": [
+    "Sandboxed test attempts were discarded because the sandbox denied local sockets and stream primitives; authoritative test results above were rerun outside the sandbox.",
+    "The first full-suite PostgreSQL attempt was discarded because one external database was incorrectly shared across four xdist workers; the authoritative PostgreSQL affected suite ran serially, and the authoritative full suite used worker-owned SQLite databases."
+  ],
+  "known_limits": [
+    "No background reviewer was used at the sponsor's request to conserve quota.",
+    "Independent review of this exact candidate remains outstanding; this evidence is not an acceptance decision.",
+    "M7 remains closed and no production provider call, deployment, publication, or media-product acceptance is authorized."
+  ],
+  "next_authority": "independent review of the exact evidence commit that contains this file"
+}
