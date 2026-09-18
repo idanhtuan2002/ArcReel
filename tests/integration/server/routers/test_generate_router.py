@@ -341,6 +341,42 @@ class TestGenerateRouter:
             assert call["media_type"] == "video"
             assert call["payload"]["duration_seconds"] == 5
 
+    def test_video_idempotency_key_binds_actor_and_canonical_command(self, tmp_path, monkeypatch):
+        project_path = _prepare_files(tmp_path)
+        fake_pm = _FakePM(project_path)
+        fake_queue = _FakeQueue()
+        client = _client(monkeypatch, fake_pm, fake_queue, user_id="alice")
+
+        request = {
+            "script_file": "episode_1.json",
+            "duration_seconds": 5,
+            "idempotency_key": "cmd-video-1",
+            "prompt": {
+                "action": "奔跑",
+                "camera_motion": "Static",
+                "ambiance_audio": "雨声",
+            },
+        }
+        with client:
+            response = client.post(
+                "/api/v1/projects/demo/generate/video/E1S01",
+                json=request,
+            )
+            replay = client.post("/api/v1/projects/demo/generate/video/E1S01", json=request)
+            changed = client.post(
+                "/api/v1/projects/demo/generate/video/E1S01",
+                json={**request, "prompt": {**request["prompt"], "action": "停下"}},
+            )
+
+        assert response.status_code == 200, response.text
+        assert replay.status_code == 200, replay.text
+        assert changed.status_code == 200, changed.text
+        call = fake_queue.calls[0]
+        assert call["command_id"] == "cmd-video-1"
+        assert call["actor_scope"] == "user:alice"
+        assert fake_queue.calls[1]["command_digest"] == call["command_digest"]
+        assert fake_queue.calls[2]["command_digest"] != call["command_digest"]
+
     def test_video_use_tts_requires_fresh_audio_without_enqueuing_tts(self, tmp_path, monkeypatch):
         from lib.artifact_manifest import ArtifactComparison, ArtifactStatus
         from lib.narration_delivery import (

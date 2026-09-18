@@ -1,7 +1,6 @@
 """Machine-checkable M7 prerequisite and evidence-baseline verifier.
 
-Task 0 (umbrella plan `docs/superpowers/plans/2026-09-12-r2-m7-host-production-
-hardening.md`) must fail closed before any M7 implementation code is trusted
+The verifier must fail closed before any implementation code is trusted
 unless every precondition below holds: the M6 handoff this worktree is rooted
 on is present and formally accepted, the worktree is clean at the
 materialization base, that base is the exact recorded M6-accepted head, the

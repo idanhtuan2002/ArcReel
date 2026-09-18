@@ -1,13 +1,4 @@
-"""Integration coverage for M7-A actor-scoped command idempotency (plan Task 5):
-exact replay, concurrent duplicate races and same-key/different-digest rejection
-at ``TaskRepository.enqueue()``, the call path both ``GenerationQueue.enqueue_task``
-and ``server/routers/generate.py``'s ``generate_video`` invoke unchanged. The
-router itself only reads ``idempotency_key``, computes ``command_digest`` and
-passes both through -- the atomicity/concurrency/digest-mismatch guarantees this
-file proves all live in the repository, so exercising it directly (rather than
-replaying ``generate_video``'s unrelated project/script/admission pre-validation
-through a full HTTP stack) is the direct, non-brittle way to prove them.
-"""
+"""Integration coverage for actor-scoped command idempotency in TaskRepository."""
 
 from __future__ import annotations
 
@@ -162,7 +153,7 @@ async def test_command_id_scope_is_per_actor(db_session: AsyncSession) -> None:
     assert bob["replayed"] is False
 
 
-# --- opt-in: no command_id keeps pre-M7 behavior unchanged ------------------------------
+# --- opt-in: no command_id retains resource-based active-task deduplication --------------
 
 
 async def test_omitting_command_id_keeps_the_pre_m7_resource_dedup_behavior(db_session: AsyncSession) -> None:

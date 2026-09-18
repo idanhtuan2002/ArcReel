@@ -1,9 +1,8 @@
-"""M7 host-production-hardening contracts (spec section 4; plan Task 1).
+"""Provider-neutral host-production-hardening contracts.
 
 Provider-neutral, immutable execution-identity, idempotency, provider-
 capability and durable-event shapes for closing H1-H2. No field or contract
-name here is optional scope beyond what the accepted design names; later
-tasks add ports, services and persistence, not new shapes.
+name here is optional; ports, services and persistence consume these shapes.
 """
 
 from __future__ import annotations
@@ -105,8 +104,7 @@ TERMINAL_ATTEMPT_STATES: frozenset[ExecutionAttemptState] = frozenset(
     }
 )
 
-# ProviderObservationKind terminal facts, in the fixed order spec section 4.2's
-# "no transition leaves a terminal state" rule resolves ties by: the terminal kind
+# Terminal provider facts preserve the first committed terminal truth: the terminal kind
 # already recorded always wins over a later-arriving different terminal kind.
 TERMINAL_OBSERVATION_KINDS: frozenset[ProviderObservationKind] = frozenset(
     {
@@ -266,7 +264,7 @@ COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION = 1
 
 
 def command_receipt_result_envelope(*, task_id: str, result: JSONValue) -> dict[str, JSONValue]:
-    """The exact shape ``CommandReceipt.result_digest`` hashes (spec section 4.1):
+    """Return the exact shape hashed by ``CommandReceipt.result_digest``:
     ``{"schema_version": 1, "task_id": str, "result": object}``."""
     return {"schema_version": COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION, "task_id": task_id, "result": result}
 

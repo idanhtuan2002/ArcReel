@@ -1,6 +1,7 @@
-"""Scoped, fenced adapter for the M7-A execution-attempt authority (plan Task 3).
+"""Scoped, fenced adapter for the execution-attempt authority.
 
-Three separate write authorities, exactly as spec section 4.1 requires: worker
+Three separate write authorities isolate worker transitions from provider facts
+and operator decisions. Worker
 transitions (``transition_worker``) require an unexpired owner/token lease
 fence; provider observations (``apply_provider_observation``) and operator
 resolutions (``resolve_operator_review``) each write through their own method
@@ -13,19 +14,16 @@ one ``ProjectEvent`` row in the same transaction, or writes nothing (a fenced
 ``state_version`` is the row's single optimistic-concurrency counter: it
 advances on every accepted mutation of this row, including a lease
 acquire/release that does not itself change ``state`` -- "every attempt
-mutation checks expected_version" (spec section 4.2) reads as one counter for
-the whole row, not one per field.
+mutation advances one counter for the whole row, not one counter per field.
 
-``apply_provider_observation``'s ports.py signature (normative, spec section
-4.1) takes no ``ProviderCapabilityProfile`` -- ``fold_observation`` needs one
+``apply_provider_observation`` takes no ``ProviderCapabilityProfile``;
+``fold_observation`` needs one
 only to resolve ``NOT_FOUND``'s settling-window policy, and the qualified
-provider capability registry is plan Task 4's own deliverable
-(``r2/host_hardening/provider_capabilities.py``), built after this repository.
-This repository therefore takes a ``capability_resolver`` constructor
+provider capability registry owns that policy. This repository therefore takes
+a ``capability_resolver`` constructor
 dependency (``Callable[[str], ProviderCapabilityProfile]``, keyed by the
 attempt's own ``route.capability_profile_ref``) rather than importing a
-registry that does not exist yet at this task; Task 4 supplies the real
-resolver and this task's own tests supply a fixed fake.
+registry directly.
 """
 
 from __future__ import annotations
@@ -379,7 +377,7 @@ class ExecutionAttemptRepository:
             )
         )
         if existing is not None:
-            return snapshot  # duplicate observation_id: a no-op (spec section 4.2)
+            return snapshot  # A duplicate observation_id is an idempotent no-op.
 
         next_seq = (
             await self.session.execute(

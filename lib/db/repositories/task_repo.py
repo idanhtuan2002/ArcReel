@@ -210,8 +210,8 @@ class TaskRepository(BaseRepository):
         actor_scope: str | None = None,
         command_digest: str | None = None,
     ) -> dict[str, Any]:
-        # M7-A idempotent command layer (spec section 4.1): opt-in, independent of the
-        # resource-based active-task dedup below. All three or none -- a partial set
+        # Actor-scoped command replay is opt-in and independent of resource-based
+        # active-task deduplication. All three or none -- a partial set
         # would silently disable the exact-replay guarantee instead of failing loudly.
         if len({command_id is None, actor_scope is None, command_digest is None}) != 1:
             raise ValueError("command_id, actor_scope and command_digest must all be provided together")

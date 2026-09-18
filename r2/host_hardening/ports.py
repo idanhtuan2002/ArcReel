@@ -1,7 +1,7 @@
-"""Structural ports for the M7 execution-identity/idempotency layer (spec section
-4.1; plan Task 1). Pure ``Protocol`` seams -- import only host-hardening
-contracts, never a concrete repository, session, ORM row or clock. Later tasks
-implement the concrete PostgreSQL-scoped adapters.
+"""Structural ports for the execution-identity and idempotency layer.
+
+These pure ``Protocol`` seams import only host-hardening contracts, never a
+concrete repository, session, ORM row, or clock.
 """
 
 from __future__ import annotations

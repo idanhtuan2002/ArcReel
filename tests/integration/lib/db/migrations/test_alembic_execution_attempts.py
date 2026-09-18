@@ -1,5 +1,5 @@
-"""Alembic coverage for the M7-A execution-identity persistence boundary (plan
-Task 2): ``execution_attempts``, ``provider_observations``,
+"""Alembic coverage for the execution-identity persistence boundary:
+``execution_attempts``, ``provider_observations``,
 ``attempt_integrity_incidents``, ``operator_resolution_receipts``,
 ``command_receipts`` and ``project_events``."""
 

@@ -1,5 +1,4 @@
-"""Versioned, fail-closed provider capability registry (spec section 10; plan
-Task 4).
+"""Versioned, fail-closed provider capability registry.
 
 Two layers, matching the established declarative-definition convention
 (``lib.custom_provider.endpoint_definition.validator``): ``schema.json``
@@ -8,8 +7,8 @@ token scope/value consistency, the ``NOT_FOUND`` settling-window requirement,
 ``ref``/provider/adapter match, ``entry_digest`` tamper detection, and
 qualification/release-mode gating. Both must pass.
 
-``registry.json`` seeds zero profiles: this task defines the loader and its
-fail-closed rules, not real provider evidence. No route is enabled by this
+``registry.json`` seeds zero profiles because no real provider evidence is
+bundled. No route is enabled by this
 file alone. ``ProviderCapabilityProfile.supports_webhook`` being
 ``Literal[False]`` already makes ``supports_webhook: true`` a Pydantic
 construction failure -- this module does not re-check it, only surfaces that
@@ -212,11 +211,11 @@ def require_enabled_capability(
     now: datetime,
     registry_path: Path = DEFAULT_REGISTRY_PATH,
 ) -> ProviderCapabilityProfile:
-    """Fail-closed: only a ``QUALIFIED``, unexpired capability may be enabled in
-    ``PRODUCTION_CANDIDATE`` release mode (spec section 10, "Only QUALIFIED
-    routes may be enabled in a production-candidate configuration"). ``DEV``
-    mode still requires unexpired evidence -- it relaxes the qualification bar,
-    not the freshness one."""
+    """Fail closed unless production capabilities are qualified and unexpired.
+
+    ``DEV`` mode still requires unexpired evidence; it relaxes the qualification
+    bar, not the freshness requirement.
+    """
     entries = _load_entries(registry_path)
     entry = entries.get(ref)
     if entry is None:

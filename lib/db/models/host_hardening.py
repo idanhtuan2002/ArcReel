@@ -1,11 +1,10 @@
-"""M7-A execution-identity/idempotency persistence boundary ORM models
-(spec section 4; plan Task 2).
+"""Execution-identity and idempotency persistence boundary ORM models.
 
 ``execution_attempts`` is the recovery authority: ``(user_id, project_name,
 task_id, attempt_no)`` is the idempotent identity of ``plan()``, and
 ``provider_job_id`` is a bound observation, never a second identity. Provider
 observations, operator resolutions and command receipts each own a distinct
-append-only evidence table so the repository (a later task) can commit worker
+append-only evidence table so the repository can commit worker
 transitions, provider facts and operator decisions through three separate
 write authorities without a shared mutable row. ``project_events`` is the
 durable SSE-replay authority; delivery is a projection of this table, never
@@ -59,8 +58,7 @@ class ExecutionAttemptModel(UserOwnedMixin, Base):
     __table_args__ = (
         PrimaryKeyConstraint("execution_id", name="pk_execution_attempts"),
         UniqueConstraint("user_id", "project_name", "execution_id", name="uq_execution_attempts_scope"),
-        # The idempotent identity of plan() (spec section 4.1): at most one
-        # attempt per (user_id, project_name, task_id, attempt_no).
+        # plan() admits at most one attempt per scoped task and attempt number.
         UniqueConstraint("user_id", "project_name", "task_id", "attempt_no", name="uq_execution_attempts_task_attempt"),
         Index("ix_execution_attempts_project_name", "project_name"),
         Index(
@@ -76,8 +74,7 @@ class ExecutionAttemptModel(UserOwnedMixin, Base):
         CheckConstraint("state_version >= 1", name="ck_execution_attempts_state_version"),
         CheckConstraint("lease_token IS NULL OR lease_token >= 1", name="ck_execution_attempts_lease_token"),
         CheckConstraint(f"state IN {_EXECUTION_ATTEMPT_STATES}", name="ck_execution_attempts_state"),
-        # terminal_at is set if and only if state is terminal (spec 4.2: "no
-        # transition leaves a terminal state").
+        # terminal_at is set if and only if state is terminal.
         CheckConstraint(
             f"(state IN {_TERMINAL_ATTEMPT_STATES} AND terminal_at IS NOT NULL) "
             f"OR (state NOT IN {_TERMINAL_ATTEMPT_STATES} AND terminal_at IS NULL)",
@@ -181,8 +178,8 @@ class AttemptIntegrityIncidentModel(UserOwnedMixin, Base):
 
 class OperatorResolutionReceiptModel(UserOwnedMixin, Base):
     """Closed, evidence-bearing operator decision that alone may move an
-    attempt out of ``NEEDS_OPERATOR`` (spec ``OperatorResolutionReceipt``).
-    The action/resolved-state compatibility CHECK enforces spec section 4.2's
+    attempt out of ``NEEDS_OPERATOR``.
+    The action/resolved-state compatibility CHECK enforces the closed
     operator-action rules at the database boundary, not only in application
     code.
     """

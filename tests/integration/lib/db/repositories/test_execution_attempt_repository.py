@@ -1,5 +1,5 @@
-"""Integration coverage for the fenced M7-A execution-attempt repository (plan
-Task 3): lease fencing, the three separate write authorities, and real
+"""Integration coverage for the fenced execution-attempt repository:
+lease fencing, three separate write authorities, and real
 PostgreSQL concurrent CAS."""
 
 from __future__ import annotations

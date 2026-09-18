@@ -111,8 +111,8 @@ class GenerateVideoRequest(BaseModel):
     # 时长基准的批量入口与由模型推断参数的 Agent 视频工具上。
     narration_delivery: NarrationDelivery = POST_PRODUCTION
     confirmed_request_duration_seconds: int | None = Field(default=None, gt=0)
-    # M7-A actor-scoped idempotency key (spec section 4.1). Absent (the default) keeps
-    # this route's pre-M7 at-most-active-task-per-resource behavior unchanged; a
+    # The actor-scoped idempotency key is optional. When absent, this route retains
+    # at-most-one-active-task-per-resource behavior; a
     # present key makes an exact retry return the original task receipt instead of a
     # second submission.
     idempotency_key: str | None = None
@@ -394,8 +394,8 @@ async def generate_video(
         extra_payload=extra_payload,
     )
 
-    # M7-A idempotent command (spec section 4.1): absent idempotency_key keeps this
-    # route's pre-M7 behavior unchanged. command_digest covers exactly the fields
+    # An absent idempotency_key retains resource-based active-task deduplication.
+    # command_digest covers exactly the fields
     # that define "the same command" -- everything TaskSpec itself validated.
     command_id = req.idempotency_key
     actor_scope: str | None = None

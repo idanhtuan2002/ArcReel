@@ -1,7 +1,7 @@
-"""Pure ExecutionAttempt transition table and monotonic observation fold
-(spec section 4.2; plan Task 1). No I/O, no persistence, no clock reads: every
-function here is a deterministic value transformation so the repository layer
-(a later task) can unit test recovery behavior without a database.
+"""Pure ExecutionAttempt transition table and monotonic observation fold.
+
+There is no I/O, persistence, or clock access. Every function is a deterministic
+value transformation so recovery behavior can be tested without a database.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from r2.contracts.host_hardening import (
     ProviderRouteSnapshot,
 )
 
-# --- legal transition table (spec section 4.2) ----------------------------------------
+# --- legal transition table -----------------------------------------------------------
 
 LEGAL_TRANSITIONS: dict[ExecutionAttemptState, frozenset[ExecutionAttemptState]] = {
     ExecutionAttemptState.PLANNED: frozenset(
@@ -106,7 +106,7 @@ def is_legal_transition(current: ExecutionAttemptState, target: ExecutionAttempt
 
 class AttemptIdentityMismatch(ValueError):
     """Raised when an exact ``plan()`` replay's identity fields disagree with the
-    already-persisted attempt (spec section 4.1)."""
+    already-persisted attempt."""
 
 
 def validate_exact_replay(
@@ -174,7 +174,7 @@ def fold_observation(
     observation: PersistedProviderObservation,
     capability: ProviderCapabilityProfile,
 ) -> AttemptSnapshot:
-    """Monotonic provider-observation fold (spec section 4.2).
+    """Monotonic provider-observation fold.
 
     An observation cannot move attempt state backwards, invent an intermediate
     ``ACCEPTED`` step, or leave a terminal state. Applying the identical
