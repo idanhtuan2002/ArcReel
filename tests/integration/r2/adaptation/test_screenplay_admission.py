@@ -16,11 +16,11 @@ import json
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.adaptation_uow import SqlAlchemyAdaptationUnitOfWork, adaptation_uow_factory
-from lib.db.models.adaptation import AdaptationHeadModel
+from lib.db.models.adaptation import AdaptationEvaluationFindingModel, AdaptationHeadModel
 from lib.db.repositories.adaptation import AdaptationRepository
 from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.errors import (
@@ -752,6 +752,39 @@ async def test_admit_does_not_let_one_report_waiver_cover_same_named_finding_in_
         waiver_refs=[waiver.decision_ref],
     )
     with pytest.raises(AdaptationBlockingFindingUnresolvedError):
+        await authority_service.admit_screenplay_for_direction(command, authenticated_principal=_PRINCIPAL)
+
+
+async def test_admit_rejects_a_report_with_deleted_finding_rows_that_retains_its_digest(
+    session_factory: Factory,
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    branch, map_receipt, proposal, report = await _seed_admissible_proposal(
+        adaptation_evidence_service,
+        authority_service,
+        evaluation_service,
+        dramatic_text="Something happens.\nMore happens.",
+    )
+    assert report.findings
+    async with adaptation_uow_factory(session_factory)() as uow:
+        await uow.session.execute(
+            delete(AdaptationEvaluationFindingModel).where(
+                AdaptationEvaluationFindingModel.user_id == USER,
+                AdaptationEvaluationFindingModel.project_name == PROJECT,
+                AdaptationEvaluationFindingModel.report_digest == report.report_digest,
+            )
+        )
+        await uow.commit()
+
+    command = _admit_command(
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+    )
+    with pytest.raises(AdaptationStaleDependencyError):
         await authority_service.admit_screenplay_for_direction(command, authenticated_principal=_PRINCIPAL)
 
 

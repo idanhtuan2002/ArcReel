@@ -45,6 +45,7 @@ from r2.adaptation.hashing import (
     compute_adaptation_hash,
     compute_command_identity_hash,
     compute_decision_identity_hash,
+    compute_profile_evaluation_report_digest,
     compute_profile_sidecar_id,
 )
 from r2.adaptation.ports import AdaptationRepositoryPort, AdaptationShowrunnerAuthorityPort, AdaptationUnitOfWorkFactory
@@ -86,6 +87,14 @@ def _verify_authorization_binding(
         )
 
 
+def _verify_report_integrity(
+    report: ProfileEvaluationReport,
+    error_type: type[AdaptationStaleDependencyError] | type[AdaptationWaiverNotApplicableError],
+) -> None:
+    if compute_profile_evaluation_report_digest(report) != report.report_digest:
+        raise error_type(f"report {report.report_digest!r}'s stored content does not match its digest")
+
+
 async def _verify_report_artifact_binding(
     repo: AdaptationRepositoryPort,
     *,
@@ -95,6 +104,7 @@ async def _verify_report_artifact_binding(
     user_id: str,
     error_type: type[AdaptationStaleDependencyError] | type[AdaptationWaiverNotApplicableError],
 ) -> None:
+    _verify_report_integrity(report, error_type)
     if report.artifact_hash != artifact_ref.content_hash:
         raise error_type(
             f"report {report.report_digest!r} evaluated artifact content {report.artifact_hash!r}, which "
