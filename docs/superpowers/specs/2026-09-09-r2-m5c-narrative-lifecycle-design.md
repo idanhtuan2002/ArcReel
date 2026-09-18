@@ -1579,6 +1579,10 @@ action. A response-lost M5A call may retry only with the exact persisted
 
 The authenticated facade requires:
 
+- an authenticated principal with an exact project-scoped Human Showrunner
+  capability proven through `NarrativeShowrunnerAuthorityPort`;
+- the exact caller-supplied `NarrativeWorkScope`, used for a scoped admission
+  lookup rather than a global ID-only lookup;
 - one exact `NarrativeHandoffAdmission`;
 - the exact `CanonDelta` bound by that receipt; and
 - the exact persisted `CanonCommitApproval` whose complete payload, reference, and

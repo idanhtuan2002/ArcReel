@@ -50,6 +50,7 @@ from r2.contracts.adaptation import (
 )
 from r2.contracts.content_basis import ContentBasis
 from r2.contracts.enums import ContentBasisType, CreativeApprovalStatus
+from tests.integration.r2.adaptation._fakes import FakeAuthority
 
 USER = "u1"
 PROJECT = "project-a"
@@ -257,6 +258,7 @@ async def test_decide_waiver_deny_waiver_leaves_no_effective_selection(
     )
     receipt = await authority_service.decide_waiver(command, authenticated_principal=_PRINCIPAL)
     assert receipt.outcome == "RECORDED"
+    assert receipt.current_at_return is False
 
 
 # --- Human Showrunner denial -------------------------------------------------------------
@@ -283,6 +285,30 @@ async def test_decide_waiver_denial_grants_nothing(
         await denying_authority_service.decide_waiver(command, authenticated_principal=_PRINCIPAL)
     async with adaptation_uow_factory(session_factory)() as uow:
         assert await uow.repository.get_decision_by_id(user_id=USER, project_name=PROJECT, decision_id="w-1") is None
+
+
+async def test_decide_waiver_rejects_authorization_for_another_command(
+    session_factory: Factory,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    screenplay, report = await _seed_screenplay_with_a_profile_block_finding(
+        adaptation_evidence_service, evaluation_service
+    )
+    finding = report.findings[0]
+    command = _waive_command(
+        artifact_ref=_screenplay_ref(screenplay),
+        profile_ref=report.profile_ref,
+        report_ref=report_ref_of(report),
+        finding_ids=[finding.finding_id],
+        rule_versions=[finding.rule_version],
+    )
+    service = AdaptationAuthorityService(
+        adaptation_uow_factory(session_factory), FakeAuthority(command_identity_hash="cid:wrong-command")
+    )
+
+    with pytest.raises(AdaptationAuthorityDeniedError):
+        await service.decide_waiver(command, authenticated_principal=_PRINCIPAL)
 
 
 # --- applicability guard: missing report, digest mismatch, unknown finding -------------
@@ -324,6 +350,64 @@ async def test_decide_waiver_rejects_a_report_digest_mismatch(
         finding_ids=[finding.finding_id],
         rule_versions=[finding.rule_version],
     )
+    with pytest.raises(AdaptationWaiverNotApplicableError):
+        await authority_service.decide_waiver(command, authenticated_principal=_PRINCIPAL)
+
+
+async def test_decide_waiver_rejects_an_unresolved_artifact_with_matching_bytes(
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    screenplay, report = await _seed_screenplay_with_a_profile_block_finding(
+        adaptation_evidence_service, evaluation_service
+    )
+    finding = report.findings[0]
+    laundered_ref = ArtifactVersionRef(
+        artifact_id="another-screenplay",
+        version=99,
+        content_hash=screenplay.content_hash,
+    )
+    command = _waive_command(
+        artifact_ref=laundered_ref,
+        profile_ref=report.profile_ref,
+        report_ref=report_ref_of(report),
+        finding_ids=[finding.finding_id],
+        rule_versions=[finding.rule_version],
+    )
+
+    with pytest.raises(AdaptationNotFoundError):
+        await authority_service.decide_waiver(command, authenticated_principal=_PRINCIPAL)
+
+
+async def test_decide_waiver_rejects_a_report_for_another_resolved_artifact_with_matching_bytes(
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    first, first_report = await _seed_screenplay_with_a_profile_block_finding(
+        adaptation_evidence_service, evaluation_service
+    )
+    second = await adaptation_evidence_service.append_screenplay(
+        _screenplay(
+            screenplay_id="sp-2",
+            branch_ref=first.adaptation_branch_ref,
+            map_ref=first.adaptation_map_ref,
+            dramatic_text="Something happens.\nMore happens.",
+        ),
+        user_id=USER,
+        project_name=PROJECT,
+    )
+    assert second.content_hash == first.content_hash
+    finding = first_report.findings[0]
+    command = _waive_command(
+        artifact_ref=_screenplay_ref(second),
+        profile_ref=first_report.profile_ref,
+        report_ref=report_ref_of(first_report),
+        finding_ids=[finding.finding_id],
+        rule_versions=[finding.rule_version],
+    )
+
     with pytest.raises(AdaptationWaiverNotApplicableError):
         await authority_service.decide_waiver(command, authenticated_principal=_PRINCIPAL)
 

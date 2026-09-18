@@ -526,8 +526,10 @@ def _new_effective_selection(
 ) -> tuple[str | None, ArtifactVersionRef | None]:
     """The new ``(effective_decision_id, selected_artifact_ref)`` pair after appending
     ``decision``: an accepting action (``APPROVE``/``WAIVE``/``ADMIT``) always becomes
-    its own effective selection; any other action (``REJECT``/``DENY_WAIVER``/
-    ``REVOKE``) leaves the previous selection unchanged."""
+    its own effective selection; ``REJECT``/``DENY_WAIVER`` leave the previous
+    selection unchanged, while ``REVOKE`` clears screenplay-use authority."""
+    if isinstance(decision, ScreenplayAdmissionDecision) and decision.command.action.value == "REVOKE":
+        return None, None
     if decision.command.action.value != _ACCEPTING_ACTION_BY_KIND[decision.decision_kind]:
         return current_effective_id, current_artifact
     if isinstance(decision, MapApprovalDecision):

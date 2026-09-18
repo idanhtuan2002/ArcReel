@@ -14,9 +14,10 @@ exact decision."
 
 from __future__ import annotations
 
+from r2.adaptation.authority_kernel import require_head_matches_fold
 from r2.adaptation.errors import AdaptationNotFoundError
 from r2.adaptation.ports import AdaptationUnitOfWorkFactory
-from r2.contracts.adaptation import ArtifactVersionRef, DecisionRef, ScreenplayArtifactV2
+from r2.contracts.adaptation import AdaptationAuthorityFamily, ArtifactVersionRef, DecisionRef, ScreenplayArtifactV2
 
 
 class ApprovedScreenplayReader:
@@ -47,6 +48,29 @@ class ApprovedScreenplayReader:
                 raise AdaptationNotFoundError(
                     f"screenplay {screenplay_ref.artifact_id!r} v{screenplay_ref.version}'s admission record does "
                     "not match the exact screenplay/admission refs requested"
+                )
+
+            head = await repo.prepare_or_lock_head(
+                user_id=user_id,
+                project_name=project_name,
+                family=AdaptationAuthorityFamily.SCREENPLAY_ADMISSION,
+                head_key=screenplay_ref.artifact_id,
+            )
+            if head is None:
+                raise AdaptationNotFoundError(
+                    f"screenplay {screenplay_ref.artifact_id!r} has no current admission authority"
+                )
+            decisions = await repo.list_decisions_for_locked_head(
+                user_id=user_id,
+                project_name=project_name,
+                family=AdaptationAuthorityFamily.SCREENPLAY_ADMISSION,
+                head_key=screenplay_ref.artifact_id,
+            )
+            require_head_matches_fold(decisions, head)
+            if head.effective_decision_id != admission_ref.decision_id or head.selected_artifact_ref != screenplay_ref:
+                raise AdaptationNotFoundError(
+                    f"screenplay {screenplay_ref.artifact_id!r} v{screenplay_ref.version} is not the current "
+                    "effective admission selection"
                 )
 
             screenplay = await repo.get_exact_screenplay(

@@ -60,11 +60,32 @@ append-only replay.
 
 Every authority command uses an opaque retry ID, complete semantic-tuple equality
 before stale-head rejection, an expected predecessor, project/user scoping, and
-one deterministic lock order. A profile report or waiver is applicable only to
-the exact artifact bytes, branch/map versions, profile version, ruleset digest,
-and named findings it binds. Any changed input invalidates the old waiver for a
-new approval. A screenplay cannot lock while any referenced map entry is not
+one deterministic lock order. The Human authorization returned for an invocation
+must bind the exact canonical command hash in addition to its action and principal.
+A map approval resolves every relied-on report and requires the reports' ordered
+exact sidecar refs/digests to equal the map's `profile_analysis_refs`; a merely
+non-empty report list is not sufficient. It also requires each report's artifact
+hash to equal the exact map hash, derives the sidecar identity from exact artifact
+ID/version plus profile, resolves that sidecar, and recomputes its semantic hash.
+A profile report or waiver is applicable only to the exact artifact identity and
+bytes, branch/map versions, profile version, ruleset digest, exact report digest,
+finding ID and rule version it binds. Matching bytes or a same-named finding in a
+different report is insufficient. Any changed input invalidates the old waiver for
+a new approval. A screenplay cannot lock while any referenced map entry is not
 approved or any blocking profile finding lacks an applicable Human waiver.
+
+`REVOKE` on a screenplay-admission lineage clears its effective decision and
+selected artifact. It is not a historical rejection that leaves an earlier
+admission usable. Revocation proves it repeats the current effective ADMIT's exact
+immutable context and stored screenplay, but does not require that admission's
+historical map/report/waiver dependencies remain current; dependency supersession
+must never make revocation impossible. `ApprovedScreenplayReader` is an
+authority-consuming interface: under the locked admission head it rebuilds and
+compares the decision chain and returns bytes only when the requested admission
+and screenplay ref remain the current effective selection. This is a read-time
+authorization boundary, not a lease that cancels direction work already started
+after the transaction releases its lock; any future in-flight cancellation contract
+requires a separate execution fence.
 
 PostgreSQL implementation shall use short `READ COMMITTED` transactions plus
 explicit row locks and uniqueness/OCC constraints, following the accepted M5

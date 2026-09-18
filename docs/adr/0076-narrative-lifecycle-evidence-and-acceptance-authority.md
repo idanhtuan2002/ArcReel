@@ -68,6 +68,14 @@ introduce a Canon approval service. The existing M5A `CanonCommitApproval` and
 `CanonTransactionService` remain respectively the Canon approval receipt and
 sole Canon commit authority.
 
+The Narrative-to-Canon handoff facade is authenticated, not an admission-ID
+capability. Each invocation supplies the exact `NarrativeWorkScope` and an
+authenticated principal, reuses `NarrativeShowrunnerAuthorityPort` to prove a
+project-scoped Human Showrunner grant bound to that admission and scope, and then
+loads the admission through the scoped exact repository lookup. The global
+ID-only lookup remains internal collision-detection machinery and cannot drive a
+Canon commit.
+
 ## Considered options
 
 - Reusing the mutable draft quarantine or a boolean on `NarrativeRevision`

@@ -1,0 +1,57 @@
+{
+  "schema_version": "r2-v1-m5c-m6-integration-candidate-v1",
+  "status": "READY_FOR_REVIEW",
+  "candidate_code_head": "e913c056c85af916d66b5a65650845fe14a88f6f",
+  "base": {
+    "r2_main": "71a96bd606e919d344a7e0c8bcdec6073d862a24",
+    "m5c_final_record": "43ec287abf11e8f4909c998ba2751300719a2f24",
+    "m6_final_record": "814761e3a40a0f2b7c694aaf56a51302ca24eaa8"
+  },
+  "lineage": {
+    "m5c_verified_code": "8b1959e7ae882716a9d531f459d8289c83968fbb",
+    "m6_verified_code": "636c86d85c126000dee6ecda34e53460895f6e93",
+    "alembic_head": "6c7c4a0e0002",
+    "tree_matches_m6_final_record": false,
+    "only_tree_difference_from_m6_final_record": "docs/r2/evidence/R2_M5C_FINAL_VERIFICATION.md"
+  },
+  "gates": {
+    "frozen_registry": "PASS",
+    "ruff_check": "PASS",
+    "ruff_format_check": "PASS",
+    "basedpyright": "PASS",
+    "lint_imports": "PASS",
+    "deptry": "PASS",
+    "test_audit": "PASS",
+    "full_backend_pytest": {
+      "status": "PASS",
+      "passed": 13683,
+      "skipped": 17,
+      "warnings": 102,
+      "command": "pytest -n 4 --dist loadfile -q --tb=short"
+    },
+    "m5c_m6_postgres_integration": {
+      "status": "PASS",
+      "passed": 203,
+      "command": "pytest tests/integration/r2/adaptation/ tests/integration/r2/narrative_lifecycle/ tests/integration/r2/test_m5c_architecture_boundaries_db.py -q --tb=short",
+      "postgres": "PostgreSQL 18, isolated database r2_v1_integration"
+    },
+    "m5c_m6_acceptance_corpus": {
+      "status": "PASS",
+      "passed": 148,
+      "command": "pytest tests/unit/r2/adaptation tests/unit/r2/contracts/test_adaptation.py tests/integration/r2/test_m5c_acceptance.py tests/integration/r2/test_m6_dual_profile_acceptance.py -q --tb=short",
+      "postgres": "PostgreSQL 18, isolated database r2_v1_integration"
+    },
+    "migration_round_trip": {
+      "status": "PASS",
+      "sequence": ["upgrade head", "current 6c7c4a0e0002", "downgrade 6c7c4a0e0001", "upgrade head", "current 6c7c4a0e0002"],
+      "postgres": "PostgreSQL 18, isolated database r2_v1_integration"
+    }
+  },
+  "known_limits": [
+    "M5C and M6 independent Codex reviews remain outstanding; both handoffs were accepted by explicit human override.",
+    "verify_m6_scope.py --checkpoint M6-FINAL is not integration-aware: its hard-coded sibling-worktree check and M6-base allowlist reject the retained M5C final evidence file.",
+    "M7 is intentionally excluded; no M7 implementation or acceptance is implied by this candidate.",
+    "No production provider call, worker start, deployment, public publication or media-product acceptance is authorized by this evidence."
+  ],
+  "next_authority": "independent review of this exact candidate, followed by an explicit decision on whether to open a separate M7-A continuation"
+}

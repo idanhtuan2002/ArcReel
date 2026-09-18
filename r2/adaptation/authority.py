@@ -4,16 +4,15 @@ M6 adaptation branches (plan Tasks 7, 11 and 12). ``decide_map`` (``MAP_APPROVAL
 (``SCREENPLAY_ADMISSION``) are all implemented here, extending the same generic
 ``AdaptationHead``/``AdaptationDecision`` machinery — no new head or decision shape.
 
-**Applicability scope note (Task 7, narrowed by Task 11).** ``decide_waiver`` proves a
+**Applicability scope note (Tasks 7 and 11).** ``decide_waiver`` proves a
 waiver command actually applies before it is recorded: its named
 ``ProfileEvaluationReport`` (``ProfileWaiverCommand.report_ref``) must resolve, must
 have evaluated exactly ``command.artifact_ref``'s current content under exactly
 ``command.profile_ref``, and every named finding must exist in that report with a
 matching ``rule_version`` and a waivable disposition (never ``INTEGRITY_BLOCK``). This
-is what ``MapApprovalCommand.relied_report_refs`` still cannot get from this service —
-whole-map per-ref report coverage remains the Task 7 coarse completeness proxy (a map
-declaring ``profile_analysis_refs`` cannot rely on zero reports) until a later task
-needs it.
+same authority surface resolves every ``MapApprovalCommand.relied_report_refs`` entry
+and requires its ordered exact sidecar refs/digests to equal the map's
+``profile_analysis_refs`` before a whole-map decision can be recorded.
 
 **Admission note (Task 12).** ``admit_screenplay_for_direction`` never trusts
 ``ScreenplayAdmissionCommand.admitted_screenplay`` as free-form input: it re-derives
@@ -42,18 +41,26 @@ from r2.adaptation.errors import (
     AdaptationStaleHeadError,
     AdaptationWaiverNotApplicableError,
 )
-from r2.adaptation.hashing import compute_adaptation_hash, compute_command_identity_hash, compute_decision_identity_hash
+from r2.adaptation.hashing import (
+    compute_adaptation_hash,
+    compute_command_identity_hash,
+    compute_decision_identity_hash,
+    compute_profile_evaluation_report_digest,
+    compute_profile_sidecar_id,
+)
 from r2.adaptation.ports import AdaptationRepositoryPort, AdaptationShowrunnerAuthorityPort, AdaptationUnitOfWorkFactory
 from r2.contracts.adaptation import (
     AdaptationAuthorityFamily,
     AdaptationDecisionAction,
     AdaptationDecisionAuthorization,
     AdaptationDecisionReceipt,
+    AdaptationHead,
     ArtifactVersionRef,
     DecisionRef,
     FindingDisposition,
     MapApprovalCommand,
     MapApprovalDecision,
+    ProfileEvaluationReport,
     ProfileWaiverCommand,
     ProfileWaiverDecision,
     ScreenplayAdmissionCommand,
@@ -70,10 +77,57 @@ def _verify_authorization_binding(
 ) -> None:
     if not isinstance(authorization, AdaptationDecisionAuthorization):
         raise AdaptationAuthorityDeniedError("the authority port returned an authorization of an unexpected shape")
-    if authorization.action != command.action or authorization.authenticated_principal != authenticated_principal:
+    if (
+        authorization.action != command.action
+        or authorization.authenticated_principal != authenticated_principal
+        or authorization.command_identity_hash != compute_command_identity_hash(command)
+    ):
         raise AdaptationAuthorityDeniedError(
             "the authority port's authorization is not bound to this exact command and principal"
         )
+
+
+def _verify_report_integrity(
+    report: ProfileEvaluationReport,
+    error_type: type[AdaptationStaleDependencyError] | type[AdaptationWaiverNotApplicableError],
+) -> None:
+    if compute_profile_evaluation_report_digest(report) != report.report_digest:
+        raise error_type(f"report {report.report_digest!r}'s stored content does not match its digest")
+
+
+async def _verify_report_artifact_binding(
+    repo: AdaptationRepositoryPort,
+    *,
+    report: ProfileEvaluationReport,
+    artifact_ref: ArtifactVersionRef,
+    project_name: str,
+    user_id: str,
+    error_type: type[AdaptationStaleDependencyError] | type[AdaptationWaiverNotApplicableError],
+) -> None:
+    _verify_report_integrity(report, error_type)
+    if report.artifact_hash != artifact_ref.content_hash:
+        raise error_type(
+            f"report {report.report_digest!r} evaluated artifact content {report.artifact_hash!r}, which "
+            f"disagrees with exact artifact {artifact_ref!r}"
+        )
+    expected_sidecar_id = compute_profile_sidecar_id(artifact_ref.artifact_id, report.profile_ref)
+    if report.sidecar_ref.artifact_id != expected_sidecar_id or report.sidecar_ref.version != artifact_ref.version:
+        raise error_type(
+            f"report {report.report_digest!r}'s sidecar ref {report.sidecar_ref!r} is not bound to exact "
+            f"artifact {artifact_ref.artifact_id!r} v{artifact_ref.version}"
+        )
+    if report.sidecar_digest != report.sidecar_ref.content_hash:
+        raise error_type(f"report {report.report_digest!r}'s sidecar digest disagrees with its exact sidecar ref")
+    sidecar = await repo.get_exact_sidecar(
+        sidecar_id=report.sidecar_ref.artifact_id,
+        version=report.sidecar_ref.version,
+        project_name=project_name,
+        user_id=user_id,
+    )
+    if sidecar is None:
+        raise error_type(f"report {report.report_digest!r}'s exact sidecar does not resolve")
+    if sidecar.content_hash != report.sidecar_digest or compute_adaptation_hash(sidecar) != report.sidecar_digest:
+        raise error_type(f"report {report.report_digest!r}'s resolved sidecar content does not match its digest")
 
 
 async def _verify_map_applicability(repo: AdaptationRepositoryPort, command: MapApprovalCommand) -> None:
@@ -102,12 +156,6 @@ async def _verify_map_applicability(repo: AdaptationRepositoryPort, command: Map
             f"map {map_ref.artifact_id!r} v{map_ref.version} belongs to branch "
             f"{map_.adaptation_branch_ref.artifact_id!r}, not the approved branch {command.branch_id!r}"
         )
-    if map_.profile_analysis_refs and not command.relied_report_refs:
-        raise AdaptationStaleDependencyError(
-            f"map {map_ref.artifact_id!r} v{map_ref.version} carries profile analysis evidence, but the "
-            "approval command relies on zero reports"
-        )
-
     if command.profile_ref.profile_id != branch.profile_ref.profile_id:
         raise AdaptationProfileMismatchError(
             f"map approval command names profile {command.profile_ref.profile_id!r}, which disagrees with "
@@ -118,6 +166,40 @@ async def _verify_map_applicability(repo: AdaptationRepositoryPort, command: Map
             f"map approval command's profile ref {command.profile_ref!r} disagrees with branch "
             f"{command.branch_id!r}'s exact bound profile ref {branch.profile_ref!r}"
         )
+
+    relied_sidecars: list[ArtifactVersionRef] = []
+    for report_ref in command.relied_report_refs:
+        report = await repo.get_exact_report(
+            report_digest=report_ref.decision_id,
+            project_name=command.project_name,
+            user_id=command.user_id,
+        )
+        if report is None:
+            raise AdaptationNotFoundError(f"evaluation report {report_ref.decision_id!r} does not resolve")
+        if report.report_digest != report_ref.decision_digest:
+            raise AdaptationStaleDependencyError(
+                f"map approval command names report digest {report_ref.decision_digest!r}, but the resolved "
+                f"report's own digest is {report.report_digest!r}"
+            )
+        if report.profile_ref != command.profile_ref:
+            raise AdaptationProfileMismatchError(
+                f"report {report_ref.decision_id!r} was evaluated against profile {report.profile_ref!r}, which "
+                f"disagrees with the map approval command's exact profile {command.profile_ref!r}"
+            )
+        await _verify_report_artifact_binding(
+            repo,
+            report=report,
+            artifact_ref=map_ref,
+            project_name=command.project_name,
+            user_id=command.user_id,
+            error_type=AdaptationStaleDependencyError,
+        )
+        relied_sidecars.append(report.sidecar_ref)
+    if relied_sidecars != map_.profile_analysis_refs:
+        raise AdaptationStaleDependencyError(
+            f"map {map_ref.artifact_id!r} v{map_ref.version}'s exact profile-analysis references do not match "
+            "the ordered sidecars bound by the relied-on reports"
+        )
     if any(entry.approval_status != CreativeApprovalStatus.APPROVED for entry in map_.entries):
         raise AdaptationStaleDependencyError(
             f"map {map_ref.artifact_id!r} v{map_ref.version} has at least one entry that is not yet "
@@ -126,6 +208,44 @@ async def _verify_map_applicability(repo: AdaptationRepositoryPort, command: Map
 
 
 async def _verify_waiver_applicability(repo: AdaptationRepositoryPort, command: ProfileWaiverCommand) -> None:
+    artifact = await repo.get_exact_screenplay(
+        screenplay_id=command.artifact_ref.artifact_id,
+        version=command.artifact_ref.version,
+        project_name=command.project_name,
+        user_id=command.user_id,
+    )
+    if artifact is None:
+        raise AdaptationNotFoundError(
+            f"screenplay {command.artifact_ref.artifact_id!r} v{command.artifact_ref.version} does not resolve"
+        )
+    if artifact.content_hash != command.artifact_ref.content_hash:
+        raise AdaptationWaiverNotApplicableError(
+            f"waiver command declares content hash {command.artifact_ref.content_hash!r} for screenplay "
+            f"{command.artifact_ref.artifact_id!r} v{command.artifact_ref.version}, but the stored hash is "
+            f"{artifact.content_hash!r}"
+        )
+    if artifact.adaptation_branch_ref.artifact_id != command.branch_id:
+        raise AdaptationWaiverNotApplicableError(
+            f"waiver command names branch {command.branch_id!r}, but its exact artifact belongs to branch "
+            f"{artifact.adaptation_branch_ref.artifact_id!r}"
+        )
+    branch = await repo.get_exact_branch(
+        branch_id=artifact.adaptation_branch_ref.artifact_id,
+        version=artifact.adaptation_branch_ref.version,
+        project_name=command.project_name,
+        user_id=command.user_id,
+    )
+    if branch is None:
+        raise AdaptationNotFoundError(
+            f"adaptation branch {artifact.adaptation_branch_ref.artifact_id!r} "
+            f"v{artifact.adaptation_branch_ref.version} does not resolve"
+        )
+    if branch.profile_ref != command.profile_ref:
+        raise AdaptationWaiverNotApplicableError(
+            f"waiver command's profile {command.profile_ref!r} disagrees with its artifact branch's exact "
+            f"profile {branch.profile_ref!r}"
+        )
+
     report = await repo.get_exact_report(
         report_digest=command.report_ref.decision_id, project_name=command.project_name, user_id=command.user_id
     )
@@ -136,17 +256,19 @@ async def _verify_waiver_applicability(repo: AdaptationRepositoryPort, command: 
             f"waiver command names report digest {command.report_ref.decision_digest!r}, but the resolved "
             f"report's own digest is {report.report_digest!r}"
         )
-    if report.artifact_hash != command.artifact_ref.content_hash:
-        raise AdaptationWaiverNotApplicableError(
-            f"report {command.report_ref.decision_id!r} evaluated artifact content {report.artifact_hash!r}, "
-            f"which disagrees with the waiver command's exact artifact content {command.artifact_ref.content_hash!r} "
-            "-- a semantic change invalidates any prior waiver of this report"
-        )
     if report.profile_ref != command.profile_ref:
         raise AdaptationWaiverNotApplicableError(
             f"report {command.report_ref.decision_id!r} was evaluated against profile {report.profile_ref!r}, "
             f"which disagrees with the waiver command's exact profile {command.profile_ref!r}"
         )
+    await _verify_report_artifact_binding(
+        repo,
+        report=report,
+        artifact_ref=command.artifact_ref,
+        project_name=command.project_name,
+        user_id=command.user_id,
+        error_type=AdaptationWaiverNotApplicableError,
+    )
 
     findings_by_id = {finding.finding_id: finding for finding in report.findings}
     for finding_id, rule_version in zip(command.finding_ids, command.rule_versions, strict=True):
@@ -263,11 +385,11 @@ async def _verify_admission_applicability(repo: AdaptationRepositoryPort, comman
             f"map approval decision {command.effective_map_approval_ref.decision_id!r} belongs to branch "
             f"{map_decision.command.branch_id!r}, not the admission's own branch {command.branch_id!r}"
         )
-    if map_decision.command.map_ref.artifact_id != proposal.adaptation_map_ref.artifact_id:
+    if map_decision.command.map_ref != proposal.adaptation_map_ref:
         raise AdaptationStaleDependencyError(
             f"map approval decision {command.effective_map_approval_ref.decision_id!r} approved map "
-            f"{map_decision.command.map_ref.artifact_id!r}, not the proposal's own bound map "
-            f"{proposal.adaptation_map_ref.artifact_id!r}"
+            f"{map_decision.command.map_ref!r}, not the proposal's own exact bound map "
+            f"{proposal.adaptation_map_ref!r}"
         )
     map_head = await repo.prepare_or_lock_head(
         user_id=command.user_id,
@@ -284,7 +406,8 @@ async def _verify_admission_applicability(repo: AdaptationRepositoryPort, comman
         expected_artifact_ref=map_decision.command.map_ref,
     )
 
-    blocking_findings: dict[str, FindingDisposition] = {}
+    blocking_findings: dict[tuple[str, str, str], FindingDisposition] = {}
+    reports_by_digest: dict[str, ProfileEvaluationReport] = {}
     for report_ref in command.report_refs:
         report = await repo.get_exact_report(
             report_digest=report_ref.decision_id, project_name=command.project_name, user_id=command.user_id
@@ -296,26 +419,32 @@ async def _verify_admission_applicability(repo: AdaptationRepositoryPort, comman
                 f"admission command names report digest {report_ref.decision_digest!r}, but the resolved "
                 f"report's own digest is {report.report_digest!r}"
             )
-        if report.artifact_hash != proposal.content_hash:
-            raise AdaptationStaleDependencyError(
-                f"report {report_ref.decision_id!r} evaluated artifact content {report.artifact_hash!r}, which "
-                f"disagrees with proposal {proposal_ref.artifact_id!r}'s exact content {proposal.content_hash!r}"
-            )
         if report.profile_ref != command.profile_ref:
             raise AdaptationProfileMismatchError(
                 f"report {report_ref.decision_id!r} was evaluated against profile {report.profile_ref!r}, which "
                 f"disagrees with the admission command's exact profile {command.profile_ref!r}"
             )
+        await _verify_report_artifact_binding(
+            repo,
+            report=report,
+            artifact_ref=proposal_ref,
+            project_name=command.project_name,
+            user_id=command.user_id,
+            error_type=AdaptationStaleDependencyError,
+        )
+        reports_by_digest[report.report_digest] = report
         for finding in report.findings:
             if finding.disposition in (FindingDisposition.INTEGRITY_BLOCK, FindingDisposition.PROFILE_BLOCK):
-                blocking_findings[finding.finding_id] = finding.disposition
+                blocking_findings[(report.report_digest, finding.finding_id, finding.rule_version)] = (
+                    finding.disposition
+                )
 
     if any(disposition == FindingDisposition.INTEGRITY_BLOCK for disposition in blocking_findings.values()):
         raise AdaptationBlockingFindingUnresolvedError(
             "at least one dependency report carries an INTEGRITY_BLOCK finding, which is never waivable"
         )
 
-    covered_finding_ids: set[str] = set()
+    covered_findings: set[tuple[str, str, str]] = set()
     for waiver_ref in command.waiver_refs:
         waiver_decision = await repo.get_decision_by_id(
             user_id=command.user_id, project_name=command.project_name, decision_id=waiver_ref.decision_id
@@ -332,11 +461,16 @@ async def _verify_admission_applicability(repo: AdaptationRepositoryPort, comman
                 f"waiver decision {waiver_ref.decision_id!r} is a {waiver_decision.command.action.value}, not a "
                 "WAIVE decision"
             )
-        if waiver_decision.command.artifact_ref.content_hash != proposal.content_hash:
+        if waiver_decision.command.artifact_ref != proposal_ref:
             raise AdaptationWaiverNotApplicableError(
-                f"waiver decision {waiver_ref.decision_id!r} targets content "
-                f"{waiver_decision.command.artifact_ref.content_hash!r}, which disagrees with proposal "
-                f"{proposal_ref.artifact_id!r}'s exact content {proposal.content_hash!r}"
+                f"waiver decision {waiver_ref.decision_id!r} targets artifact "
+                f"{waiver_decision.command.artifact_ref!r}, which disagrees with the proposal's exact "
+                f"artifact reference {proposal_ref!r}"
+            )
+        if waiver_decision.command.branch_id != command.branch_id:
+            raise AdaptationWaiverNotApplicableError(
+                f"waiver decision {waiver_ref.decision_id!r} belongs to branch "
+                f"{waiver_decision.command.branch_id!r}, not the admission's branch {command.branch_id!r}"
             )
         if waiver_decision.command.profile_ref != command.profile_ref:
             raise AdaptationWaiverNotApplicableError(
@@ -344,6 +478,22 @@ async def _verify_admission_applicability(repo: AdaptationRepositoryPort, comman
                 f"{waiver_decision.command.profile_ref!r}, which disagrees with the admission command's exact "
                 f"profile {command.profile_ref!r}"
             )
+        waiver_report = reports_by_digest.get(waiver_decision.command.report_ref.decision_id)
+        if waiver_report is None or waiver_decision.command.report_ref.decision_digest != waiver_report.report_digest:
+            raise AdaptationWaiverNotApplicableError(
+                f"waiver decision {waiver_ref.decision_id!r} does not bind one of the exact reports consumed "
+                "by this admission"
+            )
+        waiver_findings = {finding.finding_id: finding for finding in waiver_report.findings}
+        for finding_id, rule_version in zip(
+            waiver_decision.command.finding_ids, waiver_decision.command.rule_versions, strict=True
+        ):
+            finding = waiver_findings.get(finding_id)
+            if finding is None or finding.rule_version != rule_version:
+                raise AdaptationWaiverNotApplicableError(
+                    f"waiver decision {waiver_ref.decision_id!r} no longer matches finding {finding_id!r} and "
+                    f"rule version {rule_version!r} in its exact report"
+                )
         waiver_artifact_ref: ArtifactVersionRef = waiver_decision.command.artifact_ref
         waiver_head_key = f"{waiver_artifact_ref.artifact_id}:{waiver_artifact_ref.version}"
         waiver_head = await repo.prepare_or_lock_head(
@@ -360,14 +510,73 @@ async def _verify_admission_applicability(repo: AdaptationRepositoryPort, comman
             expected_decision_id=waiver_decision.command.decision_id,
             expected_artifact_ref=waiver_artifact_ref,
         )
-        covered_finding_ids.update(waiver_decision.command.finding_ids)
-
-    for finding_id, disposition in blocking_findings.items():
-        assert disposition == FindingDisposition.PROFILE_BLOCK
-        if finding_id not in covered_finding_ids:
-            raise AdaptationBlockingFindingUnresolvedError(
-                f"finding {finding_id!r} is a PROFILE_BLOCK finding with no applicable waiver covering it"
+        covered_findings.update(
+            (waiver_report.report_digest, finding_id, rule_version)
+            for finding_id, rule_version in zip(
+                waiver_decision.command.finding_ids,
+                waiver_decision.command.rule_versions,
+                strict=True,
             )
+        )
+
+    for finding_key, disposition in blocking_findings.items():
+        assert disposition == FindingDisposition.PROFILE_BLOCK
+        if finding_key not in covered_findings:
+            report_digest, finding_id, rule_version = finding_key
+            raise AdaptationBlockingFindingUnresolvedError(
+                f"finding {finding_id!r} at rule {rule_version!r} in report {report_digest!r} is a "
+                "PROFILE_BLOCK finding with no applicable exact waiver covering it"
+            )
+
+
+async def _verify_revoke_applicability(
+    repo: AdaptationRepositoryPort,
+    command: ScreenplayAdmissionCommand,
+    head: AdaptationHead | None,
+) -> None:
+    admitted = command.admitted_screenplay
+    admitted_ref = ArtifactVersionRef(
+        artifact_id=admitted.screenplay_id,
+        version=admitted.version,
+        content_hash=admitted.content_hash,
+    )
+    if head is None or head.effective_decision_id is None or head.selected_artifact_ref != admitted_ref:
+        raise AdaptationStaleDependencyError(
+            f"screenplay {admitted.screenplay_id!r} v{admitted.version} is not the current effective admission"
+        )
+    effective = await repo.get_decision_by_id(
+        user_id=command.user_id,
+        project_name=command.project_name,
+        decision_id=head.effective_decision_id,
+    )
+    if (
+        not isinstance(effective, ScreenplayAdmissionDecision)
+        or effective.command.action != AdaptationDecisionAction.ADMIT
+    ):
+        raise AdaptationStaleDependencyError("the current screenplay selection is not an ADMIT decision")
+    original = effective.command
+    if (
+        original.branch_id != command.branch_id
+        or original.proposal_ref != command.proposal_ref
+        or original.admitted_screenplay != command.admitted_screenplay
+        or original.profile_ref != command.profile_ref
+        or original.effective_map_approval_ref != command.effective_map_approval_ref
+        or original.report_refs != command.report_refs
+        or original.waiver_refs != command.waiver_refs
+    ):
+        raise AdaptationStaleDependencyError(
+            "REVOKE must repeat the exact immutable admission context of the current effective ADMIT decision"
+        )
+    stored = await repo.get_exact_screenplay(
+        screenplay_id=admitted.screenplay_id,
+        version=admitted.version,
+        project_name=command.project_name,
+        user_id=command.user_id,
+    )
+    if stored != admitted:
+        raise AdaptationStaleDependencyError(
+            f"current admitted screenplay {admitted.screenplay_id!r} v{admitted.version} no longer resolves exactly"
+        )
 
 
 class AdaptationAuthorityService:
@@ -449,7 +658,7 @@ class AdaptationAuthorityService:
                 family=AdaptationAuthorityFamily.MAP_APPROVAL,
                 head_key=command.branch_id,
                 outcome="RECORDED",
-                current_at_return=True,
+                current_at_return=command.action == AdaptationDecisionAction.APPROVE,
             )
 
     async def _resolve_exact_retry(
@@ -560,7 +769,7 @@ class AdaptationAuthorityService:
                 family=AdaptationAuthorityFamily.PROFILE_WAIVER,
                 head_key=head_key,
                 outcome="RECORDED",
-                current_at_return=True,
+                current_at_return=command.action == AdaptationDecisionAction.WAIVE,
             )
 
     async def _resolve_waiver_exact_retry(
@@ -644,7 +853,10 @@ class AdaptationAuthorityService:
                     f"but {head_key!r}'s current predecessor is {actual_predecessor!r}"
                 )
 
-            await _verify_admission_applicability(repo, command)
+            if command.action == AdaptationDecisionAction.ADMIT:
+                await _verify_admission_applicability(repo, command)
+            else:
+                await _verify_revoke_applicability(repo, command, head)
 
             authorization = await self._authority.authorize(
                 authenticated_principal=authenticated_principal,
@@ -692,7 +904,7 @@ class AdaptationAuthorityService:
                 family=AdaptationAuthorityFamily.SCREENPLAY_ADMISSION,
                 head_key=head_key,
                 outcome="RECORDED",
-                current_at_return=True,
+                current_at_return=command.action == AdaptationDecisionAction.ADMIT,
             )
 
     async def _resolve_admission_exact_retry(

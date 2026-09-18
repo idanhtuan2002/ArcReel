@@ -16,7 +16,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.adaptation_uow import adaptation_uow_factory
-from lib.db.models.adaptation import AdaptationHeadModel
+from lib.db.models.adaptation import AdaptationEvaluationReportModel, AdaptationHeadModel
 from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.authority_kernel import fold_adaptation_head, verify_locked_adaptation_selection
 from r2.adaptation.errors import (
@@ -30,6 +30,11 @@ from r2.adaptation.errors import (
     AdaptationStaleHeadError,
 )
 from r2.adaptation.evidence import AdaptationEvidenceService
+from r2.adaptation.hashing import (
+    compute_adaptation_hash,
+    compute_profile_evaluation_report_digest,
+    compute_profile_sidecar_id,
+)
 from r2.contracts.adaptation import (
     AdaptationAuthorityFamily,
     AdaptationBranchV2,
@@ -41,9 +46,13 @@ from r2.contracts.adaptation import (
     AdaptationProfileId,
     AdaptationProfileRef,
     ArtifactVersionRef,
+    DecisionRef,
     MapApprovalCommand,
+    ProfileEvaluationReport,
+    WesternDramaAnalysis,
 )
 from r2.contracts.enums import CreativeApprovalStatus
+from tests.integration.r2.adaptation._fakes import FakeAuthority
 
 USER = "u1"
 PROJECT = "project-a"
@@ -127,6 +136,7 @@ def _approve_command(
     branch_id: str = "branch-1",
     map_ref: ArtifactVersionRef,
     profile_ref: AdaptationProfileRef,
+    relied_report_refs: list[DecisionRef] | None = None,
     expected_predecessor_id: str | None = None,
     action: AdaptationDecisionAction = AdaptationDecisionAction.APPROVE,
 ) -> MapApprovalCommand:
@@ -137,7 +147,7 @@ def _approve_command(
         branch_id=branch_id,
         map_ref=map_ref,
         profile_ref=profile_ref,
-        relied_report_refs=[],
+        relied_report_refs=relied_report_refs or [],
         expected_predecessor_id=expected_predecessor_id,
         action=action,
     )
@@ -206,6 +216,7 @@ async def test_decide_map_reject_leaves_no_effective_selection(
     )
     receipt = await authority_service.decide_map(command, authenticated_principal=_PRINCIPAL)
     assert receipt.outcome == "RECORDED"
+    assert receipt.current_at_return is False
 
 
 async def test_decide_map_second_approval_advances_generation_after_reject(
@@ -243,6 +254,22 @@ async def test_decide_map_denial_grants_nothing(
         branch_id=branch.branch_id, version=1, project_name=PROJECT, user_id=USER
     )
     assert stored is not None  # branch/map evidence untouched; assert no decision below
+    async with adaptation_uow_factory(session_factory)() as uow:
+        assert await uow.repository.get_decision_by_id(user_id=USER, project_name=PROJECT, decision_id="d-1") is None
+
+
+async def test_decide_map_rejects_authorization_for_another_command(
+    session_factory: Factory, adaptation_evidence_service: AdaptationEvidenceService
+) -> None:
+    branch, map_ = await _seed_branch_and_map(adaptation_evidence_service)
+    service = AdaptationAuthorityService(
+        adaptation_uow_factory(session_factory), FakeAuthority(command_identity_hash="cid:wrong-command")
+    )
+    command = _approve_command(map_ref=_map_ref(map_), profile_ref=branch.profile_ref)
+
+    with pytest.raises(AdaptationAuthorityDeniedError):
+        await service.decide_map(command, authenticated_principal=_PRINCIPAL)
+
     async with adaptation_uow_factory(session_factory)() as uow:
         assert await uow.repository.get_decision_by_id(user_id=USER, project_name=PROJECT, decision_id="d-1") is None
 
@@ -285,6 +312,252 @@ async def test_decide_map_rejects_analyzed_map_with_zero_relied_reports(
     analysis_ref = ArtifactVersionRef(artifact_id="report-1", version=1, content_hash="sha256:" + "f6" * 32)
     branch, map_ = await _seed_branch_and_map(adaptation_evidence_service, profile_analysis_refs=[analysis_ref])
     command = _approve_command(map_ref=_map_ref(map_), profile_ref=branch.profile_ref)
+    with pytest.raises(AdaptationStaleDependencyError):
+        await authority_service.decide_map(command, authenticated_principal=_PRINCIPAL)
+
+
+async def test_decide_map_rejects_a_dangling_relied_report(
+    authority_service: AdaptationAuthorityService, adaptation_evidence_service: AdaptationEvidenceService
+) -> None:
+    analysis_ref = ArtifactVersionRef(artifact_id="analysis-1", version=1, content_hash="sha256:" + "f6" * 32)
+    branch, map_ = await _seed_branch_and_map(adaptation_evidence_service, profile_analysis_refs=[analysis_ref])
+    dangling_report = DecisionRef(decision_id="report-missing", decision_digest="report-missing")
+    command = _approve_command(
+        map_ref=_map_ref(map_),
+        profile_ref=branch.profile_ref,
+        relied_report_refs=[dangling_report],
+    )
+
+    with pytest.raises(AdaptationNotFoundError):
+        await authority_service.decide_map(command, authenticated_principal=_PRINCIPAL)
+
+
+async def test_decide_map_accepts_reports_that_bind_the_exact_ordered_analysis_sidecars(
+    session_factory: Factory,
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+) -> None:
+    sidecar_draft = WesternDramaAnalysis(
+        schema_version="r2-western-drama-analysis-v1",
+        content_hash="pending",
+        format_findings=[],
+        rubric_observations=["reviewed"],
+        evidence_locations=["scene-1"],
+    )
+    sidecar = sidecar_draft.model_copy(update={"content_hash": compute_adaptation_hash(sidecar_draft)})
+    branch = await adaptation_evidence_service.create_branch(_branch(), user_id=USER, project_name=PROJECT)
+    map_draft = _map(adaptation_map_id="map-1", branch_ref=_branch_ref(branch))
+    sidecar_ref = ArtifactVersionRef(
+        artifact_id=compute_profile_sidecar_id(map_draft.adaptation_map_id, branch.profile_ref),
+        version=map_draft.version,
+        content_hash=sidecar.content_hash,
+    )
+    analyzed_draft = map_draft.model_copy(update={"profile_analysis_refs": [sidecar_ref], "content_hash": "pending"})
+    analyzed_map = analyzed_draft.model_copy(update={"content_hash": compute_adaptation_hash(analyzed_draft)})
+    map_ = await adaptation_evidence_service.append_map(analyzed_map, user_id=USER, project_name=PROJECT)
+    report_draft = ProfileEvaluationReport(
+        schema_version="r2-profile-evaluation-report-v1",
+        artifact_hash=map_.content_hash,
+        profile_ref=branch.profile_ref,
+        evaluator_version="test-evaluator-v1",
+        sidecar_ref=sidecar_ref,
+        sidecar_digest=sidecar.content_hash,
+        findings=[],
+        report_digest="pending",
+        created_at=datetime.now(UTC),
+    )
+    report = report_draft.model_copy(update={"report_digest": compute_profile_evaluation_report_digest(report_draft)})
+    async with adaptation_uow_factory(session_factory)() as uow:
+        await uow.repository.insert_sidecar(
+            sidecar_ref.artifact_id,
+            sidecar_ref.version,
+            sidecar,
+            user_id=USER,
+            project_name=PROJECT,
+        )
+        await uow.repository.insert_report(report, user_id=USER, project_name=PROJECT)
+        await uow.commit()
+    command = _approve_command(
+        map_ref=_map_ref(map_),
+        profile_ref=branch.profile_ref,
+        relied_report_refs=[DecisionRef(decision_id=report.report_digest, decision_digest=report.report_digest)],
+    )
+
+    receipt = await authority_service.decide_map(command, authenticated_principal=_PRINCIPAL)
+
+    assert receipt.outcome == "RECORDED"
+
+
+async def test_decide_map_rejects_a_report_for_different_artifact_content(
+    session_factory: Factory,
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+) -> None:
+    sidecar_draft = WesternDramaAnalysis(
+        schema_version="r2-western-drama-analysis-v1",
+        content_hash="pending",
+        format_findings=[],
+        rubric_observations=["reviewed"],
+        evidence_locations=["scene-1"],
+    )
+    sidecar = sidecar_draft.model_copy(update={"content_hash": compute_adaptation_hash(sidecar_draft)})
+    branch = await adaptation_evidence_service.create_branch(_branch(), user_id=USER, project_name=PROJECT)
+    map_draft = _map(adaptation_map_id="map-1", branch_ref=_branch_ref(branch))
+    sidecar_ref = ArtifactVersionRef(
+        artifact_id=compute_profile_sidecar_id(map_draft.adaptation_map_id, branch.profile_ref),
+        version=map_draft.version,
+        content_hash=sidecar.content_hash,
+    )
+    analyzed_draft = map_draft.model_copy(update={"profile_analysis_refs": [sidecar_ref], "content_hash": "pending"})
+    analyzed_map = analyzed_draft.model_copy(update={"content_hash": compute_adaptation_hash(analyzed_draft)})
+    map_ = await adaptation_evidence_service.append_map(analyzed_map, user_id=USER, project_name=PROJECT)
+    report_draft = ProfileEvaluationReport(
+        schema_version="r2-profile-evaluation-report-v1",
+        artifact_hash="sha256:" + "11" * 32,
+        profile_ref=branch.profile_ref,
+        evaluator_version="test-evaluator-v1",
+        sidecar_ref=sidecar_ref,
+        sidecar_digest=sidecar.content_hash,
+        findings=[],
+        report_digest="pending",
+        created_at=datetime.now(UTC),
+    )
+    report = report_draft.model_copy(update={"report_digest": compute_profile_evaluation_report_digest(report_draft)})
+    async with adaptation_uow_factory(session_factory)() as uow:
+        await uow.repository.insert_sidecar(
+            sidecar_ref.artifact_id,
+            sidecar_ref.version,
+            sidecar,
+            user_id=USER,
+            project_name=PROJECT,
+        )
+        await uow.repository.insert_report(report, user_id=USER, project_name=PROJECT)
+        await uow.commit()
+
+    command = _approve_command(
+        map_ref=_map_ref(map_),
+        profile_ref=branch.profile_ref,
+        relied_report_refs=[DecisionRef(decision_id=report.report_digest, decision_digest=report.report_digest)],
+    )
+    with pytest.raises(AdaptationStaleDependencyError):
+        await authority_service.decide_map(command, authenticated_principal=_PRINCIPAL)
+
+
+async def test_decide_map_rejects_a_resolved_sidecar_with_tampered_semantic_content(
+    session_factory: Factory,
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+) -> None:
+    claimed_hash = "sha256:" + "22" * 32
+    tampered_sidecar = WesternDramaAnalysis(
+        schema_version="r2-western-drama-analysis-v1",
+        content_hash=claimed_hash,
+        format_findings=[],
+        rubric_observations=["semantic content does not hash to the claimed value"],
+        evidence_locations=["scene-1"],
+    )
+    branch = await adaptation_evidence_service.create_branch(_branch(), user_id=USER, project_name=PROJECT)
+    map_draft = _map(adaptation_map_id="map-1", branch_ref=_branch_ref(branch))
+    sidecar_ref = ArtifactVersionRef(
+        artifact_id=compute_profile_sidecar_id(map_draft.adaptation_map_id, branch.profile_ref),
+        version=map_draft.version,
+        content_hash=claimed_hash,
+    )
+    analyzed_draft = map_draft.model_copy(update={"profile_analysis_refs": [sidecar_ref], "content_hash": "pending"})
+    analyzed_map = analyzed_draft.model_copy(update={"content_hash": compute_adaptation_hash(analyzed_draft)})
+    map_ = await adaptation_evidence_service.append_map(analyzed_map, user_id=USER, project_name=PROJECT)
+    report_draft = ProfileEvaluationReport(
+        schema_version="r2-profile-evaluation-report-v1",
+        artifact_hash=map_.content_hash,
+        profile_ref=branch.profile_ref,
+        evaluator_version="test-evaluator-v1",
+        sidecar_ref=sidecar_ref,
+        sidecar_digest=claimed_hash,
+        findings=[],
+        report_digest="pending",
+        created_at=datetime.now(UTC),
+    )
+    report = report_draft.model_copy(update={"report_digest": compute_profile_evaluation_report_digest(report_draft)})
+    async with adaptation_uow_factory(session_factory)() as uow:
+        await uow.repository.insert_sidecar(
+            sidecar_ref.artifact_id,
+            sidecar_ref.version,
+            tampered_sidecar,
+            user_id=USER,
+            project_name=PROJECT,
+        )
+        await uow.repository.insert_report(report, user_id=USER, project_name=PROJECT)
+        await uow.commit()
+
+    command = _approve_command(
+        map_ref=_map_ref(map_),
+        profile_ref=branch.profile_ref,
+        relied_report_refs=[DecisionRef(decision_id=report.report_digest, decision_digest=report.report_digest)],
+    )
+    with pytest.raises(AdaptationStaleDependencyError):
+        await authority_service.decide_map(command, authenticated_principal=_PRINCIPAL)
+
+
+async def test_decide_map_rejects_tampered_report_metadata_that_retains_its_digest(
+    session_factory: Factory,
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+) -> None:
+    sidecar_draft = WesternDramaAnalysis(
+        schema_version="r2-western-drama-analysis-v1",
+        content_hash="pending",
+        format_findings=[],
+        rubric_observations=["reviewed"],
+        evidence_locations=["scene-1"],
+    )
+    sidecar = sidecar_draft.model_copy(update={"content_hash": compute_adaptation_hash(sidecar_draft)})
+    branch = await adaptation_evidence_service.create_branch(_branch(), user_id=USER, project_name=PROJECT)
+    map_draft = _map(adaptation_map_id="map-1", branch_ref=_branch_ref(branch))
+    sidecar_ref = ArtifactVersionRef(
+        artifact_id=compute_profile_sidecar_id(map_draft.adaptation_map_id, branch.profile_ref),
+        version=map_draft.version,
+        content_hash=sidecar.content_hash,
+    )
+    analyzed_draft = map_draft.model_copy(update={"profile_analysis_refs": [sidecar_ref], "content_hash": "pending"})
+    analyzed_map = analyzed_draft.model_copy(update={"content_hash": compute_adaptation_hash(analyzed_draft)})
+    map_ = await adaptation_evidence_service.append_map(analyzed_map, user_id=USER, project_name=PROJECT)
+    report_draft = ProfileEvaluationReport(
+        schema_version="r2-profile-evaluation-report-v1",
+        artifact_hash=map_.content_hash,
+        profile_ref=branch.profile_ref,
+        evaluator_version="test-evaluator-v1",
+        sidecar_ref=sidecar_ref,
+        sidecar_digest=sidecar.content_hash,
+        findings=[],
+        report_digest="pending",
+        created_at=datetime.now(UTC),
+    )
+    report = report_draft.model_copy(update={"report_digest": compute_profile_evaluation_report_digest(report_draft)})
+    async with adaptation_uow_factory(session_factory)() as uow:
+        await uow.repository.insert_sidecar(
+            sidecar_ref.artifact_id,
+            sidecar_ref.version,
+            sidecar,
+            user_id=USER,
+            project_name=PROJECT,
+        )
+        await uow.repository.insert_report(report, user_id=USER, project_name=PROJECT)
+        await uow.session.execute(
+            update(AdaptationEvaluationReportModel)
+            .where(
+                AdaptationEvaluationReportModel.user_id == USER,
+                AdaptationEvaluationReportModel.project_name == PROJECT,
+                AdaptationEvaluationReportModel.report_digest == report.report_digest,
+            )
+            .values(evaluator_version="tampered-evaluator-v2")
+        )
+        await uow.commit()
+
+    command = _approve_command(
+        map_ref=_map_ref(map_),
+        profile_ref=branch.profile_ref,
+        relied_report_refs=[DecisionRef(decision_id=report.report_digest, decision_digest=report.report_digest)],
+    )
     with pytest.raises(AdaptationStaleDependencyError):
         await authority_service.decide_map(command, authenticated_principal=_PRINCIPAL)
 

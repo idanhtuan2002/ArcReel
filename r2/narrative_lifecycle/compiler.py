@@ -57,7 +57,7 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, cast
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -324,7 +324,7 @@ def _parse_resolution_instruction(text: str) -> _ResolutionInstruction | str:
             return "MALFORMED_RESOLUTION_INSTRUCTION"
     elif "," in argument:
         return "MALFORMED_RESOLUTION_INSTRUCTION"
-    return _ResolutionInstruction(kind=kind, argument=argument)  # pyright: ignore[reportArgumentType]
+    return _ResolutionInstruction(kind=cast(ResolutionInstructionKind, kind), argument=argument)
 
 
 def _change_sets_conflict(

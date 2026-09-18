@@ -737,10 +737,17 @@ scan finds no authority/provider import.
   "6b7c4a0e0001"`, `down_revision = "6a7c4a0e0001"`.
 
 - [ ] Test Human Showrunner denial, whole-map hash binding, incomplete entry
-  evidence, exact retry before stale head, retry after supersession, stale policy,
-  cross-profile refs, same/different-ID concurrent genesis and rollback. Add
-  FK-valid corrupted-head cases for effective `REJECT`, wrong selected artifact,
-  broken predecessor/generation fold and stored/rebuilt projection mismatch.
+   evidence, exact retry before stale head, retry after supersession, stale policy,
+   cross-profile refs, same/different-ID concurrent genesis and rollback. Add
+   FK-valid corrupted-head cases for effective `REJECT`, wrong selected artifact,
+   broken predecessor/generation fold and stored/rebuilt projection mismatch.
+- [ ] Reject an authorization whose `command_identity_hash` differs from the
+  canonical command. Resolve every `relied_report_refs` entry and require the
+  reports' ordered exact sidecar refs/digests to equal the map's ordered
+  `profile_analysis_refs`; also bind the exact map hash, derive sidecar identity
+  from artifact ID/version plus profile, resolve the sidecar and recompute its
+  semantic hash. Dangling, extra, missing, reordered, cross-artifact or
+  cross-profile report evidence writes nothing.
 - [ ] Reuse the M5C transaction protocol as a pattern while keeping a separate
   adaptation authority type and repository surface.
 - [ ] Implement one pure chain-fold/validation helper used by both the standalone
@@ -891,8 +898,14 @@ migration `revision = "6c7c4a0e0001"`, `down_revision =
   non-waivable integrity finding and waiver laundering after semantic change.
 - [ ] Implement pure evaluator ports wrapped by append-only report evidence.
 - [ ] Implement Human-only waiver decisions bound to exact artifact/profile/rule/
-  finding tuple and rationale; v1 applicability expires only by semantic/profile
-  change or explicit supersession, not wall-clock time.
+   finding tuple and rationale; v1 applicability expires only by semantic/profile
+   change or explicit supersession, not wall-clock time.
+- [ ] At issuance and admission, prove the waiver's full artifact ref, branch,
+  report ref, finding ids, rule versions and profile against the exact proposal
+  and the exact reports consumed by that admission; matching bytes alone are
+  insufficient identity, and coverage keys include exact report digest, finding
+  ID and rule version so one report cannot cover another report's same-named
+  finding.
 - [ ] Run `uv run python -m pytest
   tests/integration/r2/adaptation/test_evaluation.py
   tests/integration/r2/adaptation/test_waivers.py
@@ -934,7 +947,13 @@ cannot be waived, and semantic/profile changes invalidate applicability.
   require the same screenplay ID and exact permitted lifecycle transition,
   append N+1 plus its decision, and never update N in place.
 - [ ] Expose an exact approved/locked screenplay reader for Director; expose no
-  mutation through that port.
+  mutation through that port. The reader locks and rebuilds the admission head
+  and returns only the current effective admission. `REVOKE` clears the effective
+  decision and selected artifact, so old admission refs become unusable. A
+  revocation repeats and proves the current ADMIT's immutable context but does not
+  re-run positive dependency currentness; superseding an old map/report/waiver
+  must not prevent revocation. The reader provides read-time authority, not an
+  in-flight cancellation lease.
 - [ ] Run `uv run python -m pytest
   tests/integration/r2/adaptation/test_screenplay_admission.py
   tests/integration/lib/db/migrations/test_alembic_screenplay_admission.py

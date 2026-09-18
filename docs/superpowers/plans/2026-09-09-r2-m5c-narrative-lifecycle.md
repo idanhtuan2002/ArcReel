@@ -1753,7 +1753,7 @@ git commit -m "feat(r2): admit the atomic narrative-to-canon handoff"
 - Test: `tests/integration/server/services/test_narrative_canon_handoff.py`
 
 **Interfaces:**
-- The authenticated facade requires one exact `NarrativeHandoffAdmission`, the exact `CanonDelta` bound by that receipt, and the exact persisted `CanonCommitApproval` whose complete payload, reference, and fingerprint are bound by that receipt. It then calls the **existing** `CanonTransactionService.commit(*, delta, approval, project_name, user_id, now)`. It constructs the M5A approval **before** Narrative admission and passes it to the admission transaction; on the initial request or after process restart it reloads the exact durable delta + approval from the committed admission before calling or retrying M5A.
+- The authenticated facade requires an authenticated principal, the exact caller-supplied `NarrativeWorkScope`, one project-scoped Human Showrunner capability proven through the existing `NarrativeShowrunnerAuthorityPort`, one exact scoped `NarrativeHandoffAdmission`, the exact `CanonDelta` bound by that receipt, and the exact persisted `CanonCommitApproval` whose complete payload, reference, and fingerprint are bound by that receipt. It never drives a commit from the repository's global ID-only collision lookup. It then calls the **existing** `CanonTransactionService.commit(*, delta, approval, project_name, user_id, now)`. It constructs the M5A approval **before** Narrative admission and passes it to the admission transaction; on the initial request or after process restart it reloads the exact durable delta + approval from the committed admission before calling or retrying M5A.
 - M5A independently verifies the approval, recomputes the delta hash, locks the Canon branch, resolves exact Canon retry, checks the base, validates the candidate Canon view, appends the accepted delta + version, advances the branch head, and updates its projection atomically. If Canon advanced before commit, M5A returns its existing base conflict; the Narrative admission stays immutable but a new delta + admission are required. Narrative supersession after admission is not substituted for M5A base OCC.
 - The facade does **not** create a second Canon approval service and constructs/receives only the existing M5A `CanonCommitApproval`.
 
@@ -1761,14 +1761,24 @@ git commit -m "feat(r2): admit the atomic narrative-to-canon handoff"
 
 ```python
 async def test_facade_reloads_the_durable_delta_and_approval_after_restart(facade, admitted_handoff):
-    result = await facade.commit_from_admission(admission_id=admitted_handoff.admission_id, now=NOW)
+    result = await facade.commit_from_admission(
+        admission_id=admitted_handoff.admission_id,
+        scope=admitted_handoff.admission.work_scope,
+        authenticated_principal=SHOWRUNNER,
+        now=NOW,
+    )
     assert result.version.committed_delta_id == admitted_handoff.canon_delta_id
 
 
 async def test_canon_head_movement_after_admission_is_rejected_by_existing_m5a_occ(facade, admitted_handoff, canon):
     await canon.commit(unrelated_delta())  # advances the branch head
     with pytest.raises(CanonBaseVersionConflict):
-        await facade.commit_from_admission(admission_id=admitted_handoff.admission_id, now=NOW)
+        await facade.commit_from_admission(
+            admission_id=admitted_handoff.admission_id,
+            scope=admitted_handoff.admission.work_scope,
+            authenticated_principal=SHOWRUNNER,
+            now=NOW,
+        )
 ```
 
 Also cover: an admission receipt is not accepted as a Canon approval (M5A approval validation still runs); reusing an admission with another M5A approval tuple fails the admission fingerprint check before Canon commit; M5A exact retry remains governed by its existing delta/approval identity; a response-lost M5A call retries only with the exact persisted `AdmittedNarrativeHandoff` delta + approval tuple.

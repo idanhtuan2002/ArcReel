@@ -326,7 +326,10 @@ async def test_two_different_profile_branches_admit_concurrently_without_content
     )
 
     barrier = asyncio.Barrier(2)
-    uow_factory = lambda: _BarrierBeforeHeadLockUnitOfWork(concurrent_session_factory, barrier)  # noqa: E731
+
+    def uow_factory():
+        return _BarrierBeforeHeadLockUnitOfWork(concurrent_session_factory, barrier)
+
     western_authority = AdaptationAuthorityService(uow_factory, FakeAuthority())
     shuangwen_authority = AdaptationAuthorityService(uow_factory, FakeAuthority())
 
@@ -378,7 +381,10 @@ async def test_two_concurrent_admissions_of_the_same_screenplay_yield_one_winner
     )
 
     barrier = asyncio.Barrier(2)
-    uow_factory = lambda: _BarrierBeforeHeadLockUnitOfWork(concurrent_session_factory, barrier)  # noqa: E731
+
+    def uow_factory():
+        return _BarrierBeforeHeadLockUnitOfWork(concurrent_session_factory, barrier)
+
     racing = AdaptationAuthorityService(uow_factory, FakeAuthority())
 
     async def run(decision_id: str):

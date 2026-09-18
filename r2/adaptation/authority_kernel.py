@@ -33,8 +33,9 @@ from r2.contracts.adaptation import (
 )
 
 # The family's "select a new effective candidate" action, mirroring M5C's own
-# ``ACCEPTING_ACTION`` map. REJECT/DENY_WAIVER/REVOKE never change the effective
-# pointer, regardless of family.
+# ``ACCEPTING_ACTION`` map. REJECT and DENY_WAIVER do not retroactively clear a
+# prior accepted selection. REVOKE is different: it explicitly removes current
+# screenplay-use authority.
 _ACCEPTING_ACTION: dict[AdaptationAuthorityFamily, AdaptationDecisionAction] = {
     AdaptationAuthorityFamily.MAP_APPROVAL: AdaptationDecisionAction.APPROVE,
     AdaptationAuthorityFamily.PROFILE_WAIVER: AdaptationDecisionAction.WAIVE,
@@ -118,7 +119,11 @@ def fold_adaptation_head(decisions: Sequence[AdaptationDecision]) -> AdaptationH
         if command.action == accepting_action:
             effective_decision_id = command.decision_id
             selected_artifact_ref = _selected_artifact_ref_of(decision)
-        elif command.action != rejecting_action:
+        elif command.action == rejecting_action:
+            if family == AdaptationAuthorityFamily.SCREENPLAY_ADMISSION:
+                effective_decision_id = None
+                selected_artifact_ref = None
+        else:
             raise AdaptationAuthorityIntegrityError(f"unexpected {family.value} action {command.action!r} in chain")
 
     return AdaptationHead(

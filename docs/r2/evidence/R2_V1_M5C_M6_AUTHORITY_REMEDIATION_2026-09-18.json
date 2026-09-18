@@ -1,0 +1,131 @@
+{
+  "schema_version": "r2-v1-m5c-m6-authority-remediation-v1",
+  "status": "APPROVED",
+  "candidate_code_head": "54acf51948ef0fdc21da7d868778483cebd230ed",
+  "behavioral_remediation_head": "54acf51948ef0fdc21da7d868778483cebd230ed",
+  "parent_candidate_head": "cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3",
+  "scope": {
+    "milestones": ["M5C", "M6"],
+    "m7_opened": false,
+    "schema_or_migration_changed": false,
+    "findings_closed": [
+      "authorization binds the exact command_identity_hash",
+      "map approval resolves and binds exact ordered report sidecars",
+      "screenplay admission binds the exact map artifact version and hash",
+      "waivers bind the exact artifact, branch, profile, report, findings, and rule versions",
+      "REVOKE clears effective screenplay authority and the approved reader checks the locked fold",
+      "Canon handoff authenticates the principal and resolves the admission inside the exact scope",
+      "new or touched suppressions were replaced with typed code or ordinary functions",
+      "every authority report-consumption path recomputes the stored report's content-addressed digest"
+    ]
+  },
+  "gates": {
+    "ruff_check": "PASS",
+    "ruff_format_check": "PASS",
+    "basedpyright": {
+      "status": "PASS",
+      "errors": 0,
+      "warnings": 0,
+      "notes": 0
+    },
+    "lint_imports": {
+      "status": "PASS",
+      "kept": 20,
+      "broken": 0
+    },
+    "deptry": "PASS",
+    "test_audit": {
+      "status": "PASS",
+      "violations": 0
+    },
+    "affected_postgres_suite": {
+      "status": "PASS",
+      "passed": 256,
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55439/r2_v1_integration uv run python -m pytest tests/integration/r2/adaptation tests/integration/server/services/test_narrative_canon_handoff.py tests/integration/r2/test_m5c_acceptance.py tests/unit/r2/adaptation tests/unit/r2/narrative_lifecycle/test_canon_delta_compiler.py tests/unit/r2/production_intelligence/test_take_director.py -q --tb=short",
+      "postgres": "PostgreSQL 18, isolated database r2_v1_integration"
+    },
+    "full_backend_pytest": {
+      "status": "PASS",
+      "passed": 13694,
+      "skipped": 17,
+      "warnings": 103,
+      "command": "env -u DATABASE_URL uv run python -m pytest -n 4 --dist loadfile -q --tb=short",
+      "database_mode": "worker-owned SQLite test databases",
+      "verified_at_head": "8ed493322c378b40bf0ae40f2ccca2a2f1d45f0b"
+    },
+    "post_gate_doc_only_review_fix": {
+      "status": "PASS",
+      "head": "42bfba2c8efe46e611dcf46ae9ec767cfdbb2328",
+      "change": "Corrected one test docstring so the retry contract names admission id, authenticated principal, and exact scope.",
+      "targeted_pytest": "6 passed",
+      "ruff": "PASS",
+      "diff_check": "PASS"
+    },
+    "round_2_remediation": {
+      "status": "PASS",
+      "head": "f5c85e3cad1abe297f6e408f66ed7743f9aabf11",
+      "red_regressions": "3 failed as expected before implementation",
+      "new_adversarial_cases": "5 passed",
+      "sqlite_adaptation": "151 passed, 5 skipped",
+      "postgres_18_adaptation": "95 passed",
+      "full_backend_pytest": "13699 passed, 17 skipped, 102 warnings",
+      "ruff_format_basedpyright_imports_deptry_audit": "PASS",
+      "diff_check": "PASS"
+    },
+    "round_3_report_integrity_remediation": {
+      "status": "PASS",
+      "head": "54acf51948ef0fdc21da7d868778483cebd230ed",
+      "red_regressions": "2 failed as expected before implementation",
+      "new_adversarial_cases": "2 passed for tampered report metadata and deleted finding rows",
+      "authority_suites": "61 passed, 1 skipped",
+      "affected_sqlite_suite": "258 passed, 5 skipped, 1 warning",
+      "affected_postgres_18_suite": "263 passed",
+      "full_backend_pytest": "13701 passed, 17 skipped, 102 warnings",
+      "ruff_format_basedpyright_imports_deptry_audit": "PASS",
+      "diff_check": "PASS"
+    },
+    "diff_check": "PASS"
+  },
+  "review_history": [
+    {
+      "reviewed_head": "dffa78c7c7688e2196886eafe9179c718068bb0d",
+      "verdict": "CHANGES_REQUIRED",
+      "blocking_findings": [
+        "cross-artifact and cross-report waiver laundering",
+        "incomplete map report and resolved-sidecar binding",
+        "REVOKE blocked by historical dependency supersession",
+        "evidence overstated closure"
+      ],
+      "record": "docs/r2/evidence/R2_V1_M5C_M6_AUTHORITY_INDEPENDENT_REVIEW_2026-09-18.md"
+    },
+    {
+      "reviewed_head": "0bc4298759427216093ccca3bf2a59373e0d31de",
+      "verdict": "CHANGES_REQUIRED",
+      "reviewer": "main agent",
+      "blocking_findings": [
+        "stored evaluation-report content was not recomputed against its content-addressed report_digest"
+      ],
+      "resolved_by": "54acf51948ef0fdc21da7d868778483cebd230ed"
+    },
+    {
+      "reviewed_head": "aaa4eb7eeabbab81650dcbe1fde02ef02103067d",
+      "fixed_point": "cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3",
+      "verdict": "APPROVED",
+      "reviewer": "independent read-only reviewer",
+      "blocking_findings": [],
+      "fresh_targeted_verification": "8 passed, 1 warning",
+      "standards": "PASS",
+      "diff_check": "PASS"
+    }
+  ],
+  "environment_notes": [
+    "Sandboxed test attempts were discarded because the sandbox denied local sockets and stream primitives; authoritative test results above were rerun outside the sandbox.",
+    "The first full-suite PostgreSQL attempt was discarded because one external database was incorrectly shared across four xdist workers; the authoritative PostgreSQL affected suite ran serially, and the authoritative full suite used worker-owned SQLite databases."
+  ],
+  "known_limits": [
+    "Exactly one independent reviewer was used; no parallel or nested reviewer agents were opened.",
+    "The graph index was stale for the candidate worktree; the independent reviewer used exact Git/source and fresh targeted tests.",
+    "No production provider call, deployment, publication, or media-product acceptance is authorized by this design-and-code acceptance."
+  ],
+  "next_authority": "begin M7 from the accepted M5C/M6 candidate reviewed at aaa4eb7eeabbab81650dcbe1fde02ef02103067d"
+}
