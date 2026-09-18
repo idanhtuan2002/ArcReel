@@ -80,6 +80,23 @@ def upgrade() -> None:
             sqlite_where=sa.text("provider_job_id IS NOT NULL"),
         )
 
+    with op.batch_alter_table("api_calls", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("execution_id", sa.String(length=255), nullable=True))
+        batch_op.create_index(
+            "uq_api_calls_execution_id",
+            ["execution_id"],
+            unique=True,
+            postgresql_where=sa.text("execution_id IS NOT NULL"),
+            sqlite_where=sa.text("execution_id IS NOT NULL"),
+        )
+        batch_op.create_foreign_key(
+            "fk_api_calls_execution_attempt",
+            "execution_attempts",
+            ["user_id", "project_name", "execution_id"],
+            ["user_id", "project_name", "execution_id"],
+            ondelete="RESTRICT",
+        )
+
     op.create_table(
         "provider_observations",
         sa.Column("user_id", sa.String(), server_default="default", nullable=False),
@@ -243,6 +260,11 @@ def downgrade() -> None:
     with op.batch_alter_table("provider_observations", schema=None) as batch_op:
         batch_op.drop_index("ix_provider_observations_project_name")
     op.drop_table("provider_observations")
+
+    with op.batch_alter_table("api_calls", schema=None) as batch_op:
+        batch_op.drop_constraint("fk_api_calls_execution_attempt", type_="foreignkey")
+        batch_op.drop_index("uq_api_calls_execution_id")
+        batch_op.drop_column("execution_id")
 
     with op.batch_alter_table("execution_attempts", schema=None) as batch_op:
         batch_op.drop_index("uq_execution_attempts_provider_job")

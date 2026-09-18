@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 
 from lib.cost_calculator import cost_calculator
 from lib.custom_provider import is_custom_provider, parse_provider_id
@@ -24,6 +25,13 @@ from lib.providers import PROVIDER_GEMINI, CallType
 # 解析侧（grok / dashscope extractor）的 clamp 引用同一常量，保持口径一致。
 MAX_BILLED_DURATION_SECONDS = 86400
 MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024
+
+
+class UsageExecutionMismatch(RuntimeError):
+    """A usage row cannot be bound to the requested execution identity."""
+
+    def __init__(self, *, call_id: int, execution_id: str) -> None:
+        super().__init__(f"api call {call_id} cannot bind execution {execution_id!r}")
 
 
 def _persisted_size(value: object) -> int:
@@ -127,6 +135,7 @@ def _row_to_dict(row: ApiCall) -> dict[str, Any]:
     return {
         "id": row.id,
         "project_name": row.project_name,
+        "execution_id": row.execution_id,
         "call_type": row.call_type,
         "model": row.model,
         "prompt": row.prompt,
@@ -158,6 +167,24 @@ def _row_to_dict(row: ApiCall) -> dict[str, Any]:
 
 
 class UsageRepository(BaseRepository):
+    async def bind_execution(self, *, call_id: int, execution_id: str) -> None:
+        try:
+            result = await self.session.execute(
+                update(ApiCall)
+                .where(
+                    ApiCall.id == call_id,
+                    or_(ApiCall.execution_id.is_(None), ApiCall.execution_id == execution_id),
+                )
+                .values(execution_id=execution_id)
+            )
+            if rowcount(result) != 1:
+                await self.session.rollback()
+                raise UsageExecutionMismatch(call_id=call_id, execution_id=execution_id)
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise UsageExecutionMismatch(call_id=call_id, execution_id=execution_id) from exc
+
     async def update_last_provider_response(self, call_id: int, body: object) -> None:
         await self.session.execute(
             update(ApiCall).where(ApiCall.id == call_id).values(last_provider_response=bound_provider_response(body))

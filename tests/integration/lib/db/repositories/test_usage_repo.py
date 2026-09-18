@@ -6,10 +6,42 @@ import pytest
 from sqlalchemy import update
 
 from lib.db.models.api_call import ApiCall
-from lib.db.repositories.usage_repo import MAX_PROVIDER_RESPONSE_BYTES, SettlementInput, UsageRepository
+from lib.db.repositories.usage_repo import (
+    MAX_PROVIDER_RESPONSE_BYTES,
+    SettlementInput,
+    UsageExecutionMismatch,
+    UsageRepository,
+)
 
 
 class TestUsageRepository:
+    async def test_bind_execution_is_exactly_idempotent(self, db_session):
+        repo = UsageRepository(db_session)
+        call_id = await repo.start_call(project_name="demo", call_type="video", model="m")
+
+        await repo.bind_execution(call_id=call_id, execution_id="exec-1")
+        await repo.bind_execution(call_id=call_id, execution_id="exec-1")
+
+        calls = await repo.get_calls(call_id=call_id)
+        assert calls["items"][0]["execution_id"] == "exec-1"
+
+    async def test_bind_execution_rejects_a_different_execution_for_the_same_call(self, db_session):
+        repo = UsageRepository(db_session)
+        call_id = await repo.start_call(project_name="demo", call_type="video", model="m")
+        await repo.bind_execution(call_id=call_id, execution_id="exec-1")
+
+        with pytest.raises(UsageExecutionMismatch):
+            await repo.bind_execution(call_id=call_id, execution_id="exec-2")
+
+    async def test_bind_execution_rejects_the_same_execution_for_a_second_call(self, db_session):
+        repo = UsageRepository(db_session)
+        first = await repo.start_call(project_name="demo", call_type="video", model="m")
+        second = await repo.start_call(project_name="demo", call_type="video", model="m")
+        await repo.bind_execution(call_id=first, execution_id="exec-1")
+
+        with pytest.raises(UsageExecutionMismatch):
+            await repo.bind_execution(call_id=second, execution_id="exec-1")
+
     async def test_start_and_finish_call(self, db_session):
         repo = UsageRepository(db_session)
         call_id = await repo.start_call(

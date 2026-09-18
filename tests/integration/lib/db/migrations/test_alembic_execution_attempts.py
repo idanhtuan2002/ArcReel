@@ -97,6 +97,16 @@ def test_upgrade_creates_the_execution_identity_schema_additively(
 
             unique = {tuple(sorted(c["column_names"])) for c in inspector.get_unique_constraints("execution_attempts")}
             assert tuple(sorted(("user_id", "project_name", "task_id", "attempt_no"))) in unique
+
+            api_call_columns = {column["name"]: column for column in inspector.get_columns("api_calls")}
+            assert api_call_columns["execution_id"]["nullable"] is True
+            api_call_indexes = {index["name"]: index for index in inspector.get_indexes("api_calls")}
+            assert api_call_indexes["uq_api_calls_execution_id"]["unique"] == 1
+            assert api_call_indexes["uq_api_calls_execution_id"]["column_names"] == ["execution_id"]
+            api_call_fks = {foreign_key["name"]: foreign_key for foreign_key in inspector.get_foreign_keys("api_calls")}
+            execution_fk = api_call_fks["fk_api_calls_execution_attempt"]
+            assert execution_fk["constrained_columns"] == ["user_id", "project_name", "execution_id"]
+            assert execution_fk["referred_columns"] == ["user_id", "project_name", "execution_id"]
     finally:
         engine.dispose()
 

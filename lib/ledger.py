@@ -91,6 +91,10 @@ class Ledger:
     def __init__(self, *, session_factory=None):
         self._session_factory = session_factory or safe_session_factory
 
+    async def bind_execution(self, *, call_id: int, execution_id: str) -> None:
+        async with self._session_factory() as session:
+            await UsageRepository(session).bind_execution(call_id=call_id, execution_id=execution_id)
+
     @asynccontextmanager
     async def record(
         self,

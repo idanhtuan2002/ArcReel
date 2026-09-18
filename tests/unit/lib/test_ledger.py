@@ -98,6 +98,15 @@ class TestSettlementDispatch:
 
 
 class TestRecordBracket:
+    async def test_bind_execution_uses_a_fresh_repository_session(self, db_factory: async_sessionmaker) -> None:
+        ledger = Ledger(session_factory=db_factory)
+        async with ledger.record(project_name="demo", call_type="video", model="m") as call:
+            await ledger.bind_execution(call_id=call.call_id, execution_id="exec-1")
+            call.success(_VideoResult())
+
+        row = await _only_row(db_factory)
+        assert row.execution_id == "exec-1"
+
     async def test_call_id_available_in_block_and_success_flips_row(self, db_factory: async_sessionmaker) -> None:
         ledger = Ledger(session_factory=db_factory)
         seen_call_id: int | None = None

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import JSON, Boolean, DateTime, Float, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKeyConstraint, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lib.db.base import Base, TimestampMixin, UserOwnedMixin
@@ -16,6 +16,7 @@ class ApiCall(TimestampMixin, UserOwnedMixin, Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     project_name: Mapped[str] = mapped_column(String, nullable=False)
+    execution_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     call_type: Mapped[str] = mapped_column(String, nullable=False)
     model: Mapped[str] = mapped_column(String, nullable=False)
     prompt: Mapped[str | None] = mapped_column(Text)
@@ -47,4 +48,17 @@ class ApiCall(TimestampMixin, UserOwnedMixin, Base):
         Index("idx_api_calls_call_type", "call_type"),
         Index("idx_api_calls_status", "status"),
         Index("idx_api_calls_started_at", "started_at"),
+        Index(
+            "uq_api_calls_execution_id",
+            "execution_id",
+            unique=True,
+            postgresql_where=sa.text("execution_id IS NOT NULL"),
+            sqlite_where=sa.text("execution_id IS NOT NULL"),
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "execution_id"],
+            ["execution_attempts.user_id", "execution_attempts.project_name", "execution_attempts.execution_id"],
+            name="fk_api_calls_execution_attempt",
+            ondelete="RESTRICT",
+        ),
     )
