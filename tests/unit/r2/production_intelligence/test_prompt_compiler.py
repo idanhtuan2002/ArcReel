@@ -145,6 +145,8 @@ def test_provider_identity_comes_only_from_the_execution_decision() -> None:
     request = _compiler().compile(plan=_plan(), decision=_decision())
     assert request.provider == _decision().provider_id
     assert request.model == _decision().model_or_tool_id
+    assert request.method_decision_ref == _decision().method_decision_ref
+    assert "host_task_ref" not in request.model_dump(mode="json")
     assert "provider" not in set(PromptPlan.model_fields)
 
 

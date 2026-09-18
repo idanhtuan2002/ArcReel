@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import AwareDatetime, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import AwareDatetime, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from .common import (
     ContractIdentity,
@@ -102,7 +102,8 @@ class PromptPlan(ContractIdentity):
 
 class ProviderRequest(R2ContractModel):
     id: NonEmptyStr
-    method_decision_ref: NonEmptyStr
+    method_decision_ref: NonEmptyStr | None = Field(default=None, exclude_if=lambda value: value is None)
+    host_task_ref: NonEmptyStr | None = Field(default=None, exclude_if=lambda value: value is None)
     prompt_plan_ref: NonEmptyStr | None = None
     provider: NonEmptyStr
     model: NonEmptyStr
@@ -110,6 +111,12 @@ class ProviderRequest(R2ContractModel):
     payload: dict[str, JSONValue]
     execution_options: dict[str, JSONValue] = Field(default_factory=dict)
     adapter_version: NonEmptyStr
+
+    @model_validator(mode="after")
+    def require_exactly_one_origin(self) -> ProviderRequest:
+        if (self.method_decision_ref is None) == (self.host_task_ref is None):
+            raise ValueError("provider request requires exactly one origin reference")
+        return self
 
     @field_validator("payload", "execution_options", mode="before")
     @classmethod
