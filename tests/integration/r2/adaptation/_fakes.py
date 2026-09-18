@@ -14,9 +14,16 @@ PRINCIPAL = "human:anhtuan"
 
 
 class FakeAuthority:
-    def __init__(self, *, deny: bool = False, principal: str = PRINCIPAL) -> None:
+    def __init__(
+        self,
+        *,
+        deny: bool = False,
+        principal: str = PRINCIPAL,
+        command_identity_hash: str | None = None,
+    ) -> None:
         self.deny = deny
         self.principal = principal
+        self.command_identity_hash = command_identity_hash
         self.calls: list[tuple[str, str]] = []
 
     async def authorize(
@@ -29,7 +36,7 @@ class FakeAuthority:
             authenticated_principal=authenticated_principal,
             authority_role="HUMAN_SHOWRUNNER",
             action=action,
-            command_identity_hash=command_identity_hash,
+            command_identity_hash=self.command_identity_hash or command_identity_hash,
             approval_receipt=f"receipt:{command_identity_hash}",
             authorized_at=datetime.now(UTC),
         )

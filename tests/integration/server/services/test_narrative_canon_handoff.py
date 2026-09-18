@@ -32,7 +32,7 @@ from r2.narrative.canon_transaction import CanonTransactionService, new_version_
 from r2.narrative.errors import CanonBaseVersionConflict
 from r2.narrative.hashing import seal_canon_delta
 from r2.narrative_lifecycle.acceptance import AdmittedNarrativeHandoff, NarrativeAcceptanceService
-from r2.narrative_lifecycle.errors import NarrativeEvidenceNotFoundError
+from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError, NarrativeEvidenceNotFoundError
 from server.services.narrative_canon_handoff import NarrativeCanonHandoffFacade
 from tests.integration.r2.narrative_lifecycle._fakes import SHOWRUNNER, FakeShowrunnerAuthorityPort
 from tests.integration.r2.narrative_lifecycle.test_handoff_admission import (
@@ -124,7 +124,9 @@ def canon(session_factory: Factory) -> CanonTransactionService:
 
 @pytest.fixture
 def facade(session_factory: Factory, canon: CanonTransactionService) -> NarrativeCanonHandoffFacade:
-    return NarrativeCanonHandoffFacade(narrative_lifecycle_uow_factory(session_factory), canon)
+    return NarrativeCanonHandoffFacade(
+        narrative_lifecycle_uow_factory(session_factory), canon, FakeShowrunnerAuthorityPort()
+    )
 
 
 @pytest.fixture
@@ -156,7 +158,12 @@ async def test_facade_reloads_the_durable_delta_and_approval_after_restart(
     """A fresh facade call — nothing but the admission id, standing in for a call made
     after a process restart — reloads the exact persisted delta and approval and lands
     them on Canon through the existing M5A commit path."""
-    result = await facade.commit_from_admission(admission_id=admitted_handoff.admission_id, now=NOW)
+    result = await facade.commit_from_admission(
+        admission_id=admitted_handoff.admission_id,
+        scope=admitted_handoff.admission.work_scope,
+        authenticated_principal=SHOWRUNNER,
+        now=NOW,
+    )
     assert isinstance(result, CanonCommitResult)
     assert result.version.committed_delta_id == admitted_handoff.canon_delta.canon_delta_id
     assert result.accepted_delta.approval == admitted_handoff.canon_commit_approval
@@ -174,7 +181,12 @@ async def test_canon_head_movement_after_admission_is_rejected_by_existing_m5a_o
         now=NOW,
     )  # advances the branch head away from the admission's exact base
     with pytest.raises(CanonBaseVersionConflict):
-        await facade.commit_from_admission(admission_id=admitted_handoff.admission_id, now=NOW)
+        await facade.commit_from_admission(
+            admission_id=admitted_handoff.admission_id,
+            scope=admitted_handoff.admission.work_scope,
+            authenticated_principal=SHOWRUNNER,
+            now=NOW,
+        )
 
 
 async def test_a_retry_after_a_lost_response_replays_the_exact_persisted_commit(
@@ -183,11 +195,52 @@ async def test_a_retry_after_a_lost_response_replays_the_exact_persisted_commit(
     """A caller that never saw the first response — a dropped reply, or a crash between
     the M5A commit and recording success — retries by admission id alone. M5A's own
     exact-retry governs the outcome: the same version is returned, not a second one."""
-    first = await facade.commit_from_admission(admission_id=admitted_handoff.admission_id, now=NOW)
-    second = await facade.commit_from_admission(admission_id=admitted_handoff.admission_id, now=NOW)
+    first = await facade.commit_from_admission(
+        admission_id=admitted_handoff.admission_id,
+        scope=admitted_handoff.admission.work_scope,
+        authenticated_principal=SHOWRUNNER,
+        now=NOW,
+    )
+    second = await facade.commit_from_admission(
+        admission_id=admitted_handoff.admission_id,
+        scope=admitted_handoff.admission.work_scope,
+        authenticated_principal=SHOWRUNNER,
+        now=NOW,
+    )
     assert second == first
 
 
 async def test_an_unadmitted_id_does_not_resolve(facade: NarrativeCanonHandoffFacade) -> None:
     with pytest.raises(NarrativeEvidenceNotFoundError):
-        await facade.commit_from_admission(admission_id="adm-never-admitted", now=NOW)
+        await facade.commit_from_admission(
+            admission_id="adm-never-admitted",
+            scope=_handoff_command().work_scope,
+            authenticated_principal=SHOWRUNNER,
+            now=NOW,
+        )
+
+
+async def test_facade_denies_a_principal_without_showrunner_capability(
+    facade: NarrativeCanonHandoffFacade, admitted_handoff: AdmittedNarrativeHandoff
+) -> None:
+    with pytest.raises(NarrativeDecisionAuthorizationError, match="lacks Human Showrunner capability"):
+        await facade.commit_from_admission(
+            admission_id=admitted_handoff.admission_id,
+            scope=admitted_handoff.admission.work_scope,
+            authenticated_principal="human:not-showrunner",
+            now=NOW,
+        )
+
+
+async def test_facade_does_not_resolve_an_admission_through_another_scope(
+    facade: NarrativeCanonHandoffFacade, admitted_handoff: AdmittedNarrativeHandoff
+) -> None:
+    wrong_scope = admitted_handoff.admission.work_scope.model_copy(update={"user_id": "another-user"})
+
+    with pytest.raises(NarrativeEvidenceNotFoundError):
+        await facade.commit_from_admission(
+            admission_id=admitted_handoff.admission_id,
+            scope=wrong_scope,
+            authenticated_principal=SHOWRUNNER,
+            now=NOW,
+        )

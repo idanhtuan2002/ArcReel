@@ -10,9 +10,10 @@ recomputed, or freshly issued one. It creates no second Canon approval authority
 second Canon write path; every M5A exception (``CanonBaseVersionConflict``,
 ``CanonApprovalError``, ``CanonValidationError``, ...) propagates unchanged.
 
-Reloading from the admission id alone — not from an in-memory ``AdmittedNarrativeHandoff``
-handed back at admission time — is what makes the initial call and every retry after a
-lost response or a process restart resolve to the same tuple.
+Reloading from the admission id plus its authenticated exact scope — not from an
+in-memory ``AdmittedNarrativeHandoff`` handed back at admission time — is what makes
+the initial call and every retry after a lost response or a process restart resolve to
+the same tuple without exposing a cross-tenant id-only capability.
 """
 
 from __future__ import annotations
@@ -22,8 +23,16 @@ from datetime import datetime
 from r2.contracts import CanonCommitApproval, CanonCommitResult, CanonDelta
 from r2.contracts.narrative_lifecycle import NarrativeWorkScope
 from r2.narrative.canon_transaction import CanonTransactionService
-from r2.narrative_lifecycle.errors import NarrativeEvidenceIntegrityError, NarrativeEvidenceNotFoundError
-from r2.narrative_lifecycle.ports import NarrativeLifecycleRepositoryPort, NarrativeLifecycleUnitOfWorkFactory
+from r2.narrative_lifecycle.errors import (
+    NarrativeDecisionAuthorizationError,
+    NarrativeEvidenceIntegrityError,
+    NarrativeEvidenceNotFoundError,
+)
+from r2.narrative_lifecycle.ports import (
+    NarrativeLifecycleRepositoryPort,
+    NarrativeLifecycleUnitOfWorkFactory,
+    NarrativeShowrunnerAuthorityPort,
+)
 
 
 class NarrativeCanonHandoffFacade:
@@ -38,17 +47,37 @@ class NarrativeCanonHandoffFacade:
         self,
         narrative_uow_factory: NarrativeLifecycleUnitOfWorkFactory,
         canon: CanonTransactionService,
+        authority: NarrativeShowrunnerAuthorityPort,
     ) -> None:
         self._uow_factory = narrative_uow_factory
         self._canon = canon
+        self._authority = authority
 
-    async def commit_from_admission(self, *, admission_id: str, now: datetime) -> CanonCommitResult:
+    async def commit_from_admission(
+        self,
+        *,
+        admission_id: str,
+        scope: NarrativeWorkScope,
+        authenticated_principal: str,
+        now: datetime,
+    ) -> CanonCommitResult:
         """Reload the exact durable delta and approval bound by ``admission_id`` and call
         M5A with them. Safe to call repeatedly for the same admission: M5A's own exact
         retry (keyed on the delta's identity and payload) governs whether this mints a
         new Canon version or replays the one it already committed.
         """
-        delta, approval, scope = await self._reload_admitted_tuple(admission_id)
+        authentication = await self._authority.authenticate_scoped_showrunner(
+            authenticated_principal, admission_id, scope
+        )
+        if (
+            authentication.decision_id != admission_id
+            or authentication.user_id != scope.user_id
+            or authentication.project_name != scope.project_name
+        ):
+            raise NarrativeDecisionAuthorizationError(
+                "the authority port's authentication is not bound to this exact admission and scope"
+            )
+        delta, approval = await self._reload_admitted_tuple(admission_id, scope)
         return await self._canon.commit(
             delta=delta,
             approval=approval,
@@ -58,14 +87,17 @@ class NarrativeCanonHandoffFacade:
         )
 
     async def _reload_admitted_tuple(
-        self, admission_id: str
-    ) -> tuple[CanonDelta, CanonCommitApproval, NarrativeWorkScope]:
+        self, admission_id: str, scope: NarrativeWorkScope
+    ) -> tuple[CanonDelta, CanonCommitApproval]:
         async with self._uow_factory() as uow:
             repo: NarrativeLifecycleRepositoryPort = uow.repository
-            admission = await repo.get_handoff_admission_by_id(admission_id=admission_id)
+            admission = await repo.get_exact_handoff_admission(
+                admission_id=admission_id,
+                project_name=scope.project_name,
+                user_id=scope.user_id,
+            )
             if admission is None:
                 raise NarrativeEvidenceNotFoundError(f"handoff admission {admission_id!r} does not resolve")
-            scope = admission.work_scope
             evidence = await repo.get_exact_compiled_canon_delta(
                 compilation_result_id=admission.compilation_result_id,
                 project_name=scope.project_name,
@@ -77,7 +109,7 @@ class NarrativeCanonHandoffFacade:
                 )
             delta = evidence.canon_delta.model_copy(deep=True)
             approval = admission.canon_commit_approval.model_copy(deep=True)
-            return delta, approval, scope
+            return delta, approval
 
 
 __all__ = ["NarrativeCanonHandoffFacade"]

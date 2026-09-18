@@ -346,7 +346,7 @@ def m5c_pipeline(session_factory: Factory) -> M5CPipeline:
         evidence=NarrativeLifecycleEvidenceService(uow),
         integrity=NarrativeLifecycleIntegrityChecker(uow),
         canon=canon,
-        handoff=NarrativeCanonHandoffFacade(uow, canon),
+        handoff=NarrativeCanonHandoffFacade(uow, canon, FakeShowrunnerAuthorityPort()),
     )
 
 
@@ -737,7 +737,12 @@ async def _m26_narrative_currentness_through_m5a(pipeline: M5CPipeline) -> Mutat
     await pipeline.seed_admissible_handoff()
     admitted = await pipeline.admit()
     await _supersede_the_revision(pipeline.acceptance, pipeline.session_factory)
-    committed = await pipeline.handoff.commit_from_admission(admission_id=admitted.admission_id, now=NOW)
+    committed = await pipeline.handoff.commit_from_admission(
+        admission_id=admitted.admission_id,
+        scope=admitted.admission.work_scope,
+        authenticated_principal=SHOWRUNNER,
+        now=NOW,
+    )
     landed = committed.version.committed_delta_id == admitted.canon_delta.canon_delta_id
     return MutationResult(
         outcome="COMMITTED_WITHOUT_NARRATIVE_CURRENTNESS"
@@ -1325,7 +1330,12 @@ async def test_a_canon_base_race_after_admission_is_rejected_by_m5a(m5c_pipeline
     admitted = await m5c_pipeline.admit()
     await m5c_pipeline.advance_canon_head()
     with pytest.raises(CanonBaseVersionConflict):
-        await m5c_pipeline.handoff.commit_from_admission(admission_id=admitted.admission_id, now=NOW)
+        await m5c_pipeline.handoff.commit_from_admission(
+            admission_id=admitted.admission_id,
+            scope=admitted.admission.work_scope,
+            authenticated_principal=SHOWRUNNER,
+            now=NOW,
+        )
 
 
 def test_the_v1_compatibility_gate_names_both_regressions_and_clears_the_accepted_scene() -> None:
