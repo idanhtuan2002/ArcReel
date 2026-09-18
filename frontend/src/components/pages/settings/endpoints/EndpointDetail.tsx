@@ -25,16 +25,23 @@ import { definitionFileName, isRenderableDefinition, type EndpointFormSection } 
 import { EndpointDiagnostics } from "./EndpointDiagnostics";
 import { EndpointForm } from "./EndpointForm";
 import { EndpointTestSection } from "./EndpointTestSection";
+import type { AnyEndpointDefinition } from "@/types";
 import { VariableInsertionProvider } from "./endpoint-form-primitives";
 
 const VALIDATE_DEBOUNCE_MS = 400;
 
-/** 选中项：新建草稿、我的端点、内置声明式、内置 Python 四态。 */
+/** 选中项：新建草稿、我的声明式端点、我的 ComfyUI 端点、内置声明式、内置 Python 五态。 */
 export type EndpointSelection =
   | { mode: "new"; definition: EndpointDefinition }
-  | { mode: "custom"; record: CustomEndpointInfo }
+  | { mode: "custom"; record: CustomEndpointInfo; definition: EndpointDefinition }
+  | { mode: "comfyui"; record: CustomEndpointInfo }
   | { mode: "builtin"; descriptor: EndpointDescriptor }
   | { mode: "python"; descriptor: EndpointDescriptor };
+
+/** 我的端点：两种 kind 共用同一条保存记录，键、安装记录与删除入口都取自它。 */
+function savedRecordOf(selection: EndpointSelection): CustomEndpointInfo | null {
+  return selection.mode === "custom" || selection.mode === "comfyui" ? selection.record : null;
+}
 
 interface EndpointDetailProps {
   selection: EndpointSelection;
@@ -68,7 +75,7 @@ function endpointReferences(error: unknown): EndpointReference[] | null {
 
 function KindBadge({ selection }: { selection: EndpointSelection }) {
   const { t } = useTranslation("dashboard");
-  const custom = selection.mode === "new" || selection.mode === "custom";
+  const custom = selection.mode === "new" || savedRecordOf(selection) !== null;
   const label =
     selection.mode === "python"
       ? t("ce_group_builtin_python")
@@ -100,16 +107,13 @@ export function EndpointDetail({
   const pushToast = useAppStore((s) => s.pushToast);
 
   const editable = selection.mode === "new" || selection.mode === "custom";
-  const persistedId = selection.mode === "custom" ? selection.record.id : null;
+  const savedRecord = savedRecordOf(selection);
+  const persistedId = savedRecord?.id ?? null;
 
   // 选中项由父级以 key 区分挂载，草稿因此可以直接由初始 selection 派生；
   // 只有内置声明式端点的定义需要另行拉取。
   const [draft, setDraft] = useState<EndpointDefinition | null>(() =>
-    selection.mode === "new"
-      ? selection.definition
-      : selection.mode === "custom"
-        ? selection.record.definition
-        : null,
+    selection.mode === "new" || selection.mode === "custom" ? selection.definition : null,
   );
   const [editorMode, setEditorMode] = useState<"form" | "json">("form");
   // JSON 片段编辑器自持文本状态：换端点或从 JSON 视图返回时递增，强制它按新定义重挂载。
@@ -170,7 +174,7 @@ export function EndpointDetail({
 
   const dirty =
     selection.mode === "new" ||
-    (selection.mode === "custom" && draftJson !== JSON.stringify(selection.record.definition));
+    (selection.mode === "custom" && draftJson !== JSON.stringify(selection.definition));
 
   const hasErrors = (validation?.errors.length ?? 0) > 0;
 
@@ -222,11 +226,16 @@ export function EndpointDetail({
     }
   }, [persistedId, onDeleted, pushToast, t]);
 
+  // 导出的是「当前看到的这份定义」：可编辑时是草稿，ComfyUI 端点没有草稿、导它已保存的那份。
+  // 端点定义不含凭证，导出即备份与分享的那一步，两种 kind 共用同一条生命周期。
+  const exportable: AnyEndpointDefinition | null =
+    draft ?? (selection.mode === "comfyui" ? selection.record.definition : null);
+
   const handleExport = useCallback(() => {
-    if (!draft) return;
-    const blob = new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" });
-    downloadBlob(blob, definitionFileName(draft));
-  }, [draft]);
+    if (!exportable) return;
+    const blob = new Blob([JSON.stringify(exportable, null, 2)], { type: "application/json" });
+    downloadBlob(blob, definitionFileName(exportable));
+  }, [exportable]);
 
   const handleCopyAsMine = useCallback(async () => {
     if (!draft) return;
@@ -260,11 +269,43 @@ export function EndpointDetail({
   const title =
     selection.mode === "new"
       ? t("ce_new_endpoint")
-      : selection.mode === "custom"
-        ? selection.record.display_name || t("ce_unnamed")
-        : (selection.descriptor.display_name ?? t(selection.descriptor.display_name_key));
+      : savedRecord
+        ? savedRecord.display_name || t("ce_unnamed")
+        : selection.mode === "builtin" || selection.mode === "python"
+          ? (selection.descriptor.display_name ?? t(selection.descriptor.display_name_key))
+          : t("ce_unnamed");
 
-  const endpointKey = selection.mode === "custom" ? selection.record.key : selection.mode === "new" ? null : selection.descriptor.key;
+  const endpointKey = savedRecord
+    ? savedRecord.key
+    : selection.mode === "builtin" || selection.mode === "python"
+      ? selection.descriptor.key
+      : null;
+
+  // 声明式表单直接解引用 submit / poll，ComfyUI 定义上没有这两节；它的绑定编辑器另有其形，
+  // 在此只给一条只读说明，删除入口照常保留，否则导进来的端点从界面上再也摘不掉。
+  const definitionless = selection.mode === "python" || selection.mode === "comfyui";
+
+  // 我的端点都删得掉，包括详情还只读的 ComfyUI——不然导进来的端点从界面上再也摘不掉。
+  const exportButton = exportable !== null && (
+    <button type="button" onClick={handleExport} className={GHOST_BTN_CLS}>
+      <Download className="h-3.5 w-3.5" aria-hidden />
+      {t("ce_export")}
+    </button>
+  );
+
+  const deleteButton = persistedId !== null && (
+    <button
+      type="button"
+      onClick={() => {
+        setDeleteReferences(null);
+        setConfirmDelete(true);
+      }}
+      className={GHOST_BTN_CLS}
+    >
+      <Trash2 className="h-3.5 w-3.5" aria-hidden />
+      {t("common:delete")}
+    </button>
+  );
 
   return (
     <div className="px-6 py-6">
@@ -299,23 +340,8 @@ export function EndpointDetail({
 
         {editable ? (
           <>
-            <button type="button" onClick={handleExport} disabled={!draft} className={GHOST_BTN_CLS}>
-              <Download className="h-3.5 w-3.5" aria-hidden />
-              {t("ce_export")}
-            </button>
-            {persistedId !== null && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteReferences(null);
-                  setConfirmDelete(true);
-                }}
-                className={GHOST_BTN_CLS}
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                {t("common:delete")}
-              </button>
-            )}
+            {exportButton}
+            {deleteButton}
             <button
               type="button"
               onClick={() => void handleSave()}
@@ -328,24 +354,31 @@ export function EndpointDetail({
               {t("ce_save")}
             </button>
           </>
+        ) : selection.mode === "builtin" ? (
+          <button
+            type="button"
+            onClick={() => void handleCopyAsMine()}
+            disabled={saving || !draft}
+            className={GHOST_BTN_CLS}
+          >
+            <Copy className="h-3.5 w-3.5" aria-hidden />
+            {t("ce_copy_as_mine")}
+          </button>
         ) : (
-          selection.mode === "builtin" && (
-            <button
-              type="button"
-              onClick={() => void handleCopyAsMine()}
-              disabled={saving || !draft}
-              className={GHOST_BTN_CLS}
-            >
-              <Copy className="h-3.5 w-3.5" aria-hidden />
-              {t("ce_copy_as_mine")}
-            </button>
-          )
+          <>
+            {exportButton}
+            {deleteButton}
+          </>
         )}
       </div>
 
       {!editable && (
         <div className="mb-5 rounded-[10px] border border-hairline bg-bg-grad-a/40 px-4 py-3 text-[12.5px] leading-[1.55] text-text-2">
-          {selection.mode === "builtin" ? t("ce_builtin_readonly") : t("ce_python_readonly")}
+          {selection.mode === "builtin"
+            ? t("ce_builtin_readonly")
+            : selection.mode === "comfyui"
+              ? t("ce_comfyui_readonly")
+              : t("ce_python_readonly")}
         </div>
       )}
 
@@ -362,7 +395,7 @@ export function EndpointDetail({
         </p>
       )}
 
-      {selection.mode !== "python" && !draft && !loadError && (
+      {!definitionless && !draft && !loadError && (
         <div className="flex items-center gap-2 py-8 text-text-3">
           <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin text-accent-2" aria-hidden />
           <span className="font-mono text-[11px] uppercase tracking-[0.14em]">
@@ -371,7 +404,7 @@ export function EndpointDetail({
         </div>
       )}
 
-      {draft && selection.mode !== "python" && (
+      {draft && !definitionless && (
         <>
           {editable && validation && (
             <EndpointDiagnostics

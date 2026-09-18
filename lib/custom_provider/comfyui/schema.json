@@ -425,7 +425,8 @@
           "type": "object",
           "required": [
             "node",
-            "input"
+            "input",
+            "class_type"
           ],
           "additionalProperties": false,
           "properties": {

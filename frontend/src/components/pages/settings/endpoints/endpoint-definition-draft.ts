@@ -1,4 +1,5 @@
 import type {
+  AnyEndpointDefinition,
   EndpointDefinition,
   EndpointExtractSpec,
   EndpointInputEncoding,
@@ -150,6 +151,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * 这份定义是不是声明式的。ComfyUI 定义只有 `workflow` 与 `bindings`，详情表单与头部直接解引用的
+ * `submit` / `poll` 在它上面根本不存在，两者只能在同一个判据上分道。
+ */
+export function isDeclarativeDefinition(value: AnyEndpointDefinition): value is EndpointDefinition {
+  return value.kind === "declarative";
+}
+
+/**
  * JSON 视图写回草稿前的结构闸：表单与头部不做防御性访问（草稿即定义），
  * 直接解引用 meta、submit.extract、poll.extract 这几个容器，缺任一即不可渲染。
  * 字段级缺失（如 meta.name）只影响单个控件的取值，交给服务端校验诊断。
@@ -166,7 +175,7 @@ export function isRenderableDefinition(value: unknown): value is EndpointDefinit
 }
 
 /** 导出为不含凭证的定义 JSON；文件名取 meta.name，落到 ASCII 安全的形态。 */
-export function definitionFileName(definition: EndpointDefinition): string {
+export function definitionFileName(definition: AnyEndpointDefinition): string {
   const raw = definition.meta?.name?.trim() || "endpoint";
   const slug = raw.replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "");
   return `${slug || "endpoint"}.json`;
