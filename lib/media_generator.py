@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from lib.config.resolver import ConfigResolver
     from lib.image_backends.base import ImageBackend
     from lib.reference_compression import CompressedRef, PayloadLimits, ReferenceSpec
+    from lib.video_backends.base import VideoGenerationResult
     from r2.host_hardening.host_submit import AttemptSubmitter
 
 from lib.async_thread import run_noninterruptible_sync
@@ -154,6 +155,21 @@ def segment_id_for(call_type: CallType, resource_type: str, resource_id: str) ->
     if allowed is None:
         raise ValueError(f"unknown ledger channel: {call_type!r}")
     return resource_id if resource_type in allowed else None
+
+
+def _merge_result_provenance(version_metadata: dict[str, Any], result: "VideoGenerationResult") -> None:
+    """把只有生成过一次才知道的事实并进版本元数据，在落盘之前。
+
+    元数据的其余部分在提交之前就已定稿（它们是请求的一部分），而实发种子与实发 workflow 的指纹
+    要到 backend 跑完才存在——ComfyUI 的 ``policy: "random"`` 是提交那一刻现随机的，不写下来这
+    一版就再也复现不了。
+
+    ``seed`` 只在 backend 报了实发值时覆盖：多数通道原样回显请求里的那一个，覆盖是恒等；回报了
+    与请求不同的那些（供应商自行决定种子），写下来的才是真正生成用的。
+    """
+    if result.seed is not None:
+        version_metadata["seed"] = result.seed
+    version_metadata.update(result.provenance or {})
 
 
 class MediaGenerator:
@@ -1099,6 +1115,7 @@ class MediaGenerator:
             final_request = video_requests[-1]
             if final_request.execution_id is not None:
                 version_metadata["execution_id"] = final_request.execution_id
+            _merge_result_provenance(version_metadata, result)
             call.success(result)
 
         await self._prepare_formal_video_commit(
