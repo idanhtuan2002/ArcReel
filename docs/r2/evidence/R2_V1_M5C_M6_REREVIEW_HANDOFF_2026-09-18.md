@@ -36,3 +36,25 @@ The same sole independent reviewer began re-reviewing exact packet HEAD `e0633fe
 4. Only after an explicit `APPROVED` verdict on the exact candidate may the main agent verify citations/results and record acceptance. Otherwise remediate findings and repeat the exact-HEAD review gate.
 
 The temporary PostgreSQL container used during verification was named `r2-v1-remediation-pg18`; confirm it is stopped or remove it before resuming if it still exists.
+
+## Main-agent final review checkpoint
+
+Review target: exact HEAD `0bc4298759427216093ccca3bf2a59373e0d31de`, against fixed point
+`cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3`.
+
+Verdict: `CHANGES_REQUIRED` (main-agent review, not independent acceptance).
+
+Blocking finding:
+
+- **P0 — Stored evaluation-report content is not verified against its content-addressed `report_digest`.**
+  `AdaptationRepository.get_exact_report` rebuilds a report from mutable database rows, while the authority
+  paths only compare the stored `report_digest` field with the requested reference. They recompute the
+  resolved sidecar hash but never recompute `compute_profile_evaluation_report_digest(report)`. A corrupted
+  report or finding row can therefore retain the old digest while deleting or changing a blocking finding,
+  and map approval, waiver issuance, or screenplay admission may consume evidence that is not the exact
+  content named by the digest. Add one shared fail-closed report-integrity guard, use it at every authority
+  consumption boundary, and add adversarial database-corruption tests for report metadata and findings.
+
+Review verification: the three focused regression tests for cross-artifact waiver rejection,
+report-scoped waiver coverage, and REVOKE after map supersession passed (`3 passed, 1 warning`);
+`git diff --check` passed and the worktree was clean before this handoff update.
