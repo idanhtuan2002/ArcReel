@@ -1,8 +1,8 @@
 {
   "schema_version": "r2-v1-m5c-m6-authority-remediation-v1",
   "status": "READY_FOR_INDEPENDENT_REREVIEW",
-  "candidate_code_head": "f5c85e3cad1abe297f6e408f66ed7743f9aabf11",
-  "behavioral_remediation_head": "f5c85e3cad1abe297f6e408f66ed7743f9aabf11",
+  "candidate_code_head": "54acf51948ef0fdc21da7d868778483cebd230ed",
+  "behavioral_remediation_head": "54acf51948ef0fdc21da7d868778483cebd230ed",
   "parent_candidate_head": "cc3f6e769e26b6379c5d8ac3c2dc7b9e6e4538d3",
   "scope": {
     "milestones": ["M5C", "M6"],
@@ -15,7 +15,8 @@
       "waivers bind the exact artifact, branch, profile, report, findings, and rule versions",
       "REVOKE clears effective screenplay authority and the approved reader checks the locked fold",
       "Canon handoff authenticates the principal and resolves the admission inside the exact scope",
-      "new or touched suppressions were replaced with typed code or ordinary functions"
+      "new or touched suppressions were replaced with typed code or ordinary functions",
+      "every authority report-consumption path recomputes the stored report's content-addressed digest"
     ]
   },
   "gates": {
@@ -71,6 +72,18 @@
       "ruff_format_basedpyright_imports_deptry_audit": "PASS",
       "diff_check": "PASS"
     },
+    "round_3_report_integrity_remediation": {
+      "status": "PASS",
+      "head": "54acf51948ef0fdc21da7d868778483cebd230ed",
+      "red_regressions": "2 failed as expected before implementation",
+      "new_adversarial_cases": "2 passed for tampered report metadata and deleted finding rows",
+      "authority_suites": "61 passed, 1 skipped",
+      "affected_sqlite_suite": "258 passed, 5 skipped, 1 warning",
+      "affected_postgres_18_suite": "263 passed",
+      "full_backend_pytest": "13701 passed, 17 skipped, 102 warnings",
+      "ruff_format_basedpyright_imports_deptry_audit": "PASS",
+      "diff_check": "PASS"
+    },
     "diff_check": "PASS"
   },
   "review_history": [
@@ -84,6 +97,15 @@
         "evidence overstated closure"
       ],
       "record": "docs/r2/evidence/R2_V1_M5C_M6_AUTHORITY_INDEPENDENT_REVIEW_2026-09-18.md"
+    },
+    {
+      "reviewed_head": "0bc4298759427216093ccca3bf2a59373e0d31de",
+      "verdict": "CHANGES_REQUIRED",
+      "reviewer": "main agent",
+      "blocking_findings": [
+        "stored evaluation-report content was not recomputed against its content-addressed report_digest"
+      ],
+      "resolved_by": "54acf51948ef0fdc21da7d868778483cebd230ed"
     }
   ],
   "environment_notes": [

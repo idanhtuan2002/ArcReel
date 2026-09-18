@@ -58,3 +58,22 @@ Blocking finding:
 Review verification: the three focused regression tests for cross-artifact waiver rejection,
 report-scoped waiver coverage, and REVOKE after map supersession passed (`3 passed, 1 warning`);
 `git diff --check` passed and the worktree was clean before this handoff update.
+
+## Report-integrity remediation
+
+The P0 above is remediated by code commit `54acf51948ef0fdc21da7d868778483cebd230ed`.
+The shared authority report-binding path now recomputes every resolved report's semantic digest before
+map approval, waiver issuance, or screenplay admission can consume it. Two database-corruption tests
+proved RED before implementation and GREEN afterward: one mutates report metadata while retaining the
+digest; the other deletes finding rows while retaining the digest.
+
+Fresh gates on the remediation:
+
+- authority suites: `61 passed, 1 skipped`;
+- affected SQLite M5C/M6 suite: `258 passed, 5 skipped, 1 warning`;
+- affected PostgreSQL 18 suite: `263 passed`;
+- full backend: `13701 passed, 17 skipped, 102 warnings`;
+- Ruff check/format, basedpyright, import-linter, deptry, test audit, and diff check: pass.
+
+Status returns to `READY_FOR_INDEPENDENT_REREVIEW`; this remediation is not accepted until one independent
+reviewer issues an explicit verdict on the exact evidence commit containing this section.
