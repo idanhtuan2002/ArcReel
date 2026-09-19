@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from lib.config.resolver import ConfigResolver
     from lib.image_backends.base import ImageBackend
     from lib.reference_compression import CompressedRef, PayloadLimits, ReferenceSpec
+    from r2.host_hardening.host_submit import AttemptSubmitter
 
 from lib.async_thread import run_noninterruptible_sync
 from lib.audio_utils import probe_reference_audio_total_seconds
@@ -848,6 +849,7 @@ class MediaGenerator:
         resolution: str | None = None,
         poll_timeout_seconds: int = DEFAULT_VIDEO_POLL_TIMEOUT_SECONDS,
         task_id: str | None = None,
+        attempt_submitter: "AttemptSubmitter | None" = None,
         before_submit: Callable[[int], Awaitable[Mapping[str, object] | None]] | None = None,
         formal_output: bool = False,
         before_formal_commit: Callable[[Path, int, Mapping[str, Any]], Awaitable[None]] | None = None,
@@ -879,6 +881,9 @@ class MediaGenerator:
         Returns:
             (output_path, version_number, video_ref, video_uri) 四元组
         """
+        if task_id is not None and attempt_submitter is None:
+            raise RuntimeError("M7_SUBMIT_ROUTE_UNBOUND: worker video request requires an attempt submitter")
+
         output_path = self._get_output_path(resource_type, resource_id)
         self._ensure_parent_dir(output_path)
 
@@ -1023,6 +1028,7 @@ class MediaGenerator:
             end_spec_idx = slot_plan.end_index
             ref_start_idx = slot_plan.reference_start_index
             provider_resubmit_unsafe = False
+            video_requests: list[VideoGenerationRequest] = []
 
             def _mark_provider_resubmit_unsafe() -> None:
                 nonlocal provider_resubmit_unsafe
@@ -1036,34 +1042,36 @@ class MediaGenerator:
                 ref_arg = (
                     [c.path for c in compressed[ref_start_idx:]] if ref_start_idx is not None else reference_images
                 )
-                return video_backend.generate(
-                    VideoGenerationRequest(
-                        prompt=prompt,
-                        output_path=backend_output_path,
-                        aspect_ratio=request_aspect_ratio,
-                        duration_seconds=duration_int,
-                        resolution=resolution,
-                        start_image=start_arg,
-                        end_image=end_arg,
-                        reference_images=ref_arg,
-                        # 音频不进压缩器（specs 只收图片），故直接透传原列表：顺序即 prompt
-                        # 「音频N」的指认顺序，任何重排都会把 A 角色的音色安到 B 角色头上。
-                        reference_audio_files=reference_audio_files,
-                        # 数组参考图压缩保序（不改数量、不重排），故调用方按未压缩的
-                        # reference_images 下标算出的 targets 对压缩后的 ref_arg 同样有效。
-                        reference_audio_targets=reference_audio_targets,
-                        generate_audio=effective_generate_audio,
-                        poll_timeout_seconds=poll_timeout_seconds,
-                        project_name=self.project_name,
-                        task_id=task_id,
-                        on_provider_resubmit_unsafe=_mark_provider_resubmit_unsafe,
-                        on_provider_response=lambda _stage, body: self.ledger.record_provider_response(
-                            call_id=call.call_id, body=body
-                        ),
-                        service_tier=version_metadata.get("service_tier", "default"),
-                        seed=version_metadata.get("seed"),
-                    )
+                video_request = VideoGenerationRequest(
+                    prompt=prompt,
+                    output_path=backend_output_path,
+                    aspect_ratio=request_aspect_ratio,
+                    duration_seconds=duration_int,
+                    resolution=resolution,
+                    start_image=start_arg,
+                    end_image=end_arg,
+                    reference_images=ref_arg,
+                    # 音频不进压缩器（specs 只收图片），故直接透传原列表：顺序即 prompt
+                    # 「音频N」的指认顺序，任何重排都会把 A 角色的音色安到 B 角色头上。
+                    reference_audio_files=reference_audio_files,
+                    # 数组参考图压缩保序（不改数量、不重排），故调用方按未压缩的
+                    # reference_images 下标算出的 targets 对压缩后的 ref_arg 同样有效。
+                    reference_audio_targets=reference_audio_targets,
+                    generate_audio=effective_generate_audio,
+                    poll_timeout_seconds=poll_timeout_seconds,
+                    project_name=self.project_name,
+                    task_id=task_id,
+                    attempt_submitter=attempt_submitter,
+                    api_call_id=call.call_id,
+                    on_provider_resubmit_unsafe=_mark_provider_resubmit_unsafe,
+                    on_provider_response=lambda _stage, body: self.ledger.record_provider_response(
+                        call_id=call.call_id, body=body
+                    ),
+                    service_tier=version_metadata.get("service_tier", "default"),
+                    seed=version_metadata.get("seed"),
                 )
+                video_requests.append(video_request)
+                return video_backend.generate(video_request)
 
             async def _before_first_submit() -> None:
                 if before_submit is not None:
@@ -1084,6 +1092,9 @@ class MediaGenerator:
                     staged_output_path.unlink(missing_ok=True)
                 raise
             video_uri = result.video_uri
+            final_request = video_requests[-1]
+            if final_request.execution_id is not None:
+                version_metadata["execution_id"] = final_request.execution_id
             call.success(result)
 
         await self._prepare_formal_video_commit(

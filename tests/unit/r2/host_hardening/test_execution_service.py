@@ -286,6 +286,43 @@ async def test_accepted_receipt_moves_to_accepted_with_job_id() -> None:
     assert result.provider_job_id == "remote-1"
 
 
+async def test_plan_and_submitting_are_committed_before_network_submit() -> None:
+    repo = _FakeRepository()
+    commits: list[ExecutionAttemptState] = []
+
+    async def _commit() -> None:
+        commits.append(repo._require("exec-1").state)
+
+    class _CommitAwareAdapter(_AcceptedAdapter):
+        async def submit(self, *, attempt: AttemptSnapshot, request: ProviderRequest) -> ProviderObservation:
+            assert commits[0] is ExecutionAttemptState.PLANNED
+            assert commits[-1] is ExecutionAttemptState.SUBMITTING
+            return await super().submit(attempt=attempt, request=request)
+
+    service = ExecutionAttemptServiceImpl(
+        repo,
+        capability_resolver=lambda _ref: _capability(),
+        adapter_resolver=lambda _route: _CommitAwareAdapter(),
+        owner_id_factory=lambda: "worker-1",
+        commit=_commit,
+    )
+
+    await service.plan_and_submit(
+        user_id=USER,
+        project_name=PROJECT,
+        attempt=_attempt(),
+        request=REQUEST,
+        adapter=_CommitAwareAdapter(),
+    )
+
+    assert commits == [
+        ExecutionAttemptState.PLANNED,
+        ExecutionAttemptState.PLANNED,
+        ExecutionAttemptState.SUBMITTING,
+        ExecutionAttemptState.ACCEPTED,
+    ]
+
+
 async def test_plan_and_submit_is_a_no_op_for_an_attempt_already_past_planned() -> None:
     repo = _FakeRepository()
     service = _service(repo)

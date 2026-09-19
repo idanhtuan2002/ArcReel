@@ -10,6 +10,7 @@ import logging
 import math
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -2690,26 +2691,41 @@ async def execute_video_task(
     )
     try:
         await asyncio.to_thread(assert_current_artifact_input_claims_usable, project_path, formal_input_claims)
-        _output_path, version, _, video_uri = await generator.generate_video_async(
-            prompt=prompt_text,
-            resource_type="videos",
-            resource_id=resource_id,
-            start_image=provider_start_image,
-            end_image=provider_end_image,
-            aspect_ratio=aspect_ratio,
-            duration_seconds=duration_seconds,
-            resolution=resolution,
-            task_id=task_id,
-            before_submit=checkpoint_hook,
-            formal_output=task_id is not None,
-            before_formal_commit=artifact_committer.prepare_selection if artifact_committer is not None else None,
-            commit_formal_output=artifact_committer,
-            seed=seed,
-            service_tier=service_tier,
-            visual_basis_digest=visual_basis_digest,
-            generate_audio=ctx.video.requested_generate_audio,
-            poll_timeout_seconds=poll_timeout_seconds,
-        )
+        async with AsyncExitStack() as attempt_stack:
+            attempt_submitter = None
+            if task_id is not None:
+                from lib.db import async_session_factory
+                from server.services.execution_attempts import build_attempt_submitter
+
+                attempt_session = await attempt_stack.enter_async_context(async_session_factory())
+                attempt_submitter = build_attempt_submitter(
+                    attempt_session,
+                    user_id=user_id,
+                    project_name=project_name,
+                    usage_binder=getattr(generator, "ledger", None),
+                )
+
+            _output_path, version, _, video_uri = await generator.generate_video_async(
+                prompt=prompt_text,
+                resource_type="videos",
+                resource_id=resource_id,
+                start_image=provider_start_image,
+                end_image=provider_end_image,
+                aspect_ratio=aspect_ratio,
+                duration_seconds=duration_seconds,
+                resolution=resolution,
+                task_id=task_id,
+                attempt_submitter=attempt_submitter,
+                before_submit=checkpoint_hook,
+                formal_output=task_id is not None,
+                before_formal_commit=artifact_committer.prepare_selection if artifact_committer is not None else None,
+                commit_formal_output=artifact_committer,
+                seed=seed,
+                service_tier=service_tier,
+                visual_basis_digest=visual_basis_digest,
+                generate_audio=ctx.video.requested_generate_audio,
+                poll_timeout_seconds=poll_timeout_seconds,
+            )
 
         async def _finalize() -> dict[str, Any]:
             return await _finalize_video_task(
@@ -2783,11 +2799,15 @@ async def _finalize_video_task(
     else:
         thumbnail_file.unlink(missing_ok=True)
 
-    created_at = await asyncio.to_thread(
-        lambda: generator.versions.get_versions("videos", resource_id)["versions"][-1]["created_at"]
-    )
+    def _version_facts() -> tuple[str, str | None]:
+        records = generator.versions.get_versions("videos", resource_id)["versions"]
+        record = next((item for item in records if item.get("version") == version), records[-1])
+        execution_id = record.get("execution_id")
+        return record["created_at"], execution_id if isinstance(execution_id, str) and execution_id else None
 
-    return {
+    created_at, execution_id = await asyncio.to_thread(_version_facts)
+
+    result = {
         "version": version,
         "file_path": f"videos/scene_{resource_id}.mp4",
         "created_at": created_at,
@@ -2795,6 +2815,9 @@ async def _finalize_video_task(
         "resource_id": resource_id,
         "video_uri": video_uri,
     }
+    if execution_id is not None:
+        result["execution_id"] = execution_id
+    return result
 
 
 async def execute_character_task(

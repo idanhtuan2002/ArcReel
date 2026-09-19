@@ -10,7 +10,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal, Protocol, cast
+from typing import TYPE_CHECKING, Literal, Protocol, cast
 from urllib.parse import urlsplit
 
 import httpx
@@ -23,6 +23,9 @@ from lib.http_status_errors import provider_rejected_error, redacted_status_erro
 from lib.http_status_errors import raise_for_status_redacted as raise_for_status_redacted
 from lib.logging_utils import redact_diagnostic_text, sanitize_diagnostic_payload
 from lib.retry import BASE_RETRYABLE_ERRORS, AsyncClock, SystemClock, _should_retry, with_retry_async
+
+if TYPE_CHECKING:
+    from r2.host_hardening.host_submit import AttemptSubmitter
 
 # `_should_retry` 默认会做字符串模式兜底（"timeout"/"503" 等），
 # 而 persist 重试要严格"DB 瞬态错误"语义——业务异常（如
@@ -1208,6 +1211,9 @@ class VideoGenerationRequest:
     # `ProviderJobIdPersistenceMixin._persist_provider_job_id` 持久化 job_id。
     # 非 worker 路径（grid / 直生 / 测试）保持 None，统一点据此跳过持久化。
     task_id: str | None = None
+    attempt_submitter: AttemptSubmitter | None = None
+    api_call_id: int | None = None
+    execution_id: str | None = None
 
     # MediaGenerator uses this one-way signal to close its compression-retry window. Resumable backends signal
     # after the provider job handle is durable; an opaque submit-and-wait backend must signal before entering a

@@ -428,6 +428,51 @@ class TestMediaGenerator:
         assert history["versions"][0]["execution_api_call_id"] == 1
 
     @pytest.mark.asyncio
+    async def test_worker_video_request_carries_submitter_and_api_call_id(self, tmp_path, monkeypatch):
+        persist_api_call_id = AsyncMock()
+        monkeypatch.setattr("lib.video_backends.base.persist_api_call_id", persist_api_call_id)
+        gen = _build_generator(tmp_path)
+        submitter = object()
+
+        class _AttemptBoundBackend(_FakeVideoBackend):
+            async def generate(self, request):
+                request.execution_id = "execution-1"
+                return await super().generate(request)
+
+        backend = _AttemptBoundBackend()
+        gen._video_backend = backend
+
+        await gen.generate_video_async(
+            prompt="paid request",
+            resource_type="reference_videos",
+            resource_id="E1U1",
+            task_id="task-1",
+            attempt_submitter=submitter,
+        )
+
+        request = backend.calls[0]
+        assert request.attempt_submitter is submitter
+        assert request.api_call_id == 1
+        assert request.execution_id == "execution-1"
+        assert gen.versions.add_calls[-1]["execution_id"] == "execution-1"
+        persist_api_call_id.assert_awaited_once_with("task-1", 1)
+
+    @pytest.mark.asyncio
+    async def test_worker_route_missing_submitter_fails_before_backend(self, tmp_path):
+        gen = _build_generator(tmp_path)
+
+        with pytest.raises(RuntimeError, match="M7_SUBMIT_ROUTE_UNBOUND"):
+            await gen.generate_video_async(
+                prompt="paid request",
+                resource_type="reference_videos",
+                resource_id="E1U1",
+                task_id="task-1",
+            )
+
+        assert gen._video_backend.calls == []
+        assert gen.ledger.started == []
+
+    @pytest.mark.asyncio
     async def test_video_before_submit_failure_prevents_provider_call(self, tmp_path):
         gen = _build_generator(tmp_path)
 
@@ -547,6 +592,7 @@ class TestMediaGenerator:
                 resource_id="E1U1",
                 formal_output=True,
                 task_id="task-output-failure",
+                attempt_submitter=object(),
             )
 
         assert current.read_bytes() == b"old-current"
@@ -579,6 +625,7 @@ class TestMediaGenerator:
                 resource_id="E1U1",
                 formal_output=True,
                 task_id="task-ledger-failure",
+                attempt_submitter=object(),
             )
 
         assert current.read_bytes() == b"old-current"
@@ -610,6 +657,7 @@ class TestMediaGenerator:
             resource_id="E1U1",
             formal_output=True,
             task_id="task-output-success",
+            attempt_submitter=object(),
             before_formal_commit=_prepare,
             commit_formal_output=_commit,
             execution_request_digest="d" * 64,
@@ -644,6 +692,7 @@ class TestMediaGenerator:
                 resource_id="E1U1",
                 formal_output=True,
                 task_id="task-missing-callback",
+                attempt_submitter=object(),
             )
 
         assert current.read_bytes() == b"old-current"
@@ -680,6 +729,7 @@ class TestMediaGenerator:
                 resource_id="E1U1",
                 formal_output=True,
                 task_id="task-prepare-failure",
+                attempt_submitter=object(),
                 before_formal_commit=_fail_prepare,
             )
 
@@ -792,6 +842,7 @@ class TestMediaGenerator:
             resource_id="E1U1",
             formal_output=True,
             task_id="task-restarted",
+            attempt_submitter=object(),
             commit_formal_output=select_formal_video(gen, prompt="paid request"),
         )
 

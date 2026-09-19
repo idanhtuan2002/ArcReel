@@ -20,7 +20,7 @@ pattern.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from uuid import uuid4
 
@@ -56,6 +56,10 @@ def _default_owner_id() -> str:
     return f"exec-svc:{uuid4().hex}"
 
 
+async def _no_commit() -> None:
+    return None
+
+
 class ExecutionAttemptServiceImpl:
     def __init__(
         self,
@@ -65,12 +69,14 @@ class ExecutionAttemptServiceImpl:
         adapter_resolver: Callable[[ProviderRouteSnapshot], ProviderExecutionAdapter],
         owner_id_factory: Callable[[], str] = _default_owner_id,
         lease_ttl_seconds: int = DEFAULT_LEASE_TTL_SECONDS,
+        commit: Callable[[], Awaitable[None]] = _no_commit,
     ) -> None:
         self._repository = repository
         self._capability_resolver = capability_resolver
         self._adapter_resolver = adapter_resolver
         self._owner_id_factory = owner_id_factory
         self._lease_ttl_seconds = lease_ttl_seconds
+        self._commit = commit
 
     async def _acquire_fence(
         self, *, user_id: str, project_name: str, execution_id: str, expected_version: int
@@ -84,6 +90,7 @@ class ExecutionAttemptServiceImpl:
             owner=owner,
             expires_at=utc_now() + timedelta(seconds=self._lease_ttl_seconds),
         )
+        await self._commit()
         return leased, AttemptLeaseFence(owner=owner, token=leased.lease_token or 0)
 
     async def plan_and_submit(
@@ -96,6 +103,7 @@ class ExecutionAttemptServiceImpl:
         adapter: ProviderExecutionAdapter,
     ) -> AttemptSnapshot:
         snapshot = await self._repository.plan(user_id=user_id, project_name=project_name, attempt=attempt)
+        await self._commit()
         if snapshot.state is not ExecutionAttemptState.PLANNED:
             # Exact replay of an attempt that already progressed past planning
             # (a prior call submitted it, or a crash resumed here): idempotent,
@@ -117,11 +125,12 @@ class ExecutionAttemptServiceImpl:
             new_state=ExecutionAttemptState.SUBMITTING,
             fence=fence,
         )
+        await self._commit()
 
         try:
             observation = await adapter.submit(attempt=submitting, request=request)
         except AmbiguousSubmitError:
-            return await self._repository.transition_worker(
+            unknown = await self._repository.transition_worker(
                 user_id=user_id,
                 project_name=project_name,
                 execution_id=snapshot.execution_id,
@@ -130,8 +139,10 @@ class ExecutionAttemptServiceImpl:
                 new_state=ExecutionAttemptState.SUBMIT_OUTCOME_UNKNOWN,
                 fence=fence,
             )
+            await self._commit()
+            return unknown
         except Exception:
-            return await self._repository.transition_worker(
+            failed = await self._repository.transition_worker(
                 user_id=user_id,
                 project_name=project_name,
                 execution_id=snapshot.execution_id,
@@ -140,14 +151,18 @@ class ExecutionAttemptServiceImpl:
                 new_state=ExecutionAttemptState.FAILED_BEFORE_ACCEPTANCE,
                 fence=fence,
             )
+            await self._commit()
+            return failed
 
-        return await self._repository.apply_provider_observation(
+        accepted = await self._repository.apply_provider_observation(
             user_id=user_id,
             project_name=project_name,
             execution_id=snapshot.execution_id,
             expected_version=submitting.state_version,
             observation=observation,
         )
+        await self._commit()
+        return accepted
 
     async def reconcile(self, *, user_id: str, project_name: str, execution_id: str) -> ReconcileResult:
         snapshot = await self._repository.get_exact(
@@ -198,6 +213,7 @@ class ExecutionAttemptServiceImpl:
             expected_version=snapshot.state_version,
             observation=observation,
         )
+        await self._commit()
         operator_reason = None
         if resolved.state is ExecutionAttemptState.NEEDS_OPERATOR:
             # fold_observation itself chose NEEDS_OPERATOR: a non-authoritative
@@ -234,6 +250,7 @@ class ExecutionAttemptServiceImpl:
             fence=fence,
             reason_code=reason_code,
         )
+        await self._commit()
         return ReconcileResult(
             execution_id=snapshot.execution_id,
             state=result.state,
