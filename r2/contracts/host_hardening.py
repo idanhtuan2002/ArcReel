@@ -305,6 +305,22 @@ class PromotionReceipt(R2ContractModel):
     created_at: AwareDatetime
 
 
+class DurableProjectEvent(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    event_id: int = Field(ge=1)
+    user_id: NonEmptyStr
+    project_name: NonEmptyStr
+    task_id: NonEmptyStr | None = None
+    execution_id: NonEmptyStr | None = None
+    event_type: ProjectEventType
+    state_version: int | None = Field(default=None, ge=1)
+    public_payload: dict[str, JSONValue]
+    payload_schema_version: int = Field(ge=1)
+    trace_id: NonEmptyStr | None = None
+    dedupe_key: NonEmptyStr
+
+
 COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION = 1
 
 
@@ -324,6 +340,7 @@ __all__ = [
     "BackupSetState",
     "CandidateIdentity",
     "CommandReceipt",
+    "DurableProjectEvent",
     "ExecutionAttemptState",
     "MasterHeadSnapshot",
     "OperatorResolutionAction",

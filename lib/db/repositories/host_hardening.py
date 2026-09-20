@@ -58,6 +58,7 @@ from r2.contracts.host_hardening import (
     AttemptLeaseFence,
     AttemptSnapshot,
     CommandReceipt,
+    DurableProjectEvent,
     ExecutionAttemptState,
     MasterHeadSnapshot,
     OperatorResolutionReceipt,
@@ -1005,3 +1006,62 @@ class ActiveAttemptReferenceCheckImpl:
     async def has_active_attempt_for_candidate(self, *, user_id: str, project_name: str, candidate_id: str) -> bool:
         del user_id, project_name, candidate_id
         return True
+
+
+# --- M7-C: durable project-event replay (H5) -------------------------------------------
+
+
+def _durable_event_from_row(row: ProjectEventModel) -> DurableProjectEvent:
+    return DurableProjectEvent(
+        event_id=row.event_id,
+        user_id=row.user_id,
+        project_name=row.project_name,
+        task_id=row.task_id,
+        execution_id=row.execution_id,
+        event_type=ProjectEventType(row.event_type),
+        state_version=row.state_version,
+        public_payload=row.public_payload_json,
+        payload_schema_version=row.payload_schema_version,
+        trace_id=row.trace_id,
+        dedupe_key=row.dedupe_key,
+    )
+
+
+class ProjectEventRepository:
+    """Read side of the M7-A ``project_events`` table (spec section 7
+    ``ProjectEventRepository``). The write side lives with each authority that
+    appends its own event (``ExecutionAttemptRepository``,
+    ``MasterAuthorityRepository``); this repository never writes, so a reader
+    can never become a shadow authority for attempt/candidate/master state.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def high_watermark(self, *, user_id: str, project_name: str) -> int:
+        value = (
+            await self.session.execute(
+                select(func.max(ProjectEventModel.event_id)).where(
+                    ProjectEventModel.user_id == user_id,
+                    ProjectEventModel.project_name == project_name,
+                )
+            )
+        ).scalar_one()
+        return value or 0
+
+    async def replay_after(
+        self, *, user_id: str, project_name: str, cursor: int | None, limit: int
+    ) -> list[DurableProjectEvent]:
+        rows = (
+            await self.session.execute(
+                select(ProjectEventModel)
+                .where(
+                    ProjectEventModel.user_id == user_id,
+                    ProjectEventModel.project_name == project_name,
+                    ProjectEventModel.event_id > (cursor or 0),
+                )
+                .order_by(ProjectEventModel.event_id.asc())
+                .limit(limit)
+            )
+        ).scalars()
+        return [_durable_event_from_row(row) for row in rows]
