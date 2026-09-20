@@ -241,32 +241,51 @@ ambiguous-vs-definite exception split, reusing the state that already exists
 for "maybe reached the provider" rather than inventing a new one); a clean
 `ProviderObservation` applies via `apply_provider_observation` as usual.
 
-- [ ] Write failing tests (fakes only -- no real backend has anything to
+**Extra finding while implementing:** the fence needed `acquire_lease`'s new
+`force=True` (`lib/db/repositories/host_hardening.py`) -- `request_cancel`
+never touches the lease, so a fresh, realistic cancel request (users cancel
+within minutes of submitting) can land while the submission-phase lease's
+300s TTL has not yet elapsed, even though nothing is using it. Without
+`force`, that fencing call would fail and silently defer a legitimate cancel
+for no correctness reason. `force` skips only the ownership/liveness OR-clause
+-- the `state_version` CAS underneath still gives two racing callers exactly
+one winner (proven against real PostgreSQL). Also had to add `force: bool =
+False` to the fake `_FakeRepository.acquire_lease` in
+`tests/unit/r2/host_hardening/test_execution_service.py` to keep it matching
+the `ExecutionAttemptRepository` Protocol.
+
+- [x] Write failing tests (fakes only -- no real backend has anything to
   prove): a fake adapter whose `cancel` raises `BackendCapabilityUnsupportedError`
-  leaves the attempt `CANCEL_REQUESTED` with the fence released (not stuck
-  holding a lease); a fake adapter whose `cancel` raises any other exception
-  moves it to `CANCEL_OUTCOME_UNKNOWN` and reconciles from there; a fake
-  adapter whose `cancel` returns a `CANCELLED` observation lands the attempt
-  `CANCELLED`; two concurrent calls to `realize_pending_cancels` racing the
-  same attempt have exactly one winner (real PostgreSQL); an `ACCEPTED`/`RUNNING`
-  attempt with no `CANCEL_REQUESTED` sibling is never touched by this scan.
-- [ ] Run focused tests; expected RED is the missing method.
-- [ ] Implement `list_pending_cancels` and `realize_pending_cancels`.
-- [ ] Run focused + `tests/unit/r2/host_hardening/` +
+  leaves the attempt `CANCEL_REQUESTED` with the fence released; a fake adapter
+  whose `cancel` raises any other exception moves it to `CANCEL_OUTCOME_UNKNOWN`
+  and reconciles to `NEEDS_OPERATOR`; a fake adapter whose `cancel` returns a
+  `CANCELLED` observation lands the attempt `CANCELLED`; two concurrent calls
+  to `realize_pending_cancels` racing the same attempt have exactly one winner
+  (real PostgreSQL); an `ACCEPTED` attempt with no `CANCEL_REQUESTED` sibling
+  is never touched. Also added at the repository level: `acquire_lease` with
+  `force=True` seizes a live lease while the `state_version` CAS still rejects
+  a stale version; `list_pending_cancels` finds a `CANCEL_REQUESTED` row
+  regardless of lease state and excludes every other state.
+- [x] Run focused tests; expected RED is the missing method -- confirmed, then
+  a second RED round when the naive fence (no `force`) rejected a
+  still-nominally-live submission-phase lease in the success/ambiguous tests.
+- [x] Implement `list_pending_cancels` and `realize_pending_cancels`.
+- [x] Run focused + `tests/unit/r2/host_hardening/` +
   `tests/integration/server/services/test_execution_recovery_scan.py`
-  (must still pass unchanged); expected GREEN.
-- [ ] Run the concurrency race through real PostgreSQL via Docker, same
-  pattern as D1.
-- [ ] Full static/test gates.
-- [ ] Commit `feat(r2): realize pending cancel intents against the provider`.
-- [ ] **Stop here for a sponsor decision.** `ACCEPTED`/`RUNNING` exact-route
+  (unchanged, still passing); GREEN (14094 passed full suite).
+- [x] Run the concurrency race through real PostgreSQL via Docker (39 passed).
+- [x] Full static/test gates.
+- [x] Commit `feat(r2): realize pending cancel intents against the provider (M7-C Task D3)` (`dffbd892`).
+- [x] **Stopped for a sponsor decision.** `ACCEPTED`/`RUNNING` exact-route
   poll/download recovery (the other half of the original H5 ask) remains
-  blocked on the happy-path lease-renewal architecture question above --
-  report this explicitly rather than silently dropping it. Report also: what
-  D1-D3 prove (mechanism correctness against fakes + real PostgreSQL CAS),
-  what they do not yet prove (the poller has never run against a real backend's
-  real HTTP
-  API, and has never been invoked from any live process).
+  blocked on the happy-path lease-renewal architecture question above.
+  What D1-D3 prove: mechanism correctness (state transitions, fencing,
+  idempotent replay, concurrent-race safety) against fakes and real
+  PostgreSQL CAS. What they do not prove: `realize_pending_cancels` has never
+  run against a real backend's real HTTP API (none support cancel today), and
+  nothing in D1-D3 has ever been invoked from any live process -- D4 (live
+  wiring) and D5 (real SIGKILL tests) remain explicitly blocked pending a
+  separate go-ahead, as they were before this task.
 
 ---
 
