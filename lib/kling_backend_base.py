@@ -139,12 +139,21 @@ class KlingBackendBase:
 
         if request is None:
             return (await _submit()).value
+        # Kling's video API has three distinct URLs by request shape (text2video /
+        # image2video / multi-image2video, see kling.py's _build_payload) unlike
+        # this base's other submit families (agnes/openai poll by a single fixed
+        # endpoint regardless of request shape). endpoint_id must disambiguate them
+        # -- a route snapshot that only says "videos.create" cannot tell a later
+        # exact-route poll which of the three URLs the provider actually accepted.
+        # Deriving it from endpoint_path (already "videos/<subpath>" for every real
+        # call site) instead of a separate hardcoded literal keeps the two in sync
+        # by construction.
         return await submit_video_attempt(
             request,
             provider_id=PROVIDER_KLING,
             provider_model_id=self._model,
             backend_model_id=self._model,
-            endpoint_id="videos.create",
+            endpoint_id=endpoint_path.replace("/", ".", 1),
             submitted_base_url=self._base_url,
             submit=_submit,
         )

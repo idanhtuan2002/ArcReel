@@ -17,7 +17,10 @@ NOW = datetime(2026, 9, 18, tzinfo=UTC)
 
 
 def test_every_paid_async_submit_family_is_inventoried() -> None:
-    assert len(discovered_submit_families()) == 9
+    # Kling's video API has three distinct URLs by request shape and so
+    # registers three families sharing one submit symbol -- 9 single-endpoint
+    # families minus the old combined Kling entry, plus 3 (=11).
+    assert len(discovered_submit_families()) == 11
     assert discovered_submit_families() == registered_submit_families()
 
 

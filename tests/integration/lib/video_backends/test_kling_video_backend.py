@@ -107,6 +107,36 @@ async def test_worker_kling_submit_is_attempt_bound(tmp_path: Path) -> None:
     assert routes.submit.call_count == 1
 
 
+async def test_worker_kling_submit_route_disambiguates_by_subpath(tmp_path: Path) -> None:
+    """A recovery poller resuming from a persisted route must be able to tell
+    which of Kling's three URLs the provider actually accepted -- the route
+    snapshot's endpoint_id has to differ per subpath, not collapse to one
+    shared "videos.create" identity that cannot say which URL was used."""
+    endpoint_ids: dict[str, str] = {}
+    for index, subpath in enumerate(("text2video", "image2video", "multi-image2video")):
+        submitter = RecordingAttemptSubmitter()
+        request = _request(
+            tmp_path,
+            task_id=f"task-{index}",
+            api_call_id=index,
+            attempt_submitter=submitter,
+        )
+        with _kling_api() as routes:
+            routes.submit.mock(return_value=_resp(_submit(f"job-{index}")))
+            async with httpx.AsyncClient() as client:
+                await _jwt_backend()._submit_task(client, f"videos/{subpath}", {"prompt": "p"}, request)
+        route = submitter.calls[0]["route"]
+        assert route.provider_id == PROVIDER_KLING
+        endpoint_ids[subpath] = route.endpoint_id
+
+    assert endpoint_ids == {
+        "text2video": "videos.text2video",
+        "image2video": "videos.image2video",
+        "multi-image2video": "videos.multi-image2video",
+    }
+    assert len(set(endpoint_ids.values())) == 3
+
+
 class TestConstructionAndCapabilities:
     def test_name_and_default_model(self):
         b = _jwt_backend()

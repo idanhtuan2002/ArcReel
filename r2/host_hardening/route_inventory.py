@@ -65,9 +65,22 @@ PAID_ASYNC_SUBMIT_FAMILIES = (
         "vidu-video-create@host-video-v1",
         "lib.video_backends.vidu:ViduVideoBackend._create_task",
     ),
+    # Kling's video API has three distinct URLs by request shape (unlike this
+    # inventory's other single-endpoint families) -- see the comment at
+    # KlingBackendBase._submit_task's submit_video_attempt call.
     PaidAsyncSubmitFamily(
-        SubmitRouteKey("kling", "videos.create", HOST_VIDEO_ADAPTER_VERSION),
-        "kling-videos-create@host-video-v1",
+        SubmitRouteKey("kling", "videos.text2video", HOST_VIDEO_ADAPTER_VERSION),
+        "kling-videos-text2video@host-video-v1",
+        "lib.kling_backend_base:KlingBackendBase._submit_task",
+    ),
+    PaidAsyncSubmitFamily(
+        SubmitRouteKey("kling", "videos.image2video", HOST_VIDEO_ADAPTER_VERSION),
+        "kling-videos-image2video@host-video-v1",
+        "lib.kling_backend_base:KlingBackendBase._submit_task",
+    ),
+    PaidAsyncSubmitFamily(
+        SubmitRouteKey("kling", "videos.multi-image2video", HOST_VIDEO_ADAPTER_VERSION),
+        "kling-videos-multi-image2video@host-video-v1",
         "lib.kling_backend_base:KlingBackendBase._submit_task",
     ),
     PaidAsyncSubmitFamily(
