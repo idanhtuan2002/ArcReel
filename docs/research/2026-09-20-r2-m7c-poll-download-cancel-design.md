@@ -27,8 +27,14 @@ cho các bước sau submit.
 Vá đúng nghĩa "Poll, download and cancel use only the persisted route snapshot"
 (spec §5 mục 8) đòi hỏi hoặc (a) di trú toàn bộ happy path polling sang
 `ExecutionAttemptService`, hoặc (b) một đường phục hồi hẹp hơn chỉ kích hoạt sau
-khi phát hiện mất tiến trình. Cả hai đều là thay đổi runtime thật, đúng phạm vi
-sponsor đã yêu cầu hoãn. Tài liệu này chỉ dừng ở thiết kế.
+khi phát hiện mất tiến trình. **Đã chọn (b)** — không phải quyết định mới, mà
+là default kiến trúc đã chốt sẵn trong nghiên cứu gốc M7
+(`docs/research/2026-09-12-r2-m7-host-production-hardening-research.md`, xem
+§2.5 bên dưới); (a) bị chính nghiên cứu gốc loại vì "biến mọi running task
+thành queued". (b) tái dùng gần hết hạ tầng đã có (`candidate_store`,
+`usage_repo` execution↔ledger binding, `CommandReceiptRepository`) — chỉ thiếu
+một registry route→adapter nhỏ. Vẫn là thay đổi runtime thật, đúng phạm vi
+sponsor đã yêu cầu hoãn ở đợt này — tài liệu này chỉ dừng ở thiết kế.
 
 ## 1. Bản đồ hiện trạng (bằng chứng cụ thể)
 
@@ -136,8 +142,72 @@ logic đã test kỹ qua PostgreSQL thật.
   thấy hôm nay.
 
 (b) khoanh vùng rủi ro nhỏ hơn nhiều và đúng tinh thần "scanner trước, nối
-worker.start() thật sau" mà sponsor đã chọn cho Task C3 phần trước. Khuyến nghị
-dùng (b) làm bước tiếp theo nếu/khi sponsor quyết định mở khóa live-wiring.
+worker.start() thật sau" mà sponsor đã chọn cho Task C3 phần trước.
+
+## 2.5 Quyết định: (b), không phải lựa chọn mới — đây là default đã chốt từ
+nghiên cứu gốc
+
+Trước khi tự chọn giữa (a)/(b), tôi đọc lại
+`docs/research/2026-09-12-r2-m7-host-production-hardening-research.md` (nghiên
+cứu gốc của cả M7, viết trước khi M7-A/B/C tồn tại) — đúng theo nguyên tắc
+research-first (kiểm tra nghiên cứu/ADR đã có trước khi đề xuất). Tài liệu đó
+ĐÃ trả lời chính xác câu hỏi (a) so với (b) từ 2026-09-12, ở hai chỗ:
+
+> "Restart scanner chỉ lấy lease hết hạn. Nó resume poll/cancel nếu có remote
+> ID, reconcile unknown nếu adapter khai báo capability, hoặc để operator xử
+> lý; **nó không biến mọi running task thành queued**." (§2.4, dòng 180-182)
+
+> "khi backend down, later exact-route poll/reconciliation ghi observation/outbox
+> độc lập với worker; **restart scanner** resume từ durable state" (§4.1, dòng
+> 248-250)
+
+Cả hai câu đều mô tả đúng (b) — một scanner phục hồi hẹp, không phải di trú
+happy path. Câu "nó không biến mọi running task thành queued" trực tiếp LOẠI
+(a): (a) sẽ bắt MỌI task RUNNING (kể cả không hề crash) đi qua một cơ chế quản
+lý mới — đúng cái nghiên cứu gốc đã cảnh báo không nên làm. Vậy đây không phải
+một quyết định thiết kế MỚI của tôi — nó là default kiến trúc đã được chốt cho
+M7 từ đầu; M7-C's Task C3 hiện có (`docs/superpowers/plans/2026-09-12-r2-m7c-restart-event-recovery.md`)
+cũng gọi đúng cấu phần này là "Expired-attempt scanner" trong mục Interfaces,
+khớp với cách đặt tên `reconcile_expired` đã xây.
+
+**Kết luận: chọn (b).** Không cần nghiên cứu thêm để so hai phương án — câu hỏi
+đã có câu trả lời trong tài liệu nền tảng của chính M7, và (b) cũng là phần mở
+rộng tự nhiên, cùng một họ, với `reconcile_expired` vừa test xong qua PostgreSQL
+thật.
+
+### Reuse-first: hạ tầng đã có, chỉ cần nối dây
+
+Kiểm tra thêm để tránh phát minh lại cái đã có (nguyên tắc reuse-first):
+
+- **Download an toàn**: `lib/candidate_store.py::prepare_candidate` đã làm đúng
+  toàn bộ phần "ghi file kết quả an toàn" (temp file cùng filesystem, fsync,
+  verify digest/media probe, rename bất biến, replay idempotent nếu trùng
+  identity+digest, quarantine nếu mismatch) — xây cho M7-B nhưng không đặc thù
+  cho ảnh/candidate xuất bản, có thể dùng thẳng cho việc "tải xong rồi ghi an
+  toàn" của recovery poller. Phần CÒN THIẾU chỉ là bước tải HTTP thật từ
+  provider (đặc thù từng backend, đã có sẵn bên trong `resume_video`/`generate`
+  của từng backend — chỉ cần bọc lại thành một hàm nhỏ, không viết lại).
+- **Không double-charge**: `lib/db/repositories/usage_repo.py::UsageRepository.bind_execution`
+  (dòng 170) đã ghi `ApiCall.execution_id` — tức mỗi `execution_id` đã có thể
+  tra ngược ra đúng `api_call_id` đã mở lúc submit. Recovery poller khi chốt
+  `SUCCEEDED`/`FAILED` có thể tái dùng đúng `ledger.resume_success`/`resume_failed`
+  (đã có, đang dùng trong `resume_video_async`) keyed theo `api_call_id` tra
+  ngược này — không cần cơ chế chống double-charge mới.
+- **Cancel-intent idempotent**: `CommandReceiptRepository` (`lib/db/repositories/host_hardening.py:602`,
+  đã dùng thật trong `task_repo.py:221-334` cho dedupe tạo task theo
+  `(user_id, project_name, actor_scope, command_id)`) là đúng pattern cần cho
+  authority cancel-intent thứ tư ở §3.1 — không cần phát minh cơ chế idempotency
+  mới, chỉ tái dùng với `execution_id` thay vì `task_id` làm khoá kết quả.
+- **`unsupported_poll` đã để lại đúng một câu gợi ý**: `r2/host_hardening/host_submit.py:112`
+  (`AttemptSubmitter.submit`'s tạm adapter) cố tình raise
+  `NotImplementedError("polling is owned by the backend adapter registered for
+  this route")` — dòng comment này xác nhận ý định gốc: phải có một "registry"
+  tra route → adapter thật (poll/cancel) cho recovery poller dùng, nhưng
+  registry đó CHƯA tồn tại. Đây chính là mảnh ghép cần xây mới trong §3.2 bước
+  2 ("dựng lại `ProviderExecutionAdapter` CHỈ từ `snapshot.route`") — không có
+  gì để tái dùng ở đây, phải viết mới, nhưng phạm vi nhỏ (một hàm map
+  `provider_id` + `adapter_version` → `BackendExecutionFunctions`, mỗi backend
+  góp một entry).
 
 ## 3. Thiết kế đề xuất cho (b) — đường phục hồi hẹp
 
@@ -188,9 +258,6 @@ host-hardening, chỉ được "nhìn thấy" nếu nó bị bỏ rơi.
 
 ## 4. Việc chưa biết / cần quyết định trước khi code
 
-- (a) so với (b): (a) đúng tinh thần spec hơn (poll THẬT SỰ luôn qua route
-  snapshot) nhưng đổi runtime path chính; (b) an toàn hơn nhưng để lại một
-  khoảng "không quan sát" giữa `ACCEPTED` và khi bị phát hiện bỏ rơi.
 - Cancel provider-side thật: hôm nay dự án chưa có bất kỳ HTTP cancel call nào
   tới provider nào (kể cả ở tầng cũ) — cần xác nhận backend nào (Kling/Vidu/...)
   thực sự có API cancel trước khi hứa hẹn "provider-side cancel", nếu không
