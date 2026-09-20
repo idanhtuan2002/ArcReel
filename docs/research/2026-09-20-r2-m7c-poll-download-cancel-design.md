@@ -266,3 +266,55 @@ host-hardening, chỉ được "nhìn thấy" nếu nó bị bỏ rơi.
 - SIGKILL subprocess test thật (barrier trước submit / sau chấp nhận / giữa
   poll / sau download / sau cancel) chỉ có ý nghĩa SAU KHI (a) hoặc (b) tồn
   tại — hiện tại không có gì để SIGKILL vì poll/cancel chưa chạy thật.
+
+## 5. Nghiên cứu 2026-09-21: gỡ nút chặn "gia hạn lease" cho ACCEPTED/RUNNING
+
+Sau khi D1-D3 xong (`dffbd892`), nút chặn còn lại duy nhất của H5 là:
+happy-path không hề gia hạn lease của `execution_attempts` trong lúc
+`ACCEPTED`/`RUNNING`, nên scanner theo kiểu `list_lease_expired` sẽ báo nhầm
+mọi attempt đang chạy tốt là "bị bỏ rơi". Đào sâu thêm để xem có cách gỡ mà
+KHÔNG cần "di trú toàn bộ happy path" (phương án (a) đã bị loại) hay không.
+
+**Tìm thấy một seam có sẵn, đúng chỗ cần:** `poll_with_retry`
+(`lib/video_backends/base.py:505`) — hàm polling dùng chung cho **mọi**
+backend (cả đường `generate()` lẫn `resume_video()`, tức cả happy path lẫn
+đường resume-sau-restart) — đã có sẵn tham số
+`on_progress: Callable[[T, float], None] | None`, được gọi **mỗi vòng poll
+chưa xong** (dòng 577-578), trước khi sleep. Đây đúng là điểm để "nhịp tim"
+gia hạn lease, không cần phát minh cơ chế mới.
+
+**Nhưng seam này chưa đủ dùng ngay, vì hai lý do cụ thể:**
+
+1. `on_progress` hiện được **7 backend** (`kling`, `vidu`, `gemini`, `openai`,
+   `ark`, `agnes`, `dashscope`) gọi riêng lẻ, mỗi nơi tự viết một lambda
+   CHỈ để log (`lambda v, elapsed: logger.info(...)`), không hề nhận
+   `execution_id`/context nào để biết phải gia hạn lease của attempt nào. Muốn
+   dùng cho gia hạn lease, phải sửa **cả 7 điểm gọi** — đúng nghĩa "sửa vào
+   đường chạy thật" của mọi video generation đang chạy hôm nay, không có cách
+   nào làm ít hơn nếu muốn seam áp dụng cho toàn bộ backend.
+2. `on_progress` là hàm **đồng bộ** (`Callable[[T, float], None]`), trong khi
+   gia hạn lease cần một lệnh ghi DB **bất đồng bộ**. Hai lựa chọn, cả hai đều
+   có đánh đổi thật:
+   - Đổi `on_progress` sang async (`Callable[[T, float], Awaitable[None]]`) —
+     đổi chữ ký hàm dùng chung, ảnh hưởng cả 7 call site cùng lúc dù chỉ muốn
+     thêm 1 tính năng.
+   - Giữ nguyên chữ ký, bắn `asyncio.create_task(renew())` kiểu fire-and-forget
+     — không đổi chữ ký, nhưng phải tự quản lý: giữ tham chiếu task (tránh bị
+     GC giữa chừng), bắt lỗi renew thất bại (exception trong task rời không ai
+     await sẽ chỉ log ra global handler, không chặn được poll loop), và quyết
+     định renew thất bại có nên làm gì khác không (hay chỉ log rồi thôi, chấp
+     nhận có thể mất "quyền sở hữu" tạm thời).
+
+**Kết luận:** cơ chế tồn tại, khả thi, phạm vi được xác định rõ (không phải
+"di trú toàn bộ", nhưng CŨNG không phải "chỉ thêm code mới không đụng gì cũ" —
+đây là sửa 7 file backend đang chạy thật). Đây đúng loại thay đổi runtime thật
+mà sponsor đã yêu cầu hoãn cho tới khi có quyết định mở khóa rõ ràng — dừng ở
+nghiên cứu, không code, đúng ranh giới đã áp dụng xuyên suốt D1-D3.
+
+**Việc cần quyết định nếu mở khóa:** (i) đổi chữ ký `on_progress` thành async
+hay giữ fire-and-forget; (ii) TTL gia hạn nên bao lâu (poll_interval hiện tại
+là `VIDEO_POLL_INTERVAL_SECONDS`, cần TTL lease đủ lớn hơn khoảng đó để không
+tự hết hạn giữa hai lần gọi `on_progress`); (iii) renew thất bại liên tục (vd.
+mất kết nối DB) có nên làm gián đoạn poll loop đang chạy hay không — khuynh
+hướng an toàn là KHÔNG (đừng để một lỗi ghi lease làm hỏng một video generation
+đang chạy tốt), nhưng cần ghi rõ thành quyết định, không để ngầm định.
