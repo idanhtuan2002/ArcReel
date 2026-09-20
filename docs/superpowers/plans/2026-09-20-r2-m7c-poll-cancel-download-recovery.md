@@ -58,7 +58,7 @@ as the pre-existing architecture default) -- read this before starting D2/D3.
 
 ---
 
-### Task D1: Add the cancel-intent write authority
+### Task D1: Add the cancel-intent write authority -- DONE (`8a70ebf7`)
 
 **Files:** `lib/db/repositories/host_hardening.py`, `r2/host_hardening/ports.py`,
 `r2/contracts/host_hardening.py` (if a dedicated receipt shape is needed --
@@ -76,27 +76,27 @@ by `(user_id, project_name, actor_scope, command_id)` through
 attempt-row mutation and receipt in the same flush, catch `IntegrityError` on
 the receipt as "someone else's identical command won, replay theirs").
 
-- [ ] Write failing tests: reject from every state except `ACCEPTED`/`RUNNING`;
+- [x] Write failing tests: reject from every state except `ACCEPTED`/`RUNNING`;
   exact replay of the same `command_id` is a no-op returning the same result,
   never a second transition; two different `command_id`s racing for the same
   attempt have exactly one winner (real PostgreSQL concurrent test, same
   pattern as `test_concurrent_promotion_has_exactly_one_winner`); no lease is
   required (a `RUNNING` attempt with no lease at all still accepts the cancel).
-- [ ] Run focused tests; expected RED is the missing method.
-- [ ] Implement `request_cancel`. It writes intent only -- it must not call
+- [x] Run focused tests; expected RED is the missing method.
+- [x] Implement `request_cancel`. It writes intent only -- it must not call
   any adapter or provider; that is Task D3's job when the poller later
   observes `CANCEL_REQUESTED` on a dead-lease attempt (matches spec §4.1:
   "cancel ghi intent trước, gọi provider sau").
-- [ ] Run the full repository test file plus `tests/unit/r2/host_hardening/`;
+- [x] Run the full repository test file plus `tests/unit/r2/host_hardening/`;
   expected GREEN.
-- [ ] Run the file through real PostgreSQL (`DATABASE_URL=postgresql+asyncpg://...`
+- [x] Run the file through real PostgreSQL (`DATABASE_URL=postgresql+asyncpg://...`
   Docker container, `-m "uses_db and not sqlite_only"`), matching the M7-B/M7-C
   precedent for anything with a concurrency claim.
-- [ ] Full static/test gates (ruff, basedpyright, lint-imports, deptry,
+- [x] Full static/test gates (ruff, basedpyright, lint-imports, deptry,
   `scripts/audit_tests.py --check`, full pytest).
-- [ ] Commit `feat(r2): add the cancel-intent write authority`.
+- [x] Commit `feat(r2): add the cancel-intent write authority`.
 
-### Task D2: Build the route-to-adapter registry (structural proof, one real backend)
+### Task D2: Build the route-to-adapter registry (structural proof, one real backend) -- translation layer DONE (`b53da35a`), dispatch deferred to D3
 
 **Files:** new module (suggest `r2/host_hardening/adapter_registry.py`), one
 real video backend's translation layer (Kling -- its submit route now
@@ -148,23 +148,35 @@ adapter registered for this route").
   `task_id`, not from `AttemptSnapshot`. Decide in D3 whether that bridge is
   acceptable or whether the attempt should carry it.
 
-- [ ] Write failing tests: registry resolves the expected `BackendExecutionFunctions`
-- [ ] Write failing tests: registry resolves the expected `BackendExecutionFunctions`
-  for a known route; an unregistered `(provider_id, adapter_version)` pair
-  raises a typed error (never silently falls back to a different backend);
-  the wrapped `poll` function, given a fake HTTP transport, produces the same
-  `ProviderObservation` shape the existing submit-path adapter already
-  produces (reuse `tests/fakes.py` fixtures where they exist).
-- [ ] Run focused tests; expected RED is the missing registry/wrapper.
-- [ ] Implement the registry and the one backend's poll wrapper. Cancel wrapper
-  only if that backend has a real provider-side cancel endpoint -- confirm
-  from that backend's own existing code before promising one; if it has none,
-  leave `cancel=None` and let `BackendCapabilityUnsupportedError` stand
-  (already the correct fail-closed behavior).
-- [ ] Run focused + `tests/unit/r2/host_hardening/`, `tests/integration/lib/video_backends/`
-  for the touched backend; expected GREEN.
-- [ ] Full static/test gates.
-- [ ] Commit `feat(r2): add a route-to-adapter registry for recovery polling`.
+**Prerequisite found and fixed while researching (`cecd2cff`):** every Kling
+submit recorded the same `endpoint_id` `"videos.create"` even though Kling
+polls three different URLs by request shape, so the persisted route could not
+say which URL to poll. `endpoint_id` now derives from the real endpoint path
+and the inventory registers the three families. Agnes/OpenAI poll one fixed
+endpoint regardless of request shape, so their single identity stays correct.
+
+**Scope correction:** a dispatch registry with one entry and no caller is
+speculative generality. The translation layer D3 actually needs is built here;
+dispatch arrives with D3, its first real consumer, which will also know whether
+it needs the resolver-dependent construction seam described above.
+
+- [x] Write failing tests: the wrapped poll produces one `ProviderObservation`
+  per call for every Kling task status; a 404 reports `NOT_FOUND` rather than
+  raising; a hard error body without a failed status is still `FAILED`; an
+  attempt with no provider job id cannot be polled; a backend configured for a
+  drifted domain still queries the submitted one on the accepted subpath.
+- [x] Run focused tests; expected RED is the missing wrapper.
+- [x] Implement `KlingVideoBackend.poll_attempt` (`b53da35a`), wrapping the
+  single-shot `_poll_query` (not the poll-until-terminal-and-download loop) and
+  reusing `lib/kling_shared.py`'s status predicates. `_poll_query` gained an
+  optional `base_url` override so the query goes to the submitted domain.
+  No cancel wrapper: Kling has no provider-side cancel (`supports_cancel: false`).
+- [x] Run focused + `tests/integration/lib/video_backends/`; GREEN (83 passed).
+- [x] Full static/test gates (14085 passed).
+- [x] Commit `feat(r2): add Kling's exact-route attempt poll`.
+- [ ] Deferred to D3: the dispatch seam (`route -> BackendExecutionFunctions`),
+  including how the backend instance is constructed with a pinned
+  `submitted_base_url` and current credentials.
 
 ### Task D3: Build the recovery poller (poll, download, cancel handoff)
 
