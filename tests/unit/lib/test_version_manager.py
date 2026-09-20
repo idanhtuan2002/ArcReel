@@ -407,6 +407,46 @@ class TestVersionManager:
         assert history["versions"][-1]["is_current"] is False
         assert (project / history["versions"][-1]["file"]).read_bytes() == b"late-paid-video"
 
+    def test_commit_staged_paid_version_is_idempotent_for_the_same_execution_id(self, tmp_path):
+        # A duplicate terminal observation for the same execution_id (e.g. an
+        # outer retry re-ingesting a provider result already committed) must
+        # not append a second version record.
+        project = tmp_path / "demo"
+        vm = VersionManager(project)
+        current = project / "videos" / "scene_E1S01.mp4"
+        current.parent.mkdir(parents=True)
+        staged = current.with_name(".scene_E1S01.new.mp4")
+        staged.write_bytes(b"paid-video")
+
+        first = vm.commit_staged_paid_version(
+            resource_type="videos",
+            resource_id="E1S01",
+            prompt="first",
+            staged_file=staged,
+            current_file=current,
+            select_current=True,
+            execution_id="execution-dup-1",
+        )
+
+        retry_staged = current.with_name(".scene_E1S01.retry.mp4")
+        retry_staged.write_bytes(b"re-ingested-same-video")
+
+        second = vm.commit_staged_paid_version(
+            resource_type="videos",
+            resource_id="E1S01",
+            prompt="first",
+            staged_file=retry_staged,
+            current_file=current,
+            select_current=True,
+            execution_id="execution-dup-1",
+        )
+
+        assert second == first
+        assert not retry_staged.exists()
+        assert current.read_bytes() == b"paid-video"
+        history = vm.get_versions("videos", "E1S01")
+        assert len(history["versions"]) == 1
+
     def test_paid_version_expected_zero_ignores_internal_legacy_current_bootstrap(self, tmp_path):
         project = tmp_path / "demo"
         vm = VersionManager(project)

@@ -736,6 +736,23 @@ class VersionManager:
             records = resource_data.setdefault("versions", [])
             created_snapshots: list[Path] = []
 
+            execution_id = metadata.get("execution_id")
+            if execution_id is not None:
+                duplicate = next(
+                    (record for record in records if record.get("execution_id") == execution_id),
+                    None,
+                )
+                if duplicate is not None:
+                    # Duplicate terminal ingestion for an execution already recorded (e.g. an
+                    # outer retry re-ingesting a provider result): return the existing commit
+                    # instead of appending a second version for the same paid effect.
+                    _report_cleanup_failures(_unlink_paths(staged_file), active_failure=None)
+                    duplicate_version = duplicate["version"]
+                    return PaidVersionCommit(
+                        version=duplicate_version,
+                        selected=duplicate_version == resource_data.get("current_version", 0),
+                    )
+
             def _append_snapshot(source: Path, version_prompt: str, version_metadata: dict) -> int:
                 previous = resource_data.get("current_version", 0)
                 if not isinstance(previous, int) or isinstance(previous, bool) or previous < 0:
