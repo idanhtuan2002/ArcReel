@@ -1,0 +1,101 @@
+{
+  "schema_version": "r2-m7a-identity-idempotency-v1",
+  "status": "EXECUTION_RECOVERY_VERIFIED",
+  "status_note": "VERIFIED BY HUMAN OVERRIDE on 2026-09-20 (operator anhtuan), not by an independent Codex standards and spec review, which was explicitly declined by the operator for this candidate. Mirrors the M6 precedent (docs/r2/evidence/R2_M6_IMPLEMENTATION_HANDOFF.json) where the operator accepted a human-override acceptance instead of an independent review. This is a self-review by the same agent that implemented the change, not an independent verdict.",
+  "plan": {
+    "original_task": "docs/superpowers/plans/2026-09-12-r2-m7a-execution-identity-idempotency.md Task A7 + Task A8",
+    "amendment_plan": "docs/superpowers/plans/2026-09-18-r2-m7a-a7-attempt-bound-routes.md (Tasks 5-7 of this amendment jointly fulfil the original plan's Task A7)",
+    "task_a7_commit_intent": "refactor(host): enforce attempt-bound generation effects",
+    "task_a7_actual_commits": [
+      "110f384d refactor(host): enforce attempt-bound provider submits",
+      "b52a8ca7 fix(r2): make paid version commit idempotent per execution_id"
+    ],
+    "task_a7_commit_deviation_note": "No new code change existed to bundle under the plan's literal Task A7 commit message once Task 7's investigation concluded the version-commit fix was the only remaining gap; that fix is committed under its own accurate message instead of a relabeled empty/renamed commit. See the SDD ledger for the full ruling: docs/superpowers/plans/../.superpowers/sdd/2026-09-18-r2-m7a-a7-attempt-bound-routes/progress.md (gitignored, worktree-local)."
+  },
+  "head": {
+    "sha": "3e1b40b7ae83073efc04e8bb186342e4ec535ec4",
+    "branch": "feat/r2-m7-host-production-hardening",
+    "worktree": "/home/anhtuan/content-production-os-m7",
+    "parent_base": "814761e3a40a0f2b7c694aaf56a51302ca24eaa8",
+    "parent_base_note": "R2_M7_BASELINE.json's m6_accepted_head; matches verify_m7_scope.py's base_sha check.",
+    "commits_since_base": 37,
+    "clean_tree": true
+  },
+  "commits_this_session": [
+    "110f384d refactor(host): enforce attempt-bound provider submits",
+    "b52a8ca7 fix(r2): make paid version commit idempotent per execution_id",
+    "13ff4586 fix(test): add execution_id to the ApiCall full-row accounting baseline",
+    "3e1b40b7 fix(r2): drop route_inventory's lib.custom_provider layering violation"
+  ],
+  "h1_h2_protocol_evidence": {
+    "h1_restart_uses_stored_route": "Satisfied by the pre-existing server/services/resume_executor.py VideoSubmissionCheckpoint mechanism (predates this session): resolver_payload pins the resolved provider/model to the checkpoint regardless of the current default, and _ensure_checkpoint_endpoint_unchanged/_validate_resolved_checkpoint_identity fail closed on drift. Covered by ~15 tests in tests/unit/server/services/test_resume_executor.py.",
+    "h2_duplicate_command_concurrent_worker_retry_restart": {
+      "task_result": "lib/db/repositories/task_repo.py TaskRepository.mark_succeeded WHERE status='running' guard; tests/unit/lib/db/repositories/test_task_repo_state_machine.py::test_mark_succeeded_only_from_running (pre-existing, asserts a second call after success returns 0 rows).",
+      "usage_finalization": "lib/ledger.py Ledger.resume_success pending->terminal WHERE guard; tests/unit/lib/test_ledger.py::test_resume_success_idempotent_on_terminal_row (pre-existing).",
+      "version_commit": "lib/version_manager.py VersionManager.commit_staged_paid_version was NOT guarded (real gap, fixed this session in b52a8ca7); now short-circuits on a matching execution_id already present in records. tests/unit/lib/test_version_manager.py::test_commit_staged_paid_version_is_idempotent_for_the_same_execution_id.",
+      "concurrent_worker_lease": "r2/host_hardening/execution.py ExecutionAttemptServiceImpl + lib/db/repositories/host_hardening.py ExecutionAttemptRepository acquire_lease/transition_worker CAS with expected_version fencing. tests/integration/lib/db/repositories/test_execution_attempt_repository.py::test_concurrent_lease_acquisition_has_exactly_one_winner -- exercised against a real isolated PostgreSQL 16 instance this session (see postgres_identity/gate_results below), not only SQLite.",
+      "one_remote_job_under_native_token": "r2/host_hardening/host_submit.py AttemptSubmitter._planned_attempt sets client_token = execution_id only when ProviderIdempotencyMode.NATIVE_TOKEN; ambiguous-submit durability proven end-to-end against a real DB in tests/integration/server/services/test_attempt_bound_video_execution.py::test_ambiguous_video_submit_durably_becomes_outcome_unknown_without_resubmit (added this session, Task 6)."
+    }
+  },
+  "route_inventory": {
+    "discovered_families": 9,
+    "registered_families": 9,
+    "discovered_equals_registered": true,
+    "families": [
+      "agnes:videos.create@host-video-v1",
+      "ark:content-generation-tasks@host-video-v1",
+      "custom-*:declarative-video-submit@host-video-v1",
+      "dashscope:video-synthesis@host-video-v1",
+      "gemini:generate_videos@host-video-v1",
+      "grok:video.generate@host-video-v1",
+      "kling:videos.create@host-video-v1",
+      "openai:videos.create@host-video-v1",
+      "vidu:video-create@host-video-v1"
+    ],
+    "qualification_status": "UNQUALIFIED for every entry (per plan Task 4/A7 intent: local development and deterministic tests only; PRODUCTION_CANDIDATE still requires QUALIFIED, which this evidence does not claim)."
+  },
+  "migration": {
+    "current_head": "7a7c4a0e0001",
+    "matches_m7b_precondition": "M7-B plan's Global Constraints name this exact head as the required M7-A starting point.",
+    "graph_digest": "sha256:caa8ec4d51af4c39eb1e6a01de0051c393244dc8e3c3e45df02459c43a10c8ab",
+    "graph_digest_matches_baseline": true,
+    "roundtrip_against_real_postgres": "upgrade head -> upgrade head (no-op) -> downgrade base -> upgrade head against an isolated postgres:16-alpine container: clean, final head 7a7c4a0e0001"
+  },
+  "postgres_identity": {
+    "provisioning": "docker run postgres:16-alpine (container r2-m7a-acceptance-pg), isolated, removed after this evidence run",
+    "host": "127.0.0.1",
+    "port": 55434,
+    "database": "r2_m7a_test",
+    "user": "r2test"
+  },
+  "gate_results": {
+    "ruff_check": "pass (repo-wide)",
+    "ruff_format_check": "pass (1451 files already formatted)",
+    "basedpyright": "0 errors, 0 warnings, 0 notes (repo-wide --warnings)",
+    "lint_imports": "20 kept, 0 broken (a real 1-broken finding from this session's own execution_adapter->route_inventory->custom_provider transitive import was fixed in 3e1b40b7 before this run)",
+    "deptry": "no dependency issues found (lib server alembic scripts tests r2)",
+    "pytest_full_sqlite": {
+      "command": "uv run python -m pytest -n 4 --dist loadfile",
+      "passed": 13994,
+      "skipped": 19,
+      "failed": 0,
+      "skip_reasons": "all 19 skips are documented PostgreSQL-only preconditions (row-level locking / FK enforcement) or platform-only (_scproxy on macOS); none are unexplained"
+    },
+    "pytest_postgres_compat": {
+      "command": "uv run python -m pytest -m \"uses_db and not sqlite_only\" -n 4 --dist loadfile (exact CI postgres-compat job selection)",
+      "passed": 947,
+      "skipped": 0,
+      "failed": 0,
+      "note": "An earlier attempt in this session ran the FULL unscoped suite with DATABASE_URL pointed at the same container and saw 42 unrelated failures (auth, project_manager, script_generator, prompt_preview, plus 4 in test_execution_attempt_repository.py). Re-running just that one repository test file alone against the same Postgres instance passed 17/17, and re-running with the CI-exact `-m \"uses_db and not sqlite_only\"` filter passed 947/947 with zero failures anywhere, including the concurrency test. Conclusion: the 42-failure run was cross-test interference from running thousands of unrelated non-uses_db tests against a shared Postgres container under xdist, not a real regression; it is not counted as evidence either way and CI does not run that unscoped command against Postgres."
+    },
+    "audit_tests": "0 violations",
+    "git_diff_check": "clean"
+  },
+  "coverage_limitations": [
+    "No independent (Codex or otherwise) review was run against this exact HEAD; status is a human/self override per status_note above.",
+    "PostgreSQL testing used a fresh, empty, single-node local container; it does not exercise production-scale connection pooling, replica failover, or the CI runner's exact resource profile.",
+    "No live provider account or network credential was exercised; all provider adapters were tested against respx-mocked HTTP transports.",
+    "Frontend (pnpm check) and website checks were not run in this session; this evidence covers only the backend gate.",
+    "Codebase-memory graph coverage for the files touched this session was checked ad hoc via check_index_coverage during development, not re-verified exhaustively at this exact final HEAD."
+  ]
+}
