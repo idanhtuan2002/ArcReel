@@ -158,9 +158,11 @@ class KlingBackendBase:
             submit=_submit,
         )
 
-    async def _poll_query(self, client: httpx.AsyncClient, endpoint_path: str) -> dict:
+    async def _poll_query(self, client: httpx.AsyncClient, endpoint_path: str, *, base_url: str | None = None) -> dict:
+        # ``base_url`` 覆盖供 M7-C 精确路线轮询用：恢复扫描按持久化的 route snapshot 查询，
+        # 不读当前配置的域名（提交后配置可能已漂移）。默认沿用实例域名，现有调用方不受影响。
         resp = await client.get(
-            f"{self._base_url}/{endpoint_path}",
+            f"{base_url or self._base_url}/{endpoint_path}",
             headers=self._headers(),
         )
         raise_for_status_redacted(resp)

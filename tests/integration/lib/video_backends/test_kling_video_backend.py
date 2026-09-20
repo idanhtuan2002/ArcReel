@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Generator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -26,6 +27,12 @@ from lib.video_backends.base import (
 )
 from lib.video_backends.kling import KlingVideoBackend
 from lib.video_backends.registry import effective_generate_audio_for_model
+from r2.contracts.host_hardening import (
+    AttemptSnapshot,
+    ExecutionAttemptState,
+    ProviderObservationKind,
+    ProviderRouteSnapshot,
+)
 from tests.fakes import bounded_poll_clock, captured_provider_job_ids
 from tests.http_capture import capture_http, only_request
 from tests.unit.lib.video_backends.attempt_bound_support import RecordingAttemptSubmitter
@@ -135,6 +142,101 @@ async def test_worker_kling_submit_route_disambiguates_by_subpath(tmp_path: Path
         "multi-image2video": "videos.multi-image2video",
     }
     assert len(set(endpoint_ids.values())) == 3
+
+
+def _attempt(
+    *,
+    endpoint_id: str = "videos.image2video",
+    provider_job_id: str | None = "t-1",
+    submitted_base_url: str = _BASE_URL,
+) -> AttemptSnapshot:
+    now = datetime(2026, 9, 21, tzinfo=UTC)
+    return AttemptSnapshot(
+        execution_id="exec-1",
+        task_id="task-1",
+        attempt_no=1,
+        request_digest="sha256:" + "b" * 64,
+        route=ProviderRouteSnapshot(
+            provider_id=PROVIDER_KLING,
+            provider_account_ref="default",
+            provider_model_id="kling-v2-5-turbo",
+            backend_model_id="kling-v2-5-turbo",
+            endpoint_id=endpoint_id,
+            submitted_base_url=submitted_base_url,
+            adapter_version="host-video-v1",
+            capability_profile_ref=f"kling-{endpoint_id.replace('.', '-')}@host-video-v1",
+        ),
+        client_token="exec-1",
+        provider_job_id=provider_job_id,
+        state=ExecutionAttemptState.ACCEPTED,
+        state_version=3,
+        lease_owner=None,
+        lease_token=None,
+        lease_expires_at=None,
+        created_at=now,
+        updated_at=now,
+        submitted_at=now,
+        last_observed_at=None,
+        terminal_at=None,
+    )
+
+
+class TestPollAttempt:
+    """M7-C exact-route poll: one observation per call, URL from the persisted
+    route alone."""
+
+    @pytest.mark.parametrize(
+        ("task_status", "expected_kind"),
+        [
+            ("submitted", ProviderObservationKind.ACCEPTED),
+            ("processing", ProviderObservationKind.RUNNING),
+            ("succeed", ProviderObservationKind.SUCCEEDED),
+            ("failed", ProviderObservationKind.FAILED),
+        ],
+    )
+    async def test_task_status_maps_to_one_observation_kind(
+        self, task_status: str, expected_kind: ProviderObservationKind
+    ) -> None:
+        with _kling_api() as routes:
+            routes.poll.mock(return_value=_resp(_query(task_status, url=_DOWNLOAD_URL)))
+            observation = await _jwt_backend().poll_attempt(_attempt())
+
+        assert observation.kind is expected_kind
+        assert observation.provider_job_id == "t-1"
+        assert routes.poll.call_count == 1
+
+    async def test_poll_uses_the_persisted_subpath_and_base_url_not_the_current_config(self) -> None:
+        """The whole point of an exact-route poll: a backend configured for a
+        different domain still queries where the job was actually submitted,
+        on the subpath the provider actually accepted."""
+        submitted = "https://api-singapore.klingai.com/v1"
+        backend = KlingVideoBackend(auth_mode="bearer", api_key="static-key", base_url="https://drifted.example/v1")
+        with capture_http() as router:
+            poll = router.get(url__regex=r"^https://api-singapore\.klingai\.com/v1/videos/.*$")
+            poll.mock(return_value=_resp(_query("processing")))
+            await backend.poll_attempt(_attempt(endpoint_id="videos.multi-image2video", submitted_base_url=submitted))
+
+        assert poll.call_count == 1
+        assert only_request(poll).url.path == "/v1/videos/multi-image2video/t-1"
+
+    async def test_a_404_is_reported_as_not_found_rather_than_raising(self) -> None:
+        with _kling_api() as routes:
+            routes.poll.mock(return_value=httpx.Response(404, json={"code": 1, "message": "not found"}))
+            observation = await _jwt_backend().poll_attempt(_attempt())
+
+        assert observation.kind is ProviderObservationKind.NOT_FOUND
+
+    async def test_a_hard_error_body_without_a_failed_status_is_still_failed(self) -> None:
+        with _kling_api() as routes:
+            routes.poll.mock(return_value=_resp({"code": 1002, "message": "auth failed", "data": {}}))
+            observation = await _jwt_backend().poll_attempt(_attempt())
+
+        assert observation.kind is ProviderObservationKind.FAILED
+        assert observation.reason_code is not None
+
+    async def test_an_attempt_without_a_provider_job_id_cannot_be_polled(self) -> None:
+        with pytest.raises(ValueError, match="no provider job id"):
+            await _jwt_backend().poll_attempt(_attempt(provider_job_id=None))
 
 
 class TestConstructionAndCapabilities:

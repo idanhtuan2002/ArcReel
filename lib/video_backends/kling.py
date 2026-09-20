@@ -20,16 +20,23 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
+from lib.db.base import utc_now
 from lib.kling_backend_base import KlingBackendBase
 from lib.kling_shared import (
+    KLING_STATUS_FAILED,
+    KLING_STATUS_SUCCEED,
     extract_kling_video_url,
     image_to_base64,
+    kling_task_failure_reason,
+    kling_task_status,
 )
 from lib.providers import PROVIDER_KLING
 from lib.video_backends.base import (
@@ -42,6 +49,12 @@ from lib.video_backends.base import (
     VideoRoute,
     download_resumable_video,
     recording_poll,
+)
+from r2.contracts.fingerprints import canonical_json_bytes
+from r2.contracts.host_hardening import (
+    AttemptSnapshot,
+    ProviderObservation,
+    ProviderObservationKind,
 )
 
 logger = logging.getLogger(__name__)
@@ -457,6 +470,73 @@ class KlingVideoBackend(KlingBackendBase, ProviderJobIdPersistenceMixin):
         generate_audio = persisted_audio if persisted_audio is not None else False
         async with httpx.AsyncClient(timeout=self._http_timeout) as client:
             return await self._poll_and_build(client, subpath, task_id, request, generate_audio=generate_audio)
+
+    # ── M7-C exact-route attempt poll ───────────────────────────────────
+
+    async def poll_attempt(self, attempt: AttemptSnapshot) -> ProviderObservation:
+        """One exact-route poll of a persisted attempt, as one observation.
+
+        Deliberately single-shot rather than reusing ``_poll_and_build``: that
+        one loops to terminal *and* downloads, while a recovery scan owns its
+        own cadence and decides separately whether to ingest a result. The URL
+        comes only from the attempt's persisted route (which subpath the
+        provider actually accepted, at the base URL actually submitted to), so
+        a config change after submit cannot redirect the query.
+        """
+        job_id = attempt.provider_job_id
+        endpoint_id = attempt.route.endpoint_id
+        if not job_id or not endpoint_id:
+            raise ValueError(
+                f"attempt {attempt.execution_id!r} has no provider job id / endpoint to poll "
+                f"(provider_job_id={job_id!r}, endpoint_id={endpoint_id!r})"
+            )
+        subpath = endpoint_id.split(".", 1)[-1]
+
+        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+            try:
+                payload = await self._poll_query(
+                    client,
+                    f"videos/{subpath}/{job_id}",
+                    base_url=attempt.route.submitted_base_url,
+                )
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code != 404:
+                    raise
+                # Kling's profile declares NON_AUTHORITATIVE not-found semantics, so
+                # this never by itself proves the job does not exist -- reporting it
+                # as an observation lets the fold apply that policy.
+                return self._observation(ProviderObservationKind.NOT_FOUND, {"http_status": 404}, job_id, None)
+
+        status = kling_task_status(payload)
+        reason = kling_task_failure_reason(payload)
+        if status == KLING_STATUS_SUCCEED:
+            kind = ProviderObservationKind.SUCCEEDED
+        elif status == KLING_STATUS_FAILED or reason is not None:
+            # A top-level hard error (auth, unknown task) surfaces through
+            # kling_task_failure_reason even without a failed task_status.
+            kind = ProviderObservationKind.FAILED
+        elif status == "processing":
+            kind = ProviderObservationKind.RUNNING
+        else:
+            # "submitted", plus any status this adapter version does not know:
+            # accepted by the provider, not yet proven to be running.
+            kind = ProviderObservationKind.ACCEPTED
+        return self._observation(kind, payload, job_id, reason)
+
+    @staticmethod
+    def _observation(
+        kind: ProviderObservationKind, payload: object, job_id: str, reason: str | None
+    ) -> ProviderObservation:
+        evidence = canonical_json_bytes({"kind": kind.value, "payload": repr(payload)})
+        return ProviderObservation(
+            observation_id=str(uuid.uuid4()),
+            kind=kind,
+            observed_at=utc_now(),
+            provider_sequence=None,
+            provider_job_id=job_id,
+            reason_code=reason,
+            evidence_digest="sha256:" + hashlib.sha256(evidence).hexdigest(),
+        )
 
     # ── HTTP poll / download ────────────────────────────────────────────
 
