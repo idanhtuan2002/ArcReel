@@ -470,6 +470,14 @@ class ExecutionAttemptRepository:
         )
         await self.session.flush()
 
+        if snapshot.state is ExecutionAttemptState.NEEDS_OPERATOR:
+            # Three-authority separation (module docstring): a provider fact is
+            # still recorded as evidence above, but only resolve_operator_review
+            # may move an attempt out of an operator pause. fold_observation's
+            # pure transition table permits this edge (an operator resolution
+            # reuses the same table), so the guard belongs here, not there.
+            return snapshot
+
         capability = self._capability_resolver(snapshot.route.capability_profile_ref)
         folded = fold_observation(snapshot, persisted, capability)
 

@@ -420,6 +420,74 @@ async def test_provider_observation_applies_while_the_worker_lease_is_dead(sessi
         assert folded.provider_job_id == "remote-1"
 
 
+async def test_provider_observation_never_exits_a_needs_operator_pause(session_factory: Factory) -> None:
+    """Only resolve_operator_review may leave NEEDS_OPERATOR (module docstring's
+    three-authority separation): fold_observation's pure transition table
+    legally permits NEEDS_OPERATOR -> ACCEPTED (an operator resolution reuses
+    the same table), so apply_provider_observation must refuse that edge on
+    its own rather than relying on no caller ever reaching it that way."""
+    async with session_factory() as session:
+        repo = _repo(session)
+        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt())
+        lease = await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=planned.state_version,
+            owner="worker-a",
+            expires_at=REAL_NOW + timedelta(minutes=5),
+        )
+        fence = AttemptLeaseFence(owner="worker-a", token=lease.lease_token or 0)
+        submitting = await repo.transition_worker(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=lease.state_version,
+            expected_states=frozenset({ExecutionAttemptState.PLANNED}),
+            new_state=ExecutionAttemptState.SUBMITTING,
+            fence=fence,
+        )
+        unknown = await repo.transition_worker(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=submitting.state_version,
+            expected_states=frozenset({ExecutionAttemptState.SUBMITTING}),
+            new_state=ExecutionAttemptState.SUBMIT_OUTCOME_UNKNOWN,
+            fence=fence,
+        )
+        needs_operator = await repo.transition_worker(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=unknown.state_version,
+            expected_states=frozenset({ExecutionAttemptState.SUBMIT_OUTCOME_UNKNOWN}),
+            new_state=ExecutionAttemptState.NEEDS_OPERATOR,
+            fence=fence,
+        )
+
+        observation = ProviderObservation(
+            observation_id="obs-late",
+            kind=ProviderObservationKind.ACCEPTED,
+            observed_at=NOW,
+            provider_sequence=None,
+            provider_job_id="remote-late",
+            reason_code=None,
+            evidence_digest="sha256:" + "d" * 64,
+        )
+        folded = await repo.apply_provider_observation(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=needs_operator.state_version,
+            observation=observation,
+        )
+
+    assert folded.state is ExecutionAttemptState.NEEDS_OPERATOR
+    assert folded.state_version == needs_operator.state_version
+    assert folded.provider_job_id is None
+
+
 async def test_duplicate_observation_id_is_a_no_op(session_factory: Factory) -> None:
     async with session_factory() as session:
         repo = _repo(session)
