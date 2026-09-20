@@ -178,46 +178,94 @@ it needs the resolver-dependent construction seam described above.
   including how the backend instance is constructed with a pinned
   `submitted_base_url` and current credentials.
 
-### Task D3: Build the recovery poller (poll, download, cancel handoff)
+### Task D3: Build the recovery poller -- SCOPE CUT to cancel-intent realization only
 
-**Files:** new module (suggest `r2/host_hardening/recovery_poller.py`),
-integration tests against real PostgreSQL.
+**Research completed 2026-09-21 -- this changes D3 from what was originally
+planned:**
 
-**Interfaces:** `AttemptRecoveryPoller.scan(*, before=None, limit=100) ->
-list[ReconcileResult]`, structurally parallel to
-`ExecutionAttemptServiceImpl.reconcile_expired` but for
-`ACCEPTED`/`RUNNING`/`CANCEL_REQUESTED` (extend
-`ExecutionAttemptRepository.list_lease_expired` to accept these states --
-already state-generic, no schema change needed).
+- **`ACCEPTED`/`RUNNING` poll/download recovery is not safely buildable yet.**
+  Confirmed by grep: nothing renews or even touches `execution_attempts`'
+  lease fields between the `apply_provider_observation` call that lands
+  `ACCEPTED` and any later state change -- `plan_and_submit`'s fence is never
+  renewed, and no heartbeat exists (`lib.generation_queue`'s
+  `acquire_or_renew_lease` is the *legacy* `tasks`-table lease, a separate
+  mechanism). So every `ACCEPTED`/`RUNNING` attempt's lease looks "expired" to
+  `list_lease_expired`-style querying almost immediately, including ones a
+  live worker is legitimately still handling via the untouched legacy
+  `generate`/`resume_video` path. A scanner keyed on lease expiry cannot tell
+  "orphaned" from "alive and running fine" for these two states without the
+  happy path first renewing a live lease while it works -- which is exactly
+  the happy-path migration (option (a)) the original M7 research rejected.
+  **This is blocked on a real architecture decision (how the happy path would
+  renew a lease without becoming a full migration), not an implementation
+  detail** -- do not attempt it by reusing `list_lease_expired` on these states
+  as originally suggested here; that would misfire constantly.
+- **No backend supports provider-side cancel.** Checked
+  `r2/provider_capabilities/registry.json`: `supports_cancel: false` on all 11
+  profiles. A poller that calls `adapter.cancel()` has zero real destinations
+  to prove itself against today; every real call would raise
+  `BackendCapabilityUnsupportedError` immediately. It is still worth building
+  (fakes prove the mechanism, and Task D1's `request_cancel` already writes
+  `CANCEL_REQUESTED` rows that nothing currently ever revisits -- see the
+  `16abd4d6` fix this same research produced), but do not expect or claim any
+  real end-to-end cancel proof from it.
+- **Found and fixed in the course of this research (`16abd4d6`):**
+  `reconcile_expired`'s `RECOVERABLE_EXPIRED_STATES` used to include
+  `CANCEL_REQUESTED -> CANCEL_OUTCOME_UNKNOWN`, written for a worker that
+  `transition_worker`'d into `CANCEL_REQUESTED` under its own live lease and
+  died before calling the provider. That scenario has zero production callers
+  (`transition_worker` is never invoked with that target) -- the only real
+  writer is D1's unfenced `request_cancel`, whose lease is stale by
+  construction. Left in place, the first scan after any cancel request would
+  have folded it to `CANCEL_OUTCOME_UNKNOWN` (then `NEEDS_OPERATOR` for a
+  `NONE`-idempotency provider) without ever attempting the provider call.
+  Removed from the map before this task began.
 
-- [ ] Write failing tests (fakes only, no real network): an `ACCEPTED` attempt
-  with a dead lease and a fake adapter returning `RUNNING` is left `RUNNING`
-  with a fresh fence and no double-poll; a fake adapter returning `SUCCEEDED`
-  triggers a download-and-ingest call (fake `candidate_store.prepare_candidate`)
-  and a ledger finalize call (fake `usage_repo`/`ledger`) using the `api_call_id`
-  reverse-looked-up from `execution_id`, never a new one; a `CANCEL_REQUESTED`
-  attempt with a dead lease calls the adapter's `cancel`, and
-  `BackendCapabilityUnsupportedError` from an unsupported backend leaves the
-  attempt `CANCEL_REQUESTED` (never silently marks it `CANCELLED`); a download
-  failure after a `SUCCEEDED` observation retries the download for the same
-  `provider_job_id` on the next scan, never resubmits (spec §7); the fence is
-  released before handing off to `reconcile()`-equivalent finalization, exactly
-  as `reconcile_expired`'s `release_lease` fix (`df205ddf`) already established
-  -- write a test that would have caught that exact bug class here too.
-- [ ] Run focused tests; expected RED is the missing poller.
-- [ ] Implement, wiring Task D1's `request_cancel` observer path and Task D2's
-  registry. No new download-safety or ledger logic -- call
-  `candidate_store.prepare_candidate` and `usage_repo`/`ledger` as-is.
+**Files:** `lib/db/repositories/host_hardening.py` (new
+`list_pending_cancels`), `r2/host_hardening/ports.py`,
+`r2/host_hardening/execution.py` (new `realize_pending_cancels` on
+`ExecutionAttemptServiceImpl`), tests.
+
+**Interfaces:** `ExecutionAttemptRepository.list_pending_cancels(*, limit=100)
+-> list[tuple[str, str, AttemptSnapshot]]` -- every `CANCEL_REQUESTED` attempt,
+unscoped, **no lease-liveness filter** (unlike `list_lease_expired`: nothing
+ever holds a live lease on this state under the current design, so every row
+is immediately realizable, not just the "expired" ones).
+`ExecutionAttemptServiceImpl.realize_pending_cancels(*, limit=100) ->
+list[ReconcileResult]`: for each candidate, acquire a fresh fence, call
+`adapter.cancel(leased)`; `BackendCapabilityUnsupportedError` releases the
+fence and leaves the attempt `CANCEL_REQUESTED` (never silently `CANCELLED`);
+any other exception transitions to `CANCEL_OUTCOME_UNKNOWN` and hands off to
+the existing `reconcile()` path (mirrors `plan_and_submit`'s
+ambiguous-vs-definite exception split, reusing the state that already exists
+for "maybe reached the provider" rather than inventing a new one); a clean
+`ProviderObservation` applies via `apply_provider_observation` as usual.
+
+- [ ] Write failing tests (fakes only -- no real backend has anything to
+  prove): a fake adapter whose `cancel` raises `BackendCapabilityUnsupportedError`
+  leaves the attempt `CANCEL_REQUESTED` with the fence released (not stuck
+  holding a lease); a fake adapter whose `cancel` raises any other exception
+  moves it to `CANCEL_OUTCOME_UNKNOWN` and reconciles from there; a fake
+  adapter whose `cancel` returns a `CANCELLED` observation lands the attempt
+  `CANCELLED`; two concurrent calls to `realize_pending_cancels` racing the
+  same attempt have exactly one winner (real PostgreSQL); an `ACCEPTED`/`RUNNING`
+  attempt with no `CANCEL_REQUESTED` sibling is never touched by this scan.
+- [ ] Run focused tests; expected RED is the missing method.
+- [ ] Implement `list_pending_cancels` and `realize_pending_cancels`.
 - [ ] Run focused + `tests/unit/r2/host_hardening/` +
   `tests/integration/server/services/test_execution_recovery_scan.py`
   (must still pass unchanged); expected GREEN.
-- [ ] Run the concurrency-sensitive paths (two scans racing the same orphaned
-  attempt) through real PostgreSQL via Docker, same pattern as D1.
+- [ ] Run the concurrency race through real PostgreSQL via Docker, same
+  pattern as D1.
 - [ ] Full static/test gates.
-- [ ] Commit `feat(r2): add the exact-route poll/download/cancel recovery poller`.
-- [ ] **Stop here for a sponsor decision before D4.** Report: what D1-D3 prove
-  (mechanism correctness against fakes + real PostgreSQL CAS), what they do
-  not yet prove (the poller has never run against a real backend's real HTTP
+- [ ] Commit `feat(r2): realize pending cancel intents against the provider`.
+- [ ] **Stop here for a sponsor decision.** `ACCEPTED`/`RUNNING` exact-route
+  poll/download recovery (the other half of the original H5 ask) remains
+  blocked on the happy-path lease-renewal architecture question above --
+  report this explicitly rather than silently dropping it. Report also: what
+  D1-D3 prove (mechanism correctness against fakes + real PostgreSQL CAS),
+  what they do not yet prove (the poller has never run against a real backend's
+  real HTTP
   API, and has never been invoked from any live process).
 
 ---
