@@ -56,6 +56,7 @@ from server.routers import (
     custom_endpoints,
     custom_providers,
     end_frames,
+    execution_events,
     files,
     generate,
     grids,
@@ -77,6 +78,7 @@ from server.routers import (
     versions,
 )
 from server.routers import auth as auth_router
+from server.services.execution_events import DurableEventStreamService
 from server.services.project_events import ProjectEventService
 
 
@@ -456,6 +458,10 @@ async def lifespan(app: FastAPI):
     await project_event_service.start()
     logger.info("ProjectEventService 已启动")
 
+    # No start()/shutdown() lifecycle: purely reactive to subscribe()/notify(), no
+    # background task to manage.
+    app.state.execution_event_stream_service = DurableEventStreamService()
+
     async with remote_mcp_host.run():
         yield
 
@@ -624,6 +630,9 @@ app.include_router(
 )
 app.include_router(
     project_events.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["项目变更流"]
+)
+app.include_router(
+    execution_events.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["执行事件流"]
 )
 app.include_router(tasks.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["任务队列"])
 app.include_router(providers.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["供应商管理"])
