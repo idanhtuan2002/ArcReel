@@ -293,6 +293,18 @@ class MasterHeadSnapshot(R2ContractModel):
     approval_record: NonEmptyStr
 
 
+class PromotionReceipt(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    artifact_key: NonEmptyStr
+    command_id: NonEmptyStr
+    command_digest: NonEmptyStr
+    candidate_id: NonEmptyStr
+    master_version: int = Field(ge=1)
+    approval_record: NonEmptyStr
+    created_at: AwareDatetime
+
+
 COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION = 1
 
 
@@ -319,6 +331,7 @@ __all__ = [
     "PersistedProviderObservation",
     "PlannedExecutionAttempt",
     "ProjectEventType",
+    "PromotionReceipt",
     "ProviderCapabilityProfile",
     "ProviderIdempotencyMode",
     "ProviderNotFoundSemantics",

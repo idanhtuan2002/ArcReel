@@ -9,6 +9,8 @@ so retention policy stays exactly as current as those owners' own state.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from r2.host_hardening.ports import (
     ActiveAttemptReferenceCheck,
     IncompleteBackupReferenceCheck,
@@ -49,4 +51,24 @@ class CandidateRetentionPolicy:
         )
 
 
-__all__ = ["CandidateRetentionPolicy"]
+async def delete_candidate_if_permitted(
+    *, policy: CandidateRetentionPolicy, user_id: str, project_name: str, candidate_id: str, object_ref: Path
+) -> bool:
+    """The one sanctioned way to remove a candidate object's bytes.
+
+    ``scripts/r2/verify_m7_scope.py``'s architecture check (spec section 6,
+    "reject bypasses architecturally") fails closed if any other code path
+    under the candidate media root calls ``Path.unlink``/``os.remove``/
+    ``os.replace`` directly instead of going through this function. Returns
+    ``False`` without touching the filesystem when the policy still protects
+    the candidate; the caller decides what "not deletable yet" means for its
+    own flow (retry later, surface to an operator, etc.).
+    """
+
+    if not await policy.can_delete(user_id=user_id, project_name=project_name, candidate_id=candidate_id):
+        return False
+    object_ref.unlink(missing_ok=True)  # noqa: ASYNC240 -- single local-file delete, not a blocking I/O concern
+    return True
+
+
+__all__ = ["CandidateRetentionPolicy", "delete_candidate_if_permitted"]

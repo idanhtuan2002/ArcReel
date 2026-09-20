@@ -6,7 +6,9 @@ here points at exactly which owner still holds the candidate.
 
 from __future__ import annotations
 
-from r2.host_hardening.retention import CandidateRetentionPolicy
+from pathlib import Path
+
+from r2.host_hardening.retention import CandidateRetentionPolicy, delete_candidate_if_permitted
 
 USER = "u1"
 PROJECT = "demo"
@@ -106,3 +108,40 @@ async def test_can_delete_short_circuits_on_the_first_blocking_owner() -> None:
     assert checks["active_attempt"].calls == []
     assert checks["retained_receipt"].calls == []
     assert checks["incomplete_backup"].calls == []
+
+
+async def test_delete_candidate_if_permitted_removes_the_file_when_the_policy_allows(tmp_path: Path) -> None:
+    object_ref = tmp_path / "cand-1.mp4"
+    object_ref.write_bytes(b"paid-master-bytes")
+    policy, _ = _policy()
+
+    deleted = await delete_candidate_if_permitted(
+        policy=policy, user_id=USER, project_name=PROJECT, candidate_id=CANDIDATE, object_ref=object_ref
+    )
+
+    assert deleted is True
+    assert not object_ref.exists()
+
+
+async def test_delete_candidate_if_permitted_leaves_the_file_when_the_policy_refuses(tmp_path: Path) -> None:
+    object_ref = tmp_path / "cand-1.mp4"
+    object_ref.write_bytes(b"paid-master-bytes")
+    policy, _ = _policy(master_referenced=True)
+
+    deleted = await delete_candidate_if_permitted(
+        policy=policy, user_id=USER, project_name=PROJECT, candidate_id=CANDIDATE, object_ref=object_ref
+    )
+
+    assert deleted is False
+    assert object_ref.read_bytes() == b"paid-master-bytes"
+
+
+async def test_delete_candidate_if_permitted_is_idempotent_when_the_file_is_already_gone(tmp_path: Path) -> None:
+    object_ref = tmp_path / "cand-1.mp4"
+    policy, _ = _policy()
+
+    deleted = await delete_candidate_if_permitted(
+        policy=policy, user_id=USER, project_name=PROJECT, candidate_id=CANDIDATE, object_ref=object_ref
+    )
+
+    assert deleted is True

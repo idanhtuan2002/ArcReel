@@ -285,3 +285,176 @@ class ProjectEventModel(UserOwnedMixin, Base):
     payload_schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     trace_id: Mapped[str | None] = mapped_column(_ID, nullable=True)
     dedupe_key: Mapped[str] = mapped_column(_ID, nullable=False)
+
+
+_BACKUP_SET_STATES = "('PREPARING','COMPLETE','VERIFIED','REJECTED')"
+
+
+class CandidateObjectModel(UserOwnedMixin, Base):
+    """One immutable, content-verified candidate object (spec
+    ``VerifiedCandidateObject``). ``candidate_id`` alone is the primary key --
+    a globally opaque ID, matching the execution-attempt convention -- with a
+    redundant scoped-uniqueness constraint for query safety. Rows are never
+    updated after insert; a candidate whose bytes must change gets a new
+    ``candidate_id``.
+    """
+
+    __tablename__ = "candidate_objects"
+    __table_args__ = (
+        PrimaryKeyConstraint("candidate_id", name="pk_candidate_objects"),
+        UniqueConstraint("user_id", "project_name", "candidate_id", name="uq_candidate_objects_scope"),
+        Index("ix_candidate_objects_project_name", "project_name"),
+        Index("ix_candidate_objects_artifact_key", "user_id", "project_name", "artifact_key"),
+        CheckConstraint("byte_size >= 0", name="ck_candidate_objects_byte_size"),
+    )
+
+    candidate_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    artifact_key: Mapped[str] = mapped_column(_ID, nullable=False)
+    object_ref: Mapped[str] = mapped_column(String(1024), nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+    media_probe_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class MasterAuthorityModel(UserOwnedMixin, Base):
+    """The one mutable pointer per ``(user_id, project_name, artifact_key)``:
+    ``current_version`` is CASed by
+    :meth:`~lib.db.repositories.host_hardening.MasterAuthorityRepository.advance_head`,
+    mirroring ``CanonBranchModel.head_version_id`` for Canon authority.
+    ``current_version`` is ``0`` (no promoted version yet) until the first
+    successful promotion.
+    """
+
+    __tablename__ = "master_authorities"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "artifact_key", name="pk_master_authorities"),
+        CheckConstraint("current_version >= 0", name="ck_master_authorities_current_version"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        server_default=DEFAULT_USER_ID,
+        primary_key=True,
+    )
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    artifact_key: Mapped[str] = mapped_column(_ID, primary_key=True)
+    current_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class MasterHeadVersionModel(Base):
+    """Append-only promoted-version history (spec ``MasterHeadSnapshot``).
+    ``UniqueConstraint(scope, artifact_key, master_version)`` is the CAS
+    boundary: a concurrent promotion racing for the same next version number
+    loses at the database, mirroring ``CanonVersionModel``.
+    """
+
+    __tablename__ = "master_head_versions"
+    __table_args__ = (
+        PrimaryKeyConstraint("master_head_version_id", name="pk_master_head_versions"),
+        UniqueConstraint(
+            "user_id", "project_name", "artifact_key", "master_version", name="uq_master_head_versions_scope_version"
+        ),
+        Index("ix_master_head_versions_scope", "user_id", "project_name", "artifact_key"),
+        Index("ix_master_head_versions_candidate_id", "candidate_id"),
+        CheckConstraint("master_version >= 1", name="ck_master_head_versions_master_version"),
+    )
+
+    master_head_version_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    artifact_key: Mapped[str] = mapped_column(_ID, nullable=False)
+    master_version: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    candidate_id: Mapped[str] = mapped_column(
+        _ID, ForeignKey("candidate_objects.candidate_id", ondelete="RESTRICT"), nullable=False
+    )
+    object_ref: Mapped[str] = mapped_column(String(1024), nullable=False)
+    content_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+    approval_record: Mapped[str] = mapped_column(_ID, nullable=False)
+    promoted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PromotionReceiptModel(UserOwnedMixin, Base):
+    """Idempotency and retention record for one ``AtomicPromotionService.promote()``
+    command (spec section 6). ``(user_id, project_name, artifact_key,
+    command_id)`` is the exact-replay identity; ``command_digest`` detects a
+    conflicting replay (same command_id, different intended promotion).
+    ``candidate_id`` is a plain, queryable column -- not folded into an opaque
+    digest -- because :class:`~r2.host_hardening.retention.CandidateRetentionPolicy`
+    must be able to ask "does any receipt still retain this candidate" directly.
+    """
+
+    __tablename__ = "promotion_receipts"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "artifact_key", "command_id", name="pk_promotion_receipts"),
+        Index("ix_promotion_receipts_candidate_id", "candidate_id"),
+        Index("ix_promotion_receipts_project_name", "project_name"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        server_default=DEFAULT_USER_ID,
+        primary_key=True,
+    )
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    artifact_key: Mapped[str] = mapped_column(_ID, primary_key=True)
+    command_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+
+    command_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+    candidate_id: Mapped[str] = mapped_column(
+        _ID, ForeignKey("candidate_objects.candidate_id", ondelete="RESTRICT"), nullable=False
+    )
+    master_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    approval_record: Mapped[str] = mapped_column(_ID, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class BackupSetModel(UserOwnedMixin, Base):
+    """One backup-set lifecycle record (spec section 8 ``BackupSetManifest``,
+    ``BackupSetState``). M7-B persists only the state/reference shape the
+    retention guard needs; the full backup/restore drill is M7-D's scope.
+    """
+
+    __tablename__ = "backup_sets"
+    __table_args__ = (
+        PrimaryKeyConstraint("backup_set_id", name="pk_backup_sets"),
+        UniqueConstraint("user_id", "project_name", "backup_set_id", name="uq_backup_sets_scope"),
+        Index("ix_backup_sets_project_name", "project_name"),
+        CheckConstraint(f"state IN {_BACKUP_SET_STATES}", name="ck_backup_sets_state"),
+    )
+
+    backup_set_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    state: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class BackupSetMediaRefModel(Base):
+    """One candidate object retained by a backup set (spec ``MediaInventoryEntry``,
+    trimmed to the reference the retention guard needs).
+    """
+
+    __tablename__ = "backup_set_media_refs"
+    __table_args__ = (
+        PrimaryKeyConstraint("backup_set_id", "candidate_id", name="pk_backup_set_media_refs"),
+        ForeignKeyConstraint(
+            ["backup_set_id"],
+            ["backup_sets.backup_set_id"],
+            name="fk_backup_set_media_refs_backup_set",
+            ondelete="CASCADE",
+        ),
+        Index("ix_backup_set_media_refs_candidate_id", "candidate_id"),
+    )
+
+    backup_set_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+    candidate_id: Mapped[str] = mapped_column(
+        _ID, ForeignKey("candidate_objects.candidate_id", ondelete="RESTRICT"), primary_key=True
+    )

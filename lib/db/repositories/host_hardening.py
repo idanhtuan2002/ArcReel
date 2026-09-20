@@ -35,14 +35,21 @@ from typing import Any
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.base import utc_now
 from lib.db.models.host_hardening import (
+    BackupSetMediaRefModel,
+    BackupSetModel,
+    CandidateObjectModel,
     CommandReceiptModel,
     ExecutionAttemptModel,
+    MasterAuthorityModel,
+    MasterHeadVersionModel,
     OperatorResolutionReceiptModel,
     ProjectEventModel,
+    PromotionReceiptModel,
     ProviderObservationModel,
 )
 from lib.db.repositories.base import rowcount
@@ -52,15 +59,27 @@ from r2.contracts.host_hardening import (
     AttemptSnapshot,
     CommandReceipt,
     ExecutionAttemptState,
+    MasterHeadSnapshot,
     OperatorResolutionReceipt,
     PersistedProviderObservation,
     PlannedExecutionAttempt,
     ProjectEventType,
+    PromotionReceipt,
     ProviderCapabilityProfile,
     ProviderObservation,
     ProviderRouteSnapshot,
+    VerifiedCandidateObject,
 )
 from r2.host_hardening.transitions import fold_observation, is_legal_transition, validate_exact_replay
+
+
+def _is_unique_violation(exc: IntegrityError) -> bool:
+    """A unique constraint hit (23505 on PostgreSQL) -- not an FK or NOT NULL failure."""
+    sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+    if sqlstate is not None:
+        return sqlstate == "23505"
+    message = str(getattr(exc, "orig", None) or exc).lower()
+    return "unique constraint failed" in message or "unique" in message
 
 
 class ExecutionAttemptIntegrityError(RuntimeError):
@@ -590,3 +609,379 @@ class CommandReceiptRepository:
             )
         )
         await self.session.flush()
+
+
+# --- M7-B: immutable candidates and atomic master promotion (H3-H4) -----------------
+
+
+class CandidateIdentityConflictError(RuntimeError):
+    """A different candidate already occupies this ``candidate_id`` with unequal bytes."""
+
+
+class MasterAuthorityNotFoundError(LookupError):
+    """No master authority row exists yet for this ``(user_id, project_name, artifact_key)``."""
+
+
+class MasterHeadConflictError(RuntimeError):
+    """A concurrent promotion already advanced this master head past ``expected_master_version``."""
+
+
+class PromotionReceiptConflictError(RuntimeError):
+    """A receipt already exists for this ``command_id`` with a different ``command_digest``."""
+
+
+def _candidate_from_row(row: CandidateObjectModel) -> VerifiedCandidateObject:
+    return VerifiedCandidateObject(
+        candidate_id=row.candidate_id,
+        project_name=row.project_name,
+        artifact_key=row.artifact_key,
+        object_ref=row.object_ref,
+        byte_size=row.byte_size,
+        content_digest=row.content_digest,
+        media_probe_digest=row.media_probe_digest,
+    )
+
+
+class CandidateObjectRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_exact(self, *, user_id: str, project_name: str, candidate_id: str) -> VerifiedCandidateObject | None:
+        row = (
+            await self.session.execute(
+                select(CandidateObjectModel).where(
+                    CandidateObjectModel.user_id == user_id,
+                    CandidateObjectModel.project_name == project_name,
+                    CandidateObjectModel.candidate_id == candidate_id,
+                )
+            )
+        ).scalar_one_or_none()
+        return None if row is None else _candidate_from_row(row)
+
+    async def insert(
+        self, *, user_id: str, project_name: str, candidate: VerifiedCandidateObject, created_at: datetime
+    ) -> None:
+        try:
+            async with self.session.begin_nested():
+                self.session.add(
+                    CandidateObjectModel(
+                        user_id=user_id,
+                        project_name=project_name,
+                        candidate_id=candidate.candidate_id,
+                        artifact_key=candidate.artifact_key,
+                        object_ref=candidate.object_ref,
+                        byte_size=candidate.byte_size,
+                        content_digest=candidate.content_digest,
+                        media_probe_digest=candidate.media_probe_digest,
+                        created_at=created_at,
+                    )
+                )
+                await self.session.flush()
+        except IntegrityError as exc:
+            if not _is_unique_violation(exc):
+                raise
+            raise CandidateIdentityConflictError(
+                f"candidate {candidate.candidate_id!r} conflicts with an existing candidate in this scope"
+            ) from exc
+
+
+class MasterAuthorityRepository:
+    """Append-only master-head history plus its one CASed pointer.
+
+    Purely optimistic, matching ``ExecutionAttemptRepository.acquire_lease``
+    rather than ``CanonRepository.lock_branch``'s ``SELECT ... FOR UPDATE``:
+    ``get_current_version`` never blocks a concurrent caller,
+    ``insert_head_version`` appends immutable history (its own unique
+    constraint is the CAS boundary against a concurrent same-version write),
+    and ``advance_head`` moves the pointer only if it still matches
+    ``expected_current_version``. A pessimistic lock here would let one
+    promotion's held row lock deadlock against another promotion waiting on
+    the same barrier-like coordination a real worker queue can create.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_current(self, *, user_id: str, project_name: str, artifact_key: str) -> MasterHeadSnapshot | None:
+        authority = (
+            await self.session.execute(
+                select(MasterAuthorityModel).where(
+                    MasterAuthorityModel.user_id == user_id,
+                    MasterAuthorityModel.project_name == project_name,
+                    MasterAuthorityModel.artifact_key == artifact_key,
+                )
+            )
+        ).scalar_one_or_none()
+        if authority is None or authority.current_version == 0:
+            return None
+        version = (
+            await self.session.execute(
+                select(MasterHeadVersionModel).where(
+                    MasterHeadVersionModel.user_id == user_id,
+                    MasterHeadVersionModel.project_name == project_name,
+                    MasterHeadVersionModel.artifact_key == artifact_key,
+                    MasterHeadVersionModel.master_version == authority.current_version,
+                )
+            )
+        ).scalar_one()
+        return MasterHeadSnapshot(
+            artifact_key=version.artifact_key,
+            master_version=version.master_version,
+            candidate_id=version.candidate_id,
+            object_ref=version.object_ref,
+            content_digest=version.content_digest,
+            approval_record=version.approval_record,
+        )
+
+    async def get_current_version(self, *, user_id: str, project_name: str, artifact_key: str) -> int:
+        """Return the mutable pointer's current version, creating it at ``0`` if
+        absent. Purely optimistic, like every other M7 CAS seam
+        (:meth:`~lib.db.repositories.host_hardening.ExecutionAttemptRepository.acquire_lease`):
+        no ``SELECT ... FOR UPDATE`` hold, so a concurrent promotion never blocks
+        on this call. The actual CAS boundary is
+        :meth:`insert_head_version`'s unique constraint plus :meth:`advance_head`'s
+        expected-version-guarded ``UPDATE``; both fail closed, they never block.
+        The create-if-absent race uses a ``SAVEPOINT`` so a losing insert only
+        rolls back this call, never the caller's own earlier work in the same
+        transaction.
+        """
+
+        row = (
+            await self.session.execute(
+                select(MasterAuthorityModel).where(
+                    MasterAuthorityModel.user_id == user_id,
+                    MasterAuthorityModel.project_name == project_name,
+                    MasterAuthorityModel.artifact_key == artifact_key,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is not None:
+            return row.current_version
+        try:
+            async with self.session.begin_nested():
+                self.session.add(
+                    MasterAuthorityModel(
+                        user_id=user_id, project_name=project_name, artifact_key=artifact_key, current_version=0
+                    )
+                )
+                await self.session.flush()
+            return 0
+        except IntegrityError as exc:
+            if not _is_unique_violation(exc):
+                raise
+            # Lost the race to create the row: another transaction already committed
+            # it first. Re-read instead of raising -- the row now exists.
+            created = (
+                await self.session.execute(
+                    select(MasterAuthorityModel).where(
+                        MasterAuthorityModel.user_id == user_id,
+                        MasterAuthorityModel.project_name == project_name,
+                        MasterAuthorityModel.artifact_key == artifact_key,
+                    )
+                )
+            ).scalar_one()
+            return created.current_version
+
+    async def insert_head_version(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        master_head_version_id: str,
+        snapshot: MasterHeadSnapshot,
+        promoted_at: datetime,
+    ) -> None:
+        try:
+            async with self.session.begin_nested():
+                self.session.add(
+                    MasterHeadVersionModel(
+                        master_head_version_id=master_head_version_id,
+                        user_id=user_id,
+                        project_name=project_name,
+                        artifact_key=snapshot.artifact_key,
+                        master_version=snapshot.master_version,
+                        candidate_id=snapshot.candidate_id,
+                        object_ref=snapshot.object_ref,
+                        content_digest=snapshot.content_digest,
+                        approval_record=snapshot.approval_record,
+                        promoted_at=promoted_at,
+                    )
+                )
+                await self.session.flush()
+        except IntegrityError as exc:
+            if not _is_unique_violation(exc):
+                raise
+            raise MasterHeadConflictError(
+                f"{snapshot.artifact_key!r} already has a version {snapshot.master_version} "
+                "(concurrent promotion won the race)"
+            ) from exc
+
+    async def advance_head(
+        self, *, user_id: str, project_name: str, artifact_key: str, expected_current_version: int, new_version: int
+    ) -> None:
+        result = await self.session.execute(
+            update(MasterAuthorityModel)
+            .where(
+                MasterAuthorityModel.user_id == user_id,
+                MasterAuthorityModel.project_name == project_name,
+                MasterAuthorityModel.artifact_key == artifact_key,
+                MasterAuthorityModel.current_version == expected_current_version,
+            )
+            .values(current_version=new_version)
+        )
+        if rowcount(result) != 1:
+            raise MasterHeadConflictError(f"locked master authority {artifact_key!r} changed unexpectedly")
+
+
+class PromotionReceiptRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_exact(
+        self, *, user_id: str, project_name: str, artifact_key: str, command_id: str
+    ) -> PromotionReceipt | None:
+        row = (
+            await self.session.execute(
+                select(PromotionReceiptModel).where(
+                    PromotionReceiptModel.user_id == user_id,
+                    PromotionReceiptModel.project_name == project_name,
+                    PromotionReceiptModel.artifact_key == artifact_key,
+                    PromotionReceiptModel.command_id == command_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        return PromotionReceipt(
+            artifact_key=row.artifact_key,
+            command_id=row.command_id,
+            command_digest=row.command_digest,
+            candidate_id=row.candidate_id,
+            master_version=row.master_version,
+            approval_record=row.approval_record,
+            created_at=_stored_aware(row.created_at),
+        )
+
+    async def add(self, *, user_id: str, project_name: str, receipt: PromotionReceipt) -> None:
+        try:
+            async with self.session.begin_nested():
+                self.session.add(
+                    PromotionReceiptModel(
+                        user_id=user_id,
+                        project_name=project_name,
+                        artifact_key=receipt.artifact_key,
+                        command_id=receipt.command_id,
+                        command_digest=receipt.command_digest,
+                        candidate_id=receipt.candidate_id,
+                        master_version=receipt.master_version,
+                        approval_record=receipt.approval_record,
+                        created_at=receipt.created_at,
+                    )
+                )
+                await self.session.flush()
+        except IntegrityError as exc:
+            if not _is_unique_violation(exc):
+                raise
+            raise PromotionReceiptConflictError(
+                f"a receipt for command {receipt.command_id!r} already exists in this scope"
+            ) from exc
+
+    async def has_retained_receipt_for_candidate(self, *, user_id: str, project_name: str, candidate_id: str) -> bool:
+        row = (
+            await self.session.execute(
+                select(PromotionReceiptModel.command_id)
+                .where(
+                    PromotionReceiptModel.user_id == user_id,
+                    PromotionReceiptModel.project_name == project_name,
+                    PromotionReceiptModel.candidate_id == candidate_id,
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+
+class BackupSetRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def insert(self, *, user_id: str, project_name: str, backup_set_id: str, state: str, now: datetime) -> None:
+        self.session.add(
+            BackupSetModel(
+                user_id=user_id,
+                project_name=project_name,
+                backup_set_id=backup_set_id,
+                state=state,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await self.session.flush()
+
+    async def add_media_ref(self, *, backup_set_id: str, candidate_id: str) -> None:
+        self.session.add(BackupSetMediaRefModel(backup_set_id=backup_set_id, candidate_id=candidate_id))
+        await self.session.flush()
+
+    async def has_incomplete_backup_referencing(self, *, user_id: str, project_name: str, candidate_id: str) -> bool:
+        row = (
+            await self.session.execute(
+                select(BackupSetMediaRefModel.backup_set_id)
+                .join(BackupSetModel, BackupSetModel.backup_set_id == BackupSetMediaRefModel.backup_set_id)
+                .where(
+                    BackupSetModel.user_id == user_id,
+                    BackupSetModel.project_name == project_name,
+                    BackupSetMediaRefModel.candidate_id == candidate_id,
+                    BackupSetModel.state.in_(("PREPARING", "COMPLETE")),
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+
+class MasterHeadReferenceCheckImpl:
+    """Real ``MasterHeadReferenceCheck`` backed by :class:`MasterHeadVersionModel`."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def references_candidate(self, *, user_id: str, project_name: str, candidate_id: str) -> bool:
+        row = (
+            await self.session.execute(
+                select(MasterAuthorityModel.artifact_key)
+                .join(
+                    MasterHeadVersionModel,
+                    (MasterHeadVersionModel.user_id == MasterAuthorityModel.user_id)
+                    & (MasterHeadVersionModel.project_name == MasterAuthorityModel.project_name)
+                    & (MasterHeadVersionModel.artifact_key == MasterAuthorityModel.artifact_key)
+                    & (MasterHeadVersionModel.master_version == MasterAuthorityModel.current_version),
+                )
+                .where(
+                    MasterAuthorityModel.user_id == user_id,
+                    MasterAuthorityModel.project_name == project_name,
+                    MasterHeadVersionModel.candidate_id == candidate_id,
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return row is not None
+
+
+class ActiveAttemptReferenceCheckImpl:
+    """Fail-closed placeholder ``ActiveAttemptReferenceCheck``.
+
+    ``execution_attempts`` (A2) and ``candidate_objects`` (B1/B2) were designed
+    by separate packets and have no schema linkage yet -- an attempt records a
+    provider route and job identity, never a ``candidate_id``. Until a later
+    packet adds that linkage (e.g. when a worker records which candidate an
+    in-flight attempt is producing), this check cannot honestly scope "is
+    *this* candidate referenced" and always answers "yes": retention refuses to
+    delete rather than silently allow a candidate an active attempt might still
+    be producing. It is not a bypass -- ``CandidateRetentionPolicy`` will not
+    permit deletion of anything until this predicate is replaced with a real
+    scoped query.
+    """
+
+    async def has_active_attempt_for_candidate(self, *, user_id: str, project_name: str, candidate_id: str) -> bool:
+        del user_id, project_name, candidate_id
+        return True
