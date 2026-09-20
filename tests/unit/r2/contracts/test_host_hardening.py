@@ -8,8 +8,10 @@ from pydantic import ValidationError
 from r2.contracts.host_hardening import (
     AttemptLeaseFence,
     AttemptSnapshot,
+    CandidateIdentity,
     CommandReceipt,
     ExecutionAttemptState,
+    MasterHeadSnapshot,
     OperatorResolutionAction,
     OperatorResolutionReceipt,
     PersistedProviderObservation,
@@ -20,6 +22,7 @@ from r2.contracts.host_hardening import (
     ProviderObservation,
     ProviderObservationKind,
     ProviderRouteSnapshot,
+    VerifiedCandidateObject,
     command_receipt_result_envelope,
 )
 
@@ -175,3 +178,42 @@ def test_command_receipt_is_frozen_and_rejects_extra_fields() -> None:
         receipt.command_id = "cmd-2"
     with pytest.raises(ValidationError):
         CommandReceipt(**{**receipt.model_dump(), "unexpected_field": "x"})
+
+
+def test_candidate_identity_is_frozen_and_rejects_extra_fields() -> None:
+    identity = CandidateIdentity(
+        candidate_id="cand-1",
+        user_id="u1",
+        project_name="demo",
+        artifact_key="videos/E1S01",
+        expected_content_digest="sha256:" + "a" * 64,
+    )
+    with pytest.raises(ValidationError):
+        identity.candidate_id = "cand-2"
+    with pytest.raises(ValidationError):
+        CandidateIdentity(**{**identity.model_dump(), "unexpected_field": "x"})
+
+
+def test_verified_candidate_object_rejects_negative_byte_size() -> None:
+    with pytest.raises(ValidationError):
+        VerifiedCandidateObject(
+            candidate_id="cand-1",
+            project_name="demo",
+            artifact_key="videos/E1S01",
+            object_ref="/data/demo/videos/cand-1.mp4",
+            byte_size=-1,
+            content_digest="sha256:" + "a" * 64,
+            media_probe_digest="sha256:" + "b" * 64,
+        )
+
+
+def test_master_head_snapshot_requires_master_version_at_least_one() -> None:
+    with pytest.raises(ValidationError):
+        MasterHeadSnapshot(
+            artifact_key="videos/E1S01",
+            master_version=0,
+            candidate_id="cand-1",
+            object_ref="/data/demo/videos/cand-1.mp4",
+            content_digest="sha256:" + "a" * 64,
+            approval_record="approval-1",
+        )

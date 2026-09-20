@@ -260,6 +260,39 @@ class ReconcileResult(R2ContractModel):
     operator_reason: NonEmptyStr | None = None
 
 
+class CandidateIdentity(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    candidate_id: NonEmptyStr
+    user_id: NonEmptyStr
+    project_name: NonEmptyStr
+    artifact_key: NonEmptyStr
+    expected_content_digest: NonEmptyStr
+
+
+class VerifiedCandidateObject(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    candidate_id: NonEmptyStr
+    project_name: NonEmptyStr
+    artifact_key: NonEmptyStr
+    object_ref: NonEmptyStr
+    byte_size: int = Field(ge=0)
+    content_digest: NonEmptyStr
+    media_probe_digest: NonEmptyStr
+
+
+class MasterHeadSnapshot(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    artifact_key: NonEmptyStr
+    master_version: int = Field(ge=1)
+    candidate_id: NonEmptyStr
+    object_ref: NonEmptyStr
+    content_digest: NonEmptyStr
+    approval_record: NonEmptyStr
+
+
 COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION = 1
 
 
@@ -277,8 +310,10 @@ __all__ = [
     "AttemptLeaseFence",
     "AttemptSnapshot",
     "BackupSetState",
+    "CandidateIdentity",
     "CommandReceipt",
     "ExecutionAttemptState",
+    "MasterHeadSnapshot",
     "OperatorResolutionAction",
     "OperatorResolutionReceipt",
     "PersistedProviderObservation",
@@ -294,5 +329,6 @@ __all__ = [
     "ProviderTokenScope",
     "ReconcileResult",
     "UpstreamDisposition",
+    "VerifiedCandidateObject",
     "command_receipt_result_envelope",
 ]

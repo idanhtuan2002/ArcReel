@@ -130,9 +130,43 @@ class ExecutionAttemptService(Protocol):
     async def reconcile(self, *, user_id: str, project_name: str, execution_id: str) -> ReconcileResult: ...
 
 
+# --- H3-H4 candidate retention: one protocol per protected reference kind ------------
+# B2 supplies the real PostgreSQL-backed implementations once the master-head,
+# attempt, receipt and backup-set tables exist; B1 wires the shared guard against
+# these pure seams so its fault behavior is provable with fakes today.
+
+
+@runtime_checkable
+class MasterHeadReferenceCheck(Protocol):
+    async def references_candidate(self, *, user_id: str, project_name: str, candidate_id: str) -> bool: ...
+
+
+@runtime_checkable
+class ActiveAttemptReferenceCheck(Protocol):
+    async def has_active_attempt_for_candidate(self, *, user_id: str, project_name: str, candidate_id: str) -> bool: ...
+
+
+@runtime_checkable
+class RetainedReceiptReferenceCheck(Protocol):
+    async def has_retained_receipt_for_candidate(
+        self, *, user_id: str, project_name: str, candidate_id: str
+    ) -> bool: ...
+
+
+@runtime_checkable
+class IncompleteBackupReferenceCheck(Protocol):
+    async def has_incomplete_backup_referencing(
+        self, *, user_id: str, project_name: str, candidate_id: str
+    ) -> bool: ...
+
+
 __all__ = [
+    "ActiveAttemptReferenceCheck",
     "CommandReceiptRepository",
     "ExecutionAttemptRepository",
     "ExecutionAttemptService",
+    "IncompleteBackupReferenceCheck",
+    "MasterHeadReferenceCheck",
     "ProviderExecutionAdapter",
+    "RetainedReceiptReferenceCheck",
 ]
