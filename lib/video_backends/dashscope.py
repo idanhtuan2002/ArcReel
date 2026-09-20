@@ -62,6 +62,7 @@ from lib.video_backends.base import (
     should_retry_submit,
     submit_post,
 )
+from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -714,16 +715,38 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
         # 服务端但响应在途丢失）转 AmbiguousSubmitError 终态失败，避免自动重试重复建任务 + 重复计费；
         # >=400 由其落 body 日志 + raise_for_status 抛 HTTPStatusError（保留 status_code 供咽喉层识别
         # 413 降档），交 should_retry_submit 按状态码分流——4xx fail-fast、5xx/429 重试。
-        resp = await submit_post(
-            lambda: client.post(
-                f"{self._request_base_url}{_VIDEO_ENDPOINT}",
-                json=payload,
-                headers=dashscope_headers(self._api_key, async_mode=True),
-            ),
-            provider=PROVIDER_DASHSCOPE,
-            request=request,
+        async def _submit():
+            resp = await submit_post(
+                lambda: client.post(
+                    f"{self._request_base_url}{_VIDEO_ENDPOINT}",
+                    json=payload,
+                    headers=dashscope_headers(self._api_key, async_mode=True),
+                ),
+                provider=PROVIDER_DASHSCOPE,
+                request=request,
+            )
+            task_id = extract_task_id(resp.json())
+            return accepted_submit_receipt(task_id, provider_job_id=task_id)
+
+        if request is None:
+            resp = await submit_post(
+                lambda: client.post(
+                    f"{self._request_base_url}{_VIDEO_ENDPOINT}",
+                    json=payload,
+                    headers=dashscope_headers(self._api_key, async_mode=True),
+                ),
+                provider=PROVIDER_DASHSCOPE,
+            )
+            return extract_task_id(resp.json())
+        return await submit_video_attempt(
+            request,
+            provider_id=PROVIDER_DASHSCOPE,
+            provider_model_id=self._model,
+            backend_model_id=self._model,
+            endpoint_id="video-synthesis",
+            submitted_base_url=self._request_base_url,
+            submit=_submit,
         )
-        return extract_task_id(resp.json())
 
     async def _poll_once(self, client: httpx.AsyncClient, task_id: str, base_url: str) -> dict:
         resp = await client.get(

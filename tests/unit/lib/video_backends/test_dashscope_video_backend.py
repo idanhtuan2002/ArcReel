@@ -20,6 +20,7 @@ from lib.video_backends.base import (
 )
 from tests.fakes import bounded_poll_clock, captured_provider_job_ids
 from tests.http_capture import capture_http
+from tests.unit.lib.video_backends.attempt_bound_support import RecordingAttemptSubmitter
 
 
 def _resp(json_body: dict, status_code: int = 200) -> MagicMock:
@@ -109,6 +110,28 @@ def _ref(tmp_path: Path, name: str) -> Path:
     p = tmp_path / name
     p.write_bytes(b"\x89PNG\r\nfake")
     return p
+
+
+async def test_worker_http_submit_is_attempt_bound(tmp_path: Path) -> None:
+    from lib.video_backends.dashscope import DashScopeVideoBackend
+
+    network = AsyncMock(return_value=_resp(_submit("job-1")))
+    client = _client(post=network)
+    submitter = RecordingAttemptSubmitter()
+    request = VideoGenerationRequest(
+        prompt="paper boat",
+        output_path=tmp_path / "out.mp4",
+        task_id="task-1",
+        api_call_id=3,
+        attempt_submitter=submitter,
+    )
+
+    task_id = await DashScopeVideoBackend(api_key="sk")._create_task(client, {"input": {}}, request)
+
+    assert task_id == "job-1"
+    assert request.execution_id == "execution-1"
+    assert submitter.calls[0]["request"].host_task_ref == "task-1"
+    network.assert_awaited_once()
 
 
 class TestCapabilities:
@@ -549,6 +572,7 @@ class TestResume:
                 output_path=tmp_path / "o.mp4",
                 resolution="720p",
                 task_id="worker-task",
+                attempt_submitter=RecordingAttemptSubmitter(),
                 poll_timeout_seconds=1800,
             )
             from lib.video_backends.dashscope import DashScopeVideoBackend
@@ -629,7 +653,11 @@ class TestPersist:
             b = DashScopeVideoBackend(api_key="sk", model="happyhorse-1.0-i2v")
             await b.generate(
                 VideoGenerationRequest(
-                    prompt="p", output_path=tmp_path / "o.mp4", resolution="720p", task_id="db-task-1"
+                    prompt="p",
+                    output_path=tmp_path / "o.mp4",
+                    resolution="720p",
+                    task_id="db-task-1",
+                    attempt_submitter=RecordingAttemptSubmitter(),
                 )
             )
         assert [(r["task_id"], r["job_id"], r["provider"]) for r in persisted] == [
@@ -1185,7 +1213,11 @@ class TestWan3:
             b = self._backend(wan3_base_url="https://maas-a.example.com/ws-1/api/v1")
             await b.generate(
                 VideoGenerationRequest(
-                    prompt="p", output_path=tmp_path / "o.mp4", resolution="720p", task_id="db-task-1"
+                    prompt="p",
+                    output_path=tmp_path / "o.mp4",
+                    resolution="720p",
+                    task_id="db-task-1",
+                    attempt_submitter=RecordingAttemptSubmitter(),
                 )
             )
 
@@ -1238,7 +1270,11 @@ class TestCustomProviderBaseUrlReplay:
             backend = self._wrapped("https://custom-a.example.com")
             await backend.generate(
                 VideoGenerationRequest(
-                    prompt="p", output_path=tmp_path / "o.mp4", resolution="720p", task_id="db-task-c1"
+                    prompt="p",
+                    output_path=tmp_path / "o.mp4",
+                    resolution="720p",
+                    task_id="db-task-c1",
+                    attempt_submitter=RecordingAttemptSubmitter(),
                 )
             )
 

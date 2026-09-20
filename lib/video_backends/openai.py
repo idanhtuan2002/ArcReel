@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from lib.aspect_size import VIDEO_TIER_SHORT_EDGE, parse_aspect_ratio, resolution_to_short_edge
+from lib.config.url_utils import OFFICIAL_OPENAI_BASE_URL
 from lib.logging_utils import format_kwargs_for_log
 from lib.openai_shared import OPENAI_RETRYABLE_ERRORS, create_openai_client
 from lib.providers import PROVIDER_OPENAI
@@ -25,6 +26,7 @@ from lib.video_backends.base import (
     poll_with_retry,
     with_artifact_retry,
 )
+from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +132,7 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
 
     def __init__(self, *, api_key: str | None = None, model: str | None = None, base_url: str | None = None):
         self._client = create_openai_client(api_key=api_key, base_url=base_url)
+        self._base_url = (base_url or "").strip().rstrip("/") or OFFICIAL_OPENAI_BASE_URL
         self._model = model or DEFAULT_MODEL
 
     @property
@@ -181,7 +184,7 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
         logger.info("OpenAI 视频生成开始: model=%s, seconds=%s", self._model, kwargs["seconds"])
         logger.info("调用 %s 视频 SDK kwargs=%s", self.name, format_kwargs_for_log(kwargs))
 
-        video = await self._create_video(**kwargs)
+        video = await self._create_video(request=request, **kwargs)
         # submit 成功立即持久化 job_id；持久化失败抛 → finally mark_failed。
         # 非 worker 路径（grid / 直生 / 测试）request.task_id 为 None，统一点内跳过持久化。
         await self._persist_provider_job_id(request, video.id, provider=PROVIDER_OPENAI)
@@ -238,9 +241,24 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
         )
 
     @with_retry_async(retryable_errors=OPENAI_RETRYABLE_ERRORS)
-    async def _create_video(self, **kwargs):
+    async def _create_video(self, *, request: VideoGenerationRequest | None = None, **kwargs):
         """仅创建视频任务（带重试）；轮询交由 _poll_until_complete 自管。"""
-        return await self._client.videos.create(**kwargs)
+
+        async def _submit():
+            video = await self._client.videos.create(**kwargs)
+            return accepted_submit_receipt(video, provider_job_id=video.id)
+
+        if request is None:
+            return (await _submit()).value
+        return await submit_video_attempt(
+            request,
+            provider_id=PROVIDER_OPENAI,
+            provider_model_id=self._model,
+            backend_model_id=self._model,
+            endpoint_id="videos.create",
+            submitted_base_url=getattr(self, "_base_url", OFFICIAL_OPENAI_BASE_URL),
+            submit=_submit,
+        )
 
     async def _poll_until_complete(self, video_id: str, poll_timeout_seconds: int):
         """轮询任务直到状态归一到终态。

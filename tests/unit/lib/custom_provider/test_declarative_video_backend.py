@@ -28,6 +28,7 @@ from lib.video_backends.base import (
 from tests.factories import custom_endpoint_definition
 from tests.fakes import bounded_poll_clock
 from tests.http_capture import capture_http, request_json
+from tests.unit.lib.video_backends.attempt_bound_support import RecordingAttemptSubmitter
 
 
 def _definition() -> dict:
@@ -50,6 +51,35 @@ def _request(tmp_path: Path, **overrides) -> VideoGenerationRequest:
 
 
 class TestDeclarativeVideoBackend:
+    async def test_worker_declarative_submit_is_attempt_bound(self, tmp_path: Path):
+        submitter = RecordingAttemptSubmitter()
+        request = _request(
+            tmp_path,
+            task_id="task-1",
+            api_call_id=5,
+            attempt_submitter=submitter,
+        )
+        backend = DeclarativeVideoBackend(
+            api_key="secret",
+            base_url="https://relay.test",
+            model="video-x",
+            definition=_definition(),
+            provider="custom-1",
+        )
+        context = backend._request_context(request, require_declared_inputs=True)
+
+        with capture_http() as router:
+            submit = router.post("https://relay.test/v1/video/create").mock(
+                return_value=httpx.Response(200, json={"task_id": "job-42"})
+            )
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                task_id = await backend._submit(client, context, request)
+
+        assert task_id == "job-42"
+        assert request.execution_id == "execution-1"
+        assert submitter.calls[0]["request"].host_task_ref == "task-1"
+        assert submit.call_count == 1
+
     async def test_definition_drives_submit_poll_download_and_usage(self, tmp_path: Path):
         with capture_http() as router, bounded_poll_clock():
             submit = router.post("https://relay.test/v1/video/create").mock(
@@ -719,7 +749,13 @@ class TestDeclarativeVideoBackend:
                 model="video-x",
                 definition=_definition(),
                 provider="custom-1",
-            ).generate(_request(tmp_path, task_id="task-1"))
+            ).generate(
+                _request(
+                    tmp_path,
+                    task_id="task-1",
+                    attempt_submitter=RecordingAttemptSubmitter(),
+                )
+            )
 
         assert persisted[-1]["base_url"] == "https://relay.test"
 

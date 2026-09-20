@@ -28,6 +28,7 @@ from lib.video_backends.base import (
     poll_with_retry,
     with_artifact_retry,
 )
+from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -98,11 +99,13 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
                 location="global",
                 credentials=self._credentials,
             )
+            self._submitted_base_url = f"vertex://{self._project_id}/global"
         else:
             api_key = resolve_gemini_api_key(api_key)
             effective_base_url = normalize_base_url(base_url)
             http_options = {"base_url": effective_base_url} if effective_base_url else None
             self._client = _genai.Client(api_key=api_key, http_options=http_options)  # type: ignore[arg-type]
+            self._submitted_base_url = effective_base_url or "https://generativelanguage.googleapis.com"
 
     @property
     def name(self) -> str:
@@ -273,7 +276,29 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
                 }
             ),
         )
-        operation = await self._client.aio.models.generate_videos(model=self._video_model, source=source, config=config)
+
+        async def _submit():
+            operation = await self._client.aio.models.generate_videos(
+                model=self._video_model, source=source, config=config
+            )
+            op_name = getattr(operation, "name", None)
+            if not op_name:
+                raise RuntimeError("Gemini 提交成功但未返回 operation.name，无法持久化 provider_job_id")
+            return accepted_submit_receipt(operation, provider_job_id=op_name)
+
+        operation = await submit_video_attempt(
+            request,
+            provider_id=PROVIDER_GEMINI,
+            provider_model_id=self._video_model,
+            backend_model_id=self._video_model,
+            endpoint_id="generate_videos",
+            submitted_base_url=getattr(
+                self,
+                "_submitted_base_url",
+                "https://generativelanguage.googleapis.com",
+            ),
+            submit=_submit,
+        )
         op_name = getattr(operation, "name", "unknown")
         logger.info("视频生成已提交, operation=%s", op_name)
         return operation

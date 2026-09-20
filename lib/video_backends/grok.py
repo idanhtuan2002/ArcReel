@@ -20,6 +20,7 @@ from lib.video_backends.base import (
     VideoGenerationResult,
     download_video,
 )
+from lib.video_backends.execution_adapter import submit_video_attempt, terminal_submit_receipt
 
 logger = logging.getLogger(__name__)
 
@@ -137,4 +138,17 @@ class GrokVideoBackend:
 
         logger.info("Grok 视频生成开始: model=%s, duration=%ds", self._model, request.duration_seconds)
         logger.info("调用 %s 视频 SDK kwargs=%s", self.name, format_kwargs_for_log(generate_kwargs))
-        return await self._client.video.generate(**generate_kwargs)
+
+        async def _submit():
+            response = await self._client.video.generate(**generate_kwargs)
+            return terminal_submit_receipt(response, evidence_value=getattr(response, "url", "completed"))
+
+        return await submit_video_attempt(
+            request,
+            provider_id=PROVIDER_GROK,
+            provider_model_id=self._model,
+            backend_model_id=self._model,
+            endpoint_id="video.generate",
+            submitted_base_url="https://api.x.ai",
+            submit=_submit,
+        )

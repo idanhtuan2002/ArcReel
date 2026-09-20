@@ -25,6 +25,7 @@ from lib.video_backends.base import (
 )
 from tests.fakes import bounded_poll_clock, captured_provider_job_ids
 from tests.http_capture import capture_http, only_request, request_json
+from tests.unit.lib.video_backends.attempt_bound_support import RecordingAttemptSubmitter
 
 _BASE_URL = "https://x/v1"
 _GATEWAY_BASE_URL = "https://apihub.agnes-ai.com/v1"
@@ -665,7 +666,12 @@ class TestResume:
             routes.submit.mock(return_value=_queued("task-download"))
             routes.poll.mock(return_value=_json(_completed("task-download", "https://cdn.agnes/resumed.mp4")))
             routes.download.mock(side_effect=download_response)
-            request = _request(tmp_path, task_id="worker-task", poll_timeout_seconds=1800)
+            request = _request(
+                tmp_path,
+                task_id="worker-task",
+                attempt_submitter=RecordingAttemptSubmitter(),
+                poll_timeout_seconds=1800,
+            )
             backend = AgnesVideoBackend(api_key="k", base_url=_BASE_URL)
 
             with pytest.raises(ArtifactDownloadError) as caught:
@@ -759,7 +765,13 @@ class TestProviderJobIdPersistence:
             routes.poll.mock(return_value=_json(_completed("agnes-task-42")))
 
             backend = AgnesVideoBackend(api_key="k", base_url=_BASE_URL)
-            await backend.generate(_request(tmp_path, task_id="worker-task-99"))
+            await backend.generate(
+                _request(
+                    tmp_path,
+                    task_id="worker-task-99",
+                    attempt_submitter=RecordingAttemptSubmitter(),
+                )
+            )
 
         assert persisted == [
             {

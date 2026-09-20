@@ -44,6 +44,7 @@ from lib.video_backends.base import (
     should_retry_submit,
     submit_post,
 )
+from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -123,16 +124,30 @@ class KlingBackendBase:
         # 非幂等「建任务 + 计费」POST：submit_post 把歧义传输错误转 AmbiguousSubmitError 终态失败，
         # 避免重试重复建任务 + 重复计费；>=400 抛 HTTPStatusError 交 should_retry_submit 按状态码分流。
         # ``request`` 只有视频通道传（图片通道不做供应商响应留痕）。
-        resp = await submit_post(
-            lambda: client.post(
-                f"{self._base_url}/{endpoint_path}",
-                json=payload,
-                headers=self._headers(),
-            ),
-            provider=PROVIDER_KLING,
-            request=request,
+        async def _submit():
+            resp = await submit_post(
+                lambda: client.post(
+                    f"{self._base_url}/{endpoint_path}",
+                    json=payload,
+                    headers=self._headers(),
+                ),
+                provider=PROVIDER_KLING,
+                request=request,
+            )
+            task_id = extract_kling_task_id(resp.json())
+            return accepted_submit_receipt(task_id, provider_job_id=task_id)
+
+        if request is None:
+            return (await _submit()).value
+        return await submit_video_attempt(
+            request,
+            provider_id=PROVIDER_KLING,
+            provider_model_id=self._model,
+            backend_model_id=self._model,
+            endpoint_id="videos.create",
+            submitted_base_url=self._base_url,
+            submit=_submit,
         )
-        return extract_kling_task_id(resp.json())
 
     async def _poll_query(self, client: httpx.AsyncClient, endpoint_path: str) -> dict:
         resp = await client.get(

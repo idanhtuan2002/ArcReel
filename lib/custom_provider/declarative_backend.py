@@ -55,6 +55,7 @@ from lib.video_backends.base import (
     url_origin,
     with_artifact_retry,
 )
+from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 
 _HTTP_TIMEOUT_SECONDS = 60
 logger = logging.getLogger(__name__)
@@ -405,36 +406,47 @@ class DeclarativeVideoBackend(ProviderJobIdPersistenceMixin):
     ) -> str:
         section = self._definition["submit"]
 
-        async def operation() -> httpx.Response:
-            async def post() -> httpx.Response:
-                response = await self._send_without_status(client, section, context)
-                if response.status_code >= 400:
-                    await self._record_response(response, request, "submit")
-                return response
+        async def _submit():
+            async def operation() -> httpx.Response:
+                async def post() -> httpx.Response:
+                    response = await self._send_without_status(client, section, context)
+                    if response.status_code >= 400:
+                        await self._record_response(response, request, "submit")
+                    return response
 
-            return await submit_post(
-                post,
-                provider=self._provider,
-            )
+                return await submit_post(
+                    post,
+                    provider=self._provider,
+                )
 
-        response = await retry_async(operation, retry_if=should_retry_submit)
-        body = await self._response_body(response, request, "submit")
-        try:
-            job_id = extract_value(section["extract"]["task_id"], body)
-            error = extract_text(section["extract"].get("error"), body)
-        except JsonPathEvaluationError as exc:
-            raise DeclarativeRuntimeError("declarative_response_extract_failed", detail=exc.message) from exc
-        except (TypeError, ValueError) as exc:
-            raise DeclarativeRuntimeError("declarative_response_extract_failed", detail=str(exc)) from exc
-        # accept="scalar" 的定义可以命中数字或布尔，格式说明的口径是「按字符串化交给下游」；
-        # 这里按 str 收，与产物地址、result_id 的取值口径一致。
-        task_id = str(job_id).strip() if job_id is not None and not isinstance(job_id, (list, dict)) else ""
-        if not task_id:
-            raise DeclarativeRuntimeError(
-                "declarative_response_extract_failed",
-                detail=error or "submit response did not contain a provider task id",
-            )
-        return task_id
+            response = await retry_async(operation, retry_if=should_retry_submit)
+            body = await self._response_body(response, request, "submit")
+            try:
+                job_id = extract_value(section["extract"]["task_id"], body)
+                error = extract_text(section["extract"].get("error"), body)
+            except JsonPathEvaluationError as exc:
+                raise DeclarativeRuntimeError("declarative_response_extract_failed", detail=exc.message) from exc
+            except (TypeError, ValueError) as exc:
+                raise DeclarativeRuntimeError("declarative_response_extract_failed", detail=str(exc)) from exc
+            # accept="scalar" 的定义可以命中数字或布尔，格式说明的口径是「按字符串化交给下游」；
+            # 这里按 str 收，与产物地址、result_id 的取值口径一致。
+            task_id = str(job_id).strip() if job_id is not None and not isinstance(job_id, (list, dict)) else ""
+            if not task_id:
+                raise DeclarativeRuntimeError(
+                    "declarative_response_extract_failed",
+                    detail=error or "submit response did not contain a provider task id",
+                )
+            return accepted_submit_receipt(task_id, provider_job_id=task_id)
+
+        return await submit_video_attempt(
+            request,
+            provider_id=self._provider,
+            provider_model_id=self._model,
+            backend_model_id=self._model,
+            endpoint_id="declarative-video-submit",
+            submitted_base_url=self._render(section, context).url,
+            submit=_submit,
+        )
 
     async def _send_without_status(
         self,

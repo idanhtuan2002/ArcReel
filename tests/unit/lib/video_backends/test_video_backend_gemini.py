@@ -13,6 +13,7 @@ from lib.video_backends.base import (
     VideoGenerationResult,
 )
 from tests.fakes import bounded_poll_clock
+from tests.unit.lib.video_backends.attempt_bound_support import RecordingAttemptSubmitter
 
 
 class _RecordingRateLimiter:
@@ -124,6 +125,26 @@ def _make_done_operation(video_uri="gs://bucket/video.mp4"):
 
 
 class TestGeminiVideoBackendGenerate:
+    async def test_worker_sdk_submit_is_attempt_bound(self, gemini_backend, tmp_path):
+        operation = _make_done_operation()
+        operation.name = "operations/job-1"
+        gemini_backend._client.aio.models.generate_videos = AsyncMock(return_value=operation)
+        submitter = RecordingAttemptSubmitter()
+        request = VideoGenerationRequest(
+            prompt="paper boat",
+            output_path=tmp_path / "out.mp4",
+            task_id="task-1",
+            api_call_id=9,
+            attempt_submitter=submitter,
+        )
+
+        result = await gemini_backend._create_task(request)
+
+        assert result is operation
+        assert request.execution_id == "execution-1"
+        assert submitter.calls[0]["request"].host_task_ref == "task-1"
+        gemini_backend._client.aio.models.generate_videos.assert_awaited_once()
+
     async def test_generate_text_to_video(self, gemini_backend, tmp_path):
         output = tmp_path / "out.mp4"
 

@@ -28,6 +28,7 @@ from lib.video_backends.kling import KlingVideoBackend
 from lib.video_backends.registry import effective_generate_audio_for_model
 from tests.fakes import bounded_poll_clock, captured_provider_job_ids
 from tests.http_capture import capture_http, only_request
+from tests.unit.lib.video_backends.attempt_bound_support import RecordingAttemptSubmitter
 
 _SECRET = "s" * 40
 _BASE_URL = "https://api-beijing.klingai.com/v1"
@@ -85,6 +86,25 @@ def _request(tmp_path: Path, **overrides) -> VideoGenerationRequest:
     }
     kwargs.update(overrides)
     return VideoGenerationRequest(**kwargs)
+
+
+async def test_worker_kling_submit_is_attempt_bound(tmp_path: Path) -> None:
+    submitter = RecordingAttemptSubmitter()
+    request = _request(
+        tmp_path,
+        task_id="task-1",
+        api_call_id=4,
+        attempt_submitter=submitter,
+    )
+    with _kling_api() as routes:
+        routes.submit.mock(return_value=_resp(_submit("job-1")))
+        async with httpx.AsyncClient() as client:
+            task_id = await _jwt_backend()._submit_task(client, "videos/text2video", {"prompt": "p"}, request)
+
+    assert task_id == "job-1"
+    assert request.execution_id == "execution-1"
+    assert submitter.calls[0]["request"].host_task_ref == "task-1"
+    assert routes.submit.call_count == 1
 
 
 class TestConstructionAndCapabilities:
@@ -561,7 +581,9 @@ class TestGenerateHappyPath:
             routes.poll.mock(return_value=_resp(_query("succeed", url=_DOWNLOAD_URL)))
             routes.download.mock(return_value=httpx.Response(200, content=b""))
 
-            await _jwt_backend().generate(_request(tmp_path, task_id="local-task-1"))
+            await _jwt_backend().generate(
+                _request(tmp_path, task_id="local-task-1", attempt_submitter=RecordingAttemptSubmitter())
+            )
 
         # 持久化的是「子路径:task_id:有声标志」，resume 据此复原查询端点（text2video 因无首帧）+ 有声决策（turbo 恒 0）
         assert [(r["task_id"], r["job_id"]) for r in persisted] == [("local-task-1", "text2video:task-x:0")]
@@ -574,7 +596,14 @@ class TestGenerateHappyPath:
             routes.poll.mock(return_value=_resp(_query("succeed", url=_DOWNLOAD_URL)))
             routes.download.mock(return_value=httpx.Response(200, content=b""))
 
-            await _jwt_backend().generate(_request(tmp_path, task_id="local-task-2", start_image=img))
+            await _jwt_backend().generate(
+                _request(
+                    tmp_path,
+                    task_id="local-task-2",
+                    start_image=img,
+                    attempt_submitter=RecordingAttemptSubmitter(),
+                )
+            )
 
         # 有首帧 → image2video 前缀编入 job_id，resume 才能查对端点
         assert [r["job_id"] for r in persisted] == ["image2video:task-i:0"]
@@ -593,7 +622,12 @@ class TestResume:
             routes.submit.mock(return_value=_resp(_submit("task-download")))
             routes.poll.mock(return_value=_resp(_query("succeed", url="https://x/r.mp4")))
             routes.download.mock(side_effect=download_response)
-            request = _request(tmp_path, task_id="worker-task", poll_timeout_seconds=1800)
+            request = _request(
+                tmp_path,
+                task_id="worker-task",
+                poll_timeout_seconds=1800,
+                attempt_submitter=RecordingAttemptSubmitter(),
+            )
 
             with pytest.raises(ArtifactDownloadError) as caught:
                 await _jwt_backend().generate(request)
@@ -723,7 +757,13 @@ class TestAudioGatingResult:
         # submit 时算定的有声决策编入 job_id（v2-6 pro 有声 → 末段 :1），resume 据此直连计费
         with self._succeeding("task-c"), captured_provider_job_ids() as persisted:
             await _jwt_backend("kling-v2-6").generate(
-                _request(tmp_path, task_id="local-a", service_tier="pro", generate_audio=True)
+                _request(
+                    tmp_path,
+                    task_id="local-a",
+                    service_tier="pro",
+                    generate_audio=True,
+                    attempt_submitter=RecordingAttemptSubmitter(),
+                )
             )
 
         assert [r["job_id"] for r in persisted] == ["text2video:task-c:1"]

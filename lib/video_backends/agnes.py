@@ -56,6 +56,7 @@ from lib.video_backends.base import (
     should_retry_submit,
     submit_post,
 )
+from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -419,17 +420,31 @@ class AgnesVideoBackend(ProviderJobIdPersistenceMixin):
         # 非幂等的「建任务 + 计费」POST：submit_post 把歧义传输错误转 AmbiguousSubmitError 终态失败，
         # 避免重试重复建任务 + 重复计费；>=400 抛 HTTPStatusError 交 should_retry_submit 按状态码分流
         # （5xx/408/429 重试——含上游繁忙 503；确定性 4xx 快失败）。submit 用长超时覆盖上游长阻塞。
-        resp = await submit_post(
-            lambda: client.post(
-                f"{self._base_url}{_VIDEOS_ENDPOINT}",
-                json=payload,
-                headers=agnes_headers(self._api_key),
-                timeout=_SUBMIT_TIMEOUT_SECONDS,
-            ),
-            provider=PROVIDER_AGNES,
-            request=request,
+        async def _submit():
+            resp = await submit_post(
+                lambda: client.post(
+                    f"{self._base_url}{_VIDEOS_ENDPOINT}",
+                    json=payload,
+                    headers=agnes_headers(self._api_key),
+                    timeout=_SUBMIT_TIMEOUT_SECONDS,
+                ),
+                provider=PROVIDER_AGNES,
+                request=request,
+            )
+            task_id = _extract_task_id(resp.json())
+            return accepted_submit_receipt(task_id, provider_job_id=task_id)
+
+        if request is None:
+            return (await _submit()).value
+        return await submit_video_attempt(
+            request,
+            provider_id=PROVIDER_AGNES,
+            provider_model_id=self._model,
+            backend_model_id=self._model,
+            endpoint_id="videos.create",
+            submitted_base_url=self._base_url,
+            submit=_submit,
         )
-        return _extract_task_id(resp.json())
 
     async def _poll_once(self, client: httpx.AsyncClient, task_id: str) -> dict:
         resp = await client.get(

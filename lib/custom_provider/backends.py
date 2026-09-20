@@ -210,9 +210,12 @@ class CustomVideoBackend:
         # 注入实际执行的 endpoint，让下游协议 backend 在 submit 后与 job_id 一并持久化——
         # 续跑据此判定协议是否已被换掉。replace 而非就地改写：request 由调用方持有，
         # 包装层不该留下副作用。
-        if self._endpoint is not None:
-            request = replace(request, execution_endpoint=self._endpoint)
-        return await self._delegate.generate(request)
+        delegated_request = (
+            replace(request, execution_endpoint=self._endpoint) if self._endpoint is not None else request
+        )
+        result = await self._delegate.generate(delegated_request)
+        request.execution_id = delegated_request.execution_id
+        return result
 
     async def resume_video(self, job_id: str, request: VideoGenerationRequest) -> VideoGenerationResult:
         # 透传到下游 backend；下游不支持 resume 时抛 NotImplementedError，

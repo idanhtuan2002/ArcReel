@@ -27,7 +27,9 @@ from lib.video_backends.base import (
     should_retry_submit,
     submit_post,
 )
+from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 from lib.vidu_shared import (
+    VIDU_BASE_URL,
     VIDU_RETRYABLE_ERRORS,
     assert_vidu_body_size,
     create_vidu_client,
@@ -170,7 +172,7 @@ class ViduVideoBackend:
         base_url: str | None = None,
     ):
         self._api_key = api_key
-        self._base_url = base_url
+        self._base_url = base_url or VIDU_BASE_URL
         self._model = model or DEFAULT_MODEL
 
     @property
@@ -376,16 +378,30 @@ class ViduVideoBackend:
             endpoint,
             format_kwargs_for_log(safe_body_for_log(body)),
         )
+
         # create 是非幂等的「创建 + 计费」调用：submit_post 把歧义态（ReadTimeout 等
         # 「请求可能已送达服务端」）转 AmbiguousSubmitError 终态失败、不重试，仅「请求确定
         # 未送达」的连接建立失败交 should_retry_submit 重试，避免重复建任务 + 重复计费。
         # 413 等 4xx 经 raise_for_status 透出 httpx.HTTPStatusError（保留 status_code），
         # 让咽喉层识别 413 走降档重试；body 由 submit_post 落日志保留可诊断性。
-        resp = await submit_post(lambda: client.post(endpoint, json=body), provider=PROVIDER_VIDU, request=request)
-        data = resp.json()
-        if not data.get("task_id"):
-            raise RuntimeError(f"Vidu 视频任务创建响应缺少 task_id: {data}")
-        return data
+        async def _submit():
+            resp = await submit_post(lambda: client.post(endpoint, json=body), provider=PROVIDER_VIDU, request=request)
+            data = resp.json()
+            if not data.get("task_id"):
+                raise RuntimeError(f"Vidu 视频任务创建响应缺少 task_id: {data}")
+            return accepted_submit_receipt(data, provider_job_id=data["task_id"])
+
+        if request is None:
+            return (await _submit()).value
+        return await submit_video_attempt(
+            request,
+            provider_id=PROVIDER_VIDU,
+            provider_model_id=self._model,
+            backend_model_id=self._model,
+            endpoint_id="video-create",
+            submitted_base_url=self._base_url,
+            submit=_submit,
+        )
 
     async def _download_video(self, url: str, output_path: Path) -> None:
         """下载 CDN 上的成片，重试走共用的产物下载预算。

@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from lib.ark_shared import create_ark_client
+from lib.ark_shared import ARK_BASE_URL, ark_base_url, create_ark_client
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_ARK
 from lib.retry import with_retry_async
@@ -27,6 +27,7 @@ from lib.video_backends.base import (
     reference_audio_to_data_uri,
     should_retry_download,
 )
+from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ class ArkVideoBackend(ProviderJobIdPersistenceMixin):
         base_url: str | None = None,
     ):
         self._client = create_ark_client(api_key=api_key, base_url=base_url)
+        self._base_url = ark_base_url(base_url)
         self._model = model or self.DEFAULT_MODEL
         # service_tier 参数仅 seedance-1.x 等老模型支持；2.0 上游在 r2v 下会 400 拒绝该参数，
         # 必须不下传。2.5 按同代口径一并剔除，该口径系从 2.0 的拒绝行为推断，收窄判定
@@ -412,12 +414,25 @@ class ArkVideoBackend(ProviderJobIdPersistenceMixin):
         logger.info(
             "调用 %s 视频 SDK kwargs=%s", self.name, format_kwargs_for_log(_safe_create_params_for_log(create_params))
         )
-        create_result = await asyncio.to_thread(
-            self._client.content_generation.tasks.create,
-            **create_params,
+
+        async def _submit():
+            create_result = await asyncio.to_thread(
+                self._client.content_generation.tasks.create,
+                **create_params,
+            )
+            return accepted_submit_receipt(create_result.id, provider_job_id=create_result.id)
+
+        task_id = await submit_video_attempt(
+            request,
+            provider_id=PROVIDER_ARK,
+            provider_model_id=self._model,
+            backend_model_id=self._model,
+            endpoint_id="content-generation-tasks",
+            submitted_base_url=getattr(self, "_base_url", ARK_BASE_URL),
+            submit=_submit,
         )
-        logger.info("Ark 任务已创建: %s", create_result.id)
-        return create_result.id
+        logger.info("Ark 任务已创建: %s", task_id)
+        return task_id
 
     @staticmethod
     async def _download_video_with_retry(video_url: str, output_path) -> None:
