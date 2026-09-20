@@ -7,7 +7,6 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 
-from lib.custom_provider import is_custom_provider
 from lib.db.base import utc_now
 from r2.contracts.host_hardening import ProviderCapabilityProfile
 from r2.host_hardening.provider_capabilities import (
@@ -90,7 +89,10 @@ PAID_ASYNC_SUBMIT_FAMILIES = (
 
 
 def _normalized_provider_id(provider_id: str) -> str:
-    return CUSTOM_PROVIDER_FAMILY if is_custom_provider(provider_id) else provider_id
+    # Deliberately duplicates lib.custom_provider.CUSTOM_PROVIDER_PREFIX's "custom-" literal
+    # instead of importing it: lib.video_backends.execution_adapter reaches this module, and
+    # lib.video_backends must not depend on lib.custom_provider (import-linter layering).
+    return CUSTOM_PROVIDER_FAMILY if provider_id.startswith("custom-") else provider_id
 
 
 def _family_by_key(key: SubmitRouteKey) -> PaidAsyncSubmitFamily | None:
