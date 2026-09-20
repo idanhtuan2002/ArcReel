@@ -99,10 +99,8 @@ the receipt as "someone else's identical command won, replay theirs").
 ### Task D2: Build the route-to-adapter registry (structural proof, one real backend)
 
 **Files:** new module (suggest `r2/host_hardening/adapter_registry.py`), one
-real video backend's translation layer (pick the backend already used in
-M7-A's attempt-bound submit tests to minimize new surface --
-check `tests/integration/lib/video_backends/test_kling_video_backend.py`'s
-fixtures first), tests.
+real video backend's translation layer (Kling -- its submit route now
+disambiguates by subpath, `cecd2cff`), tests.
 
 **Interfaces:** `resolve_backend_execution_functions(route: ProviderRouteSnapshot)
 -> BackendExecutionFunctions`, keyed by `(route.provider_id, route.adapter_version)`
@@ -111,11 +109,46 @@ for submit. This directly answers the `NotImplementedError` comment left at
 `r2/host_hardening/host_submit.py:112` ("polling is owned by the backend
 adapter registered for this route").
 
-- [ ] Research first: read the chosen backend's existing internal poll/cancel
-  logic (inside its `generate`/`resume_video` implementation) to identify the
-  exact function(s) to wrap -- do not write new HTTP polling logic, wrap the
-  existing one, per `execution_adapter.py`'s own docstring ("wiring... is
-  that translation layer's job, reused as-is rather than duplicated here").
+**Research completed 2026-09-21 -- findings that shape the implementation:**
+
+- **The registry must be async and resolver-dependent, not a pure lookup.**
+  Backends are built by `lib/backend_assembly/assembler.py::assemble_backend`
+  (`provider_id`, `media_type`, `model_id`, `resolver`) which loads credentials
+  from current config. Credentials *should* be current (secrets rotate); only
+  the route *identity* is pinned. So the registry signature needs a resolver
+  (or a small port wrapping it), not just the route.
+- **`assemble_backend` cannot pin `submitted_base_url`.** It builds base_url
+  from current config with no override parameter. Built-in backends also do
+  **not** read `VideoGenerationRequest.submitted_base_url` (only
+  `lib/custom_provider/declarative_backend.py:332` honors it: `request.submitted_base_url
+  or self._base_url`). Pinning the submitted base URL therefore needs either an
+  explicit `base_url=` at construction (every built-in backend constructor
+  already accepts one, e.g. `KlingVideoBackend(..., base_url=...)`, so prefer
+  `lib/video_backends/registry.py::create_backend` with an explicit
+  `base_url=route.submitted_base_url`) or a new override parameter on
+  `assemble_backend`. Do not mutate a constructed backend's private `_base_url`.
+- **Wrap the single-shot poll, not the poll-until-terminal loop.** `PollFn` is
+  one call -> one `ProviderObservation`; the caller owns the loop. Kling's
+  `_poll_until_terminal` (`lib/kling_backend_base.py:160`) loops *and*
+  `KlingVideoBackend._poll_and_build` also downloads in the same call. The right
+  seam is `KlingBackendBase._poll_query(client, f"videos/{subpath}/{task_id}")`
+  -- one GET, raw dict -- translated via the existing
+  `lib/kling_shared.py` predicates (`is_kling_task_terminal`,
+  `kling_task_status`, `kling_task_failure_reason`) into a `ProviderObservation`.
+  Do not re-implement those predicates.
+- **Kling has no provider-side cancel.** Confirmed in code (no cancel endpoint
+  anywhere in `lib/kling_backend_base.py` / `lib/video_backends/kling.py`) and
+  in its registry profile (`supports_cancel: false`). Leave `cancel=None`.
+- **`generate_audio` is not recoverable from the attempt.** Kling's legacy
+  resume path needs it for correct pricing and reads it from its own encoded
+  legacy job id (`subpath:task_id:audio`, `_encode_job_id`), but the
+  host-hardening attempt stores only the raw `task_id`
+  (`accepted_submit_receipt(task_id, provider_job_id=task_id)`). Task D3's ledger
+  finalization must therefore source it from the legacy `tasks` row for the same
+  `task_id`, not from `AttemptSnapshot`. Decide in D3 whether that bridge is
+  acceptable or whether the attempt should carry it.
+
+- [ ] Write failing tests: registry resolves the expected `BackendExecutionFunctions`
 - [ ] Write failing tests: registry resolves the expected `BackendExecutionFunctions`
   for a known route; an unregistered `(provider_id, adapter_version)` pair
   raises a typed error (never silently falls back to a different backend);
