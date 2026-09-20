@@ -95,6 +95,10 @@ class ExecutionAttemptRepository(Protocol):
         fence: AttemptLeaseFence,
     ) -> AttemptSnapshot: ...
 
+    async def list_lease_expired(
+        self, *, states: frozenset[ExecutionAttemptState], before: datetime, limit: int = 100
+    ) -> list[tuple[str, str, AttemptSnapshot]]: ...
+
 
 @runtime_checkable
 class CommandReceiptRepository(Protocol):

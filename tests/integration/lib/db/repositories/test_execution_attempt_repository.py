@@ -641,3 +641,99 @@ async def test_command_receipt_repository_round_trips(session_factory: Factory) 
             )
             is None
         )
+
+
+# --- list_lease_expired (H5 recovery scan) ------------------------------------------------
+
+
+async def test_list_lease_expired_finds_a_stale_submitting_attempt_across_scopes(
+    session_factory: Factory,
+) -> None:
+    # transition_worker below re-checks the lease against the real wall clock
+    # (utc_now(), not injectable), so its TTL is anchored to a freshly taken
+    # timestamp here rather than the module-level REAL_NOW -- under a slow,
+    # heavily parallel full-suite run, REAL_NOW (captured at import/collection
+    # time) could already be more than 5 real seconds in the past by the time
+    # this test body actually executes.
+    now = datetime.now(UTC)
+    async with session_factory() as session:
+        repo = _repo(session)
+        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt())
+        # Live (5s ahead of `now`) when acquired and transitioned -- a real worker
+        # would use a much longer TTL. The scan below uses a `before` cutoff past
+        # that expiry to deterministically simulate "enough real time has since
+        # passed", without an actual sleep.
+        submitting_lease = await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=planned.state_version,
+            owner="worker-a",
+            expires_at=now + timedelta(seconds=5),
+        )
+        await repo.transition_worker(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=submitting_lease.execution_id,
+            expected_version=submitting_lease.state_version,
+            expected_states=frozenset({ExecutionAttemptState.PLANNED}),
+            new_state=ExecutionAttemptState.SUBMITTING,
+            fence=AttemptLeaseFence(owner="worker-a", token=submitting_lease.lease_token or 0),
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        expired = await _repo(session).list_lease_expired(
+            states=frozenset({ExecutionAttemptState.SUBMITTING}), before=now + timedelta(seconds=10)
+        )
+
+    assert len(expired) == 1
+    found_user, found_project, found_snapshot = expired[0]
+    assert found_user == USER
+    assert found_project == PROJECT
+    assert found_snapshot.execution_id == "exec-1"
+    assert found_snapshot.state is ExecutionAttemptState.SUBMITTING
+
+
+async def test_list_lease_expired_excludes_an_attempt_with_a_live_lease(session_factory: Factory) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt())
+        await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=planned.state_version,
+            owner="worker-a",
+            expires_at=REAL_NOW + timedelta(minutes=5),
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        expired = await _repo(session).list_lease_expired(
+            states=frozenset({ExecutionAttemptState.PLANNED}), before=REAL_NOW
+        )
+
+    assert expired == []
+
+
+async def test_list_lease_expired_excludes_states_not_asked_for(session_factory: Factory) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt())
+        await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=planned.state_version,
+            owner="worker-a",
+            expires_at=REAL_NOW - timedelta(seconds=1),
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        expired = await _repo(session).list_lease_expired(
+            states=frozenset({ExecutionAttemptState.SUBMITTING}), before=REAL_NOW
+        )
+
+    assert expired == []

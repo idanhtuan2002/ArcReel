@@ -21,11 +21,11 @@ pattern.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from lib.db.base import utc_now
-from lib.db.repositories.host_hardening import ExecutionAttemptRepository
+from lib.db.repositories.host_hardening import ExecutionAttemptFencingError, ExecutionAttemptRepository
 from lib.video_backends.base import AmbiguousSubmitError
 from r2.contracts.execution import ProviderRequest
 from r2.contracts.host_hardening import (
@@ -46,6 +46,16 @@ _NEEDS_OPERATOR_NO_SAFE_RECONCILIATION = "no_safe_reconciliation"
 _NEEDS_OPERATOR_AMBIGUOUS_LOOKUP = "ambiguous_lookup"
 _NEEDS_OPERATOR_NOT_FOUND_NOT_AUTHORITATIVE = "not_found_not_authoritative"
 _NEEDS_OPERATOR_CONFLICTING_FACT = "conflicting_terminal_fact"
+
+# H5 recovery scan (M7-C): a worker that dies mid-flight leaves its attempt in one
+# of these states with a lease that will expire and never be renewed. The outcome
+# is unknown either way -- the network call may or may not have reached the
+# provider -- so both map to their existing *_OUTCOME_UNKNOWN state, never
+# straight to a terminal one.
+RECOVERABLE_EXPIRED_STATES: dict[ExecutionAttemptState, ExecutionAttemptState] = {
+    ExecutionAttemptState.SUBMITTING: ExecutionAttemptState.SUBMIT_OUTCOME_UNKNOWN,
+    ExecutionAttemptState.CANCEL_REQUESTED: ExecutionAttemptState.CANCEL_OUTCOME_UNKNOWN,
+}
 
 
 class ExecutionAttemptNotFoundError(LookupError):
@@ -258,9 +268,68 @@ class ExecutionAttemptServiceImpl:
             operator_reason=reason_code,
         )
 
+    async def reconcile_expired(self, *, before: datetime | None = None, limit: int = 100) -> list[ReconcileResult]:
+        """H5 recovery scan: find every attempt whose worker died mid-flight --
+        lease expired while still ``SUBMITTING``/``CANCEL_REQUESTED`` -- reclaim
+        each one's lease under a fresh scanner-owned fence, transition it to the
+        matching ``*_OUTCOME_UNKNOWN`` state, then hand it to the existing
+        :meth:`reconcile` qualified-lookup path.
+
+        A candidate whose lease another worker or scanner already reclaimed
+        (a fencing race, since the exact same query can return the same row to
+        two concurrent scans) is skipped, not retried -- whoever holds the
+        lease now owns resolving it, and re-attempting here would just lose the
+        fence again.
+        """
+        cutoff = before or utc_now()
+        candidates = await self._repository.list_lease_expired(
+            states=frozenset(RECOVERABLE_EXPIRED_STATES), before=cutoff, limit=limit
+        )
+        results: list[ReconcileResult] = []
+        for user_id, project_name, snapshot in candidates:
+            target_state = RECOVERABLE_EXPIRED_STATES[snapshot.state]
+            try:
+                leased, fence = await self._acquire_fence(
+                    user_id=user_id,
+                    project_name=project_name,
+                    execution_id=snapshot.execution_id,
+                    expected_version=snapshot.state_version,
+                )
+            except ExecutionAttemptFencingError:
+                continue
+            try:
+                unknown = await self._repository.transition_worker(
+                    user_id=user_id,
+                    project_name=project_name,
+                    execution_id=snapshot.execution_id,
+                    expected_version=leased.state_version,
+                    expected_states=frozenset({snapshot.state}),
+                    new_state=target_state,
+                    fence=fence,
+                )
+                # reconcile() below acquires its own fresh fence under a new
+                # owner id; releasing this one first is what makes that
+                # acquisition see an unheld lease instead of racing its own
+                # still-live 300s lease under a different owner.
+                released = await self._repository.release_lease(
+                    user_id=user_id,
+                    project_name=project_name,
+                    execution_id=unknown.execution_id,
+                    expected_version=unknown.state_version,
+                    fence=fence,
+                )
+                await self._commit()
+            except ExecutionAttemptFencingError:
+                continue
+            results.append(
+                await self.reconcile(user_id=user_id, project_name=project_name, execution_id=released.execution_id)
+            )
+        return results
+
 
 __all__ = [
     "DEFAULT_LEASE_TTL_SECONDS",
+    "RECOVERABLE_EXPIRED_STATES",
     "ExecutionAttemptNotFoundError",
     "ExecutionAttemptServiceImpl",
 ]

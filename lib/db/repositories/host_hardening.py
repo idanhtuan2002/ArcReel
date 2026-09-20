@@ -381,6 +381,29 @@ class ExecutionAttemptRepository:
             )
         return await self._require_snapshot(user_id=user_id, project_name=project_name, execution_id=execution_id)
 
+    async def list_lease_expired(
+        self, *, states: frozenset[ExecutionAttemptState], before: datetime, limit: int = 100
+    ) -> list[tuple[str, str, AttemptSnapshot]]:
+        """Unscoped recovery-scan query (mirrors ``TaskRepository.list_orphan_tasks_on_start``):
+        every attempt in *states* whose lease already expired, across every user/project,
+        oldest first. Returns ``(user_id, project_name, snapshot)`` because
+        :class:`AttemptSnapshot` itself is scope-neutral and a caller acting on the
+        result needs the exact scope to re-acquire the lease."""
+
+        rows = (
+            await self.session.execute(
+                select(ExecutionAttemptModel)
+                .where(
+                    ExecutionAttemptModel.state.in_([state.value for state in states]),
+                    ExecutionAttemptModel.lease_expires_at.is_not(None),
+                    ExecutionAttemptModel.lease_expires_at <= before,
+                )
+                .order_by(ExecutionAttemptModel.lease_expires_at.asc())
+                .limit(limit)
+            )
+        ).scalars()
+        return [(row.user_id, row.project_name, _snapshot_from_row(row)) for row in rows]
+
     # --- provider-observation authority ----------------------------------------------
 
     async def apply_provider_observation(
