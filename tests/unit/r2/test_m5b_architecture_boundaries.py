@@ -104,10 +104,13 @@ def test_narrative_plan_service_cannot_reach_canon_authoritative_writes() -> Non
 def test_only_the_plan_service_calls_plan_authoritative_writes() -> None:
     # ``insert_version`` / ``advance_head`` names are shared with the Canon repository, so
     # the two Canon-write files are also exempt; each plan-allowlist file is separately
-    # asserted (below) to carry no Canon authority symbol.
+    # asserted (below) to carry no Canon authority symbol. ``advance_head`` is also the
+    # unrelated M7-B atomic-master-promotion CAS method name
+    # (r2/host_hardening/promotion.py calls MasterAuthorityRepository.advance_head).
     allowed = _PLAN_WRITE_ALLOWED | {
         "r2/narrative/canon_transaction.py",
         "lib/db/repositories/canon_repo.py",
+        "r2/host_hardening/promotion.py",
     }
     offenders: set[str] = set()
     for root in ("r2", "server", "lib"):

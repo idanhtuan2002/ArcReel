@@ -832,6 +832,26 @@ class MasterAuthorityRepository:
         if rowcount(result) != 1:
             raise MasterHeadConflictError(f"locked master authority {artifact_key!r} changed unexpectedly")
 
+    async def append_promoted_event(self, *, user_id: str, project_name: str, snapshot: MasterHeadSnapshot) -> None:
+        self.session.add(
+            ProjectEventModel(
+                user_id=user_id,
+                project_name=project_name,
+                task_id=None,
+                execution_id=None,
+                event_type=ProjectEventType.MASTER_PROMOTED.value,
+                state_version=snapshot.master_version,
+                public_payload_json={
+                    "artifact_key": snapshot.artifact_key,
+                    "master_version": snapshot.master_version,
+                    "candidate_id": snapshot.candidate_id,
+                },
+                payload_schema_version=1,
+                dedupe_key=f"master:{snapshot.artifact_key}:{snapshot.master_version}",
+            )
+        )
+        await self.session.flush()
+
 
 class PromotionReceiptRepository:
     def __init__(self, session: AsyncSession) -> None:

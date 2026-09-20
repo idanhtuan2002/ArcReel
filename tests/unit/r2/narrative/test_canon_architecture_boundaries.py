@@ -17,7 +17,8 @@ _NARRATIVE_DIR = _ROOT / "r2" / "narrative"
 _AUTHORITY_WRITE_ATTRS = {"insert_branch", "insert_delta", "insert_version", "advance_head", "lock_branch"}
 # ``insert_version`` / ``advance_head`` names are also used by the SEPARATE NarrativePlan
 # authority repository, and ``insert_branch`` by the SEPARATE M6 adaptation evidence
-# repository. These files are allowlisted and additionally asserted to carry no Canon
+# repository. ``advance_head`` is also the unrelated M7-B atomic-master-promotion CAS
+# method name. These files are allowlisted and additionally asserted to carry no Canon
 # authority symbol, so a second Canon writer cannot hide among them.
 _CANON_WRITE_CALLERS = {"r2/narrative/canon_transaction.py", "lib/db/repositories/canon_repo.py"}
 _PLAN_AUTHORITY_FILES = {
@@ -25,6 +26,7 @@ _PLAN_AUTHORITY_FILES = {
     "lib/db/repositories/narrative_plan.py",
     "lib/db/narrative_plan_uow.py",
     "r2/adaptation/evidence.py",
+    "r2/host_hardening/promotion.py",
 }
 _CANON_AUTHORITY_SYMBOLS = ("CanonWriteRepositoryPort", "CanonRepository", "CanonAuthorityUnitOfWork")
 _AUTHORITY_ONLY_SYMBOLS = (

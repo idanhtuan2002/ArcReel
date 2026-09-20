@@ -15,11 +15,14 @@ from r2.contracts.host_hardening import (
     AttemptSnapshot,
     CommandReceipt,
     ExecutionAttemptState,
+    MasterHeadSnapshot,
     OperatorResolutionReceipt,
     PlannedExecutionAttempt,
+    PromotionReceipt,
     ProviderCapabilityProfile,
     ProviderObservation,
     ReconcileResult,
+    VerifiedCandidateObject,
 )
 
 
@@ -160,13 +163,64 @@ class IncompleteBackupReferenceCheck(Protocol):
     ) -> bool: ...
 
 
+# --- H3-H4 atomic master promotion (B3) ------------------------------------------------
+
+
+@runtime_checkable
+class CandidateObjectPort(Protocol):
+    async def get_exact(
+        self, *, user_id: str, project_name: str, candidate_id: str
+    ) -> VerifiedCandidateObject | None: ...
+
+
+@runtime_checkable
+class MasterAuthorityPort(Protocol):
+    async def get_current(self, *, user_id: str, project_name: str, artifact_key: str) -> MasterHeadSnapshot | None: ...
+
+    async def get_current_version(self, *, user_id: str, project_name: str, artifact_key: str) -> int: ...
+
+    async def insert_head_version(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        master_head_version_id: str,
+        snapshot: MasterHeadSnapshot,
+        promoted_at: datetime,
+    ) -> None: ...
+
+    async def advance_head(
+        self, *, user_id: str, project_name: str, artifact_key: str, expected_current_version: int, new_version: int
+    ) -> None: ...
+
+    async def append_promoted_event(self, *, user_id: str, project_name: str, snapshot: MasterHeadSnapshot) -> None: ...
+
+
+@runtime_checkable
+class PromotionReceiptPort(Protocol):
+    async def get_exact(
+        self, *, user_id: str, project_name: str, artifact_key: str, command_id: str
+    ) -> PromotionReceipt | None: ...
+
+    async def add(self, *, user_id: str, project_name: str, receipt: PromotionReceipt) -> None: ...
+
+
+@runtime_checkable
+class MasterResolver(Protocol):
+    async def get_exact(self, *, user_id: str, project_name: str, artifact_key: str) -> MasterHeadSnapshot | None: ...
+
+
 __all__ = [
     "ActiveAttemptReferenceCheck",
+    "CandidateObjectPort",
     "CommandReceiptRepository",
     "ExecutionAttemptRepository",
     "ExecutionAttemptService",
     "IncompleteBackupReferenceCheck",
+    "MasterAuthorityPort",
     "MasterHeadReferenceCheck",
+    "MasterResolver",
+    "PromotionReceiptPort",
     "ProviderExecutionAdapter",
     "RetainedReceiptReferenceCheck",
 ]
