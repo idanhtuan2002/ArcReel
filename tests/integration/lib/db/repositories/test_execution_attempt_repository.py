@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.host_hardening import (
+    CommandReceiptConflictError,
     CommandReceiptRepository,
     ExecutionAttemptFencingError,
     ExecutionAttemptRepository,
@@ -18,6 +19,7 @@ from lib.db.repositories.host_hardening import (
 )
 from r2.contracts.host_hardening import (
     AttemptLeaseFence,
+    AttemptSnapshot,
     CommandReceipt,
     ExecutionAttemptState,
     OperatorResolutionAction,
@@ -709,6 +711,173 @@ async def test_command_receipt_repository_round_trips(session_factory: Factory) 
             )
             is None
         )
+
+
+# --- request_cancel (cancel-intent authority) ---------------------------------------------
+
+
+async def _bring_to_accepted(repo: ExecutionAttemptRepository, *, execution_id: str, owner: str) -> AttemptSnapshot:
+    planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt(execution_id=execution_id))
+    leased = await repo.acquire_lease(
+        user_id=USER,
+        project_name=PROJECT,
+        execution_id=planned.execution_id,
+        expected_version=planned.state_version,
+        owner=owner,
+        expires_at=REAL_NOW + timedelta(minutes=5),
+    )
+    fence = AttemptLeaseFence(owner=owner, token=leased.lease_token or 0)
+    submitting = await repo.transition_worker(
+        user_id=USER,
+        project_name=PROJECT,
+        execution_id=planned.execution_id,
+        expected_version=leased.state_version,
+        expected_states=frozenset({ExecutionAttemptState.PLANNED}),
+        new_state=ExecutionAttemptState.SUBMITTING,
+        fence=fence,
+    )
+    observation = ProviderObservation(
+        observation_id=f"obs-{execution_id}",
+        kind=ProviderObservationKind.ACCEPTED,
+        observed_at=NOW,
+        provider_sequence=None,
+        provider_job_id=f"remote-{execution_id}",
+        reason_code=None,
+        evidence_digest="sha256:" + "c" * 64,
+    )
+    return await repo.apply_provider_observation(
+        user_id=USER,
+        project_name=PROJECT,
+        execution_id=planned.execution_id,
+        expected_version=submitting.state_version,
+        observation=observation,
+    )
+
+
+async def test_request_cancel_moves_an_accepted_attempt_without_a_lease(session_factory: Factory) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        accepted = await _bring_to_accepted(repo, execution_id="exec-1", owner="worker-a")
+        # No lease is held at all by the time the cancel request arrives -- the
+        # worker that submitted it may have long since released/expired it.
+        cancelled_intent = await repo.request_cancel(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=accepted.execution_id,
+            expected_version=accepted.state_version,
+            actor_scope="user:alice",
+            command_id="cancel-1",
+            command_digest="sha256:" + "1" * 64,
+        )
+
+    assert cancelled_intent.state is ExecutionAttemptState.CANCEL_REQUESTED
+    assert cancelled_intent.state_version == accepted.state_version + 1
+
+
+async def test_request_cancel_rejects_an_attempt_that_is_not_accepted_or_running(session_factory: Factory) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt())
+        with pytest.raises(ExecutionAttemptTransitionError):
+            await repo.request_cancel(
+                user_id=USER,
+                project_name=PROJECT,
+                execution_id=planned.execution_id,
+                expected_version=planned.state_version,
+                actor_scope="user:alice",
+                command_id="cancel-1",
+                command_digest="sha256:" + "1" * 64,
+            )
+
+
+async def test_request_cancel_exact_replay_is_idempotent(session_factory: Factory) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        accepted = await _bring_to_accepted(repo, execution_id="exec-1", owner="worker-a")
+        first = await repo.request_cancel(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=accepted.execution_id,
+            expected_version=accepted.state_version,
+            actor_scope="user:alice",
+            command_id="cancel-1",
+            command_digest="sha256:" + "1" * 64,
+        )
+        second = await repo.request_cancel(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=accepted.execution_id,
+            expected_version=accepted.state_version,
+            actor_scope="user:alice",
+            command_id="cancel-1",
+            command_digest="sha256:" + "1" * 64,
+        )
+
+    assert second.state is ExecutionAttemptState.CANCEL_REQUESTED
+    assert second.state_version == first.state_version
+
+
+async def test_request_cancel_rejects_a_reused_command_id_with_a_different_digest(
+    session_factory: Factory,
+) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        accepted = await _bring_to_accepted(repo, execution_id="exec-1", owner="worker-a")
+        await repo.request_cancel(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=accepted.execution_id,
+            expected_version=accepted.state_version,
+            actor_scope="user:alice",
+            command_id="cancel-1",
+            command_digest="sha256:" + "1" * 64,
+        )
+        with pytest.raises(CommandReceiptConflictError):
+            await repo.request_cancel(
+                user_id=USER,
+                project_name=PROJECT,
+                execution_id=accepted.execution_id,
+                expected_version=accepted.state_version,
+                actor_scope="user:alice",
+                command_id="cancel-1",
+                command_digest="sha256:" + "2" * 64,
+            )
+
+
+async def test_request_cancel_concurrent_commands_has_exactly_one_winner(session_factory: Factory) -> None:
+    await _skip_unless_postgres(session_factory)
+    async with session_factory() as setup_session:
+        accepted = await _bring_to_accepted(_repo(setup_session), execution_id="exec-1", owner="worker-a")
+        await setup_session.commit()
+
+    barrier = asyncio.Barrier(2)
+
+    async def _try_cancel(command_id: str) -> AttemptSnapshot | Exception:
+        async with session_factory() as session:
+            await barrier.wait()
+            try:
+                snapshot = await _repo(session).request_cancel(
+                    user_id=USER,
+                    project_name=PROJECT,
+                    execution_id=accepted.execution_id,
+                    expected_version=accepted.state_version,
+                    actor_scope="user:alice",
+                    command_id=command_id,
+                    command_digest="sha256:" + "1" * 64,
+                )
+                await session.commit()
+                return snapshot
+            except ExecutionAttemptFencingError as exc:
+                await session.rollback()
+                return exc
+
+    results = await asyncio.wait_for(
+        asyncio.gather(_try_cancel("cancel-a"), _try_cancel("cancel-b"), return_exceptions=False), timeout=10.0
+    )
+    winners = [r for r in results if isinstance(r, AttemptSnapshot)]
+    losers = [r for r in results if isinstance(r, Exception)]
+    assert len(winners) == 1
+    assert len(losers) == 1
 
 
 # --- list_lease_expired (H5 recovery scan) ------------------------------------------------

@@ -99,6 +99,18 @@ class ExecutionAttemptRepository(Protocol):
         self, *, states: frozenset[ExecutionAttemptState], before: datetime, limit: int = 100
     ) -> list[tuple[str, str, AttemptSnapshot]]: ...
 
+    async def request_cancel(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        execution_id: str,
+        expected_version: int,
+        actor_scope: str,
+        command_id: str,
+        command_digest: str,
+    ) -> AttemptSnapshot: ...
+
 
 @runtime_checkable
 class CommandReceiptRepository(Protocol):

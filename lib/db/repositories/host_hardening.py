@@ -38,6 +38,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from lib.content_digest import canonical_json_digest
 from lib.db.base import utc_now
 from lib.db.models.host_hardening import (
     BackupSetMediaRefModel,
@@ -70,6 +71,7 @@ from r2.contracts.host_hardening import (
     ProviderObservation,
     ProviderRouteSnapshot,
     VerifiedCandidateObject,
+    command_receipt_result_envelope,
 )
 from r2.host_hardening.transitions import fold_observation, is_legal_transition, validate_exact_replay
 
@@ -93,6 +95,11 @@ class ExecutionAttemptFencingError(RuntimeError):
 
 class ExecutionAttemptTransitionError(ValueError):
     """A requested worker transition or operator resolution is not a legal edge."""
+
+
+class CommandReceiptConflictError(RuntimeError):
+    """A command_id was replayed with a different command_digest -- the same
+    idempotency key reused for a materially different request."""
 
 
 def _stored_aware(value: datetime) -> datetime:
@@ -590,6 +597,96 @@ class ExecutionAttemptRepository:
         if rowcount(result) != 1:
             raise ExecutionAttemptFencingError(
                 f"resolve_operator_review lost its fence for execution {execution_id!r} despite holding its "
+                f"row lock -- expected_version={expected_version}"
+            )
+        new_snapshot = await self._require_snapshot(
+            user_id=user_id, project_name=project_name, execution_id=execution_id
+        )
+        await self._append_project_event(new_snapshot, user_id=user_id, project_name=project_name)
+        return new_snapshot
+
+    # --- cancel-intent authority ------------------------------------------------------
+    # A fourth write authority, distinct from worker/provider/operator: an external
+    # cancel request (API/user) never holds the current worker's lease, so it cannot
+    # go through transition_worker. It writes intent only -- calling the provider's
+    # own cancel endpoint, if any, is the recovery poller's job once it observes
+    # CANCEL_REQUESTED on an attempt whose lease is gone (spec: "cancel ghi intent
+    # trước, gọi provider sau").
+
+    async def request_cancel(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        execution_id: str,
+        expected_version: int,
+        actor_scope: str,
+        command_id: str,
+        command_digest: str,
+    ) -> AttemptSnapshot:
+        existing_receipt = await CommandReceiptRepository(self.session).get_exact(
+            user_id=user_id, project_name=project_name, actor_scope=actor_scope, command_id=command_id
+        )
+        if existing_receipt is not None:
+            if existing_receipt.command_digest != command_digest:
+                raise CommandReceiptConflictError(
+                    f"command {command_id!r} was already used for a different cancel request"
+                )
+            return await self._require_snapshot(user_id=user_id, project_name=project_name, execution_id=execution_id)
+
+        row = await self._scalar(
+            select(ExecutionAttemptModel)
+            .where(
+                ExecutionAttemptModel.user_id == user_id,
+                ExecutionAttemptModel.project_name == project_name,
+                ExecutionAttemptModel.execution_id == execution_id,
+                ExecutionAttemptModel.state_version == expected_version,
+            )
+            .with_for_update()
+        )
+        if row is None:
+            raise ExecutionAttemptFencingError(
+                f"request_cancel: execution {execution_id!r} is not at expected_version={expected_version}"
+            )
+        snapshot = _snapshot_from_row(row)
+        if snapshot.state not in (ExecutionAttemptState.ACCEPTED, ExecutionAttemptState.RUNNING):
+            raise ExecutionAttemptTransitionError(
+                f"execution {execution_id!r} is {snapshot.state}, not ACCEPTED/RUNNING -- "
+                "cancel intent only applies to an attempt the provider has already accepted"
+            )
+
+        now = utc_now()
+        envelope = command_receipt_result_envelope(
+            task_id=snapshot.task_id, result={"execution_id": execution_id, "resolved_state": "CANCEL_REQUESTED"}
+        )
+        receipt = CommandReceipt(
+            actor_scope=actor_scope,
+            command_id=command_id,
+            command_digest=command_digest,
+            task_id=snapshot.task_id,
+            result_digest="sha256:" + canonical_json_digest(envelope, allow_nan=False),
+            created_at=now,
+        )
+        await CommandReceiptRepository(self.session).add(user_id=user_id, project_name=project_name, receipt=receipt)
+        await self.session.flush()
+
+        result = await self.session.execute(
+            update(ExecutionAttemptModel)
+            .where(
+                ExecutionAttemptModel.user_id == user_id,
+                ExecutionAttemptModel.project_name == project_name,
+                ExecutionAttemptModel.execution_id == execution_id,
+                ExecutionAttemptModel.state_version == expected_version,
+            )
+            .values(
+                state=ExecutionAttemptState.CANCEL_REQUESTED.value,
+                state_version=expected_version + 1,
+                updated_at=now,
+            )
+        )
+        if rowcount(result) != 1:
+            raise ExecutionAttemptFencingError(
+                f"request_cancel lost its fence for execution {execution_id!r} despite holding its "
                 f"row lock -- expected_version={expected_version}"
             )
         new_snapshot = await self._require_snapshot(
