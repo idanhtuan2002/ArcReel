@@ -130,6 +130,7 @@ def _expected_row(**overrides: Any) -> dict[str, Any]:
         "id": 1,
         "user_id": "default",
         "project_name": "demo",
+        "execution_id": None,
         "call_type": "image",
         "model": "",
         "prompt": None,
