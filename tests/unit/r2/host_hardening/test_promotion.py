@@ -3,6 +3,7 @@ boundary, exact command replay, and conflicting replay."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import pytest
@@ -90,9 +91,15 @@ class _FakeReceipts:
 
 
 def _service(
-    *, candidates: _FakeCandidates, authorities: _FakeAuthorities, receipts: _FakeReceipts
+    *,
+    candidates: _FakeCandidates,
+    authorities: _FakeAuthorities,
+    receipts: _FakeReceipts,
+    notify: Callable[[], None] = lambda: None,
 ) -> AtomicPromotionService:
-    return AtomicPromotionService(candidates=candidates, authorities=authorities, receipts=receipts, clock=lambda: NOW)
+    return AtomicPromotionService(
+        candidates=candidates, authorities=authorities, receipts=receipts, clock=lambda: NOW, notify=notify
+    )
 
 
 async def test_promote_appends_a_version_advances_the_head_and_records_a_receipt() -> None:
@@ -223,3 +230,73 @@ async def test_promote_rejects_a_conflicting_replay_of_the_same_command_id() -> 
             approval_record="approval-1",
             command_id="cmd-1",
         )
+
+
+async def test_promote_calls_notify_only_after_the_commit() -> None:
+    candidates = _FakeCandidates(_candidate("cand-1"))
+    authorities = _FakeAuthorities()
+    receipts = _FakeReceipts()
+    calls: list[str] = []
+
+    async def _commit() -> None:
+        calls.append("commit")
+
+    def _notify() -> None:
+        calls.append("notify")
+
+    service = AtomicPromotionService(
+        candidates=candidates,
+        authorities=authorities,
+        receipts=receipts,
+        clock=lambda: NOW,
+        commit=_commit,
+        notify=_notify,
+    )
+
+    await service.promote(
+        user_id=USER,
+        project_name=PROJECT,
+        artifact_key=ARTIFACT_KEY,
+        candidate_id="cand-1",
+        expected_master_version=0,
+        approval_record="approval-1",
+        command_id="cmd-1",
+    )
+
+    assert calls == ["commit", "notify"]
+
+
+async def test_promote_does_not_notify_on_a_conflicting_replay() -> None:
+    candidates = _FakeCandidates(_candidate("cand-1"), _candidate("cand-2"))
+    authorities = _FakeAuthorities()
+    receipts = _FakeReceipts()
+    notified = False
+
+    def _notify() -> None:
+        nonlocal notified
+        notified = True
+
+    service = _service(candidates=candidates, authorities=authorities, receipts=receipts, notify=_notify)
+    await service.promote(
+        user_id=USER,
+        project_name=PROJECT,
+        artifact_key=ARTIFACT_KEY,
+        candidate_id="cand-1",
+        expected_master_version=0,
+        approval_record="approval-1",
+        command_id="cmd-1",
+    )
+    notified = False  # reset after the real promotion's own (expected) notify
+
+    with pytest.raises(PromotionReceiptReplayMismatchError):
+        await service.promote(
+            user_id=USER,
+            project_name=PROJECT,
+            artifact_key=ARTIFACT_KEY,
+            candidate_id="cand-2",
+            expected_master_version=0,
+            approval_record="approval-1",
+            command_id="cmd-1",
+        )
+
+    assert notified is False

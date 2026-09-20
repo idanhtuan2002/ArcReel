@@ -65,6 +65,7 @@ class AtomicPromotionService:
         clock: Callable[[], datetime],
         master_head_version_id_factory: Callable[[], str] = lambda: str(uuid.uuid4()),
         commit: Callable[[], Awaitable[None]] = _no_commit,
+        notify: Callable[[], None] = lambda: None,
     ) -> None:
         self._candidates = candidates
         self._authorities = authorities
@@ -72,6 +73,12 @@ class AtomicPromotionService:
         self._clock = clock
         self._master_head_version_id_factory = master_head_version_id_factory
         self._commit = commit
+        # M7-C: a wake-up hint for DurableEventStreamService, called only after
+        # append_promoted_event's row and this method's own commit() are both
+        # durable. Never required for correctness -- the stream's idle-timeout
+        # re-drain converges to the same state without it -- so a caller with no
+        # SSE consumer may leave this as the default no-op.
+        self._notify = notify
 
     async def promote(
         self,
@@ -164,6 +171,7 @@ class AtomicPromotionService:
         )
         await self._authorities.append_promoted_event(user_id=user_id, project_name=project_name, snapshot=snapshot)
         await self._commit()
+        self._notify()
         return snapshot
 
 
