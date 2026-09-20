@@ -290,6 +290,69 @@ async def test_acquire_lease_can_reclaim_an_expired_lease_for_a_new_owner(sessio
         assert reclaimed.lease_owner == "worker-b"
 
 
+async def test_acquire_lease_rejects_a_live_lease_without_force(session_factory: Factory) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        snapshot = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt())
+        live = await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=snapshot.execution_id,
+            expected_version=snapshot.state_version,
+            owner="worker-a",
+            expires_at=REAL_NOW + timedelta(minutes=5),
+        )
+        with pytest.raises(ExecutionAttemptFencingError):
+            await repo.acquire_lease(
+                user_id=USER,
+                project_name=PROJECT,
+                execution_id=snapshot.execution_id,
+                expected_version=live.state_version,
+                owner="worker-b",
+                expires_at=REAL_NOW + timedelta(minutes=5),
+            )
+
+
+async def test_acquire_lease_with_force_seizes_a_live_lease(session_factory: Factory) -> None:
+    """CANCEL_REQUESTED realization's use case: nothing renews a lease during
+    the happy path, so a still-"live" TTL is not evidence a real actor is
+    using it -- force skips that check while state_version CAS still applies."""
+    async with session_factory() as session:
+        repo = _repo(session)
+        snapshot = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt())
+        live = await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=snapshot.execution_id,
+            expected_version=snapshot.state_version,
+            owner="worker-a",
+            expires_at=REAL_NOW + timedelta(minutes=5),
+        )
+        seized = await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=snapshot.execution_id,
+            expected_version=live.state_version,
+            owner="worker-b",
+            expires_at=REAL_NOW + timedelta(minutes=5),
+            force=True,
+        )
+        assert seized.lease_owner == "worker-b"
+
+        # The state_version CAS still applies under force: a stale version is
+        # still rejected, not silently overwritten.
+        with pytest.raises(ExecutionAttemptFencingError):
+            await repo.acquire_lease(
+                user_id=USER,
+                project_name=PROJECT,
+                execution_id=snapshot.execution_id,
+                expected_version=live.state_version,
+                owner="worker-c",
+                expires_at=REAL_NOW + timedelta(minutes=5),
+                force=True,
+            )
+
+
 async def test_transition_worker_happy_path_and_project_event(session_factory: Factory) -> None:
     async with session_factory() as session:
         repo = _repo(session)
@@ -878,6 +941,54 @@ async def test_request_cancel_concurrent_commands_has_exactly_one_winner(session
     losers = [r for r in results if isinstance(r, Exception)]
     assert len(winners) == 1
     assert len(losers) == 1
+
+
+# --- list_pending_cancels ------------------------------------------------------------
+
+
+async def test_list_pending_cancels_finds_a_cancel_requested_attempt_regardless_of_its_lease(
+    session_factory: Factory,
+) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        accepted = await _bring_to_accepted(repo, execution_id="exec-1", owner="worker-a")
+        await repo.request_cancel(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=accepted.execution_id,
+            expected_version=accepted.state_version,
+            actor_scope="user:alice",
+            command_id="cancel-1",
+            command_digest="sha256:" + "1" * 64,
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        pending = await _repo(session).list_pending_cancels()
+
+    assert len(pending) == 1
+    found_user, found_project, found_snapshot = pending[0]
+    assert found_user == USER
+    assert found_project == PROJECT
+    assert found_snapshot.execution_id == "exec-1"
+    assert found_snapshot.state is ExecutionAttemptState.CANCEL_REQUESTED
+
+
+async def test_list_pending_cancels_excludes_every_other_state(session_factory: Factory) -> None:
+    async with session_factory() as session:
+        repo = _repo(session)
+        await repo.plan(
+            user_id=USER,
+            project_name=PROJECT,
+            attempt=_attempt(task_id="task-planned", execution_id="exec-planned"),
+        )
+        await _bring_to_accepted(repo, execution_id="exec-accepted", owner="worker-a")
+        await session.commit()
+
+    async with session_factory() as session:
+        pending = await _repo(session).list_pending_cancels()
+
+    assert pending == []
 
 
 # --- list_lease_expired (H5 recovery scan) ------------------------------------------------

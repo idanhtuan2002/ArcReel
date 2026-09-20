@@ -322,22 +322,36 @@ class ExecutionAttemptRepository:
         expected_version: int,
         owner: str,
         expires_at: datetime,
+        force: bool = False,
     ) -> AttemptSnapshot:
         now = utc_now()
-        result = await self.session.execute(
-            update(ExecutionAttemptModel)
-            .where(
-                ExecutionAttemptModel.user_id == user_id,
-                ExecutionAttemptModel.project_name == project_name,
-                ExecutionAttemptModel.execution_id == execution_id,
-                ExecutionAttemptModel.state_version == expected_version,
+        conditions: list[Any] = [
+            ExecutionAttemptModel.user_id == user_id,
+            ExecutionAttemptModel.project_name == project_name,
+            ExecutionAttemptModel.execution_id == execution_id,
+            ExecutionAttemptModel.state_version == expected_version,
+        ]
+        if not force:
+            conditions.append(
                 or_(
                     ExecutionAttemptModel.lease_owner.is_(None),
                     ExecutionAttemptModel.lease_owner == owner,
                     ExecutionAttemptModel.lease_expires_at.is_(None),
                     ExecutionAttemptModel.lease_expires_at <= now,
-                ),
+                )
             )
+        # ``force`` drops the ownership/liveness check above but keeps the
+        # state_version CAS: two concurrent forced acquires still have exactly
+        # one winner, since only the first to commit still matches
+        # expected_version. It exists for CANCEL_REQUESTED realization, whose
+        # only writer (request_cancel) never touches the lease at all -- a
+        # stale submission-phase lease still nominally "live" (its 300s TTL
+        # not yet elapsed) is not evidence any real actor is using it, so
+        # requiring it to look expired would arbitrarily delay a fresh cancel
+        # intent for no correctness reason.
+        result = await self.session.execute(
+            update(ExecutionAttemptModel)
+            .where(*conditions)
             .values(
                 state_version=expected_version + 1,
                 lease_owner=owner,
@@ -406,6 +420,22 @@ class ExecutionAttemptRepository:
                     ExecutionAttemptModel.lease_expires_at <= before,
                 )
                 .order_by(ExecutionAttemptModel.lease_expires_at.asc())
+                .limit(limit)
+            )
+        ).scalars()
+        return [(row.user_id, row.project_name, _snapshot_from_row(row)) for row in rows]
+
+    async def list_pending_cancels(self, *, limit: int = 100) -> list[tuple[str, str, AttemptSnapshot]]:
+        """Unscoped scan (mirrors ``list_lease_expired``): every ``CANCEL_REQUESTED``
+        attempt, oldest updated first. Deliberately no lease-liveness filter --
+        ``CANCEL_REQUESTED``'s only writer (``request_cancel``) never touches the
+        lease, so every row is immediately realizable, not just the "expired" ones
+        a lease-based filter would find."""
+        rows = (
+            await self.session.execute(
+                select(ExecutionAttemptModel)
+                .where(ExecutionAttemptModel.state == ExecutionAttemptState.CANCEL_REQUESTED.value)
+                .order_by(ExecutionAttemptModel.updated_at.asc())
                 .limit(limit)
             )
         ).scalars()

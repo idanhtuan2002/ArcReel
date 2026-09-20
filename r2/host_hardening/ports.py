@@ -83,6 +83,7 @@ class ExecutionAttemptRepository(Protocol):
         expected_version: int,
         owner: str,
         expires_at: datetime,
+        force: bool = False,
     ) -> AttemptSnapshot: ...
 
     async def release_lease(
@@ -98,6 +99,8 @@ class ExecutionAttemptRepository(Protocol):
     async def list_lease_expired(
         self, *, states: frozenset[ExecutionAttemptState], before: datetime, limit: int = 100
     ) -> list[tuple[str, str, AttemptSnapshot]]: ...
+
+    async def list_pending_cancels(self, *, limit: int = 100) -> list[tuple[str, str, AttemptSnapshot]]: ...
 
     async def request_cancel(
         self,

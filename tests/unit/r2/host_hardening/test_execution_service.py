@@ -132,8 +132,9 @@ class _FakeRepository:
         expected_version: int,
         owner: str,
         expires_at: datetime,
+        force: bool = False,
     ) -> AttemptSnapshot:
-        del user_id, project_name
+        del user_id, project_name, force
         snapshot = self._require(execution_id)
         assert snapshot.state_version == expected_version
         updated = snapshot.model_copy(

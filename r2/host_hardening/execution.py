@@ -27,6 +27,7 @@ from uuid import uuid4
 from lib.db.base import utc_now
 from lib.db.repositories.host_hardening import ExecutionAttemptFencingError, ExecutionAttemptRepository
 from lib.video_backends.base import AmbiguousSubmitError
+from lib.video_backends.execution_adapter import BackendCapabilityUnsupportedError
 from r2.contracts.execution import ProviderRequest
 from r2.contracts.host_hardening import (
     AttemptLeaseFence,
@@ -101,7 +102,7 @@ class ExecutionAttemptServiceImpl:
         self._commit = commit
 
     async def _acquire_fence(
-        self, *, user_id: str, project_name: str, execution_id: str, expected_version: int
+        self, *, user_id: str, project_name: str, execution_id: str, expected_version: int, force: bool = False
     ) -> tuple[AttemptSnapshot, AttemptLeaseFence]:
         owner = self._owner_id_factory()
         leased = await self._repository.acquire_lease(
@@ -111,6 +112,7 @@ class ExecutionAttemptServiceImpl:
             expected_version=expected_version,
             owner=owner,
             expires_at=utc_now() + timedelta(seconds=self._lease_ttl_seconds),
+            force=force,
         )
         await self._commit()
         return leased, AttemptLeaseFence(owner=owner, token=leased.lease_token or 0)
@@ -335,6 +337,103 @@ class ExecutionAttemptServiceImpl:
                 continue
             results.append(
                 await self.reconcile(user_id=user_id, project_name=project_name, execution_id=released.execution_id)
+            )
+        return results
+
+    async def realize_pending_cancels(self, *, limit: int = 100) -> list[ReconcileResult]:
+        """Realize every ``CANCEL_REQUESTED`` attempt's cancel intent against
+        its provider for the first time.
+
+        ``request_cancel`` (an unfenced, external write authority) only ever
+        records the intent -- it never calls the provider. This is the one
+        place that does: acquire a fresh fence, call ``adapter.cancel()``, and
+        fold whatever happens. A backend that does not support cancel leaves
+        the attempt ``CANCEL_REQUESTED`` (never silently ``CANCELLED``) so a
+        human/UI can see the request was never realized; any other failure
+        during the call is ambiguous -- the cancel may have reached the
+        provider -- so it becomes ``CANCEL_OUTCOME_UNKNOWN`` and hands off to
+        the existing :meth:`reconcile` qualified-lookup path, mirroring
+        ``plan_and_submit``'s own ambiguous-vs-definite exception split.
+
+        The fence is acquired with ``force=True``: ``request_cancel`` never
+        touches the lease, so the submission-phase lease can still look
+        nominally "live" (its TTL not yet elapsed) even though nothing is
+        actually using it. Waiting for it to look expired would arbitrarily
+        delay a fresh cancel request for no correctness reason -- the
+        ``state_version`` CAS underneath ``force`` still gives two racing
+        calls exactly one winner.
+        """
+        candidates = await self._repository.list_pending_cancels(limit=limit)
+        results: list[ReconcileResult] = []
+        for user_id, project_name, snapshot in candidates:
+            try:
+                leased, fence = await self._acquire_fence(
+                    user_id=user_id,
+                    project_name=project_name,
+                    execution_id=snapshot.execution_id,
+                    expected_version=snapshot.state_version,
+                    force=True,
+                )
+            except ExecutionAttemptFencingError:
+                continue
+
+            adapter = self._adapter_resolver(snapshot.route)
+            try:
+                observation = await adapter.cancel(leased)
+            except BackendCapabilityUnsupportedError:
+                try:
+                    await self._repository.release_lease(
+                        user_id=user_id,
+                        project_name=project_name,
+                        execution_id=leased.execution_id,
+                        expected_version=leased.state_version,
+                        fence=fence,
+                    )
+                    await self._commit()
+                except ExecutionAttemptFencingError:
+                    pass
+                continue
+            except Exception:
+                try:
+                    unknown = await self._repository.transition_worker(
+                        user_id=user_id,
+                        project_name=project_name,
+                        execution_id=leased.execution_id,
+                        expected_version=leased.state_version,
+                        expected_states=frozenset({ExecutionAttemptState.CANCEL_REQUESTED}),
+                        new_state=ExecutionAttemptState.CANCEL_OUTCOME_UNKNOWN,
+                        fence=fence,
+                    )
+                    released = await self._repository.release_lease(
+                        user_id=user_id,
+                        project_name=project_name,
+                        execution_id=unknown.execution_id,
+                        expected_version=unknown.state_version,
+                        fence=fence,
+                    )
+                    await self._commit()
+                except ExecutionAttemptFencingError:
+                    continue
+                results.append(
+                    await self.reconcile(user_id=user_id, project_name=project_name, execution_id=released.execution_id)
+                )
+                continue
+
+            applied = await self._repository.apply_provider_observation(
+                user_id=user_id,
+                project_name=project_name,
+                execution_id=leased.execution_id,
+                expected_version=leased.state_version,
+                observation=observation,
+            )
+            await self._commit()
+            results.append(
+                ReconcileResult(
+                    execution_id=applied.execution_id,
+                    state=applied.state,
+                    provider_job_id=applied.provider_job_id,
+                    operator_reason=None,
+                )
             )
         return results
 
