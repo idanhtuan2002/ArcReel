@@ -1,0 +1,100 @@
+{
+  "schema_version": "r2-m7b-atomic-promotion-v1",
+  "status": "EXECUTION_RECOVERY_VERIFIED",
+  "status_note": "VERIFIED BY HUMAN OVERRIDE on 2026-09-20 (operator anhtuan), not by an independent Codex standards and spec review, which was explicitly declined by the operator for M7-A and carried forward for M7-B under the same decision. This is a self-review by the same agent that implemented the change, not an independent verdict. Mirrors the M7-A precedent (docs/r2/evidence/R2_M7_A_IDENTITY_IDEMPOTENCY.json) and the M6 precedent before it (docs/r2/evidence/R2_M6_IMPLEMENTATION_HANDOFF.json).",
+  "plan": {
+    "plan_file": "docs/superpowers/plans/2026-09-12-r2-m7b-atomic-promotion.md",
+    "precondition": "Global Constraints: start only at an independently accepted clean M7-A head 7a7c4a0e0001. Satisfied per docs/r2/evidence/R2_M7_A_IDENTITY_IDEMPOTENCY.json (self-reviewed, human override, same disclosure as this file).",
+    "tasks_completed": [
+      "B1 feat(host): add immutable candidate retention boundary (f52025df)",
+      "B2 feat(db): add atomic master head persistence (9c69fe28)",
+      "B3 feat(r2): make master promotion transactionally authoritative (1905bc7d)"
+    ]
+  },
+  "head": {
+    "sha": "1905bc7d644fec5beac4ce06c54d201a939c7ee3",
+    "branch": "feat/r2-m7-host-production-hardening",
+    "worktree": "/home/anhtuan/content-production-os-m7",
+    "parent_base": "7a7c4a0e0001 (M7-A accepted head's exact migration head)",
+    "clean_tree": true
+  },
+  "h3_h4_fault_matrix_evidence": {
+    "source": "docs/research/2026-09-12-r2-m7-host-production-hardening-research.md section 3.2's minimum fault injection list",
+    "before_after_temp_write": "tests/unit/lib/test_candidate_store.py -- disk-full during fsync leaves no final file (test_prepare_candidate_surfaces_disk_full_and_leaves_no_final_file)",
+    "before_after_fsync_put": "same file -- digest mismatch, media-probe failure and cross-mount rename each quarantine or reject before rename, never touching the destination",
+    "after_rename": "test_prepare_candidate_is_idempotent_after_kill_following_rename -- a fresh call after a crash immediately following a successful rename returns the same VerifiedCandidateObject instead of re-writing or conflicting",
+    "before_lock": "not applicable -- MasterAuthorityRepository is purely optimistic (no lock step); see 'concurrent_promotion' below for the actual CAS race proof",
+    "before_db_commit": "tests/integration/lib/db/repositories/test_host_hardening_promotion.py::test_insert_head_version_rejects_a_concurrent_same_version and test_advance_head_rejects_a_stale_expected_version",
+    "immediately_after_commit_before_publish": "MasterAuthorityRepository.append_promoted_event writes the MASTER_PROMOTED project_events row in the same flush/transaction as advance_head, before AtomicPromotionService.promote's own commit() call -- there is no separate publish step that could observe a promoted-but-uneventful state",
+    "duplicate_publish": "project_events.dedupe_key = f'master:{artifact_key}:{master_version}' is unique per (user_id, project_name, dedupe_key); a duplicate MASTER_PROMOTED write for the same version cannot occur because insert_head_version's own unique constraint already rejects a duplicate master_version before the event write is reached",
+    "cas_conflict": "tests/unit/r2/host_hardening/test_promotion.py::test_promote_rejects_a_stale_expected_master_version (fake-driven) and the real-Postgres concurrency test below",
+    "disk_full": "test_prepare_candidate_surfaces_disk_full_and_leaves_no_final_file",
+    "checksum_mismatch": "test_prepare_candidate_rejects_digest_mismatch_and_quarantines",
+    "object_timeout": "not applicable in this iteration -- no object-store adapter exists yet; only the local-filesystem candidate store from spec option B's first branch is implemented",
+    "process_sigkill": "modeled as 'kill after rename' (see after_rename above); a literal SIGKILL mid-test is not exercised, matching this repo's existing convention of modeling crash-recovery via a fresh call/session rather than an actual process kill (see e.g. ExecutionAttemptRepository's own crash-recovery tests)",
+    "concurrent_promotion": "tests/integration/lib/db/repositories/test_host_hardening_promotion.py::test_concurrent_promotion_has_exactly_one_winner -- run against a real isolated PostgreSQL 16 instance this session; exactly one of two concurrent promotions for the same artifact_key wins, the loser's insert_head_version raises MasterHeadConflictError cleanly (no deadlock, no partial state) via a begin_nested() SAVEPOINT"
+  },
+  "candidate_security_and_retention_evidence": {
+    "symlink_escape": "tests/unit/lib/test_candidate_store.py::test_prepare_candidate_rejects_symlink_escape_outside_media_root",
+    "duplicate_unequal_bytes": "test_prepare_candidate_rejects_duplicate_unequal_bytes_without_touching_existing",
+    "retention_policy_four_owners": "tests/unit/r2/host_hardening/test_retention.py -- master head, active attempt (fail-closed placeholder), retained receipt, incomplete backup set, each independently proven to block deletion; short-circuit on first blocker proven",
+    "retention_over_real_repositories": "tests/integration/lib/db/repositories/test_host_hardening_promotion.py::test_retention_policy_over_real_repositories_blocks_a_promoted_candidate",
+    "sanctioned_deletion_path": "r2/host_hardening/retention.py::delete_candidate_if_permitted is the only function in this codebase that removes a candidate object's bytes; tests/unit/r2/host_hardening/test_retention.py proves both the allow and refuse paths and idempotent double-delete"
+  },
+  "master_reader_boundary_and_legacy_projection": {
+    "resolver": "r2/host_hardening/master_resolver.py::DatabaseMasterResolver.get_exact fails closed with M7_MASTER_DIVERGED when a supplied LegacyMasterProjection disagrees with the database head (tests/unit/r2/host_hardening/test_master_resolver.py, 6 cases including 'legacy has an opinion, DB does not')",
+    "reader_inventory_method": "grep across server/ for ProductionApprovalService/ArtifactManifestPort imports, cross-checked with a codebase-memory inbound trace_path from ProductionApprovalService and GoldenAHostIntegration, cross-checked against docs/research/2026-09-17-r2-v1-production-readiness-v2-deferment.md (in the design/r2-m5b-narrative-context worktree)",
+    "reader_inventory_result": "zero master/current-version readers exist in server/ today. The only real call chain (GoldenARunner -> GoldenAComposer/GoldenALocalProducer -> GoldenAHostIntegration.approve -> ProductionApprovalService.promote) runs exclusively through the standalone scripts/r2/run_m3_golden_a.py CLI, never the live FastAPI host.",
+    "deferred_work": [
+      "Delegating ProductionApprovalService.promote() to AtomicPromotionService (would require making it async; it has zero real callers today, so this is not yet forced by anything live)",
+      "A real LegacyMasterProjection adapter bridging ArtifactManifestPort/R2ArtifactMetadata.approved_master to DatabaseMasterResolver",
+      "Wiring these into server/ at all"
+    ],
+    "deferred_to": "M3's own host-integration work, named as V1 P0 item 4 in ADR-0089 (ship-a-bounded-v1-before-v2-portfolio-automation, in the design/r2-m5b-narrative-context worktree) -- 'close the M3 real-media product gap'. Building this now against a target with no live caller would be speculative, not reuse."
+  },
+  "backup_set_scope_note": "backup_sets/backup_set_media_refs persist only the state/reference shape CandidateRetentionPolicy's incomplete-backup check needs (tests/integration/lib/db/repositories/test_host_hardening_promotion.py::test_incomplete_backup_set_blocks_its_referenced_candidate, test_verified_backup_set_does_not_block_its_referenced_candidate). The full backup/restore drill (H6, spec section 8) is M7-D's scope, not implemented here.",
+  "active_attempt_linkage_gap": "ActiveAttemptReferenceCheckImpl (lib/db/repositories/host_hardening.py) is a documented fail-closed placeholder: execution_attempts (A2) and candidate_objects (B1/B2) have no schema linkage yet, so it always answers 'yes, still active' rather than guess. CandidateRetentionPolicy therefore never permits deletion of anything today via this check alone; this is intentional, not a bypass, and is called out explicitly in its own docstring and in the B2 commit message.",
+  "migration": {
+    "current_head": "7b7c4a0e0001",
+    "down_revision": "7a7c4a0e0001",
+    "roundtrip_against_real_postgres": "upgrade head -> upgrade head (no-op) -> downgrade base -> upgrade head against an isolated postgres:16-alpine container: clean, final head 7b7c4a0e0001"
+  },
+  "postgres_identity": {
+    "provisioning": "docker run postgres:16-alpine (container r2-m7b-task-b4-pg), isolated, removed after this evidence run",
+    "host": "127.0.0.1",
+    "port": 55436,
+    "database": "r2_m7b_final",
+    "user": "r2test"
+  },
+  "gate_results": {
+    "ruff_check": "pass (repo-wide)",
+    "ruff_format_check": "pass (1462 files already formatted)",
+    "basedpyright": "0 errors, 0 warnings, 0 notes (repo-wide --warnings)",
+    "lint_imports": "20 kept, 0 broken",
+    "deptry": "no dependency issues found (lib server alembic scripts tests r2)",
+    "pytest_full_sqlite": {
+      "command": "uv run python -m pytest -n 4 --dist loadfile",
+      "passed": 14047,
+      "skipped": 20,
+      "failed": 0,
+      "note": "one interim run during this session showed a failure in tests/unit/scripts/r2/test_verify_m7_scope.py solely due to an uncommitted working tree at that moment; the final run at this exact clean HEAD is 0 failed."
+    },
+    "pytest_postgres_compat": {
+      "command": "uv run python -m pytest -m \"uses_db and not sqlite_only\" -n 4 --dist loadfile (exact CI postgres-compat job selection)",
+      "passed": 961,
+      "skipped": 0,
+      "failed": 0
+    },
+    "audit_tests": "0 violations",
+    "git_diff_check": "clean",
+    "architecture_boundary_regression_found_and_fixed": "r2/host_hardening/promotion.py's advance_head call collided by bare method name with two pre-existing Canon/NarrativePlan architecture-boundary scanners (tests/unit/r2/narrative/test_canon_architecture_boundaries.py, tests/unit/r2/test_m5b_architecture_boundaries.py); fixed by adding it to each scanner's existing documented allowlist, the same pattern already used for the Canon/NarrativePlan name collision."
+  },
+  "coverage_limitations": [
+    "No independent (Codex or otherwise) review was run against this exact HEAD; status is a human/self override per status_note above.",
+    "PostgreSQL testing used a fresh, empty, single-node local container; it does not exercise production-scale connection pooling, replica failover, or the CI runner's exact resource profile.",
+    "Object-store adapter faults (object timeout, S3 conditional-write semantics) are not exercised -- only the local-filesystem candidate store exists.",
+    "ProductionApprovalService/ArtifactManifestPort delegation and a real LegacyMasterProjection are explicitly deferred (see master_reader_boundary_and_legacy_projection.deferred_work); this file does not claim they are done.",
+    "ActiveAttemptReferenceCheckImpl is a fail-closed placeholder, not a real check (see active_attempt_linkage_gap).",
+    "Frontend (pnpm check) and website checks were not run in this session; this evidence covers only the backend gate."
+  ]
+}
