@@ -47,14 +47,26 @@ _NEEDS_OPERATOR_AMBIGUOUS_LOOKUP = "ambiguous_lookup"
 _NEEDS_OPERATOR_NOT_FOUND_NOT_AUTHORITATIVE = "not_found_not_authoritative"
 _NEEDS_OPERATOR_CONFLICTING_FACT = "conflicting_terminal_fact"
 
-# H5 recovery scan (M7-C): a worker that dies mid-flight leaves its attempt in one
-# of these states with a lease that will expire and never be renewed. The outcome
-# is unknown either way -- the network call may or may not have reached the
-# provider -- so both map to their existing *_OUTCOME_UNKNOWN state, never
+# H5 recovery scan (M7-C): a worker that dies mid-flight leaves its attempt
+# SUBMITTING with a lease that will expire and never be renewed. The outcome is
+# unknown either way -- the network call may or may not have reached the
+# provider -- so it maps to its existing *_OUTCOME_UNKNOWN state, never
 # straight to a terminal one.
+#
+# CANCEL_REQUESTED is deliberately NOT here. Unlike SUBMITTING (always entered
+# by transition_worker under a live worker lease that then expires if that
+# worker dies before finishing its own provider call), CANCEL_REQUESTED's only
+# production writer is request_cancel -- an unfenced, external cancel-intent
+# authority (lib.db.repositories.host_hardening) that never attempts a provider
+# call and never touches the lease at all. Treating its (always-stale, since
+# nothing ever renews it) lease as "a worker died mid-call" would fold it
+# straight to CANCEL_OUTCOME_UNKNOWN without ever actually calling the
+# provider's cancel endpoint. Realizing a fresh cancel intent -- calling
+# adapter.cancel() for the first time -- is a distinct operation from
+# reconciling an ambiguous one, and belongs to the recovery poller (a later
+# task), not this state-remap table.
 RECOVERABLE_EXPIRED_STATES: dict[ExecutionAttemptState, ExecutionAttemptState] = {
     ExecutionAttemptState.SUBMITTING: ExecutionAttemptState.SUBMIT_OUTCOME_UNKNOWN,
-    ExecutionAttemptState.CANCEL_REQUESTED: ExecutionAttemptState.CANCEL_OUTCOME_UNKNOWN,
 }
 
 
@@ -270,9 +282,9 @@ class ExecutionAttemptServiceImpl:
 
     async def reconcile_expired(self, *, before: datetime | None = None, limit: int = 100) -> list[ReconcileResult]:
         """H5 recovery scan: find every attempt whose worker died mid-flight --
-        lease expired while still ``SUBMITTING``/``CANCEL_REQUESTED`` -- reclaim
-        each one's lease under a fresh scanner-owned fence, transition it to the
-        matching ``*_OUTCOME_UNKNOWN`` state, then hand it to the existing
+        lease expired while still ``SUBMITTING`` -- reclaim each one's lease
+        under a fresh scanner-owned fence, transition it to
+        ``SUBMIT_OUTCOME_UNKNOWN``, then hand it to the existing
         :meth:`reconcile` qualified-lookup path.
 
         A candidate whose lease another worker or scanner already reclaimed

@@ -19,6 +19,8 @@ from r2.contracts.host_hardening import (
     ProviderCapabilityProfile,
     ProviderIdempotencyMode,
     ProviderNotFoundSemantics,
+    ProviderObservation,
+    ProviderObservationKind,
     ProviderRouteSnapshot,
 )
 from r2.host_hardening.execution import ExecutionAttemptServiceImpl
@@ -205,3 +207,68 @@ async def test_reconcile_expired_recovers_multiple_attempts_across_projects(sess
         results = await _service(session).reconcile_expired()
 
     assert {r.execution_id for r in results} == {"exec-a", "exec-b"}
+
+
+async def test_reconcile_expired_never_touches_a_cancel_requested_attempt(session_factory: Factory) -> None:
+    """CANCEL_REQUESTED's only production writer is the unfenced request_cancel
+    authority, which never attempts a provider call and never renews the
+    lease -- its lease is therefore always "expired" by construction, not
+    evidence a worker died mid-cancel-attempt. reconcile_expired must not fold
+    it to CANCEL_OUTCOME_UNKNOWN without ever calling the provider; realizing
+    the intent is the recovery poller's job (a later task), not this scan."""
+    async with session_factory() as session:
+        repo = _repository(session)
+        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt(execution_id="exec-1"))
+        leased = await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=planned.state_version,
+            owner="worker-a",
+            expires_at=REAL_NOW + timedelta(minutes=5),
+        )
+        fence = AttemptLeaseFence(owner="worker-a", token=leased.lease_token or 0)
+        submitting = await repo.transition_worker(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=leased.state_version,
+            expected_states=frozenset({ExecutionAttemptState.PLANNED}),
+            new_state=ExecutionAttemptState.SUBMITTING,
+            fence=fence,
+        )
+        accepted = await repo.apply_provider_observation(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=submitting.state_version,
+            observation=ProviderObservation(
+                observation_id="obs-1",
+                kind=ProviderObservationKind.ACCEPTED,
+                observed_at=REAL_NOW,
+                provider_sequence=None,
+                provider_job_id="remote-1",
+                reason_code=None,
+                evidence_digest="sha256:" + "e" * 64,
+            ),
+        )
+        cancel_requested = await repo.request_cancel(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=planned.execution_id,
+            expected_version=accepted.state_version,
+            actor_scope="user:alice",
+            command_id="cancel-1",
+            command_digest="sha256:" + "1" * 64,
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        results = await _service(session).reconcile_expired()
+
+        assert results == []
+
+        durable = await _repository(session).get_exact(user_id=USER, project_name=PROJECT, execution_id="exec-1")
+    assert durable is not None
+    assert durable.state is ExecutionAttemptState.CANCEL_REQUESTED
+    assert durable.state_version == cancel_requested.state_version
