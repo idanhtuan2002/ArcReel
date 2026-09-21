@@ -47,10 +47,10 @@ async def test_unsupported_fallback_resolver_never_raises_for_an_unregistered_ro
     assert adapter.capability_profile.ref == ROUTE.capability_profile_ref
 
     with pytest.raises(BackendCapabilityUnsupportedError):
-        await adapter.cancel(None)  # type: ignore[arg-type]
+        await adapter.cancel(None)
     with pytest.raises(BackendCapabilityUnsupportedError):
-        await adapter.poll(None)  # type: ignore[arg-type]
-    assert await adapter.reconcile(None) is None  # type: ignore[arg-type]
+        await adapter.poll(None)
+    assert await adapter.reconcile(None) is None
 
 
 async def test_unsupported_fallback_resolver_still_prefers_a_real_registered_adapter() -> None:
