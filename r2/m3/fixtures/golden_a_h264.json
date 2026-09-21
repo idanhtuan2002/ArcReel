@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "SRC-H264-STANDARD",
+      "source_type": "OFFICIAL_DOC_SNAPSHOT",
+      "title": "ITU-T H.264 Recommendation",
+      "origin": "https://www.itu.int/rec/T-REC-H.264",
+      "captured_at": "2026-09-22T00:00:00+00:00",
+      "source_fingerprint": "805f7e042578fa46cfb18fe084759c84a207e3f62c8b88bbd87be393ffc30bdf",
+      "provenance": {
+        "fixture": "golden-a-h264",
+        "snapshot_text": "H.264, officially titled Advanced video coding for generic audiovisual services, is the ITU-T recommendation for compressing digital video."
+      }
+    },
+    {
+      "id": "SRC-H264-MACROBLOCK",
+      "source_type": "REFERENCE_ARTICLE_SNAPSHOT",
+      "title": "Advanced Video Coding - macroblock structure",
+      "origin": "https://en.wikipedia.org/wiki/Advanced_Video_Coding",
+      "captured_at": "2026-09-22T00:00:00+00:00",
+      "source_fingerprint": "797a2cb1f5cd4dc76094d4c927eb33ad7061a3e1faac2a93e607358e75cda75c",
+      "provenance": {
+        "fixture": "golden-a-h264",
+        "snapshot_text": "H.264 divides each video frame into macroblocks of 16x16 luma samples, which can be split into smaller partitions as small as 4x4 for motion-compensated prediction."
+      }
+    },
+    {
+      "id": "SRC-H264-FRAMETYPES",
+      "source_type": "REFERENCE_ARTICLE_SNAPSHOT",
+      "title": "Video compression picture types",
+      "origin": "https://en.wikipedia.org/wiki/Video_compression_picture_types",
+      "captured_at": "2026-09-22T00:00:00+00:00",
+      "source_fingerprint": "2836cd6477a8de2f9abb174e0ef9863a02ef63d2e8d1bf36f29864e8674cf0e7",
+      "provenance": {
+        "fixture": "golden-a-h264",
+        "snapshot_text": "I-frames are self-contained and do not require other frames to decode; P-frames and B-frames reduce file size by referencing already-decoded frames, with B-frames referencing frames from both before and after."
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EVID-H264-001",
+      "source_ref": "SRC-H264-STANDARD",
+      "locator": "frozen-snapshot:SRC-H264-STANDARD",
+      "excerpt_or_structured_fact": "H.264, officially titled Advanced video coding for generic audiovisual services, is the ITU-T recommendation for compressing digital video.",
+      "evidence_type": "TEXT_SNAPSHOT",
+      "captured_at": "2026-09-22T00:00:00+00:00",
+      "provenance": {
+        "fixture": "golden-a-h264"
+      }
+    },
+    {
+      "id": "EVID-H264-002",
+      "source_ref": "SRC-H264-MACROBLOCK",
+      "locator": "frozen-snapshot:SRC-H264-MACROBLOCK",
+      "excerpt_or_structured_fact": "H.264 divides each video frame into macroblocks of 16x16 luma samples, which can be split into smaller partitions as small as 4x4 for motion-compensated prediction.",
+      "evidence_type": "TEXT_SNAPSHOT",
+      "captured_at": "2026-09-22T00:00:00+00:00",
+      "provenance": {
+        "fixture": "golden-a-h264"
+      }
+    },
+    {
+      "id": "EVID-H264-003",
+      "source_ref": "SRC-H264-FRAMETYPES",
+      "locator": "frozen-snapshot:SRC-H264-FRAMETYPES",
+      "excerpt_or_structured_fact": "I-frames are self-contained and do not require other frames to decode; P-frames and B-frames reduce file size by referencing already-decoded frames, with B-frames referencing frames from both before and after.",
+      "evidence_type": "TEXT_SNAPSHOT",
+      "captured_at": "2026-09-22T00:00:00+00:00",
+      "provenance": {
+        "fixture": "golden-a-h264"
+      }
+    }
+  ],
+  "research_pack": {
+    "id": "RP-GOLDEN-A-H264",
+    "version": 1,
+    "topic": "How Video Encoding Works (H.264)",
+    "scope": "Golden A factual explainer",
+    "source_refs": [
+      "SRC-H264-STANDARD",
+      "SRC-H264-MACROBLOCK",
+      "SRC-H264-FRAMETYPES"
+    ],
+    "evidence_refs": [
+      "EVID-H264-001",
+      "EVID-H264-002",
+      "EVID-H264-003"
+    ],
+    "synthesis": "H.264 is the ITU-T/ISO standard for compressing digital video. It processes each frame in fixed 16x16 macroblocks that can be split into smaller partitions for motion-compensated prediction, and it classifies frames as self-contained I-frames or as P-frames/B-frames that reduce size by referencing already-decoded frames.",
+    "uncertainties": [],
+    "open_questions": [],
+    "provenance": {
+      "fixture": "golden-a-h264"
+    }
+  },
+  "claim_ledger": {
+    "id": "LEDGER-GOLDEN-A-H264",
+    "version": 1,
+    "research_pack_ref": "RP-GOLDEN-A-H264",
+    "claims": [
+      {
+        "id": "CLAIM-H264-001",
+        "version": 1,
+        "statement": "H.264 is the ITU-T/ISO standard, titled Advanced Video Coding, for compressing digital video.",
+        "evidence_refs": [
+          "EVID-H264-001"
+        ],
+        "confidence": 1.0,
+        "status": "VERIFIED",
+        "provenance": {
+          "fixture": "golden-a-h264"
+        }
+      },
+      {
+        "id": "CLAIM-H264-002",
+        "version": 1,
+        "statement": "H.264 divides each video frame into 16x16-pixel macroblocks, splittable into smaller partitions for motion-compensated prediction.",
+        "evidence_refs": [
+          "EVID-H264-002"
+        ],
+        "confidence": 1.0,
+        "status": "VERIFIED",
+        "provenance": {
+          "fixture": "golden-a-h264"
+        }
+      },
+      {
+        "id": "CLAIM-H264-003",
+        "version": 1,
+        "statement": "H.264 frames are I-frames, P-frames, or B-frames: I-frames stand alone, while P-frames and B-frames shrink file size by referencing already-decoded frames.",
+        "evidence_refs": [
+          "EVID-H264-003"
+        ],
+        "confidence": 1.0,
+        "status": "VERIFIED",
+        "provenance": {
+          "fixture": "golden-a-h264"
+        }
+      }
+    ]
+  },
+  "script": {
+    "id": "SCRIPT-GOLDEN-A-H264",
+    "version": 1,
+    "content_basis": {
+      "basis_type": "FACTUAL",
+      "basis_version": "golden-a-h264-v1",
+      "refs": [
+        "research:RP-GOLDEN-A-H264",
+        "claim:CLAIM-H264-001",
+        "claim:CLAIM-H264-002",
+        "claim:CLAIM-H264-003"
+      ]
+    },
+    "sections": [
+      {
+        "id": "SEC-H264-01",
+        "text": "H.264, also known as Advanced Video Coding, is the ITU-T and ISO standard most video you watch today is compressed with. Its job is to shrink raw video down to a fraction of its size while keeping it watchable, so it can be streamed and stored practically.",
+        "claim_refs": [
+          "CLAIM-H264-001"
+        ],
+        "target_duration_seconds": 22.0
+      },
+      {
+        "id": "SEC-H264-02",
+        "text": "To compress a single frame, H.264 splits it into fixed 16 by 16 pixel blocks called macroblocks. Each macroblock can be broken down further, into partitions as small as 4 by 4 pixels, so the encoder can track motion and detail at whatever scale actually changed.",
+        "claim_refs": [
+          "CLAIM-H264-002"
+        ],
+        "target_duration_seconds": 25.0
+      },
+      {
+        "id": "SEC-H264-03",
+        "text": "Across frames, H.264 uses three frame types. I-frames stand alone, like a single photograph. P-frames and B-frames instead store only what changed relative to other frames, with B-frames referencing both earlier and later frames, which is why most of a video's data comes from just a few I-frames.",
+        "claim_refs": [
+          "CLAIM-H264-003"
+        ],
+        "target_duration_seconds": 25.0
+      }
+    ],
+    "participants": [],
+    "timing_intent": "60-90s factual explainer",
+    "creative_constraints": [
+      "factual",
+      "concise",
+      "provider-neutral"
+    ],
+    "approval_status": "APPROVED"
+  }
+}
