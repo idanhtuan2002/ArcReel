@@ -1,0 +1,137 @@
+{
+  "schema_version": "r2-m7c-restart-stream-recovery-v1",
+  "status": "EXECUTION_RECOVERY_VERIFIED",
+  "status_note": "VERIFIED BY HUMAN OVERRIDE on 2026-09-21 (operator anhtuan), not by an independent Codex standards and spec review, which was explicitly declined for M7-A/M7-B and carried forward for M7-C under the same decision. This is a self-review by the same agent that implemented the change, not an independent verdict. Mirrors the M7-B precedent (docs/r2/evidence/R2_M7_B_ATOMIC_PROMOTION.json) and the M7-A precedent before it (docs/r2/evidence/R2_M7_A_IDENTITY_IDEMPOTENCY.json).",
+  "plan": {
+    "plan_files": [
+      "docs/superpowers/plans/2026-09-12-r2-m7c-restart-event-recovery.md",
+      "docs/superpowers/plans/2026-09-20-r2-m7c-poll-cancel-download-recovery.md"
+    ],
+    "precondition": "Global Constraints: start only at an independently accepted clean M7-B head 7b7c4a0e0001. Satisfied per docs/r2/evidence/R2_M7_B_ATOMIC_PROMOTION.json (self-reviewed, human override, same disclosure as this file). M7-C adds no migration -- Alembic head is unchanged at 7b7c4a0e0001.",
+    "scope_note": "The original umbrella plan's Task C3 ('exact-route poll/download/cancel') was researched, found to require a materially different design than originally scoped, and replaced by the narrower, evidence-backed design recorded in the second plan file above. See docs/research/2026-09-20-r2-m7c-poll-download-cancel-design.md for the full research trail, including the discovery that the original ACCEPTED/RUNNING lease-heartbeat approach was unnecessary once the legacy-outcome mirror (D-series work below) was found.",
+    "tasks_completed": [
+      "C1 feat(host): add durable project-event replay repository (df0cd2a1)",
+      "C1 feat(host): make project event streams durable (7178af01)",
+      "C1 feat(host): expose the durable execution-event stream over HTTP (69c4a113)",
+      "C2 (frontend cursor resync) explicitly paused -- no UI consumer of the durable stream exists yet; see docs/research/2026-09-20-r2-m7c-poll-download-cancel-design.md",
+      "C3/scanner feat(r2): add H5 recovery scan for stale execution-attempt leases (df205ddf)",
+      "found+fixed fix(r2): stop provider observations from exiting a NEEDS_OPERATOR pause (b685e604)",
+      "D1 feat(r2): add the cancel-intent write authority (8a70ebf7)",
+      "found+fixed fix(r2): disambiguate Kling's submit route by its actual video subpath (cecd2cff)",
+      "D2 feat(r2): add Kling's exact-route attempt poll (b53da35a)",
+      "found+fixed fix(r2): stop reconcile_expired from misclassifying a fresh cancel intent (16abd4d6)",
+      "D3 feat(r2): realize pending cancel intents against the provider (dffbd892)",
+      "found+fixed feat(r2): mirror legacy task outcomes into execution_attempts (bfa4770d)",
+      "D4 feat(r2): wire the H5 recovery scan into a live process (41019f5a)",
+      "D5 test(r2): add real SIGKILL recovery tests (76e68479)"
+    ]
+  },
+  "head": {
+    "sha": "24830f9b5d76b2b2df7b0224feb1d2ad23360b27",
+    "branch": "feat/r2-m7-host-production-hardening",
+    "worktree": "/home/anhtuan/content-production-os-m7",
+    "parent_base": "7b7c4a0e0001 (M7-B accepted head's exact migration head)",
+    "clean_tree": true,
+    "scope_verifier": "uv run python scripts/r2/verify_m7_scope.py --check -- all 8 checks PASS at this exact HEAD (m6_accepted, clean_tree, base_sha, alembic_head, revision_graph_digest, documents, legacy_seams, submit_routes)"
+  },
+  "real_bugs_found_and_fixed_this_milestone": [
+    {
+      "bug": "apply_provider_observation could fold a provider fact straight through NEEDS_OPERATOR to a terminal state without ever going through resolve_operator_review, because fold_observation's pure legal-transition table permits that edge (an operator resolution reuses the same table) and no caller-side guard existed.",
+      "fix": "b685e604 -- guard added in lib/db/repositories/host_hardening.py::apply_provider_observation; the observation is still recorded as evidence, the attempt row is left untouched.",
+      "reachability_at_discovery": "latent -- no production caller passed a NEEDS_OPERATOR snapshot at the time, but nothing prevented it either."
+    },
+    {
+      "bug": "Every Kling video submission recorded the same endpoint_id 'videos.create' even though Kling's real API has three distinct URLs by request shape (text2video/image2video/multi-image2video); a persisted route snapshot could not say which URL the provider actually accepted, defeating the entire purpose of exact-route recovery poll for this provider.",
+      "fix": "cecd2cff -- endpoint_id now derives from the real endpoint path at submit time; route_inventory.py registers the three families the capability registry now distinguishes. Agnes and OpenAI were checked and confirmed unaffected (each polls one fixed endpoint regardless of request shape).",
+      "reachability_at_discovery": "live -- every real Kling submission was affected; only surfaced when building the exact-route poll (D2) that depends on this identity."
+    },
+    {
+      "bug": "reconcile_expired's RECOVERABLE_EXPIRED_STATES mapped CANCEL_REQUESTED -> CANCEL_OUTCOME_UNKNOWN, a mapping written for a worker that transition_worker'd into CANCEL_REQUESTED under its own live lease and died before calling the provider. That scenario has zero production callers; the only real writer of CANCEL_REQUESTED is D1's unfenced request_cancel, whose lease is stale by construction. Left in place, the first scan after any cancel request would have folded the attempt to CANCEL_OUTCOME_UNKNOWN (then NEEDS_OPERATOR for a NONE-idempotency provider) without ever attempting the provider call.",
+      "fix": "16abd4d6 -- removed CANCEL_REQUESTED from the map; realizing a fresh cancel intent was built as its own operation (D3).",
+      "reachability_at_discovery": "latent until this same session's D1 made CANCEL_REQUESTED reachable in production for the first time."
+    },
+    {
+      "bug": "realize_pending_cancels' fence acquisition used the same liveness-gated acquire_lease as reconcile_expired, but request_cancel never touches the lease -- a realistic cancel request (users cancel within minutes of submitting) could land while the submission-phase lease's 300s TTL had not yet elapsed, arbitrarily delaying a legitimate cancel for no correctness reason.",
+      "fix": "dffbd892 -- acquire_lease gained an explicit force=True mode that skips only the ownership/liveness check; the state_version CAS underneath still gives two racing callers exactly one winner (proven against real PostgreSQL).",
+      "reachability_at_discovery": "would have manifested the first time a real user cancelled quickly after submitting."
+    },
+    {
+      "bug": "The legacy orphan-recovery handler (ADR 0007, lib/generation_worker.py's _handle_orphan_tasks_on_start) is the system that actually makes every real restart-recovery decision today; it operates entirely on the legacy tasks table and never touches execution_attempts. Without a bridge, execution_attempts would go permanently stale the moment a real crash happened: the attempt would sit ACCEPTED forever while the legacy system correctly resolved the task's real fate through its own, unrelated mechanism.",
+      "fix": "bfa4770d -- GenerationQueue.mark_task_succeeded/failed/cancelled (the single choke point every finalization path -- normal executor, every orphan-handler branch, and its background resume dispatcher -- funnels through) now mirror the already-decided outcome into execution_attempts, without changing any of that decision logic. A direct ACCEPTED/RUNNING -> CANCELLED fact has no legal edge in the attempt state machine (cancellation requires a recorded intent first); the mirror synthesizes one via request_cancel before applying the CANCELLED observation.",
+      "reachability_at_discovery": "structural gap present since M7-A; found while researching whether the ACCEPTED/RUNNING lease-heartbeat design (originally planned) was actually necessary. It was not -- this mirror closes the same gap with far lower blast radius (three shared methods, zero backend files touched, versus the heartbeat design's 7 backend poll hot paths)."
+    },
+    {
+      "bug": "Test-infrastructure flake in this milestone's own new tests: test_generation_queue_execution_attempts_mirror.py, test_realize_pending_cancels.py, test_execution_recovery_scan.py, and test_execution_recovery_scheduler.py each anchored a lease's expires_at to a module-level REAL_NOW = datetime.now(UTC) evaluated once at collection time, plus a fixed timedelta(minutes=5). Under the full postgres-compat selection (~1000 tests, 4 xdist workers, real wall-clock collection-to-execution gap under system load), that margin was exceeded for these modules, so acquire_lease's own real 'not yet expired' check in transition_worker legitimately (and correctly) raised ExecutionAttemptFencingError -- 11 spurious failures, first surfaced only under the full CI-exact selection, never in isolated or SQLite runs.",
+      "fix": "Each expires_at=REAL_NOW + timedelta(minutes=5) call site changed to expires_at=datetime.now(UTC) + timedelta(minutes=5), computed fresh at actual call time instead of at module import time. created_at/observed_at uses of REAL_NOW (static test data, never compared against live now()) were left unchanged.",
+      "reachability_at_discovery": "test-only; the fencing logic itself behaved correctly (a truly expired lease must be rejected). Note: tests/integration/lib/db/repositories/test_execution_attempt_repository.py (a pre-existing, already-accepted M7-A/M7-B file) has the identical REAL_NOW-anchored-lease pattern at ~20 call sites and carries the same latent risk; it did not fail this run and was left untouched as out of this file's scope."
+    },
+    {
+      "bug": "Two pre-existing test files that predate M7-C (test_project_event_replay.py, test_execution_events.py) call MasterAuthorityRepository.insert_head_version with a candidate_id that was never seeded into candidate_objects. master_head_versions.candidate_id carries a real ForeignKey(\"candidate_objects.candidate_id\"); SQLite tests never caught this because make_test_engine runs SQLite with PRAGMA foreign_keys=OFF, and this appears to be the first time these two files were run to completion against real PostgreSQL under the exact CI postgres-compat selection -- 10 deterministic (not load-dependent) failures.",
+      "fix": "Both files' promotion helpers now insert a matching CandidateObjectRepository row (via VerifiedCandidateObject) before calling insert_head_version, following the exact pattern already established in tests/integration/lib/db/repositories/test_host_hardening_promotion.py. test_project_event_replay.py's helper additionally scopes candidate_id by project_name (cand-{project_name}-{version}) since it promotes the same master_version across two different projects, which would otherwise collide on candidate_objects' global candidate_id primary key.",
+      "reachability_at_discovery": "pre-existing, deterministic under real PostgreSQL; unrelated to any M7-C feature code. Fixed here only because it blocked getting an honest pytest_postgres_compat number for this file; this is very likely (though not confirmed by direct citation) the same class of issue referred to elsewhere as known pre-existing PostgreSQL FK gaps."
+    }
+  ],
+  "architecture_decision_this_milestone": {
+    "question": "Should H5 recovery for ACCEPTED/RUNNING attempts be built as (a) a full happy-path migration onto host-hardening polling, or (b) a narrow restart-scanner extension that leaves the live, non-crashed happy path untouched?",
+    "answer": "(b), and this was not a new decision -- the original 2026-09-12 M7 research (docs/research/2026-09-12-r2-m7-host-production-hardening-research.md sections 2.4 and 4.1) had already settled on a narrow restart scanner ('nó không biến mọi running task thành queued'). Re-read and cited before building anything, per the repository's research-first rule.",
+    "resolution": "The bookkeeping mirror (bfa4770d) turned out to close the correctness gap for ACCEPTED/RUNNING entirely on its own, since execution_attempts becomes truthful within a bounded number of restarts via the same choke point every completion path already shares. No lease-heartbeat, no ACCEPTED/RUNNING poller, and no changes to any of the 7 video backends were needed."
+  },
+  "real_sigkill_evidence": {
+    "test_file": "tests/integration/r2/host_hardening/test_h5_process_crash_recovery.py",
+    "worker_script": "tests/integration/r2/host_hardening/_crash_worker.py",
+    "method": "A real, separate OS process (subprocess.Popen) durably commits an attempt to SUBMITTING or CANCEL_REQUESTED against a real file-backed SQLite database, signals readiness via a sentinel file, then blocks forever. The test process sends a real os.kill(pid, SIGKILL), reaps the process, confirms a non-zero/hard-kill exit code, then runs the recovery scan from itself -- a genuinely different, still-alive process -- against the same database file.",
+    "why_sqlite_not_postgres": "A real subprocess needs its own DB connection regardless of dialect, so this does not need PostgreSQL to prove cross-process survival; :memory: SQLite cannot be shared across processes, so file_session_factory (real file-backed SQLite, sqlite_only marker) is used instead. Concurrency-under-load claims elsewhere in M7-C are separately proven against real PostgreSQL (see gate_results.pytest_postgres_compat).",
+    "cases_proven": [
+      "SIGKILL mid-SUBMITTING: the killed process's lease genuinely expires in real wall-clock time; reconcile_expired (run from the live test process) reclaims it and resolves it to NEEDS_OPERATOR, matching Kling's real NONE-idempotency capability profile (no safe reconciliation).",
+      "SIGKILL immediately after a cancel intent is recorded: realize_pending_cancels (run from the live test process) attempts the cancel against Kling's real capability profile (supports_cancel: false), and the intent survives the crash exactly as CANCEL_REQUESTED -- never lost, never falsely resolved to CANCELLED or FAILED."
+    ]
+  },
+  "live_process_wiring": {
+    "component": "server/services/execution_recovery_scheduler.py::ExecutionRecoveryScheduler",
+    "wired_in": "server/app.py's lifespan, started/stopped alongside (but independent of) GenerationWorker",
+    "independence_from_generation_worker": "The scheduler only ever touches execution_attempts; GenerationWorker's orphan handler only ever touches the legacy tasks table (bridged one-way by the bookkeeping mirror above). There is no shared mutable state between them to coordinate.",
+    "adapter_resolver_note": "build_adapter_resolver(default_to_unsupported=True) is used for this scheduler. Every currently registered capability profile (checked against the real registry, r2/provider_capabilities/registry.json, all 11 entries) declares idempotency_mode=NONE and supports_cancel=false, so reconcile()'s adapter-dependent qualified-lookup path never reaches an adapter at all today, and a real cancel() would fail exactly like the fallback already does. This is behaviorally identical to a fully wired adapter registry for everything currently registered, not a shortcut -- documented in docs/research/2026-09-20-r2-m7c-poll-download-cancel-design.md section 5. The default-raise-loud behavior (NoAdapterRegisteredError) is preserved unchanged for submit, which must still fail loud on a genuine misconfiguration."
+  },
+  "deferred_work": [
+    "Task C2 (frontend durable-cursor resync): paused, not started -- no UI consumer of GET /projects/{project}/execution-events/stream exists yet. Building the frontend hook now would have no caller to prove it against.",
+    "A real per-backend BackendExecutionFunctions.cancel implementation: no provider in the currently qualified/registered set declares supports_cancel: true, so there is nothing to wire a real cancel translation layer against yet. The mechanism (realize_pending_cancels) is proven against fakes and will 'just work' the first time a backend genuinely supports cancel and its capability profile is updated.",
+    "Provider qualification and disabling unqualified paid routes: every one of the 11 registered capability profiles is qualification_status UNQUALIFIED today (checked against the real registry this session). ADR-0089 P0 item 3 names this explicitly as still-required V1 work, separate from and after the execution-identity/idempotency/reconciliation work this file covers.",
+    "M7-D (backup/restore drill, H6): not started. R2_M7_B_ATOMIC_PROMOTION.json's backup_set_scope_note already flagged this as out of scope for M7-B; it remains out of scope here too."
+  ],
+  "migration": {
+    "current_head": "7b7c4a0e0001",
+    "note": "unchanged from M7-B -- M7-C adds no schema. Confirmed via `uv run alembic heads` at this exact HEAD."
+  },
+  "gate_results": {
+    "ruff_check": "pass (repo-wide)",
+    "ruff_format_check": "pass (1475 files already formatted)",
+    "basedpyright": "0 errors, 0 warnings, 0 notes (repo-wide --warnings)",
+    "lint_imports": "20 kept, 0 broken",
+    "deptry": "no dependency issues found (lib server alembic scripts tests r2)",
+    "pytest_full_sqlite": {
+      "command": "uv run python -m pytest -n 4 --dist loadfile",
+      "passed": 14109,
+      "skipped": 22,
+      "failed": 0
+    },
+    "pytest_postgres_compat": {
+      "command": "uv run python -m pytest -m \"uses_db and not sqlite_only\" -n 4 --dist loadfile (exact CI postgres-compat job selection)",
+      "passed": 1003,
+      "skipped": 0,
+      "failed": 0,
+      "note": "First run against a fresh local container surfaced 35 failures; all three root causes were process/test-authoring gaps, not product bugs, and are recorded in real_bugs_found_and_fixed_this_milestone below. Re-run clean after fixing them."
+    },
+    "audit_tests": "0 violations",
+    "git_diff_check": "clean",
+    "scope_verifier": "uv run python scripts/r2/verify_m7_scope.py --check -- all 8 checks PASS"
+  },
+  "coverage_limitations": [
+    "No independent (Codex or otherwise) review was run against this exact HEAD; status is a human/self override per status_note above.",
+    "PostgreSQL testing used fresh, empty, single-node local Docker containers (postgres:16-alpine); it does not exercise production-scale connection pooling, replica failover, or the CI runner's exact resource profile. Process note for future local reproduction: tests/conftest.py's async_session fixture (used by legacy repo tests, distinct from the per-test-schema session_factory fixture most of this suite uses) deliberately does not run migrations when DATABASE_URL is externally provided -- it trusts the CI job's own prior `alembic upgrade head` step. A local run against a brand-new container must run that migration manually first, or every async_session-based test fails with UndefinedTableError (this cost real time to diagnose in this session; see real_bugs_found_and_fixed_this_milestone for the two other, genuine test-authoring bugs found alongside it).",
+    "The real SIGKILL tests prove cross-process survival on file-backed SQLite; they do not additionally prove it on PostgreSQL, since the mechanism under test (a real process death and a fenced CAS reclaim) is dialect-independent and PostgreSQL-specific concurrency claims are separately proven elsewhere in this file's pytest_postgres_compat results.",
+    "No real backend currently supports cancel, so realize_pending_cancels' successful-cancellation and ambiguous-failure paths are proven only against fakes, never against a real provider's real HTTP API.",
+    "ACCEPTED/RUNNING attempts are made truthful only when the underlying task actually reaches a terminal legacy outcome (success/fail/cancel) through the existing orphan-recovery or normal-completion path; there is no independent, faster-than-natural-completion detection of a hung/stuck ACCEPTED/RUNNING attempt in this milestone.",
+    "Provider qualification (ADR-0089 P0 item 3's second half) and M7-D's backup/restore drill are explicitly out of scope for this file; see deferred_work above.",
+    "Frontend (pnpm check) and website checks were not run in this session; M7-C touched zero files under frontend/ or website/ (confirmed via git diff --stat against the M7-B head)."
+  ]
+}

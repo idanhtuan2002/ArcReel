@@ -119,7 +119,7 @@ async def _bring_to_cancel_requested(
         execution_id=planned.execution_id,
         expected_version=planned.state_version,
         owner=owner,
-        expires_at=REAL_NOW + timedelta(minutes=5),
+        expires_at=datetime.now(UTC) + timedelta(minutes=5),
     )
     fence = AttemptLeaseFence(owner=owner, token=leased.lease_token or 0)
     submitting = await repo.transition_worker(
@@ -246,7 +246,7 @@ async def test_realize_pending_cancels_ignores_an_accepted_attempt_with_no_cance
             execution_id=planned.execution_id,
             expected_version=planned.state_version,
             owner="worker-a",
-            expires_at=REAL_NOW + timedelta(minutes=5),
+            expires_at=datetime.now(UTC) + timedelta(minutes=5),
         )
         fence = AttemptLeaseFence(owner="worker-a", token=leased.lease_token or 0)
         submitting = await repo.transition_worker(

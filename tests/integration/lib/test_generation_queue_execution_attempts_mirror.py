@@ -78,7 +78,7 @@ async def _bring_to_accepted(session: AsyncSession, *, task_id: str, execution_i
         execution_id=planned.execution_id,
         expected_version=planned.state_version,
         owner="worker-a",
-        expires_at=REAL_NOW + timedelta(minutes=5),
+        expires_at=datetime.now(UTC) + timedelta(minutes=5),
     )
     fence = AttemptLeaseFence(owner="worker-a", token=leased.lease_token or 0)
     submitting = await repo.transition_worker(

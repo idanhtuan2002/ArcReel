@@ -9,8 +9,12 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.db.repositories.host_hardening import MasterAuthorityRepository, ProjectEventRepository
-from r2.contracts.host_hardening import MasterHeadSnapshot, ProjectEventType
+from lib.db.repositories.host_hardening import (
+    CandidateObjectRepository,
+    MasterAuthorityRepository,
+    ProjectEventRepository,
+)
+from r2.contracts.host_hardening import MasterHeadSnapshot, ProjectEventType, VerifiedCandidateObject
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -22,6 +26,21 @@ NOW = datetime(2026, 9, 20, 12, 0, tzinfo=UTC)
 
 
 async def _promote_a_version(session: AsyncSession, *, project_name: str, master_version: int) -> None:
+    candidate_id = f"cand-{project_name}-{master_version}"
+    await CandidateObjectRepository(session).insert(
+        user_id=USER,
+        project_name=project_name,
+        candidate=VerifiedCandidateObject(
+            candidate_id=candidate_id,
+            project_name=project_name,
+            artifact_key=ARTIFACT_KEY,
+            object_ref=f"/data/{project_name}/videos/{candidate_id}.mp4",
+            byte_size=1024,
+            content_digest=f"sha256:{candidate_id}",
+            media_probe_digest=f"sha256:probe-{candidate_id}",
+        ),
+        created_at=NOW,
+    )
     authorities = MasterAuthorityRepository(session)
     await authorities.insert_head_version(
         user_id=USER,
@@ -30,9 +49,9 @@ async def _promote_a_version(session: AsyncSession, *, project_name: str, master
         snapshot=MasterHeadSnapshot(
             artifact_key=ARTIFACT_KEY,
             master_version=master_version,
-            candidate_id=f"cand-{master_version}",
-            object_ref=f"/data/{project_name}/videos/cand-{master_version}.mp4",
-            content_digest=f"sha256:cand-{master_version}",
+            candidate_id=candidate_id,
+            object_ref=f"/data/{project_name}/videos/{candidate_id}.mp4",
+            content_digest=f"sha256:{candidate_id}",
             approval_record="approval",
         ),
         promoted_at=NOW,
@@ -43,9 +62,9 @@ async def _promote_a_version(session: AsyncSession, *, project_name: str, master
         snapshot=MasterHeadSnapshot(
             artifact_key=ARTIFACT_KEY,
             master_version=master_version,
-            candidate_id=f"cand-{master_version}",
-            object_ref=f"/data/{project_name}/videos/cand-{master_version}.mp4",
-            content_digest=f"sha256:cand-{master_version}",
+            candidate_id=candidate_id,
+            object_ref=f"/data/{project_name}/videos/{candidate_id}.mp4",
+            content_digest=f"sha256:{candidate_id}",
             approval_record="approval",
         ),
     )
