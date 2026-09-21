@@ -79,6 +79,7 @@ from server.routers import (
 )
 from server.routers import auth as auth_router
 from server.services.execution_events import DurableEventStreamService
+from server.services.execution_recovery_scheduler import ExecutionRecoveryScheduler
 from server.services.project_events import ProjectEventService
 
 
@@ -462,10 +463,21 @@ async def lifespan(app: FastAPI):
     # background task to manage.
     app.state.execution_event_stream_service = DurableEventStreamService()
 
+    logger.info("启动 ExecutionRecoveryScheduler...")
+    execution_recovery_scheduler = ExecutionRecoveryScheduler()
+    app.state.execution_recovery_scheduler = execution_recovery_scheduler
+    await execution_recovery_scheduler.start()
+    logger.info("ExecutionRecoveryScheduler 已启动")
+
     async with remote_mcp_host.run():
         yield
 
     # Shutdown
+    execution_recovery_scheduler = getattr(app.state, "execution_recovery_scheduler", None)
+    if execution_recovery_scheduler:
+        logger.info("正在停止 ExecutionRecoveryScheduler...")
+        await execution_recovery_scheduler.stop()
+        logger.info("ExecutionRecoveryScheduler 已停止")
     project_event_service = getattr(app.state, "project_event_service", None)
     if project_event_service:
         logger.info("正在停止 ProjectEventService...")
