@@ -321,6 +321,45 @@ class DurableProjectEvent(R2ContractModel):
     dedupe_key: NonEmptyStr
 
 
+class MediaInventoryEntry(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    project_name: NonEmptyStr
+    artifact_key: NonEmptyStr
+    object_ref: NonEmptyStr
+    object_version: NonEmptyStr | None = None
+    byte_size: int = Field(ge=0)
+    content_digest: NonEmptyStr
+
+
+class BackupSetManifest(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    backup_set_id: NonEmptyStr
+    source_deployment_id: NonEmptyStr
+    release_git_sha: NonEmptyStr
+    release_image_digest: NonEmptyStr
+    postgres_version: NonEmptyStr
+    alembic_head: NonEmptyStr
+    database_backup_ref: NonEmptyStr
+    recovery_target: NonEmptyStr
+    configuration_digest: NonEmptyStr
+    media: tuple[MediaInventoryEntry, ...]
+    state: BackupSetState
+
+
+class BackupVerdict(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    backup_set_id: NonEmptyStr
+    accepted: bool
+    reason_codes: tuple[NonEmptyStr, ...]
+    checked_master_count: int = Field(ge=0)
+    checked_media_count: int = Field(ge=0)
+    measured_rpo_seconds: int | None = Field(default=None, ge=0)
+    measured_rto_seconds: int | None = Field(default=None, ge=0)
+
+
 COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION = 1
 
 
@@ -337,12 +376,15 @@ __all__ = [
     "AttemptIntegrityIncident",
     "AttemptLeaseFence",
     "AttemptSnapshot",
+    "BackupSetManifest",
     "BackupSetState",
+    "BackupVerdict",
     "CandidateIdentity",
     "CommandReceipt",
     "DurableProjectEvent",
     "ExecutionAttemptState",
     "MasterHeadSnapshot",
+    "MediaInventoryEntry",
     "OperatorResolutionAction",
     "OperatorResolutionReceipt",
     "PersistedProviderObservation",

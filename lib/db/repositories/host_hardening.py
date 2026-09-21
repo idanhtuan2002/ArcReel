@@ -817,6 +817,23 @@ class CandidateObjectRepository:
         ).scalar_one_or_none()
         return None if row is None else _candidate_from_row(row)
 
+    async def list_all(self, *, user_id: str, project_name: str) -> list[VerifiedCandidateObject]:
+        rows = (
+            (
+                await self.session.execute(
+                    select(CandidateObjectModel)
+                    .where(
+                        CandidateObjectModel.user_id == user_id,
+                        CandidateObjectModel.project_name == project_name,
+                    )
+                    .order_by(CandidateObjectModel.candidate_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [_candidate_from_row(row) for row in rows]
+
     async def insert(
         self, *, user_id: str, project_name: str, candidate: VerifiedCandidateObject, created_at: datetime
     ) -> None:
@@ -1100,6 +1117,15 @@ class BackupSetRepository:
     async def add_media_ref(self, *, backup_set_id: str, candidate_id: str) -> None:
         self.session.add(BackupSetMediaRefModel(backup_set_id=backup_set_id, candidate_id=candidate_id))
         await self.session.flush()
+
+    async def mark_state(self, *, backup_set_id: str, state: str, now: datetime) -> None:
+        result = await self.session.execute(
+            update(BackupSetModel)
+            .where(BackupSetModel.backup_set_id == backup_set_id)
+            .values(state=state, updated_at=now)
+        )
+        if rowcount(result) != 1:
+            raise LookupError(f"no backup set {backup_set_id!r} to mark {state!r}")
 
     async def has_incomplete_backup_referencing(self, *, user_id: str, project_name: str, candidate_id: str) -> bool:
         row = (

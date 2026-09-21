@@ -226,6 +226,9 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Install postgresql-client (pg_dump/pg_restore for M7-D backup drill tests)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
       - name: Validate alembic migrations (upgrade / idempotent / downgrade / re-upgrade)
         run: |
           set -e
