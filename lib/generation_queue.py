@@ -7,6 +7,7 @@ Wraps TaskRepository with a module-level singleton pattern.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import threading
 import uuid
@@ -17,7 +18,8 @@ from typing import TYPE_CHECKING, Any
 from lib.asset_derivatives import DERIVATIVE_TASK_TYPE
 from lib.async_thread import run_noninterruptible_async
 from lib.db import safe_session_factory
-from lib.db.base import DEFAULT_USER_ID
+from lib.db.base import DEFAULT_USER_ID, utc_now
+from lib.db.repositories.host_hardening import ExecutionAttemptRepository
 from lib.db.repositories.task_repo import TaskRepository
 from lib.generation_admission import generation_admission_lock
 from lib.generation_batch import (
@@ -30,6 +32,13 @@ from lib.generation_batch import (
 )
 from lib.project_migration_guard import assert_project_migration_ok
 from lib.task_terminal_events import TERMINAL_TASK_STATUSES, emit_task_terminal_events
+from r2.contracts.host_hardening import (
+    TERMINAL_ATTEMPT_STATES,
+    ExecutionAttemptState,
+    ProviderObservation,
+    ProviderObservationKind,
+)
+from r2.host_hardening.provider_capabilities import DEFAULT_REGISTRY_PATH, load_capability_profile
 
 if TYPE_CHECKING:
     from lib.artifact_activation import ArtifactCurrencyResolver
@@ -689,6 +698,7 @@ class GenerationQueue:
             affected = await repo.mark_succeeded(task_id, result)
         if affected > 0:
             logger.info("任务成功 task_id=%s", task_id)
+            await self._mirror_terminal_outcome_to_execution_attempts(task_id, ProviderObservationKind.SUCCEEDED)
         else:
             logger.info("mark_succeeded 0 rows task_id=%s (已被外部翻状态)", task_id)
             if isinstance(result, CompensableGenerationResult):
@@ -704,6 +714,9 @@ class GenerationQueue:
             affected = await repo.mark_failed(task_id, error_message)
         if affected > 0:
             logger.warning("任务失败 task_id=%s error=%s", task_id, error_message[:200])
+            await self._mirror_terminal_outcome_to_execution_attempts(
+                task_id, ProviderObservationKind.FAILED, reason="legacy_task_failed"
+            )
         else:
             logger.info("mark_failed 0 rows task_id=%s (已被外部翻状态)", task_id)
         return affected
@@ -727,7 +740,85 @@ class GenerationQueue:
                 except Exception:
                     logger.exception("worker cancel callback 派发失败 task_id=%s (finalize cascade)", tid)
 
-        return int(result.get("rows", 0))
+        rows = int(result.get("rows", 0))
+        if rows > 0:
+            await self._mirror_terminal_outcome_to_execution_attempts(task_id, ProviderObservationKind.CANCELLED)
+        return rows
+
+    @staticmethod
+    def _resolve_capability_profile(ref: str):
+        return load_capability_profile(ref, registry_path=DEFAULT_REGISTRY_PATH)
+
+    async def _mirror_terminal_outcome_to_execution_attempts(
+        self, task_id: str, kind: ProviderObservationKind, *, reason: str | None = None
+    ) -> None:
+        """M7-C bookkeeping only: mirrors a task's now-final legacy outcome
+        (already committed above by this call's own, unmodified decision
+        logic) into its ``execution_attempts`` row, if one exists and is not
+        already terminal, so that table does not go permanently stale after a
+        real restart -- the legacy orphan handler (ADR 0007) makes every
+        real recovery decision today and never touches ``execution_attempts``
+        at all.
+
+        Never influences the task row's own outcome (already committed
+        before this runs) and never raises: this is a durable audit-trail
+        write, not a decision authority. A deterministic ``observation_id``
+        keyed by ``(task_id, kind)`` makes a duplicate mirror call an
+        idempotent no-op rather than a second (illegal, since already
+        terminal) transition attempt.
+        """
+        try:
+            async with self._session_factory() as session:
+                task = await TaskRepository(session).get(task_id)
+                if task is None:
+                    return
+                attempt_repo = ExecutionAttemptRepository(session, capability_resolver=self._resolve_capability_profile)
+                snapshot = await attempt_repo.get_for_task_attempt(
+                    user_id=task["user_id"], project_name=task["project_name"], task_id=task_id, attempt_no=1
+                )
+                if snapshot is None or snapshot.state in TERMINAL_ATTEMPT_STATES:
+                    return
+                if kind is ProviderObservationKind.CANCELLED and snapshot.state in (
+                    ExecutionAttemptState.ACCEPTED,
+                    ExecutionAttemptState.RUNNING,
+                ):
+                    # The legal-transition table requires an intent step before a
+                    # terminal CANCELLED fact (ACCEPTED/RUNNING has no direct edge
+                    # to CANCELLED, only to CANCEL_REQUESTED) -- correctly, since a
+                    # cancellation should always be traceable to a recorded intent.
+                    # Legacy cancellation has no such step, so synthesize one here
+                    # rather than let a legal, real fact get silently dropped.
+                    snapshot = await attempt_repo.request_cancel(
+                        user_id=task["user_id"],
+                        project_name=task["project_name"],
+                        execution_id=snapshot.execution_id,
+                        expected_version=snapshot.state_version,
+                        actor_scope="system:legacy-mirror",
+                        command_id=f"legacy-cancel:{task_id}",
+                        command_digest="sha256:" + hashlib.sha256(f"legacy-cancel:{task_id}".encode()).hexdigest(),
+                    )
+                digest_source = f"legacy-mirror:{task_id}:{kind.value}".encode()
+                observation = ProviderObservation(
+                    observation_id=f"legacy-mirror:{task_id}:{kind.value}",
+                    kind=kind,
+                    observed_at=utc_now(),
+                    provider_sequence=None,
+                    provider_job_id=snapshot.provider_job_id,
+                    reason_code=reason,
+                    evidence_digest="sha256:" + hashlib.sha256(digest_source).hexdigest(),
+                )
+                await attempt_repo.apply_provider_observation(
+                    user_id=task["user_id"],
+                    project_name=task["project_name"],
+                    execution_id=snapshot.execution_id,
+                    expected_version=snapshot.state_version,
+                    observation=observation,
+                )
+                await session.commit()
+        except Exception:
+            logger.exception(
+                "mirror legacy task outcome to execution_attempts failed task_id=%s kind=%s", task_id, kind
+            )
 
     async def cancel_task(self, task_id: str) -> dict[str, Any]:
         async with self._task_repo() as repo:
