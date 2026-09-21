@@ -14,7 +14,7 @@ from pathlib import Path
 # source tree (see .gitignore's vendor/**/ entries) -- excluded explicitly so
 # this digest is stable regardless of whether `npm install`/a render already
 # ran in this same checkout before the check does.
-_EXCLUDED_DIR_NAMES = frozenset({"node_modules", ".remotion", "out"})
+_EXCLUDED_DIR_NAMES = frozenset({"node_modules", ".remotion", "out", "_r2_runtime_staging"})
 
 
 def _is_excluded(path: Path, *, root: Path) -> bool:

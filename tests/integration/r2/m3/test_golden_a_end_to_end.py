@@ -2,10 +2,17 @@ import json
 import subprocess
 from decimal import Decimal
 
+import pytest
+
 from r2.contracts.enums import ArtifactCurrencyStatus, ProductionMethod
 from r2.m3.golden_a import GoldenARunner
 
+# GoldenARunner.run() does 4 real ~22-25s-shot Remotion renders + a compose;
+# see pyproject.toml note on per-test timeout overrides.
+_RUN_TIMEOUT = pytest.mark.timeout(900)
 
+
+@_RUN_TIMEOUT
 def test_single_run_produces_real_60_90s_final_and_three_methods(tmp_path):
     result = GoldenARunner().run(tmp_path)
 
@@ -40,6 +47,7 @@ def test_single_run_produces_real_60_90s_final_and_three_methods(tmp_path):
     assert probe.stdout.strip() == "video"
 
 
+@_RUN_TIMEOUT
 def test_lineage_reaches_claim_evidence_and_source(tmp_path):
     result = GoldenARunner().run(tmp_path)
     trace = result.lineage
@@ -62,6 +70,7 @@ def test_lineage_reaches_claim_evidence_and_source(tmp_path):
     assert by_shot["SH04"]["claims"] == ["CLAIM-003"]
 
 
+@_RUN_TIMEOUT
 def test_claim2_change_selectively_invalidates_expected_shots_and_final(tmp_path):
     result = GoldenARunner().run(tmp_path)
 
@@ -75,6 +84,7 @@ def test_claim2_change_selectively_invalidates_expected_shots_and_final(tmp_path
     assert result.invalidation == expected
 
 
+@_RUN_TIMEOUT
 def test_evidence_files_capture_cost_provenance_lineage_and_restart(tmp_path):
     result = GoldenARunner().run(tmp_path)
 

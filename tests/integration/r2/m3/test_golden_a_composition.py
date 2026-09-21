@@ -25,6 +25,12 @@ def dep_for(index: int) -> DependencySnapshot:
     )
 
 
+def statement_for(index: int) -> str:
+    bundle = load_golden_a_factual_bundle()
+    claims_by_id = {claim.id: claim for claim in bundle.claim_ledger.claims}
+    return claims_by_id[f"CLAIM-{index:03d}"].statement
+
+
 def approved_host(tmp_path):
     bundle = load_golden_a_factual_bundle()
     direction = GoldenAOpenMontageAdapter(FixtureOpenMontageBackend()).direct(bundle.script)
@@ -43,10 +49,13 @@ def approved_host(tmp_path):
     for item in prepared:
         dep = dep_for(claim_by_shot[item.shot.id])
         content_fp = compute_content_fingerprint(item.shot, [dep])
+        display_text = (
+            None if item.method.method is ProductionMethod.REUSE else statement_for(claim_by_shot[item.shot.id])
+        )
         produced = producer.produce(
             item,
             work_dir=tmp_path / "produced" / item.shot.id,
-            execution_variant="task7",
+            display_text=display_text,
         )
         registered = host.stage_candidate(
             target_ref=item.shot.id,
@@ -81,6 +90,7 @@ def test_composer_requires_approved_masters(tmp_path):
         )
 
 
+@pytest.mark.timeout(900)  # 4 real ~22-25s-shot Remotion renders + a compose; see pyproject.toml note
 def test_ffmpeg_composes_real_approved_masters_into_final_mp4(tmp_path):
     host = approved_host(tmp_path)
     result = GoldenAComposer().compose(

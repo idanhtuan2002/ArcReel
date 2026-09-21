@@ -33,7 +33,7 @@ from r2.production import (
     R2ContractRef,
 )
 
-from .local_production import LocalProducedAsset
+from .render_plan import RenderedCutAsset
 
 
 def _sha_text(value: str) -> str:
@@ -194,7 +194,7 @@ class GoldenAHostIntegration:
         *,
         target_ref: str,
         content_fingerprint: str,
-        produced: LocalProducedAsset,
+        produced: RenderedCutAsset,
         content_basis: ContentBasis,
         direct_dependencies: Sequence[DependencySnapshot],
         contract_version: int,

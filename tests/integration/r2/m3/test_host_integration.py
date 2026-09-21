@@ -52,6 +52,7 @@ def setup_sh01(tmp_path):
     return prepared, host, dep, fingerprint, resource_type
 
 
+@pytest.mark.timeout(500)  # two real ~22s-shot Remotion renders; see pyproject.toml note
 def test_real_host_b_c_d_master_semantics_and_restart(tmp_path):
     prepared, host, dep, fingerprint, resource_type = setup_sh01(tmp_path)
     producer = GoldenALocalProducer()
@@ -59,7 +60,6 @@ def test_real_host_b_c_d_master_semantics_and_restart(tmp_path):
     produced_b = producer.produce(
         prepared,
         work_dir=tmp_path / "b",
-        execution_variant="B",
     )
     b = host.stage_candidate(
         target_ref=prepared.shot.id,
@@ -104,10 +104,19 @@ def test_real_host_b_c_d_master_semantics_and_restart(tmp_path):
     assert host.snapshot(prepared.shot.id).approved_master.selected_candidate_id == b.candidate.id
     assert sha(host.current_file_for(prepared.shot.id)) == produced_b.sha256
 
+    # Regeneration bound to a genuinely different real reuse asset -- proves
+    # host promotion semantics against real, distinguishable content instead
+    # of an arbitrary "execution_variant" label the old color-stub needed.
+    script = load_golden_a_factual_bundle().script
+    direction = GoldenAOpenMontageAdapter(FixtureOpenMontageBackend()).direct(script)
+    prepared_d = GoldenAProductionPreparation().prepare(
+        direction.shots,
+        reused_asset_ref="r2/m3/fixtures/assets/reused_terminal_frame_v2.svg",
+    )[0]
+    assert prepared_d.shot.id == prepared.shot.id
     produced_d = producer.produce(
-        prepared,
+        prepared_d,
         work_dir=tmp_path / "d",
-        execution_variant="D",
     )
     assert produced_d.sha256 != produced_b.sha256
     d = host.stage_candidate(
@@ -142,12 +151,12 @@ def test_real_host_b_c_d_master_semantics_and_restart(tmp_path):
     assert sha(restarted.current_file_for(prepared.shot.id)) == produced_d.sha256
 
 
+@pytest.mark.timeout(300)  # one real ~22s-shot Remotion render; see pyproject.toml note
 def test_manifest_metadata_keeps_factual_basis_and_dependencies(tmp_path):
     prepared, host, dep, fingerprint, _ = setup_sh01(tmp_path)
     produced = GoldenALocalProducer().produce(
         prepared,
         work_dir=tmp_path / "asset",
-        execution_variant="metadata",
     )
     host.stage_candidate(
         target_ref=prepared.shot.id,

@@ -276,19 +276,26 @@ class GoldenARunner:
         claim_snapshots = self._claim_snapshots(bundle)
         shot_claim_ids = self._shot_claim_ids(bundle, direction)
 
+        claims_by_id = {claim.id: claim for claim in bundle.claim_ledger.claims}
+
         provenance: list[dict] = []
         methods: set[ProductionMethod] = set()
 
         for item in prepared:
-            dependencies = [claim_snapshots[claim_id] for claim_id in shot_claim_ids[item.shot.id]]
+            claim_ids = shot_claim_ids[item.shot.id]
+            dependencies = [claim_snapshots[claim_id] for claim_id in claim_ids]
             content_fp = compute_content_fingerprint(
                 item.shot,
                 dependencies,
             )
+            # DETERMINISTIC shots render their linked claim's real statement on
+            # screen (this is what makes claim lineage visible, not just
+            # data-linked); REUSE shots have no display text to resolve.
+            display_text = claims_by_id[claim_ids[0]].statement if claim_ids else None
             produced = producer.produce(
                 item,
                 work_dir=production_dir / item.shot.id,
-                execution_variant="golden-a-e2e",
+                display_text=display_text,
             )
             registered = host.stage_candidate(
                 target_ref=item.shot.id,

@@ -120,6 +120,9 @@ def _assert_slice_shape(slice_: GoldenBSliceEvidence, *, canon_ref) -> None:
     _assert_real_video(slice_.final.path)
 
 
+@pytest.mark.timeout(
+    1500
+)  # real per-shot Remotion renders: measured ~400s/slice x 2 slices (~800s); see pyproject.toml note
 async def test_two_dual_profile_slices_share_one_canon_parent_with_isolated_evidence(
     session_factory: Factory, tmp_path
 ) -> None:
@@ -239,6 +242,9 @@ def _assert_sibling_unaffected(slice_: GoldenBSliceEvidence, *, canon_ref) -> No
     _assert_real_video(slice_.final.path)
 
 
+@pytest.mark.timeout(
+    1500
+)  # real per-shot Remotion renders via _build_pair: measured ~800s/pair; see pyproject.toml note
 async def test_mutation_cross_profile_report_reuse_is_rejected_and_siblings_are_unaffected(
     session_factory: Factory, tmp_path
 ) -> None:
@@ -335,6 +341,9 @@ async def test_mutation_cross_profile_report_reuse_is_rejected_and_siblings_are_
     _assert_sibling_unaffected(shuangwen, canon_ref=canon.canon_ref)
 
 
+@pytest.mark.timeout(
+    1500
+)  # real per-shot Remotion renders via _build_pair: measured ~800s/pair; see pyproject.toml note
 async def test_mutation_stale_map_approval_after_supersession_is_rejected(session_factory: Factory, tmp_path) -> None:
     """Owning boundary: verify_locked_adaptation_selection inside
     admit_screenplay_for_direction -- an admission naming a MAP_APPROVAL decision that
@@ -427,6 +436,9 @@ async def test_mutation_stale_map_approval_after_supersession_is_rejected(sessio
     _assert_sibling_unaffected(shuangwen, canon_ref=canon.canon_ref)
 
 
+@pytest.mark.timeout(
+    1500
+)  # real per-shot Remotion renders via _build_pair: measured ~800s/pair; see pyproject.toml note
 async def test_mutation_readmitting_an_already_locked_screenplay_is_rejected(
     session_factory: Factory, tmp_path
 ) -> None:
@@ -477,6 +489,9 @@ async def test_mutation_readmitting_an_already_locked_screenplay_is_rejected(
     _assert_sibling_unaffected(shuangwen, canon_ref=canon.canon_ref)
 
 
+@pytest.mark.timeout(
+    1500
+)  # real per-shot Remotion renders via _build_pair: measured ~800s/pair; see pyproject.toml note
 async def test_mutation_reused_decision_id_with_a_different_command_is_rejected(
     session_factory: Factory, tmp_path
 ) -> None:
@@ -506,6 +521,9 @@ async def test_mutation_reused_decision_id_with_a_different_command_is_rejected(
     _assert_sibling_unaffected(shuangwen, canon_ref=canon.canon_ref)
 
 
+@pytest.mark.timeout(
+    1500
+)  # real per-shot Remotion renders via _build_pair: measured ~800s/pair; see pyproject.toml note
 async def test_mutation_waiver_laundering_after_a_semantic_change_is_rejected(
     session_factory: Factory, tmp_path
 ) -> None:

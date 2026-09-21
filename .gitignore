@@ -62,9 +62,12 @@ frontend/.vite/
 
 # Vendored donor projects: source is committed, installed dependencies and
 # build/render output are not (installed fresh via `npm ci` at use time).
+# _r2_runtime_staging/ is r2/m3/remotion_engine.py's own transient staging
+# area (always removed after each render, but ignored as defense in depth).
 vendor/**/node_modules/
 vendor/**/.remotion/
 vendor/**/out/
+vendor/**/_r2_runtime_staging/
 
 # Git backup
 .git.backup

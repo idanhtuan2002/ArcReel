@@ -442,6 +442,7 @@ async def run_profile_slice(
     approved_target_refs: list[str] = []
     multi_candidate_shot_id = direction.shots[0].id
     multi_candidate_count = 0
+    scenes_by_id = {scene.scene_id: scene for scene in admitted_screenplay.scenes}
 
     for index, shot in enumerate(direction.shots):
         readiness = ProductionReadinessEvaluator().evaluate(
@@ -451,20 +452,26 @@ async def run_profile_slice(
             observed_target_version=f"{shot.id}@1",
             binding_snapshot_ref="golden-b-snapshot@1",
         )
+        # M3's real-media closure (docs/superpowers/specs/2026-09-21-r2-m3-real-media-closure-design.md):
+        # GENERATED_VIDEO has no real content source in this closure (no paid
+        # provider is qualified) -- DETERMINISTIC renders the scene's own real
+        # dramatic_text on screen instead of a "TAKE local stand-in" label.
         prepared = GoldenAPreparedShot(
             shot=shot,
             bindings=(),
             readiness=readiness,
             method=GoldenAMethodAssignment(
-                target_ref=shot.id, method=ProductionMethod.GENERATED_VIDEO, rationale="TAKE local stand-in"
+                target_ref=shot.id, method=ProductionMethod.DETERMINISTIC, rationale="Golden B dramatic text"
             ),
         )
+        dramatic_text = scenes_by_id[shot.scene_id].dramatic_text
         variants = ["default", "b"] if index == 0 else ["default"]
         registered = None
         for variant in variants:
             if index == 0:
                 multi_candidate_count += 1
-            produced = local_producer.produce(prepared, work_dir=work_dir / "produced", execution_variant=variant)
+            display_text = dramatic_text if variant == "default" else f"{dramatic_text} ({variant})"
+            produced = local_producer.produce(prepared, work_dir=work_dir / "produced", display_text=display_text)
             fingerprint = compute_content_fingerprint(shot, [])
             registered = host.stage_candidate(
                 target_ref=shot.id,
