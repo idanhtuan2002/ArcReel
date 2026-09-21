@@ -2,6 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**STATUS 2026-09-21: D1-D5 all complete.** The sponsor explicitly lifted the
+"do not touch live worker startup" constraint below (`git log`: `8a70ebf7`
+through `76e68479`). What actually closed H5, in the end, was *not* the
+`ACCEPTED`/`RUNNING` poller this plan originally scoped for D3 -- see
+`docs/research/2026-09-20-r2-m7c-poll-download-cancel-design.md` §6: mirroring
+every task-finalization outcome into `execution_attempts`
+(`GenerationQueue.mark_task_succeeded/failed/cancelled`, `bfa4770d`) makes that
+table truthful within a bounded number of restarts without touching any
+backend at all, since the legacy orphan handler (ADR 0007) already makes
+every real recovery decision and just never told `execution_attempts` about
+it. D4 wires `reconcile_expired`/`realize_pending_cancels` into a live
+periodic scan (`41019f5a`); D5 proves the whole thing survives a real SIGKILL,
+not a simulated one (`76e68479`). Read §6 of the design doc before touching
+this area again -- the original D3 "poll/download recovery" framing below is
+historical context for how the investigation got here, not the final design.
+
 **Goal:** Close the remainder of Task C3
 (`docs/superpowers/plans/2026-09-12-r2-m7c-restart-event-recovery.md`) --
 exact-route poll, download and cancel for an attempt orphaned by a dead
