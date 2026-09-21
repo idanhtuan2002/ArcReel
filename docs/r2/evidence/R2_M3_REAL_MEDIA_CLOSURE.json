@@ -1,0 +1,130 @@
+{
+  "schema_version": "r2-m3-real-media-closure-v1",
+  "status": "REAL_MEDIA_CLOSED",
+  "status_note": "SELF-REVIEWED BY THE IMPLEMENTING AGENT on 2026-09-22 (operator anhtuan), not by an independent Codex standards and spec review, per the plan's own Global Constraints (\"self-review with human override, honestly disclosed, if Codex is unavailable\") and mirroring the M7-A..D precedent (docs/r2/evidence/R2_M7_D_RECOVERY_VERIFIED.json and its own predecessors). This is not an independent verdict.",
+  "plan": {
+    "plan_file": "docs/superpowers/plans/2026-09-21-r2-m3-real-media-closure.md",
+    "design_spec": "docs/superpowers/specs/2026-09-21-r2-m3-real-media-closure-design.md",
+    "research": "docs/research/2026-09-21-r2-m3-real-media-closure-research.md",
+    "precondition": "Global Constraints: start only from the accepted M7-D head (05314871). Satisfied -- this closure branched from that exact head on content-production-os-m7 / feat/r2-m7-host-production-hardening and added no M7 code, no paid provider calls, and vendored only remotion-composer/.",
+    "tasks_completed": [
+      "Task 1 feat(r2): vendor remotion-composer as the M3 render engine (f4d89579)",
+      "Task 2 feat(r2): add RenderPlan contracts and the shot-to-cut projection (03866b45)",
+      "Task 3 feat(r2): replace the M3 solid-color render stub with real Remotion output (4a7676eb)",
+      "Task 4 feat(r2): add a second Golden A factual topic fixture (4bc6f9d2)",
+      "Task 5 feat(r2): render both Golden A/B corpus products through the real chain (49f0361a)",
+      "Task 5 docs(r2): record M3 real-media closure (this commit)"
+    ]
+  },
+  "head": {
+    "sha": "49f0361a",
+    "branch": "feat/r2-m7-host-production-hardening",
+    "worktree": "/home/anhtuan/content-production-os-m7",
+    "parent_base": "05314871 (accepted M7-D head, unchanged by this closure -- no M7 code touched, no Alembic migration added)",
+    "clean_tree": true,
+    "scope_verifier": "uv run python -m pytest tests/unit/scripts/r2/test_verify_m7_scope.py::test_verify_m7_scope_passes_against_the_real_baseline_and_repo -- PASS at this exact HEAD (fails only while the tree is dirty mid-task, as observed and expected during this closure's own development; passes again once every task's changes are committed)"
+  },
+  "f1_gap_closed": {
+    "prior_defect": "docs/r2/evidence/PROJECT_STATUS_REVIEW_2026-09-09.md's F1: every shot rendered as a solid FFmpeg color=... test pattern regardless of production method; Golden A's REUSE method read a real source file's SHA-256 but never used it visually.",
+    "fix": "r2/m3/remotion_engine.py drives a real `npx remotion render` against the vendored remotion-composer/ Explainer composition. REUSE cuts stage the real bound source file into the project's own public/ dir (staticFile() convention -- Chrome's headless renderer refuses local file:// loads, a real bug found and fixed this closure) and render it as video_passthrough. DETERMINISTIC cuts render the shot's real linked Claim.statement or ScreenplayScene.dramatic_text as on-screen text. COMPOSITE (GoldenAComposer's ffmpeg concat) is unchanged and already real.",
+    "verified_not_a_regression": "Every pre-existing M3/M6 test that used to pass against the solid-color stub still passes against real output (full suite, see gate_results); three tests (tests/fixtures/r2/m6_dual_profile_corpus.py's golden-slice builder, and two of its consumers) had to be updated because they had been relying on the old stub's permissiveness (an out-of-scope GENERATED_VIDEO method + an execution_variant parameter with no real-render analog) -- both fixed to use real DETERMINISTIC rendering of Golden B's own real dramatic_text instead."
+  },
+  "r2_dec_031_vendor_evidence": {
+    "gate": "R2-DEC-031",
+    "full_record": "docs/r2/evidence/R2_M3_DONOR_BASELINE.json",
+    "summary": {
+      "donor": "github.com/calesthio/OpenMontage @ 08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "vendored_surface": "remotion-composer/ (TypeScript project) only -- OpenMontage's Python tooling (tools/video/video_compose.py, tools/base_tool.py) is not vendored; R2 owns a new, narrow subprocess wrapper (r2/m3/remotion_engine.py) mirroring the existing ffmpeg subprocess pattern",
+      "baseline_verification": "two independent byte-exact digests (git tree sha + a portable content digest), both reproduced and drift-tested",
+      "coverage": "real zero-key render, real Vietnamese-diacritic render (prior session), real Chinese (Shuangwen) render (this closure, see narrative_product below), plus the donor's own 56-passed upstream contract test log",
+      "parity": "N/A in the classic donor/port sense -- this is the first real use of this composition inside R2; parity is instead the vendored Explainer.tsx being used completely unmodified"
+    }
+  },
+  "audio_decision": "explicit_mute",
+  "audio_decision_rationale": "Both products ship muted for this closure -- RenderPlan carries no audio block. Real narration requires either a TTS pipeline or recorded voice talent, neither built nor in scope here. This is a recorded decision per the V1 bar's own alternative (\"intelligible selected audio or an explicit mute decision\"), not a silently missing feature.",
+  "factual_product": {
+    "topic": "How video encoding/compression works (H.264)",
+    "fixture": "r2/m3/fixtures/golden_a_h264.json",
+    "director_backend": "r2.m3.director.FixtureOpenMontageBackendH264 (new; implements the existing GoldenAOpenMontageBackend Protocol, no interface change)",
+    "test": "tests/integration/r2/m3/test_golden_a_real_media_closure.py::test_h264_factual_product_renders_real_media_with_three_distinct_methods",
+    "chain_exercised": "load_golden_a_factual_bundle -> FixtureOpenMontageBackendH264 -> GoldenAProductionPreparation (unchanged) -> render_cut (Task 3) -> GoldenAHostIntegration -> GoldenAComposer.compose (unchanged)",
+    "measured": {
+      "SH01_REUSE_duration_seconds": 23.061333,
+      "SH02_DETERMINISTIC_duration_seconds": 26.048,
+      "SH03_DETERMINISTIC_duration_seconds": 26.048,
+      "final_composite_duration_seconds": 75.157333,
+      "v1_bar_window": "60-180s, satisfied"
+    },
+    "method_diversity_proof": "shot_methods == {REUSE, DETERMINISTIC}; final.method == COMPOSITE; all 4 real outputs (3 shots + final) have distinct sha256; every shot's own rendered frame has pixel stddev > 5.0 (real content, not solid color)",
+    "external_provider_cost": "0 (Decimal) for every produced asset and the final composite"
+  },
+  "narrative_product": {
+    "corpus": "tests/fixtures/r2/m6_dual_profile_corpus.py's existing Golden B \"ledger reveal\" corpus, reused verbatim, unchanged -- 6 scenes, 2 named characters, 15s each = 90s target, two profile variants (WESTERN_GENERIC, CN_SHORT_DRAMA_SHUANGWEN)",
+    "chain_exercised": "AdmittedScreenplayRef -> TakeDirectorAdapter.direct() (unchanged) -> TakeDirectionResult.shots -> project_shot_to_cut (Task 2) -> render_cut (Task 3) -> GoldenAComposer.compose (unchanged, proven milestone-agnostic: it composes M6-produced masters exactly as it composes M3's own)",
+    "acceptance_test": "tests/integration/r2/test_m6_dual_profile_acceptance.py -- 10 tests, all green at this HEAD, each building at least one full real Western-generic and/or CN-Shuangwen slice",
+    "real_content_strengthening": "_assert_real_video now additionally asserts frame_pixel_stddev(final_video) > 5.0 (previously only checked ffprobe codec_type==video), reusing the same real-content check as the factual product",
+    "cjk_mojibake_spot_check": "One-time manual verification (not a repeatable automated test -- OCR is explicitly out of scope per the design spec): extracted a frame ~20s into a real Shuangwen final render and visually inspected it. Result: correct, legible simplified Chinese text with proper punctuation (\"第9章 阿May撬开木箱，账本用布包着放在里面。\"), no mojibake, no tofu boxes. This closes the open item from the prior session's research (Vietnamese was verified then; CJK was untested until this task). The frame image itself was a scratch artifact under the session's own tmp scratchpad and was not checked into the repository.",
+    "external_provider_cost": "0 (Decimal) for every produced asset and every final composite"
+  },
+  "method_diversity_proof_overall": "Per spec section 9's \"at least three production methods\" bar: proven within the factual product alone (REUSE + DETERMINISTIC + COMPOSITE, each producing visibly distinct non-solid-color output, see factual_product.method_diversity_proof above). The narrative product additionally proves DETERMINISTIC + COMPOSITE work correctly for a second, independently-authored milestone's data through the identical render/compose code path, without needing to re-derive REUSE (already proven).",
+  "gate_results": {
+    "ruff_check": "pass (repo-wide)",
+    "ruff_format_check": "pass (1494 files already formatted)",
+    "basedpyright": "0 errors, 0 warnings, 0 notes (repo-wide --warnings)",
+    "lint_imports": "20 kept, 0 broken",
+    "deptry": "no dependency issues found (lib server alembic scripts tests r2)",
+    "pytest_full_sqlite": {
+      "command": "uv run python -m pytest -n 4 --dist loadfile",
+      "passed": 14160,
+      "skipped": 35,
+      "failed": 0,
+      "note": "One run at an intermediate, uncommitted HEAD during this closure's own development showed test_verify_m7_scope failing solely because the tree was dirty (expected, self-resolving); re-verified passing once every task's changes were committed (see head.scope_verifier). The final count above (14160 passed) is from the run against the fully committed Task 1-5 code, before the evidence-recording commit."
+    },
+    "pytest_postgres_compat": "not re-run for this closure -- Tasks 1-5 touch zero database/schema/ORM/migration/repository code (only r2/m3/*, a new test-fixture-only director backend, fixture JSON, and test files); the postgres-compat selection (uses_db and not sqlite_only) exercises dialect-specific DB behavior with no plausible path to be affected by a video-rendering change. Standing up a disposable PostgreSQL instance solely to re-confirm an unrelated selection was judged not worth the cost; this is a disclosed scope decision, not an oversight.",
+    "audit_tests": "0 violations (uv run python scripts/audit_tests.py --check)",
+    "git_diff_check": "clean at head.sha",
+    "frontend_website_checks": "not run -- this closure touched zero files under frontend/ or website/ (confirmed via git diff --stat across all 5 tasks)"
+  },
+  "verification_matrix": [
+    {
+      "requirement": "one real factual artifact end-to-end",
+      "proof": "New topic (H.264) rendered through the full ResearchPack -> ClaimLedger -> ScriptArtifact -> ShotSpec -> RenderCut -> ApprovedMaster chain, real Remotion output, ffprobe-verified. See factual_product above.",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "one real narrative/drama artifact end-to-end",
+      "proof": "Golden B corpus rendered through ScreenplayArtifactV2 -> TakeDirectorAdapter -> ShotSpecV2 -> RenderCut -> ApprovedMaster, both profile variants. See narrative_product above.",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "at least three production methods",
+      "proof": "REUSE (real passthrough), DETERMINISTIC (real claim/dramatic-text card), COMPOSITE (real concat) -- each producing visibly distinct, non-solid-color output. See method_diversity_proof_overall above.",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "claim lineage visible",
+      "proof": "Claim.statement (factual product) and ScreenplayScene.dramatic_text (narrative product) are not just data-linked but literally rendered on screen in the DETERMINISTIC shots -- confirmed by pixel-diversity checks and, for the narrative product's Shuangwen variant, direct visual inspection.",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "cost/provenance captured",
+      "proof": "RenderedCutAsset.external_provider_cost = Decimal(\"0\") for every produced asset in both products (accurate: no paid provider used); execution_fingerprint/tool_version recorded exactly as the pre-existing LocalProducedAsset shape already did.",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "R2-DEC-031 (donor reuse)",
+      "proof": "See r2_dec_031_vendor_evidence above and docs/r2/evidence/R2_M3_DONOR_BASELINE.json in full.",
+      "status": "PROVEN"
+    }
+  ],
+  "coverage_limitations": [
+    "No independent (Codex or otherwise) review was run against this exact HEAD; status is a self-review with human override per status_note above.",
+    "No real narration audio for either product -- both ship explicitly muted; see audio_decision above. This is a recorded decision, not a gap.",
+    "No paid-provider production methods (GENERATED_VIDEO, STOCK, GENERATED_IMAGE, SCREEN_CAPTURE) are exercised anywhere in this closure -- project_shot_to_cut raises UnimplementedRenderMethodError for all of them by design (r2/m3/render_projection.py), so a silent placeholder fallback is structurally impossible, but real paid-provider rendering remains entirely unbuilt and out of this closure's scope.",
+    "No new narrative content was authored for the narrative product -- Golden B's existing 'ledger reveal' corpus (tests/fixtures/r2/m6_dual_profile_corpus.py) was reused verbatim, unchanged, per the design spec's explicit non-goal.",
+    "The CJK mojibake check for the Shuangwen variant is a one-time manual visual spot-check, not an automated, repeatable assertion -- OCR-based automated verification is explicitly out of scope per the design spec. A regression here would only be caught by a future manual re-check or an automated OCR addition, neither of which exists today.",
+    "postgres-compat pytest selection was not re-run for this closure; see gate_results.pytest_postgres_compat for the disclosed reasoning.",
+    "Real Remotion rendering is substantially slower than the old solid-color ffmpeg stub it replaced (roughly linear in each shot's target_duration, empirically ~3.5-4s of render wall time per second of output on this development machine) -- per-test pytest-timeout markers on the affected M3/M6 integration tests were raised from the global 120s default to measured-plus-margin values (300s-1500s depending on how many real renders a given test performs) rather than left at a value that would spuriously fail. This is a real, disclosed cost of closing F1 with actual content instead of a stub, not a defect.",
+    "Frontend (pnpm check) and website checks were not run in this session; this closure touched zero files under frontend/ or website/ (confirmed via git diff --stat across all 5 tasks)."
+  ]
+}
