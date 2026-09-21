@@ -1,0 +1,90 @@
+{
+  "schema_version": "r2-m7d-recovery-verified-v1",
+  "status": "RECOVERY_VERIFIED",
+  "status_note": "VERIFIED BY HUMAN OVERRIDE on 2026-09-21 (operator anhtuan), not by an independent Codex standards and spec review, which was explicitly declined for M7-A/M7-B/M7-C and carried forward for M7-D under the same decision. This is a self-review by the same agent that implemented the change, not an independent verdict. Mirrors the M7-C precedent (docs/r2/evidence/R2_M7_C_RESTART_STREAM_RECOVERY.json) and the M7-A/M7-B precedents before it.",
+  "plan": {
+    "plan_file": "docs/superpowers/plans/2026-09-12-r2-m7d-backup-observability.md",
+    "precondition": "Global Constraints: start only from accepted clean M7-C at Alembic head 7b7c4a0e0001. Satisfied per docs/r2/evidence/R2_M7_C_RESTART_STREAM_RECOVERY.json. M7-D adds no migration -- Alembic head is unchanged at 7b7c4a0e0001.",
+    "tasks_completed": [
+      "D1 feat(host): define consistent database media backup sets (6ba94f673ff44fce725fabaf2529e185e755de65)",
+      "D2 feat(host): correlate generation without leaking secrets (f4e588bbd34ea8c15c6aa87519615a4c985b9e00)",
+      "D3 docs(r2): record M7-D recovery verification (this commit)"
+    ]
+  },
+  "head": {
+    "sha": "f4e588bbd34ea8c15c6aa87519615a4c985b9e00",
+    "branch": "feat/r2-m7-host-production-hardening",
+    "worktree": "/home/anhtuan/content-production-os-m7",
+    "parent_base": "7b7c4a0e0001 (M7-C accepted head's exact migration head, unchanged by M7-D)",
+    "clean_tree": true,
+    "scope_verifier": "uv run python scripts/r2/verify_m7_scope.py --check -- all 8 checks PASS at this exact HEAD (m6_accepted, clean_tree, base_sha, alembic_head, revision_graph_digest, documents, legacy_seams, submit_routes)"
+  },
+  "h6_backup_and_restore": {
+    "manifest_contract": "r2.contracts.host_hardening.BackupSetManifest / MediaInventoryEntry / BackupVerdict (new this milestone)",
+    "engine": "r2.host_hardening.backup: create_backup_set, restore_backup_set, verify_restored_backup_set",
+    "fault_matrix_proven": [
+      "split recovery point -- candidate count checked before and after the dump/copy work; a mutation mid-run raises InconsistentRecoveryPointError (real concurrent-insert test against PostgreSQL)",
+      "missing media -- MediaIntegrityError before any dump work",
+      "corrupt media (digest mismatch) -- MediaIntegrityError",
+      "incomplete copy -- post-copy re-checksum against the source catches a truncated/corrupted copy",
+      "GC race -- BackupSetRepository.add_media_ref is recorded for every included candidate before any byte is read, so CandidateRetentionPolicy refuses deletion for the whole PREPARING/COMPLETE window (real test proves a delete attempt is refused)",
+      "secret/path leakage -- object_ref path-escape guard (PathEscapesMediaRootError); manifest JSON asserted free of the source DSN/password in a real test",
+      "source-target alias -- refused before any write, both for create (backup_dir aliasing media_root) and restore (target_media_root aliasing backup_dir)",
+      "non-empty restore target -- refused for both a non-empty target database and a non-empty target media root, before any write"
+    ],
+    "clean_target_drill": {
+      "test_file": "tests/integration/r2/host_hardening/test_backup_restore_drill.py",
+      "method": "Seeded 2 candidate objects (real media bytes on disk), 1 promoted master head, and its durable project event into a disposable PostgreSQL database + disposable media root, via the exact repositories the product uses. Created a backup set, then genuinely destroyed the source (DROP DATABASE, rmtree the media root), then restored into a second, independently disposable, empty database + empty media root.",
+      "post_restore_verification": "verify_restored_backup_set: accepted=true, checked_media_count=2, checked_master_count=1, zero reason_codes. Additionally re-read the restored data through the same repository/query paths the product uses (CandidateObjectRepository.get_exact, a direct master_head_versions row read) and confirmed every field round-tripped, proving the ADR-0089 P0 item 5 bar directly: selected projects and masters remain resolvable, not merely byte-identical on disk.",
+      "measured_rpo_seconds": 0.161,
+      "measured_rto_seconds": 0.927,
+      "rpo_rto_definition": "RPO measured as the gap between the last durable write before backup creation and create_backup_set's own recovery_target timestamp (same-process wall clock). RTO measured as the wall-clock duration from the start of restore_backup_set through the end of verify_restored_backup_set. Both are same-machine, same-process, disposable-container measurements -- not representative of a real network-attached restore's transfer time; see coverage_limitations."
+    },
+    "scope_note": "Golden A/B (M3/M6's own fixture generators) were not invoked directly for this drill: pg_dump/pg_restore operate on the whole database regardless of which tables are populated, so the backup/restore mechanism's own correctness does not depend on which fixture produced the rows. The drill instead seeds a representative cross-section (candidate/master/event) directly through the same repositories M3/M6's own code paths use, and proves resolvability through those same repositories post-restore."
+  },
+  "h7_secret_safe_correlation": {
+    "policy_module": "r2.host_hardening.telemetry (allowlist, public_provider_job_ref keyed-HMAC reference)",
+    "wiring_module": "server.telemetry (OpenTelemetry spans, W3C baggage clearing)",
+    "wired_call_site": "server.services.execution_recovery_scheduler.ExecutionRecoveryScheduler.scan_once -- one span per reconciled/cancel-realized attempt",
+    "secret_canary_evidence": "tests/integration/server/services/test_execution_recovery_telemetry.py planted a real-shaped canary as a provider_job_id, ran the real ambiguous-cancel-failure recovery path (the one reachable path today where a recovered ReconcileResult carries an already-accepted provider_job_id, since all 11 registered profiles are NONE-idempotency/supports_cancel:false), and asserted the raw canary string is absent from every exported span attribute, from application logs (caplog), and from durable project_event public payloads, while confirming execution_id correlation and the HMAC-substituted provider_job_ref are both present.",
+    "scope_note": "H7 wiring covers the r2.host_hardening execution-recovery pipeline (this milestone's own new surface) only. lib/video_backends/base.py's persist_provider_job_id already logs a raw job_id today (pre-existing, predates M7); it is one of docs/r2/evidence/R2_M7_BASELINE.json's tracked legacy_seams and was deliberately left untouched rather than risk an unreviewed change to a frozen legacy integration point outside this milestone's scope."
+  },
+  "provider_qualification_deferred": "M7-E (production candidate / H8 compatibility and provider qualification) is a separate, later milestone per its own plan (docs/superpowers/plans/2026-09-12-r2-m7e-production-candidate.md), gated on this file's RECOVERY_VERIFIED status. Real provider qualification additionally requires paid canary execution, credential authority, and bounded budget evidence, all explicitly named as separately-approved operational steps outside any agent's own authority -- M7-D does not attempt any part of it.",
+  "migration": {
+    "current_head": "7b7c4a0e0001",
+    "note": "unchanged from M7-C -- M7-D adds no schema. Confirmed via `uv run alembic upgrade head / upgrade head / downgrade base / upgrade head` round trip against a real disposable PostgreSQL 18 database: clean upgrade, idempotent re-upgrade, clean downgrade to base, clean re-upgrade to head."
+  },
+  "gate_results": {
+    "ruff_check": "pass (repo-wide)",
+    "ruff_format_check": "pass (1485 files already formatted)",
+    "basedpyright": "0 errors, 0 warnings, 0 notes (repo-wide --warnings)",
+    "lint_imports": "20 kept, 0 broken",
+    "deptry": "no dependency issues found (lib server alembic scripts tests r2)",
+    "pytest_full_sqlite": {
+      "command": "uv run python -m pytest -n 4 --dist loadfile",
+      "passed": 14137,
+      "skipped": 35,
+      "failed": 0
+    },
+    "pytest_postgres_compat": {
+      "command": "uv run python -m pytest -m \"uses_db and not sqlite_only\" -n 4 --dist loadfile (exact CI postgres-compat job selection)",
+      "passed": 1017,
+      "skipped": 0,
+      "failed": 0
+    },
+    "audit_tests": "0 violations",
+    "git_diff_check": "clean",
+    "scope_verifier": "uv run python scripts/r2/verify_m7_scope.py --check -- all 8 checks PASS",
+    "alembic_round_trip": "upgrade head / upgrade head (idempotent) / downgrade base / upgrade head -- all clean, against a real disposable PostgreSQL 18 database"
+  },
+  "coverage_limitations": [
+    "No independent (Codex or otherwise) review was run against this exact HEAD; status is a human/self override per status_note above.",
+    "The restore drill and all PostgreSQL testing used fresh, empty, single-node local Docker containers; it does not exercise production-scale connection pooling, replica failover, network-attached storage transfer time, or the CI runner's exact resource profile. Measured RPO/RTO reflect a same-machine, same-process, disposable-container round trip, not a real cross-network restore.",
+    "pg_dump/pg_restore client/server major-version compatibility is a real, observed operational hazard (see the module docstring in r2/host_hardening/backup.py and the runbook) -- this milestone's own testing used a version-matched client/server pair; a mismatched pair in a real deployment would need the same care documented in docs/r2/runbooks/m7-backup-restore.md.",
+    "No automated write-fence: create_backup_set proves (does not assume) that no candidate mutation happened during its own run, but a real production backup still requires the operator to stop the application/worker first, per the runbook's Preconditions section.",
+    "The restore drill seeds a representative cross-section of the durable ID chain (candidate/master/event) directly through the product's own repositories, not the full M3/M6 Golden A/B fixture-generation pipeline; see h6_backup_and_restore.scope_note.",
+    "H7 telemetry wiring covers only the execution-recovery scheduler; other execution-pipeline seams (submission, promotion) do not yet emit spans. This is a real, disclosed gap, not a claim of complete instrumentation.",
+    "Provider qualification (H8) is explicitly out of scope for this file; see provider_qualification_deferred above.",
+    "Frontend (pnpm check) and website checks were not run in this session; M7-D touched zero files under frontend/ or website/ (confirmed via git diff --stat against the M7-C head)."
+  ]
+}
