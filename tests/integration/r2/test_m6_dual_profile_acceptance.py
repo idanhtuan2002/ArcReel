@@ -59,6 +59,7 @@ from r2.contracts.enums import CreativeApprovalStatus
 from r2.contracts.production import CameraAngle, ShotSpecV1, ShotSpecV2
 from r2.production import ProductionApprovalService
 from r2.production.shot_schema_upgrade import ShotSpecManualMappingRequired, upgrade_shot_spec_v1
+from tests.fixtures.r2.m3_media_assertions import frame_pixel_stddev
 from tests.fixtures.r2.m6_dual_profile_corpus import GoldenBSliceEvidence, build_golden_b_canon, run_profile_slice
 
 USER = "u1"
@@ -108,6 +109,13 @@ def _assert_real_video(path) -> None:
         text=True,
     )
     assert probe.stdout.strip() == "video"
+
+    # Real per-shot Remotion rendering (M3 real-media closure Task 3) means
+    # the first shot's own DETERMINISTIC text card is visible ~1s in, not a
+    # solid color -- frame_pixel_stddev is the same real-content check used
+    # for M3's own Golden A products.
+    stddev = frame_pixel_stddev(path, path.parent)
+    assert stddev > 5.0, f"final video's opening frame looks solid-color (pixel stddev={stddev})"
 
 
 def _assert_slice_shape(slice_: GoldenBSliceEvidence, *, canon_ref) -> None:

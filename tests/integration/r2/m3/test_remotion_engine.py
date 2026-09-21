@@ -5,45 +5,14 @@ docs/r2/evidence/R2_M3_DONOR_BASELINE.json)."""
 
 from __future__ import annotations
 
-import subprocess
 from decimal import Decimal
 from pathlib import Path
 
-import numpy as np
 import pytest
-from PIL import Image
 
 from r2.m3.remotion_engine import render_cut
 from r2.m3.render_plan import RenderCut
-
-
-def _frame_pixel_stddev(video_path: Path, tmp_path: Path, *, frame_index: int = 30) -> float:
-    """Extract one frame and return the standard deviation of its pixel
-    values -- a real, content-bearing frame (text, an image) has meaningfully
-    non-zero variance; a solid-color frame's variance is ~0 (H.264 lossy
-    artifacts aside)."""
-    frame_path = tmp_path / "frame.png"
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(video_path),
-            "-vf",
-            f"select=eq(n\\,{frame_index})",
-            "-vframes",
-            "1",
-            "-update",
-            "1",
-            str(frame_path),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    image = Image.open(frame_path).convert("L")
-    pixels = np.asarray(image, dtype=np.float64)
-    return float(pixels.std())
+from tests.fixtures.r2.m3_media_assertions import frame_pixel_stddev as _frame_pixel_stddev
 
 
 def test_video_passthrough_with_a_missing_source_raises_before_any_subprocess_call(tmp_path: Path) -> None:

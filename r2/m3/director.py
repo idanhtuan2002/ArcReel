@@ -181,6 +181,153 @@ class FixtureOpenMontageBackend:
         )
 
 
+class FixtureOpenMontageBackendH264:
+    """Golden A's second factual topic (M3 real-media closure Task 5): one
+    REUSE shot + two DETERMINISTIC shots, one per script section -- no
+    section needs splitting across shots, unlike the Git topic's SC02."""
+
+    def direct(self, script: ScriptArtifact) -> GoldenADirectionResult:
+        if script.id != "SCRIPT-GOLDEN-A-H264":
+            raise ValueError("Fixture backend only accepts Golden A H264")
+        scenes_data = [
+            {
+                "id": "SC01",
+                "schema_version": "1",
+                "version": 1,
+                "source_artifact_ref": "SCRIPT-GOLDEN-A-H264",
+                "source_unit_refs": ["SEC-H264-01"],
+                "content_basis": {
+                    "basis_type": "FACTUAL",
+                    "basis_version": "golden-a-h264-v1",
+                    "refs": ["research:RP-GOLDEN-A-H264", "claim:CLAIM-H264-001"],
+                },
+                "purpose": "Explain SEC-H264-01",
+                "duration_target": 22.0,
+                "temporal_context": None,
+                "location_ref": None,
+                "entity_refs": [],
+                "required_beats": ["beat:SEC-H264-01"],
+                "continuity_requirements": [],
+                "allowed_methods": ["REUSE"],
+                "approval_status": "APPROVED",
+            },
+            {
+                "id": "SC02",
+                "schema_version": "1",
+                "version": 1,
+                "source_artifact_ref": "SCRIPT-GOLDEN-A-H264",
+                "source_unit_refs": ["SEC-H264-02"],
+                "content_basis": {
+                    "basis_type": "FACTUAL",
+                    "basis_version": "golden-a-h264-v1",
+                    "refs": ["research:RP-GOLDEN-A-H264", "claim:CLAIM-H264-002"],
+                },
+                "purpose": "Explain SEC-H264-02",
+                "duration_target": 25.0,
+                "temporal_context": None,
+                "location_ref": None,
+                "entity_refs": [],
+                "required_beats": ["beat:SEC-H264-02"],
+                "continuity_requirements": [],
+                "allowed_methods": ["DETERMINISTIC"],
+                "approval_status": "APPROVED",
+            },
+            {
+                "id": "SC03",
+                "schema_version": "1",
+                "version": 1,
+                "source_artifact_ref": "SCRIPT-GOLDEN-A-H264",
+                "source_unit_refs": ["SEC-H264-03"],
+                "content_basis": {
+                    "basis_type": "FACTUAL",
+                    "basis_version": "golden-a-h264-v1",
+                    "refs": ["research:RP-GOLDEN-A-H264", "claim:CLAIM-H264-003"],
+                },
+                "purpose": "Explain SEC-H264-03",
+                "duration_target": 25.0,
+                "temporal_context": None,
+                "location_ref": None,
+                "entity_refs": [],
+                "required_beats": ["beat:SEC-H264-03"],
+                "continuity_requirements": [],
+                "allowed_methods": ["DETERMINISTIC"],
+                "approval_status": "APPROVED",
+            },
+        ]
+        shots_data = [
+            {
+                "id": "SH01",
+                "schema_version": "1",
+                "version": 1,
+                "scene_id": "SC01",
+                "content_basis": {
+                    "basis_type": "FACTUAL",
+                    "basis_version": "golden-a-h264-v1",
+                    "refs": ["research:RP-GOLDEN-A-H264"],
+                },
+                "purpose": "Visualize SH01",
+                "target_duration": 22.0,
+                "framing": "graphic",
+                "camera": "static",
+                "entity_refs": [],
+                "audio_intent": "narration",
+                "required_continuity": [],
+                "required_reference_roles": [],
+                "allowed_methods": ["REUSE"],
+                "quality_tier": 1,
+                "approval_status": "APPROVED",
+            },
+            {
+                "id": "SH02",
+                "schema_version": "1",
+                "version": 1,
+                "scene_id": "SC02",
+                "content_basis": {
+                    "basis_type": "FACTUAL",
+                    "basis_version": "golden-a-h264-v1",
+                    "refs": ["research:RP-GOLDEN-A-H264"],
+                },
+                "purpose": "Visualize SH02",
+                "target_duration": 25.0,
+                "framing": "graphic",
+                "camera": "static",
+                "entity_refs": [],
+                "audio_intent": "narration",
+                "required_continuity": [],
+                "required_reference_roles": [],
+                "allowed_methods": ["DETERMINISTIC"],
+                "quality_tier": 1,
+                "approval_status": "APPROVED",
+            },
+            {
+                "id": "SH03",
+                "schema_version": "1",
+                "version": 1,
+                "scene_id": "SC03",
+                "content_basis": {
+                    "basis_type": "FACTUAL",
+                    "basis_version": "golden-a-h264-v1",
+                    "refs": ["research:RP-GOLDEN-A-H264"],
+                },
+                "purpose": "Visualize SH03",
+                "target_duration": 25.0,
+                "framing": "graphic",
+                "camera": "static",
+                "entity_refs": [],
+                "audio_intent": "narration",
+                "required_continuity": [],
+                "required_reference_roles": [],
+                "allowed_methods": ["DETERMINISTIC"],
+                "quality_tier": 1,
+                "approval_status": "APPROVED",
+            },
+        ]
+        return GoldenADirectionResult(
+            tuple(SceneSpec.model_validate(x) for x in scenes_data),
+            tuple(ShotSpec.model_validate(x) for x in shots_data),
+        )
+
+
 class GoldenAOpenMontageAdapter:
     def __init__(self, backend: GoldenAOpenMontageBackend) -> None:
         self._backend = backend
