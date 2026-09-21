@@ -318,3 +318,32 @@ tự hết hạn giữa hai lần gọi `on_progress`); (iii) renew thất bại
 mất kết nối DB) có nên làm gián đoạn poll loop đang chạy hay không — khuynh
 hướng an toàn là KHÔNG (đừng để một lỗi ghi lease làm hỏng một video generation
 đang chạy tốt), nhưng cần ghi rõ thành quyết định, không để ngầm định.
+
+## 6. 2026-09-21: tìm ra lối đóng nút chặn KHÔNG cần heartbeat — bookkeeping mirror (`bfa4770d`)
+
+Trong lúc tìm hiểu quan hệ giữa `execution_attempts` và hệ thống phục hồi cũ
+(`_handle_orphan_tasks_on_start`, ADR-0007, đang chạy thật, chưa từng biết
+`execution_attempts` tồn tại), phát hiện: **mọi** đường hoàn tất task (happy
+path bình thường, và mọi nhánh của orphan handler kể cả dispatcher resume nền)
+đều đi qua đúng BA method dùng chung: `GenerationQueue.mark_task_succeeded /
+mark_task_failed / mark_task_cancelled`. Móc bookkeeping vào đúng ba chỗ này
+(ghi lại kết quả cuối cùng vào `execution_attempts` sau khi logic quyết định
+cũ đã tự chạy xong, không đổi logic đó) giải quyết được đúng vấn đề cốt lõi
+mà kế hoạch heartbeat ở mục 5 định giải quyết — **mà không cần đụng vào 7
+backend hay `poll_with_retry` chút nào.**
+
+Hệ quả: `execution_attempts` giờ chắc chắn trở nên đúng sự thật (terminal)
+trong một số hữu hạn lần restart — bất kể task hoàn tất qua happy path hay qua
+orphan-resume ở lần restart nào — vì cả hai đều gọi chung ba method đó. Điều
+này làm mục 5 (heartbeat gia hạn lease + poller ACCEPTED/RUNNING) hết cần
+thiết cho đúng mục tiêu "đóng nút chặn H5": heartbeat chỉ còn giá trị bổ sung
+(phát hiện job treo nhanh hơn thay vì chờ hoàn tất tự nhiên), không còn là
+điều kiện tiên quyết về đúng đắn. Quyết định: **không xây heartbeat/poller
+ACCEPTED-RUNNING** — giữ đúng nguyên tắc không sửa 7 file backend đang chạy
+thật khi có cách rẻ hơn, an toàn hơn đạt cùng mục tiêu.
+
+Một chi tiết cần lưu ý khi hiện thực: bảng chuyển trạng thái hợp lệ không cho
+`ACCEPTED`/`RUNNING` → `CANCELLED` trực tiếp (đúng thiết kế: cancel luôn cần
+bước ghi ý định `CANCEL_REQUESTED` trước). Legacy cancel không có bước đó, nên
+mirror phải tự tổng hợp một bước `request_cancel` (qua `system:legacy-mirror`
+actor scope) trước khi áp observation `CANCELLED`.
