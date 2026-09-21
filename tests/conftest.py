@@ -119,6 +119,20 @@ def stub_sandbox_check(monkeypatch, request):
     monkeypatch.setattr("server.app.check_sandbox_available", lambda: True)
 
 
+@pytest.fixture(autouse=True)
+def telemetry_hmac_key(monkeypatch):
+    """Fixed H7 telemetry HMAC key/version for every test.
+
+    Without an explicit ``ARCREEL_TELEMETRY_HMAC_KEY``, ``server.telemetry``
+    generates and caches one random key per process (like
+    ``server.auth.get_token_secret``) -- fine for a real run, but it would
+    make ``public_job_ref`` output non-reproducible across test runs for any
+    test asserting on its exact value.
+    """
+    monkeypatch.setenv("ARCREEL_TELEMETRY_HMAC_KEY", "test-fixed-telemetry-hmac-key")
+    monkeypatch.setenv("ARCREEL_TELEMETRY_HMAC_KEY_VERSION", "test")
+
+
 @pytest.fixture(scope="session", autouse=True)
 def profile_env(tmp_path_factory):
     """Provide one minimal runtime profile per pytest worker.

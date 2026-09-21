@@ -24,13 +24,36 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 
 from lib.db import safe_session_factory
+from r2.contracts.host_hardening import ReconcileResult
 from server.services.execution_attempts import AdapterRegistry, build_execution_attempt_service
+from server.telemetry import execution_span, public_job_ref
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 60.0
+_DEPLOYMENT_ENVIRONMENT = os.environ.get("DEPLOYMENT_ENVIRONMENT", "development")
+
+
+def _span_for_reconcile_result(operation_name: str, result: ReconcileResult) -> None:
+    """One H7-correlated span per reconciled/cancel-realized attempt.
+
+    The raw ``provider_job_id`` never leaves this function -- everything else
+    (the span, and by extension any exporter/collector reading it) only ever
+    sees ``public_job_ref``'s HMAC-derived reference.
+    """
+    durable_ids = {"execution_id": result.execution_id}
+    if result.provider_job_id is not None:
+        durable_ids["provider_job_ref"] = public_job_ref(result.provider_job_id)
+    with execution_span(
+        operation_name,
+        deployment_environment=_DEPLOYMENT_ENVIRONMENT,
+        attempt_state=result.state.value,
+        **durable_ids,
+    ):
+        pass
 
 
 class ExecutionRecoveryScheduler:
@@ -77,6 +100,10 @@ class ExecutionRecoveryScheduler:
             )
             expired = await service.reconcile_expired()
             cancels = await service.realize_pending_cancels()
+            for result in expired:
+                _span_for_reconcile_result("host_hardening.reconcile_expired", result)
+            for result in cancels:
+                _span_for_reconcile_result("host_hardening.realize_pending_cancel", result)
             if expired or cancels:
                 logger.info(
                     "host-hardening recovery scan: reconciled=%d realized_cancels=%d",
