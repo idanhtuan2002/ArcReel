@@ -60,6 +60,12 @@ frontend/dist/
 frontend/.vite/
 *.tsbuildinfo
 
+# Vendored donor projects: source is committed, installed dependencies and
+# build/render output are not (installed fresh via `npm ci` at use time).
+vendor/**/node_modules/
+vendor/**/.remotion/
+vendor/**/out/
+
 # Git backup
 .git.backup
 

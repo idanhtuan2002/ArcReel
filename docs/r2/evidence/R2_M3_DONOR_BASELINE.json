@@ -1,0 +1,40 @@
+{
+  "schema_version": "r2-m3-donor-baseline-v1",
+  "generated_for": "R2-M3-real-media-closure",
+  "gate": "R2-DEC-031",
+  "note": "M3 vendors exactly one donor surface: OpenMontage's remotion-composer/ TypeScript project (the Remotion composition layer), unmodified. None of OpenMontage's Python tooling (tools/video/video_compose.py, tools/base_tool.py) is vendored -- R2 owns a new, narrow Python subprocess wrapper instead (r2/m3/remotion_engine.py), mirroring the existing ffmpeg subprocess pattern already used by composition.py/local_production.py. See docs/research/2026-09-21-r2-m3-real-media-closure-research.md sections 4 and 7 for the full reasoning.",
+  "ports": {
+    "remotion_composer": {
+      "repo": "calesthio/OpenMontage",
+      "revision": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "source_path": "remotion-composer/",
+      "url": "https://github.com/calesthio/OpenMontage/tree/08e2151fa02de28a5d6a312b3d575692bf147ad7/remotion-composer",
+      "vendored_path": "vendor/openmontage/remotion-composer/",
+      "verification": {
+        "method": "Two independent, cross-checking digests, both verified byte-exact against the pinned upstream commit at vendoring time.",
+        "git_tree_sha": "5d1021a203d9fbfef587e4bf3f9c154abe4736c7",
+        "git_tree_sha_note": "`git rev-parse <revision>:remotion-composer` in a fresh clone of the donor repo at the pinned commit. Independently reproduced this session via `git write-tree --prefix=vendor/openmontage/remotion-composer` against the freshly-copied, staged files in this repo -- identical value, proving byte-exact copy (git tree hashes are content-addressed and repo-independent).",
+        "portable_content_digest": "b343597a661df9b970f5fe55e586a274b9f6cb2025a33394b6bfc16fde5a22c0",
+        "portable_content_digest_note": "r2.m3.donor_baseline.compute_vendor_tree_digest applied to vendor/openmontage/remotion-composer/ -- pure Python, no git subprocess dependency, used by the ongoing drift-detection test so it works identically in CI regardless of git index state.",
+        "file_count": 41
+      },
+      "python_wrapper": "r2/m3/remotion_engine.py (new, not part of this vendored surface -- R2-owned code)",
+      "selected_compositions": ["Explainer"],
+      "excluded_compositions": [
+        "CinematicRenderer",
+        "TalkingHead",
+        "TitledVideo",
+        "CollageBurst",
+        "LyricOverlay"
+      ],
+      "excluded_reason": "M3's real-media closure only needs the Cut/Overlay/AudioConfig-driven Explainer composition (docs/superpowers/specs/2026-09-21-r2-m3-real-media-closure-design.md section 4). The other registered compositions in Root.tsx are real, vendored (kept, since they are part of the same remotion-composer/ project and un-vendoring individual files would fork the donor's own directory structure), but have no R2 caller and are not exercised by any R2 test.",
+      "intentional_deviations": [],
+      "coverage_evidence": [
+        "Real zero-key render executed this session: `npx remotion render src/index.tsx Explainer <out>.mp4 --props='{\"cuts\":[{\"in_seconds\":0,\"out_seconds\":3}],...}'` produced a valid h264/aac 1920x1080 4.05s file, verified via ffprobe.",
+        "Real Vietnamese-diacritic text render executed this session (a text Cut with 'Việt Nam: Đây là một câu tiếng Việt có dấu, kiểm tra font.'), verified by extracting and visually inspecting a frame -- correct rendering, no mojibake, no missing glyphs.",
+        "Upstream donor's own contract tests already ran clean prior to this session (docs/r2/evidence/reuse-map-2026-09-07/openmontage-probe.log): 56 passed, exit 0, across test_phase0_contracts.py, test_remotion_video_transition_contract.py, test_theme_text_contrast_contract.py."
+      ],
+      "parity_coverage_notes": "No prior R2 implementation exists for this surface (M3's real rendering was always a solid-color stub, never a reimplementation of Explainer's behavior) -- there is no R2-side output to diff against for classic donor/port parity. Parity is instead established by using the vendored Explainer.tsx completely unmodified (no R2 fork of its render logic) plus this session's own real render executions as coverage evidence."
+    }
+  }
+}
