@@ -128,11 +128,6 @@ export interface CustomProviderModelInput {
   capability_overrides?: CapabilityOverrides | null;
 }
 
-export interface CustomProviderCredentials {
-  base_url: string;
-  api_key: string;
-}
-
 export interface AnthropicDiscoverRequest {
   base_url?: string;
   api_key?: string;

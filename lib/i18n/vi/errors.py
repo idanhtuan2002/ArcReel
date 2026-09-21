@@ -421,6 +421,9 @@ MESSAGES = {
     # Agent credentials
     "agent_preset_unknown": "Nhà cung cấp đặt sẵn không xác định: {preset_id}",
     "agent_base_url_required_custom": "Cấu hình tuỳ chỉnh yêu cầu base_url",
+    "agent_api_key_required": "Hãy nhập api_key hoặc chọn nhà cung cấp tùy chỉnh để nhập",
+    "agent_api_key_source_conflict": "Không thể cung cấp api_key khi nhập từ nhà cung cấp tùy chỉnh",
+    "agent_import_provider_no_key": "Nhà cung cấp tùy chỉnh đã chọn chưa cấu hình api_key",
     "agent_no_fields_to_update": "Không có trường nào để cập nhật",
     "agent_credential_not_found": "Không tìm thấy xác thực",
     "agent_cannot_delete_active": "Không thể xóa xác thực đang hoạt động; hãy kích hoạt xác thực khác trước",

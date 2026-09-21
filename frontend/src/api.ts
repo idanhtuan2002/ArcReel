@@ -56,7 +56,6 @@ import type {
   EndpointTestStage,
   TrialRunInfo,
   TrialRunModelRef,
-  CustomProviderCredentials,
   AnthropicDiscoverRequest,
   AnthropicDiscoverResponse,
   CostEstimateResponse,
@@ -3044,10 +3043,6 @@ class API {
 
   static async checkCustomConnectivityById(id: number): Promise<{ success: boolean; message: string }> {
     return this.request(`/custom-providers/${id}/test`, { method: "POST" });
-  }
-
-  static async getCustomProviderCredentials(id: number): Promise<CustomProviderCredentials> {
-    return this.request(`/custom-providers/${id}/credentials`);
   }
 
   static async discoverAnthropicModels(
