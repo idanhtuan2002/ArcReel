@@ -69,6 +69,7 @@ from r2.contracts.adaptation import (
     ArtifactVersionRef,
     DecisionRef,
     MapApprovalCommand,
+    ProfileEvaluationReport,
     ProfileWaiverCommand,
     ScreenplayAdmissionCommand,
     ScreenplayArtifactV2,
@@ -260,15 +261,33 @@ class GoldenBSliceEvidence:
     final: GoldenACompositeAsset
 
 
-async def run_profile_slice(
+@dataclass(frozen=True)
+class PreAdmissionSetup:
+    """Everything ``run_profile_slice`` needs after admission (``report`` for
+    its evidence digest) plus the ready-to-submit command itself. Splitting
+    this out lets any caller -- ``run_profile_slice``, or a real HTTP client
+    exercising the Gate B route -- reach an exact, valid
+    ``ScreenplayAdmissionCommand`` without re-deriving branch/map/evaluation
+    setup, and without that caller itself having to call
+    ``admit_screenplay_for_direction`` (the P1 gate route does that)."""
+
+    admit: ScreenplayAdmissionCommand
+    report: ProfileEvaluationReport
+
+
+async def build_screenplay_admission_command(
     profile_ref: AdaptationProfileRef,
     *,
     canon: CanonFixture,
     uow_factory: AdaptationUnitOfWorkFactory,
     user_id: str,
     project_name: str,
-    work_dir: Path,
-) -> GoldenBSliceEvidence:
+) -> PreAdmissionSetup:
+    """Real branch -> map -> map approval -> screenplay proposal -> profile
+    evaluation -> waiver-if-needed, ending in a real, submittable
+    ``ScreenplayAdmissionCommand`` -- everything Gate B (Narrative Lock)
+    needs before an admission decision, extracted from ``run_profile_slice``
+    so it is independently reusable (P1's real-authority end-to-end test)."""
     branch_id = f"golden-b-{profile_ref.profile_id.value.lower()}"
     map_id = f"{branch_id}-map"
     screenplay_id = f"{branch_id}-sp"
@@ -276,7 +295,6 @@ async def run_profile_slice(
     evidence = AdaptationEvidenceService(uow_factory)
     authority = AdaptationAuthorityService(uow_factory, _FakeAuthority())
     evaluation = ProfileEvaluationService(uow_factory)
-    reader = ApprovedScreenplayReader(uow_factory)
 
     branch = await evidence.create_branch(
         AdaptationBranchV2(
@@ -417,6 +435,28 @@ async def run_profile_slice(
         expected_predecessor_id=None,
         action=AdaptationDecisionAction.ADMIT,
     )
+    return PreAdmissionSetup(admit=admit, report=report)
+
+
+async def run_profile_slice(
+    profile_ref: AdaptationProfileRef,
+    *,
+    canon: CanonFixture,
+    uow_factory: AdaptationUnitOfWorkFactory,
+    user_id: str,
+    project_name: str,
+    work_dir: Path,
+) -> GoldenBSliceEvidence:
+    authority = AdaptationAuthorityService(uow_factory, _FakeAuthority())
+    reader = ApprovedScreenplayReader(uow_factory)
+
+    setup = await build_screenplay_admission_command(
+        profile_ref, canon=canon, uow_factory=uow_factory, user_id=user_id, project_name=project_name
+    )
+    admit = setup.admit
+    report = setup.report
+    admitted_screenplay = admit.admitted_screenplay
+
     admission_receipt = await authority.admit_screenplay_for_direction(admit, authenticated_principal=_PRINCIPAL)
     admitted_ref = ArtifactVersionRef(
         artifact_id=admitted_screenplay.screenplay_id,
@@ -493,11 +533,11 @@ async def run_profile_slice(
 
     return GoldenBSliceEvidence(
         profile_ref=profile_ref,
-        branch_id=branch_id,
+        branch_id=admit.branch_id,
         parent_canon_ref=canon.canon_ref,
-        map_approval_ref=map_receipt.decision_ref,
+        map_approval_ref=admit.effective_map_approval_ref,
         report_digest=report.report_digest,
-        waiver_ref=waiver_ref,
+        waiver_ref=admit.waiver_refs[0] if admit.waiver_refs else None,
         admission_ref=admission_receipt.decision_ref,
         admitted_screenplay_ref=admitted_ref,
         scenes=tuple(direction.scenes),
