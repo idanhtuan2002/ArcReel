@@ -30,6 +30,7 @@ from lib.db.models.config import ProviderConfig, SystemSetting
 from lib.db.models.credential import ProviderCredential
 from lib.db.models.custom_endpoint import CustomEndpoint
 from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
+from lib.db.models.gates import FinalCutReceiptModel, GreenlightDecisionModel, PublishApprovalDecisionModel
 from lib.db.models.host_hardening import (
     AttemptIntegrityIncidentModel,
     BackupSetMediaRefModel,
@@ -97,7 +98,9 @@ __all__ = [
     "CustomProvider",
     "CustomProviderModel",
     "ExecutionAttemptModel",
+    "FinalCutReceiptModel",
     "GenerationBatch",
+    "GreenlightDecisionModel",
     "MasterAuthorityModel",
     "MasterHeadVersionModel",
     "NarrativeChangeSetModel",
@@ -114,6 +117,7 @@ __all__ = [
     "ProviderConfig",
     "ProviderCredential",
     "ProviderObservationModel",
+    "PublishApprovalDecisionModel",
     "SystemSetting",
     "Task",
     "User",
