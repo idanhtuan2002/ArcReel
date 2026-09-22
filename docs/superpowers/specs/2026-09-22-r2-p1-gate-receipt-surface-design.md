@@ -142,10 +142,30 @@ directly).
 
 ### 4.2 Gate C's audit companion
 
-A new, small, append-only table (`gate_final_cut_receipts`), written by
-`ProductionApprovalService.promote()` in the same call as its existing
-`ArtifactManifestPort.promote_version_with_r2_metadata` write — additive,
-not a replacement:
+A new, small, append-only table (`gate_final_cut_receipts`). **Deliberately
+not written from inside `ProductionApprovalService.promote()`** — a real
+constraint found while planning implementation: `ProductionApprovalService`
+is synchronous and operates purely over the file-based
+`ArtifactManifestPort`/`ProjectArtifactManifestAdapter` (no async DB
+session in scope at all), and is constructed directly at 10+ call sites
+across M3, M4, and M6 (`r2/m3/host_integration.py`,
+`tests/integration/r2/m4/test_approved_master_semantics.py`,
+`tests/integration/r2/production/test_master_promotion_integration.py`,
+`tests/integration/r2/test_m6_dual_profile_acceptance.py`, and more).
+Changing its constructor to require a new async-DB-backed repository
+dependency would ripple into every one of those call sites for no reason
+connected to their own tests' purpose — the opposite of "smallest surface."
+
+Instead, `FinalCutReceipt` is written by the **new async route handler**
+(§5's `POST .../gates/final-cut`), immediately after it `await
+asyncio.to_thread(...)`-calls the existing, completely unmodified
+`ProductionApprovalService.promote()` — mirroring the exact
+sync-host-call-bridged-into-an-async-route pattern already established in
+`server/routers/versions.py:349-355`'s `restore_version` handler. The
+handler already holds every field a receipt needs (`artifact_key`,
+`candidate`, `approval_record`, `selected_at`) because it is the same
+request that was just passed to `promote()`; no new coupling between the
+two is needed.
 
 ```python
 class FinalCutReceipt(R2ContractModel):
@@ -160,15 +180,21 @@ class FinalCutReceipt(R2ContractModel):
     sequence: Annotated[int, Field(ge=1)]  # per (user_id, project_name, artifact_key)
 ```
 
-`ProductionApprovalService.promote()` gains one new required constructor
-dependency (a small repository port, mirroring `ArtifactManifestPort`'s own
-shape) and appends exactly one `FinalCutReceipt` row per successful
-promotion — including a *no-op* promotion (the `changed=False` branch at
-`approval_service.py:56-61` today returns early; this design still records a
-receipt for that re-approval, since ADR-0089 wants every gate decision
-recorded, not only state-changing ones). Existing behavior (the
-`ApprovedMasterMetadata` write, its return shape, every current caller
-including `GoldenAHostIntegration.approve`) is unchanged.
+`ProductionApprovalService`'s own code, signature, and every existing
+caller (including `GoldenAHostIntegration.approve`, and every M3/M4/M6 test
+constructing it directly) are **completely untouched** by this design. A
+receipt is written whenever the new route is used, including for a *no-op*
+re-approval (the `changed=False` branch at `approval_service.py:56-61`
+today returns early but still represents a real, explicit gate decision the
+operator made through the route) — but any caller that reaches
+`ProductionApprovalService.promote()` directly, bypassing the new route
+(every current test, and any future non-HTTP caller), gets no receipt. This
+is an accepted, disclosed limitation (§8): the audit trail covers
+approvals made *through the new operator surface*, not every possible
+programmatic call to the underlying service — consistent with "smallest
+surface" and with ADR-0089's own framing (Gate receipts exist to prove a
+*human* made a decision through a controlled surface, not to audit every
+internal service call).
 
 ## 5. Operator-control surface
 
@@ -182,7 +208,7 @@ command shape from §4 and returning the resulting decision record:
 ```text
 POST /api/v1/projects/{project_name}/gates/greenlight
 POST /api/v1/projects/{project_name}/gates/narrative-lock      (thin wrapper over the existing AdaptationAuthorityService call)
-POST /api/v1/projects/{project_name}/gates/final-cut           (thin wrapper over the existing ProductionApprovalService call, now also writing FinalCutReceipt)
+POST /api/v1/projects/{project_name}/gates/final-cut           (calls the existing, unmodified ProductionApprovalService.promote via asyncio.to_thread, then the handler itself appends a FinalCutReceipt row -- see §4.2)
 POST /api/v1/projects/{project_name}/gates/publish-approval
 GET  /api/v1/projects/{project_name}/gates                     (read all four gates' current/history state for display)
 ```
@@ -208,22 +234,30 @@ precedent) and rejected for *this* item, not forgotten:
 
 `AtomicPromotionService.promote()` is async, idempotent via `command_id`,
 and its `MasterHeadVersionModel` is a strictly better-shaped audit trail
-than the new `gate_final_cut_receipts` table proposed in §4.2. Delegating to
-it directly would mean either (a) making `ProductionApprovalService`
-async — a real signature change rippling into every M3/M4 caller built this
-session and previously, or (b) routing M3's `GoldenALocalProducer` output
-through M7-B's `CandidateObjectPort.prepare_candidate` first so a
-`VerifiedCandidateObject` exists for `AtomicPromotionService` to promote —
-a genuine, valuable pipeline unification that is its own project, not a
-"smallest surface" addition. `docs/r2/evidence/R2_M7_B_ATOMIC_PROMOTION.json`
+than the new `gate_final_cut_receipts` table proposed in §4.2. The new route
+handler in §5 is itself already async (every FastAPI route is), so the
+sync/async mismatch that would have blocked calling it from inside
+`ProductionApprovalService` (§4.2) does not block calling it from the
+*route* — but a real, unchanged blocker remains: `AtomicPromotionService`
+promotes a `VerifiedCandidateObject` (M7-B's own hardened candidate-store
+output, keyed by a `candidate_id` that only exists once something has gone
+through `CandidateObjectPort.prepare_candidate`), while every real M3/M4
+candidate the route would actually receive is a `GenerationCandidate` — a
+different shape produced by a completely different pipeline that has never
+run through M7-B's candidate store at all. Routing M3's
+`GoldenALocalProducer` output through `prepare_candidate` first so a
+`VerifiedCandidateObject` exists for `AtomicPromotionService` to promote is
+a genuine, valuable pipeline unification, but it is its own project, not a
+"smallest surface" addition — `docs/r2/evidence/R2_M7_B_ATOMIC_PROMOTION.json`
 already names this exact bridge as deferred, deliberately, for the same
 reason ("building this now against a target with no live caller would be
 speculative, not reuse" — now there *is* a live caller, M3, but the
-compatibility gap between `GenerationCandidate` and `VerifiedCandidateObject`
-is unchanged). §4.2's small additive table is the smaller, correct-for-now
-answer; the `AtomicPromotionService` bridge remains named and deferred
-(§8), a candidate for a future milestone once M3/M4's candidate pipeline is
-itself being revisited for other reasons.
+`GenerationCandidate`/`VerifiedCandidateObject` compatibility gap is
+unchanged). §4.2's small additive table, written directly by the route
+rather than by either service, is the smaller, correct-for-now answer; the
+`AtomicPromotionService` bridge remains named and deferred (§8), a
+candidate for a future milestone once M3/M4's candidate pipeline is itself
+being revisited for other reasons.
 
 ## 7. Migration
 
@@ -239,8 +273,9 @@ expressing the same append-only pattern.
 ## 8. Deferred work (named, not silently dropped)
 
 - **`AtomicPromotionService` ⟷ M3/M4 candidate-pipeline bridge** (§6): real,
-  valuable, requires either an async `ProductionApprovalService` or routing
-  M3 output through M7-B's candidate store first. Not this item's scope.
+  valuable, requires routing M3/M4 output through M7-B's candidate store
+  (`CandidateObjectPort.prepare_candidate`) first so a `VerifiedCandidateObject`
+  exists for it to promote. Not this item's scope.
 - **Gate D's `deliverable_digest` source**: this design reuses whatever
   digest the approved Final Cut candidate already carries. If a *later*,
   distinct export/packaging step (Jianying draft or a real final-deliverable
