@@ -373,6 +373,24 @@ export interface VersionInfo {
   source?: string;
 }
 
+/** ADR-0089 V1 Human Gate A/D decision record (Greenlight / Publish Approval). */
+export interface GateDecision {
+  decision_id: string;
+  action: string;
+  sequence: number;
+  created_at: string;
+  authorization: { authenticated_principal: string; authorized_at: string };
+  source_digest?: string;
+  deliverable_digest?: string;
+  platform?: string;
+  visibility?: string;
+}
+
+export interface GateHistory {
+  greenlight: GateDecision[];
+  publish_approval: GateDecision[];
+}
+
 /** 分镜/视频单元媒体上传的统一响应。 */
 export interface ShotUploadResult {
   success: boolean;
@@ -2532,6 +2550,38 @@ class API {
         method: "POST",
       }
     );
+  }
+
+  /** ADR-0089 Gate A: greenlight (or revoke) a project's idea/source selection. */
+  static async greenlightProject(
+    projectName: string,
+    payload: { source_digest: string; action: "GREENLIGHT" | "REVOKE" }
+  ): Promise<GateDecision> {
+    return this.request(`/projects/${encodeURIComponent(projectName)}/gates/greenlight`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** ADR-0089 Gate D: approve (or revoke) manual external publication of a deliverable. */
+  static async publishApproval(
+    projectName: string,
+    payload: {
+      deliverable_digest: string;
+      platform: string;
+      visibility: string;
+      action: "APPROVE_PUBLISH" | "REVOKE";
+    }
+  ): Promise<GateDecision> {
+    return this.request(`/projects/${encodeURIComponent(projectName)}/gates/publish-approval`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** Greenlight (A) and Publish Approval (D) full decision history for a project. */
+  static async getGateHistory(projectName: string): Promise<GateHistory> {
+    return this.request(`/projects/${encodeURIComponent(projectName)}/gates`);
   }
 
   // ==================== 风格参考图 API ====================

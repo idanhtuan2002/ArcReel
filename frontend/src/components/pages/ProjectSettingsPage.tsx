@@ -25,6 +25,7 @@ import {
 import { SpeechRateField, isValidSpeechRate } from "@/components/shared/SpeechRateField";
 import { ACCENT_BTN_CLS, ACCENT_BUTTON_STYLE, GHOST_BTN_LG_CLS, radioCardClass } from "@/components/ui/darkroom-tokens";
 import { AgentMemoryCabinet } from "@/components/agent/AgentMemoryCabinet";
+import { GateApprovalPanel } from "@/components/shared/GateApprovalPanel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useWarnUnsaved } from "@/hooks/useWarnUnsaved";
 import { normalizeRoute, type GenerationRoute } from "@/utils/generation-mode";
@@ -713,6 +714,14 @@ export function ProjectSettingsPage() {
             description={t("agent_memory_project_desc")}
           >
             <AgentMemoryCabinet scope={{ level: "project", projectName }} frame="card" />
+          </SectionCard>
+
+          <SectionCard
+            kicker="V1 Human Gates"
+            title={t("gate_section_title")}
+            description={t("gate_section_description")}
+          >
+            <GateApprovalPanel projectName={projectName} />
           </SectionCard>
 
           {/* Style picker (independent save flow, mutually exclusive template / custom) */}
