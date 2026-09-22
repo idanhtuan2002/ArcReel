@@ -604,3 +604,33 @@ _Avoid_: 浏览器直发请求；把 SSE 归入此类——事件流是普通的
 **自带认证端点（self-authenticated endpoint）**：
 不依赖登录会话、在端点内部自行校验专用凭证的端点，成因一律是浏览器原生请求；它与公开端点同样不要求登录，但拦得住匿名请求。
 _Avoid_: 与公开端点混为一谈。
+
+### V1 发布与 V2 演进
+
+**V1 制作发布版（V1 production release）**：
+供一名自托管创作者实际完成 factual/explainer 与 narrative/drama 两类短视频、经过四个人工 Gate、导出并可恢复的首个正式发布版；外部平台发布仍由人手动完成。
+_Avoid_: 完整 North Star、原型、仅测试通过但没有真实媒体的版本。
+
+**V2 演进线（V2 evolution line）**：
+从 V1 的确切 annotated release tag 与已验证 database/media 恢复基线建立的后继产品线，用于加入组合级多流水线控制、自动分发与学习闭环。
+_Avoid_: 复制工作目录、从未完成或不可恢复的 V1 开始。
+
+**Human Gate A — Greenlight**：
+人对确切项目及 idea/source 选择作出的批准，允许进入开发；选择发生实质变化后须重新批准。
+_Avoid_: Agent 推荐、项目已创建、自动评分通过。
+
+**Human Gate B — Narrative Lock**：
+人对确切 source 与 script revision 作出的叙事锁定，允许该修订进入制作；后续实质修改会使批准失效。
+_Avoid_: 草稿完成、confidence 阈值、Agent 自批。
+
+**Human Gate C — Final Cut**：
+人对确切 selected master/export candidate 作出的最终剪辑批准，允许进入发布包装。
+_Avoid_: render 成功、最新版本、自动 QA 分数。
+
+**Human Gate D — Publish Approval**：
+人对确切 deliverable、目标平台意图与 visibility 作出的发布批准；V1 中它仅允许人手动向外部平台发布，不证明 ArcReel 已上传或送达。
+_Avoid_: 平台 delivery receipt、拥有凭证、自动发布权限。
+
+**手动外部发布（manual external publication）**：
+Gate D 后由人离开 ArcReel 在目标平台执行的上传/发布；系统可记录操作员提供的结果，但不得把它声明为受治理的平台送达事实。
+_Avoid_: ArcReel 自动分发、M11 distribution receipt、计划发布。

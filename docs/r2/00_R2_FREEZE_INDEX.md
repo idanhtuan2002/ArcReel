@@ -22,3 +22,12 @@
 
 Broad donor research is closed. New research is limited to targeted gap resolution,
 implementation evidence and provider qualification.
+
+## Post-freeze accepted release strategy
+
+The frozen R2.1--R2.6 documents and registries remain unchanged. Release
+sequencing is constrained by:
+
+- [ADR-0089](../adr/0089-ship-a-bounded-v1-before-v2-portfolio-automation.md)
+- [V1 Production Release and V2 Evolution Strategy](R2_V1_PRODUCTION_RELEASE_STRATEGY.md)
+- [V1 production-readiness research](../research/2026-09-17-r2-v1-production-readiness-v2-deferment.md)
