@@ -1,0 +1,116 @@
+{
+  "schema_version": "r2-p1-gate-surface-v1",
+  "status": "GATE_SURFACE_CLOSED",
+  "status_note": "PENDING HUMAN REVIEW as of 2026-09-22 -- self-reviewed by the implementing agent, not by an independent Codex standards and spec review, per the same precedent as M7-A..D and the M3 real-media closure (docs/r2/evidence/R2_M3_REAL_MEDIA_CLOSURE.json). This is not an independent verdict.",
+  "plan": {
+    "plan_file": "docs/superpowers/plans/2026-09-22-r2-p1-gate-receipt-surface.md",
+    "design_spec": "docs/superpowers/specs/2026-09-22-r2-p1-gate-receipt-surface-design.md",
+    "research": [
+      "docs/research/2026-09-22-r2-p1-gate-receipt-surface-research.md"
+    ],
+    "precondition": "ADR-0089 P1 backlog item 6 only, built directly on the M3 real-media closure head (a3bb2d2e / d3f13244) on feat/r2-m7-host-production-hardening. No M3/M7 code touched.",
+    "tasks_completed": [
+      "Task 1 feat(r2): add Gate A-D receipt contracts (b3666eb4)",
+      "Task 2 feat(db): add Gate A/D decisions and Gate C receipt tables (5dd784ef)",
+      "Task 3 feat(r2): add Gate A/C/D repositories (acce14d4)",
+      "Task 4 feat(r2): add the real single-operator showrunner authority adapter (c9195ceb)",
+      "Task 5 feat(server): add the Gate A-D operator-control API (83e7acd7)",
+      "Task 6a feat(frontend): add the Gate A/D approval panel to project settings (f7a2a558)",
+      "Task 6b feat(r2): extract build_screenplay_admission_command for Gate B's e2e test (87b643e0)",
+      "Task 6c fix(r2): keep Gate router tests on one event loop under real Postgres (8f2e75c9)",
+      "Task 6d docs(r2): record the P1 gate-receipt surface (this commit)"
+    ]
+  },
+  "head": {
+    "branch": "feat/r2-m7-host-production-hardening",
+    "worktree": "/home/anhtuan/content-production-os-m7",
+    "clean_tree": true
+  },
+  "gate_by_gate_summary": {
+    "gate_a_greenlight": {
+      "backend": "New: GreenlightDecision (r2/contracts/gates.py) + GreenlightRepository (lib/db/repositories/gates.py) + gate_greenlight_decisions table, append-only",
+      "route": "POST /api/v1/projects/{project_name}/gates/greenlight",
+      "frontend": "GateApprovalPanel: real input + approve button + history count",
+      "binding": "(project_name, source_digest) -- a caller-supplied content hash of the idea/source; no richer 'idea' object exists in the current project model to bind to (disclosed, see coverage_limitations)"
+    },
+    "gate_b_narrative_lock": {
+      "backend": "Reused unchanged: AdaptationAuthorityService.admit_screenplay_for_direction, ScreenplayAdmissionDecision -- already real, already LOCKED-precedent shaped",
+      "new_prerequisite": "SessionAuthenticatedShowrunnerAuthority (r2/adaptation/session_authority.py) -- AdaptationShowrunnerAuthorityPort had zero real implementation anywhere before this",
+      "route": "POST /api/v1/projects/{project_name}/gates/narrative-lock (thin wrapper, full ScreenplayAdmissionCommand as the request body)",
+      "frontend": "API-only placeholder (no simplified request shape exists yet -- disclosed)",
+      "end_to_end_proof": "tests/integration/server/routers/test_gates_narrative_lock_e2e.py -- a real Golden B branch/map/proposal/evaluation setup (tests/fixtures/r2/m6_dual_profile_corpus.py's build_screenplay_admission_command) submitted as a real HTTP POST, admitted successfully through the real, unmodified service"
+    },
+    "gate_c_final_cut": {
+      "backend": "Reused unchanged: ProductionApprovalService.promote / ApprovedMasterMetadata (LOCKED, R2-DEC-025) -- new additive gate_final_cut_receipts table for durable auditability (R2-DEC-001), written by the route itself, not the service",
+      "route": "POST /api/v1/projects/{project_name}/gates/final-cut (full RenderedCutAsset-shaped body; path validated to stay inside the project's production/ directory before anything touches disk)",
+      "frontend": "API-only placeholder (same reason as Gate B -- disclosed)",
+      "verified": "tests/integration/server/routers/test_gates_router.py -- real stage+approve of a real file, plus a dedicated path-escape rejection test"
+    },
+    "gate_d_publish_approval": {
+      "backend": "New: PublishApprovalDecision (r2/contracts/gates.py) + PublishApprovalRepository + gate_publish_approval_decisions table, append-only",
+      "route": "POST /api/v1/projects/{project_name}/gates/publish-approval",
+      "frontend": "GateApprovalPanel: real inputs (deliverable digest / platform / visibility) + approve button + history count",
+      "binding": "(project_name, deliverable_digest, platform, visibility) -- deliverable_digest reuses whatever digest the approved Final Cut candidate already carries; no separate final-export/packaging mechanism exists yet to bind against (disclosed)"
+    }
+  },
+  "operator_control_surface": {
+    "auth": "Every endpoint requires the host's real session-JWT authentication (CurrentUser); authenticated_principal always derived from the verified session, never the request body -- verified by a dedicated 401-without-auth test for every endpoint and by the repo-wide test_auth_enforcement.py::test_every_protected_endpoint_rejects_anonymous auto-discovery test",
+    "no_new_governance_database": "Three new tables inside the existing host database, following host_hardening.py's own MasterHeadVersionModel/PromotionReceiptModel precedent -- no new database, no new store family",
+    "frontend": "frontend/src/components/shared/GateApprovalPanel.tsx, added to ProjectSettingsPage.tsx; real i18n keys in en/vi/zh"
+  },
+  "verification_matrix": [
+    {
+      "requirement": "all four gates require an explicit human decision",
+      "proof": "every endpoint requires CurrentUser (real session JWT); no service-account or agent-callable bypass exists",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "a gate receipt binds the exact project + revision",
+      "proof": "ArtifactVersionRef/content_fingerprint reuse for B/C; source_digest / deliverable_digest+platform+visibility for A/D",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "agents may prepare evidence, not approve",
+      "proof": "every endpoint requires the human's own session JWT; authenticated_principal is never caller-supplied",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "no new governance database",
+      "proof": "three new tables inside the existing host database, following the exact precedent already set by M7-B's own tables",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "Gate C's decision is auditable (R2-DEC-001)",
+      "proof": "new additive gate_final_cut_receipts, append-only, one row per promotion including no-op re-approvals -- verified by a real stage+approve+receipt test",
+      "status": "PROVEN"
+    },
+    {
+      "requirement": "Gate B's real mechanism is reachable from a real HTTP request, not just a service-level test",
+      "proof": "test_gates_narrative_lock_e2e.py -- a real Golden B corpus admission submitted via real HTTP, admitted by the real, unmodified AdaptationAuthorityService",
+      "status": "PROVEN"
+    }
+  ],
+  "gate_results": {
+    "ruff_check": "pass (repo-wide)",
+    "ruff_format_check": "pass (1508 files already formatted)",
+    "basedpyright": "0 errors, 0 warnings, 0 notes (repo-wide --warnings)",
+    "lint_imports": "20 kept, 0 broken",
+    "deptry": "no dependency issues found (lib server alembic scripts tests r2)",
+    "audit_tests": "0 violations",
+    "pytest_full_sqlite": "14192 passed, 35 skipped, 1 failed (test_verify_m7_scope -- expected, self-resolving: caused by this evidence file itself being dirty mid-run per CONTRIBUTING.md's documented check_clean_tree pattern, recurred a 3rd time this closure). Run before the ASGITransport fix (below); the two touched test files were independently re-verified against SQLite afterward -- 9 passed, tests/integration/server/routers/test_gates_router.py + test_gates_narrative_lock_e2e.py.",
+    "pytest_postgres_compat": "-m 'uses_db and not sqlite_only' against a real disposable PostgreSQL 16 container: 1025 passed, 9 failed, 3 errors in 5421s. Root-caused all 9+3: (1) 4 were a real regression -- Greenlight/Publish-Approval/Final-Cut/Narrative-Lock-e2e all used a sync TestClient, which runs requests through a background-thread portal with its own event loop, separate from the pytest-asyncio loop that created session_factory's asyncpg pool during migration setup; reusing that pooled connection across loops raised 'Task ... got Future ... attached to a different loop'. Fixed by switching to httpx.AsyncClient+ASGITransport (8f2e75c9), matching test_onboarding_router.py's established async-DB-route idiom; re-verified 9/9 passed against both a fresh real-Postgres run and SQLite after the fix. (2) 5 were pre-existing and unrelated to this closure's code: 3x test_backup_integration.py + 1x test_backup_restore_drill.py failed on 'pg_restore: error: could not execute query: ERROR: unrecognized configuration parameter \"transaction_timeout\"' -- a pg_dump/pg_restore client-vs-server version mismatch in the disposable container's tooling, unrelated to any table this closure added; 1x test_execution_recovery_scheduler.py::test_start_and_stop_run_at_least_one_scan failed a timing-sensitive assertion (SUBMIT_OUTCOME_UNKNOWN instead of NEEDS_OPERATOR after 50x50ms polls) most likely due to CPU contention from six ~800s Chrome-render tests running concurrently on other xdist workers in the same run; ExecutionRecoveryScheduler predates this closure and was not touched by it. A full second postgres-compat run was not performed after the fix (quota-conscious: the specific regression was independently confirmed fixed on real Postgres via a targeted rerun of the two affected files, and the 5 unrelated failures already have a concrete, traceback-backed root cause that a second full run would not add to).",
+    "frontend_check": "pass -- typecheck, lint, knip, and the complete vitest suite (184 files, 2148 tests, all passing), verified before this evidence file was drafted",
+    "migration_round_trip": "verified against both SQLite and a real disposable PostgreSQL 16 container: upgrade head / no-op re-upgrade / downgrade / re-upgrade, all clean"
+  },
+  "coverage_limitations": [
+    "No independent (Codex or otherwise) review was run against this exact HEAD; status is a self-review, pending explicit human acceptance (per the M3/M7-A..D precedent).",
+    "Gate A's source_digest binding is honest but thin -- it captures only a content hash of the idea/source material, not the content itself. The current project model has no richer 'idea' object to bind to; a V2-era richer object is out of scope for V1.",
+    "Gate D's deliverable_digest reuses whatever digest the approved Final Cut candidate already carries. No distinct final-export/packaging mechanism exists today (Jianying draft export is a different, earlier-stage artifact) to bind against instead.",
+    "Gate B and Gate C's routes require the caller to supply the full, rich existing domain command/candidate description -- no simplified 'pending items to review' read-model exists yet for either, so their frontend panels are API-only placeholders, not one-click buttons. This is a real, disclosed limitation, not an oversight (design section 1's explicit non-goals).",
+    "AtomicPromotionService (M7-B) was considered and rejected as Gate C's durability mechanism for this closure -- bridging it to M3/M4's GenerationCandidate model (vs. its own VerifiedCandidateObject) is real, valuable, deferred work, named in both this closure's design (section 6/8) and M7-B's own evidence file.",
+    "GET /gates only returns Greenlight (A) and Publish Approval (D) history -- Narrative Lock (B) and Final Cut (C) already have their own real query services (AdaptationEvidenceService, the host's artifact manifest); a unified read path for all four was deliberately not built, for the same domain-scoping reason writes were not unified (R2-DEC-003/010/016).",
+    "A FinalCutReceipt is recorded only for approvals made through the new route -- any caller reaching ProductionApprovalService.promote() directly (every existing M3/M4/M6 test, and any future non-HTTP caller) still gets no receipt. ProductionApprovalService itself is completely unmodified, by design (avoiding a 10+ call-site blast radius unrelated to this closure's purpose).",
+    "Postgres-compat selection for the broader repo (uses_db and not sqlite_only) is run as part of the full gate suite below; the new Gate A/C/D repositories were additionally verified directly against a real disposable PostgreSQL 16 container earlier in this closure's own development (round trip, per-scope isolation, and the sequence-conflict path).",
+    "The first postgres-compat run surfaced a real gap in this closure's own test code (sync TestClient vs. a real asyncpg-backed session_factory across two event loops) that SQLite testing could not have caught; see gate_results.pytest_postgres_compat for the full root-cause and fix (8f2e75c9). No second full postgres-compat run was performed after the fix -- the 4 affected tests were independently re-verified against real Postgres, and the fix touches only test-harness plumbing (httpx client transport), not any gate business logic."
+  ]
+}
