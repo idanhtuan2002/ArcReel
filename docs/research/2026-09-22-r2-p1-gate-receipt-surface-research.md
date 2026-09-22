@@ -168,5 +168,72 @@ being a pointer change, not a delete) — not directly confirmed by reading
    "smallest" read as "smallest total surface area to reason about" rather
    than "smallest diff."
 
-These two candidates (and any other the sponsor prefers) are open design
-options, not decisions — see the follow-up question this research prompted.
+## 6. Cross-referenced against frozen precedent — conclusion, not an open menu
+
+The two candidates in §5 were re-checked against `R2_04_DECISION_REGISTRY.json`
+(30 decisions, all `LOCKED`/`ACTIVE`) rather than left as an unresolved
+preference. Relevant precedent:
+
+- **R2-DEC-001** ("Human Showrunner remains final creative/governance
+  authority", `LOCKED`): "Human approval/override is explicit, auditable, and
+  cannot be replaced by autonomous agent mutation." Explicitly lists
+  `ProductionApprovalService` as an affected component.
+- **R2-DEC-025** ("ApprovedMaster requires explicit selection", `LOCKED`): "A
+  successful generation is not an approved master; selection/approval is
+  explicit and failed later generations preserve the existing master."
+  Explicitly binds `ProductionApprovalService` + "ArcReel version storage".
+  `reopen_conditions: ["contract contradiction discovered"]` — this contract
+  is frozen, not a starting point to redesign.
+- **R2-DEC-003/010/016** ("Five authority planes", "Factual/fiction truth
+  distinct", "Shot readiness distinct from content/runtime status") — three
+  independent, all-`LOCKED` decisions that each freeze a *separation*
+  between authority domains that could have been merged into one generic
+  mechanism, and explicitly chose not to. This is a consistent, repeated
+  architectural preference across the whole frozen registry, not a one-off.
+
+**This settles §5's open question:** a single new shared ledger used by all
+four gates would run against the registry's own repeated, LOCKED preference
+for domain-scoped authority over merged generic mechanisms, and Gate C's
+existing contract (`ApprovedMaster` is a "current selection," per R2-DEC-025)
+is frozen and not open to being replaced by a new shape. The direction this
+research settles on for the design phase: **keep Gate B and Gate C's existing
+mechanisms exactly as they are (no contract change); add a small, additive,
+append-only audit companion to Gate C specifically** (so it satisfies
+R2-DEC-001's "auditable" bar, which its current latest-only shape does not,
+without touching the frozen "current master" pointer contract); **and build
+two new, small, domain-appropriately-named decision records for Gate A and
+Gate D**, each following the same established shape (explicit command +
+an exact artifact/project-revision binding + an authorization sub-record +
+append-only) as precedent from M5C/M6, but as their own distinct constructs
+rather than folded into M6's adaptation-specific `AdaptationDecision` union.
+
+## 7. Operator-control surface — a real, reusable precedent found, and why it doesn't fully apply
+
+`frontend/src/components/canvas/timeline/VersionTimeMachine.tsx` (440 lines,
+tested, real feature) already gives a human operator a working "browse
+versions, see which is current, click an action, get a toast" interaction —
+proof the host has a real, working pattern for exactly this *shape* of
+human-facing control surface. Traced its action end to end: `handleRestore`
+→ `API.restoreVersion` → `POST /projects/{project}/versions/{type}/{id}/restore/{version}`
+(`server/routers/versions.py:344`) → `restore_resource_version`, which calls
+straight into the host's own generic `VersionManager` "switch current-version
+pointer" mechanism. **This confirms, independently of §4's grep-based
+finding, that zero real surface reaches R2's approval layer today**: this
+restore endpoint has no `ProductionApprovalService` call, no candidate
+lifecycle/fingerprint validation, no `selected_by`/`approval_record` —
+it is the pre-R2 host's own file-version-switching feature, not an R2 Gate.
+
+**Conclusion, not left open:** ArcReel is a web-app product end to end
+(`frontend/` React SPA is the primary interface per this repo's own
+`AGENTS.md` first line, not a CLI tool) — an operator using ArcReel to
+produce and review a video would expect to approve a gate in the same web
+app, not switch to a separate CLI. The "smallest" reading that stays
+consistent with the product's own nature is: real new API endpoints (added
+under `server/routers/`, following existing router registration conventions
+— required regardless of front-end choice, since something must call into
+the approval services) plus a minimal front-end affordance reusing
+`VersionTimeMachine`'s established interaction *pattern* (panel-driven
+browse → select → confirm → toast) rather than its component (whose
+underlying endpoint is the wrong mechanism, per above) — not a CLI-only
+surface, and not a new dedicated multi-page UI either.
+
