@@ -58,6 +58,7 @@ from server.routers import (
     end_frames,
     execution_events,
     files,
+    gates,
     generate,
     grids,
     onboarding,
@@ -632,6 +633,7 @@ app.include_router(
     tags=["分镜尾帧"],
 )
 app.include_router(versions.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["版本管理"])
+app.include_router(gates.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["V1 人工 Gate"])
 app.include_router(usage.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["费用统计"])
 app.include_router(auth_router.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["认证"])
 app.include_router(
