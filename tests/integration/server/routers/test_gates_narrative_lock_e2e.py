@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.adaptation_uow import adaptation_uow_factory
@@ -59,12 +59,19 @@ async def test_narrative_lock_admits_a_real_screenplay_through_the_real_route(
     app.dependency_overrides[get_current_user] = lambda: OPERATOR
     app.include_router(gates.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
     register_error_handlers(app)
-    client = TestClient(app)
 
-    response = client.post(
-        f"/api/v1/projects/{PROJECT}/gates/narrative-lock",
-        json=setup.admit.model_dump(mode="json"),
-    )
+    # ASGITransport keeps the request on this test's own event loop -- a sync
+    # TestClient spins up a separate portal-thread event loop, and reusing a
+    # real asyncpg-backed session_factory (whose pool was created on THIS
+    # loop by the fixture's own migration step) from that other loop raises
+    # "Task ... got Future ... attached to a different loop" under real
+    # Postgres. Matches tests/integration/server/routers/test_onboarding_router.py's
+    # established async-DB-route testing idiom.
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            f"/api/v1/projects/{PROJECT}/gates/narrative-lock",
+            json=setup.admit.model_dump(mode="json"),
+        )
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["decision_ref"]["decision_id"] == setup.admit.decision_id
@@ -89,11 +96,11 @@ async def test_narrative_lock_rejects_a_project_name_mismatch_before_touching_th
     app.dependency_overrides[get_current_user] = lambda: OPERATOR
     app.include_router(gates.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
     register_error_handlers(app)
-    client = TestClient(app)
 
-    response = client.post(
-        "/api/v1/projects/a-completely-different-project/gates/narrative-lock",
-        json=setup.admit.model_dump(mode="json"),
-    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/projects/a-completely-different-project/gates/narrative-lock",
+            json=setup.admit.model_dump(mode="json"),
+        )
     assert response.status_code == 400
     assert "does not match" in response.json()["detail"]

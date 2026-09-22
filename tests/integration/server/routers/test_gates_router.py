@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from server.auth import CurrentUserInfo, get_current_user
@@ -43,23 +43,34 @@ class _FakeProjectManager:
         return path
 
 
-def _authed_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory, project_root: Path) -> TestClient:
+def _make_app(
+    monkeypatch: pytest.MonkeyPatch, session_factory: Factory, project_root: Path, *, authed: bool
+) -> FastAPI:
     monkeypatch.setattr(gates, "async_session_factory", session_factory)
     monkeypatch.setattr(gates, "get_project_manager", lambda: _FakeProjectManager(project_root))
     app = FastAPI()
-    app.dependency_overrides[get_current_user] = lambda: USER
+    if authed:
+        app.dependency_overrides[get_current_user] = lambda: USER
     app.include_router(gates.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
     register_error_handlers(app)
-    return TestClient(app)
+    return app
 
 
-def _unauthed_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory, project_root: Path) -> TestClient:
-    monkeypatch.setattr(gates, "async_session_factory", session_factory)
-    monkeypatch.setattr(gates, "get_project_manager", lambda: _FakeProjectManager(project_root))
-    app = FastAPI()
-    app.include_router(gates.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
-    register_error_handlers(app)
-    return TestClient(app)
+def _authed_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory, project_root: Path) -> AsyncClient:
+    # ASGITransport keeps the request on this test's own event loop -- a sync
+    # TestClient spins up a separate portal-thread event loop, and reusing a
+    # real asyncpg-backed session_factory (whose pool was created on THIS
+    # loop by the fixture's own migration step) from that other loop raises
+    # "Task ... got Future ... attached to a different loop" under real
+    # Postgres. Matches tests/integration/server/routers/test_onboarding_router.py's
+    # established async-DB-route testing idiom.
+    app = _make_app(monkeypatch, session_factory, project_root, authed=True)
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+def _unauthed_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory, project_root: Path) -> AsyncClient:
+    app = _make_app(monkeypatch, session_factory, project_root, authed=False)
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
 @pytest.mark.parametrize(
@@ -79,61 +90,59 @@ def _unauthed_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory, 
         ("get", f"/api/v1/projects/{PROJECT}/gates", None),
     ],
 )
-def test_gate_endpoints_require_real_authentication(
+async def test_gate_endpoints_require_real_authentication(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path, method: str, path: str, body: dict | None
 ) -> None:
-    client = _unauthed_client(monkeypatch, session_factory, tmp_path)
-    response = client.request(method, path, json=body)
+    async with _unauthed_client(monkeypatch, session_factory, tmp_path) as client:
+        response = await client.request(method, path, json=body)
     assert response.status_code == 401
 
 
-def test_greenlight_round_trips_through_the_real_repository(
+async def test_greenlight_round_trips_through_the_real_repository(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
 ) -> None:
-    client = _authed_client(monkeypatch, session_factory, tmp_path)
-    response = client.post(
-        f"/api/v1/projects/{PROJECT}/gates/greenlight",
-        json={"source_digest": "sha256:" + "a" * 64, "action": "GREENLIGHT"},
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert body["source_digest"] == "sha256:" + "a" * 64
-    assert body["authorization"]["authenticated_principal"] == "operator-1"
-    assert body["sequence"] == 1
+    async with _authed_client(monkeypatch, session_factory, tmp_path) as client:
+        response = await client.post(
+            f"/api/v1/projects/{PROJECT}/gates/greenlight",
+            json={"source_digest": "sha256:" + "a" * 64, "action": "GREENLIGHT"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["source_digest"] == "sha256:" + "a" * 64
+        assert body["authorization"]["authenticated_principal"] == "operator-1"
+        assert body["sequence"] == 1
 
-    history = client.get(f"/api/v1/projects/{PROJECT}/gates")
+        history = await client.get(f"/api/v1/projects/{PROJECT}/gates")
     assert history.status_code == 200
     assert len(history.json()["greenlight"]) == 1
     assert history.json()["publish_approval"] == []
 
 
-def test_publish_approval_round_trips_through_the_real_repository(
+async def test_publish_approval_round_trips_through_the_real_repository(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
 ) -> None:
-    client = _authed_client(monkeypatch, session_factory, tmp_path)
-    response = client.post(
-        f"/api/v1/projects/{PROJECT}/gates/publish-approval",
-        json={
-            "deliverable_digest": "sha256:" + "b" * 64,
-            "platform": "youtube",
-            "visibility": "unlisted",
-            "action": "APPROVE_PUBLISH",
-        },
-    )
+    async with _authed_client(monkeypatch, session_factory, tmp_path) as client:
+        response = await client.post(
+            f"/api/v1/projects/{PROJECT}/gates/publish-approval",
+            json={
+                "deliverable_digest": "sha256:" + "b" * 64,
+                "platform": "youtube",
+                "visibility": "unlisted",
+                "action": "APPROVE_PUBLISH",
+            },
+        )
     assert response.status_code == 200
     body = response.json()
     assert body["platform"] == "youtube"
     assert body["authorization"]["authenticated_principal"] == "operator-1"
 
 
-def test_final_cut_stages_and_approves_a_real_file(
+async def test_final_cut_stages_and_approves_a_real_file(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(gates, "async_session_factory", session_factory)
     project_root = tmp_path / "projects"
     project_root.mkdir()
     project_manager = _FakeProjectManager(project_root)
-    monkeypatch.setattr(gates, "get_project_manager", lambda: project_manager)
     project_dir = project_manager.get_project_path(PROJECT)
 
     production_dir = project_dir / "production"
@@ -141,11 +150,7 @@ def test_final_cut_stages_and_approves_a_real_file(
     rendered_file = production_dir / "SH01.mp4"
     rendered_file.write_bytes(b"not a real video, just proving the route stages+approves a real file")
 
-    app = FastAPI()
-    app.dependency_overrides[get_current_user] = lambda: USER
-    app.include_router(gates.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
-    register_error_handlers(app)
-    client = TestClient(app)
+    app = _make_app(monkeypatch, session_factory, project_root, authed=True)
 
     request_body = {
         "resource_type": "videos",
@@ -169,25 +174,24 @@ def test_final_cut_stages_and_approves_a_real_file(
         },
         "approval_record": "APR-SH01",
     }
-    response = client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=request_body)
-    assert response.status_code == 200
-    body = response.json()
-    assert body["approved_master"]["selected_by"] == "operator-1"
-    assert body["receipt"]["approval_record"] == "APR-SH01"
-    assert body["receipt"]["sequence"] == 1
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=request_body)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["approved_master"]["selected_by"] == "operator-1"
+        assert body["receipt"]["approval_record"] == "APR-SH01"
+        assert body["receipt"]["sequence"] == 1
 
-    history = client.get(f"/api/v1/projects/{PROJECT}/gates")
+        history = await client.get(f"/api/v1/projects/{PROJECT}/gates")
     assert history.status_code == 200
 
 
-def test_final_cut_rejects_a_path_escape_before_touching_disk(
+async def test_final_cut_rejects_a_path_escape_before_touching_disk(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(gates, "async_session_factory", session_factory)
     project_root = tmp_path / "projects"
     project_root.mkdir()
     project_manager = _FakeProjectManager(project_root)
-    monkeypatch.setattr(gates, "get_project_manager", lambda: project_manager)
     project_dir = project_manager.get_project_path(PROJECT)
     (project_dir / "production").mkdir(parents=True)
 
@@ -195,11 +199,7 @@ def test_final_cut_rejects_a_path_escape_before_touching_disk(
     secret = tmp_path / "secret.txt"
     secret.write_text("do not touch")
 
-    app = FastAPI()
-    app.dependency_overrides[get_current_user] = lambda: USER
-    app.include_router(gates.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
-    register_error_handlers(app)
-    client = TestClient(app)
+    app = _make_app(monkeypatch, session_factory, project_root, authed=True)
 
     request_body = {
         "resource_type": "videos",
@@ -223,6 +223,7 @@ def test_final_cut_rejects_a_path_escape_before_touching_disk(
         },
         "approval_record": "APR-SH01",
     }
-    response = client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=request_body)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=request_body)
     assert response.status_code == 400
     assert "escapes" in response.json()["detail"]
