@@ -33,8 +33,25 @@
       "Remove task/packet and temporal wording from changed code comments and docstrings."
     ]
   },
+  "m7d_prerequisite_review": {
+    "reviewed_base": "74d048db",
+    "reviewed_candidate": "053148717feaba921debb3f6eee5684854f0e227",
+    "verdict": "CHANGES_REQUIRED",
+    "critical": [
+      "The database dump is deployment-wide while media inventory covers one project's candidates; restore verification does not prove project/master/media closure or playability.",
+      "Only an in-memory test tracer is configured; production telemetry covers only recovery scheduling, not the request-to-master/usage chain.",
+      "RECOVERY_VERIFIED is claimed despite absent Golden A/B review/export, incomplete H7, skipped frontend/website gates and no persisted VERIFIED backup transition."
+    ],
+    "important": [
+      "Restore uses unvalidated manifest paths for media and database dump, allowing paths outside declared roots.",
+      "PREPARING backup/media refs are flushed but uncommitted while copying and dumping, so concurrent retention cannot see the claimed GC fence.",
+      "Whole-database pg_dump includes plaintext credential columns although the runbook says credentials are never in a backup set; no secure-backup procedure is shown.",
+      "Provider-boundary baggage clearing has no production caller; raw provider job IDs still enter legacy logs and the canary test covers one recovery path only."
+    ],
+    "coverage_limit": "Read-only focused exact-commit source review of H6/H7 and acceptance truth; no fresh tests or exhaustive H1-H5 audit."
+  },
   "open_gates": [
-    "M7-D RECOVERY_VERIFIED was recorded by human override/self-review, not the independent review required by the M7-E plan.",
+    "M7-D independent H6/H7 review returned CHANGES_REQUIRED at exact candidate 05314871; RECOVERY_VERIFIED cannot satisfy the M7-E prerequisite.",
     "E1 has CHANGES_REQUIRED independent reviews and cannot be accepted.",
     "E2 restore-derived Golden/browser and runbook work has not started on this branch.",
     "No paid provider call, credential use, migration, deployment, release tag or production activation was performed."
