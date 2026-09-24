@@ -30,7 +30,6 @@ from r2.host_hardening.route_inventory import submit_route_inventory_problems
 if TYPE_CHECKING:
     from alembic.script import ScriptDirectory
 
-M6_WORKTREE_DIRNAME = "content-production-os-m6"
 M6_HANDOFF_RELPATH = "docs/r2/evidence/R2_M6_IMPLEMENTATION_HANDOFF.json"
 BASELINE_RELPATH = "docs/r2/evidence/R2_M7_BASELINE.json"
 MATERIALIZATION_ANCHOR_RELPATH = "docs/superpowers/plans/2026-09-12-r2-m7-host-production-hardening.md"
@@ -151,11 +150,16 @@ def _worktree_base(repo: Path) -> str:
     return "" if not materialization_commit else _run(["git", "rev-parse", f"{materialization_commit}^"], cwd=repo)
 
 
-def _m6_handoff_status(repo: Path) -> str | None:
-    handoff = repo.parent / M6_WORKTREE_DIRNAME / M6_HANDOFF_RELPATH
-    if not handoff.is_file():
+def _m6_handoff_status(repo: Path, accepted_base: str) -> str | None:
+    result = subprocess.run(
+        ["git", "show", f"{accepted_base}:{M6_HANDOFF_RELPATH}"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
         return None
-    data = json.loads(handoff.read_text())
+    data = json.loads(result.stdout)
     status = data.get("status")
     return status if isinstance(status, str) else None
 
@@ -234,7 +238,7 @@ def run_all_checks(*, repo: Path, baseline: Mapping[str, object]) -> list[CheckR
     actual_base = _worktree_base(repo)
     expected_base = str(baseline["m6_accepted_head"])
 
-    m6_status = _m6_handoff_status(repo)
+    m6_status = _m6_handoff_status(repo, expected_base)
 
     documents = dict(baseline["documents"])
     legacy_seams = dict(baseline["legacy_seams"])
