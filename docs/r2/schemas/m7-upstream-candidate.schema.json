@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "M7-E upstream compatibility report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "host_sha", "evidence_sha", "upstream_url", "old_sha", "new_sha", "merge_base_sha", "source_tree_sha", "integration_method", "dependency_files", "change_inventory", "rollback_target_sha", "gates"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "host_sha": {"$ref": "#/$defs/git_sha"},
+    "evidence_sha": {"$ref": "#/$defs/git_sha"},
+    "upstream_url": {"type": "string", "minLength": 1},
+    "old_sha": {"$ref": "#/$defs/git_sha"},
+    "new_sha": {"$ref": "#/$defs/git_sha"},
+    "merge_base_sha": {"$ref": "#/$defs/git_sha"},
+    "source_tree_sha": {"$ref": "#/$defs/git_sha"},
+    "integration_method": {"enum": ["MERGE", "CHERRY_PICK", "REBASE", "PATCH"]},
+    "dependency_files": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}}},
+    "change_inventory": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["commit_sha", "disposition", "evidence_path", "evidence_digest"], "properties": {"commit_sha": {"$ref": "#/$defs/git_sha"}, "disposition": {"enum": ["UNCHANGED", "ADAPTED", "DEFERRED", "REJECTED"]}, "evidence_path": {"type": "string", "pattern": "^docs/r2/evidence/[^/].*"}, "evidence_digest": {"$ref": "#/$defs/digest"}}}},
+    "rollback_target_sha": {"$ref": "#/$defs/git_sha"},
+    "gates": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["status", "evidence_sha", "evidence_path", "evidence_digest", "required_skips"], "properties": {"status": {"enum": ["PASS", "FAIL"]}, "evidence_sha": {"$ref": "#/$defs/git_sha"}, "evidence_path": {"type": "string", "pattern": "^docs/r2/evidence/[^/].*"}, "evidence_digest": {"$ref": "#/$defs/digest"}, "required_skips": {"type": "integer", "minimum": 0}}}}
+  },
+  "$defs": {
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

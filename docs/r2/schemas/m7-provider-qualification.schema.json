@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "M7-E provider qualification report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile_ref", "profile_entry_digest", "provider_id", "api_version", "adapter_version", "status", "evidence_kind", "evidence_sha", "evidence_path", "evidence_digest", "recorded_at", "expires_at", "required_skips"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "profile_ref": {"type": "string", "minLength": 1},
+    "profile_entry_digest": {"$ref": "#/$defs/digest"},
+    "provider_id": {"type": "string", "minLength": 1},
+    "api_version": {"type": "string", "minLength": 1},
+    "adapter_version": {"type": "string", "minLength": 1},
+    "status": {"enum": ["UNQUALIFIED", "OFFLINE_VERIFIED", "SANDBOX_VERIFIED", "QUALIFIED"]},
+    "evidence_kind": {"enum": ["LOCAL_FIXTURE", "SANDBOX_CALL", "REAL_PROVIDER_CALL"]},
+    "evidence_sha": {"type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"},
+    "evidence_path": {"type": "string", "minLength": 1},
+    "evidence_digest": {"$ref": "#/$defs/digest"},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "required_skips": {"type": "integer", "minimum": 0}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}
