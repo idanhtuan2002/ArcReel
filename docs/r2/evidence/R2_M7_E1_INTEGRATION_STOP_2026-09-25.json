@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "status": "CHANGES_REQUIRED",
+  "scope": "M7-E E1 offline compatibility gates integrated onto the V1 lineage; not an M7-E acceptance or production candidate",
+  "lineage": {
+    "base_sha": "95ea4eff132e5e154d2de8a2fe6342ed12edc8ba",
+    "reviewed_code_sha": "404a594585acc1b1b94e17b8624bbb88a0420941",
+    "source_branch_sha": "a833aafb682ebccba28a533a56044d7e2e3500fa",
+    "integrated_commits": [
+      "a5b7f4e116f981f48a0564fcaf78f83f780b4070",
+      "88915f28eec932e8a3a27ef74b485d2ae5d4e85d",
+      "404a594585acc1b1b94e17b8624bbb88a0420941"
+    ]
+  },
+  "verification_at_reviewed_code_sha": {
+    "focused_tests": "52 passed; tests/unit/scripts/r2/test_verify_upstream_candidate.py tests/unit/scripts/r2/test_verify_provider_qualification.py tests/unit/scripts/r2/test_verify_m7_scope.py",
+    "full_backend": "14228 passed, 35 skipped, 128 warnings in 5547.67s; python -m pytest -n 4 --dist loadfile -q --tb=short",
+    "static": "ruff check PASS; ruff format --check PASS (1513 files); basedpyright 0 errors/warnings; lint-imports 20 kept, 0 broken; deptry PASS",
+    "test_audit": "0 violations",
+    "scope_verifier": "8 of 8 checks PASS",
+    "coverage_limit": "Codebase Memory M7 generation 2026-09-18T10:57:40Z is stale for E1 code and excludes scripts, tests and docs; exact changed source was read directly."
+  },
+  "review_findings": {
+    "spec": [
+      "COMPATIBLE can be returned without proving that the pinned upstream change was integrated into the Host candidate; integration_method and candidate-to-upstream mapping are not verified.",
+      "OFFLINE_VERIFIED can be returned for committed provider evidence whose contents report failure; only bytes and self-described evidence_kind are checked.",
+      "A committed manifest can self-assert PASS commands and exit codes without executable gate logs, test counts or a trustworthy run identity.",
+      "SANDBOX_VERIFIED and QUALIFIED are intentionally refused by the offline verifier; no exact-version provider qualification has occurred."
+    ],
+    "standards": [
+      "New unit tests launch Git and Python subprocesses, contrary to CONTRIBUTING.md test-tier rules; move them to integration tier.",
+      "Core compatibility tests are located under the scripts mirror path and mixed with CLI tests; split by tested object and source mirror.",
+      "Remove task/packet and temporal wording from changed code comments and docstrings."
+    ]
+  },
+  "open_gates": [
+    "M7-D RECOVERY_VERIFIED was recorded by human override/self-review, not the independent review required by the M7-E plan.",
+    "E1 has CHANGES_REQUIRED independent reviews and cannot be accepted.",
+    "E2 restore-derived Golden/browser and runbook work has not started on this branch.",
+    "No paid provider call, credential use, migration, deployment, release tag or production activation was performed."
+  ]
+}
