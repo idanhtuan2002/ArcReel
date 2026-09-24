@@ -52,11 +52,21 @@ def _report(tmp_path: Path) -> tuple[dict, Path, Path]:
         _git(repo, "init", "-q")
     rollback_sha = _commit(host, "app.txt", "host")
     host_sha = _commit(host, "candidate.txt", "candidate code")
-    evidence_sha = _commit(host, EVIDENCE_PATH, "verified evidence")
-    evidence_digest = "sha256:" + hashlib.sha256(b"verified evidence").hexdigest()
     old_sha = _commit(upstream, "uv.lock", "old-lock")
     new_sha = _commit(upstream, "uv.lock", "new-lock")
     _git(upstream, "remote", "add", "origin", "https://example.invalid/upstream.git")
+    manifest = {
+        "schema_version": 1,
+        "target_sha": host_sha,
+        "changes": {new_sha: "ADAPTED"},
+        "results": {
+            gate: {"status": "PASS", "required_skips": 0, "exit_code": 0, "command": f"verify {gate}"}
+            for gate in REQUIRED_GATES
+        },
+    }
+    manifest_text = json.dumps(manifest, sort_keys=True)
+    evidence_sha = _commit(host, EVIDENCE_PATH, manifest_text)
+    evidence_digest = "sha256:" + hashlib.sha256(manifest_text.encode()).hexdigest()
     report = {
         "schema_version": 1,
         "host_sha": host_sha,
@@ -199,6 +209,47 @@ def test_change_disposition_evidence_must_match_committed_artifact(tmp_path: Pat
     report, host, upstream = _report(tmp_path)
     report["change_inventory"][0]["evidence_digest"] = "sha256:" + "0" * 64
     with pytest.raises(CompatibilityError, match=r"change_inventory.*evidence_digest"):
+        verify_upstream_candidate(report, host_repo=host, upstream_repo=upstream)
+
+
+def test_reported_gate_pass_cannot_override_failed_committed_manifest(tmp_path: Path) -> None:
+    report, host, upstream = _report(tmp_path)
+    manifest = json.loads((host / EVIDENCE_PATH).read_text())
+    manifest["results"]["migration"]["status"] = "FAIL"
+    manifest_text = json.dumps(manifest, sort_keys=True)
+    report["evidence_sha"] = _commit(host, EVIDENCE_PATH, manifest_text)
+    digest = "sha256:" + hashlib.sha256(manifest_text.encode()).hexdigest()
+    report["change_inventory"][0]["evidence_digest"] = digest
+    for gate in report["gates"].values():
+        gate["evidence_digest"] = digest
+    with pytest.raises(CompatibilityError, match=r"migration.*manifest"):
+        verify_upstream_candidate(report, host_repo=host, upstream_repo=upstream)
+
+
+def test_reported_change_disposition_must_match_committed_manifest(tmp_path: Path) -> None:
+    report, host, upstream = _report(tmp_path)
+    manifest = json.loads((host / EVIDENCE_PATH).read_text())
+    manifest["changes"][report["new_sha"]] = "REJECTED"
+    manifest_text = json.dumps(manifest, sort_keys=True)
+    report["evidence_sha"] = _commit(host, EVIDENCE_PATH, manifest_text)
+    digest = "sha256:" + hashlib.sha256(manifest_text.encode()).hexdigest()
+    report["change_inventory"][0]["evidence_digest"] = digest
+    for gate in report["gates"].values():
+        gate["evidence_digest"] = digest
+    with pytest.raises(CompatibilityError, match=r"change_inventory.*manifest"):
+        verify_upstream_candidate(report, host_repo=host, upstream_repo=upstream)
+
+
+def test_gates_cannot_select_conflicting_manifests(tmp_path: Path) -> None:
+    report, host, upstream = _report(tmp_path)
+    second_manifest = json.loads((host / EVIDENCE_PATH).read_text())
+    second_manifest["results"]["golden_b"]["status"] = "FAIL"
+    second_text = json.dumps(second_manifest, sort_keys=True)
+    second_path = "docs/r2/evidence/other-gate-evidence.json"
+    report["evidence_sha"] = _commit(host, second_path, second_text)
+    report["gates"]["migration"]["evidence_path"] = second_path
+    report["gates"]["migration"]["evidence_digest"] = "sha256:" + hashlib.sha256(second_text.encode()).hexdigest()
+    with pytest.raises(CompatibilityError, match="single manifest"):
         verify_upstream_candidate(report, host_repo=host, upstream_repo=upstream)
 
 

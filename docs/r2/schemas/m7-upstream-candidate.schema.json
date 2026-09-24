@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "M7-E upstream compatibility report",
+  "description": "host_sha pins the tested code; evidence_sha pins a clean descendant that changes only one declared docs/r2/evidence JSON manifest. The manifest contains schema_version=1, target_sha=host_sha, changes mapping each upstream commit to its disposition, and results mapping each required gate to status, required_skips, exit_code and command. This offline report does not itself grant production approval.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "host_sha", "evidence_sha", "upstream_url", "old_sha", "new_sha", "merge_base_sha", "source_tree_sha", "integration_method", "dependency_files", "change_inventory", "rollback_target_sha", "gates"],

@@ -109,8 +109,9 @@ def verify_upstream_candidate(report: dict[str, Any], *, host_repo: Path, upstre
     )
     if evidence_ancestor.returncode:
         raise CompatibilityError("host_sha is not an ancestor of evidence_sha")
-    evidence_paths = {item["evidence_path"] for item in report["change_inventory"]}
-    evidence_paths.update(gate["evidence_path"] for gate in report["gates"].values())
+    manifest_refs = {(item["evidence_path"], item["evidence_digest"]) for item in report["change_inventory"]}
+    manifest_refs.update((gate["evidence_path"], gate["evidence_digest"]) for gate in report["gates"].values())
+    evidence_paths = {path for path, _digest in manifest_refs}
     changed_paths = set(
         _git(host_repo, "diff", "--no-renames", "--name-only", host_sha, evidence_sha, "--").splitlines()
     )
@@ -143,10 +144,29 @@ def verify_upstream_candidate(report: dict[str, Any], *, host_repo: Path, upstre
     inventoried_commits = [item["commit_sha"] for item in report["change_inventory"]]
     if inventoried_commits != expected_commits:
         raise CompatibilityError("change_inventory does not cover the exact ordered upstream range")
+
+    manifests: dict[str, dict[str, Any]] = {}
+
+    def committed_manifest(path: str, label: str) -> dict[str, Any]:
+        if path not in manifests:
+            try:
+                data = json.loads(_git_bytes(host_repo, "show", f"{evidence_sha}:{path}"))
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise CompatibilityError(f"{label} manifest is not valid JSON") from exc
+            if not isinstance(data, dict) or data.get("schema_version") != 1 or data.get("target_sha") != host_sha:
+                raise CompatibilityError(f"{label} manifest does not bind the candidate host_sha")
+            manifests[path] = data
+        return manifests[path]
+
     for item in report["change_inventory"]:
         actual = _committed_evidence_digest(host_repo, evidence_sha, item["evidence_path"], "change_inventory")
         if actual != item["evidence_digest"]:
             raise CompatibilityError("change_inventory evidence_digest does not match committed artifact")
+        manifest = committed_manifest(item["evidence_path"], "change_inventory")
+        if manifest.get("changes") != {
+            entry["commit_sha"]: entry["disposition"] for entry in report["change_inventory"]
+        }:
+            raise CompatibilityError("change_inventory does not match committed manifest")
 
     dependency_paths: set[str] = set()
     for item in report["dependency_files"]:
@@ -168,6 +188,22 @@ def verify_upstream_candidate(report: dict[str, Any], *, host_repo: Path, upstre
         actual = _committed_evidence_digest(host_repo, evidence_sha, gate["evidence_path"], gate_name)
         if actual != gate["evidence_digest"]:
             raise CompatibilityError(f"{gate_name} evidence_digest does not match committed artifact")
+        manifest = committed_manifest(gate["evidence_path"], gate_name)
+        results = manifest.get("results")
+        if not isinstance(results, dict) or set(results) != set(REQUIRED_GATES):
+            raise CompatibilityError(f"{gate_name} manifest has an incomplete gate inventory")
+        result = results.get(gate_name)
+        if (
+            not isinstance(result, dict)
+            or result.get("status") != "PASS"
+            or result.get("required_skips") != 0
+            or result.get("exit_code") != 0
+            or not isinstance(result.get("command"), str)
+            or not result["command"]
+        ):
+            raise CompatibilityError(f"{gate_name} manifest does not prove a completed PASS gate")
+    if len(manifest_refs) != 1:
+        raise CompatibilityError("all gates and dispositions must bind one single manifest")
     return "COMPATIBLE"
 
 
