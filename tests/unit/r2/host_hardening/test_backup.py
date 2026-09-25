@@ -152,8 +152,10 @@ def test_verify_media_does_not_read_outside_restore_root(tmp_path: Path) -> None
     [
         ("../outside.dump", "video.mp4"),
         ("/outside.dump", "video.mp4"),
+        ("\x00", "video.mp4"),
         ("database.dump", "../outside.mp4"),
         ("database.dump", "/outside.mp4"),
+        ("database.dump", "\x00"),
     ],
 )
 async def test_restore_rejects_manifest_escape_before_database_access(

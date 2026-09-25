@@ -101,6 +101,7 @@ def _manifest_path(root: Path, ref: str) -> Path:
         or Path(ref).is_absolute()
         or PureWindowsPath(ref).drive
         or "\\" in ref
+        or "\x00" in ref
         or any(part in {"", ".", ".."} for part in parts)
         or root.is_symlink()
     ):
