@@ -386,3 +386,20 @@ def test_closure_must_capture_new_evidence_in_the_start_store(mutation: str) -> 
             signatures=signatures,
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
+def test_closure_cannot_change_physical_mount_identities() -> None:
+    import json
+
+    raw, start, reader, signatures = signed_closure()
+    data = json.loads(raw)
+    data["root_mount_check"]["mount_identities"] = ["attacker-db", "attacker-projects", "attacker-media"]
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_closure(
+            altered_start(canonical_json_bytes(data, allow_nan=False)),
+            start=start,
+            expected=closure_expectation(),
+            reader=reader,
+            signatures=signatures,
+        )
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID

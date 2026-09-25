@@ -310,6 +310,8 @@ def verify_capture_fence_closure(
         observations_started_at=closure.capture_checks_completed_at,
         observations_ended_at=closure.fenced_capture_ended_at,
     )
+    if closure.root_mount_check.mount_identities != start.root_mount_check.mount_identities:
+        _reject("root_mounts")
     _verify_final_refs(start, closure)
     _verify_signature(closure, decoded, expected, signatures)
     _verify_blobs(closure, expected, reader)
