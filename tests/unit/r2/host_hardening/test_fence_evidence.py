@@ -9,8 +9,15 @@ from typing import Any
 import pytest
 
 from lib.content_digest import canonical_json_bytes, canonical_json_digest
-from r2.contracts.backup_fence import CaptureFenceStartV1, EvidenceBlobRefV1
+from r2.contracts.backup_fence import (
+    CaptureFenceStartV1,
+    EvidenceBlobRefV1,
+    PostgresWriterCheckV1,
+    RootMountCheckV1,
+    ServiceStopEvidenceV1,
+)
 from r2.host_hardening.fence_evidence import (
+    EvidenceSemantics,
     FenceEvidenceError,
     FenceExpectationV1,
     FenceFailureCode,
@@ -19,8 +26,54 @@ from r2.host_hardening.fence_evidence import (
 )
 from tests.unit.r2.contracts.test_backup_fence import valid_start_mapping
 
-_BLOB = b"stopped and independently observed"
 _KINDS = ("app", "worker", "recovery_scanner", "gc_cleanup")
+
+
+def _observation_body(item: dict[str, Any]) -> bytes:
+    if "service_kind" in item:
+        payload = {
+            "evidence_type": item["evidence_type"],
+            "service_kind": item["service_kind"],
+            "instance_id": item["instance_id"],
+            "observed_state": item["observed_state"],
+            "observed_at": item["observed_at"],
+        }
+    elif "database_id" in item:
+        payload = {
+            "evidence_type": "POSTGRES_WRITER_SESSION_CHECK",
+            "database_id": item["database_id"],
+            "monitor_session_id": item["monitor_session_id"],
+            "active_writer_sessions": item["active_writer_sessions"],
+            "active_writer_transactions": item["active_writer_transactions"],
+            "checked_at": item["checked_at"],
+        }
+    else:
+        payload = {
+            "evidence_type": "ROOT_MOUNT_IDENTITY_CHECK",
+            "root_ids": item["root_ids"],
+            "mount_identities": item["mount_identities"],
+            "no_alias": item["no_alias"],
+            "no_symlink": item["no_symlink"],
+            "checked_at": item["checked_at"],
+        }
+    return canonical_json_bytes(payload, allow_nan=False)
+
+
+class FixtureSemantics:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def validate_service(self, item: ServiceStopEvidenceV1, blob: bytes) -> bool:
+        self.calls.append("service")
+        return blob == _observation_body(item.model_dump(mode="json"))
+
+    def validate_postgres(self, item: PostgresWriterCheckV1, blob: bytes) -> bool:
+        self.calls.append("postgres")
+        return blob == _observation_body(item.model_dump(mode="json"))
+
+    def validate_roots(self, item: RootMountCheckV1, blob: bytes) -> bool:
+        self.calls.append("roots")
+        return blob == _observation_body(item.model_dump(mode="json"))
 
 
 class MemoryReader:
@@ -69,9 +122,10 @@ def signed_start() -> tuple[bytes, MemoryReader, FixtureSignatures]:
     items.extend((data["postgres_writer_check"], data["root_mount_check"]))
     for item in items:
         blob = item["blob"]
-        blob["byte_size"] = len(_BLOB)
-        blob["sha256"] = "sha256:" + hashlib.sha256(_BLOB).hexdigest()
-        blobs[(blob["store_id"], blob["object_ref"], blob["object_version"])] = _BLOB
+        body = _observation_body(item)
+        blob["byte_size"] = len(body)
+        blob["sha256"] = "sha256:" + hashlib.sha256(body).hexdigest()
+        blobs[(blob["store_id"], blob["object_ref"], blob["object_version"])] = body
     unsigned = {key: value for key, value in data.items() if key != "signature"}
     data["signature"] = hashlib.sha256(canonical_json_bytes(unsigned, allow_nan=False)).hexdigest()
     return canonical_json_bytes(data, allow_nan=False), MemoryReader(blobs), FixtureSignatures()
@@ -89,11 +143,68 @@ def altered_start(raw: bytes, **changes: object) -> bytes:
 
 def test_valid_start_verifies_signature_and_all_versioned_blobs() -> None:
     raw, reader, signatures = signed_start()
-    record = verify_capture_fence_start(raw, expected=valid_expectation(), reader=reader, signatures=signatures)
+    semantics: EvidenceSemantics = FixtureSemantics()
+    record = verify_capture_fence_start(
+        raw, expected=valid_expectation(), reader=reader, signatures=signatures, semantics=semantics
+    )
     assert record.backup_set_id == "bset-1"
     assert len(reader.calls) == 6
     assert all(call[0] == "operator-evidence" and call[2] == "v1" for call in reader.calls)
     assert len(signatures.calls) == 1
+    assert isinstance(semantics, FixtureSemantics)
+    assert semantics.calls == ["service"] * 4 + ["postgres", "roots"]
+
+
+@pytest.mark.parametrize("kind", ["service", "postgres", "roots"])
+def test_hash_valid_but_semantically_contradictory_blob_rejects(kind: str) -> None:
+    import json
+
+    raw, reader, signatures = signed_start()
+    data = json.loads(raw)
+    item = (
+        data["services"][0]
+        if kind == "service"
+        else data["postgres_writer_check"]
+        if kind == "postgres"
+        else data["root_mount_check"]
+    )
+    ref = item["blob"]
+    contradictory = b"ALL SERVICES RUNNING; WRITERS ACTIVE; MOUNT REPLACED"
+    ref["byte_size"] = len(contradictory)
+    ref["sha256"] = "sha256:" + hashlib.sha256(contradictory).hexdigest()
+    reader.blobs[(ref["store_id"], ref["object_ref"], ref["object_version"])] = contradictory
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_start(
+            altered_start(canonical_json_bytes(data, allow_nan=False)),
+            expected=valid_expectation(),
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
+        )
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
+def test_missing_or_throwing_semantic_inspector_is_typed() -> None:
+    raw, reader, signatures = signed_start()
+
+    class ThrowingSemantics(FixtureSemantics):
+        def validate_service(self, item: ServiceStopEvidenceV1, blob: bytes) -> bool:
+            raise ValueError("/private/operator/command-output")
+
+    with pytest.raises(FenceEvidenceError) as missing:
+        verify_capture_fence_start(raw, expected=valid_expectation(), reader=reader, signatures=signatures)
+    assert missing.value.category == "blob_semantics"
+    assert reader.calls == []
+    with pytest.raises(FenceEvidenceError) as throwing:
+        verify_capture_fence_start(
+            raw,
+            expected=valid_expectation(),
+            reader=reader,
+            signatures=signatures,
+            semantics=ThrowingSemantics(),
+        )
+    assert throwing.value.category == "blob_semantics"
+    assert throwing.value.__context__ is None
 
 
 def test_absent_start_is_typed_and_has_no_side_effects() -> None:
@@ -102,7 +213,9 @@ def test_absent_start_is_typed_and_has_no_side_effects() -> None:
             raise AssertionError(f"unexpected port access: {name}")
 
     with pytest.raises(FenceEvidenceError) as exc:
-        verify_capture_fence_start(None, expected=UnusedPort(), reader=UnusedPort(), signatures=UnusedPort())
+        verify_capture_fence_start(
+            None, expected=UnusedPort(), reader=UnusedPort(), signatures=UnusedPort(), semantics=UnusedPort()
+        )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
 
@@ -113,7 +226,9 @@ def test_untrusted_record_shape_is_typed_before_port_access(raw: bytes) -> None:
             raise AssertionError(f"unexpected port access: {name}")
 
     with pytest.raises(FenceEvidenceError) as exc:
-        verify_capture_fence_start(raw, expected=NoAccess(), reader=NoAccess(), signatures=NoAccess())
+        verify_capture_fence_start(
+            raw, expected=NoAccess(), reader=NoAccess(), signatures=NoAccess(), semantics=NoAccess()
+        )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
 
@@ -136,7 +251,11 @@ def test_independent_identity_trust_and_window_mismatches_reject(change: dict[st
     raw, reader, signatures = signed_start()
     with pytest.raises(FenceEvidenceError) as exc:
         verify_capture_fence_start(
-            altered_start(raw, **change), expected=valid_expectation(), reader=reader, signatures=signatures
+            altered_start(raw, **change),
+            expected=valid_expectation(),
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
@@ -163,6 +282,7 @@ def test_incomplete_or_unfenced_writer_state_rejects(mutation: str) -> None:
             expected=valid_expectation(),
             reader=reader,
             signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
@@ -186,7 +306,7 @@ def test_blob_integrity_and_bounds_reject(mutation: str) -> None:
     elif mutation == "oversized":
         first_ref["byte_size"] = 65_537
     elif mutation == "overread":
-        reader.blobs[key] = _BLOB + b"extra"
+        reader.blobs[key] += b"extra"
     elif mutation == "reused_ref":
         data["services"][1]["blob"] = first_ref
     else:
@@ -197,6 +317,7 @@ def test_blob_integrity_and_bounds_reject(mutation: str) -> None:
             expected=valid_expectation(),
             reader=reader,
             signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
     assert "tampered secret evidence" not in str(exc.value)
@@ -215,6 +336,7 @@ def test_invalid_signature_and_malformed_record_reject_without_reading() -> None
             expected=valid_expectation(),
             reader=reader,
             signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert reader.calls == []
     with pytest.raises(FenceEvidenceError):
@@ -223,6 +345,7 @@ def test_invalid_signature_and_malformed_record_reject_without_reading() -> None
             expected=valid_expectation(),
             reader=reader,
             signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert reader.calls == []
 
@@ -239,16 +362,30 @@ def test_port_failures_do_not_retain_sensitive_exception_context() -> None:
             raise ValueError("/private/operator/key")
 
     with pytest.raises(FenceEvidenceError) as signature_error:
-        verify_capture_fence_start(raw, expected=valid_expectation(), reader=reader, signatures=FailingSignatures())
+        verify_capture_fence_start(
+            raw,
+            expected=valid_expectation(),
+            reader=reader,
+            signatures=FailingSignatures(),
+            semantics=FixtureSemantics(),
+        )
     assert signature_error.value.__context__ is None
     with pytest.raises(FenceEvidenceError) as reader_error:
-        verify_capture_fence_start(raw, expected=valid_expectation(), reader=FailingReader({}), signatures=signatures)
+        verify_capture_fence_start(
+            raw,
+            expected=valid_expectation(),
+            reader=FailingReader({}),
+            signatures=signatures,
+            semantics=FixtureSemantics(),
+        )
     assert reader_error.value.__context__ is None
 
 
 def valid_start() -> CaptureFenceStartV1:
     raw, reader, signatures = signed_start()
-    return verify_capture_fence_start(raw, expected=valid_expectation(), reader=reader, signatures=signatures)
+    return verify_capture_fence_start(
+        raw, expected=valid_expectation(), reader=reader, signatures=signatures, semantics=FixtureSemantics()
+    )
 
 
 def closure_expectation() -> FenceExpectationV1:
@@ -267,7 +404,9 @@ def signed_closure() -> tuple[bytes, CaptureFenceStartV1, MemoryReader, FixtureS
     import json
 
     start_raw, reader, signatures = signed_start()
-    start = verify_capture_fence_start(start_raw, expected=valid_expectation(), reader=reader, signatures=signatures)
+    start = verify_capture_fence_start(
+        start_raw, expected=valid_expectation(), reader=reader, signatures=signatures, semantics=FixtureSemantics()
+    )
     reader.calls.clear()
     signatures.calls.clear()
     data = json.loads(start_raw)
@@ -276,7 +415,10 @@ def signed_closure() -> tuple[bytes, CaptureFenceStartV1, MemoryReader, FixtureS
         item["observed_at" if "service_kind" in item else "checked_at"] = "2026-09-25T12:08:30Z"
         item["blob"]["object_version"] = "v2"
         ref = item["blob"]
-        reader.blobs[(ref["store_id"], ref["object_ref"], ref["object_version"])] = _BLOB
+        body = _observation_body(item)
+        ref["byte_size"] = len(body)
+        ref["sha256"] = "sha256:" + hashlib.sha256(body).hexdigest()
+        reader.blobs[(ref["store_id"], ref["object_ref"], ref["object_version"])] = body
     data["capture_checks_completed_at"] = "2026-09-25T12:08:00Z"
     data["fenced_capture_ended_at"] = "2026-09-25T12:09:00Z"
     return altered_start(canonical_json_bytes(data, allow_nan=False)), start, reader, signatures
@@ -284,13 +426,42 @@ def signed_closure() -> tuple[bytes, CaptureFenceStartV1, MemoryReader, FixtureS
 
 def test_valid_closure_checks_all_final_immutable_versions() -> None:
     raw, start, reader, signatures = signed_closure()
+    semantics = FixtureSemantics()
     closure = verify_capture_fence_closure(
-        raw, start=start, expected=closure_expectation(), reader=reader, signatures=signatures
+        raw,
+        start=start,
+        expected=closure_expectation(),
+        reader=reader,
+        signatures=signatures,
+        semantics=semantics,
     )
     assert closure.fenced_capture_ended_at.minute == 9
     assert len(reader.calls) == 6
     assert all(call[2] == "v2" for call in reader.calls)
     assert len(signatures.calls) == 1
+    assert semantics.calls == ["service"] * 4 + ["postgres", "roots"]
+
+
+def test_closure_hash_valid_contradictory_final_blob_rejects() -> None:
+    import json
+
+    raw, start, reader, signatures = signed_closure()
+    data = json.loads(raw)
+    ref = data["root_mount_check"]["blob"]
+    contradictory = b"ROOT MOUNT REPLACED; ALIAS PRESENT"
+    ref["byte_size"] = len(contradictory)
+    ref["sha256"] = "sha256:" + hashlib.sha256(contradictory).hexdigest()
+    reader.blobs[(ref["store_id"], ref["object_ref"], ref["object_version"])] = contradictory
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_closure(
+            altered_start(canonical_json_bytes(data, allow_nan=False)),
+            start=start,
+            expected=closure_expectation(),
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
+        )
+    assert exc.value.category == "blob_semantics"
 
 
 def test_closure_missing_is_not_a_window_end() -> None:
@@ -301,6 +472,7 @@ def test_closure_missing_is_not_a_window_end() -> None:
             expected=closure_expectation(),
             reader=unused_reader(),
             signatures=unused_signatures(),
+            semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
@@ -328,6 +500,7 @@ def test_closure_identity_or_window_drift_rejects(change: dict[str, object]) -> 
             expected=closure_expectation(),
             reader=reader,
             signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
@@ -358,7 +531,12 @@ def test_closure_final_evidence_rejects_failures(mutation: str) -> None:
         raw = canonical_json_bytes(data, allow_nan=False)
     with pytest.raises(FenceEvidenceError) as exc:
         verify_capture_fence_closure(
-            raw, start=start, expected=closure_expectation(), reader=reader, signatures=signatures
+            raw,
+            start=start,
+            expected=closure_expectation(),
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
@@ -367,7 +545,9 @@ def test_expectation_cannot_alias_database_and_file_root() -> None:
     raw, reader, signatures = signed_start()
     expected = replace(valid_expectation(), file_root_ids=("db-1", "media-1"))
     with pytest.raises(FenceEvidenceError) as exc:
-        verify_capture_fence_start(raw, expected=expected, reader=reader, signatures=signatures)
+        verify_capture_fence_start(
+            raw, expected=expected, reader=reader, signatures=signatures, semantics=FixtureSemantics()
+        )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
     assert exc.value.category == "expectation"
 
@@ -395,6 +575,7 @@ def test_closure_must_capture_new_evidence_in_the_start_store(mutation: str) -> 
             expected=expected,
             reader=reader,
             signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
@@ -412,5 +593,6 @@ def test_closure_cannot_change_physical_mount_identities() -> None:
             expected=closure_expectation(),
             reader=reader,
             signatures=signatures,
+            semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID

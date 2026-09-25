@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -14,7 +15,10 @@ from r2.contracts.backup_fence import (
     CaptureFenceStartV1,
     EvidenceBlobRefV1,
     FenceRecordInvalid,
+    PostgresWriterCheckV1,
+    RootMountCheckV1,
     ServiceKind,
+    ServiceStopEvidenceV1,
     parse_canonical_fence_record,
 )
 
@@ -57,6 +61,16 @@ class EvidenceReader(Protocol):
 
 class SignatureVerifier(Protocol):
     def verify_ed25519(self, key_id: str, payload: bytes, signature: str) -> bool: ...
+
+
+class EvidenceSemantics(Protocol):
+    """Trusted, type-specific interpretation of immutable observation bytes."""
+
+    def validate_service(self, item: ServiceStopEvidenceV1, blob: bytes) -> bool: ...
+
+    def validate_postgres(self, item: PostgresWriterCheckV1, blob: bytes) -> bool: ...
+
+    def validate_roots(self, item: RootMountCheckV1, blob: bytes) -> bool: ...
 
 
 def _reject(category: str) -> NoReturn:
@@ -179,26 +193,54 @@ def _blob_matches_ref(value: object, ref: EvidenceBlobRefV1) -> bool:
     )
 
 
-def _verify_blobs(record: CaptureFenceStartV1, expected: FenceExpectationV1, reader: EvidenceReader) -> None:
+def _read_verified_blob(ref: EvidenceBlobRefV1, expected: FenceExpectationV1, reader: EvidenceReader) -> bytes:
+    if ref.store_id not in expected.allowed_evidence_store_ids:
+        _reject("evidence_store")
+    if not 1 <= ref.byte_size <= MAX_EVIDENCE_BYTES:
+        _reject("blob_size")
+    available = True
+    try:
+        blob = reader.read_exact(ref, max_bytes=ref.byte_size)
+    except Exception:
+        available = False
+        blob = b""
+    if not available:
+        _reject("blob_unavailable")
+    if not _blob_matches_ref(blob, ref):
+        _reject("blob_integrity")
+    return blob
+
+
+def _require_semantics(check: Callable[[], bool]) -> None:
+    try:
+        valid = check()
+    except Exception:
+        valid = False
+    if valid is not True:
+        _reject("blob_semantics")
+
+
+def _verify_blobs(
+    record: CaptureFenceStartV1,
+    expected: FenceExpectationV1,
+    reader: EvidenceReader,
+    semantics: EvidenceSemantics | None,
+) -> None:
+    if semantics is None:
+        _reject("blob_semantics")
     refs = evidence_refs(record)
     identities = tuple((ref.store_id, ref.object_ref, ref.object_version) for ref in refs)
     if len(set(identities)) != len(identities):
         _reject("evidence_refs")
-    for ref in refs:
-        if ref.store_id not in expected.allowed_evidence_store_ids:
-            _reject("evidence_store")
-        if not 1 <= ref.byte_size <= MAX_EVIDENCE_BYTES:
-            _reject("blob_size")
-        available = True
-        try:
-            blob = reader.read_exact(ref, max_bytes=ref.byte_size)
-        except Exception:
-            available = False
-            blob = b""
-        if not available:
-            _reject("blob_unavailable")
-        if not _blob_matches_ref(blob, ref):
-            _reject("blob_integrity")
+    for item in record.services:
+        blob = _read_verified_blob(item.blob, expected, reader)
+        _require_semantics(lambda item=item, blob=blob: semantics.validate_service(item, blob))
+    db = record.postgres_writer_check
+    db_blob = _read_verified_blob(db.blob, expected, reader)
+    _require_semantics(lambda: semantics.validate_postgres(db, db_blob))
+    roots = record.root_mount_check
+    root_blob = _read_verified_blob(roots.blob, expected, reader)
+    _require_semantics(lambda: semantics.validate_roots(roots, root_blob))
 
 
 def _verify_final_refs(start: CaptureFenceStartV1, closure: CaptureFenceClosureV1) -> None:
@@ -225,6 +267,7 @@ def verify_capture_fence_start(
     expected: FenceExpectationV1,
     reader: EvidenceReader,
     signatures: SignatureVerifier,
+    semantics: EvidenceSemantics | None = None,
 ) -> CaptureFenceStartV1:
     """Verify a start proof without granting any database or filesystem authority."""
 
@@ -246,7 +289,7 @@ def verify_capture_fence_start(
         observations_ended_at=record.quiescence_confirmed_at,
     )
     _verify_signature(record, decoded, expected, signatures)
-    _verify_blobs(record, expected, reader)
+    _verify_blobs(record, expected, reader, semantics)
     return record
 
 
@@ -257,6 +300,7 @@ def verify_capture_fence_closure(
     expected: FenceExpectationV1,
     reader: EvidenceReader,
     signatures: SignatureVerifier,
+    semantics: EvidenceSemantics | None = None,
 ) -> CaptureFenceClosureV1:
     """Verify a signed post-capture observation against a verified start."""
 
@@ -314,13 +358,14 @@ def verify_capture_fence_closure(
         _reject("root_mounts")
     _verify_final_refs(start, closure)
     _verify_signature(closure, decoded, expected, signatures)
-    _verify_blobs(closure, expected, reader)
+    _verify_blobs(closure, expected, reader, semantics)
     return closure
 
 
 __all__ = [
     "MAX_EVIDENCE_BYTES",
     "EvidenceReader",
+    "EvidenceSemantics",
     "FenceEvidenceError",
     "FenceExpectationV1",
     "FenceFailureCode",
