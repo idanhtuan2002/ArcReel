@@ -224,10 +224,12 @@ numbers are invalid); the record carries signer key ID and signature, never
 the private key ([RFC 8032](https://www.rfc-editor.org/rfc/rfc8032)). The verifier checks its
 signature against the release-approved public-key allowlist in
 `RecoveryTrustRootV1`, pinned outside the backup directory and not replaceable
-by the evidence-submitting caller. It also checks the role, exact
-deployment/set/release bindings, complete
-writer inventory, ordering and expiry. **Before inserting PREPARING**, the
-module resolves *every* referenced item from the approved append-only evidence
+by the evidence-submitting caller. The same independently pinned trust root
+binds each allowed signer key ID to the exact named custodian principal and
+role; a valid signature from another allowlisted custodian is not authority
+for this custodian. It also checks the role, exact deployment/set/release
+bindings, complete writer inventory, ordering and expiry. **Before inserting
+PREPARING**, the module resolves *every* referenced item from the approved append-only evidence
 store by exact object version, reads it through a bounded, no-follow path,
 checks nonempty bytes, byte size and SHA-256 against the signed record, and
 validates its declared evidence type. A signed record with a missing or
