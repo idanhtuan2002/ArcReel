@@ -32,7 +32,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import shutil
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from sqlalchemy import func, select, text
@@ -92,6 +92,39 @@ def _under_root(path: Path, root: Path) -> Path:
     if resolved_path != resolved_root and resolved_root not in resolved_path.parents:
         raise PathEscapesMediaRootError(f"{path} does not resolve under media root {root}")
     return resolved_path
+
+
+def _manifest_path(root: Path, ref: str) -> Path:
+    parts = ref.split("/")
+    if (
+        not ref
+        or Path(ref).is_absolute()
+        or PureWindowsPath(ref).drive
+        or "\\" in ref
+        or any(part in {"", ".", ".."} for part in parts)
+        or root.is_symlink()
+    ):
+        raise PathEscapesMediaRootError("manifest reference is not a safe relative path")
+    current = root
+    for part in parts:
+        current /= part
+        if current.is_symlink():
+            raise PathEscapesMediaRootError("manifest reference traverses a symlink")
+    return _under_root(current, root)
+
+
+def _validated_restore_paths(
+    manifest: BackupSetManifest, *, backup_dir: Path, target_media_root: Path
+) -> tuple[Path, list[tuple[Path, Path]]]:
+    if target_media_root.is_symlink():
+        raise PathEscapesMediaRootError("restore target root is a symlink")
+    dump_path = _manifest_path(backup_dir, manifest.database_backup_ref)
+    media_dir = backup_dir / _MEDIA_DIRNAME
+    media_paths = [
+        (_manifest_path(media_dir, entry.object_ref), _manifest_path(target_media_root, entry.object_ref))
+        for entry in manifest.media
+    ]
+    return dump_path, media_paths
 
 
 def _sha256_file(path: Path) -> str:
@@ -194,11 +227,9 @@ def _copy_and_verify_media(
 
 def _restore_media(manifest: BackupSetManifest, *, backup_dir: Path, target_media_root: Path) -> None:
     """Blocking: copy every backed-up media file into the restore target."""
-    media_dir = backup_dir / _MEDIA_DIRNAME
+    _, media_paths = _validated_restore_paths(manifest, backup_dir=backup_dir, target_media_root=target_media_root)
     target_media_root.mkdir(parents=True, exist_ok=True)
-    for entry in manifest.media:
-        source = media_dir / entry.object_ref
-        destination = target_media_root / entry.object_ref
+    for source, destination in media_paths:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
 
@@ -209,7 +240,7 @@ def _verify_restored_media(manifest: BackupSetManifest, *, media_root: Path) -> 
     checked = 0
     for entry in manifest.media:
         checked += 1
-        restored_path = media_root / entry.object_ref
+        restored_path = _manifest_path(media_root, entry.object_ref)
         if not restored_path.is_file():
             reason_codes.append(f"MEDIA_MISSING:{entry.object_ref}")
             continue
@@ -329,10 +360,10 @@ async def restore_backup_set(
     """
     if _paths_alias(backup_dir, target_media_root):
         raise SourceTargetAliasError(f"target_media_root {target_media_root} aliases backup_dir {backup_dir}")
+    dump_path, _ = _validated_restore_paths(manifest, backup_dir=backup_dir, target_media_root=target_media_root)
     await _assert_database_is_empty(target_session)
     await asyncio.to_thread(_assert_target_is_empty, target_media_root)
 
-    dump_path = backup_dir / manifest.database_backup_ref
     await _run_subprocess(
         [
             pg_restore_path,
