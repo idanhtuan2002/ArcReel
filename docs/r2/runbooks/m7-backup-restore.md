@@ -9,7 +9,9 @@ disposable clean target (`restore_backup_set` /
 `docs/r2/evidence/R2_M7_D_RECOVERY_VERIFIED.json` records a human/self
 override, not independent acceptance of the current H6 requirement. The
 [H6 closure design](../../superpowers/specs/2026-09-25-r2-v1-m7d-recovery-closure-design.md)
-is a draft, not implemented behavior.
+remains a candidate, not an implemented backup workflow. The pure
+`r2.host_hardening.fence_evidence` start/closure verifier is not wired into
+the current disposable `create_backup_set` API and does not enforce its fence.
 
 **Secret-bearing archive:** this function dumps the whole PostgreSQL database
 to an unencrypted `database.dump`, including rows that may contain provider

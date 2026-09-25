@@ -10,6 +10,7 @@ from typing import NoReturn, Protocol
 
 from lib.content_digest import canonical_json_bytes, canonical_json_digest
 from r2.contracts.backup_fence import (
+    CaptureFenceClosureV1,
     CaptureFenceStartV1,
     EvidenceBlobRefV1,
     FenceRecordInvalid,
@@ -79,6 +80,7 @@ def _verify_expectation(expected: FenceExpectationV1) -> None:
         or not expected.allowed_evidence_store_ids
         or not expected.file_root_ids
         or len(set(expected.file_root_ids)) != len(expected.file_root_ids)
+        or expected.db_root_id in expected.file_root_ids
         or not writers
         or len(set(writers)) != len(writers)
         or {kind for kind, _ in writers} != _REQUIRED_KINDS
@@ -106,7 +108,13 @@ def _verify_identity_and_window(record: CaptureFenceStartV1, expected: FenceExpe
         _reject("capture_window")
 
 
-def _verify_observations(record: CaptureFenceStartV1, expected: FenceExpectationV1) -> None:
+def _verify_observations(
+    record: CaptureFenceStartV1,
+    expected: FenceExpectationV1,
+    *,
+    observations_started_at: datetime,
+    observations_ended_at: datetime,
+) -> None:
     submitted_writers = tuple((item.service_kind, item.instance_id) for item in record.services)
     approved_writers = expected.approved_writers
     if (
@@ -123,7 +131,7 @@ def _verify_observations(record: CaptureFenceStartV1, expected: FenceExpectation
         record.postgres_writer_check.checked_at,
         record.root_mount_check.checked_at,
     )
-    if any(not record.fence_started_at <= observed <= record.quiescence_confirmed_at for observed in observation_times):
+    if any(not observations_started_at <= observed <= observations_ended_at for observed in observation_times):
         _reject("observation_window")
     db_check = record.postgres_writer_check
     if (
@@ -172,7 +180,11 @@ def _blob_matches_ref(value: object, ref: EvidenceBlobRefV1) -> bool:
 
 
 def _verify_blobs(record: CaptureFenceStartV1, expected: FenceExpectationV1, reader: EvidenceReader) -> None:
-    for ref in evidence_refs(record):
+    refs = evidence_refs(record)
+    identities = tuple((ref.store_id, ref.object_ref, ref.object_version) for ref in refs)
+    if len(set(identities)) != len(identities):
+        _reject("evidence_refs")
+    for ref in refs:
         if ref.store_id not in expected.allowed_evidence_store_ids:
             _reject("evidence_store")
         if not 1 <= ref.byte_size <= MAX_EVIDENCE_BYTES:
@@ -187,6 +199,24 @@ def _verify_blobs(record: CaptureFenceStartV1, expected: FenceExpectationV1, rea
             _reject("blob_unavailable")
         if not _blob_matches_ref(blob, ref):
             _reject("blob_integrity")
+
+
+def _verify_final_refs(start: CaptureFenceStartV1, closure: CaptureFenceClosureV1) -> None:
+    start_services = {(item.service_kind, item.instance_id): item.blob for item in start.services}
+    pairs = [(start_services[(item.service_kind, item.instance_id)], item.blob) for item in closure.services]
+    pairs.extend(
+        (
+            (start.postgres_writer_check.blob, closure.postgres_writer_check.blob),
+            (start.root_mount_check.blob, closure.root_mount_check.blob),
+        )
+    )
+    for before, after in pairs:
+        if before.store_id != after.store_id or (
+            before.store_id,
+            before.object_ref,
+            before.object_version,
+        ) == (after.store_id, after.object_ref, after.object_version):
+            _reject("final_evidence_ref")
 
 
 def verify_capture_fence_start(
@@ -209,10 +239,81 @@ def verify_capture_fence_start(
     record, decoded = parsed
     _verify_expectation(expected)
     _verify_identity_and_window(record, expected)
-    _verify_observations(record, expected)
+    _verify_observations(
+        record,
+        expected,
+        observations_started_at=record.fence_started_at,
+        observations_ended_at=record.quiescence_confirmed_at,
+    )
     _verify_signature(record, decoded, expected, signatures)
     _verify_blobs(record, expected, reader)
     return record
+
+
+def verify_capture_fence_closure(
+    raw: bytes | None,
+    *,
+    start: CaptureFenceStartV1,
+    expected: FenceExpectationV1,
+    reader: EvidenceReader,
+    signatures: SignatureVerifier,
+) -> CaptureFenceClosureV1:
+    """Verify a signed post-capture observation against a verified start."""
+
+    if not isinstance(raw, bytes) or not raw:
+        _reject("missing_closure")
+    try:
+        parsed = parse_canonical_fence_record(raw, CaptureFenceClosureV1)
+    except FenceRecordInvalid:
+        parsed = None
+    if parsed is None:
+        _reject("invalid_record")
+    closure, decoded = parsed
+    _verify_expectation(expected)
+    _verify_identity_and_window(start, expected)
+    _verify_observations(
+        start,
+        expected,
+        observations_started_at=start.fence_started_at,
+        observations_ended_at=start.quiescence_confirmed_at,
+    )
+    _verify_identity_and_window(closure, expected)
+    start_binding = (
+        "schema_version",
+        "backup_set_id",
+        "source_deployment_id",
+        "release_git_sha",
+        "release_image_digest",
+        "db_root_id",
+        "file_root_ids",
+        "writer_inventory_digest",
+        "custodian_id",
+        "custodian_role",
+        "fence_started_at",
+        "quiescence_confirmed_at",
+        "fence_expires_at",
+        "signer_key_id",
+    )
+    if any(getattr(closure, field) != getattr(start, field) for field in start_binding):
+        _reject("start_binding")
+    if not (
+        start.quiescence_confirmed_at
+        <= closure.capture_checks_completed_at
+        <= closure.fenced_capture_ended_at
+        <= start.fence_expires_at
+        and closure.fenced_capture_ended_at <= expected.evaluated_at
+    ):
+        _reject("capture_window")
+    _verify_observations(
+        closure,
+        expected,
+        observations_started_at=closure.capture_checks_completed_at,
+        observations_ended_at=closure.fenced_capture_ended_at,
+    )
+    _verify_final_refs(start, closure)
+    _verify_signature(closure, decoded, expected, signatures)
+    _verify_blobs(closure, expected, reader)
+    return closure
 
 
 __all__ = [
@@ -223,5 +324,6 @@ __all__ = [
     "FenceFailureCode",
     "SignatureVerifier",
     "evidence_refs",
+    "verify_capture_fence_closure",
     "verify_capture_fence_start",
 ]
