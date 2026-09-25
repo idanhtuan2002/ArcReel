@@ -23,6 +23,9 @@ from .fingerprints import canonical_json_bytes
 type ServiceKind = Literal["app", "worker", "recovery_scanner", "gc_cleanup"]
 type ServiceObservation = Literal["STOPPED", "DRAINED"]
 type ServiceEvidenceType = Literal["SERVICE_MANAGER_STATUS", "OPERATOR_COMMAND_TRANSCRIPT"]
+MAX_FENCE_RECORD_BYTES = 1_048_576
+_MAX_JSON_DEPTH = 64
+_MAX_JSON_NODES = 16_384
 
 
 class FenceRecordInvalid(ValueError):
@@ -141,11 +144,31 @@ def _reject_nonfinite(_value: str) -> None:
     raise FenceRecordInvalid("nonfinite_number")
 
 
+def _check_json_shape(value: object) -> None:
+    stack: list[tuple[object, int]] = [(value, 0)]
+    nodes = 0
+    while stack:
+        item, depth = stack.pop()
+        nodes += 1
+        if depth > _MAX_JSON_DEPTH or nodes > _MAX_JSON_NODES:
+            raise FenceRecordInvalid("record_shape")
+        if isinstance(item, dict):
+            stack.extend((child, depth + 1) for child in item.values())
+        elif isinstance(item, list):
+            stack.extend((child, depth + 1) for child in item)
+
+
+def _valid_record_bytes(value: object) -> bool:
+    return isinstance(value, bytes) and 0 < len(value) <= MAX_FENCE_RECORD_BYTES
+
+
 def parse_canonical_fence_record[FenceModelT: BaseModel](
     raw: bytes, model: type[FenceModelT]
 ) -> tuple[FenceModelT, dict[str, object]]:
     """Parse exact canonical JSON bytes without discarding signed fields."""
 
+    if not _valid_record_bytes(raw):
+        raise FenceRecordInvalid("record_size")
     try:
         decoded = json.loads(
             raw.decode("utf-8"),
@@ -154,17 +177,27 @@ def parse_canonical_fence_record[FenceModelT: BaseModel](
         )
         if not isinstance(decoded, dict):
             raise FenceRecordInvalid("top_level_object")
+        _check_json_shape(decoded)
         if canonical_json_bytes(ensure_json_value(decoded)) != raw:
             raise FenceRecordInvalid("noncanonical_bytes")
         record = model.model_validate(decoded)
     except FenceRecordInvalid:
         raise
-    except (UnicodeDecodeError, json.JSONDecodeError, ValidationError, TypeError, ValueError, OverflowError):
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        ValidationError,
+        TypeError,
+        ValueError,
+        OverflowError,
+        RecursionError,
+    ):
         raise FenceRecordInvalid("invalid_record") from None
     return record, decoded
 
 
 __all__ = [
+    "MAX_FENCE_RECORD_BYTES",
     "CaptureFenceClosureV1",
     "CaptureFenceStartV1",
     "EvidenceBlobRefV1",

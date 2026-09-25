@@ -106,6 +106,17 @@ def test_absent_start_is_typed_and_has_no_side_effects() -> None:
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
 
 
+@pytest.mark.parametrize("raw", [b" " * 1_048_577, b'{"x":' + b"[" * 2_000 + b"0" + b"]" * 2_000 + b"}"])
+def test_untrusted_record_shape_is_typed_before_port_access(raw: bytes) -> None:
+    class NoAccess:
+        def __getattr__(self, name: str) -> Any:
+            raise AssertionError(f"unexpected port access: {name}")
+
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_start(raw, expected=NoAccess(), reader=NoAccess(), signatures=NoAccess())
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
 @pytest.mark.parametrize(
     "change",
     [

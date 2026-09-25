@@ -187,3 +187,15 @@ def test_validation_error_does_not_expose_raw_evidence_in_exception_chain() -> N
         parse_canonical_fence_record(canonical_json_bytes(data, allow_nan=False), CaptureFenceStartV1)
     assert exc.value.__cause__ is None
     assert "/private/operator-credential" not in str(exc.value)
+
+
+def test_oversized_record_rejects_before_json_decode() -> None:
+    with pytest.raises(FenceRecordInvalid) as exc:
+        parse_canonical_fence_record(b" " * 1_048_577, CaptureFenceStartV1)
+    assert exc.value.category == "record_size"
+
+
+def test_deeply_nested_record_rejects_without_recursion_error() -> None:
+    raw = b'{"x":' + b"[" * 2_000 + b"0" + b"]" * 2_000 + b"}"
+    with pytest.raises(FenceRecordInvalid):
+        parse_canonical_fence_record(raw, CaptureFenceStartV1)
