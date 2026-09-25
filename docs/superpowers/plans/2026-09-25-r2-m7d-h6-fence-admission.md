@@ -167,6 +167,11 @@ The exact-HEAD reviews of `1768d0fe` and `21fbde8a` found that hash-valid but co
 - Change closure input from constructible `start: CaptureFenceStartV1` to `start_raw: bytes | None`. On every closure check, invoke the same start verifier with the independent expectation, signature verifier, reader and semantic inspector; then compare exact start/closure bindings and final evidence. A missing, malformed, bad-signature or altered/missing-blob start fails before closure is accepted.
 - RED tests use a valid closure with invalid start signature and with tampered start blob; both reject. GREEN tests assert start and final references are each read by immutable version, and both signatures are checked. This repeats bounded I/O deliberately to remove an unenforced provenance assumption.
 
+### Task 6: Bound untrusted record parsing
+
+- Cap each raw canonical JSON record at `1_048_576` bytes before UTF-8 decode. Reject empty/oversized input and map `RecursionError` from deeply nested JSON or validation to `FenceRecordInvalid`; the public verifier maps that to `BACKUP_FENCE_EVIDENCE_INVALID` without retaining raw values or an exception context.
+- RED tests submit a one-byte-over-limit record and a roughly 2,000-level nested JSON payload through parser and public start/closure APIs; assert typed/sanitized rejection before any signature or evidence reader call. A future production ingress may impose a tighter release-approved maximum.
+
 ## Plan self-review (2026-09-25)
 
 - Spec coverage: §4.1 start schema/canonical signature/blob preflight maps to Tasks 1–2; closure/window maps to Task 3. Registry, migration, inventory, archive custody and restore are explicitly excluded and remain dependent packets.
