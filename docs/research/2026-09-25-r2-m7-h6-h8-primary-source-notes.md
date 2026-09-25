@@ -562,10 +562,16 @@ committed self-reports as independent acceptance.
 
 ### Required decisions/evidence before implementation or release claims
 
-- Approve the exact secret-custody policy for a whole-DB archive (encryption,
-  key ownership, access, retention and isolated restore handling), and prove
-  the operator can enforce the write/GC fence. This note does not choose a key
-  provider or perform a backup.
+- Before *core contract implementation*, approve the H6 design's typed
+  whole-DB custody contract (authenticated encryption, key-role separation,
+  access, retention evidence and isolated restore handling) and fence-evidence
+  interface. Before a *production custody adapter*, live backup/restore or
+  `RECOVERY_VERIFIED`, approve the actual repository/key/signing owners,
+  retention schedule and evidence from a real fence/restore drill. This is a
+  staged-implementation choice; it does not turn a disposable test fixture
+  into production custody. See the companion
+  [H6 custody source review](2026-09-25-r2-m7-h6-custody-policy-primary-sources.md)
+  and [draft H6 design](../superpowers/specs/2026-09-25-r2-v1-m7d-recovery-closure-design.md).
 - Confirm whether the bounded V1 release is permitted with **zero enabled
   paid routes**. ADR-0089 and the V1 strategy say qualify *or disable* each
   paid path, but the M7-E plan's `PRODUCTION_CANDIDATE` dossier says
