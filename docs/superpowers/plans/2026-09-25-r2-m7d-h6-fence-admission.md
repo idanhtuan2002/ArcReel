@@ -152,6 +152,21 @@ if not (start.quiescence_confirmed_at <= closure.capture_checks_completed_at
 
 This packet ends with a typed, pure verifier and adversarial tests, **not** a running H6 backup. The next independently reviewable packet must design/migrate deployment-scoped backup state and global retention with CAS and audited disposal; only after that may the capture orchestrator invoke this preflight before mutation. Production custody/repository/key/signature adapters, live restores and `RECOVERY_VERIFIED` remain blocked by the separate deployment-bound design gate.
 
+## Review remediation before packet exit
+
+The exact-HEAD reviews of `1768d0fe` and `21fbde8a` found that hash-valid but contradictory evidence blobs were accepted, and that closure accepted a publicly constructible, unverified start model. These are authority gaps, not optional production polish. The initial Task 3 commit is only a checkpoint; packet exit is blocked until both fixes have RED/GREEN tests and a fresh exact-HEAD review.
+
+### Task 4: Require type-specific semantic evidence inspection
+
+- Add a required `EvidenceSemantics` protocol with `validate_service(item, bytes)`, `validate_postgres(check, bytes)`, and `validate_roots(check, bytes)` methods returning exact `True` on success. It is supplied by the trusted composition root, never by evidence bytes or a backup caller. No permissive default and no production implementation are added in this packet.
+- After signature, size and hash checks, call the matching method for *every* service, PostgreSQL and root blob. Missing method, exception or non-`True` result fails sanitized `BACKUP_FENCE_EVIDENCE_INVALID`. The service method receives the declared `SERVICE_MANAGER_STATUS`/`OPERATOR_COMMAND_TRANSCRIPT` type and must interpret it; an adapter that merely repeats record fields is not sufficient for H6 admission.
+- Replace the test fixture's one arbitrary sentence with distinct, canonical type-specific observation blobs. RED tests submit hash-valid contradictory service/DB/root contents and assert the semantic port rejects them; GREEN tests pin exact method coverage on start and closure. The production adapter remains a separate acceptance gate and cannot be replaced by the test fixture.
+
+### Task 5: Reverify the start at closure
+
+- Change closure input from constructible `start: CaptureFenceStartV1` to `start_raw: bytes | None`. On every closure check, invoke the same start verifier with the independent expectation, signature verifier, reader and semantic inspector; then compare exact start/closure bindings and final evidence. A missing, malformed, bad-signature or altered/missing-blob start fails before closure is accepted.
+- RED tests use a valid closure with invalid start signature and with tampered start blob; both reject. GREEN tests assert start and final references are each read by immutable version, and both signatures are checked. This repeats bounded I/O deliberately to remove an unenforced provenance assumption.
+
 ## Plan self-review (2026-09-25)
 
 - Spec coverage: §4.1 start schema/canonical signature/blob preflight maps to Tasks 1–2; closure/window maps to Task 3. Registry, migration, inventory, archive custody and restore are explicitly excluded and remain dependent packets.
