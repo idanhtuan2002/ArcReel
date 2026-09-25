@@ -6,7 +6,7 @@
 
 **Architecture:** Add immutable wire contracts in `r2/contracts/backup_fence.py` and a pure verifier in `r2/host_hardening/fence_evidence.py`. The verifier receives an independently supplied expectation, signature verifier and bounded immutable-evidence reader; it never fetches from an arbitrary caller path, signs data, changes backup state, or claims to stop processes. There is no production signature/evidence-store adapter in this packet, and the existing legacy disposable `create_backup_set` remains unchanged. A later H6 capture packet must call this preflight before registry admission, PREPARING insert or file write.
 
-**Tech Stack:** Python 3.13, Pydantic 2, existing `lib.content_digest.canonical_json_bytes`, pytest. No new dependency or infrastructure.
+**Tech Stack:** Python 3.13, Pydantic 2, existing `r2.contracts.fingerprints.canonical_json_bytes` inside contracts and `lib.content_digest` in the host verifier, pytest. No new dependency or infrastructure.
 
 **Spec:** `docs/superpowers/specs/2026-09-25-r2-v1-m7d-recovery-closure-design.md` §4.1 and §5.1.
 
@@ -52,7 +52,7 @@ def test_duplicate_keys_are_not_signature_equivalent() -> None:
 ```
 
 - [ ] **Step 2: Run the selected test to see RED.** `DATABASE_URL=sqlite+aiosqlite:///:memory: /home/anhtuan/content-production-os-m7/.venv/bin/python -m pytest tests/unit/r2/contracts/test_backup_fence.py -q`; expected import/contract failures, not zero collected tests.
-- [ ] **Step 3: Implement immutable models and parser.** Use `ConfigDict(frozen=True, extra="forbid")`; `Literal[1]`, `AwareDatetime`, `NonEmptyStr`, `StrictInt` for counts, `Field(strict=True, ge=1)` for byte size, and a lowercase digest pattern. Strict mode on the whole model would reject valid JSON timestamp strings; keep strictness on fields where coercion is unsafe. Decode UTF-8 strictly; call `json.loads(..., object_pairs_hook=reject_duplicate_pairs, parse_constant=reject_nonfinite)`, require a top-level object, compare its original bytes with `canonical_json_bytes(decoded, allow_nan=False)`, then call `model.model_validate(decoded)`. Return the validated model and original decoded dict so the signature payload can exclude only `signature` without reformatting timestamps. Map decoding/validation failures to `FenceRecordInvalid` without embedding raw values.
+- [ ] **Step 3: Implement immutable models and parser.** Use `ConfigDict(frozen=True, extra="forbid")`; `Literal[1]`, `AwareDatetime`, `NonEmptyStr`, `StrictInt` for counts, `Field(strict=True, ge=1)` for byte size, and a lowercase digest pattern. Strict mode on the whole model would reject valid JSON timestamp strings; keep strictness on fields where coercion is unsafe. Decode UTF-8 strictly; call `json.loads(..., object_pairs_hook=reject_duplicate_pairs, parse_constant=reject_nonfinite)`, require a top-level object, compare its original bytes with the existing contract-layer `canonical_json_bytes(ensure_json_value(decoded))`, then call `model.model_validate(decoded)`. Return the validated model and original decoded dict so the signature payload can exclude only `signature` without reformatting timestamps. Map decoding/validation failures to `FenceRecordInvalid` without embedding raw values. Contract modules must not import `lib` (the architecture-boundary test covers this).
 
 ```python
 def reject_duplicate_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:

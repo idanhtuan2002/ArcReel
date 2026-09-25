@@ -17,9 +17,8 @@ from pydantic import (
     ValidationError,
 )
 
-from lib.content_digest import canonical_json_bytes
-
-from .common import NonEmptyStr
+from .common import NonEmptyStr, ensure_json_value
+from .fingerprints import canonical_json_bytes
 
 type ServiceKind = Literal["app", "worker", "recovery_scanner", "gc_cleanup"]
 type ServiceObservation = Literal["STOPPED", "DRAINED"]
@@ -155,7 +154,7 @@ def parse_canonical_fence_record[FenceModelT: BaseModel](
         )
         if not isinstance(decoded, dict):
             raise FenceRecordInvalid("top_level_object")
-        if canonical_json_bytes(decoded, allow_nan=False) != raw:
+        if canonical_json_bytes(ensure_json_value(decoded)) != raw:
             raise FenceRecordInvalid("noncanonical_bytes")
         record = model.model_validate(decoded)
     except FenceRecordInvalid:
