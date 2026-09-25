@@ -126,26 +126,38 @@ restores the old non-null `user_id`/`project_name` constraints only when no
 `DEPLOYMENT` row remains; otherwise it fails closed without dropping rows.
 
 `CustodyOperationRegistryV1` is the independent, durable admission authority
-for a source deployment and its canonical source/target DB, media and staging
-root identities as applicable.
-It records one versioned operation slot per deployment and unique active
-claims on each normalized root/mount identity, so an alias or second
-deployment cannot obtain an overlapping claim. Its states are IDLE,
-CAPTURING, STAGING_UNRESOLVED and RESTORING; each active slot binds the exact
-set/attempt or restore-request ID, owner, fence/staging root IDs and immutable
-audit reference. A ledger transaction atomically claims all roots and CASes
-IDLE to CAPTURING or RESTORING **before** source PREPARING insertion, staging
-creation, decrypt or target mutation. New capture and restore admission must
-acquire this same slot, never merely query the old `backup_set_id`; a busy
-slot fails `BACKUP_CAPTURE_DOMAIN_BUSY`. Crash or lease timeout never clears a
-claim: uncertain capture becomes STAGING_UNRESOLVED and remains blocking until
-signed disposition. Disposition, source rejection, receipt acceptance,
-restore completion and fence release all validate the slot version and exact
-owner; only after their audited terminal conditions may CAS return it to IDLE
-and release root claims. If the independent registry is unavailable, admission
-fails closed. Disposable tests use a transactional fixture; production needs
-an approved independently controlled registry adapter, not an in-process
-mutex or a check-then-insert sequence.
+for canonical source/target DB, media and staging root identities. In the
+same transactional registry, each source deployment has one versioned capture
+slot, each isolated recovery target has one versioned restore slot, and all
+slots contend for unique active claims on normalized root/mount identities;
+aliases or a second deployment cannot claim an overlapping root. Capture
+states are IDLE, CAPTURING and STAGING_UNRESOLVED; restore states are IDLE and
+RESTORING. An active slot binds exact set/attempt or restore-request ID,
+owner, claimed roots and immutable audit reference. A ledger transaction
+atomically claims all relevant roots and CASes the appropriate IDLE slot to
+CAPTURING or RESTORING **before** source PREPARING insertion, staging creation,
+decrypt or target mutation. A new source capture cannot bypass an unresolved
+capture slot with a new `backup_set_id`; a conflicting slot/root claim fails
+`BACKUP_CAPTURE_DOMAIN_BUSY`. Crash or lease timeout never clears a claim:
+uncertain capture becomes STAGING_UNRESOLVED and remains blocking until signed
+disposition. Disposition, source rejection, receipt acceptance, restore
+completion and fence release all validate the relevant slot version/owner;
+only after audited terminal conditions may CAS return it to IDLE and release
+its root claims.
+
+An unresolved source capture does **not** bar a separately approved restore of
+an earlier ledger-ACCEPTED set into a disjoint clean target when the restore
+lease, target-root claims and no-source-staging-access check all pass. That
+restore uses the same registry authority but a separate target slot; it
+cannot clear the source quarantine or consume objects from the interrupted
+attempt. A target overlapping an unresolved staging/source claim fails
+`BACKUP_STAGING_UNRESOLVED`; other claim conflicts fail
+`BACKUP_CAPTURE_DOMAIN_BUSY`. An unaccepted set or absent independent ledger
+proof fails closed. This preserves disaster recovery if the source DB is lost
+before a PREPARING row can be inspected. If the registry itself is unavailable,
+admission fails closed. Disposable tests use a transactional fixture;
+production needs an approved independently controlled registry adapter, not
+an in-process mutex or a check-then-insert sequence.
 
 The manifest revision records the exact database archive digest/size and a
 sorted complete inventory with each entry's root kind (project/formal or
@@ -383,8 +395,9 @@ The V1 *custody contract* is nevertheless fixed before implementation:
    access-controlled encrypted ephemeral volume with owner-only permissions,
    no unencrypted swap/core dump and an explicitly recorded volume/key ID,
    not the existing arbitrary durable `backup_dir`. A crash leaves it
-   quarantined; the operation registry refuses a new capture or restore with
-   `BACKUP_STAGING_UNRESOLVED` until an operator inspects and validates its
+   quarantined; the operation registry refuses a new capture or any operation
+   that touches those source/staging roots with `BACKUP_STAGING_UNRESOLVED`
+   until an operator inspects and validates its
    sanitization. The interrupted attempt is never resumed: after disposition,
    a new capture needs a new set/attempt ID, fresh fence, DEK and nonce state.
    A signed `StagingDispositionV1` records set/deployment and attempt IDs,
@@ -589,7 +602,9 @@ interruption at each state transition, nonempty/aliased target, archive digest
 failure, missing/stale/forged start or closure fence evidence, missing/
 tampered underlying evidence blobs, two new attempts racing on one deployment
 or aliased root, new-attempt-versus-disposition registry CAS, refusal to admit
-a PREPARING restore, an audited PREPARING disposition, interrupted plaintext
+a PREPARING restore, a source-loss drill where unresolved staging blocks a
+new capture but an earlier accepted set restores to a disjoint target (and
+an aliased target rejects), an audited PREPARING disposition, interrupted plaintext
 staging with verified cleanup, missing or tampered staging-disposition
 evidence, a restored row that is missing/wrong/COMPLETE,
 zero-formal-file project, out-of-root master reference, unknown manifest
@@ -636,8 +651,10 @@ key-recovery procedures, staging sanitization and interrupted-attempt restart,
 operation-registry claim/disposition, independent ledger admission/abort,
 dual-authorized disposal and timing evidence, clean-target/no-egress
 restore, and the inspected PREPARING/exceptional COMPLETE-to-REJECTED
-dispositions with their audit evidence. The version-1
-manifest/verdict compatibility, exact PostgreSQL image/client and decoder
+dispositions with their audit evidence. The runbook now carries an interim
+warning about the current secret-bearing, disposable-only mechanism; that
+warning is not the future procedure. Version-1 manifest/verdict compatibility,
+exact PostgreSQL image/client and decoder
 pins (the current production Compose uses a floating `postgres:18-alpine`
 tag), and migration downgrade tests belong to the
 same packet; a documentation-only correction is not H6 acceptance.
