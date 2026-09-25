@@ -49,6 +49,7 @@ class FenceExpectationV1:
     file_root_ids: tuple[str, ...]
     approved_writers: tuple[tuple[ServiceKind, str], ...]
     allowed_signer_ids: frozenset[str]
+    custodian_signer_bindings: frozenset[tuple[str, str, str]]
     allowed_evidence_store_ids: frozenset[str]
     custodian_id: str
     custodian_role: str
@@ -91,6 +92,11 @@ def _verify_expectation(expected: FenceExpectationV1) -> None:
     writers = expected.approved_writers
     if (
         not expected.allowed_signer_ids
+        or not expected.custodian_signer_bindings
+        or any(
+            not key_id or not custodian_id or not role or key_id not in expected.allowed_signer_ids
+            for key_id, custodian_id, role in expected.custodian_signer_bindings
+        )
         or not expected.allowed_evidence_store_ids
         or not expected.file_root_ids
         or len(set(expected.file_root_ids)) != len(expected.file_root_ids)
@@ -172,7 +178,15 @@ def _verify_signature(
     expected: FenceExpectationV1,
     signatures: SignatureVerifier,
 ) -> None:
-    if record.signer_key_id not in expected.allowed_signer_ids:
+    if (
+        record.signer_key_id not in expected.allowed_signer_ids
+        or (
+            record.signer_key_id,
+            expected.custodian_id,
+            expected.custodian_role,
+        )
+        not in expected.custodian_signer_bindings
+    ):
         _reject("signature")
     unsigned = {key: value for key, value in decoded.items() if key != "signature"}
     try:

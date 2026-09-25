@@ -91,7 +91,7 @@ class FixtureSignatures:
 
     def verify_ed25519(self, key_id: str, payload: bytes, signature: str) -> bool:
         self.calls.append((key_id, payload, signature))
-        return key_id == "operator-key-1" and signature == hashlib.sha256(payload).hexdigest()
+        return key_id in {"operator-key-1", "operator-key-2"} and signature == hashlib.sha256(payload).hexdigest()
 
 
 def valid_expectation() -> FenceExpectationV1:
@@ -104,6 +104,7 @@ def valid_expectation() -> FenceExpectationV1:
         file_root_ids=("projects-1", "media-1"),
         approved_writers=tuple((kind, kind + "-1") for kind in _KINDS),
         allowed_signer_ids=frozenset({"operator-key-1"}),
+        custodian_signer_bindings=frozenset({("operator-key-1", "operator-1", "backup-custodian")}),
         allowed_evidence_store_ids=frozenset({"operator-evidence"}),
         custodian_id="operator-1",
         custodian_role="backup-custodian",
@@ -654,3 +655,73 @@ def test_closure_cannot_change_physical_mount_identities() -> None:
             semantics=FixtureSemantics(),
         )
     assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
+def test_another_approved_key_cannot_impersonate_start_custodian() -> None:
+    raw, reader, signatures = signed_start()
+    expected = replace(
+        valid_expectation(),
+        allowed_signer_ids=frozenset({"operator-key-1", "operator-key-2"}),
+        custodian_signer_bindings=frozenset(
+            {
+                ("operator-key-1", "operator-1", "backup-custodian"),
+                ("operator-key-2", "operator-2", "backup-custodian"),
+            }
+        ),
+    )
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_start(
+            altered_start(raw, signer_key_id="operator-key-2"),
+            expected=expected,
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
+        )
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
+def test_another_approved_key_cannot_impersonate_closure_custodian() -> None:
+    raw, start_raw, reader, signatures = signed_closure()
+    expected = replace(
+        closure_expectation(),
+        allowed_signer_ids=frozenset({"operator-key-1", "operator-key-2"}),
+        custodian_signer_bindings=frozenset(
+            {
+                ("operator-key-1", "operator-1", "backup-custodian"),
+                ("operator-key-2", "operator-2", "backup-custodian"),
+            }
+        ),
+    )
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_closure(
+            altered_start(raw, signer_key_id="operator-key-2"),
+            start_raw=altered_start(start_raw, signer_key_id="operator-key-2"),
+            expected=expected,
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
+        )
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
+def test_rotation_key_explicitly_bound_to_same_custodian_is_accepted() -> None:
+    raw, start_raw, reader, signatures = signed_closure()
+    expected = replace(
+        closure_expectation(),
+        allowed_signer_ids=frozenset({"operator-key-1", "operator-key-2"}),
+        custodian_signer_bindings=frozenset(
+            {
+                ("operator-key-1", "operator-1", "backup-custodian"),
+                ("operator-key-2", "operator-1", "backup-custodian"),
+            }
+        ),
+    )
+    closure = verify_capture_fence_closure(
+        altered_start(raw, signer_key_id="operator-key-2"),
+        start_raw=altered_start(start_raw, signer_key_id="operator-key-2"),
+        expected=expected,
+        reader=reader,
+        signatures=signatures,
+        semantics=FixtureSemantics(),
+    )
+    assert closure.signer_key_id == "operator-key-2"
