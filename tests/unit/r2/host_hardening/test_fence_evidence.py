@@ -10,7 +10,6 @@ import pytest
 
 from lib.content_digest import canonical_json_bytes, canonical_json_digest
 from r2.contracts.backup_fence import (
-    CaptureFenceStartV1,
     EvidenceBlobRefV1,
     PostgresWriterCheckV1,
     RootMountCheckV1,
@@ -381,13 +380,6 @@ def test_port_failures_do_not_retain_sensitive_exception_context() -> None:
     assert reader_error.value.__context__ is None
 
 
-def valid_start() -> CaptureFenceStartV1:
-    raw, reader, signatures = signed_start()
-    return verify_capture_fence_start(
-        raw, expected=valid_expectation(), reader=reader, signatures=signatures, semantics=FixtureSemantics()
-    )
-
-
 def closure_expectation() -> FenceExpectationV1:
     return replace(valid_expectation(), evaluated_at=datetime(2026, 9, 25, 12, 10, tzinfo=UTC))
 
@@ -400,11 +392,11 @@ def unused_signatures() -> FixtureSignatures:
     return FixtureSignatures()
 
 
-def signed_closure() -> tuple[bytes, CaptureFenceStartV1, MemoryReader, FixtureSignatures]:
+def signed_closure() -> tuple[bytes, bytes, MemoryReader, FixtureSignatures]:
     import json
 
     start_raw, reader, signatures = signed_start()
-    start = verify_capture_fence_start(
+    verify_capture_fence_start(
         start_raw, expected=valid_expectation(), reader=reader, signatures=signatures, semantics=FixtureSemantics()
     )
     reader.calls.clear()
@@ -421,31 +413,31 @@ def signed_closure() -> tuple[bytes, CaptureFenceStartV1, MemoryReader, FixtureS
         reader.blobs[(ref["store_id"], ref["object_ref"], ref["object_version"])] = body
     data["capture_checks_completed_at"] = "2026-09-25T12:08:00Z"
     data["fenced_capture_ended_at"] = "2026-09-25T12:09:00Z"
-    return altered_start(canonical_json_bytes(data, allow_nan=False)), start, reader, signatures
+    return altered_start(canonical_json_bytes(data, allow_nan=False)), start_raw, reader, signatures
 
 
 def test_valid_closure_checks_all_final_immutable_versions() -> None:
-    raw, start, reader, signatures = signed_closure()
+    raw, start_raw, reader, signatures = signed_closure()
     semantics = FixtureSemantics()
     closure = verify_capture_fence_closure(
         raw,
-        start=start,
+        start_raw=start_raw,
         expected=closure_expectation(),
         reader=reader,
         signatures=signatures,
         semantics=semantics,
     )
     assert closure.fenced_capture_ended_at.minute == 9
-    assert len(reader.calls) == 6
-    assert all(call[2] == "v2" for call in reader.calls)
-    assert len(signatures.calls) == 1
-    assert semantics.calls == ["service"] * 4 + ["postgres", "roots"]
+    assert len(reader.calls) == 12
+    assert [call[2] for call in reader.calls] == ["v1"] * 6 + ["v2"] * 6
+    assert len(signatures.calls) == 2
+    assert semantics.calls == (["service"] * 4 + ["postgres", "roots"]) * 2
 
 
 def test_closure_hash_valid_contradictory_final_blob_rejects() -> None:
     import json
 
-    raw, start, reader, signatures = signed_closure()
+    raw, start_raw, reader, signatures = signed_closure()
     data = json.loads(raw)
     ref = data["root_mount_check"]["blob"]
     contradictory = b"ROOT MOUNT REPLACED; ALIAS PRESENT"
@@ -455,7 +447,7 @@ def test_closure_hash_valid_contradictory_final_blob_rejects() -> None:
     with pytest.raises(FenceEvidenceError) as exc:
         verify_capture_fence_closure(
             altered_start(canonical_json_bytes(data, allow_nan=False)),
-            start=start,
+            start_raw=start_raw,
             expected=closure_expectation(),
             reader=reader,
             signatures=signatures,
@@ -464,11 +456,77 @@ def test_closure_hash_valid_contradictory_final_blob_rejects() -> None:
     assert exc.value.category == "blob_semantics"
 
 
+def test_closure_does_not_accept_a_start_with_bad_signature() -> None:
+    import json
+
+    raw, start_raw, reader, signatures = signed_closure()
+    forged_start = json.loads(start_raw)
+    forged_start["signature"] = "not-a-valid-start-signature"
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_closure(
+            raw,
+            start_raw=canonical_json_bytes(forged_start, allow_nan=False),
+            expected=closure_expectation(),
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
+        )
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
+def test_closure_rejects_when_start_blob_is_missing() -> None:
+    import json
+
+    raw, start_raw, reader, signatures = signed_closure()
+    ref = json.loads(start_raw)["services"][0]["blob"]
+    del reader.blobs[(ref["store_id"], ref["object_ref"], ref["object_version"])]
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_closure(
+            raw,
+            start_raw=start_raw,
+            expected=closure_expectation(),
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
+        )
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
 def test_closure_missing_is_not_a_window_end() -> None:
     with pytest.raises(FenceEvidenceError) as exc:
         verify_capture_fence_closure(
             None,
-            start=valid_start(),
+            start_raw=signed_start()[0],
+            expected=closure_expectation(),
+            reader=unused_reader(),
+            signatures=unused_signatures(),
+            semantics=FixtureSemantics(),
+        )
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+
+
+def test_closure_rejects_missing_start_before_any_port_call() -> None:
+    raw, _, reader, signatures = signed_closure()
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_closure(
+            raw,
+            start_raw=None,
+            expected=closure_expectation(),
+            reader=reader,
+            signatures=signatures,
+            semantics=FixtureSemantics(),
+        )
+    assert exc.value.code is FenceFailureCode.BACKUP_FENCE_EVIDENCE_INVALID
+    assert reader.calls == []
+    assert signatures.calls == []
+
+
+def test_deeply_nested_closure_rejects_before_start_or_port_access() -> None:
+    raw = b'{"x":' + b"[" * 2_000 + b"0" + b"]" * 2_000 + b"}"
+    with pytest.raises(FenceEvidenceError) as exc:
+        verify_capture_fence_closure(
+            raw,
+            start_raw=signed_start()[0],
             expected=closure_expectation(),
             reader=unused_reader(),
             signatures=unused_signatures(),
@@ -492,11 +550,11 @@ def test_closure_missing_is_not_a_window_end() -> None:
     ],
 )
 def test_closure_identity_or_window_drift_rejects(change: dict[str, object]) -> None:
-    raw, start, reader, signatures = signed_closure()
+    raw, start_raw, reader, signatures = signed_closure()
     with pytest.raises(FenceEvidenceError) as exc:
         verify_capture_fence_closure(
             altered_start(raw, **change),
-            start=start,
+            start_raw=start_raw,
             expected=closure_expectation(),
             reader=reader,
             signatures=signatures,
@@ -511,7 +569,7 @@ def test_closure_identity_or_window_drift_rejects(change: dict[str, object]) -> 
 def test_closure_final_evidence_rejects_failures(mutation: str) -> None:
     import json
 
-    raw, start, reader, signatures = signed_closure()
+    raw, start_raw, reader, signatures = signed_closure()
     data = json.loads(raw)
     if mutation == "missing_blob":
         ref = data["services"][0]["blob"]
@@ -532,7 +590,7 @@ def test_closure_final_evidence_rejects_failures(mutation: str) -> None:
     with pytest.raises(FenceEvidenceError) as exc:
         verify_capture_fence_closure(
             raw,
-            start=start,
+            start_raw=start_raw,
             expected=closure_expectation(),
             reader=reader,
             signatures=signatures,
@@ -556,7 +614,7 @@ def test_expectation_cannot_alias_database_and_file_root() -> None:
 def test_closure_must_capture_new_evidence_in_the_start_store(mutation: str) -> None:
     import json
 
-    raw, start, reader, signatures = signed_closure()
+    raw, start_raw, reader, signatures = signed_closure()
     data = json.loads(raw)
     ref = data["services"][0]["blob"]
     if mutation == "replay_start_ref":
@@ -571,7 +629,7 @@ def test_closure_must_capture_new_evidence_in_the_start_store(mutation: str) -> 
     with pytest.raises(FenceEvidenceError) as exc:
         verify_capture_fence_closure(
             altered_start(canonical_json_bytes(data, allow_nan=False)),
-            start=start,
+            start_raw=start_raw,
             expected=expected,
             reader=reader,
             signatures=signatures,
@@ -583,13 +641,13 @@ def test_closure_must_capture_new_evidence_in_the_start_store(mutation: str) -> 
 def test_closure_cannot_change_physical_mount_identities() -> None:
     import json
 
-    raw, start, reader, signatures = signed_closure()
+    raw, start_raw, reader, signatures = signed_closure()
     data = json.loads(raw)
     data["root_mount_check"]["mount_identities"] = ["attacker-db", "attacker-projects", "attacker-media"]
     with pytest.raises(FenceEvidenceError) as exc:
         verify_capture_fence_closure(
             altered_start(canonical_json_bytes(data, allow_nan=False)),
-            start=start,
+            start_raw=start_raw,
             expected=closure_expectation(),
             reader=reader,
             signatures=signatures,

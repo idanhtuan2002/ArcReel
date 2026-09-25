@@ -296,13 +296,13 @@ def verify_capture_fence_start(
 def verify_capture_fence_closure(
     raw: bytes | None,
     *,
-    start: CaptureFenceStartV1,
+    start_raw: bytes | None,
     expected: FenceExpectationV1,
     reader: EvidenceReader,
     signatures: SignatureVerifier,
     semantics: EvidenceSemantics | None = None,
 ) -> CaptureFenceClosureV1:
-    """Verify a signed post-capture observation against a verified start."""
+    """Reverify the raw start, then validate signed post-capture observations."""
 
     if not isinstance(raw, bytes) or not raw:
         _reject("missing_closure")
@@ -313,14 +313,10 @@ def verify_capture_fence_closure(
     if parsed is None:
         _reject("invalid_record")
     closure, decoded = parsed
-    _verify_expectation(expected)
-    _verify_identity_and_window(start, expected)
-    _verify_observations(
-        start,
-        expected,
-        observations_started_at=start.fence_started_at,
-        observations_ended_at=start.quiescence_confirmed_at,
+    start = verify_capture_fence_start(
+        start_raw, expected=expected, reader=reader, signatures=signatures, semantics=semantics
     )
+    _verify_expectation(expected)
     _verify_identity_and_window(closure, expected)
     start_binding = (
         "schema_version",
