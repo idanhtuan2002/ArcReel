@@ -172,6 +172,11 @@ The exact-HEAD reviews of `1768d0fe` and `21fbde8a` found that hash-valid but co
 - Cap each raw canonical JSON record at `1_048_576` bytes before UTF-8 decode. Reject empty/oversized input and map `RecursionError` from deeply nested JSON or validation to `FenceRecordInvalid`; the public verifier maps that to `BACKUP_FENCE_EVIDENCE_INVALID` without retaining raw values or an exception context.
 - RED tests submit a one-byte-over-limit record and a roughly 2,000-level nested JSON payload through parser and public start/closure APIs; assert typed/sanitized rejection before any signature or evidence reader call. A future production ingress may impose a tighter release-approved maximum.
 
+### Task 7: Bind signer authority to the named custodian
+
+- Keep the independently supplied release signer allowlist, and add a release-trust-root-sourced `custodian_signer_bindings: frozenset[tuple[key_id, custodian_id, role]]` to `FenceExpectationV1`. The record may neither invent this binding nor widen it. Require a nonempty binding set and membership of the exact `(record.signer_key_id, expected.custodian_id, expected.custodian_role)` tuple before signature verification; a valid Ed25519 signature from another allowlisted operator is not custody authority for the named custodian.
+- RED tests use two cryptographically valid fixture keys, globally allowlist both, bind each to a different custodian, and re-sign start and closure as key B while claiming custodian A. Both must reject with `BACKUP_FENCE_EVIDENCE_INVALID`; an exact key A binding passes. The production trust-root adapter must supply these bindings from policy outside the evidence-submitting caller.
+
 ## Plan self-review (2026-09-25)
 
 - Spec coverage: §4.1 start schema/canonical signature/blob preflight maps to Tasks 1–2; closure/window maps to Task 3. Registry, migration, inventory, archive custody and restore are explicitly excluded and remain dependent packets.
