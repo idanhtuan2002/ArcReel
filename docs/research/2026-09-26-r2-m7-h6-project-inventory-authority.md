@@ -297,6 +297,36 @@ existing bytes, intentionally pending references, remote URIs, history, and
 deprecated fields. The backup adapter must not borrow the archive's auto-fix
 behavior as a capture-time integrity check.
 
+### Candidate release-pinned reference field map (positive evidence)
+
+The table consolidates *confirmed* field identities for the proposed H6
+classifier. It is review input, not a claim that all historical schema
+versions or DB path fields have been exhausted. A nonempty local value must
+resolve to a physical inventory binding unless a stated pending rule applies;
+absent/null/empty values retain their distinct source states. H6's no-follow
+canonical path policy remains stricter than the ordinary validator's basename
+fallback.
+
+| Source and field | Candidate classification | Counterexample to test |
+| --- | --- | --- |
+| `project.json`: `style_image`; `characters[*].character_sheet`, `reference_image`, `reference_audio`; `scenes[*].scene_sheet`; `props[*].prop_sheet` | Optional local file; every nonempty value binds project bytes. | Missing local file, absolute alias and in-root symlink. |
+| `project.json`: `products[*].product_sheet`, each `products[*].reference_images[]`, and `characters[*].derivatives[*].character_sheet` | Optional local file(s); validator checks some types but not all file existence. | Missing product original/derivative sheet while ordinary tree validation passes. |
+| `project.json`: `episodes[*].script_file` | Required nonempty ledger field; absent target is pending only when `episode` parses as a positive episode number, while an existing target binds bytes and is parsed as an episode script. | Positive-number pending script versus malformed-number missing script; no automatic script creation. |
+| Episode script: supported segment/scene/shot/video-unit `generated_assets.storyboard_image`, `storyboard_last_image`, `video_clip`, `video_thumbnail`, `narration_audio` | Optional local file; nonempty values bind bytes. The current generated-assets validator omits thumbnail. | Missing thumbnail with otherwise passing tree validator. |
+| Episode script: supported segment/scene/shot `end_frame_image` | Optional local file constrained to `end_frames/` in the existing validator; H6 must also reject aliases/symlinks. | Same bytes at a path outside the end-frame root. |
+| Episode script: `generated_assets.video_uri` | Value-sensitive: absent/empty, approved external URI, or local file binding. External URI is recorded as remote identity, not invented local bytes. | `https://` URI versus same field containing a local path. |
+| Artifact Manifest `entries[*].artifact_path` and `versions/versions.json` `versions[*].file` | Registered formal artifact and retained history snapshot respectively; each declared nonpending reference requires bytes. | Missing unselected/rejected history snapshot; absent versus present-empty manifest/index. |
+| DB `assets.image_path`, `assets.audio_path`, `asset_derivatives.image_path`; candidate/master object references | Non-null global-asset binding by table/row/field; candidate/master binding by exact candidate/object-version identity under approved media root. | Two rows share one file; absent `_global_assets` with DB reference; out-of-root master. |
+| DB `api_calls.output_path`, `ProviderCredential.credentials_path`, adaptation finding `target_path` | **Unresolved/review-only**: historical usage path, separate secret-custody path and semantic field path respectively. Do not classify by column suffix or quietly copy credential files. | Historical usage path after deletion; secret path absent from public manifest; semantic `target_path` not treated as a filesystem path. |
+
+This field map is deliberately positive, not a default for unknown schemas.
+Before acceptance, enumerate each supported project/script/history schema
+revision and additional writer/import/migration routes, decide whether
+`api_calls.output_path` is historical evidence or current file authority
+under each lifecycle state, and make unknown declared reference types a typed
+capture failure. See the [writer/reader pass](2026-09-26-r2-m7-h6-path-writers.md)
+for observed field mutators and ordinary validator behavior.
+
 ## Global-asset reference multiplicity
 
 The `assets` table uniquely constrains `(type, name)`, and
