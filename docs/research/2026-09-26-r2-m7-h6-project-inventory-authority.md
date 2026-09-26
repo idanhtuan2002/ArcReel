@@ -404,6 +404,9 @@ fallback.
 | Episode script: `generated_assets.video_uri` | Value-sensitive: absent/empty, approved external URI, or local file binding. External URI is recorded as remote identity, not invented local bytes. | `https://` URI versus same field containing a local path. |
 | Artifact Manifest `entries[*].artifact_path` and `versions/versions.json` `versions[*].file` | Registered formal artifact and retained history snapshot respectively; each declared nonpending reference requires bytes. | Missing unselected/rejected history snapshot; absent versus present-empty manifest/index. |
 | Project `grids/grid_*.json`: `grid_image_path`, `frame_chain[*].image_path`, `reference_images[*].path`, `script_file` | Grid record fields name a composite, split-frame outputs, reference inputs and an episode script. Their exact required-versus-pending predicates remain to be approved. | Ready composite missing while metadata survives; missing split-frame or reference input; malformed grid JSON skipped by the UI list; grid record referring to a missing script. |
+| Persisted `presentations/episode_*/*.json`: `script_file`, `subtitle_artifact_path`, `presentation_artifact_path`, `video.artifact_path`, nullable `narration_audio.artifact_path` | Version-1 presentation projection names its own formal files and selected media. `ArtifactPlanner` reads and compares it with a recomputed expected presentation. | Missing selected video/audio, stale internal path, or a presentation JSON that exists but fails the planner's exact comparison. |
+| `tasks.execution_checkpoint_json` and project-local `.arcreel/tasks/*/provider_media/manifest.json`: `script_file`, `narration.artifact_path`, `media[*].source_locator`, `media[*].staged_locator` | Versioned submission checkpoint and staging manifest bind provider input copies for task resume. Staging cleanup can remove files while the DB checkpoint remains. | Active checkpoint with missing staged bytes; terminal task with intentionally cleaned staging; checkpoint/manifest digest or task-identity mismatch. |
+| Project-local quarantine draft JSON `meta.source` | A nullable source selector is reused when revalidating or promoting the draft; null derives the episode source file. | Named source missing or changed, null with missing derived episode source, corrupt draft whose `meta.source` cannot be trusted. |
 | DB `assets.image_path`, `assets.audio_path`, `asset_derivatives.image_path`; candidate/master object references | Non-null global-asset binding by table/row/field; candidate/master binding by exact candidate/object-version identity under approved media root. | Two rows share one file; absent `_global_assets` with DB reference; out-of-root master. |
 | DB `api_calls.output_path`, explicit Vertex credential/config paths, implicit Vertex file resolvers, adaptation finding `target_path` | **Review-only**: candidate historical usage metadata, separate secret-custody selectors and semantic field path respectively. Do not classify by column suffix, enumerate only DB rows, or quietly copy credential files. | Historical usage path after deletion; explicit and resolver selectors covered by protected disposition but secret paths absent from public manifest; semantic `target_path` not treated as a filesystem path. |
 
@@ -442,6 +445,65 @@ split-frame and reference-image paths. It must test a malformed record and
 missing referenced bytes without silently dropping either. This is a
 bounded current-source finding, not an exhaustive grid-history audit or an
 approved capture rule.
+
+### Presentation projections and provider-media staging
+
+`MaterializedPresentation.to_dict()` writes `script_file`, its subtitle and
+presentation artifact paths, and a version-1 `SpeechPresentation` payload
+(`server/services/presentation_read_model.py:66-92,839-887`;
+`lib/speech_presentation.py:233-250`). The nested video and optional narration
+tracks emit their selected media `artifact_path`, version and content evidence
+(`lib/speech_presentation.py:54-72,167-198,469-478`); the raw-video variant
+also emits a selected video path (`:253-287,333-350`). These JSON files are
+registered as formal artifacts, and `ArtifactPlanner` later reads the optional
+subtitle/presentation pair and compares the persisted object with a
+recomputed expected value before accepting it as current evidence
+(`server/services/presentation_read_model.py:873-887`;
+`lib/artifact_planner.py:1029-1045,1135-1148`). Thus exact physical retention
+alone does not classify the declared internal paths. V1-02 must decide whether
+to parse and bind every nested media path, verify the planner's reconstructed
+projection, or explicitly narrow the restore claim. This is a positive
+current-source finding, not a claim that a missing optional presentation is
+corruption.
+
+`Task.execution_checkpoint_json` is a nullable persisted field
+(`lib/db/models/task.py:16-46`). A guarded pre-submit transition writes a
+video checkpoint for a running task before provider submission
+(`lib/db/repositories/task_repo.py:1059-1084`;
+`server/services/reference_video_tasks.py:700-711`). The checkpoint's
+versioned payload includes `script_file`, narration `artifact_path`, and for
+each media item `source_locator` and `staged_locator`; it binds the latter to
+`.arcreel/tasks/{task_id}/provider_media/`
+(`lib/reference_video/execution_checkpoint.py:147-225,600-679,681-715`).
+The project-local staging `manifest.json` has schema version 1 and repeats
+the same media records; the loader validates the manifest, and a separate
+verifier hashes staged files (`:283-298,325-339`). Checkpoint resume binds its
+task ID, project, script and unit to the owning DB row (`:952-987`). Finalized task
+paths and cancellation/error paths can remove staging
+(`server/services/reference_video_tasks.py:713-720,786-790`;
+`lib/reference_video/execution_checkpoint.py:361-425`). Therefore a retained
+checkpoint row is not unconditional proof that its staged file should still
+exist. V1-01 task-state disposition and V1-02 reference classification must
+jointly define active-versus-terminal required bytes, including source input
+that was changed or deleted after the immutable staging copy. Do not treat
+the hidden `.arcreel/` subtree as disposable by name while active resume can
+read it, and do not fabricate missing staged files from mutable source inputs.
+
+### Quarantined draft source selectors
+
+Quarantine drafts are persisted as versioned envelopes with `meta` and
+`content` (`lib/draft_quarantine.py:95-97,165-185,242-267`). The draft workflow
+records a validated `meta.source` and later reuses it for revalidation and
+promotion (`server/draft_workflow.py:166-184,1197-1222`). A string value names
+a project-local source file; null resolves to `source/episode_N.txt`, and the
+loader requires that file to exist and contain text
+(`server/text_generation.py:498-538`). The reader treats an invalid envelope
+as no usable draft while the physical file can still block normal generation
+(`lib/draft_quarantine.py:270-276`). Thus V1-02 must preserve draft bytes and
+classify `meta.source` by its value and draft state; it cannot declare every
+draft JSON an opaque file with no relevant path. Whether a broken or obsolete
+draft blocks exact H6 recovery, or is retained only as historical bytes,
+remains a reviewed policy decision.
 
 ## Global-asset reference multiplicity
 
@@ -587,6 +649,12 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
    its script, composite, split-frame and reference-image paths under each
    recorded status; UI-style malformed-record skipping cannot prove complete
    capture.
+10. persisted presentation/subtitle projection pairs and their nested selected
+    media paths, including optional absence and exact planner comparison;
+    versioned task checkpoints and staging manifests, with required staged
+    bytes determined from task/resume state rather than a path-name heuristic.
+11. quarantine-draft `meta.source` selectors, including a named source, null
+    derived episode source and an invalid or obsolete envelope.
 
 These are open schema decisions, not reasons to reinterpret the accepted
 pure `RecoveryConfigV1` parser as a production capture implementation.

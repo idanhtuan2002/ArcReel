@@ -223,8 +223,11 @@ version history.
 
 Second, a release-pinned reference classifier walks the **known** fields in
 `project.json`, episode scripts, `grids/grid_*.json`, Artifact Manifest,
-`versions/versions.json`, global-asset DB rows, candidate/master rows and other
-approved DB-to-file authorities. Each nonempty local reference becomes a binding on an inventoried
+`versions/versions.json`, quarantine drafts and their source selectors,
+persisted presentation/subtitle projections,
+versioned task submission checkpoints and provider-media staging manifests,
+global-asset DB rows, candidate/master rows and other approved DB-to-file
+authorities. Each nonempty local reference becomes a binding on an inventoried
 file, even when the ordinary `DataValidator` does not check that field (for
 example `video_thumbnail`, product originals/sheet or derivative sheets).
 It distinguishes an intentionally pending `episodes[*].script_file` from a
@@ -243,6 +246,14 @@ Grid records require a read-only, version/shape-aware parser for their
 `reference_images[*].path` fields. The status-dependent pending and required
 rules remain a V1-02 approval item; a UI list that skips malformed grid JSON
 is not evidence of complete capture.
+Presentation and task-checkpoint paths need their own versioned field maps:
+an absent optional presentation differs from a present but divergent
+projection, and a cleaned terminal task differs from an active checkpoint
+whose immutable staged media is missing. The V1-01 task-state disposition and
+V1-02 file rule must agree before either is admission authority.
+Quarantine-draft `meta.source` can name a project file or select the derived
+episode source when null; malformed or obsolete drafts need an explicit
+disposition rather than a filename-based exclusion.
 
 The classifier does not call any
 write-capable project load, archive repair, profile sync, version restore or
@@ -815,6 +826,11 @@ snapshot; same-path content drift; and file-count/size-limit rejection. Grid
 cases include a pending record with no composite, a ready record whose
 composite is missing, a missing split-frame or reference-image target, and
 malformed grid JSON that the UI list would skip.
+They also include optional presentation absence versus divergent persisted
+media paths, an active checkpoint missing staged bytes, and a terminal
+checkpoint after legitimate staging cleanup. Draft cases include a named
+source file, a null selector with missing derived source, and a corrupt
+envelope retained by the physical census.
 These fixtures must exercise capture and clean-target restore through the
 same inventory interface, not only a standalone path parser.
 

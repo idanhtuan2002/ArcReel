@@ -5,6 +5,11 @@ Scope: bounded V1-01 research on the current `feat/r2-m7e-v1-lineage`
 worktree. This note makes no lifecycle, retention, schema, or capture-policy
 decision.
 
+This table expands the existing [liveness map](2026-09-26-r2-m7-h6-project-liveness-map.md)
+with explicit direct and selected indirect ORM row identities. The earlier
+map contains candidate tombstone and capture-admission policies; neither note
+is an approval or evidence of live database contents.
+
 ## Required question
 
 H6 design section 8 requires an approved table of project-scoped DB rows,
