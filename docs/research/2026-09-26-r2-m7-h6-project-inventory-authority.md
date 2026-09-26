@@ -98,6 +98,13 @@ to `lib/db/models/`, not the entire repository or a live database.
    (`lib/db/repositories/usage_repo.py:395-440,747-772`); whether any
    historical value must bind a restorable file remains an open policy
    classification, not a conclusion from its column name.
+10. Global-asset deletion commits the asset and derivative row removal before
+    unlinking their files; a file-unlink error is logged rather than rolled
+    back (`server/routers/assets.py:248-262`). Thus an unreferenced file in
+    `_global_assets` is possible in normal operation. The asset row IDs,
+    derivative row IDs and nullable reference fields are distinct
+    (`lib/db/models/asset.py:11-47`). `source_project` is nullable provenance,
+    not a substitute for the asset/derivative file binding.
 
 ## Inference and alternatives
 
@@ -124,7 +131,9 @@ to `lib/db/models/`, not the entire repository or a live database.
   the existing logical project root, with exact DB-row/path bindings and
   size/hash checks; missing or out-of-root references fail capture. Whether
   unreferenced orphan files in that directory are retained or rejected is a
-  separate explicit policy choice, not a silent omission.
+  separate explicit policy choice, not a silent omission. The current delete
+  ordering means "reject every orphan" may reject a source left by a
+  previously successful API deletion; the policy must account for that state.
 - Reusing `normalize_artifact_path()` for formal-entry references is useful,
   but using it for every backup file would incorrectly conflate formal
   registration with `project.json`, the Artifact Manifest file, and possibly
