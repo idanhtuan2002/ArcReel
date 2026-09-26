@@ -68,6 +68,22 @@ transient, because creation can defer `project.json` publication.
 project names would reject normal post-delete history as corruption; ignoring
 all DB-only names could instead conceal an interrupted/live operational case.
 
+## Follow-up: the directory helper has two different call intents
+
+The current-worktree call-site check found a second production caller of
+`delete_project_directory()`: `server/tool_runtime.py:1171-1183` invokes it
+only when composed project creation fails after `create_project(...,
+publish=False)`. That is rollback of an unpublished directory, not a user
+request to delete a previously live project. The API delete route is at
+`server/routers/projects.py:1101-1116`; the helper itself is at
+`lib/project_manager.py:447-462`. An H6 tombstone or retention disposition
+must therefore attach to an explicit published-project deletion command,
+not indiscriminately to the low-level directory-removal helper. The helper
+can remain a physical operation used by failed-create rollback. This
+additional caller was discovered from the indexed M7 graph and verified
+against the current worktree; the graph is from a different, older worktree,
+so the current source is authoritative.
+
 ## Candidate policies (not approved)
 
 1. **Filesystem-primary deletion with a durable DB tombstone.** A valid
@@ -86,6 +102,49 @@ retired, or historical against it during capture/restore. This gives the
 strongest inventory proof, but is the broadest schema/API migration and needs
 complete write-route, retention, and restore semantics before implementation.
 
+For the narrow single-operator V1, the provisional recommendation is a
+two-phase, explicit deletion admission plus durable tombstone, rather than
+turning every historical project-scoped row into a live-project registry.
+The dedicated delete command would first fail closed on non-terminal work
+(at minimum a live execution attempt, unresolved `PREPARING` backup or
+active recovery lease), durably record a deletion intent keyed by normalized
+project identity, then remove the published directory, and finally mark the
+tombstone terminal. Capture would admit a directory only when it is a valid
+published project (`project.json` present) with no deletion intent, classify
+a DB-only identity with a terminal tombstone as historical, and reject a
+DB-only identity without one as ambiguous rather than silently inventing a
+deleted project. An in-progress intent, directory-only identity, conflicting
+identity reuse or interrupted delete also rejects capture until inspected
+disposition. This is a *candidate*, not a selected schema or an instruction
+to delete files: the transaction/crash matrix, name-reuse policy and exact
+row predicates still need review. Existing DB-only identities predate such
+tombstones and cannot be backfilled by guessing from current absence; they
+need explicit inspected classification evidence or remain a typed rejection.
+
+Proposed capture-admission matrix for review (all codes and predicates are
+candidate contract values, not implemented behavior):
+
+| Directory / `project.json` | Deletion record | Project-scoped DB rows | Proposed capture result |
+| --- | --- | --- | --- |
+| Present, valid published project | None | Any consistent scoped rows | Admit as live; inventory directory and all its reference-bearing rows. |
+| Present, valid published project | Intent or terminal tombstone | Any | Reject `BACKUP_PROJECT_LIFECYCLE_CONFLICT`; a stale or reused name must not silently become live. |
+| Absent | Terminal tombstone for exact project identity | Historical rows only | Preserve rows in the whole DB dump, but do not fabricate project files or live project admission. Current mutable heads and non-terminal work still require explicit disposition. |
+| Absent | No tombstone or intent | Any scoped row | Reject `BACKUP_PROJECT_LIVENESS_AMBIGUOUS`; legacy evidence must be inspected, never guessed from absence. |
+| Present directory, absent/invalid `project.json` | Any | Any | Reject `BACKUP_PROJECT_UNPUBLISHED`; this may be interrupted creation or damaged published data. |
+| Absent or present | Non-terminal deletion intent | Any | Reject `BACKUP_PROJECT_DELETION_INCOMPLETE` until inspected recovery/disposition. |
+
+The exact identity key must prevent a deleted project's old evidence being
+silently rebound to a new project with the same name. Either disallow name
+reuse in V1 or add a durable generation/ID to all relevant write and restore
+authorities; a name-only tombstone cannot safely support reuse. The simpler
+V1 candidate is no name reuse after published deletion, with a distinct
+failed-create rollback that leaves no tombstone. A legacy DB-only disposition
+would require a signed, independently stored `LegacyProjectDispositionV1`
+bound to source deployment, normalized name, inspected row IDs/states and
+evidence digest; the reviewer must decide whether this suffices for capture
+or whether the source must first be repaired. Neither option is silently
+selected here.
+
 ## Unknowns and required decision checks
 
 - No source inspected defines a durable project tombstone, retirement state,
@@ -96,7 +155,8 @@ and current master/canon/narrative heads at deletion is not specified.
 - A database-level inventory was not queried; this note classifies model and
 route behavior, not existing production rows.
 - Before freezing H6 inventory/capture, select the authoritative filesystem
-predicate, enumerate all affected write/delete routes, define typed
+predicate, enumerate all affected write/delete routes (including failed-
+create rollback), define typed
 filesystem-only/DB-only/tombstoned cases, and add adversarial tests. This is
 the unresolved gate already required by the recovery-closure design.
 
@@ -111,7 +171,9 @@ First-party source only. Structural discovery used codebase-memory project
   was not tracked; their claims above are from direct source. This is a
   source-code survey, not a live-database audit.
 
-- `server/routers/projects.py:1101-1116`; `lib/project_manager.py:388-438,447-462,601-611,1852-1857`.
+- `server/routers/projects.py:1101-1116`;
+  `server/tool_runtime.py:1160-1183`;
+  `lib/project_manager.py:388-438,447-462,601-611,1852-1857`.
 - `lib/db/models/host_hardening.py:1-12,38-107,230-287,293-460`; `r2/host_hardening/transitions.py:30-90`.
 - `lib/db/models/task.py:12-104`; `lib/db/models/api_call.py:14-55`;
   `lib/db/models/session.py:11-34`;
