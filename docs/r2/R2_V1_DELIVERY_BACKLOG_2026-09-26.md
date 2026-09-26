@@ -35,6 +35,17 @@ V2 begins only from the released V1 tag and verified recovery baseline.
 | V1-08 | Run E3/release gates and prepare an annotated V1 tag from a clean candidate. Purpose: create a reproducible single-operator release, not merely a passing test branch. | Full affected/backend/frontend/static/migration/browser gates on exact SHA, reviewed runbooks and deferred-capability disclosure, `PRODUCTION_CANDIDATE` dossier, separate Human/operations approval before live actions, clean tag only after V1 release gate. |
 | V2-01 (later) | Preserve V1 maintenance line and restore its tagged DB/media baseline into isolated V2 staging. Purpose: start V2 from a recoverable real product rather than a copied worktree. | V1 tag, verified recovery baseline, one stable operator release cycle and evidence-backed V2 gap; then decide portfolio identity/resource/pause semantics before code. |
 
+## Document authority for the next packets
+
+| Packet | Existing material | How to use it |
+| --- | --- | --- |
+| Whole V1/V2 release boundary | Accepted ADR-0089 and `R2_V1_PRODUCTION_RELEASE_STRATEGY.md`. | Authoritative product scope, Human Gates, release and V2-start conditions. |
+| V1-01/02 H6 inventory | `docs/research/2026-09-26-r2-m7-h6-project-inventory-authority.md` and the current project-liveness/file-reference research. | Source input only; no approved DB-liveness or orphan-file rule yet. |
+| V1-03/04 H6 recovery | `docs/superpowers/specs/2026-09-25-r2-v1-m7d-recovery-closure-design.md`, H6 primary-source/custody/donor notes, and the existing fence/config contract plans. | The closure design is explicitly **draft**; old `2026-09-12-r2-m7d-backup-observability.md` predates its stricter inventory/custody requirements and is not an executable production plan as-is. |
+| V1-05 H7 | Host-hardening design §9 and `2026-09-12-r2-m7d-backup-observability.md` D2/D3, plus the independent M7-D findings in `R2_M7_E1_INTEGRATION_STOP_2026-09-25.json`. | A starting design/plan and observed gaps; re-scope against the stricter H6/D3 acceptance contract before claiming `RECOVERY_VERIFIED`. |
+| V1-06 E1 | `2026-09-12-r2-m7e-production-candidate.md` E1 and `R2_M7_E1_INTEGRATION_STOP_2026-09-25.json`. | Existing implementation is CHANGES_REQUIRED; remediate its exact findings, do not restart E1 as if no code exists. |
+| V1-07/08 product/release | `2026-09-22-r2-p1-gate-receipt-surface-design.md`, its plan/evidence, M3 real-media evidence, and the M7-E plan E2/E3. | Gate surface and rendered corpus exist, but the full A–D operator/browser run and exact-lineage release evidence remain separate work. |
+
 ## Execution rule
 
 Work one acceptance packet at a time. Research and reuse existing Host contracts
