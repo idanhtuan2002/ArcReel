@@ -182,6 +182,15 @@ to `lib/db/models/`, not the entire repository or a live database.
   reject an otherwise valid post-delete source, while ignoring every DB-only
   name could hide a corrupt live project. This is unresolved, not a basis for
   an unconditional discrepancy check.
+- The root census also has whole-project intermediate directories. Archive
+  overwrite can leave `.import-backup-*` beside a missing or replacement
+  target (`server/services/project_archive.py:1956-1987`). The v5-to-v6
+  migration creates hidden staging/rollback siblings and swaps the target
+  through them (`lib/project_migrations/v5_to_v6_asset_namespace.py:584-614`;
+  `lib/project_migrations/staged_swap.py:37-74,90-149`). UI-visible project
+  enumeration skips these names. A read-only H6 census must recognize their
+  exact ownership and reject unresolved replacement/swap state; it cannot
+  silently omit them or run startup repair to make the source appear stable.
 - `project.json` is required for every admitted project directory by the
   draft H6 design. A directory lacking it is a fail-closed capture error,
   not a zero-formal-file project. Zero formal files may still be valid when

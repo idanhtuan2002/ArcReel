@@ -40,6 +40,13 @@ V1 inventory/manifest or capture adapter is frozen
   rollback restores it (`server/routers/projects.py:309-344`;
   `server/services/project_archive.py:1930-1950,1956-1987`). Process loss
   between those operations is not covered by that exception handler.
+- The v5-to-v6 migrator is another whole-tree writer: it copies to a hidden
+  staging sibling and swaps the project directory through a hidden rollback
+  sibling. Startup has a presence-based reclaim path for an interrupted swap
+  (`lib/project_migrations/v5_to_v6_asset_namespace.py:584-614`;
+  `lib/project_migrations/staged_swap.py:90-149`;
+  `lib/project_migrations/runner.py:242-255`). This is not a durable H6
+  lifecycle record and capture must not invoke that repair path.
 - The bounded direct-field scan below found project naming in the listed ORM
   modules. There is no `Project` ORM/table in that scope. This is a bounded
   model-source observation, not a claim about a live database, migrations,
@@ -78,6 +85,7 @@ the current delete route do not provide one.
 | DB-only project name | Every table above can retain its domain row after API deletion because deletion only removes the directory. | Distinguish historical retention from interrupted/operational state; current source supplies no tombstone to do so. |
 | Same name in directory and DB after reuse | The current identity is name based in both filesystem and scoped rows. | Define reuse/generation semantics; a name-only comparison cannot distinguish an old row from a new directory. |
 | Target temporarily absent or changed during archive overwrite | The import installer can put the old tree under a hidden sibling before moving a different staged tree into the same target name. | Define a distinct replacement intent, source/target identity proof, capture fence, and crash reconciliation. Do not treat target absence as deletion or same-name replacement as proven continuity. |
+| Target absent or paired with hidden v6 swap siblings | Migration can leave rollback/staging siblings around an absent or newly swapped target; startup may later reclaim or clean them. | Recognize exact swap sibling names, block unresolved capture, and require independent migration disposition. Do not treat target absence as published deletion or silently discard the hidden old tree. |
 
 ## Inferences and open decisions
 
@@ -114,6 +122,9 @@ the current delete route do not provide one.
    fence and crash matrix; decide whether replacement preserves the exact
    project identity or creates a new generation, and how a retired name is
    rejected on new-name import.
+6. Include the v5-to-v6 whole-tree swap and startup reclaim/cleanup in the
+   census and writer fence. An H6 read-only capture cannot use presence-based
+   startup repair as its proof of a stable project identity.
 
 ## Evidence limits
 

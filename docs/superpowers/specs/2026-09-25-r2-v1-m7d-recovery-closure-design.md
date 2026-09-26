@@ -779,7 +779,9 @@ minimal `project.json`, unpublished Agent creation, DB-only legacy evidence,
 delete intent before and after partial directory removal, a retired name
 reused, archive import into a retired name, overwrite import stopped after
 renaming the old target to `.import-backup-*` or after installing the new
-tree, and active work starting against the deletion or replacement boundary. The exact
+tree, v5-to-v6 migration stopped between its two directory renames or before
+hidden rollback cleanup, and active work starting against the deletion or
+replacement boundary. The exact
 expected result for each case follows the approved lifecycle contract.
 Fault tests cover missing/corrupt formal file, absent or
 divergent master, second-project media omission, a DB-referenced global
@@ -876,7 +878,12 @@ Archive import with `overwrite` can move an old project to a hidden sibling
 and install another tree under the same name
 (`server/services/project_archive.py:1956-1987`); the lifecycle contract must
 also fence and reconcile this replacement route and reject import into a
-retired name under any no-reuse policy. The
+retired name under any no-reuse policy. The v5-to-v6 migrator similarly swaps
+the whole project through hidden staging/rollback siblings and can leave a
+target-name gap on process loss
+(`lib/project_migrations/v5_to_v6_asset_namespace.py:584-614`);
+read-only capture must recognize and reject unresolved swap state without
+running startup reclaim. The
 gate must also approve the `GLOBAL_ASSET` binding identity (asset or
 derivative row ID, reference field and media kind), duplicate/null references,
 orphan-file policy, and absent-root behavior. This draft proposes exact

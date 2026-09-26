@@ -134,6 +134,29 @@ The source's `project_metadata_lock` use in this service wraps export's
 visible-tree copy (`:654-685`), not the import installation (`:1956-1987`),
 so that existing lock cannot be counted as an import/capture lifecycle fence.
 
+## Follow-up: v5-to-v6 migration swaps the whole project tree
+
+The v5-to-v6 migrator copies the project to a hidden staging sibling, transforms
+that copy, renames the original to a hidden rollback sibling, and renames the
+staging tree to the original name
+(`lib/project_migrations/v5_to_v6_asset_namespace.py:584-614`). A process stop
+between renames leaves the target name absent with a rollback tree present;
+after the second rename the target and rollback can both exist. Startup
+`run_project_migrations()` calls `reclaim_interrupted_swaps()` before scanning
+projects; the helper restores a rollback sibling only if the target is absent
+(`lib/project_migrations/runner.py:242-255`;
+`lib/project_migrations/staged_swap.py:90-126`). Later cleanup can remove old
+staging/rollback siblings when a target exists (`staged_swap.py:129-149`).
+
+These are migration intermediate states, not evidence of published deletion.
+The candidate backup census must identify recognized hidden swap siblings and
+their target names, block while a swap is active or unresolved, and require an
+inspected recovery/disposition before capture. It cannot invoke startup
+reclaim or migration during a read-only source snapshot. A future lifecycle
+fence must cover this whole-tree writer as well as import overwrite. The
+current source's reclaim rule depends on filesystem presence and naming; it
+does not provide an H6 signed lifecycle record.
+
 ## Candidate policies (not approved)
 
 1. **Filesystem-primary deletion with a durable DB tombstone.** A valid
@@ -217,6 +240,8 @@ candidate V1 rule, including after terminal deletion.
 | Overwrite import has renamed the target to `.import-backup-*`, before installing the staged tree | Same `REPLACING` intent | Target name absent, old bytes under a hidden sibling | Block capture; do not classify the DB name as deleted or the sibling as an unrelated orphan. |
 | Overwrite import has installed the new tree, before backup cleanup and terminal record | Same `REPLACING` intent | New tree at target name, old bytes under hidden sibling | Block capture; determine whether to complete or roll back from exact staged/old identities before releasing the name. |
 | New-name import has installed the tree but stopped before a publication record | Candidate creation/import intent, if adopted | Valid metadata may exist without proven lifecycle publication | Block capture until the source tree and identity are reconciled; a retired name must remain reserved. |
+| v5-to-v6 migration has renamed the original to hidden rollback, before moving staging into place | Candidate migration/swap intent or observed unresolved swap | Target absent; `.<name>.v6-rollback-*` and perhaps staging sibling present | Block capture; do not classify name as deleted or infer which tree is current. |
+| v5-to-v6 migration has installed staging, before rollback cleanup | Same migration/swap state until a verified completion boundary | Target and hidden rollback sibling present | Block capture or verify an approved completion/disposition rule before excluding the sibling. |
 | Metadata/directory diverges without a matching intent or terminal tombstone | None or contradictory state | Missing, minimal, malformed or reused identity | Reject capture with typed ambiguity/corruption evidence; no name-only historical inference. |
 
 The intent must be durably recorded **before** `rmtree`; a normal database
@@ -244,7 +269,7 @@ and current master/canon/narrative heads at deletion is not specified.
 route behavior, not existing production rows.
 - Before freezing H6 inventory/capture, select the authoritative filesystem
   predicate, enumerate all affected write/delete/replace routes (including
-  failed-create rollback and archive overwrite), define typed
+  failed-create rollback, archive overwrite and v5-to-v6 migration swap), define typed
 filesystem-only/DB-only/tombstoned cases, and add adversarial tests. This is
 the unresolved gate already required by the recovery-closure design.
 
@@ -263,6 +288,9 @@ First-party source only. Structural discovery used codebase-memory project
   `server/routers/projects.py:309-344`;
   `server/services/project_archive.py:315-423,1930-1987`;
   `tests/integration/server/services/test_project_archive_service.py:1466-1486,1646-1702`;
+  `lib/project_migrations/v5_to_v6_asset_namespace.py:584-614`;
+  `lib/project_migrations/staged_swap.py:90-149`;
+  `lib/project_migrations/runner.py:242-255`;
   `server/tool_runtime.py:1160-1183`;
   `lib/project_manager.py:388-438,447-462,601-611,1852-1857`.
 - `lib/db/models/host_hardening.py:1-12,38-107,230-287,293-460`; `r2/host_hardening/transitions.py:30-90`.
