@@ -781,7 +781,10 @@ reused, archive import into a retired name, overwrite import stopped after
 renaming the old target to `.import-backup-*` or after installing the new
 tree, v5-to-v6 migration stopped between its two directory renames or before
 hidden rollback cleanup, and active work starting against the deletion or
-replacement boundary. The exact
+replacement boundary. Task-state cases include a queued/running/cancelling
+Task without a matching non-terminal attempt, the converse, and contradictory
+task/attempt terminal state; the deletion gate must classify each without
+using one table as a proxy for the other. The exact
 expected result for each case follows the approved lifecycle contract.
 Fault tests cover missing/corrupt formal file, absent or
 divergent master, second-project media omission, a DB-referenced global

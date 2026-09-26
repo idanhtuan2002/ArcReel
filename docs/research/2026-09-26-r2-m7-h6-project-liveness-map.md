@@ -179,8 +179,9 @@ For the narrow single-operator V1, the provisional recommendation is a
 two-phase, explicit deletion admission plus durable tombstone, rather than
 turning every historical project-scoped row into a live-project registry.
 The dedicated delete command would first fail closed on non-terminal work
-(at minimum a live execution attempt, unresolved `PREPARING` backup or
-active recovery lease), durably record a deletion intent keyed by normalized
+(at minimum a `queued`/`running`/`cancelling` Task, a non-terminal execution
+attempt, unresolved `PREPARING` backup or active recovery lease), durably
+record a deletion intent keyed by normalized
 project identity, then remove the published directory, and finally mark the
 tombstone terminal. Capture would admit a directory only when it is a valid
 published project (`project.json` present) with no deletion intent, classify
@@ -257,6 +258,18 @@ routes have no such shared boundary
 no shared lifecycle boundary (`server/services/project_archive.py:1956-1987`).
 These are candidate invariants and tests,
 not implementation authorization.
+
+The task predicate must not be inferred solely from execution attempts:
+`Task.status` has a separate active unique-index domain of `queued`,
+`running`, and `cancelling` (`lib/db/models/task.py:13-68`), while attempt
+states/terminal timestamps are independently constrained
+(`lib/db/models/host_hardening.py:38-42,73-107`). The inspected declarations
+do not require a matching attempt for every active Task, and the two rows may
+diverge after interruption; treating either
+table as a complete proxy would leave a deletion race. A candidate gate should
+read both scoped predicates and block on either active result, then require
+an explicit inspected disposition for contradictory or stale states. The
+current delete route reads neither table (`server/routers/projects.py:1100-1116`).
 
 ## Unknowns and required decision checks
 

@@ -113,7 +113,9 @@ the current delete route do not provide one.
    unpublished, deleting, retired, and historical states.
 2. Define the atomic/crash-safe disposition of active tasks, non-terminal
    attempts/leases, `PREPARING` backups, current heads, and retained evidence
-   when a published project is deleted.
+   when a published project is deleted. Task and attempt predicates must be
+   checked independently because their model constraints do not make either
+   table a complete liveness proxy for the other.
 3. Define whether and how names may be reused without re-binding historical
    rows to a different project identity.
 4. Specify typed capture results for every identity case above, including
