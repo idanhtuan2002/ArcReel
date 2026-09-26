@@ -238,15 +238,64 @@ that a backup reader must classify without invoking that mutating repair pass:
 | --- | --- | --- |
 | `project.json` | `style_image`; `characters[*].character_sheet`, `reference_image`, `reference_audio`; `scenes[*].scene_sheet`; `props[*].prop_sheet`; `episodes[*].script_file` (`server/services/project_archive.py:761-945`). | An episode ledger may declare a prospective `script_file` before the script exists; archive repair treats a valid positive episode number as a warning, not a missing-file blocker (`:906-936`). H6 must decide separately whether to retain that pending state, rather than rejecting every absent path-like value. |
 | Episode script JSON | `generated_assets.storyboard_image`, `video_clip`, `narration_audio` for storyboard skeletons; `generated_assets.video_clip`, `video_thumbnail` for `video_units` (`server/services/project_archive.py:970-1149,1240-1335`). | Version metadata can resolve a current media file from `versions/`, while the archive repair pass may materialize or rewrite it. A backup reader must inventory the original bytes and references, not silently repair them (`:1452-1556`). |
-| `video_units` content | `video_uri` is a remote URL, not a local file path (`server/services/project_archive.py:1240-1250`). | URL identity and provider availability are not proven by a local-file hash. |
+| `generated_assets.video_uri` | The archive's reference-video repair path calls this a remote URL and deliberately does not canonicalize it (`server/services/project_archive.py:1240-1258`), but the current validator accepts either an external URI or an existing local path (`lib/data_validator.py:252-290,784-790`). | Classify by value, not field name. External URI identity/provider availability is not proven by a local-file hash; a local value needs file closure. |
+
+The validator reveals two further local-file fields not covered by that archive
+repair sample: `generated_assets.storyboard_last_image` and per-item
+`end_frame_image` (`lib/data_validator.py:770-776,812-832`). Conversely,
+`GeneratedAssets` declares `video_thumbnail` and project-cover rendering
+reads it, but `_validate_generated_assets()` has no corresponding reference
+check (`lib/script_models.py:184-201`; `server/services/project_cover.py:60-98`;
+`lib/data_validator.py:750-810`). A direct, read-only probe of the current
+method returned `val_path_missing` for nonexistent `storyboard_last_image`
+and local `video_uri`, no error for nonexistent `video_thumbnail`, and no
+error for an external `https://` video URI. The probe used the existing
+`/home/anhtuan/content-production-os/.venv/bin/python` because this
+worktree's virtualenv lacks Pydantic; `uv run` could not fetch its missing
+locked dependency with network unavailable. This checks this method's
+behavior only, not every caller. H6 therefore cannot use a passing
+`DataValidator.validate_project_tree()` result as proof that all file
+references are present; its own inventory/restore checker needs an explicit
+field map and fault corpus.
+
+The project catalog has another source-backed omission from the initial
+sample: `products[*].product_sheet` and each
+`products[*].reference_images[]` element. `ASSET_SPECS` declares the former
+as a sheet path and the latter as uploaded original-image paths;
+`ProjectManager` has dedicated sheet/reference writers, and generation reads
+the originals for product-sheet creation (`lib/asset_types.py:121-139`;
+`lib/project_manager.py:3573-3608`;
+`server/services/generation_tasks.py:2892-2914`). The generation reader
+skips missing originals and merely warns if all declared originals are
+missing. `DataValidator` checks the product reference list's *element types*,
+but its project-tree path walk does not check product sheet/reference file
+existence (`lib/data_validator.py:605-671,1485-1610`). Character derivative
+sheet references are likewise type-checked in `_validate_derivatives()` but
+not enumerated by that project-tree path walk (`:565-603`). These are
+positive file-reference findings, not a claim that every declared product or
+derivative sheet must already exist: the H6 liveness predicate still needs
+to distinguish pending assets from dangling current references.
+
+The validator's path resolver also accepts an absolute path if `safe_join()`
+resolves it *within* the project root, and returns the input candidate spelling
+after its existence check; `safe_join()` resolves symlinks for containment but
+does not forbid an in-root symlink (`lib/data_validator.py:201-250`;
+`lib/path_safety.py:37-101`). This is suitable evidence of the validator's
+current behavior, not a canonical H6 inventory path rule. The H6 reader must
+decide separately whether to reject absolute aliases and every symlink at
+capture/restore rather than treating validation success as a normalized
+portable reference.
 
 This is **not** a complete `project.json`/script schema or a liveness rule for
 every field. The evidence comes from one archive repair path, which may omit
-fields that it does not repair. The remaining V1-02 work is to enumerate
-current writers/readers and schema validators for each path-bearing payload,
-then distinguish required existing bytes, intentionally pending references,
-remote URIs, history, and deprecated fields. The backup adapter must not
-borrow the archive's auto-fix behavior as a capture-time integrity check.
+fields that it does not repair. A bounded first-party writer/reader pass for
+the named fields is recorded in
+`docs/research/2026-09-26-r2-m7-h6-path-writers.md`; it does not close
+historical migration/import writers or every path-bearing field. The
+remaining V1-02 work is to expand that inventory, then distinguish required
+existing bytes, intentionally pending references, remote URIs, history, and
+deprecated fields. The backup adapter must not borrow the archive's auto-fix
+behavior as a capture-time integrity check.
 
 ## Next decision gate
 
@@ -277,7 +326,9 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
    filter is not an H6 backup policy;
 7. current project/script path-field writers and readers beyond the positive
    archive-repair sample, including the pending episode-ledger case and
-   remote `video_uri`.
+   local-versus-remote `video_uri`, `storyboard_last_image`, `end_frame_image`,
+   `video_thumbnail` missed by the present validator, product originals/sheet,
+   and character derivative sheets.
 
 These are open schema decisions, not reasons to reinterpret the accepted
 pure `RecoveryConfigV1` parser as a production capture implementation.
