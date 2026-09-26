@@ -97,7 +97,15 @@ to `lib/db/models/`, not the entire repository or a live database.
    the usage repository for output-type/cost grouping
    (`lib/db/repositories/usage_repo.py:395-440,747-772`); whether any
    historical value must bind a restorable file remains an open policy
-   classification, not a conclusion from its column name.
+   classification, not a conclusion from its column name. The grouping helper
+   explicitly tolerates absolute and relative paths and maps their
+   `characters/scenes/props/products` segments to cost buckets
+   (`lib/db/repositories/usage_repo.py:116-130`). The media generator can
+   pass a real `output_path` into usage settlement
+   (`lib/media_generator.py:613-637,730-745`), but this does not establish
+   that each historical usage row is the current file authority: a row can
+   outlive a deleted or superseded project output. Its path needs a separate
+   liveness/ownership decision before being made a required backup file.
 10. Global-asset deletion commits the asset and derivative row removal before
     unlinking their files; a file-unlink error is logged rather than rolled
     back (`server/routers/assets.py:248-262`). Thus an unreferenced file in
