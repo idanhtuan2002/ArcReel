@@ -160,19 +160,25 @@ production needs an approved independently controlled registry adapter, not
 an in-process mutex or a check-then-insert sequence.
 
 The manifest revision records the exact database archive digest/size and a
-sorted complete inventory with each entry's root kind (project/formal or
-candidate-media), relative path, byte size, SHA-256 and, where authoritative,
-project, artifact, candidate ID, storage object version (distinct from the
-candidate ID), media kind and capture-time probe result. A local immutable
-object is pinned by its content digest and re-hash under the write fence; a
-remote mutable object additionally needs an immutable object-version ID or
-equivalent content-addressed read. A master reference outside the approved
-root set is a typed `BACKUP_REFERENCE_OUT_OF_SCOPE` failure, never silently
-omitted. The manifest binds source deployment, release Git/image,
+sorted complete inventory with each entry's role (project metadata/formal,
+cross-project `GLOBAL_ASSET`, or candidate-media), approved logical root,
+relative path, byte size, SHA-256 and, where authoritative, project,
+artifact, global-asset row, candidate ID, storage object version (distinct
+from the candidate ID), media kind and capture-time probe result.
+`GLOBAL_ASSET` is under the approved project root but is not a project:
+`_global_assets` is excluded from `ProjectManager.list_projects()` while
+DB `assets`/`asset_derivatives` rows can reference its files. Capture binds
+those DB references and files, never silently omitting them from a whole-DB
+set ([source reconciliation](../../research/2026-09-26-r2-m7-h6-project-inventory-authority.md)).
+A local immutable object is pinned by its content digest and re-hash under
+the write fence; a remote mutable object additionally needs an immutable
+object-version ID or equivalent content-addressed read. A master reference
+outside the approved root set is a typed `BACKUP_REFERENCE_OUT_OF_SCOPE`
+failure, never silently omitted. The manifest binds source deployment, release Git/image,
 PostgreSQL/Alembic and the V1 configuration fingerprint described next. It
 stores no DB connection string, plaintext credential, encryption key or
-absolute path. A source with no project records or a missing `project.json`
-fails `BACKUP_REQUIRED_INVENTORY_EMPTY`. A project with zero formal files is
+absolute path. A source with no admitted project directories or a missing
+`project.json` fails `BACKUP_REQUIRED_INVENTORY_EMPTY`. A project with zero formal files is
 valid only when its restored DB and Artifact Manifest have zero formal-file
 references. The Host adapter legitimately represents an absent, empty
 `.arcreel_artifacts.json` as an empty manifest; the inventory records and
@@ -268,9 +274,13 @@ disposition; there is no fabricated window end at capture entry.
    §4 operation-registry slot or mutating backup state, then atomically claims
    the deployment and root identities; it does not claim it physically
    stopped an external process.
-2. Read all candidate/master/project identities and project-file references
-   from the fenced source; hash every project/formal and media source file and
-   perform the capture-time media probe that will be recorded in the inventory.
+2. Read all candidate/master/project identities, project-file references,
+   and global-asset DB/file references from the fenced source. Enumerate
+   admitted project directories separately from active authoritative
+   project-scoped DB rows and reconcile both sets; `_global_assets` is an
+   independent inventory role, not a project. Hash every project/formal,
+   global-asset and media source file and perform the capture-time media
+   probe that will be recorded in the inventory.
    Refuse missing owners, divergent master projections,
    paths outside approved roots, symlinks/junctions, duplicate refs with
    unequal bytes, or mutable/unversioned media that cannot be pinned.
@@ -540,10 +550,11 @@ manifest. `COMPLETE` is the later
 *source-side* state and must not be invented inside the snapshot. Missing,
 different or already-COMPLETE restored rows fail `RESTORED_BACKUP_ROW_MISMATCH`.
 
-Verification then enumerates all restored projects, manifest entries, formal-file
-bindings, candidate objects and approved master heads from the restored DB
-and project files. It compares each against the sealed inventory, resolves
-each head through `DatabaseMasterResolver` with its legacy projection where
+Verification then enumerates all restored project directories, manifest entries,
+formal-file bindings, global-asset DB rows/files, candidate objects and
+approved master heads from the restored DB and project files. It compares
+each against the sealed inventory, resolves each head through
+`DatabaseMasterResolver` with its legacy projection where
 applicable, reads formal files through the Host's guarded artifact adapter
 and media through the bounded candidate store, checks size/hash and probes
 actual media playability. For every
@@ -563,10 +574,11 @@ It rejects unlisted authoritative references as well as listed-but-missing files
 Only after complete closure may the independent recovery-evidence ledger
 record `VERIFIED` for the set. If the source DB still exists, its backup row
 may reflect that verdict as a projection; the restored snapshot's row remains
-PREPARING. The verdict reports checked project, formal-file, candidate, master
-and media counts, typed reason codes, measured recovery point/RPO/RTO, exact
-release identity and the following timing evidence references/digests. Before
-a drill, an independent drill authority signs `RecoveryDrillRequestV1` with
+PREPARING. The verdict reports checked project, formal-file, global-asset,
+candidate, master and media counts, typed reason codes, measured recovery
+point/RPO/RTO, exact release identity and the following timing evidence
+references/digests. Before a drill, an independent drill authority signs
+`RecoveryDrillRequestV1` with
 the exact scenario, target deployment/set, corpus, `CustodyPolicyV1` ID/digest
 and RPO/RTO targets. At simulated cutover, **before approval, retrieval,
 provisioning or any recovery action**, that authority appends a signed
@@ -598,7 +610,9 @@ clock is `RECOVERY_MEASUREMENT_INVALID`, not a pass.
 The initial test corpus includes at least two projects (the V1 factual and
 drama products) plus an unrelated third project to catch one-project-only
 inventory bugs. Fault tests cover missing/corrupt formal file, absent or
-divergent master, second-project media omission, path traversal/symlink,
+divergent master, second-project media omission, a DB-referenced global
+asset omitted or missing, an active authoritative DB project reference
+without an admitted project directory, path traversal/symlink,
 concurrent visible GC query, changed file/DB state during capture, process
 interruption at each state transition, nonempty/aliased target, archive digest
 failure, missing/stale/forged start or closure fence evidence, missing/
