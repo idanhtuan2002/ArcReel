@@ -118,7 +118,11 @@ to `lib/db/models/`, not the entire repository or a live database.
    current output bytes. Do not treat a stale historical `output_path` as
    authority to read outside approved roots. This is not an exhaustive audit
    of every future or dynamic consumer, so the release-pinned classifier
-   needs a final reader/call-site review before approval.
+   needs a final reader/call-site review before approval. The separate
+   [bounded production-use audit](2026-09-26-r2-m7-h6-api-call-output-path-audit.md)
+   followed persistence through the ledger, usage repository/route, cost
+   estimator and frontend drawer. It found no file-open or current-media
+   consumer in those checked paths; its scope and limits are recorded there.
 10. Global-asset deletion commits the asset and derivative row removal before
     unlinking their files; a file-unlink error is logged rather than rolled
     back (`server/routers/assets.py:248-262`). Thus an unreferenced file in
@@ -225,11 +229,46 @@ unknown hidden file. A blanket hidden-file exclusion loses known state; a
 blanket tree copy can retain transient state and potentially unclassified
 secret-bearing bytes. Neither can be approved from the archive export filter.
 
+Follow-up positive lock-writer census for the release exclusion review:
+
+| Writer | Observed on-disk lock identity | Boundary |
+| --- | --- | --- |
+| `project_metadata_lock()` in `lib/formal_write.py:79-87` | Project-root `.project.json.lock`. | Known synchronization file, not the `project.json` payload. |
+| `lib/profile_manifest.py:36-38,166-174` and `lib/artifact_manifest.py:53-60` | Project-root `.profile_sync.lock` and `.artifact_manifest.lock`. | Preserve the adjacent hidden *manifests*; these names identify lock writers but do not by themselves authorize exclusion. |
+| `ProjectManager.file_lock()` / `async_file_lock()` (`lib/project_manager.py:1949-1987`) | `.{target.name}.lock` in the **target's parent directory**. | Target can be a script, draft, plan, prompt-authoring file or asset file, so a static root-filename list is incomplete. |
+| `GridManager._record_lock()` (`lib/grid_manager.py:122-129`) | `.{record.name}.lock` next to a grid record. | The grid record itself remains project payload. |
+| `generation_admission._lock_path()` (`lib/generation_admission.py:17-24`) | Digest-named lock under application-data `.generation-admission-locks`, not a project tree. | It is outside the proposed project-file census; do not invent a project exclusion for it. |
+
+The M7 graph's inbound trace for `ProjectManager.file_lock()` found 18
+callers and seven for `async_file_lock()`, across the manager, script
+generator/review and server draft/text flows. Current-worktree source checks
+confirmed the dynamic path derivation and representative calls
+(`lib/script_generator.py:1401-1402,1771-1772`;
+`server/draft_workflow.py:1156,1240`;
+`server/text_generation.py:848,1508`). This is a *positive* writer set,
+not proof that no other module makes project-local locks. If H6 excludes
+locks, it must derive each identity from a release-pinned writer and target
+class, then test the expected regular-file type and exact location; it must
+not drop an arbitrary `*.lock`, unknown hidden file, symlink named like a
+lock, or the locked payload. A competing V1 option is to retain every regular
+lock file as opaque bytes under encrypted custody. The examined lock
+functions use these files as lock handles and do not parse their contents
+(`lib/formal_write.py:79-87`; `lib/project_manager.py:1949-1987`;
+`lib/artifact_manifest.py:1269-1338`;
+`lib/profile_manifest.py:166-209`). The all-regular-file option avoids an
+unproven ownership claim for a user-modified file that happens to match a
+writer's lock name and matches the exact-tree recovery goal. It still rejects
+symlinks/devices and requires a verified quiescent fence. The proposed V1
+preference is to *include* regular locks and test that subsequent project
+operations work after restore; the reviewer must approve this before schema
+freeze. The complete lock-writer map remains useful for fence completeness.
+
 Candidate scope choices for schema review, not settled policy:
 
 | Choice | Benefit | Unclosed risk / required proof |
 | --- | --- | --- |
-| All regular project files, except an exact runtime exclusion set | Retains otherwise unknown user files and version history. | Audit secrets, symlinks, sockets, temporary/lock files and the exact exclusion set; classify unknown hidden paths before release. |
+| All regular project files, including lock files | Retains otherwise unknown user files, version history and any user-modified lock-named bytes without exclusion ambiguity. | Require no-follow type checks, encrypted custody, quiescent fence, exact restore comparison and post-restore lock-use test. |
+| All regular project files, except an exact runtime exclusion set | Reduces copied runtime files. | Prove writer-specific ownership of each excluded file; a matching name alone is insufficient if a user modified it. |
 | Only known formal/DB-bound files | Smaller authority surface. | Prove every project-local customization, source file, version and profile tombstone is either restorable or intentionally out of scope; current profile state contradicts a simple formal-only assumption. |
 | Enumerated authoritative roots plus explicit metadata/profile roles, fail-closed on unknown paths | Makes omissions visible and supports role-specific validation. | Requires an exhaustive writer/reference inventory and migration rule for new roots; no such approval exists yet. |
 

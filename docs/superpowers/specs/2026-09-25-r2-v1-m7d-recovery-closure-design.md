@@ -208,9 +208,11 @@ project and `_global_assets`. Candidate/master rows separately select the
 media objects to capture under approved media roots; this proposal does not
 silently expand into an unbounded sweep of unrelated media-store objects.
 An unrecognized regular project file is retained as an opaque `PROJECT_FILE`
-with no invented formal claim; it is never silently excluded. Known transient
-lock files are excluded only by an exact, release-versioned list of writers,
-names and locations proven at review; a matching symlink, junction, socket,
+with no invented formal claim; it is never silently excluded. V1 proposes
+capturing even regular lock-named files as opaque bytes: current writers can
+derive dynamic `.{target.name}.lock` paths, so a name match alone cannot prove
+that an existing file is disposable runtime state. A blanket `*.lock` or
+hidden-file glob is never an exclusion. A lock-named symlink, junction, socket,
 device or other unsupported entry is a typed reject, not an exclusion. The
 entire project-file payload, including `.claude/`, `CLAUDE.md` and
 `.arcreel_profile_manifest.json`, falls under authenticated-encryption custody.
@@ -755,7 +757,8 @@ The inventory fault subset additionally covers absent versus present-empty
 Artifact Manifest, profile manifest, version index and `_global_assets` root;
 modified/project-only profile files and a deletion tombstone; an unknown
 regular file retained byte-exactly; an unknown declared reference type rejected;
-known lock exclusion versus unknown hidden-file retention; an unsupported
+retained regular lock file versus unknown hidden-file retention; post-restore
+lock acquisition; an unsupported
 filesystem entry; pending versus dangling episode script; local versus
 external `video_uri`; missing `video_thumbnail`, product original and
 derivative sheet; two DB bindings for one global-asset file; a referenced
@@ -792,7 +795,8 @@ derivative row ID, reference field and media kind), duplicate/null references,
 orphan-file policy, and absent-root behavior. This draft proposes exact
 physical-file retention with multi-binding records, an absent root only when
 no DB reference exists, and captured (not silently discarded) orphan bytes.
-It also needs a release-versioned reference field map, lock exclusion list,
+It also needs a release-versioned reference field map, bounded lock-writer
+map for the fence and a post-restore lock-use test,
 approved census bounds, profile/secret custody disposition, and explicit
 approval of the proposed all-retained-version-history rule. Current project deletion only
 removes the directory, so unconditional DB-name/directory set equality is not
