@@ -1,5 +1,49 @@
 # R2 V1 H6 research handoff — 2026-09-26
 
+## Current checkpoint after resumed work
+
+This section supersedes the older Git-state and resume instructions below;
+they remain as the historical checkpoint from the earlier interruption.
+
+- Worktree: `/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage`.
+- Branch: `feat/r2-m7e-v1-lineage`.
+- Exact HEAD before this checkpoint update:
+  `eaa5cc4d4ca7890aae4f927f9af97f90885a74ef`; worktree was clean.
+- New commits since the older checkpoint: `c4c26ad3` (V1-01/V1-02 research),
+  `30b253be` (pure H6 grid reference probe and tests), `b6d245ab`
+  (presentation/staging/draft reference research), `117bdf0c` (archive
+  overwrite lifecycle and other JSON evidence), `eaa5cc4d` (v5-to-v6
+  whole-tree migration swap evidence). This checkpoint edit is intentionally
+  separate from those verified commits.
+
+The pure grid probe reads supplied bytes only and does not enter production
+capture. Its affected host/grid tests passed (350), with repo-wide Ruff,
+format, basedpyright, lint-imports and deptry checks passing at the code
+packet. The new archive-overwrite tests selected for evidence passed (3);
+project-migration swap-recovery tests passed (13). After the latest clean HEAD,
+the real-baseline M7 scope verifier passed (1 selected test); the full scope
+test module also passed (18) after `117bdf0c`. The backend full suite remains
+incomplete because an earlier run was interrupted in an unrelated real-media
+render; do not cite it as green.
+
+V1-01 candidate now covers HTTP intermediate metadata, explicit deletion,
+failed Agent creation rollback, archive overwrite and v5-to-v6 whole-tree
+swap. V1-02 positive field map includes grid, presentations, execution
+checkpoint/staging, quarantine drafts, profile manifest, migration-failure
+and storyboard-failure JSON. See the two liveness notes, project inventory
+note and other-JSON survey for exact evidence and limits. These are research
+and **draft** decisions. No lifecycle schema, fence, capture/restore adapter,
+custody profile or recovery verdict was approved or implemented.
+
+Next work: independently review the V1-01 crash/identity matrix and V1-02
+release-pinned classifier against all supported schema versions and runtime
+writers; resolve the archive-overwrite and migration-swap fence semantics,
+then obtain sponsor/design acceptance before production H6 implementation.
+Preserve unrelated dirty work in the root checkout; inspect live Git state on
+resume. No license analysis is in scope.
+
+## Historical checkpoint from the earlier interruption
+
 Stopped at the user's quota/session request. This is a resume checkpoint,
 not H6 design approval, production-backup evidence or an implementation
 acceptance receipt.
