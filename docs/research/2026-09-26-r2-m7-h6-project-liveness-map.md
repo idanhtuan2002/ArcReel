@@ -308,6 +308,35 @@ direct repository callers remain decisions for independent review. The
 per-unit generation lock and migration verdict are different predicates and
 do not themselves provide this project-wide boundary.
 
+### Existing fence/lock reuse check
+
+`project_metadata_lock(project_dir)` serializes metadata/formal transactions
+on `.project.json.lock` **inside** the project directory
+(`lib/formal_write.py:79-87`). It can protect participating file writers
+while that directory is stable, but its lock-file identity moves or disappears
+when import or migration renames the whole tree or deletion removes it.
+Relying on that pathname alone across those operations would let different
+processes lock different inodes for the same logical project; this is an
+inference from the lock location and the observed rename/delete operations.
+
+`generation_admission_lock()` uses an application-data lock keyed by
+`(project_name, resource_id)` and only covers selected TTS/video enqueue and
+media-selection paths (`lib/generation_admission.py:18-57`;
+`lib/generation_queue.py:484-495`). Its root is stable across project-tree
+renames, but its scope is one resource and not every writer. Reusing the
+portalocker implementation pattern may be possible; claiming that the current
+per-unit lock already fences project deletion would be false.
+
+The H6 `verify_capture_fence_start()` and closure verifier validate signed
+operator stop/quiescence evidence for a backup window. They do not themselves
+stop the app, acquire a project lifecycle lock or reject a Task insert
+(`r2/host_hardening/fence_evidence.py:278-382`; H6 fence plan §Goal). This
+preflight can be composed with a future lifecycle protocol, but it cannot
+replace the missing transaction/admission boundary while the application is
+running. The candidate should compare a root-stable project-name lock plus
+durable lifecycle version/CAS against a DB transaction/advisory-lock design;
+neither alternative is selected by this note.
+
 ## Unknowns and required decision checks
 
 - No source inspected defines a durable project tombstone, retirement state,

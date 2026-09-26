@@ -896,6 +896,13 @@ derivative row ID, reference field and media kind), duplicate/null references,
 orphan-file policy, and absent-root behavior. This draft proposes exact
 physical-file retention with multi-binding records, an absent root only when
 no DB reference exists, and captured (not silently discarded) orphan bytes.
+Existing `.project.json.lock` sits inside the directory that deletion/import
+can move, and the generation-admission lock is per resource. The signed H6
+capture-fence verifier validates stop evidence but does not serialize Task,
+attempt or backup row admission. V1-01 therefore needs an explicitly reviewed
+project-wide, root-stable lifecycle/CAS boundary shared by those writers and
+the create/delete/replace commands; the lock and transaction design remains
+open.
 It also needs a release-versioned reference field map, bounded lock-writer
 map for the fence and a post-restore lock-use test,
 approved census bounds, profile/secret custody disposition, and explicit
