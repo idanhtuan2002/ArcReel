@@ -175,6 +175,60 @@ The existing project archive is a transformed one-project export, not a
 substitute for this matrix: it can exclude hidden/non-standard entries and
 trim version history (`server/services/project_archive.py:436-483,521-600`).
 
+## Project-tree scope: profile state is not disposable runtime state
+
+The standard project tree has `source`, `scripts`, `drafts`, `characters`,
+`scenes`, `props`, `products`, `storyboards`, `videos`, `audio`, `subtitles`,
+`presentations`, `thumbnails`, `output`, and `grids`, plus `project.json`
+(`lib/project_manager.py:286-315`). That list is a creation layout, **not** a
+complete backup allowlist. The archive export walks only visible, approved
+root entries and excludes hidden paths, `.claude/`, and `CLAUDE.md`
+(`server/services/project_archive.py:220-226,714-734`). Its import then
+re-synchronizes the project agent profile (`:1965-1978`). These behaviors
+serve portable project export, not byte-exact whole-deployment recovery.
+
+In particular, `sync_agent_profile()` materializes the deployment profile
+into project-local `.claude/` and `CLAUDE.md`. The adjacent hidden
+`.arcreel_profile_manifest.json` tracks the baseline and deletion tombstones
+(`lib/project_manager.py:464-487`; `lib/profile_manifest.py:1-7,36-44`). The
+sync state machine preserves user-modified and project-only files, and a
+deleted built-in file becomes a tombstone rather than being automatically
+restored (`lib/profile_manifest.py:586-640`). If the manifest is absent,
+corrupt, or incompatible, sync takes a reset path that removes the destination
+profile tree before materializing the current deployment profile
+(`:321-355,502-550,671-739`). Thus simply excluding the hidden manifest or
+copying only `.claude/` bytes can change project behavior on restore. This is
+an inference from the state machine, not evidence that any particular live
+project has customizations.
+
+The same tree can contain transient lock files: profile sync uses
+`.profile_sync.lock`, Artifact Manifest uses `.artifact_manifest.lock`, and
+project metadata/file locking uses `.project.json.lock` or
+`.{basename}.lock` (`lib/profile_manifest.py:36-38,166-174`;
+`lib/artifact_manifest.py:53-60`; `lib/project_manager.py:1921-1930,1951-1986`).
+These names identify synchronization machinery, but this research has not
+proved a repository-wide exhaustive lock pattern or a safe rule for every
+unknown hidden file. A blanket hidden-file exclusion loses known state; a
+blanket tree copy can retain transient state and potentially unclassified
+secret-bearing bytes. Neither can be approved from the archive export filter.
+
+Candidate scope choices for schema review, not settled policy:
+
+| Choice | Benefit | Unclosed risk / required proof |
+| --- | --- | --- |
+| All regular project files, except an exact runtime exclusion set | Retains otherwise unknown user files and version history. | Audit secrets, symlinks, sockets, temporary/lock files and the exact exclusion set; classify unknown hidden paths before release. |
+| Only known formal/DB-bound files | Smaller authority surface. | Prove every project-local customization, source file, version and profile tombstone is either restorable or intentionally out of scope; current profile state contradicts a simple formal-only assumption. |
+| Enumerated authoritative roots plus explicit metadata/profile roles, fail-closed on unknown paths | Makes omissions visible and supports role-specific validation. | Requires an exhaustive writer/reference inventory and migration rule for new roots; no such approval exists yet. |
+
+Minimum V1-02 fault corpus from this finding: a modified `.claude/` file;
+a project-only `.claude/` file; a tombstoned built-in file with its manifest;
+an absent versus present-empty profile manifest; a transient lock; and an
+unknown hidden file. Restore verification must compare the chosen profile
+state before any sync operation that could rewrite it. Whether project-local
+profile content belongs inside the encrypted archive, in a separate custody
+artifact, or in an explicitly unsupported V1 capability remains a sponsor
+decision tied to the secret-custody policy.
+
 ## Next decision gate
 
 Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
@@ -198,7 +252,10 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
    adapters;
 5. the global-asset binding identity (asset versus derivative table, row ID,
    reference field and media kind), duplicate shared paths, null references,
-   unreferenced orphan files, and absent versus empty `_global_assets` root.
+   unreferenced orphan files, and absent versus empty `_global_assets` root;
+6. project-local profile customizations and tombstones, together with the
+   exact transient/secret/unknown-path rule. The project export's hidden-file
+   filter is not an H6 backup policy.
 
 These are open schema decisions, not reasons to reinterpret the accepted
 pure `RecoveryConfigV1` parser as a production capture implementation.
