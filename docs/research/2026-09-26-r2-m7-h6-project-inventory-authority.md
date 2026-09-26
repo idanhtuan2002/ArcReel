@@ -229,6 +229,25 @@ profile content belongs inside the encrypted archive, in a separate custody
 artifact, or in an explicitly unsupported V1 capability remains a sponsor
 decision tied to the secret-custody policy.
 
+## Positive path-field sample; not yet an exhaustive schema
+
+The archive repair pass supplies a concrete *sample* of project-file links
+that a backup reader must classify without invoking that mutating repair pass:
+
+| Source payload | Observed local-file fields | Boundary case |
+| --- | --- | --- |
+| `project.json` | `style_image`; `characters[*].character_sheet`, `reference_image`, `reference_audio`; `scenes[*].scene_sheet`; `props[*].prop_sheet`; `episodes[*].script_file` (`server/services/project_archive.py:761-945`). | An episode ledger may declare a prospective `script_file` before the script exists; archive repair treats a valid positive episode number as a warning, not a missing-file blocker (`:906-936`). H6 must decide separately whether to retain that pending state, rather than rejecting every absent path-like value. |
+| Episode script JSON | `generated_assets.storyboard_image`, `video_clip`, `narration_audio` for storyboard skeletons; `generated_assets.video_clip`, `video_thumbnail` for `video_units` (`server/services/project_archive.py:970-1149,1240-1335`). | Version metadata can resolve a current media file from `versions/`, while the archive repair pass may materialize or rewrite it. A backup reader must inventory the original bytes and references, not silently repair them (`:1452-1556`). |
+| `video_units` content | `video_uri` is a remote URL, not a local file path (`server/services/project_archive.py:1240-1250`). | URL identity and provider availability are not proven by a local-file hash. |
+
+This is **not** a complete `project.json`/script schema or a liveness rule for
+every field. The evidence comes from one archive repair path, which may omit
+fields that it does not repair. The remaining V1-02 work is to enumerate
+current writers/readers and schema validators for each path-bearing payload,
+then distinguish required existing bytes, intentionally pending references,
+remote URIs, history, and deprecated fields. The backup adapter must not
+borrow the archive's auto-fix behavior as a capture-time integrity check.
+
 ## Next decision gate
 
 Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
@@ -255,7 +274,10 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
    unreferenced orphan files, and absent versus empty `_global_assets` root;
 6. project-local profile customizations and tombstones, together with the
    exact transient/secret/unknown-path rule. The project export's hidden-file
-   filter is not an H6 backup policy.
+   filter is not an H6 backup policy;
+7. current project/script path-field writers and readers beyond the positive
+   archive-repair sample, including the pending episode-ledger case and
+   remote `video_uri`.
 
 These are open schema decisions, not reasons to reinterpret the accepted
 pure `RecoveryConfigV1` parser as a production capture implementation.
