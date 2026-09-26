@@ -369,6 +369,30 @@ recovery claim and how to handle a pre-existing dangling record. This is a
 research inventory, not approval to trim history or reject production data
 under an unreviewed rule.
 
+## Draft-design delta for review, not a schema choice
+
+The current H6 draft enumerates project metadata/formal, `GLOBAL_ASSET`, and
+candidate-media roles in its inventory description
+(`docs/superpowers/specs/2026-09-25-r2-v1-m7d-recovery-closure-design.md:163-189`).
+The source findings above additionally require an explicit disposition for
+project-local profile state/tombstones, non-formal inputs and thumbnails,
+`versions.json` and historical snapshots, pending script references, and
+remote-capable `video_uri`. Calling these all “formal” would contradict the
+Artifact Manifest's narrower registration semantics; omitting them would
+weaken the draft's complete-project/recovery claim. This is a gap to resolve
+*before* freezing `BackupInventoryEntryV1`, not an accepted role expansion.
+
+The review must choose and document, for each class, one of: exact captured
+bytes and binding; a separately authenticated custody/provisioning artifact;
+an intentionally pending/remote reference that is verified by its own rule;
+or an explicit V1 exclusion with a narrowed recovery claim. The same review
+must define handling of unrecognized project files and stale/orphan bytes,
+because neither the current archive's visible-tree filter nor a blanket tree
+copy preserves both completeness and custody safety. Fault tests should
+assert each chosen disposition, including absent-versus-empty metadata,
+duplicate bindings, same-path content drift, and missing selected/unselected
+history. No implementation may silently pick a disposition by filename.
+
 ## Next decision gate
 
 Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
