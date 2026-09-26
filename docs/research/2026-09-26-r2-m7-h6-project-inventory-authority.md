@@ -106,6 +106,19 @@ to `lib/db/models/`, not the entire repository or a live database.
    that each historical usage row is the current file authority: a row can
    outlive a deleted or superseded project output. Its path needs a separate
    liveness/ownership decision before being made a required backup file.
+   A follow-up bounded current-worktree read found that
+   `UsageRepository.finish_call()` writes this field as settlement metadata;
+   `_row_to_dict()` returns it in call history, while
+   `get_project_image_costs_by_asset_type()` groups its string value by path
+   segment without opening the file (`lib/db/repositories/usage_repo.py:115-150,
+   395-440,747-772`). This supports a **candidate** classification as
+   historical accounting evidence, not a current file-existence obligation.
+   The whole DB dump must still preserve the original value exactly; physical
+   project census and formal/version/candidate bindings separately preserve
+   current output bytes. Do not treat a stale historical `output_path` as
+   authority to read outside approved roots. This is not an exhaustive audit
+   of every future or dynamic consumer, so the release-pinned classifier
+   needs a final reader/call-site review before approval.
 10. Global-asset deletion commits the asset and derivative row removal before
     unlinking their files; a file-unlink error is logged rather than rolled
     back (`server/routers/assets.py:248-262`). Thus an unreferenced file in
@@ -317,7 +330,7 @@ fallback.
 | Episode script: `generated_assets.video_uri` | Value-sensitive: absent/empty, approved external URI, or local file binding. External URI is recorded as remote identity, not invented local bytes. | `https://` URI versus same field containing a local path. |
 | Artifact Manifest `entries[*].artifact_path` and `versions/versions.json` `versions[*].file` | Registered formal artifact and retained history snapshot respectively; each declared nonpending reference requires bytes. | Missing unselected/rejected history snapshot; absent versus present-empty manifest/index. |
 | DB `assets.image_path`, `assets.audio_path`, `asset_derivatives.image_path`; candidate/master object references | Non-null global-asset binding by table/row/field; candidate/master binding by exact candidate/object-version identity under approved media root. | Two rows share one file; absent `_global_assets` with DB reference; out-of-root master. |
-| DB `api_calls.output_path`, `ProviderCredential.credentials_path`, adaptation finding `target_path` | **Unresolved/review-only**: historical usage path, separate secret-custody path and semantic field path respectively. Do not classify by column suffix or quietly copy credential files. | Historical usage path after deletion; secret path absent from public manifest; semantic `target_path` not treated as a filesystem path. |
+| DB `api_calls.output_path`, `ProviderCredential.credentials_path`, adaptation finding `target_path` | **Review-only**: candidate historical usage metadata, separate secret-custody path and semantic field path respectively. Do not classify by column suffix or quietly copy credential files. | Historical usage path after deletion; secret path absent from public manifest; semantic `target_path` not treated as a filesystem path. |
 
 This field map is deliberately positive, not a default for unknown schemas.
 Before acceptance, enumerate each supported project/script/history schema
