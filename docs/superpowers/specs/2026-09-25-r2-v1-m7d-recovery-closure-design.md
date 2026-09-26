@@ -222,9 +222,9 @@ export is not the capture adapter because it hides dotfiles and can trim
 version history.
 
 Second, a release-pinned reference classifier walks the **known** fields in
-`project.json`, episode scripts, Artifact Manifest, `versions/versions.json`,
-global-asset DB rows, candidate/master rows and other approved DB-to-file
-authorities. Each nonempty local reference becomes a binding on an inventoried
+`project.json`, episode scripts, `grids/grid_*.json`, Artifact Manifest,
+`versions/versions.json`, global-asset DB rows, candidate/master rows and other
+approved DB-to-file authorities. Each nonempty local reference becomes a binding on an inventoried
 file, even when the ordinary `DataValidator` does not check that field (for
 example `video_thumbnail`, product originals/sheet or derivative sheets).
 It distinguishes an intentionally pending `episodes[*].script_file` from a
@@ -238,6 +238,12 @@ roots fails closed. An arbitrary string in an otherwise opaque file is not
 assumed to be a file reference; the review must enumerate every authoritative
 reference-bearing field and its version before this rule can be implemented.
 Opaque physical bytes do not make an unclassified declared reference valid.
+Grid records require a read-only, version/shape-aware parser for their
+`script_file`, `grid_image_path`, `frame_chain[*].image_path`, and
+`reference_images[*].path` fields. The status-dependent pending and required
+rules remain a V1-02 approval item; a UI list that skips malformed grid JSON
+is not evidence of complete capture.
+
 The classifier does not call any
 write-capable project load, archive repair, profile sync, version restore or
 root-creating helper during capture.
@@ -805,7 +811,10 @@ external `video_uri`; missing `video_thumbnail`, product original and
 derivative sheet; two DB bindings for one global-asset file; a referenced
 global-asset file missing while orphan bytes are retained; selected,
 unselected and rejected-but-retained version snapshots; post-purge orphan
-snapshot; same-path content drift; and file-count/size-limit rejection.
+snapshot; same-path content drift; and file-count/size-limit rejection. Grid
+cases include a pending record with no composite, a ready record whose
+composite is missing, a missing split-frame or reference-image target, and
+malformed grid JSON that the UI list would skip.
 These fixtures must exercise capture and clean-target restore through the
 same inventory interface, not only a standalone path parser.
 
@@ -831,7 +840,10 @@ Before the inventory/manifest V1 schema or capture adapter is frozen, the
 project-inventory research gate must approve an exact table of project-scoped
 DB row types, their live-versus-historical predicates, deletion/tombstone or
 retirement semantics, and typed handling of filesystem-only and DB-only
-identities. It must also approve the `GLOBAL_ASSET` binding identity (asset or
+identities. The [bounded source table](../../research/2026-09-26-r2-m7-h6-project-liveness-table.md)
+finds no current DB project-liveness registry and leaves deletion, retirement
+and name reuse as explicit decisions; it is not an approved predicate. The
+gate must also approve the `GLOBAL_ASSET` binding identity (asset or
 derivative row ID, reference field and media kind), duplicate/null references,
 orphan-file policy, and absent-root behavior. This draft proposes exact
 physical-file retention with multi-binding records, an absent root only when

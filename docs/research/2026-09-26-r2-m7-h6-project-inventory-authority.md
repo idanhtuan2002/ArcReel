@@ -403,6 +403,7 @@ fallback.
 | Episode script: supported segment/scene/shot `end_frame_image` | Optional local file constrained to `end_frames/` in the existing validator; H6 must also reject aliases/symlinks. | Same bytes at a path outside the end-frame root. |
 | Episode script: `generated_assets.video_uri` | Value-sensitive: absent/empty, approved external URI, or local file binding. External URI is recorded as remote identity, not invented local bytes. | `https://` URI versus same field containing a local path. |
 | Artifact Manifest `entries[*].artifact_path` and `versions/versions.json` `versions[*].file` | Registered formal artifact and retained history snapshot respectively; each declared nonpending reference requires bytes. | Missing unselected/rejected history snapshot; absent versus present-empty manifest/index. |
+| Project `grids/grid_*.json`: `grid_image_path`, `frame_chain[*].image_path`, `reference_images[*].path`, `script_file` | Grid record fields name a composite, split-frame outputs, reference inputs and an episode script. Their exact required-versus-pending predicates remain to be approved. | Ready composite missing while metadata survives; missing split-frame or reference input; malformed grid JSON skipped by the UI list; grid record referring to a missing script. |
 | DB `assets.image_path`, `assets.audio_path`, `asset_derivatives.image_path`; candidate/master object references | Non-null global-asset binding by table/row/field; candidate/master binding by exact candidate/object-version identity under approved media root. | Two rows share one file; absent `_global_assets` with DB reference; out-of-root master. |
 | DB `api_calls.output_path`, explicit Vertex credential/config paths, implicit Vertex file resolvers, adaptation finding `target_path` | **Review-only**: candidate historical usage metadata, separate secret-custody selectors and semantic field path respectively. Do not classify by column suffix, enumerate only DB rows, or quietly copy credential files. | Historical usage path after deletion; explicit and resolver selectors covered by protected disposition but secret paths absent from public manifest; semantic `target_path` not treated as a filesystem path. |
 
@@ -413,6 +414,34 @@ revision and additional writer/import/migration routes, decide whether
 under each lifecycle state, and make unknown declared reference types a typed
 capture failure. See the [writer/reader pass](2026-09-26-r2-m7-h6-path-writers.md)
 for observed field mutators and ordinary validator behavior.
+
+### Grid-record reference gap found in the current tree
+
+`GridGeneration` persists `script_file`, nullable `grid_image_path`,
+`frame_chain[*].image_path`, and `reference_images[*].path` in a project-local
+grid JSON record (`lib/grid/models.py:11-27,31-64,116-165`). The constructor
+starts with `grid_image_path=None` and `status="pending"`, while replacing a
+composite sets it to `grids/{id}.png` (`:203-254`). Split completion writes
+frame image paths and `split_at` to that same record
+(`server/services/grid_split.py:461-472`); the split operation reads each
+reference image path from the record and uses it as an input when present
+(`:304-325`). Generation and regeneration also load the named script
+(`server/services/generation_tasks.py:3201-3207`;
+`server/routers/grids.py:305-312`). These are positive path-bearing fields
+outside the earlier project/script/history matrix, even if some paths also
+have a formal Manifest entry.
+
+`GridManager` stores records under `grids/`, but its constructor creates that
+directory; its `list_all()` uses `glob("grid_*.json")` and logs/skips invalid
+JSON (`lib/grid_manager.py:23-29,157-165`). Therefore neither invoking that
+constructor during read-only capture nor using `list_all()` as a complete
+grid-record proof is safe. The physical tree census preserves the bytes, but
+it does not classify record references. V1-02 must define a read-only parser,
+version/shape acceptance, and status-sensitive rules for pending composite,
+split-frame and reference-image paths. It must test a malformed record and
+missing referenced bytes without silently dropping either. This is a
+bounded current-source finding, not an exhaustive grid-history audit or an
+approved capture rule.
 
 ## Global-asset reference multiplicity
 
@@ -554,6 +583,10 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
 8. exact `versions.json`/snapshot history scope, including selected,
    rejected-but-retained, missing and orphan snapshot cases. A current-only
    portable export is not an exact H6 restore.
+9. `grids/grid_*.json` identity and read-only parsing, with explicit rules for
+   its script, composite, split-frame and reference-image paths under each
+   recorded status; UI-style malformed-record skipping cannot prove complete
+   capture.
 
 These are open schema decisions, not reasons to reinterpret the accepted
 pure `RecoveryConfigV1` parser as a production capture implementation.
