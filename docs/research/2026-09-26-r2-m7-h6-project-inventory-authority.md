@@ -154,6 +154,27 @@ to `lib/db/models/`, not the entire repository or a live database.
   claim. Calling its repair/export path as the H6 backup implementation would
   change the recovery bytes and conceal missing source artifacts.
 
+## V1 file-authority matrix for the next schema review
+
+This matrix names confirmed source classes and the minimum counterexample the
+manifest/fault corpus must express. It is **not** yet a complete list of every
+path-like value inside `project.json` or every Host file writer; that bounded
+inventory and its exclusions remain the decision gate below.
+
+| Source class | Confirmed authority and current behavior | Required distinction / fault case |
+| --- | --- | --- |
+| `project.json` in an admitted project directory | `ProjectManager` normally creates it; `project_exists()` tests it, whereas `list_projects()` can show a directory without it (`lib/project_manager.py:419-437,1848-1857`; `server/routers/projects.py:603-618`). | Missing metadata file is different from a valid project with zero formal files. Do not create/repair it during capture. |
+| Project-local `.arcreel_artifacts.json` and registered formal files | Manifest entries bind a canonical formal `artifact_path` and basis digest; the project adapter's read-only loader returns `({}, None)` when the manifest file is absent, while a present empty manifest serializes as a real JSON file with `"entries": {}` (`lib/artifact_manifest.py:113-125,1025-1060,1401-1442,1958-1966,2075-2135`). | `snapshot_entries()` alone collapses absent and present-empty to `{}`. Inventory must record presence and, when present, the file bytes/hash separately from the zero-or-more formal entries. Missing/corrupt registered file fails; zero entries can be valid only with no contradictory DB reference. |
+| Candidate media and approved master | Immutable candidate rows carry `candidate_id`, `object_ref`, size/content/probe digests; master head/version rows bind the selected candidate and repeated object/content identity (`lib/db/models/host_hardening.py:293-380`). Current backup copies one project's candidate list even though `pg_dump` captures the whole DB (`r2/host_hardening/backup.py:256-329`). | Capture all admitted deployment-scoped candidates and master links, reject an out-of-root or missing candidate, and prove the selected master resolves after restore. A single-project inventory cannot close a whole-DB archive. |
+| DB-bound `_global_assets` | `assets.image_path`, `assets.audio_path`, and `asset_derivatives.image_path` are nullable file references; normal upload/copy stores paths relative to `projects_root` under `_global_assets/{type}/` (`lib/db/models/asset.py:11-47`; `server/routers/assets.py:90-125`). | Bind each non-null reference by exact table/row ID/field, then check safe relative path, root containment, bytes and hash. Do not call creating `get_global_assets_root()` to discover an absent root. A null field is not a missing file. |
+| Unreferenced `_global_assets` bytes | API asset deletion commits row removal before unlink and only logs an unlink error (`server/routers/assets.py:248-262`). | Orphans can follow an otherwise successful delete. Explicitly choose include, reject or documented exclusion; do not infer that every orphan means corruption, and test an absent versus empty root. |
+| `api_calls.output_path` | The media generator writes a real output path into accounting, but the usage repository also classifies historical absolute/relative paths by cost bucket (`lib/media_generator.py:613-637,730-745`; `lib/db/repositories/usage_repo.py:116-130,395-440,747-772`). | A usage row is neither automatic current-file authority nor automatically irrelevant. Classify current owner versus historical evidence and test a stale path after project deletion. |
+| `provider_credential.credentials_path` | Provider connectivity reads a separate credential file (`lib/db/models/credential.py:30`; `server/routers/providers.py:771-779`). | Keep this outside non-secret inventory; require the approved custody/restore profile's separate provisioning proof or proof that the profile needs no such secret. Never embed the path or bytes in a public manifest. |
+
+The existing project archive is a transformed one-project export, not a
+substitute for this matrix: it can exclude hidden/non-standard entries and
+trim version history (`server/services/project_archive.py:436-483,521-600`).
+
 ## Next decision gate
 
 Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
