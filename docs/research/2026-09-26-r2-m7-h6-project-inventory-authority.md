@@ -123,6 +123,41 @@ to `lib/db/models/`, not the entire repository or a live database.
    followed persistence through the ledger, usage repository/route, cost
    estimator and frontend drawer. It found no file-open or current-media
    consumer in those checked paths; its scope and limits are recorded there.
+   A separate custody-path check found that the Vertex credential upload
+   writes JSON to `app_data_dir().parent / "vertex_keys" /
+   f"vertex_cred_{cred.id}.json` and then stores that **absolute** path in
+   `provider_credential.credentials_path`
+   (`server/routers/providers.py:688-735`;
+   `lib/db/models/credential.py:19-47`). In production Compose,
+   `./vertex_keys` is mounted separately at `/app/vertex_keys`
+   (`deploy/production/docker-compose.yml:39`), while the application data
+   root is resolved separately (`lib/app_data_dir.py:1-39`). Connectivity
+   checking opens and parses the named file; credential deletion commits the
+   DB row removal before best-effort file unlink
+   (`server/routers/providers.py:651-666,768-790`). A whole-DB/project-tree
+   archive therefore does not by itself restore this external secret file.
+   The candidate V1 no-paid-route profile can treat it as a disabled external
+   dependency only with explicit route-disable and no-provider drill proof;
+   any profile needing Vertex must provision it through approved secret
+   custody and verify the remapped target binding. Neither secret contents
+   nor source absolute path belongs in a public inventory. This is a
+   source-backed dependency finding, not selection of a key manager or
+   authorization to read a live credential.
+   The DB row is not the only Vertex file selector. The legacy configuration
+   migration can store a discovered `vertex_keys` path in
+   `provider_config` (`lib/config/migration.py:82-87`), while
+   `resolve_vertex_credentials_path()` selects a preferred JSON file or the
+   first other JSON file in that directory (`lib/system_config.py:122-147`).
+   The text and video Vertex backends call this resolver directly; the image
+   backend uses it when no explicit `credentials_path` is supplied
+   (`lib/text_backends/gemini.py:118-136`,
+   `lib/video_backends/gemini.py:81-94`,
+   `lib/image_backends/gemini.py:58-75`). A restore disposition that enumerates
+   only `provider_credential` rows would therefore miss a real file-read
+   path. The release-pinned classifier must inventory configured path fields
+   **and** resolver-based dependencies, then prove every such route disabled
+   or provisioned under an approved profile. These source checks establish
+   possible reads, not whether any route is enabled in a live deployment.
 10. Global-asset deletion commits the asset and derivative row removal before
     unlinking their files; a file-unlink error is logged rather than rolled
     back (`server/routers/assets.py:248-262`). Thus an unreferenced file in
@@ -186,7 +221,7 @@ inventory and its exclusions remain the decision gate below.
 | DB-bound `_global_assets` | `assets.image_path`, `assets.audio_path`, and `asset_derivatives.image_path` are nullable file references; normal upload/copy stores paths relative to `projects_root` under `_global_assets/{type}/` (`lib/db/models/asset.py:11-47`; `server/routers/assets.py:90-125`). | Bind each non-null reference by exact table/row ID/field, then check safe relative path, root containment, bytes and hash. Do not call creating `get_global_assets_root()` to discover an absent root. A null field is not a missing file. |
 | Unreferenced `_global_assets` bytes | API asset deletion commits row removal before unlink and only logs an unlink error (`server/routers/assets.py:248-262`). | Orphans can follow an otherwise successful delete. Explicitly choose include, reject or documented exclusion; do not infer that every orphan means corruption, and test an absent versus empty root. |
 | `api_calls.output_path` | The media generator writes a real output path into accounting, but the usage repository also classifies historical absolute/relative paths by cost bucket (`lib/media_generator.py:613-637,730-745`; `lib/db/repositories/usage_repo.py:116-130,395-440,747-772`). | A usage row is neither automatic current-file authority nor automatically irrelevant. Classify current owner versus historical evidence and test a stale path after project deletion. |
-| `provider_credential.credentials_path` | Provider connectivity reads a separate credential file (`lib/db/models/credential.py:30`; `server/routers/providers.py:771-779`). | Keep this outside non-secret inventory; require the approved custody/restore profile's separate provisioning proof or proof that the profile needs no such secret. Never embed the path or bytes in a public manifest. |
+| Vertex external secret selectors | Provider connectivity reads `provider_credential.credentials_path`; legacy migration can populate `provider_config.credentials_path`, and text/video/image backends can select a file from `vertex_keys` without a DB row path (`server/routers/providers.py:771-779`; `lib/config/migration.py:82-87`; `lib/system_config.py:122-147`). | Keep paths/bytes outside non-secret inventory; enumerate both explicit fields and resolver-based selectors in protected restore evidence. Require independently approved provisioning or exact disabled-route/no-provider proof for every selector. |
 
 The existing project archive is a transformed one-project export, not a
 substitute for this matrix: it can exclude hidden/non-standard entries and

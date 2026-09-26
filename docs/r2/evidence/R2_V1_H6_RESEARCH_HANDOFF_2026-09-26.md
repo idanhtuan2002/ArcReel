@@ -1,0 +1,74 @@
+# R2 V1 H6 research handoff — 2026-09-26
+
+Stopped at the user's quota/session request. This is a resume checkpoint,
+not H6 design approval, production-backup evidence or an implementation
+acceptance receipt.
+
+## Exact Git state
+
+- Worktree: `/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage`
+- Branch: `feat/r2-m7e-v1-lineage`
+- HEAD: `06edb3f8bf5ddafcc41cbf430c2660ece4b1451e`
+- Committed this turn: `06edb3f8` (bounded `ApiCall.output_path` audit and
+  candidate retention of regular lock-named files).
+- Dirty, **not committed or accepted**:
+  - `docs/research/2026-09-26-r2-m7-h6-project-inventory-authority.md`
+  - `docs/superpowers/specs/2026-09-25-r2-v1-m7d-recovery-closure-design.md`
+  - this handoff file.
+
+Preserve these dirty files. Do not reset, clean, or fold them into an
+unrelated packet. Re-read live `git status` and diff on resume.
+
+## Source-backed progress and open draft
+
+- `docs/research/2026-09-26-r2-m7-h6-api-call-output-path-audit.md` traces
+  normal runtime persistence, usage display and cost classification. Within
+  its stated source scope, persisted `ApiCall.output_path` is not a current
+  media reader. A follow-up found the legacy SQLite-to-ORM migration copies
+  that field but does not open the named file. The audit is research, not an
+  approved H6 classifier.
+- Source inspection found that Vertex credential uploads write JSON under
+  `app_data_dir().parent/vertex_keys`, mounted separately from project data
+  in production Compose; the DB stores the absolute `credentials_path`.
+  Connectivity check opens it. This finding is in the dirty inventory note.
+  No live secret was read and no provider call was made.
+- The dirty H6 design proposes `ExternalSecretDispositionV1` and two verdict
+  references. It would require signed disabled-route/no-provider evidence
+  for the V1 no-paid-route profile, and reject unresolved DB credential-file
+  dependencies. This is **draft**; review its field schema, trust source,
+  failure code, and consistency with the isolated no-credential restore
+  before adopting it. No custody product, policy or production approval was
+  selected.
+- The committed H6 design still says `DRAFT FOR SPONSOR REVIEW`; V1-01
+  liveness/tombstone policy, V1-02 complete reference classifier, actual
+  custody policy/profile and independent H6 acceptance remain open. Do not
+  implement or claim `RECOVERY_VERIFIED` from these notes.
+
+## Checks and exact resume entry
+
+- Ran `git diff --check` on the dirty files: passed. Docs-only changes;
+  no backend/frontend/full test suite was run, per scope and user request.
+- On resume: inspect live status/diff and this handoff; self-review the
+  external-secret research/design delta against source and existing §6
+  custody semantics; refine or reject the proposal, run `git diff --check`,
+  then commit only this scoped document packet if coherent. Continue V1-02
+  reference/lifecycle research or seek the required sponsor design review;
+  do not treat a self-review as approval or start production capture code.
+
+## Continuation on 2026-09-26
+
+The source review found a material omission in the initial draft: Vertex file
+selection also comes from `provider_config` migration and direct
+`resolve_vertex_credentials_path()` calls in the text/video backends (with an
+image fallback). The draft now requires a release-pinned census of explicit DB
+path references **and** implicit resolver selectors, a signed target-bound
+disposition fetched from the independent recovery ledger, and disabled-route/
+no-provider evidence for every selector in the proposed V1 profile. It
+explicitly rejects missing selectors or a supposedly disabled enabled route.
+The research and design edits remain a candidate, not a sponsor or independent
+review verdict. No secret contents, live credential or provider was accessed.
+
+Next gate: independently review the revised classifier/disposition contract
+alongside V1-01 project liveness and the remaining V1-02 path/reader census.
+Do not implement the capture/restore adapter or claim H6 recovery closure from
+this documentation packet.

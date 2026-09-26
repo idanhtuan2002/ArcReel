@@ -616,6 +616,7 @@ approver, isolated target, decryption/authentication result and audit IDs;
 it is created during the drill, not fabricated at capture time.
 `BackupVerdictV1` has `custody_evidence_ref`, `custody_evidence_digest`,
 `restore_custody_attestation_ref`, `restore_custody_attestation_digest`,
+`external_secret_disposition_ref`, `external_secret_disposition_digest`,
 `recovery_ledger_sequence`, `crypto_profile_id`, `crypto_profile_digest`,
 verdict signer key ID/signature and
 `custody_status` (`NOT_CONFIGURED`, `REJECTED`, `VERIFIED`). Absent, malformed,
@@ -633,6 +634,43 @@ apply. Cluster-wide roles/tablespaces and external secret provisioning are
 not covered by a per-database `pg_dump`; the selected restore profile must
 either prove they are not required for the V1 target or provision and verify
 them separately before acceptance.
+
+The V1 source has a concrete external-file dependency: Vertex credential
+uploads live in a separately mounted `vertex_keys` directory while
+`provider_credential.credentials_path` stores their source absolute path.
+Legacy `provider_config` may also hold a path, and the text/video backends
+resolve a file directly from `vertex_keys`; the image backend can do the same
+when no path is supplied
+([inventory research](../../research/2026-09-26-r2-m7-h6-project-inventory-authority.md)).
+The protected, signed `ExternalSecretDispositionV1` is the named restore
+evidence artifact referenced by the verdict fields above. It binds the exact
+backup set, authenticated custody receipt, restore request and isolated target,
+release/configuration and route-policy digests, signer/trust-anchor version,
+and a complete release-pinned census of DB path references and implicit
+resolver-based secret-file selectors. Each entry identifies its source row
+and field or backend resolver/route, target logical secret slot, disposition,
+and evidence refs/digests; no source absolute path or secret bytes enter the
+public inventory or disposition. The verifier obtains the signed artifact and
+its accepted version from the independently controlled recovery evidence
+ledger, then checks its census against the restored DB, bundled backend map
+and effective target route policy. An archive-local copy cannot establish
+trust or completeness.
+
+Each dependency is either `PROVISIONED_VERIFIED`, backed by independently
+approved target-provisioning and isolated file/readability evidence plus a
+verified remapped target binding, or `DISABLED_NOT_REQUIRED`, backed by the
+exact disabled-route policy and a no-provider drill covering the explicit
+path and implicit resolver routes. A restored absolute source path is never
+treated as a usable target credential. Missing or extra census entries,
+an enabled route labeled not-required, an unremapped source path selected by
+an enabled target route, or failed provisioning/readability/no-provider
+evidence rejects with `RESTORE_EXTERNAL_SECRET_UNRESOLVED` before any fence
+lift. This contract does
+not authorize copying live secrets into the project archive, making a provider
+call, or claiming production custody without the §6 policy gate. The proposed
+V1 no-paid-route profile permits only `DISABLED_NOT_REQUIRED`; that profile's
+effective disablement and drill still require approval. A profile using
+`PROVISIONED_VERIFIED` requires a separate design and operational decision.
 
 Restore first authenticates the custody receipt and ciphertext, then validates
 manifest schema, identity, complete digests and all relative paths—including
@@ -734,7 +772,10 @@ new capture but an earlier accepted set restores to a disjoint target (and
 an aliased target rejects), an audited PREPARING disposition, interrupted plaintext
 staging with verified cleanup, missing or tampered staging-disposition
 evidence, a restored row that is missing/wrong/COMPLETE,
-zero-formal-file project, out-of-root master reference, unknown manifest
+zero-formal-file project, out-of-root master reference, a DB credential-file
+reference or implicit Vertex resolver without a signed disabled/provisioned
+disposition, an omitted selector, a falsely disabled enabled route, unknown
+manifest
 version, missing/wrong configuration field, absent receipt, forged/rolled-back
 signed receipt, wrong key and tampered ciphertext before target mutation, and
 a receipt whose unsigned security field is changed, a wrong/stale ledger
