@@ -256,7 +256,13 @@ logical root, rejects absolute/drive/URI/traversal aliases, then rechecks
 root containment and no symlink/junction at every capture and restore read.
 Version index and every recorded snapshot are retained as distinct bindings,
 including unselected and rejected-but-retained versions; an absent
-`versions.json` is not synthesized. An unreferenced regular file (including a
+`versions.json` is not synthesized. A `versions.json` record whose snapshot
+bytes are missing fails
+`BACKUP_REQUIRED_FILE_MISSING`, even though the current `add_version()` API
+can persist such a record after its source file disappears. No normal
+production caller intentionally declares a pending snapshot; an operator
+must inspect and repair the source before a new exact-recovery attempt or
+leave the attempt rejected. An unreferenced regular file (including a
 global-asset orphan or post-purge history snapshot) is captured with an
 `UNREFERENCED` disposition, not silently dropped or automatically treated as
 corruption. Any DB/JSON reference whose required file is missing is a typed

@@ -352,9 +352,18 @@ The history state also has edge cases the H6 manifest must represent rather
 than silently fix. `_load_versions()` treats an absent `versions.json` as an
 empty in-memory map, while a present empty map is a distinct file
 (`lib/version_manager.py:171-182`). `add_version()` accepts `source_file=None`
-and still records a snapshot path without copying bytes (`:364-431`); this
-does not prove current production callers use that state, but it prevents a
-blanket assumption that every record has bytes. Conversely,
+and still records a snapshot path without copying bytes (`:364-431`). A
+follow-up current-worktree call-site check found that all four production
+callers supply `source_file`: `backup_current()` and
+`ensure_current_tracked()` first check the current file exists
+(`lib/version_manager.py:1106-1167`), while the image/video generator passes
+its output path (`lib/media_generator.py:252-276,645-664`). This does **not**
+make a recorded snapshot's bytes guaranteed: `add_version()` also skips the
+copy when a supplied source path no longer exists, yet still persists the
+record. Thus an H6 fail-closed missing-snapshot rule is defensible for a
+verified exact restore, but a pre-existing missing history file blocks that
+capture until source repair or a rejected-attempt disposition; it is not an approved
+pending state merely because the parameter is nullable. Conversely,
 `purge_resource()` removes its record before best-effort unlink of snapshots,
 so an unreferenced history file can remain after a legitimate purge
 (`:1169-1196`). No read-only H6 reader should call version migration, restore,
