@@ -784,7 +784,11 @@ hidden rollback cleanup, and active work starting against the deletion or
 replacement boundary. Task-state cases include a queued/running/cancelling
 Task without a matching non-terminal attempt, the converse, and contradictory
 task/attempt terminal state; the deletion gate must classify each without
-using one table as a proxy for the other. The exact
+using one table as a proxy for the other. A task enqueue that passes its
+migration check before deletion but commits afterward, an attempt plan that
+commits after deletion intent, and a backup `PREPARING` insert racing with
+deletion must all be refused or serialized by the same lifecycle admission
+boundary. The exact
 expected result for each case follows the approved lifecycle contract.
 Fault tests cover missing/corrupt formal file, absent or
 divergent master, second-project media omission, a DB-referenced global

@@ -271,6 +271,43 @@ read both scoped predicates and block on either active result, then require
 an explicit inspected disposition for contradictory or stale states. The
 current delete route reads neither table (`server/routers/projects.py:1100-1116`).
 
+### Admission writer check: deletion must fence new work
+
+In the current task path, `GenerationQueue.enqueue_task()` checks the
+project's migration verdict before calling `TaskRepository.enqueue()`; only
+TTS/video/reference-video requests with a script use the separate per-unit
+`generation_admission_lock` (`lib/generation_queue.py:399-425,459-495`). The
+migration guard explicitly returns no failure when `get_project_path()`
+cannot locate the directory, leaving not-found handling to its caller
+(`lib/project_migration_guard.py:21-44`). The repository independently inserts
+a `queued` Task and commits it without a project-lifecycle predicate in its
+inspected method (`lib/db/repositories/task_repo.py:189-267,337-346`). Thus a
+successful migration check before deletion is not an atomic admission check:
+the directory can be removed before the queued row commits. This is a
+source-order race inference, not a reproduced concurrent incident.
+
+Execution attempts have a separate write boundary:
+`ExecutionAttemptServiceImpl.plan_and_submit()` calls repository `plan()` and
+commits; the repository inserts a `PLANNED` row scoped by user/project/task
+(`r2/host_hardening/execution.py:120-130`;
+`lib/db/repositories/host_hardening.py:188-207`). The inspected insert does not
+compare a project lifecycle version. The existing M7-B `create_backup_set()`
+likewise inserts `PREPARING` before its media/DB copy
+(`r2/host_hardening/backup.py:256-286`). Within a bounded `lib/`, `server/`,
+`r2/`, `scripts/` caller search, that function is used by integration tests
+only; do not infer a currently exposed production backup route from it. It
+still defines the row-writer seam that any H6 backup adapter must serialize.
+
+The candidate V1-01 contract therefore needs one durable lifecycle admission
+check shared by task enqueue, attempt planning, backup preparation, creation,
+archive replacement and deletion. The project identity/version checked by a
+writer must be the same one it records in its transaction or signed command
+evidence; a check followed by an unguarded commit has the race above. The
+exact lock/transaction protocol, writer allowlist and handling of legacy
+direct repository callers remain decisions for independent review. The
+per-unit generation lock and migration verdict are different predicates and
+do not themselves provide this project-wide boundary.
+
 ## Unknowns and required decision checks
 
 - No source inspected defines a durable project tombstone, retirement state,
