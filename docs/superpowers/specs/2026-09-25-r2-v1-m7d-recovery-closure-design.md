@@ -160,11 +160,21 @@ production needs an approved independently controlled registry adapter, not
 an in-process mutex or a check-then-insert sequence.
 
 The manifest revision records the exact database archive digest/size and a
-sorted complete inventory with each entry's role (project metadata/formal,
-cross-project `GLOBAL_ASSET`, or candidate-media), approved logical root,
-relative path, byte size, SHA-256 and, where authoritative, project,
-artifact, global-asset row, candidate ID, storage object version (distinct
-from the candidate ID), media kind and capture-time probe result.
+sorted complete physical inventory. A file entry is keyed by approved logical
+root and canonical relative path, has byte size and SHA-256, and carries a
+storage class (`PROJECT_FILE`, `GLOBAL_ASSET`, or `CANDIDATE_MEDIA`) plus a
+sorted set of semantic bindings. Zero bindings means an unreferenced
+project/global file; admitted candidate media must have at least one
+candidate/master binding. The bindings identify, where
+applicable, project metadata, Artifact Manifest/formal claim, profile state,
+version index/snapshot, DB global-asset table/row/field, candidate ID,
+storage object version (distinct from candidate ID), media kind and
+capture-time probe result. Several DB bindings may legitimately name the
+same physical file; conflicting observed hashes for one physical identity
+fail capture rather than selecting one binding. Directory-presence entries
+record exact project/global-root and empty-subdirectory existence without
+inventing file bytes or a SHA-256 digest. Absent optional manifests/roots
+have explicit presence records, distinct from present empty files/directories.
 `GLOBAL_ASSET` is under the approved project root but is not a project:
 `_global_assets` is excluded from `ProjectManager.list_projects()` while
 DB `assets`/`asset_derivatives` rows can reference its files. Capture binds
@@ -173,7 +183,9 @@ set ([source reconciliation](../../research/2026-09-26-r2-m7-h6-project-inventor
 The capture reader derives `_global_assets` beneath the approved project root
 without calling the write-capable `get_global_assets_root()` helper. An absent
 root is not silently created; its admissibility depends on the frozen
-DB-reference and orphan-file policy below.
+DB-reference and orphan-file policy below. This revision proposes that an
+absent root is valid only when no DB row references it; an empty present root
+is a distinct state, and unreferenced regular orphan bytes are retained.
 A local immutable object is pinned by its content digest and re-hash under
 the write fence; a remote mutable object additionally needs an immutable
 object-version ID or equivalent content-addressed read. A master reference
@@ -187,6 +199,78 @@ valid only when its restored DB and Artifact Manifest have zero formal-file
 references. The Host adapter legitimately represents an absent, empty
 `.arcreel_artifacts.json` as an empty manifest; the inventory records and
 verifies that absence, while still copying `project.json`.
+
+### Project-file census and reference closure (V1 proposal)
+
+The source inventory has two different obligations. First, a no-follow
+physical census records every regular file and directory under each admitted
+project and `_global_assets`. Candidate/master rows separately select the
+media objects to capture under approved media roots; this proposal does not
+silently expand into an unbounded sweep of unrelated media-store objects.
+An unrecognized regular project file is retained as an opaque `PROJECT_FILE`
+with no invented formal claim; it is never silently excluded. Known transient
+lock files are excluded only by an exact, release-versioned list of writers,
+names and locations proven at review; a matching symlink, junction, socket,
+device or other unsupported entry is a typed reject, not an exclusion. The
+entire project-file payload, including `.claude/`, `CLAUDE.md` and
+`.arcreel_profile_manifest.json`, falls under authenticated-encryption custody.
+Profile sync must not run before restore verification compares the captured
+bytes, manifest presence and deletion tombstones. Existing portable archive
+export is not the capture adapter because it hides dotfiles and can trim
+version history.
+
+Second, a release-pinned reference classifier walks the **known** fields in
+`project.json`, episode scripts, Artifact Manifest, `versions/versions.json`,
+global-asset DB rows, candidate/master rows and other approved DB-to-file
+authorities. Each nonempty local reference becomes a binding on an inventoried
+file, even when the ordinary `DataValidator` does not check that field (for
+example `video_thumbnail`, product originals/sheet or derivative sheets).
+It distinguishes an intentionally pending `episodes[*].script_file` from a
+missing existing script using the approved ledger predicate, and classifies
+`video_uri` by its *value*: local path binds bytes; an approved external URI
+gets a typed remote-reference record, never a fabricated local file. Empty,
+null, absent and present-empty values retain their distinct source states.
+An unrecognized version of a declared reference-bearing schema, an
+unsupported declared reference type or a known reference outside approved
+roots fails closed. An arbitrary string in an otherwise opaque file is not
+assumed to be a file reference; the review must enumerate every authoritative
+reference-bearing field and its version before this rule can be implemented.
+Opaque physical bytes do not make an unclassified declared reference valid.
+The classifier does not call any
+write-capable project load, archive repair, profile sync, version restore or
+root-creating helper during capture.
+
+The bounded census rejects a source exceeding the approved file-count,
+per-file or aggregate-byte limits without silently truncating it. Missing
+required local bytes fail `BACKUP_REQUIRED_FILE_MISSING`; unknown reference
+semantics fail `BACKUP_REFERENCE_UNCLASSIFIED`. Traversal, absolute alias,
+symlink/junction in a declared reference or wrong logical root fails the
+existing `BACKUP_REFERENCE_OUT_OF_SCOPE`; an unsupported entry discovered by
+the physical census fails `BACKUP_INVENTORY_ENTRY_UNSUPPORTED`. Sanitized
+failures identify a binding key or
+opaque entry ID, not a secret-bearing absolute path.
+
+The generic physical path interface is separate from Artifact Manifest's
+formal-path validator. It admits only canonical relative paths under one
+logical root, rejects absolute/drive/URI/traversal aliases, then rechecks
+root containment and no symlink/junction at every capture and restore read.
+Version index and every recorded snapshot are retained as distinct bindings,
+including unselected and rejected-but-retained versions; an absent
+`versions.json` is not synthesized. An unreferenced regular file (including a
+global-asset orphan or post-purge history snapshot) is captured with an
+`UNREFERENCED` disposition, not silently dropped or automatically treated as
+corruption. Any DB/JSON reference whose required file is missing is a typed
+reject. This preserves actual source bytes while leaving classification of
+pre-existing dangling/pending states to the reviewed reference table.
+
+The alternatives are a formal-file allowlist (loses profile/history/opaque
+user data), a blind tree copy (cannot prove DB/JSON reference closure), or
+this paired census/classifier. The paired option is the V1 recommendation,
+subject to the explicit review gate below; it preserves bytes while rejecting
+known dangling authority claims. This proposal is based on the [project-tree and file-authority research](../../research/2026-09-26-r2-m7-h6-project-inventory-authority.md)
+and [bounded writer/reader map](../../research/2026-09-26-r2-m7-h6-path-writers.md).
+It does not settle project lifecycle admission or approve a production
+custody profile; both gates remain in §8.
 
 `configuration_digest` is SHA-256 over canonical `RecoveryConfigV1`, not an
 arbitrary caller dictionary. Required fields are the source deployment ID;
@@ -283,9 +367,10 @@ disposition; there is no fabricated window end at capture entry.
    admitted project directories separately from project-scoped DB rows and
    reconcile them under the approved liveness/classification table described
    below; `_global_assets` is an independent inventory role, not a project.
-   Hash every project/formal,
-   global-asset and media source file and perform the capture-time media
-   probe that will be recorded in the inventory.
+   Run the physical census and reference classifier above, hash every
+   project/global-asset/candidate file, and perform the capture-time media
+   probe that will be recorded in the inventory. Preserve directory and
+   absent-versus-empty presence separately from file hashes.
    Refuse missing owners, divergent master projections,
    paths outside approved roots, symlinks/junctions, duplicate refs with
    unequal bytes, or mutable/unversioned media that cannot be pinned.
@@ -342,13 +427,14 @@ disposition; there is no fabricated window end at capture entry.
    refs overprotected until idempotent reconciliation; missing proof, a hold,
    an active restore lease or unavailable ledger never releases refs. A
    DISPOSED set cannot be restored or become COMPLETE/VERIFIED again.
-4. Copy the complete project/formal-file, global-asset and candidate-media
+4. Copy the complete project-file, global-asset and candidate-media
    inventory into a private, explicit destination. Hash source and destination
    for every role. Run a
    whole-database custom-format `pg_dump` while the same write fence holds,
    then hash the archive. Re-enumerate all DB identities/revisions and all
-   project/formal, global-asset and candidate-media file identities, sizes and
-   SHA-256 hashes against the frozen step-2 inventory;
+   project, global-asset and candidate-media file identities, directory and
+   presence records, binding sets, sizes and SHA-256 hashes against the frozen
+   step-2 inventory;
    a same-path content edit is drift too. The end check also re-probes media
    metadata. Any mismatch fails `BACKUP_SOURCE_DRIFT`; no identity-only
    shortcut is accepted. This is defense in depth, not a claim that two
@@ -408,7 +494,8 @@ would be a false operational decision.
 
 The V1 *custody contract* is nevertheless fixed before implementation:
 
-1. The complete DB dump, project/formal files, candidate media and protected
+1. The complete DB dump, project files (including formal, profile, history
+   and opaque files), candidate media and protected
    fence evidence are encrypted as one logical set before leaving private
    short-lived capture staging. Production staging must itself be an
    access-controlled encrypted ephemeral volume with owner-only permissions,
@@ -557,10 +644,13 @@ manifest. `COMPLETE` is the later
 *source-side* state and must not be invented inside the snapshot. Missing,
 different or already-COMPLETE restored rows fail `RESTORED_BACKUP_ROW_MISMATCH`.
 
-Verification then enumerates all restored project directories, manifest entries,
-formal-file bindings, global-asset DB rows/files, candidate objects and
-approved master heads from the restored DB and project files. It compares
-each against the sealed inventory, resolves each head through
+Verification then repeats the project/global-root physical census and the
+release-pinned reference classification on the restored DB and project files.
+It checks exact directory/presence records, all restored files (including
+opaque/unreferenced bytes, profile state and every retained version snapshot),
+all semantic binding sets, global-asset rows/files, candidate objects and
+approved master heads against the sealed inventory. A restored extra file or
+binding is a mismatch, not merely a harmless addition. It resolves each head through
 `DatabaseMasterResolver` with its legacy projection where
 applicable, reads formal files through the Host's guarded artifact adapter
 and media through the bounded candidate store, checks size/hash and probes
@@ -578,11 +668,16 @@ a skipped acceptance check. The probe records tool/version and result digest
 ([FFprobe format/stream inspection](https://ffmpeg.org/ffprobe.html),
 [FFmpeg decoding](https://ffmpeg.org/ffmpeg.html)).
 It rejects unlisted authoritative references as well as listed-but-missing files.
+An absent/present-empty mismatch, changed opaque file, changed profile
+tombstone, omitted historical snapshot or newly unbound local path fails
+`RESTORED_INVENTORY_MISMATCH`. No profile sync, archive repair or version
+materialization runs before this comparison.
 Only after complete closure may the independent recovery-evidence ledger
 record `VERIFIED` for the set. If the source DB still exists, its backup row
 may reflect that verdict as a projection; the restored snapshot's row remains
-PREPARING. The verdict reports checked project, formal-file, global-asset,
-candidate, master and media counts, typed reason codes, measured recovery
+PREPARING. The verdict reports checked project, project-file, profile,
+version-index/snapshot, formal-binding, global-asset, candidate, master and
+media counts, typed reason codes, measured recovery
 point/RPO/RTO, exact release identity and the following timing evidence
 references/digests. Before a drill, an independent drill authority signs
 `RecoveryDrillRequestV1` with
@@ -650,6 +745,20 @@ self-review or an E1 green suite cannot substitute for this evidence. All
 failure codes above are stable enum values with sanitized detail fields, not
 free-form path-bearing strings or a `reason:path` encoding.
 
+The inventory fault subset additionally covers absent versus present-empty
+Artifact Manifest, profile manifest, version index and `_global_assets` root;
+modified/project-only profile files and a deletion tombstone; an unknown
+regular file retained byte-exactly; an unknown declared reference type rejected;
+known lock exclusion versus unknown hidden-file retention; an unsupported
+filesystem entry; pending versus dangling episode script; local versus
+external `video_uri`; missing `video_thumbnail`, product original and
+derivative sheet; two DB bindings for one global-asset file; a referenced
+global-asset file missing while orphan bytes are retained; selected,
+unselected and rejected-but-retained version snapshots; post-purge orphan
+snapshot; same-path content drift; and file-count/size-limit rejection.
+These fixtures must exercise capture and clean-target restore through the
+same inventory interface, not only a standalone path parser.
+
 ## 8. Follow-on packets and stop conditions
 
 M7-D remains CHANGES_REQUIRED until this H6 design is approved, implemented
@@ -674,10 +783,16 @@ DB row types, their live-versus-historical predicates, deletion/tombstone or
 retirement semantics, and typed handling of filesystem-only and DB-only
 identities. It must also approve the `GLOBAL_ASSET` binding identity (asset or
 derivative row ID, reference field and media kind), duplicate/null references,
-orphan-file policy, and absent-root behavior. Current project deletion only
+orphan-file policy, and absent-root behavior. This draft proposes exact
+physical-file retention with multi-binding records, an absent root only when
+no DB reference exists, and captured (not silently discarded) orphan bytes.
+It also needs a release-versioned reference field map, lock exclusion list,
+approved census bounds, profile/secret custody disposition, and explicit
+approval of the proposed all-retained-version-history rule. Current project deletion only
 removes the directory, so unconditional DB-name/directory set equality is not
-the rule. Until these decisions and their tests are approved, step 2 is a
-draft acceptance obligation, not an implementable production admission rule.
+the rule. Until the liveness table and these inventory decisions and tests
+are approved, step 2 is a draft acceptance obligation, not an implementable
+production admission rule.
 
 The H6 implementation includes a separate revision of
 `docs/r2/runbooks/m7-backup-restore.md`: replace the false secret-free claim,
