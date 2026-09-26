@@ -170,6 +170,10 @@ from the candidate ID), media kind and capture-time probe result.
 DB `assets`/`asset_derivatives` rows can reference its files. Capture binds
 those DB references and files, never silently omitting them from a whole-DB
 set ([source reconciliation](../../research/2026-09-26-r2-m7-h6-project-inventory-authority.md)).
+The capture reader derives `_global_assets` beneath the approved project root
+without calling the write-capable `get_global_assets_root()` helper. An absent
+root is not silently created; its admissibility depends on the frozen
+DB-reference and orphan-file policy below.
 A local immutable object is pinned by its content digest and re-hash under
 the write fence; a remote mutable object additionally needs an immutable
 object-version ID or equivalent content-addressed read. A master reference
@@ -276,9 +280,10 @@ disposition; there is no fabricated window end at capture entry.
    stopped an external process.
 2. Read all candidate/master/project identities, project-file references,
    and global-asset DB/file references from the fenced source. Enumerate
-   admitted project directories separately from active authoritative
-   project-scoped DB rows and reconcile both sets; `_global_assets` is an
-   independent inventory role, not a project. Hash every project/formal,
+   admitted project directories separately from project-scoped DB rows and
+   reconcile them under the approved liveness/classification table described
+   below; `_global_assets` is an independent inventory role, not a project.
+   Hash every project/formal,
    global-asset and media source file and perform the capture-time media
    probe that will be recorded in the inventory.
    Refuse missing owners, divergent master projections,
@@ -337,11 +342,13 @@ disposition; there is no fabricated window end at capture entry.
    refs overprotected until idempotent reconciliation; missing proof, a hold,
    an active restore lease or unavailable ledger never releases refs. A
    DISPOSED set cannot be restored or become COMPLETE/VERIFIED again.
-4. Copy the complete project/formal-file and candidate-media inventory into a
-   private, explicit destination. Hash source and destination. Run a
+4. Copy the complete project/formal-file, global-asset and candidate-media
+   inventory into a private, explicit destination. Hash source and destination
+   for every role. Run a
    whole-database custom-format `pg_dump` while the same write fence holds,
-   then hash the archive. Re-enumerate all DB identities/revisions and file
-   identities, sizes and SHA-256 hashes against the frozen step-2 inventory;
+   then hash the archive. Re-enumerate all DB identities/revisions and all
+   project/formal, global-asset and candidate-media file identities, sizes and
+   SHA-256 hashes against the frozen step-2 inventory;
    a same-path content edit is drift too. The end check also re-probes media
    metadata. Any mismatch fails `BACKUP_SOURCE_DRIFT`; no identity-only
    shortcut is accepted. This is defense in depth, not a claim that two
@@ -611,8 +618,9 @@ The initial test corpus includes at least two projects (the V1 factual and
 drama products) plus an unrelated third project to catch one-project-only
 inventory bugs. Fault tests cover missing/corrupt formal file, absent or
 divergent master, second-project media omission, a DB-referenced global
-asset omitted or missing, an active authoritative DB project reference
-without an admitted project directory, path traversal/symlink,
+asset omitted or missing, a DB project reference classified as live by the
+approved liveness table without an admitted project directory (distinct from
+an intentionally deleted project's historical row), path traversal/symlink,
 concurrent visible GC query, changed file/DB state during capture, process
 interruption at each state transition, nonempty/aliased target, archive digest
 failure, missing/stale/forged start or closure fence evidence, missing/
@@ -659,6 +667,17 @@ test port, strict restore verification and fault corpus) from a
 real policy/receipt, operator evidence, and clean-target drill). Passing the
 first packet is not H6 closure or `RECOVERY_VERIFIED`; E1 remains blocked until
 the second packet and the rest of M7-D have independent acceptance.
+
+Before the inventory/manifest V1 schema or capture adapter is frozen, the
+project-inventory research gate must approve an exact table of project-scoped
+DB row types, their live-versus-historical predicates, deletion/tombstone or
+retirement semantics, and typed handling of filesystem-only and DB-only
+identities. It must also approve the `GLOBAL_ASSET` binding identity (asset or
+derivative row ID, reference field and media kind), duplicate/null references,
+orphan-file policy, and absent-root behavior. Current project deletion only
+removes the directory, so unconditional DB-name/directory set equality is not
+the rule. Until these decisions and their tests are approved, step 2 is a
+draft acceptance obligation, not an implementable production admission rule.
 
 The H6 implementation includes a separate revision of
 `docs/r2/runbooks/m7-backup-restore.md`: replace the false secret-free claim,

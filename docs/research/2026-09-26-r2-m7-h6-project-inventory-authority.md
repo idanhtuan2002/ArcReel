@@ -24,8 +24,9 @@ to `lib/db/models/`, not the entire repository or a live database.
 ## Confirmed facts
 
 1. `ProjectManager.list_projects()` enumerates directories directly under
-   `projects_root`, excluding names beginning with `.` or `_`; project names
-   must match `^[A-Za-z0-9-]+$`. `create_project()` creates the directory and
+   `projects_root`, excluding names beginning with `.` or `_`; it does **not**
+   validate the name against `PROJECT_NAME_PATTERN`. Creation and path
+   resolution do enforce `^[A-Za-z0-9-]+$`. `create_project()` creates the directory and
    normally publishes `project.json`, but its `publish=False` option permits
    a transient directory without that file
    (`lib/project_manager.py:97,315-322,388-437`).
@@ -68,6 +69,9 @@ to `lib/db/models/`, not the entire repository or a live database.
    and does not cover the deployment DB or external candidate media.
 8. `_global_assets` is a cross-project library intentionally excluded from
    `list_projects()` (`lib/project_manager.py:392-397,574-580`). The
+   `get_global_assets_root()` helper creates that root and its subdirectories,
+   so a read-only capture must derive and inspect the path without calling it.
+   An absent root must not be synthesized by the reader. The
    `assets` and `asset_derivatives` database tables have `image_path` and
    (for assets) `audio_path` fields (`lib/db/models/asset.py:11-47`), and the
    upload/copy routes put files under `_global_assets/{type}/` and store paths
@@ -99,11 +103,18 @@ to `lib/db/models/`, not the entire repository or a live database.
 
 - A V1 manifest whose project count comes only from SQL would miss a
   filesystem-only project. Conversely, copying only the UI-visible
-  `list_projects()` names would silently ignore disallowed/hidden directories
-  and DB rows referring to a missing project. The capture adapter needs two
-  independently enumerated sets: approved project directories under the
-  project root and all project-scoped authoritative DB references. It must
-  reconcile them before and after the dump, with a typed discrepancy failure.
+  `list_projects()` names would silently ignore hidden/underscore directories
+  and DB rows referring to a missing project; a malformed non-hidden directory
+  can appear in that list but fail `get_project_path()` validation. The capture
+  adapter needs independent filesystem and DB enumeration, then an explicit
+  liveness/classification rule before it can reconcile them. The current
+  delete route removes only the project directory
+  (`server/routers/projects.py:1100-1116`,
+  `lib/project_manager.py:447-462`); historical DB rows with its name can
+  remain. Equating every DB project name with a live directory would therefore
+  reject an otherwise valid post-delete source, while ignoring every DB-only
+  name could hide a corrupt live project. This is unresolved, not a basis for
+  an unconditional discrepancy check.
 - `project.json` is required for every admitted project directory by the
   draft H6 design. A directory lacking it is a fail-closed capture error,
   not a zero-formal-file project. Zero formal files may still be valid when
@@ -132,6 +143,11 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
 
 1. the exact project enumeration domain (including hidden, malformed,
    transient, and DB-orphan cases) and the canonical identity of a project;
+   enumerate the exact DB row types that establish live project authority,
+   define each liveness predicate and historical-row exclusion, and decide
+   whether deletion needs a durable tombstone or row retirement. Specify typed
+   handling for filesystem-only, intentionally deleted, and corrupt DB-only
+   identities; no production capture adapter can infer this from names alone;
 2. the full authoritative file-reference surface in `project.json`, Artifact
    Manifest, master rows, `assets`, `asset_derivatives`, and other DB-to-file
    references; specifically classify historical `api_calls.output_path`
@@ -141,7 +157,10 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
    a file, and how zero formal files are proved;
 4. a separate safe-relative-path rule for backup inventory, with physical
    containment/symlink checks performed again by the capture and restore
-   adapters.
+   adapters;
+5. the global-asset binding identity (asset versus derivative table, row ID,
+   reference field and media kind), duplicate shared paths, null references,
+   unreferenced orphan files, and absent versus empty `_global_assets` root.
 
 These are open schema decisions, not reasons to reinterpret the accepted
 pure `RecoveryConfigV1` parser as a production capture implementation.
