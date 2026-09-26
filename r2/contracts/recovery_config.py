@@ -133,8 +133,10 @@ def parse_recovery_config_v1(raw: bytes) -> tuple[RecoveryConfigV1, str]:
     try:
         record, _ = parse_canonical_fence_record(raw, RecoveryConfigV1)
     except FenceRecordInvalid as exc:
-        raise RecoveryConfigInvalid(exc.category) from None
-    return record, "sha256:" + hashlib.sha256(raw).hexdigest()
+        category = exc.category
+    else:
+        return record, "sha256:" + hashlib.sha256(raw).hexdigest()
+    raise RecoveryConfigInvalid(category)
 
 
 __all__ = [

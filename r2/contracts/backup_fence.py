@@ -181,8 +181,8 @@ def parse_canonical_fence_record[FenceModelT: BaseModel](
         if canonical_json_bytes(ensure_json_value(decoded)) != raw:
             raise FenceRecordInvalid("noncanonical_bytes")
         record = model.model_validate(decoded)
-    except FenceRecordInvalid:
-        raise
+    except FenceRecordInvalid as exc:
+        category = exc.category
     except (
         UnicodeDecodeError,
         json.JSONDecodeError,
@@ -192,8 +192,10 @@ def parse_canonical_fence_record[FenceModelT: BaseModel](
         OverflowError,
         RecursionError,
     ):
-        raise FenceRecordInvalid("invalid_record") from None
-    return record, decoded
+        category = "invalid_record"
+    else:
+        return record, decoded
+    raise FenceRecordInvalid(category)
 
 
 __all__ = [

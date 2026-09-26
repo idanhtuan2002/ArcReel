@@ -176,6 +176,26 @@ def test_nested_secret_field_rejects_without_echoing_value() -> None:
     assert "do-not-echo-secret" not in str(caught.value)
 
 
+def test_rejected_secret_is_absent_from_exception_context_chain() -> None:
+    data = valid_mapping()
+    tool = cast("dict[str, object]", data["pg_dump"])
+    tool["password"] = "do-not-echo-secret"
+    with pytest.raises(RecoveryConfigInvalid) as caught:
+        parse_recovery_config_v1(canonical_json_bytes(data))
+    pending: list[BaseException] = [caught.value]
+    seen: set[int] = set()
+    while pending:
+        error = pending.pop()
+        if id(error) in seen:
+            continue
+        seen.add(id(error))
+        assert "do-not-echo-secret" not in str(error)
+        if error.__cause__ is not None:
+            pending.append(error.__cause__)
+        if error.__context__ is not None:
+            pending.append(error.__context__)
+
+
 def test_noncanonical_whitespace_and_duplicate_keys_reject() -> None:
     raw = canonical_json_bytes(valid_mapping())
     with pytest.raises(RecoveryConfigInvalid):

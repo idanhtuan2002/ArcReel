@@ -183,10 +183,22 @@ def test_validation_error_does_not_expose_raw_evidence_in_exception_chain() -> N
     data = valid_start_mapping()
     data["custodian_id"] = "/private/operator-credential"
     data["schema_version"] = 2
+    data["password"] = "do-not-echo-secret"
     with pytest.raises(FenceRecordInvalid) as exc:
         parse_canonical_fence_record(canonical_json_bytes(data, allow_nan=False), CaptureFenceStartV1)
-    assert exc.value.__cause__ is None
-    assert "/private/operator-credential" not in str(exc.value)
+    pending: list[BaseException] = [exc.value]
+    seen: set[int] = set()
+    while pending:
+        error = pending.pop()
+        if id(error) in seen:
+            continue
+        seen.add(id(error))
+        assert "/private/operator-credential" not in str(error)
+        assert "do-not-echo-secret" not in str(error)
+        if error.__cause__ is not None:
+            pending.append(error.__cause__)
+        if error.__context__ is not None:
+            pending.append(error.__context__)
 
 
 def test_oversized_record_rejects_before_json_decode() -> None:
