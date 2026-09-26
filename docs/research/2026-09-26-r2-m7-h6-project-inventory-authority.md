@@ -333,6 +333,42 @@ deployment inventory; it needs a fenced, complete row scan, including every
 derivative row. The exact query/transaction strategy remains a V1-03 design
 decision.
 
+## Project-local version history is another file authority
+
+`VersionManager` keeps `versions/versions.json` under each project and records
+each version's relative `file` plus `current_version`; its read API exposes
+every recorded version as a file URL (`lib/version_manager.py:126-136,
+171-221`). The normal staged-commit paths copy snapshot bytes before
+persisting the version record and current-file selection, with rollback on
+failure (`:433-542,544-690`). `restore_version()` later reads the selected
+record's file and copies it back to the current path (`:1198-1257`). A
+rejected paid result can stay in history after the current selection moves
+back (`:875-975`). Therefore a backup containing only currently selected
+media can lose user-visible history and future restore choices; the archive
+export's `scope="current"` deliberately trims `versions.json` and snapshot
+files, so it is not an exact recovery source (`server/services/project_archive.py:521-600`).
+
+The history state also has edge cases the H6 manifest must represent rather
+than silently fix. `_load_versions()` treats an absent `versions.json` as an
+empty in-memory map, while a present empty map is a distinct file
+(`lib/version_manager.py:171-182`). `add_version()` accepts `source_file=None`
+and still records a snapshot path without copying bytes (`:364-431`); this
+does not prove current production callers use that state, but it prevents a
+blanket assumption that every record has bytes. Conversely,
+`purge_resource()` removes its record before best-effort unlink of snapshots,
+so an unreferenced history file can remain after a legitimate purge
+(`:1169-1196`). No read-only H6 reader should call version migration, restore,
+or archive repair to normalize these cases during capture.
+
+V1-02 decision/fault cases: absent versus present-empty `versions.json`;
+selected and unselected version records with missing files; a rejected-but-
+retained version; an orphan snapshot after purge; path escape/symlink in a
+record's `file`; and mismatch between selected history bytes and the current
+formal file. The policy must say which references are required for an exact
+recovery claim and how to handle a pre-existing dangling record. This is a
+research inventory, not approval to trim history or reject production data
+under an unreviewed rule.
+
 ## Next decision gate
 
 Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
@@ -364,7 +400,10 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
    archive-repair sample, including the pending episode-ledger case and
    local-versus-remote `video_uri`, `storyboard_last_image`, `end_frame_image`,
    `video_thumbnail` missed by the present validator, product originals/sheet,
-   and character derivative sheets.
+   and character derivative sheets;
+8. exact `versions.json`/snapshot history scope, including selected,
+   rejected-but-retained, missing and orphan snapshot cases. A current-only
+   portable export is not an exact H6 restore.
 
 These are open schema decisions, not reasons to reinterpret the accepted
 pure `RecoveryConfigV1` parser as a production capture implementation.
