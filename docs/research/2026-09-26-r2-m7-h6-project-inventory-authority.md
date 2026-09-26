@@ -287,7 +287,7 @@ capture/restore rather than treating validation success as a normalized
 portable reference.
 
 This is **not** a complete `project.json`/script schema or a liveness rule for
-every field. The evidence comes from one archive repair path, which may omit
+every field. The evidence began with one archive repair path, which may omit
 fields that it does not repair. A bounded first-party writer/reader pass for
 the named fields is recorded in
 `docs/research/2026-09-26-r2-m7-h6-path-writers.md`; it does not close
@@ -296,6 +296,42 @@ remaining V1-02 work is to expand that inventory, then distinguish required
 existing bytes, intentionally pending references, remote URIs, history, and
 deprecated fields. The backup adapter must not borrow the archive's auto-fix
 behavior as a capture-time integrity check.
+
+## Global-asset reference multiplicity
+
+The `assets` table uniquely constrains `(type, name)`, and
+`asset_derivatives` uniquely constrains `(asset_id, name)`; neither model
+places a uniqueness constraint on `image_path` or `audio_path`
+(`lib/db/models/asset.py:11-47`). The normal upload/copy helpers produce a
+fresh UUID filename in `_global_assets/{type}/`, so two normal writes are
+expected to have distinct paths (`server/routers/assets.py:90-125`). That is
+not a database invariant: the repository's `create()`/`update()` accepts the
+provided path, and `replace_derivatives()` replaces rows with caller-supplied
+paths (`lib/db/repositories/asset_repo.py:16-39,70-77,113-136`). H6 must not
+assume one DB binding per physical file when reading a restored or manually
+modified database.
+
+Candidate inventory representation: one normalized file identity and digest
+may have **multiple** binding receipts, each with table, primary-key, field,
+and nullable/non-null value. This is a schema candidate, not an approved
+deduplication policy. A safe version would reject inconsistent hashes for the
+same physical path across capture phases, and explicitly test two rows sharing
+a path, two fields in one row sharing a path, and a duplicate reference whose
+file is missing.
+The live delete/replace routes commit the DB change before attempting to
+unlink old files; unlink failure leaves orphans, while the deletion helper
+does not look up other rows before unlinking (`server/routers/assets.py:128-136,
+247-262,283-299`). Therefore both orphan bytes and a shared-path dangling
+reference are plausible edge cases if a duplicate path was introduced outside
+the UUID-creating route. This is an inference about possible states, not a
+claim that the ordinary API currently creates duplicate paths.
+
+The UI-oriented repository `list()` is paginated with a default limit of 100
+and orders by mutable `updated_at` (`lib/db/repositories/asset_repo.py:54-68`).
+A capture implementation cannot treat one default `list()` call as a complete
+deployment inventory; it needs a fenced, complete row scan, including every
+derivative row. The exact query/transaction strategy remains a V1-03 design
+decision.
 
 ## Next decision gate
 
