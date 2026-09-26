@@ -23,15 +23,23 @@ V1 inventory/manifest or capture adapter is frozen
 - The current project identity is filesystem based. `list_projects()` lists
   visible child directories; `get_project_path()` validates a name and only
   requires the resulting path to exist; `project_exists()` additionally
-  requires `project.json`. Normal creation writes that file, but
-  `publish=False` deliberately permits an unpublished directory
-  (`lib/project_manager.py:388-390,400-438,601-610,1848-1857`).
+  requires `project.json`. HTTP creation first writes a minimal
+  `{"content_mode": ...}` file and only later saves complete schema metadata;
+  `publish=False` deliberately permits an unpublished directory in the Agent
+  creation route (`lib/project_manager.py:388-390,400-438,601-610,2436-2454,2505-2507`;
+  `server/routers/projects.py:688-716`; `server/tool_runtime.py:1163-1183`).
 - The API deletion route calls only `delete_project_directory()`, which
   recursively removes the resolved directory. It has no DB session or row
   operation in that route/helper (`server/routers/projects.py:1100-1116`,
   `lib/project_manager.py:447-462`). The other production caller is failed
   composed creation after `publish=False`, where it removes the unpublished
   directory (`server/tool_runtime.py:1157-1183`).
+- Archive import is a separate replacement route. With `overwrite`, the
+  installer renames an existing target to `.import-backup-*`, installs the
+  staged tree under the same name, then deletes the hidden old tree; exception
+  rollback restores it (`server/routers/projects.py:309-344`;
+  `server/services/project_archive.py:1930-1950,1956-1987`). Process loss
+  between those operations is not covered by that exception handler.
 - The bounded direct-field scan below found project naming in the listed ORM
   modules. There is no `Project` ORM/table in that scope. This is a bounded
   model-source observation, not a claim about a live database, migrations,
@@ -66,8 +74,10 @@ the current delete route do not provide one.
 | --- | --- | --- |
 | Filesystem-only directory with valid `project.json` | Normal filesystem project representation; no SQL `projects` registry is present in the bounded model scan. | Select the precise accepted directory/name/metadata predicate and its fence behavior. |
 | Directory without `project.json` | `list_projects()` can list it; `create_project(..., publish=False)` can create it before composed metadata creation. | Classify it as unpublished/interrupted/damaged; do not silently promote it to a live project. |
+| Directory with only minimal `project.json` | HTTP creation can stop between its initial `create_project()` call and `create_project_metadata()`. | Check the complete supported schema and lifecycle evidence; mere file presence is not publication proof. |
 | DB-only project name | Every table above can retain its domain row after API deletion because deletion only removes the directory. | Distinguish historical retention from interrupted/operational state; current source supplies no tombstone to do so. |
 | Same name in directory and DB after reuse | The current identity is name based in both filesystem and scoped rows. | Define reuse/generation semantics; a name-only comparison cannot distinguish an old row from a new directory. |
+| Target temporarily absent or changed during archive overwrite | The import installer can put the old tree under a hidden sibling before moving a different staged tree into the same target name. | Define a distinct replacement intent, source/target identity proof, capture fence, and crash reconciliation. Do not treat target absence as deletion or same-name replacement as proven continuity. |
 
 ## Inferences and open decisions
 
@@ -85,6 +95,9 @@ the current delete route do not provide one.
    selected, must distinguish explicit published deletion from rollback of an
    uncommitted directory. This follows from the two observed callers, not
    from an approved design.
+4. Archive overwrite is an independent lifecycle writer. A delete-only
+   tombstone protocol cannot classify its intermediate hidden backup or the
+   replacement tree by name alone.
 
 ### Open decisions for the H6 gate
 
@@ -97,6 +110,10 @@ the current delete route do not provide one.
    rows to a different project identity.
 4. Specify typed capture results for every identity case above, including
    legacy DB-only rows that lack any future lifecycle record.
+5. Include archive import, especially `overwrite`, in the lifecycle writer
+   fence and crash matrix; decide whether replacement preserves the exact
+   project identity or creates a new generation, and how a retired name is
+   rejected on new-name import.
 
 ## Evidence limits
 

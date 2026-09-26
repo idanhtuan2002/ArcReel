@@ -407,10 +407,16 @@ fallback.
 | Persisted `presentations/episode_*/*.json`: `script_file`, `subtitle_artifact_path`, `presentation_artifact_path`, `video.artifact_path`, nullable `narration_audio.artifact_path` | Version-1 presentation projection names its own formal files and selected media. `ArtifactPlanner` reads and compares it with a recomputed expected presentation. | Missing selected video/audio, stale internal path, or a presentation JSON that exists but fails the planner's exact comparison. |
 | `tasks.execution_checkpoint_json` and project-local `.arcreel/tasks/*/provider_media/manifest.json`: `script_file`, `narration.artifact_path`, `media[*].source_locator`, `media[*].staged_locator` | Versioned submission checkpoint and staging manifest bind provider input copies for task resume. Staging cleanup can remove files while the DB checkpoint remains. | Active checkpoint with missing staged bytes; terminal task with intentionally cleaned staging; checkpoint/manifest digest or task-identity mismatch. |
 | Project-local quarantine draft JSON `meta.source` | A nullable source selector is reused when revalidating or promoting the draft; null derives the episode source file. | Named source missing or changed, null with missing derived episode source, corrupt draft whose `meta.source` cannot be trusted. |
+| Project-local `.arcreel_profile_manifest.json` `entries` keys | Profile synchronization baseline names materialized `CLAUDE.md`/`.claude/**` destinations and tracks active hashes or tombstones. It is a profile-state binding, not media lineage. | Missing customized destination, tombstone restored as an active file, absent versus present-empty manifest; profile sync must not run during capture to erase the distinction. |
+| Project-local `.migration_failure.json` `details[*].file` and `storyboards/generation_failures.json` `failures[*].resource_id` | The first names rejected migration inputs and is read by the generation guard; the second names storyboard units for diagnostics and can remain after a later successful batch. Preserve actual JSON bytes under the tree policy, but do not infer media authority or required target bytes from either field. | Captured failed-migration record omitted or altered while project files are retained; stale storyboard failure mistaken for a currently missing artifact. |
 | DB `assets.image_path`, `assets.audio_path`, `asset_derivatives.image_path`; candidate/master object references | Non-null global-asset binding by table/row/field; candidate/master binding by exact candidate/object-version identity under approved media root. | Two rows share one file; absent `_global_assets` with DB reference; out-of-root master. |
 | DB `api_calls.output_path`, explicit Vertex credential/config paths, implicit Vertex file resolvers, adaptation finding `target_path` | **Review-only**: candidate historical usage metadata, separate secret-custody selectors and semantic field path respectively. Do not classify by column suffix, enumerate only DB rows, or quietly copy credential files. | Historical usage path after deletion; explicit and resolver selectors covered by protected disposition but secret paths absent from public manifest; semantic `target_path` not treated as a filesystem path. |
 
 This field map is deliberately positive, not a default for unknown schemas.
+The bounded [other JSON survey](2026-09-26-r2-m7-h6-other-json-reference-survey.md)
+supplies the profile, migration-failure and storyboard-failure classifications;
+it found no reader for the last record within its stated Python source scope,
+which does not establish that no external consumer exists.
 Before acceptance, enumerate each supported project/script/history schema
 revision and additional writer/import/migration routes, decide whether
 `api_calls.output_path` is historical evidence or current file authority
@@ -655,6 +661,10 @@ Before freezing `BackupInventoryEntryV1` or `BackupManifestV1`, resolve:
     bytes determined from task/resume state rather than a path-name heuristic.
 11. quarantine-draft `meta.source` selectors, including a named source, null
     derived episode source and an invalid or obsolete envelope.
+12. profile-manifest path keys and tombstones, migration-failure repair
+    pointers and storyboard-failure unit IDs; preserve their bytes while
+    keeping their distinct profile, blocking-diagnostic and possibly stale
+    diagnostic meanings.
 
 These are open schema decisions, not reasons to reinterpret the accepted
 pure `RecoveryConfigV1` parser as a production capture implementation.

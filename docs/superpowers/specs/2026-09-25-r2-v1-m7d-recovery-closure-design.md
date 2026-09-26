@@ -774,7 +774,14 @@ clock is `RECOVERY_MEASUREMENT_INVALID`, not a pass.
 
 The initial test corpus includes at least two projects (the V1 factual and
 drama products) plus an unrelated third project to catch one-project-only
-inventory bugs. Fault tests cover missing/corrupt formal file, absent or
+inventory bugs. V1-01 fault cases include interrupted HTTP creation after
+minimal `project.json`, unpublished Agent creation, DB-only legacy evidence,
+delete intent before and after partial directory removal, a retired name
+reused, archive import into a retired name, overwrite import stopped after
+renaming the old target to `.import-backup-*` or after installing the new
+tree, and active work starting against the deletion or replacement boundary. The exact
+expected result for each case follows the approved lifecycle contract.
+Fault tests cover missing/corrupt formal file, absent or
 divergent master, second-project media omission, a DB-referenced global
 asset omitted or missing, a DB project reference classified as live by the
 approved liveness table without an admitted project directory (distinct from
@@ -830,7 +837,10 @@ They also include optional presentation absence versus divergent persisted
 media paths, an active checkpoint missing staged bytes, and a terminal
 checkpoint after legitimate staging cleanup. Draft cases include a named
 source file, a null selector with missing derived source, and a corrupt
-envelope retained by the physical census.
+envelope retained by the physical census. Diagnostic cases include a
+`.migration_failure.json` record whose repair pointer names a rejected input,
+and stale `storyboards/generation_failures.json` unit IDs; neither may be
+silently promoted to media lineage or dropped from the exact physical tree.
 These fixtures must exercise capture and clean-target restore through the
 same inventory interface, not only a standalone path parser.
 
@@ -859,6 +869,14 @@ retirement semantics, and typed handling of filesystem-only and DB-only
 identities. The [bounded source table](../../research/2026-09-26-r2-m7-h6-project-liveness-table.md)
 finds no current DB project-liveness registry and leaves deletion, retirement
 and name reuse as explicit decisions; it is not an approved predicate. The
+HTTP create route can leave a minimal `project.json` before complete metadata
+is saved, so file existence alone cannot prove publication. The gate must
+classify this interrupted-create state and supported historical schemas.
+Archive import with `overwrite` can move an old project to a hidden sibling
+and install another tree under the same name
+(`server/services/project_archive.py:1956-1987`); the lifecycle contract must
+also fence and reconcile this replacement route and reject import into a
+retired name under any no-reuse policy. The
 gate must also approve the `GLOBAL_ASSET` binding identity (asset or
 derivative row ID, reference field and media kind), duplicate/null references,
 orphan-file policy, and absent-root behavior. This draft proposes exact

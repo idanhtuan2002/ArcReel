@@ -84,6 +84,56 @@ additional caller was discovered from the indexed M7 graph and verified
 against the current worktree; the graph is from a different, older worktree,
 so the current source is authoritative.
 
+## Follow-up: HTTP creation has an intermediate metadata file
+
+The HTTP route calls `create_project()` with its default `publish=True` and
+then separately calls `create_project_metadata()`
+(`server/routers/projects.py:688-716`). The first call writes a minimal
+`project.json` containing only `content_mode`; the second constructs the
+current schema metadata and saves it in a later write
+(`lib/project_manager.py:400-438,2436-2443,2505-2507`). A process stop or
+error between the calls can therefore leave a directory with an existing
+`project.json` that is not the completed HTTP creation result. The separate
+composed Agent tool uses `publish=False` and rolls back its unpublished
+directory on failure (`server/tool_runtime.py:1163-1183`). These are two
+distinct intermediate states; neither a bare directory nor mere metadata
+file presence proves finished publication. The candidate admission matrix
+below must read "valid published project" as an independently checked
+schema/lifecycle predicate, not `project_exists()` alone. Historical schema
+versions need a read-only compatibility rule or an inspected pre-capture
+migration; capture must not mutate the source to make it appear current.
+
+## Follow-up: archive import can replace a published directory
+
+`POST /api/v1/projects/import` passes the caller's `conflict_policy` to
+`ProjectArchiveService.import_project_archive()`
+(`server/routers/projects.py:309-344`). The service accepts `overwrite` and,
+when the target exists, reports `overwritten` before installing the staged
+tree (`server/services/project_archive.py:315-323,409-423,1930-1950`). Its
+installer renames the old target to a hidden `.import-backup-*` sibling, moves
+the staged directory into the same name, syncs the profile, copies back
+project memory, and then removes the sibling. On an ordinary exception it
+deletes the new target and renames the sibling back
+(`server/services/project_archive.py:1956-1987`). Integration tests exercise
+replacement and exception rollback
+(`tests/integration/server/services/test_project_archive_service.py:1466-1486,1646-1702`).
+
+This route does not call `delete_project_directory()` or the API deletion
+route. A process stop after the first rename can leave no target directory
+while the old bytes survive under the hidden sibling; a stop after moving the
+staged tree can leave a new tree at the old name and the old one hidden. The
+rollback in source handles raised exceptions, not a stopped process. These
+are crash-window inferences from the ordered file operations, not observed
+runtime incidents. Neither condition permits a capture to infer project
+deletion, publication, or same-identity continuity from the target name alone.
+The candidate lifecycle protocol therefore needs a distinct import-replace
+intent, a fence against capture and active work for the target identity, and
+an inspected reconciliation rule for hidden siblings. New-name import also
+needs to reject a previously retired name under the proposed no-reuse rule.
+The source's `project_metadata_lock` use in this service wraps export's
+visible-tree copy (`:654-685`), not the import installation (`:1956-1987`),
+so that existing lock cannot be counted as an import/capture lifecycle fence.
+
 ## Candidate policies (not approved)
 
 1. **Filesystem-primary deletion with a durable DB tombstone.** A valid
@@ -126,11 +176,11 @@ candidate contract values, not implemented behavior):
 
 | Directory / `project.json` | Deletion record | Project-scoped DB rows | Proposed capture result |
 | --- | --- | --- | --- |
-| Present, valid published project | None | Any consistent scoped rows | Admit as live; inventory directory and all its reference-bearing rows. |
+| Present, independently validated published project | None | Any consistent scoped rows | Admit as live; inventory directory and all its reference-bearing rows. Mere `project.json` existence is insufficient. |
 | Present, valid published project | Intent or terminal tombstone | Any | Reject `BACKUP_PROJECT_LIFECYCLE_CONFLICT`; a stale or reused name must not silently become live. |
 | Absent | Terminal tombstone for exact project identity | Historical rows only | Preserve rows in the whole DB dump, but do not fabricate project files or live project admission. Current mutable heads and non-terminal work still require explicit disposition. |
 | Absent | No tombstone or intent | Any scoped row | Reject `BACKUP_PROJECT_LIVENESS_AMBIGUOUS`; legacy evidence must be inspected, never guessed from absence. |
-| Present directory, absent/invalid `project.json` | Any | Any | Reject `BACKUP_PROJECT_UNPUBLISHED`; this may be interrupted creation or damaged published data. |
+| Present directory, absent/minimal/invalid `project.json` | Any | Any | Reject `BACKUP_PROJECT_UNPUBLISHED`; this may be interrupted creation or damaged published data. |
 | Absent or present | Non-terminal deletion intent | Any | Reject `BACKUP_PROJECT_DELETION_INCOMPLETE` until inspected recovery/disposition. |
 
 The exact identity key must prevent a deleted project's old evidence being
@@ -145,6 +195,44 @@ evidence digest; the reviewer must decide whether this suffices for capture
 or whether the source must first be repaired. Neither option is silently
 selected here.
 
+### Crash and race matrix for the candidate
+
+This matrix refines the two-phase tombstone candidate for review; it does not
+assert that the current API implements any row or lock below. A candidate
+lifecycle key is `(source_deployment_id, normalized_project_name)` because the
+filesystem root is keyed by name while current domain rows additionally carry
+their own `user_id` (`lib/project_manager.py:418-424`;
+`lib/db/models/host_hardening.py:60-67`). Every scoped row belonging to that
+name, across users, needs an explicit disposition. No name reuse is the
+candidate V1 rule, including after terminal deletion.
+
+| Point reached | Durable candidate state | Directory / metadata may show | Capture and retry consequence |
+| --- | --- | --- | --- |
+| HTTP create writes its minimal metadata but has not saved the complete schema | No lifecycle row in the narrow tombstone design | Directory and `project.json` exist, but metadata contains only `content_mode` | Reject as unpublished; a retry may repair or remove only after inspecting the intermediate state. |
+| Delete command passes a complete active-work check and records intent, before physical removal | `DELETING` intent with expected project identity and command ID | Complete directory may remain | Block capture, same-name creation and another destructive command; resume or dispose the exact intent. |
+| Removal has started, including partial `rmtree` or process loss | Same `DELETING` intent | Partial or absent directory | Block capture and same-name creation. Do not infer completion from absence alone. |
+| Directory removal finishes, before terminal marker commits | Same `DELETING` intent | Directory absent | Retried command may finish the same intent idempotently after checking the exact identity; a new command may not create a second intent. |
+| Terminal marker commits after removal | `RETIRED` tombstone | Directory absent | Preserve DB history as historical only after required operational dispositions; reject future same-name creation. |
+| Overwrite import claims the exact existing identity, before renaming the target | Distinct `REPLACING` intent with target identity and staged archive identity | Published target and validated staging tree may both exist | Block capture, deletion and conflicting writers until a single replacement result is known. The current route has no such intent. |
+| Overwrite import has renamed the target to `.import-backup-*`, before installing the staged tree | Same `REPLACING` intent | Target name absent, old bytes under a hidden sibling | Block capture; do not classify the DB name as deleted or the sibling as an unrelated orphan. |
+| Overwrite import has installed the new tree, before backup cleanup and terminal record | Same `REPLACING` intent | New tree at target name, old bytes under hidden sibling | Block capture; determine whether to complete or roll back from exact staged/old identities before releasing the name. |
+| New-name import has installed the tree but stopped before a publication record | Candidate creation/import intent, if adopted | Valid metadata may exist without proven lifecycle publication | Block capture until the source tree and identity are reconciled; a retired name must remain reserved. |
+| Metadata/directory diverges without a matching intent or terminal tombstone | None or contradictory state | Missing, minimal, malformed or reused identity | Reject capture with typed ambiguity/corruption evidence; no name-only historical inference. |
+
+The intent must be durably recorded **before** `rmtree`; a normal database
+transaction cannot atomically include filesystem removal. The active-work
+predicate and intent claim need one serialized admission boundary, otherwise
+a task or backup can start between the check and the intent. Finalizing the
+tombstone after absence needs an independently inspectable audit record. A
+capturing source must observe the exact lifecycle version under its signed
+write fence and recheck it before closure. The current creation and deletion
+routes have no such shared boundary
+(`server/routers/projects.py:688-716,1100-1116`;
+`server/tool_runtime.py:1163-1183`). The overwrite import installer also has
+no shared lifecycle boundary (`server/services/project_archive.py:1956-1987`).
+These are candidate invariants and tests,
+not implementation authorization.
+
 ## Unknowns and required decision checks
 
 - No source inspected defines a durable project tombstone, retirement state,
@@ -155,8 +243,8 @@ and current master/canon/narrative heads at deletion is not specified.
 - A database-level inventory was not queried; this note classifies model and
 route behavior, not existing production rows.
 - Before freezing H6 inventory/capture, select the authoritative filesystem
-predicate, enumerate all affected write/delete routes (including failed-
-create rollback), define typed
+  predicate, enumerate all affected write/delete/replace routes (including
+  failed-create rollback and archive overwrite), define typed
 filesystem-only/DB-only/tombstoned cases, and add adversarial tests. This is
 the unresolved gate already required by the recovery-closure design.
 
@@ -172,6 +260,9 @@ First-party source only. Structural discovery used codebase-memory project
   source-code survey, not a live-database audit.
 
 - `server/routers/projects.py:1101-1116`;
+  `server/routers/projects.py:309-344`;
+  `server/services/project_archive.py:315-423,1930-1987`;
+  `tests/integration/server/services/test_project_archive_service.py:1466-1486,1646-1702`;
   `server/tool_runtime.py:1160-1183`;
   `lib/project_manager.py:388-438,447-462,601-611,1852-1857`.
 - `lib/db/models/host_hardening.py:1-12,38-107,230-287,293-460`; `r2/host_hardening/transitions.py:30-90`.
