@@ -1,5 +1,32 @@
 # R2 V1 H6 research handoff — 2026-09-26
 
+## V1-02 field-map continuation — 2026-09-27
+
+Live clean HEAD before this checkpoint edit: `d1339025` on
+`feat/r2-m7e-v1-lineage`. Commits `dda1a5eb` and `d1339025` refined the
+**existing** [file-authority matrix](../../research/2026-09-26-r2-m7-h6-project-inventory-authority.md),
+instead of creating a second map. The grid slice records raw unversioned
+states, pending/old composite paths, frame paths surviving replacement and
+fixture obligations. The version-history slice records absent/present index,
+all selected/unselected/rejected snapshots, and a separate identity check
+beyond the existing bucket validator. A disposable probe showed that
+`is_managed_snapshot_path()` accepts another resource's same-bucket filename;
+another showed that `add_version()` can persist a reference without source
+bytes. Both are ordinary API behaviors, not production H6 acceptance.
+
+The global-asset follow-up found that `AssetRepository.list()` is paginated,
+`list_derivatives_by_asset_ids()` covers only supplied IDs, and
+`CandidateObjectRepository.list_all()` covers one user/project scope. Reuse
+these readers only after a fenced complete DB-row domain is established;
+V1-03 transaction/query design remains open. Fresh targeted grid, census and
+version-manager tests passed (`45 passed`); `git diff --check` passed before
+each scoped commit. No production classifier, capture adapter, restore code,
+schema migration or provider call was added. The H6 design remains draft and
+needs V1-01 liveness, V1-02 reference-authority, deployment identity, custody,
+sponsor and independent review gates before implementation/acceptance. On
+resume, inspect live Git status and continue the remaining field-map cases in
+the same matrix; preserve unrelated root-checkout work.
+
 ## Continuation checkpoint — 2026-09-27
 
 The live M7-D worktree was clean at `b586b3c3b22cb411682aa8f5f3dd291232f0e83e`
