@@ -533,3 +533,135 @@ TTS). Only those are qualified; all others are disabled in release mode.
   review surface. U2 is simpler to describe but re-opens every accepted
   gate. With paid cloud in scope, U3's paid-route fixes must be chosen per
   qualified route, so the route list also shapes the backport set.
+
+## Addendum 3 (2026-09-28): flexible providers, and closing R4
+
+**Sponsor requirement (R2, refined):** "nếu được, tôi muốn sử dụng và thay đổi
+linh hoạt, không bị giới hạn các provider cloud". If possible, the operator
+wants to use and switch cloud providers freely, without a fixed list. For R4
+the sponsor asked for research to continue until the best option is chosen.
+
+### New facts
+
+- **A full-merge dry run is smaller in text but larger in meaning.**
+  - `git merge-tree` of HEAD with `v0.31.0` gives 54 textual conflicts;
+    with `upstream/main` it gives 58. That is fewer than the sum over the
+    seven individual security backports (74), because those backports hit
+    the upstream restructure piecemeal.
+  - Semantic conflicts the full merge would bring:
+    - **Credentials would be captured.** `cc1fa742` moves Vertex
+      credentials into `<data root>/vertex_keys/`. H6 captures the whole
+      data root, so backups would contain Vertex credentials. That breaks
+      ADR-0090's credential exclusion and forces an H6 change and a new
+      drill.
+    - **The data-root layout changes.** `2964330a` moves the database file,
+      user memory (`users/`) and runtime state (`runtime/`). The H6
+      inventory and the recorded drills would change.
+    - **The Alembic graph would fork.**
+      - Upstream's new chain starts from `9f3c7a52d1b4`; V1's starts from
+        `c04b7d93e5a1`.
+      - Joining them needs either a merge revision (a non-linear graph,
+        which is a stop condition in spec §12) or rewritten upstream
+        revisions.
+    - **Task cancellation semantics change.** Upstream `23c60be146cc`
+      retires the `cancelling` task status. M7-C accepted cancellation
+      semantics that use it.
+    - **The executor is re-architected.** `fe1e15e2` changes restart and
+      resume, which M7-A/C cover.
+- **An in-repo budget mechanism exists but is not wired.**
+  - `lib/budget_reservation.py`, `server/services/budget_reservation_service.py`
+    and `server/services/paid_submission_guard.py::submit_with_budget_guard`
+    implement an atomic budget reservation that is claimed before the first
+    paid side effect (`bf03242d`).
+  - `submit_with_budget_guard` has no production caller.
+- **External precedent: LiteLLM** (<https://docs.litellm.ai/docs/proxy/users>).
+  - It serves arbitrary providers and bounds spend by reserving budget
+    before the call: "If the reservation would exceed the budget, LiteLLM
+    rejects the request before sending it to the provider".
+  - Budgets have per-key, per-user, per-team and per-model scopes and a
+    reset duration, and are enforced against spend stored in a database.
+  - It does not qualify providers one by one.
+
+### R4 decision by research: U3 (pin the base and backport a selected set)
+
+- U2's lower textual conflict count does not outweigh its semantic cost. It
+  would re-open the M7-A/B/C/D acceptances: executor, cancellation, the
+  Alembic graph, the H6 inventory and credential exclusion. It would also
+  breach a spec §12 stop condition.
+- U1 leaves eight confirmed security defects.
+- U3 keeps every accepted packet valid and removes the known defects, using
+  E1's verifier as its reviewable record.
+
+**Selection rule for the backport set:**
+
+- every confirmed security or scope fix;
+- every paid-route cost or correctness fix that touches a route class V1
+  enables;
+- every data-integrity fix for export or versions.
+
+Each commit is `CHERRY_PICK` (stable patch-id) or `ADAPTED` (ported tests).
+Everything else is `DEFERRED` to a post-V1 upstream-merge packet. That packet
+uses the same verifier and must re-run H6/M7 acceptance.
+
+### R2: options that meet the flexibility requirement
+
+**Baseline for every option: generic safety invariants.** These are enforced
+in release mode for **every** paid route, built-in or custom, and proven once
+per adapter class with offline tests:
+
+1. **Budget before submit.** The existing budget reservation is claimed
+   before the first paid side effect. An operator-set budget scope rejects
+   over-limit requests before they are sent, as in LiteLLM.
+2. **At most once on ambiguous outcomes.**
+   - Synchronous routes never retry automatically after the request may
+     have been sent. The ambiguity becomes a recorded failed attempt.
+   - Async video keeps the M7 attempt layer, which is already generic
+     across the families and custom providers.
+3. **Outbound destination guard**, from the backport.
+4. **Usage ledger and correlation.** H7 is done.
+5. **A source-derived route inventory test.**
+
+**F1 — self-serve qualification at runtime (recommended).**
+
+- **What it adds.** The operator can enable any provider or model: built-in,
+  custom or a newly added one. From the product, the operator runs one
+  bounded **qualification canary** for that exact route: provider, endpoint,
+  model and adapter version. Running it is the operator's own authorization
+  and spend.
+- **What is recorded.** The canary evidence is a deployment record: a
+  database row plus an evidence file in the data root. It has an expiry, and
+  it is invalidated when the adapter version changes on a release upgrade.
+- **What release mode refuses.** Any route without a current qualification.
+- **Flexibility.** Switching providers means qualifying the new route once:
+  a single small paid call, within minutes.
+- **Policy.** It stays compatible with ADR-0089 and the strategy ("qualify
+  or disable each paid path"). Only the place where qualification is stored
+  moves, from a static repository registry to deployment state. That is
+  needed anyway, because custom providers exist only at runtime.
+- **Changes needed.**
+  - A runtime qualification store. It reuses the E1 provider-report shape,
+    and the verifier reads it.
+  - A canary runner (T1-shaped evidence).
+  - Release-mode checks against that store.
+
+**F2 — operator opt-in without a canary ("GUARDED").**
+
+- **How it works.** Any route can be enabled by an explicit operator opt-in.
+  It then runs under the generic invariants and the budget cap, with no
+  canary.
+- **Trade-off.** It is the most flexible, but it changes V1 policy: the
+  strategy §5/§6 rule "unqualified enabled provider stops the release"
+  would need an ADR amendment. It is also weaker: nothing shows the exact
+  API version behaves as the adapter expects, so failures are bounded only
+  by the budget and at-most-once.
+
+**F3 — a static repository registry qualified per provider (the original
+E1 shape).**
+
+- **Rejected.** It contradicts the flexibility requirement. Every provider
+  switch needs a code release, and custom providers cannot be covered.
+
+**Recommendation: F1 on top of the generic invariants.** It gives the
+flexibility asked for and keeps the V1 policy unchanged. It reuses the
+existing budget reservation, the M7 attempt layer and E1's report shape. The
+cost is one small paid call per new route.
