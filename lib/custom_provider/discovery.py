@@ -8,13 +8,16 @@ import logging
 from google import genai
 from openai import OpenAI
 
+from lib.artifact_download_guard import artifact_http_client
 from lib.config.anthropic_url import anthropic_auth_headers, derive_anthropic_endpoints
 from lib.custom_provider.endpoints import endpoint_to_media_type, infer_endpoint
 from lib.http_status_errors import raise_for_status_redacted
-from lib.httpx_shared import get_http_client
 from lib.telemetry import clears_baggage_at_provider_boundary
 
 logger = logging.getLogger(__name__)
+
+#: Anthropic 协议模型列表请求的 I/O 超时。
+_DISCOVERY_TIMEOUT_SECONDS = 15.0
 
 
 class UnsupportedDiscoveryFormatError(ValueError):
@@ -91,11 +94,11 @@ async def _discover_anthropic(base_url: str | None, api_key: str) -> list[dict]:
     ep = derive_anthropic_endpoints(base_url or "https://api.anthropic.com")
     normalized = ep.discovery_root or "https://api.anthropic.com"
     url = f"{normalized}/v1/models"
-    client = get_http_client()
-    resp = await client.get(url, headers=anthropic_auth_headers(api_key), timeout=15.0)
-    if resp.status_code == 401:
-        # 部分网关（火山方舟）只认 Authorization: Bearer，对 x-api-key 一律 401
-        resp = await client.get(url, headers=anthropic_auth_headers(api_key, bearer=True), timeout=15.0)
+    async with artifact_http_client(timeout=_DISCOVERY_TIMEOUT_SECONDS) as client:
+        resp = await client.get(url, headers=anthropic_auth_headers(api_key))
+        if resp.status_code == 401:
+            # 部分网关（火山方舟）只认 Authorization: Bearer，对 x-api-key 一律 401
+            resp = await client.get(url, headers=anthropic_auth_headers(api_key, bearer=True))
     raise_for_status_redacted(resp)
     data = resp.json()
     entries = sorted(

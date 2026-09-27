@@ -276,6 +276,9 @@ class TestDeclarativeVideoBackend:
 
         assert submit.calls.last.request.headers["X-API-Key"] == "secret"
         assert "X-API-Key" not in moved.calls.last.request.headers
+        # 307 保留方法，但请求体与凭证同作用域：跨源续跳不把创建载荷转发给重定向目标
+        assert submit.calls.last.request.content
+        assert moved.calls.last.request.content == b""
 
     async def test_submit_302_does_not_replay_the_creation_payload(self, tmp_path: Path):
         """302 后按 GET 跟随、丢掉请求体：原样重放创建请求会在跳转目标上再建一个付费任务。"""

@@ -796,6 +796,9 @@ async def request_with_scoped_credentials(
 
     凭证的作用域取 ``url`` 自己的源，而不是某个外部基准：调用方指定的地址就是凭证的去处，
     需要防的是服务端用 ``Location`` 把它引到别处。
+
+    跨源续跳除卸掉凭证外也不转发请求体：307 / 308 保留方法，但请求体同样只在凭证作用域内。
+    同源续跳按 :func:`_rewrites_to_get` 的规则处置，307 / 308 原样重发。
     """
     credential_origin = url_origin(url)
     # 首跳的 auth.query 已经拼在 url 上，params 不重复带；只在同源续跳时补回。
@@ -818,6 +821,8 @@ async def request_with_scoped_credentials(
             current_method = "GET"
             current_json = None
         hop = hop.redirected_to(location, credential_origin)
+        if url_origin(hop.url) != credential_origin:
+            current_json = None
     raise RuntimeError(f"request exceeded {_MAX_REDIRECTS} redirects: {_without_query(url)}")
 
 

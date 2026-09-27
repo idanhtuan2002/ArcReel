@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import Generator
 from pathlib import Path
@@ -586,21 +585,16 @@ class TestDiscoverModels:
     def test_discover_error_text_drops_credentials(self, custom_providers_client: TestClient):
         """发现失败时回给前端的 discovery_failed 文案不含 base_url 里的查询串与权限段凭证。"""
         base_url = "https://ant-user:sk-leaked-userinfo@relay.example.com/anthropic?api_key=sk-leaked-query"
-        discovery_client = httpx.AsyncClient()
-        try:
-            with capture_http() as http:
-                route = http.get(host="relay.example.com").respond(status_code=401, text="unauthorized")
-                with patch("lib.custom_provider.discovery.get_http_client", return_value=discovery_client):
-                    resp = custom_providers_client.post(
-                        "/api/v1/custom-providers/discover",
-                        json={
-                            "discovery_format": "anthropic",
-                            "base_url": base_url,
-                            "api_key": "sk-ant",
-                        },
-                    )
-        finally:
-            asyncio.run(discovery_client.aclose())
+        with capture_http() as http:
+            route = http.get(host="relay.example.com").respond(status_code=401, text="unauthorized")
+            resp = custom_providers_client.post(
+                "/api/v1/custom-providers/discover",
+                json={
+                    "discovery_format": "anthropic",
+                    "base_url": base_url,
+                    "api_key": "sk-ant",
+                },
+            )
 
         # 泄漏面真实存在：出站请求 URL 上带着查询串凭证。权限段口令进异常消息这件事由
         # test_model_discovery.py 的 test_status_error_message_drops_query_and_userinfo_credentials
