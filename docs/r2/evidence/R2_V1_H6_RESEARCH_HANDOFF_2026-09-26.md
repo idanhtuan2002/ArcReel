@@ -10,6 +10,9 @@ allows provider polling without reopening staged inputs. The V1-01 draft now
 proposes that all `queued`, `running` and `cancelling` tasks block a quiescent
 exact capture pending a reviewed fence. A later failed-to-running
 artifact-download retry is a separate DB writer that must join that fence.
+The next bounded writer sweep additionally found a direct worker
+`running -> queued` SQL commit outside `TaskRepository` and a manual batch
+requeue method; both must be included in the task census/fence review.
 These are source-backed candidate rules, not H6 acceptance or production code.
 
 The isolated checkpoint-state test passed (1); `git diff --check` and the

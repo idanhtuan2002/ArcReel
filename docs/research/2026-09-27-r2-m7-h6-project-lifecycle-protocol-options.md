@@ -138,6 +138,19 @@ would leave a race and a post-commit dispatch failure can leave `running`
 without an in-process poller. This is a positive writer finding, not a
 complete task-writer inventory.
 
+A bounded literal search for `update(Task)`, `insert(Task)`, `delete(Task)` and
+`Task(` under `lib/`, `server/`, `r2/` and `scripts/` also found a direct
+worker SQL write outside `TaskRepository`: `_requeue_single_task()` commits a
+guarded `running -> queued` update using `safe_session_factory()`
+(`lib/generation_worker.py:758-799`). The repository's manual
+`requeue_running()` operation can perform the same transition for a batch
+(`lib/db/repositories/task_repo.py:1220-1257`). Neither route admits new task
+identity, but both mutate the active-task census and therefore must be
+stopped or included in the signed capture fence. The direct-worker write is
+easy to miss if lifecycle integration reviews only `TaskRepository` methods.
+This search covers those literal Python forms in the stated paths, not dynamic
+SQL, external jobs, or all status transitions.
+
 ## Why the other mechanisms are insufficient alone
 
 | Mechanism | Useful part | Missing proof for V1-01 |
