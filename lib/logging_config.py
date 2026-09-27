@@ -11,6 +11,8 @@ from pathlib import Path
 from lib.app_data_dir import app_data_dir
 from lib.env_init import PROJECT_ROOT
 from lib.logging_utils import redact_provider_text
+from lib.request_context import current_provider_job_ids
+from lib.telemetry import job_ref_for_log
 
 _HANDLER_ATTR = "_arcreel_logging"
 _FILE_HANDLER_ATTR = "_arcreel_file_logging"
@@ -109,8 +111,16 @@ _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 _LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
+#: Shorter IDs are not substituted: replacing a two-character token would mangle text.
+_MIN_JOB_ID_LENGTH = 6
+
+
 class RedactingFormatter(logging.Formatter):
     """Mask credentials and URL query/userinfo in every rendered record, tracebacks included.
+
+    Provider job IDs the current task has learnt (exception text, poll URLs) are
+    replaced by their HMAC reference, so raw job IDs stay in the execution
+    repository.
 
     Applied at the handler, so a log call anywhere -- an echoed provider error,
     a retried exception message, a traceback -- cannot write an API key, bearer
@@ -120,7 +130,11 @@ class RedactingFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        return redact_provider_text(super().format(record))
+        rendered = super().format(record)
+        for job_id in current_provider_job_ids():
+            if len(job_id) >= _MIN_JOB_ID_LENGTH:
+                rendered = rendered.replace(job_id, job_ref_for_log(job_id))
+        return redact_provider_text(rendered)
 
 
 def _default_formatter() -> logging.Formatter:

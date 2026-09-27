@@ -218,3 +218,31 @@ async def test_failed_generation_keeps_secrets_out_of_spans_and_logs(
     # The failure is still diagnosable from the rendered log (ADR-0052).
     assert "RuntimeError" in logs
     assert "provider rejected" in logs
+
+
+@pytest.mark.asyncio
+async def test_provider_job_ids_learnt_by_a_task_are_referenced_not_logged(
+    session_factory: Factory, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = GenerationQueue(session_factory=session_factory)
+    poll_logger = logging.getLogger("lib.video_backends.base")
+
+    async def _submit_then_fail(task: dict[str, Any], *, claimed_provider_id: str | None = None) -> dict[str, Any]:
+        del claimed_provider_id
+        await persist_provider_job_id(task["task_id"], CANARY_JOB_ID, provider="openai")
+        poll_logger.warning("poll failed for https://api.invalid/v1/tasks/%s/creations", CANARY_JOB_ID)
+        raise RuntimeError(f"provider task {CANARY_JOB_ID} expired")
+
+    claimed = await _enqueue_and_claim(queue, resource_id="Sidekick")
+    worker = GenerationWorker(queue=queue, executor=_submit_then_fail)
+
+    with (
+        patch("lib.generation_queue.get_generation_queue", return_value=queue),
+        caplog.at_level(logging.DEBUG),
+    ):
+        await worker._process_task(claimed, claimed_provider_id="openai")
+
+    logs = _log_text(caplog.records)
+    assert CANARY_JOB_ID not in logs
+    assert public_job_ref(CANARY_JOB_ID) in logs
+    assert "expired" in logs

@@ -21,6 +21,7 @@ from lib.http_status_errors import ProviderRejectedError as ProviderRejectedErro
 from lib.http_status_errors import provider_rejected_error, redacted_status_error
 from lib.http_status_errors import raise_for_status_redacted as raise_for_status_redacted
 from lib.logging_utils import redact_provider_text, sanitize_diagnostic_payload
+from lib.request_context import bind_provider_job_id
 from lib.retry import BASE_RETRYABLE_ERRORS, AsyncClock, SystemClock, _should_retry, with_retry_async
 from lib.telemetry import public_job_ref, record_correlation_span
 
@@ -82,6 +83,7 @@ async def persist_provider_job_id(
     日志只记录 task_id / provider / 异常类型，不记录 job_id 与异常消息（消息可能回显 job_id）。
     """
     try:
+        bind_provider_job_id(job_id)
         await _persist_with_retry(task_id, job_id, endpoint, base_url)
         record_correlation_span(
             "provider.job_accepted",
@@ -560,7 +562,9 @@ async def poll_with_retry[T](
             if not predicate(e):
                 raise
             consecutive_failures += 1
-            logger.warning("%s轮询异常（将重试）: %s - %s", prefix, type(e).__name__, str(e)[:200])
+            logger.warning(
+                "%s轮询异常（将重试）: %s - %s", prefix, type(e).__name__, redact_provider_text(str(e))[:200]
+            )
             if consecutive_failures >= VIDEO_POLL_MAX_CONSECUTIVE_FAILURES:
                 raise RuntimeError(
                     f"{prefix}连续轮询失败 {VIDEO_POLL_MAX_CONSECUTIVE_FAILURES} 次，最后错误: {e}"

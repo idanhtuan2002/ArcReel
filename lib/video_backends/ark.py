@@ -13,6 +13,7 @@ import httpx
 from lib.ark_shared import ARK_BASE_URL, ark_base_url, create_ark_client
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_ARK
+from lib.request_context import bind_provider_job_id
 from lib.retry import with_retry_async
 from lib.telemetry import job_ref_for_log
 from lib.video_backends.base import (
@@ -432,6 +433,7 @@ class ArkVideoBackend(ProviderJobIdPersistenceMixin):
             submitted_base_url=getattr(self, "_base_url", ARK_BASE_URL),
             submit=_submit,
         )
+        bind_provider_job_id(task_id)
         logger.info("Ark 任务已创建: job_ref=%s", job_ref_for_log(task_id))
         return task_id
 

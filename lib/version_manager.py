@@ -5,7 +5,6 @@
 支持版本备份、切换当前版本、记录和查询。
 """
 
-import hashlib
 import json
 import logging
 import os
@@ -35,7 +34,7 @@ from lib.resource_paths import (
     version_snapshot_relative_path,
 )
 from lib.schema_guards import is_bool
-from lib.telemetry import record_correlation_span
+from lib.telemetry import keyed_ref, record_correlation_span
 
 _LOCKS_GUARD = threading.Lock()
 _LOCKS_BY_VERSIONS_FILE: dict[str, threading.RLock] = {}
@@ -123,11 +122,10 @@ def version_candidate_ref(resource_type: str, resource_id: str, version: int) ->
     """Telemetry reference for one version record.
 
     ``resource_id`` is a user-authored name (a character, scene or prop), so the
-    exported reference carries its digest; the version record itself is found
-    through the span's ``task_id``, which ``versions.json`` also stores.
+    exported reference carries a keyed digest of it; the version record itself is
+    found through the span's ``task_id``, which ``versions.json`` also stores.
     """
-    digest = hashlib.sha256(resource_id.encode("utf-8")).hexdigest()[:16]
-    return f"{resource_type}/{digest}/v{version}"
+    return f"{resource_type}/{keyed_ref(resource_id)}/v{version}"
 
 
 def _record_version_span(resource_type: str, resource_id: str, version: int, *, selected: bool) -> None:

@@ -63,7 +63,7 @@ from lib.reference_video.execution_checkpoint import (
     cleanup_staged_provider_media,
 )
 from lib.reference_video.request_projection import ReferenceProjectionBlockedError
-from lib.request_context import bound_task
+from lib.request_context import bind_provider_job_id, bound_task
 from lib.script_editor import ScriptEditError
 from lib.task_failure import encode_failure
 from lib.telemetry import correlation_span
@@ -1018,6 +1018,7 @@ class GenerationWorker:
                         task_id=task_id,
                     ),
                 ):
+                    bind_provider_job_id(job_id)
                     return await execute_resume_video_task(task, job_id=job_id)
             finally:
                 if checkpoint is not None:

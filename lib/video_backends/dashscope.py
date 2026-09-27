@@ -40,6 +40,7 @@ from lib.dashscope_shared import (
 from lib.data_uri import file_to_data_uri
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_DASHSCOPE
+from lib.request_context import bind_provider_job_id
 from lib.retry import (
     DEFAULT_BACKOFF_SECONDS,
     DEFAULT_MAX_ATTEMPTS,
@@ -497,6 +498,7 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
         )
         async with httpx.AsyncClient(timeout=self._http_timeout) as client:
             task_id = await self._create_task(client, payload, request)
+            bind_provider_job_id(task_id)
             logger.info("DashScope 视频任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)
             # 一并写回实际提交域名（wan3.0 走独立 maas 域名，且两者都随用户配置可变）：
             # 续跑据此回放原域名，不然改配置后轮询会打到查不到该任务的主机。

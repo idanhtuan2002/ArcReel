@@ -16,6 +16,8 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
+from lib.logging_utils import redact_provider_text
+
 logger = logging.getLogger(__name__)
 
 # 基础可重试错误（不依赖任何 SDK）
@@ -159,7 +161,7 @@ async def retry_async[T](
                 raise
             wait_time = _compute_wait(attempt, backoff_seconds, jitter=jitter)
             if log_exception_detail:
-                logger.warning("API 调用异常: %s - %s", type(exc).__name__, str(exc)[:200])
+                logger.warning("API 调用异常: %s - %s", type(exc).__name__, redact_provider_text(str(exc))[:200])
             else:
                 logger.warning("API 调用异常: %s", type(exc).__name__)
             logger.warning("重试 %d/%d, %.1f 秒后...", attempt + 1, max_attempts - 1, wait_time)

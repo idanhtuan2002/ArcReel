@@ -17,6 +17,7 @@ from contextvars import ContextVar
 
 _REQUEST_ID: ContextVar[str | None] = ContextVar("arcreel_request_id", default=None)
 _TASK_ID: ContextVar[str | None] = ContextVar("arcreel_task_id", default=None)
+_PROVIDER_JOB_IDS: ContextVar[tuple[str, ...]] = ContextVar("arcreel_provider_job_ids", default=())
 
 # Caller-supplied ``X-Request-ID`` values are reused only in opaque identifier
 # shapes (a UUID, 32 hex digits as in a W3C trace ID, or an ID this module
@@ -64,11 +65,24 @@ def bound_task(task_id: str, *, request_id: str | None) -> Generator[None]:
     """
     task_token = _TASK_ID.set(task_id)
     request_token = _REQUEST_ID.set(request_id)
+    # Provider job IDs learnt while this task runs stay bound in the task's context
+    # after the block, so failure handling that logs after it still has them.
+    _PROVIDER_JOB_IDS.set(())
     try:
         yield
     finally:
         _REQUEST_ID.reset(request_token)
         _TASK_ID.reset(task_token)
+
+
+def bind_provider_job_id(job_id: str | None) -> None:
+    """Record a provider job ID the current task learnt, so log rendering can hide it."""
+    if job_id and job_id not in _PROVIDER_JOB_IDS.get():
+        _PROVIDER_JOB_IDS.set((*_PROVIDER_JOB_IDS.get(), job_id))
+
+
+def current_provider_job_ids() -> tuple[str, ...]:
+    return _PROVIDER_JOB_IDS.get()
 
 
 def task_attribution() -> dict[str, str]:
@@ -79,8 +93,10 @@ def task_attribution() -> dict[str, str]:
 
 __all__ = [
     "accept_or_mint_request_id",
+    "bind_provider_job_id",
     "bound_request_id",
     "bound_task",
+    "current_provider_job_ids",
     "current_request_id",
     "current_task_id",
     "new_request_id",

@@ -15,6 +15,7 @@ from lib.config.url_utils import normalize_base_url
 from lib.gemini_shared import VERTEX_SCOPES, RateLimiter, get_shared_rate_limiter, resolve_gemini_api_key
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_GEMINI
+from lib.request_context import bind_provider_job_id
 from lib.retry import with_retry_async
 from lib.system_config import resolve_vertex_credentials_path
 from lib.telemetry import job_ref_for_log
@@ -301,6 +302,7 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
             submit=_submit,
         )
         op_name = getattr(operation, "name", "unknown")
+        bind_provider_job_id(op_name)
         logger.info("视频生成已提交, job_ref=%s", job_ref_for_log(op_name))
         return operation
 

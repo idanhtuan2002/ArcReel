@@ -30,6 +30,7 @@ from lib.generation_batch import (
     build_generation_batch_read_model,
     validate_blocked_items,
 )
+from lib.logging_utils import redact_provider_text
 from lib.project_migration_guard import assert_project_migration_ok
 from lib.request_context import current_request_id
 from lib.task_terminal_events import TERMINAL_TASK_STATUSES, emit_task_terminal_events
@@ -722,7 +723,7 @@ class GenerationQueue:
         async with self._task_repo() as repo:
             affected = await repo.mark_failed(task_id, error_message)
         if affected > 0:
-            logger.warning("任务失败 task_id=%s error=%s", task_id, error_message[:200])
+            logger.warning("任务失败 task_id=%s error=%s", task_id, redact_provider_text(error_message)[:200])
             await self._mirror_terminal_outcome_to_execution_attempts(
                 task_id, ProviderObservationKind.FAILED, reason="legacy_task_failed"
             )

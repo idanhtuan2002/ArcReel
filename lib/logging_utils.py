@@ -39,16 +39,19 @@ _INLINE_AUTH_RE = re.compile(
     r"(?i)(?<![A-Za-z0-9])((?:proxy-)?authorization\s*[=:]\s*)(?:(?:basic|bearer)\s+)?[^\s,;&]+"
 )
 _BEARER_RE = re.compile(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]+")
-_SENSITIVE_TEXT_KEY_PATTERN = rf"(?:(?i:{_SEPARATED_SENSITIVE_KEY_PATTERN})|{_CAMEL_SENSITIVE_KEY_PATTERN})"
-_DOUBLE_QUOTED_SECRET_RE = re.compile(
-    rf"((?<![A-Za-z0-9_-]){_SENSITIVE_TEXT_KEY_PATTERN}\s*[\'\"]?\s*[=:]\s*\")"
-    r'((?:\\.|[^"\\])*)(\")'
-)
-_SINGLE_QUOTED_SECRET_RE = re.compile(
-    rf"((?<![A-Za-z0-9_-]){_SENSITIVE_TEXT_KEY_PATTERN}\s*['\"]?\s*[=:]\s*')"
-    r"((?:\\.|[^'\\])*)(')"
-)
-_INLINE_SECRET_RE = re.compile(rf"((?<![A-Za-z0-9_-]){_SENSITIVE_TEXT_KEY_PATTERN}\s*[=:]\s*)" r"(?!['\"])([^\s,;&]+)")
+# Key/value credentials in free text. A candidate key is a whole identifier (letters,
+# digits, ``_``, ``-``, ``.``) starting at an identifier boundary, so a match never
+# restarts inside one identifier and the scan stays linear; whether the key is
+# sensitive is decided on its last attribute segment by ``_is_sensitive_text_key``.
+_TEXT_KEY = r"(?<![A-Za-z0-9_.-])(?P<key>[A-Za-z0-9_.-]+)"
+# Each pattern ends where the value begins; the value is measured only for a
+# sensitive key, so non-sensitive pairs cost only their key and separator.
+_DOUBLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}\s*['\"]?\s*[=:]\s*\"")
+_DOUBLE_QUOTED_VALUE_RE = re.compile(r'(?:\\.|[^"\\])*(?=")')
+_SINGLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}\s*['\"]?\s*[=:]\s*'")
+_SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\])*(?=')")
+_INLINE_SECRET_RE = re.compile(rf"{_TEXT_KEY}\s*[=:]\s*(?=[^\s,;&'\"])")
+_INLINE_VALUE_RE = re.compile(r"[^\s,;&]+")
 _SIGNED_QUERY_RE = re.compile(
     r"(?i)([?&](?:x-amz-signature|x-goog-signature|signature|sig|access_token|auth_token|token|api_key|key|password)=)([^&#\s]*)"
 )
@@ -60,17 +63,57 @@ _PROSE_CREDENTIAL_RE = re.compile(
     r"(?i)(\b(?:api|access|secret|auth|private|signing)[ _-]?(?:key|token)s?\b(?:[ \t]+[A-Za-z]+){0,2}[ \t]*[:=]\s*)"
     r"([\'\"]?)[^\s,;&\'\"]+\2"
 )
+# A PEM private key body is bounded (RSA-8192 is under 7 KB), so an unterminated
+# BEGIN header scans at most that far instead of to the end of the text.
 _PEM_PRIVATE_KEY_RE = re.compile(
-    r"-----BEGIN (?P<label>(?:[A-Z0-9]+ )*PRIVATE KEY)-----.*?-----END (?P=label)-----",
+    r"-----BEGIN (?P<label>(?:[A-Z0-9]+ )*PRIVATE KEY)-----.{0,16384}?-----END (?P=label)-----",
     re.DOTALL,
 )
 _MASKED = "••••"
+_SENSITIVE_KEY_SUFFIX_RE = re.compile(
+    r"(?i)(?:^|[_-])(?:api[_-]?key|authorization|cookie|password|passwd|pwd|secret[_-]?access[_-]?keys?|secrets?|"
+    r"access[_-]?tokens?|auth[_-]?tokens?|bearer[_-]?tokens?|private[_-]?keys?|signing[_-]?keys?|tokens?)$"
+)
+_CAMEL_SENSITIVE_KEY_SUFFIX_RE = re.compile(
+    r"(?:^(?:apiKey|privateKey|signingKey)|[A-Za-z0-9](?:ApiKey|PrivateKey|SigningKey|SecretAccessKey|Secret|Token))$"
+)
+
+
+def _is_sensitive_text_key(key: str) -> bool:
+    segment = key.rsplit(".", 1)[-1]
+    return bool(_SENSITIVE_KEY_SUFFIX_RE.search(segment) or _CAMEL_SENSITIVE_KEY_SUFFIX_RE.search(segment))
+
+
+def _mask_sensitive_pairs(key_pattern: re.Pattern[str], value_pattern: re.Pattern[str], text: str) -> str:
+    """Mask the value after every sensitive key that ``key_pattern`` finds.
+
+    Scanning resumes right after each key/separator, so a sensitive pair that
+    follows a non-sensitive one inside the same token (``a=token=secret``) is
+    still found, and every character is examined a bounded number of times.
+    """
+    parts: list[str] = []
+    copied = 0
+    position = 0
+    while (match := key_pattern.search(text, position)) is not None:
+        position = match.end()
+        if not _is_sensitive_text_key(match.group("key")):
+            continue
+        value = value_pattern.match(text, match.end())
+        if value is None or not value.group(0):
+            continue
+        parts.append(text[copied : value.start()])
+        parts.append(_MASKED)
+        copied = value.end()
+        position = max(position, value.end())
+    parts.append(text[copied:])
+    return "".join(parts)
 
 
 #: Operator opt-in that restores generation content (prompts, model output) in logs.
 GENERATION_CONTENT_LOG_ENV = "ARCREEL_LOG_GENERATION_CONTENT"
 _CONTENT_KEY_RE = re.compile(
-    r"(?i)(?:[a-z0-9]+[_-])*(?:prompt|prompts|messages?|content|contents|text|instructions?|input_text|query)"
+    r"(?i)(?:[a-z0-9]+[_-])*(?:prompt|prompts|messages?|content|contents|text|instructions?|inputs?|input_text|query"
+    r"|caption|description|lyrics|script)"
 )
 
 
@@ -121,14 +164,15 @@ def redact_diagnostic_text(value: object) -> str:
         rendered = str(value)
     except Exception:
         rendered = f"<unprintable {type(value).__module__}.{type(value).__name__}>"
-    rendered = _PEM_PRIVATE_KEY_RE.sub(_MASKED, rendered)
+    if "-----END " in rendered:
+        rendered = _PEM_PRIVATE_KEY_RE.sub(_MASKED, rendered)
     rendered = _COOKIE_LINE_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
     rendered = _AUTH_LINE_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
     rendered = _INLINE_AUTH_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
     rendered = _BEARER_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
-    rendered = _DOUBLE_QUOTED_SECRET_RE.sub(lambda match: f"{match.group(1)}{_MASKED}{match.group(3)}", rendered)
-    rendered = _SINGLE_QUOTED_SECRET_RE.sub(lambda match: f"{match.group(1)}{_MASKED}{match.group(3)}", rendered)
-    rendered = _INLINE_SECRET_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
+    rendered = _mask_sensitive_pairs(_DOUBLE_QUOTED_SECRET_RE, _DOUBLE_QUOTED_VALUE_RE, rendered)
+    rendered = _mask_sensitive_pairs(_SINGLE_QUOTED_SECRET_RE, _SINGLE_QUOTED_VALUE_RE, rendered)
+    rendered = _mask_sensitive_pairs(_INLINE_SECRET_RE, _INLINE_VALUE_RE, rendered)
     rendered = _PROSE_CREDENTIAL_RE.sub(
         lambda match: f"{match.group(1)}{match.group(2)}{_MASKED}{match.group(2)}", rendered
     )

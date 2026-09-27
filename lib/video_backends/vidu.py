@@ -14,6 +14,7 @@ from pathlib import Path
 
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_VIDU
+from lib.request_context import bind_provider_job_id
 from lib.retry import with_retry_async
 from lib.telemetry import job_ref_for_log
 from lib.video_backends.base import (
@@ -239,6 +240,7 @@ class ViduVideoBackend:
             if request.on_provider_resubmit_unsafe is not None:
                 request.on_provider_resubmit_unsafe()
             credits = payload.get("credits")
+            bind_provider_job_id(task_id)
             logger.info(
                 "Vidu 视频任务已创建: endpoint=%s job_ref=%s credits=%s model=%s",
                 endpoint,

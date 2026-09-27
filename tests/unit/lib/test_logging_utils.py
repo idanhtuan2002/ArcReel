@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from pydantic import BaseModel
 
 from lib.logging_utils import format_kwargs_for_log, sanitize_diagnostic_payload
@@ -361,3 +362,56 @@ def test_diagnostic_payload_keeps_numeric_token_counters():
         "access_token": "••••",
         "auth_token": "••••",
     }
+
+
+@pytest.mark.parametrize(
+    ("text", "secret"),
+    [
+        ("--password=hunter2hunter2", "hunter2hunter2"),
+        ("--token=abcdef123456", "abcdef123456"),
+        ("_token=abcdef123456", "abcdef123456"),
+        ("__api_key=abcdef123456", "abcdef123456"),
+        ("self._api_key=abcdef123456", "abcdef123456"),
+        ('{"_secret": "abcdef123456"}', "abcdef123456"),
+        ("2fa_token=abcdef123456", "abcdef123456"),
+        ("Client(_api_key='AIzaSyD12345')", "AIzaSyD12345"),
+        ("a=token=abcdef123456", "abcdef123456"),
+        ("x-api-key: abcdef123456", "abcdef123456"),
+        ('"clientSecret":"abcdef123456"', "abcdef123456"),
+    ],
+)
+def test_key_value_credentials_are_masked_whatever_precedes_the_key(text, secret):
+    from lib.logging_utils import redact_diagnostic_text
+
+    assert secret not in redact_diagnostic_text(text)
+
+
+def test_non_credential_pairs_are_left_intact():
+    from lib.logging_utils import redact_diagnostic_text
+
+    text = "model=gpt-4o size=1024x1024 https://h.invalid/p?x=1"
+    assert redact_diagnostic_text(text) == text
+
+
+def test_redaction_is_linear_on_separator_chains():
+    import time
+
+    from lib.logging_utils import redact_provider_text
+
+    started = time.perf_counter()
+    redact_provider_text("=".join(["abc"] * 30000))
+    redact_provider_text(":".join(["token"] * 30000))
+    redact_provider_text('"api_key": "' * 20000)
+    redact_provider_text("-----BEGIN PRIVATE KEY-----\nAAAA\n" * 4000)
+    assert time.perf_counter() - started < 2.0
+
+
+def test_declarative_prompt_keys_are_summarized_by_default(monkeypatch):
+    monkeypatch.delenv("ARCREEL_LOG_GENERATION_CONTENT", raising=False)
+    out = format_kwargs_for_log({"input": "a red boat", "caption": "sunset", "description": "calm sea", "seed": 7})
+    parsed = json.loads(out)
+
+    assert "red boat" not in out
+    assert "sunset" not in out
+    assert "calm sea" not in out
+    assert parsed["seed"] == 7

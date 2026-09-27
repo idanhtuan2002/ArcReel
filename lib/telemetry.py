@@ -16,6 +16,8 @@ provider these spans go to the OpenTelemetry API's no-op tracer.
 from __future__ import annotations
 
 import functools
+import hashlib
+import hmac
 import logging
 import os
 import secrets
@@ -66,6 +68,17 @@ def public_job_ref(raw_provider_job_id: str) -> str:
     """``public_provider_job_ref`` bound to this process's telemetry key."""
     key, version = _telemetry_hmac_key()
     return public_provider_job_ref(raw_provider_job_id, key=key, key_version=version)
+
+
+def keyed_ref(value: str) -> str:
+    """A keyed, non-reversible 16-hex reference for a user-authored identifier.
+
+    Uses this process's telemetry HMAC key, so short names cannot be recovered
+    by hashing guesses.
+    """
+    key, version = _telemetry_hmac_key()
+    digest = hmac.new(key, value.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    return f"{version}:{digest}"
 
 
 def job_ref_for_log(raw_provider_job_id: str | None) -> str:
@@ -241,6 +254,7 @@ __all__ = [
     "get_tracer",
     "install_baggage_free_propagator",
     "job_ref_for_log",
+    "keyed_ref",
     "public_job_ref",
     "record_correlation_span",
 ]
