@@ -25,6 +25,7 @@ from r2.host_hardening.deployment_backup import (
     DATA_ROOT,
     AttestationRejected,
     BackupIntegrityError,
+    BackupSetNotRestorable,
     OfflineFenceViolation,
     ReleaseIdentity,
     RestoreTargetNotEmpty,
@@ -730,8 +731,14 @@ async def test_attesting_with_a_corrupt_verdict_is_rejected(
         target_release_git_sha=IDENTITY.release_git_sha,
         media_probe=_always_playable,
     )
-    (backup_dir / "verdicts" / f"{RESTORE_TARGET}.json").write_text("{not json", encoding="utf-8")
+    verdict_file = backup_dir / "verdicts" / f"{RESTORE_TARGET}.json"
+    verdict_file.write_text("{not json", encoding="utf-8")
 
+    with pytest.raises(AttestationRejected):
+        attest_deployment_restore(
+            backup_dir=backup_dir, golden_evidence=_golden(backup_dir), measured_rpo_seconds=0, measured_rto_seconds=1
+        )
+    verdict_file.write_bytes(b"\xff\xfe not utf-8")
     with pytest.raises(AttestationRejected):
         attest_deployment_restore(
             backup_dir=backup_dir, golden_evidence=_golden(backup_dir), measured_rpo_seconds=0, measured_rto_seconds=1
@@ -758,3 +765,18 @@ async def test_autovacuum_style_maintenance_during_capture_is_not_a_write(
 
     assert manifest.fence.write_counter_before == manifest.fence.write_counter_after
     assert read_state(tmp_path / "backup-set")["state"] == BackupSetState.COMPLETE.value
+
+
+async def test_a_manifest_of_an_older_schema_version_is_not_restorable(
+    source: tuple[str, Path], target_url: str, tmp_path: Path
+) -> None:
+    backup_dir, _ = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-10")
+    manifest_file = backup_dir / "manifest.json"
+    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    manifest["schema_version"] = 1
+    manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(BackupSetNotRestorable):
+        await restore_deployment_backup(
+            backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: tmp_path / "again"}
+        )

@@ -360,7 +360,7 @@ class BackupVerdict(R2ContractModel):
     measured_rto_seconds: int | None = Field(default=None, ge=0)
 
 
-DEPLOYMENT_BACKUP_SCHEMA_VERSION = 1
+DEPLOYMENT_BACKUP_SCHEMA_VERSION = 2
 
 
 class BackupFileEntry(R2ContractModel):
@@ -415,7 +415,7 @@ class DeploymentBackupManifest(R2ContractModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    schema_version: Literal[1] = DEPLOYMENT_BACKUP_SCHEMA_VERSION
+    schema_version: Literal[2] = DEPLOYMENT_BACKUP_SCHEMA_VERSION
     backup_set_id: NonEmptyStr
     source_deployment_id: NonEmptyStr
     release_git_sha: NonEmptyStr

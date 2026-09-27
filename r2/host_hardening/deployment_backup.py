@@ -474,7 +474,13 @@ def read_state(backup_dir: Path) -> dict[str, Any]:
 
 
 def read_manifest(backup_dir: Path) -> DeploymentBackupManifest:
-    return DeploymentBackupManifest.model_validate_json((backup_dir / MANIFEST_FILENAME).read_text(encoding="utf-8"))
+    """The set's manifest; a manifest of another schema version or shape is not restorable."""
+    try:
+        return DeploymentBackupManifest.model_validate_json(
+            (backup_dir / MANIFEST_FILENAME).read_text(encoding="utf-8")
+        )
+    except (ValidationError, UnicodeDecodeError) as exc:
+        raise BackupSetNotRestorable("manifest.json is not a supported deployment backup manifest") from exc
 
 
 # --------------------------------------------------------------------------- capture
@@ -656,7 +662,7 @@ def _file_digest_of(path: Path, model: type[DeploymentBackupVerdict] | type[Gold
         return None
     try:
         return _digest(model.model_validate_json(path.read_text(encoding="utf-8")))
-    except ValidationError as exc:
+    except (ValidationError, UnicodeDecodeError) as exc:
         raise BackupIntegrityError(f"{path.name} is not a valid record") from exc
 
 
@@ -668,7 +674,7 @@ def _verify_attestation_record(backup_dir: Path, manifest: DeploymentBackupManif
         raise BackupIntegrityError("state is VERIFIED but the set has no attestation")
     try:
         attestation = DeploymentBackupAttestation.model_validate_json(path.read_text(encoding="utf-8"))
-    except ValidationError as exc:
+    except (ValidationError, UnicodeDecodeError) as exc:
         raise BackupIntegrityError("attestation.json is not a valid record") from exc
     recorded = "sha256:" + canonical_json_digest(attestation.model_dump(mode="json"))
     if recorded != state.get("attestation_digest") or attestation.manifest_digest != manifest_digest(manifest):
@@ -1019,7 +1025,7 @@ def attest_deployment_restore(
         raise AttestationRejected("no restore verdict has been recorded for this target")
     try:
         verdict = DeploymentBackupVerdict.model_validate_json(verdict_path.read_text(encoding="utf-8"))
-    except ValidationError as exc:
+    except (ValidationError, UnicodeDecodeError) as exc:
         raise AttestationRejected("the recorded restore verdict is not a valid record") from exc
     if verdict.manifest_digest != digest or not verdict.checks_passed:
         raise AttestationRejected("the recorded restore verdict did not pass for this manifest")

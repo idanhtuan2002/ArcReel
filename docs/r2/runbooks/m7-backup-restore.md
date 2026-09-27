@@ -95,8 +95,11 @@ the copy:
 
 - another client session is connected to the database;
 - a Task is active;
-- a user table's row counters moved (autovacuum and `ANALYZE` do not count);
-- a table was truncated, rewritten or altered;
+- a user table's row counters moved, in any schema (autovacuum and `ANALYZE`
+  do not count);
+- a table in the application schema was truncated, rewritten or altered.
+  `VACUUM FULL`, `CLUSTER` and `REINDEX` also count; do not run them during
+  capture.
 - a sequence advanced;
 - the data-root file fingerprint changed.
 
@@ -214,6 +217,10 @@ digest in the deployment before relying on restores across upgrades.
 
 - **Planned downtime.** The offline fence stops the application for the
   duration of capture.
+- **What the fence cannot see.** It detects data changes, not catalog-only
+  changes: large objects, DDL in other schemas, CHECK constraints,
+  non-rewriting type widening, functions and comments. The offline premise
+  (application and worker stopped) is what excludes those writers.
 - **Snapshot only.** A backup set is a snapshot at `recovery_point`. There is
   no PITR.
 - **Credentials re-entered by the operator.** Credentials are re-entered after

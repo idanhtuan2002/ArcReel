@@ -65,8 +65,10 @@ _SINGLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_KV_SEP}['\"]?{_KV_SEP}[=:]
 _SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\])*", re.DOTALL)
 _SINGLE_QUOTED_LINE_VALUE_RE = re.compile(r"(?:\\.|[^'\\\n])*")
 _INLINE_SECRET_RE = re.compile(rf"{_TEXT_KEY}['\"]?{_KV_SEP}[=:]{_KV_SEP}(?=[^\s,;&'\"])")
-# An unquoted value stops before closing brackets so JSON/repr structure survives.
-_INLINE_VALUE_RE = re.compile(r"[^\s,;&}\])]+")
+# An unquoted value keeps brackets inside it (``abc)def``) and stops only before a
+# trailing run of closing brackets, so JSON/repr structure survives. The two
+# character classes are disjoint, so matching stays linear.
+_INLINE_VALUE_RE = re.compile(r"[^\s,;&}\])]+(?:[}\])]+[^\s,;&}\])]+)*")
 _NUMERIC_VALUE_RE = re.compile(r"-?\d+(?:\.\d+)?")
 _SIGNED_QUERY_RE = re.compile(
     r"(?i)([?&](?:x-amz-signature|x-goog-signature|signature|sig|access_token|auth_token|token|api_key|key|password)=)([^&#\s]*)"
@@ -89,7 +91,8 @@ _SENSITIVE_KEY_SUFFIX_RE = re.compile(
     r"access[_-]?tokens?|auth[_-]?tokens?|bearer[_-]?tokens?|private[_-]?keys?|signing[_-]?keys?|tokens?)$"
 )
 _CAMEL_SENSITIVE_KEY_SUFFIX_RE = re.compile(
-    r"(?:^(?:apiKey|privateKey|signingKey)|[A-Za-z0-9](?:ApiKey|PrivateKey|SigningKey|SecretAccessKey|Secret|Token))$"
+    r"(?:^(?:apiKey|privateKey|signingKey|secretKey)"
+    r"|[A-Za-z0-9](?:ApiKey|PrivateKey|SigningKey|SecretKey|SecretAccessKey|Secret|Token))$"
 )
 
 
@@ -129,6 +132,7 @@ def _mask_sensitive_pairs(
     text: str,
     *,
     unterminated_pattern: re.Pattern[str] | None = None,
+    exempt_token_counts: bool = False,
 ) -> str:
     """Mask the value after every sensitive key that ``key_pattern`` finds.
 
@@ -136,8 +140,10 @@ def _mask_sensitive_pairs(
     follows a non-sensitive one inside the same token (``a=token=secret``) is
     still found, and every character is examined a bounded number of times.
     A quoted value that reaches the end of the text without its closing quote is
-    re-measured with ``unterminated_pattern``. A numeric value under a token-count
-    key (``prompt_tokens: 128``) is usage, not a credential, and is left alone.
+    re-measured with ``unterminated_pattern``. With ``exempt_token_counts``, an
+    unquoted number under a plural token-count key (``prompt_tokens: 128``) is
+    usage, not a credential, and is left alone; singular ``*_token`` keys and
+    quoted values are always credentials.
     """
     parts: list[str] = []
     copied = 0
@@ -152,8 +158,12 @@ def _mask_sensitive_pairs(
             value = unterminated_pattern.match(text, match.end())
         if value is None or not value.group(0):
             continue
-        if _NUMERIC_VALUE_RE.fullmatch(value.group(0)) and _is_token_count(
-            key.rsplit(".", 1)[-1].strip("_-"), float(value.group(0))
+        segment = key.rsplit(".", 1)[-1].strip("_-")
+        if (
+            exempt_token_counts
+            and segment.lower().endswith("tokens")
+            and _NUMERIC_VALUE_RE.fullmatch(value.group(0))
+            and _is_token_count(segment, float(value.group(0)))
         ):
             continue
         parts.append(text[copied : value.start()])
@@ -237,7 +247,7 @@ def redact_diagnostic_text(value: object) -> str:
         rendered,
         unterminated_pattern=_SINGLE_QUOTED_LINE_VALUE_RE,
     )
-    rendered = _mask_sensitive_pairs(_INLINE_SECRET_RE, _INLINE_VALUE_RE, rendered)
+    rendered = _mask_sensitive_pairs(_INLINE_SECRET_RE, _INLINE_VALUE_RE, rendered, exempt_token_counts=True)
     rendered = _PROSE_CREDENTIAL_RE.sub(
         lambda match: f"{match.group(1)}{match.group(2)}{_MASKED}{match.group(2)}", rendered
     )

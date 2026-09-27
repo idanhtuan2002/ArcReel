@@ -508,3 +508,30 @@ def test_an_unterminated_quoted_credential_masks_only_the_rest_of_its_line():
 
     assert "abcdef123456" not in rendered
     assert rendered.endswith("\nTraceback line 2\nline 3")
+
+
+@pytest.mark.parametrize(
+    ("text", "secret"),
+    [
+        ("password=abc)def", "def"),
+        ("client_secret=abc}def", "def"),
+        ('{"password": abc}def}', "def"),
+        ("token=84736251", "84736251"),
+        ('"github_token": "84736251"', "84736251"),
+        ('{"token": "0.5"}', "0.5"),
+        ('{"secretKey": "abcdef123"}', "abcdef123"),
+    ],
+    ids=[
+        "paren-inside",
+        "brace-inside",
+        "json-brace-inside",
+        "numeric-token",
+        "quoted-numeric",
+        "quoted-float",
+        "camel",
+    ],
+)
+def test_bracketed_and_numeric_credentials_are_fully_masked(text, secret):
+    from lib.logging_utils import redact_diagnostic_text
+
+    assert secret not in redact_diagnostic_text(text)
