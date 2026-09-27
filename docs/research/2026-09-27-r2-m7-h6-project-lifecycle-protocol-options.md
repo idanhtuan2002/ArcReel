@@ -172,3 +172,46 @@ at generation `2026-09-18T10:57:40Z` has metadata-changed repository files,
 does not track the new backup module, and excludes `scripts/`; the named
 paths were read directly from this worktree. A release-pinned full writer
 allowlist and all write directions remain an acceptance gate.
+
+## Legacy bootstrap and deployment identity: bounded decision matrix
+
+The candidate lifecycle key needs an authoritative `source_deployment_id`
+before any existing name can be registered. `RecoveryConfigV1` parses a
+caller-supplied logical ID and fingerprints canonical configuration bytes
+(`r2/contracts/recovery_config.py:81-102,130-139`); it does not establish that
+the value belongs to the running DB and project root. In a bounded literal
+search of `lib/`, `server/`, `r2/` and `deploy/`, no runtime resolver for that
+binding was found. This is an unresolved trust anchor, not a claim that no
+external deployment registry exists. A proposed bootstrap must bind an
+independently controlled deployment identity, DB identity and project-root
+identity in signed, reviewable evidence; it must reject a caller-selected ID
+that conflicts with that binding.
+
+`ProjectManager.normalize_project_name()` strips surrounding whitespace and
+accepts only ASCII letters, digits and hyphens
+(`lib/project_manager.py:97,315-322`). A filesystem census must preserve each
+raw entry name before applying normalization: a raw name that changes under
+normalization, fails validation, collides after normalization, is a symlink,
+or is hidden must be classified explicitly, never silently dropped.
+`list_projects()` merely returns visible directories and does not validate
+metadata (`lib/project_manager.py:388-390`).
+
+| Observed source state before lifecycle rows exist | Candidate bootstrap treatment | Required evidence or unresolved decision |
+| --- | --- | --- |
+| Exact valid name, ordinary directory, complete supported `project.json`, no unresolved sibling/intent | Propose `LIVE`, subject to independent review of the full census and DB references. | Capture the exact tree identity and metadata bytes; check completeness and current migration verdict without a write. `project_exists()` or schema version alone is insufficient. |
+| Directory with only minimal metadata, missing/corrupt metadata, or unpublished Agent creation | Hold as `UNPUBLISHED_OR_DAMAGED`; do not mint `LIVE` or infer `RETIRED`. | HTTP creation writes a minimal `project.json` before full metadata (`server/routers/projects.py:687-716`; `lib/project_manager.py:400-438`). Distinguishing interrupted creation from later damage requires inspection. |
+| Complete older schema or unresolved migration verdict/swap sibling | Hold for migration disposition; do not mutate it during the census. | `project_schema_is_current()` checks only the strict version (`lib/project_schema.py:10-27`); `DataValidator.validate_project_dir()` checks payload but does not establish publication (`lib/data_validator.py:734-748`). Startup migration can write backups, migrate and reclaim swaps (`lib/project_migrations/runner.py:166-191,242-269`). |
+| DB rows with exact name but no admitted directory | Hold as `LEGACY_DB_ONLY`; retain the rows and refuse liveness inference. | An inspected, signed row-level disposition across all users and current heads is needed. Filesystem absence does not prove historical retirement; see the [liveness map](2026-09-26-r2-m7-h6-project-liveness-map.md). |
+| Directory and DB rows with the same name but conflicting ownership, deployment or unresolved historical identity | Hold as `IDENTITY_CONFLICT`. | Filesystem project names are global while domain rows may be user-scoped. Review all scoped row IDs and their meaning before binding them to one lifecycle identity. |
+| Hidden import backup, migration staging/rollback sibling, deletion/replacement intent, or retained retired name | Block bootstrap and capture for the affected identity. | Inspect the exact command/tree lineage; do not run startup reclaim during a read-only census or treat a present directory as fresh creation. |
+
+The table is a proposal for review, not an implemented admission algorithm.
+An approved bootstrap would first stop every project writer under a signed
+fence, then produce a reproducible manifest of raw root entries, normalized
+names, file identities, DB row IDs/states across users, migration verdicts,
+hidden siblings and preexisting intents. It would bind that manifest and the
+deployment/root identities to a reviewer disposition before inserting any
+rows. A crash or rerun must compare the same manifest/command digest and
+refuse changed inputs; a batch insert cannot guess `LIVE` from a directory or
+`RETIRED` from absence. The exact signed format, bootstrap transaction,
+failure taxonomy and independent review are still open gates.
