@@ -415,3 +415,35 @@ def test_declarative_prompt_keys_are_summarized_by_default(monkeypatch):
     assert "sunset" not in out
     assert "calm sea" not in out
     assert parsed["seed"] == 7
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "word" + " " * 50_000,
+        "\n" * 50_000,
+        "word" + "\n" * 50_000,
+        "\r\n" * 25_000,
+        "api_key:" + " " * 50_000,
+        'x"' + " " * 50_000,
+        "cookie:\n" * 6_000,
+        "-----BEGIN PRIVATE KEY-----\n" * 4_000 + "-----END PRIVATE KEY-----",
+    ],
+    ids=["word-spaces", "newlines", "word-newlines", "crlf", "key-spaces", "quote-spaces", "cookie-lines", "pem-end"],
+)
+def test_redaction_is_linear_on_whitespace_and_marker_runs(text):
+    import time
+
+    from lib.logging_utils import redact_provider_text
+
+    started = time.perf_counter()
+    redact_provider_text(text)
+    assert time.perf_counter() - started < 1.0
+
+
+def test_a_quoted_credential_cut_before_its_closing_quote_is_still_masked():
+    from lib.logging_utils import redact_diagnostic_text
+
+    assert "abcdef123456" not in redact_diagnostic_text('{"token": "abcdef123456')
+    assert "abcdef123456" not in redact_diagnostic_text("api_key='abcdef123456")
+    assert redact_diagnostic_text('{"note": "hello"}') == '{"note": "hello"}'

@@ -1156,6 +1156,19 @@ class TestProviderJobIdPersistenceMixin:
             await self._backend()._persist_provider_job_id(self._request(task_id=None), "job-1", provider="ark")
         assert persisted == []
 
+    async def test_non_worker_path_still_binds_the_job_id_for_log_redaction(self):
+        import asyncio
+
+        from lib.request_context import current_provider_job_ids
+
+        async def _trial_run() -> tuple[str, ...]:
+            await self._backend()._persist_provider_job_id(
+                self._request(task_id=None), "trial-job-000123", provider="ark"
+            )
+            return current_provider_job_ids()
+
+        assert await asyncio.create_task(_trial_run()) == ("trial-job-000123",)
+
     async def test_persist_failure_propagates_fail_fast(self):
         """持久化失败抛出原异常，由 worker finally 兜底 mark_failed（fail-fast，不吞）。"""
         boom = _make_operational_error("database is locked")

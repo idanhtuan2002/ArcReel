@@ -132,6 +132,9 @@ class ProviderJobIdPersistenceMixin:
         已在 ``persist_provider_job_id`` 内重试 3 次），由 worker finally 兜底 mark_failed ——
         保持现有 fail-fast 语义（ADR 0007）。
         """
+        # Outside a queued task (endpoint trial runs) the job is not persisted, but its
+        # ID is still bound so poll URLs and errors log its reference, not the raw ID.
+        bind_provider_job_id(job_id)
         if request.task_id is not None:
             await persist_provider_job_id(
                 request.task_id,

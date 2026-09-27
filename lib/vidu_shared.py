@@ -23,6 +23,7 @@ import httpx
 
 from lib.data_uri import image_to_data_uri as _image_to_data_uri
 from lib.http_status_errors import raise_for_status_redacted
+from lib.logging_utils import redact_provider_text
 from lib.retry import BASE_RETRYABLE_ERRORS
 
 logger = logging.getLogger(__name__)
@@ -221,4 +222,4 @@ def test_vidu_connection(config: dict[str, str]) -> None:
         return
     if resp.status_code in (401, 403):
         raise RuntimeError(f"HTTP {resp.status_code}: 凭证无效")
-    raise RuntimeError(f"HTTP {resp.status_code}: 连接测试无法判定（{resp.text[:200]}）")
+    raise RuntimeError(f"HTTP {resp.status_code}: 连接测试无法判定（{redact_provider_text(resp.text)[:200]}）")

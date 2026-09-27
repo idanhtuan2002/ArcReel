@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 import json
 import math
@@ -33,8 +34,12 @@ _SEPARATED_SENSITIVE_KEY_PATTERN = (
 _CAMEL_SENSITIVE_KEY_PATTERN = r"(?:apiKey|privateKey|signingKey|[A-Za-z][A-Za-z0-9]*(?:ApiKey|PrivateKey|SigningKey|SecretAccessKey|Secret|Token))"
 _SENSITIVE_KEY_RE = re.compile(_SEPARATED_SENSITIVE_KEY_PATTERN, re.IGNORECASE)
 _CAMEL_SENSITIVE_KEY_RE = re.compile(_CAMEL_SENSITIVE_KEY_PATTERN)
-_COOKIE_LINE_RE = re.compile(r"(?im)^(\s*(?:set-)?cookie\s*:\s*).*$")
-_AUTH_LINE_RE = re.compile(r"(?im)^(\s*(?:proxy-)?authorization\s*:\s*).*$")
+# Separator whitespace stays on one line and is bounded: an unbounded ``\s*`` next
+# to another whitespace quantifier, or ``^\s*`` across newline runs, backtracks
+# quadratically on long blank runs.
+_SEP = r"[ \t]{0,16}"
+_COOKIE_LINE_RE = re.compile(rf"(?im)^({_SEP}(?:set-)?cookie{_SEP}:{_SEP}).*$")
+_AUTH_LINE_RE = re.compile(rf"(?im)^({_SEP}(?:proxy-)?authorization{_SEP}:{_SEP}).*$")
 _INLINE_AUTH_RE = re.compile(
     r"(?i)(?<![A-Za-z0-9])((?:proxy-)?authorization\s*[=:]\s*)(?:(?:basic|bearer)\s+)?[^\s,;&]+"
 )
@@ -46,11 +51,13 @@ _BEARER_RE = re.compile(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]+")
 _TEXT_KEY = r"(?<![A-Za-z0-9_.-])(?P<key>[A-Za-z0-9_.-]+)"
 # Each pattern ends where the value begins; the value is measured only for a
 # sensitive key, so non-sensitive pairs cost only their key and separator.
-_DOUBLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}\s*['\"]?\s*[=:]\s*\"")
-_DOUBLE_QUOTED_VALUE_RE = re.compile(r'(?:\\.|[^"\\])*(?=")')
-_SINGLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}\s*['\"]?\s*[=:]\s*'")
-_SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\])*(?=')")
-_INLINE_SECRET_RE = re.compile(rf"{_TEXT_KEY}\s*[=:]\s*(?=[^\s,;&'\"])")
+_DOUBLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_SEP}['\"]?{_SEP}[=:]{_SEP}\"")
+# A quoted value ends at its closing quote, or at the end of the line when the
+# text was cut before the quote closed; either way the value is masked.
+_DOUBLE_QUOTED_VALUE_RE = re.compile(r'(?:\\.|[^"\\\n])*')
+_SINGLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_SEP}['\"]?{_SEP}[=:]{_SEP}'")
+_SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\\n])*")
+_INLINE_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_SEP}[=:]{_SEP}(?=[^\s,;&'\"])")
 _INLINE_VALUE_RE = re.compile(r"[^\s,;&]+")
 _SIGNED_QUERY_RE = re.compile(
     r"(?i)([?&](?:x-amz-signature|x-goog-signature|signature|sig|access_token|auth_token|token|api_key|key|password)=)([^&#\s]*)"
@@ -63,12 +70,10 @@ _PROSE_CREDENTIAL_RE = re.compile(
     r"(?i)(\b(?:api|access|secret|auth|private|signing)[ _-]?(?:key|token)s?\b(?:[ \t]+[A-Za-z]+){0,2}[ \t]*[:=]\s*)"
     r"([\'\"]?)[^\s,;&\'\"]+\2"
 )
-# A PEM private key body is bounded (RSA-8192 is under 7 KB), so an unterminated
-# BEGIN header scans at most that far instead of to the end of the text.
-_PEM_PRIVATE_KEY_RE = re.compile(
-    r"-----BEGIN (?P<label>(?:[A-Z0-9]+ )*PRIVATE KEY)-----.{0,16384}?-----END (?P=label)-----",
-    re.DOTALL,
-)
+_PEM_BEGIN_RE = re.compile(r"-----BEGIN (?P<label>(?:[A-Z0-9]+ )*PRIVATE KEY)-----")
+_PEM_END_RE = re.compile(r"-----END (?P<label>(?:[A-Z0-9]+ )*PRIVATE KEY)-----")
+# A PEM private key body is bounded (RSA-8192 is under 7 KB).
+_PEM_MAX_BODY = 16384
 _MASKED = "••••"
 _SENSITIVE_KEY_SUFFIX_RE = re.compile(
     r"(?i)(?:^|[_-])(?:api[_-]?key|authorization|cookie|password|passwd|pwd|secret[_-]?access[_-]?keys?|secrets?|"
@@ -77,6 +82,31 @@ _SENSITIVE_KEY_SUFFIX_RE = re.compile(
 _CAMEL_SENSITIVE_KEY_SUFFIX_RE = re.compile(
     r"(?:^(?:apiKey|privateKey|signingKey)|[A-Za-z0-9](?:ApiKey|PrivateKey|SigningKey|SecretAccessKey|Secret|Token))$"
 )
+
+
+def _mask_pem_blocks(text: str) -> str:
+    """Replace each BEGIN…END private-key block with the mask.
+
+    BEGIN and END markers are each found in one pass and paired by position,
+    so many unmatched headers cost linear time instead of one scan per header.
+    """
+    ends: dict[str, list[tuple[int, int]]] = {}
+    for end in _PEM_END_RE.finditer(text):
+        ends.setdefault(end.group("label"), []).append((end.start(), end.end()))
+    parts: list[str] = []
+    copied = 0
+    for begin in _PEM_BEGIN_RE.finditer(text):
+        if begin.start() < copied:
+            continue
+        candidates = ends.get(begin.group("label"), [])
+        index = bisect.bisect_left(candidates, (begin.end(), -1))
+        if index == len(candidates) or candidates[index][0] - begin.end() > _PEM_MAX_BODY:
+            continue
+        parts.append(text[copied : begin.start()])
+        parts.append(_MASKED)
+        copied = candidates[index][1]
+    parts.append(text[copied:])
+    return "".join(parts)
 
 
 def _is_sensitive_text_key(key: str) -> bool:
@@ -165,7 +195,7 @@ def redact_diagnostic_text(value: object) -> str:
     except Exception:
         rendered = f"<unprintable {type(value).__module__}.{type(value).__name__}>"
     if "-----END " in rendered:
-        rendered = _PEM_PRIVATE_KEY_RE.sub(_MASKED, rendered)
+        rendered = _mask_pem_blocks(rendered)
     rendered = _COOKIE_LINE_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
     rendered = _AUTH_LINE_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
     rendered = _INLINE_AUTH_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
