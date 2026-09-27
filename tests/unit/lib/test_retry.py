@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock
 
 import pytest
@@ -349,3 +350,27 @@ class TestRetryAsync:
 
         assert result == "ok"
         assert clock.sleeps == [5.25]
+
+    async def test_default_retry_log_includes_exception_message(self, caplog):
+        operation = AsyncMock(side_effect=[ConnectionError("reset-detail"), "ok"])
+
+        with caplog.at_level(logging.WARNING, logger="lib.retry"):
+            await retry_async(operation, clock=_FakeClock(), jitter=_no_jitter)
+
+        assert any("reset-detail" in r.getMessage() for r in caplog.records)
+
+    async def test_retry_log_omits_exception_message_when_detail_disabled(self, caplog):
+        operation = AsyncMock(side_effect=[ConnectionError("secret-canary"), "ok"])
+
+        with caplog.at_level(logging.WARNING, logger="lib.retry"):
+            result = await retry_async(
+                operation,
+                clock=_FakeClock(),
+                jitter=_no_jitter,
+                log_exception_detail=False,
+            )
+
+        assert result == "ok"
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("ConnectionError" in m for m in messages)
+        assert all("secret-canary" not in m for m in messages)

@@ -998,16 +998,17 @@ class TestPersistJobIdRetry:
             bounded_poll_clock(),
             caplog.at_level(logging.INFO, logger="lib.video_backends.base"),
         ):
-            await persist_provider_job_id("task-1", "job-1", provider="openai")
+            await persist_provider_job_id("task-1", "provider-job-secret-canary", provider="openai")
 
         assert attempts == 3
         assert any("provider_job_id 已持久化" in r.message for r in caplog.records)
+        assert all("provider-job-secret-canary" not in r.getMessage() for r in caplog.records)
 
     async def test_terminal_failure_logs_structured(self, caplog):
-        """全部重试失败 → logger.error 记录 task_id / provider / job_id 三键 + 重抛。"""
+        """全部重试失败时，日志保留任务归因而不泄露供应商 job ID。"""
 
         async def _always_fail(_tid: str, _job: str) -> None:
-            raise _make_operational_error("database is locked")
+            raise _make_operational_error("database is locked: provider-job-secret-canary")
 
         class _FailingQueue:
             async def persist_provider_job_id(
@@ -1023,14 +1024,16 @@ class TestPersistJobIdRetry:
             caplog.at_level(logging.ERROR, logger="lib.video_backends.base"),
             pytest.raises(OperationalError),
         ):
-            await persist_provider_job_id("task-X", "job-X", provider="ark")
+            await persist_provider_job_id("task-X", "provider-job-secret-canary", provider="ark")
 
         terminal = [r for r in caplog.records if r.levelno == logging.ERROR]
         assert terminal, "expected logger.error call"
         msg = terminal[-1].message
         assert "task_id=task-X" in msg
         assert "provider=ark" in msg
-        assert "job_id=job-X" in msg
+        assert "provider-job-secret-canary" not in msg
+        assert "OperationalError" in msg
+        assert all("provider-job-secret-canary" not in r.getMessage() for r in caplog.records)
 
     async def test_no_retry_for_value_error(self):
         """ValueError 不在 retryable_errors 内 → 立即抛出，retry 仅尝试 1 次。"""

@@ -57,6 +57,7 @@ _PERSIST_BACKOFF_SECONDS: tuple[int, ...] = (1, 2, 4)
     max_attempts=3,
     backoff_seconds=_PERSIST_BACKOFF_SECONDS,
     retry_if=lambda e: isinstance(e, _PERSIST_RETRYABLE_ERRORS),
+    log_exception_detail=False,
 )
 async def _persist_with_retry(task_id: str, job_id: str, endpoint: str | None, base_url: str | None) -> None:
     from lib.generation_queue import get_generation_queue
@@ -78,17 +79,17 @@ async def persist_provider_job_id(
     任务按哪套协议提交），``base_url`` 是请求实际发往的域名（连接维度，两类供应商通用，续跑据此
     回放原域名轮询）。两者与 job_id 同一次写入落地。DB 瞬态错误最多重试 3 次，业务异常立即抛。
     重试用尽抛异常，由 worker finally 兜底 mark_failed（fail-fast）。
+    日志只记录 task_id / provider / 异常类型，不记录 job_id 与异常消息（消息可能回显 job_id）。
     """
     try:
         await _persist_with_retry(task_id, job_id, endpoint, base_url)
-        logger.info("provider_job_id 已持久化 task_id=%s provider=%s job_id=%s", task_id, provider, job_id)
+        logger.info("provider_job_id 已持久化 task_id=%s provider=%s", task_id, provider)
     except Exception as exc:
         logger.error(
-            "provider_job_id_persist_failed task_id=%s provider=%s job_id=%s error=%s",
+            "provider_job_id_persist_failed task_id=%s provider=%s error_type=%s",
             task_id,
             provider,
-            job_id,
-            exc,
+            type(exc).__name__,
         )
         raise
 

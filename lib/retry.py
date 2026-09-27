@@ -96,6 +96,7 @@ def with_retry_async(
     retry_if: Callable[[Exception], bool] | None = None,
     clock: AsyncClock | None = None,
     jitter: Callable[[float, float], float] | None = None,
+    log_exception_detail: bool = True,
 ):
     """异步函数重试装饰器兼容壳，等待逻辑委托给 ``retry_async``。
 
@@ -104,6 +105,9 @@ def with_retry_async(
 
     当指定 retry_if 时，用该谓词替代默认的 _should_retry 进行重试判定，
     允许调用方精确控制哪些异常应当重试（如仅重试特定 HTTP 状态码）。
+
+    ``log_exception_detail=False`` 时重试日志只记录异常类型，不记录异常消息，供参数或异常
+    消息可能携带敏感标识（如供应商 job ID）的调用方使用。
     """
 
     predicate = retry_if if retry_if is not None else lambda e: _should_retry(e, retryable_errors)
@@ -120,6 +124,7 @@ def with_retry_async(
                 retry_if=predicate,
                 clock=clock,
                 jitter=jitter,
+                log_exception_detail=log_exception_detail,
             )
 
         return wrapper
@@ -136,8 +141,12 @@ async def retry_async[T](
     retry_if: Callable[[Exception], bool] | None = None,
     clock: AsyncClock | None = None,
     jitter: Callable[[float, float], float] | None = None,
+    log_exception_detail: bool = True,
 ) -> T:
-    """执行可重试异步操作，允许显式注入时钟与随机抖动。"""
+    """执行可重试异步操作，允许显式注入时钟与随机抖动。
+
+    ``log_exception_detail=False`` 时重试日志只记录异常类型，不记录异常消息。
+    """
     active_clock = clock if clock is not None else SystemClock()
     predicate = retry_if if retry_if is not None else lambda e: _should_retry(e, retryable_errors)
 
@@ -149,7 +158,10 @@ async def retry_async[T](
             if is_last or isinstance(exc, NonRetryableError) or not predicate(exc):
                 raise
             wait_time = _compute_wait(attempt, backoff_seconds, jitter=jitter)
-            logger.warning("API 调用异常: %s - %s", type(exc).__name__, str(exc)[:200])
+            if log_exception_detail:
+                logger.warning("API 调用异常: %s - %s", type(exc).__name__, str(exc)[:200])
+            else:
+                logger.warning("API 调用异常: %s", type(exc).__name__)
             logger.warning("重试 %d/%d, %.1f 秒后...", attempt + 1, max_attempts - 1, wait_time)
             await active_clock.sleep(wait_time)
 
