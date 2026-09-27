@@ -131,6 +131,36 @@ def artifact_http_client(
     return httpx.AsyncClient(event_hooks={"request": [guard]}, **kwargs)
 
 
+def check_destination_sync(url: httpx.URL) -> None:
+    """:func:`check_destination` for synchronous clients: the same scheme and address rules.
+
+    Resolution uses the blocking ``getaddrinfo``; a resolution failure is left to the transport,
+    as in the async check.
+    """
+    if url.scheme not in _ALLOWED_SCHEMES:
+        raise ArtifactDestinationRejectedError(f"artifact URL scheme is not allowed: {url.scheme or '(none)'}")
+    host = url.host
+    try:
+        addresses: Iterable[str] = [str(ipaddress.ip_address(host))]
+    except ValueError:
+        port = url.port or (443 if url.scheme == "https" else 80)
+        try:
+            addresses = [str(info[4][0]) for info in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)]
+        except OSError:
+            return
+    if any(_is_rejected_address(address) for address in addresses):
+        raise ArtifactDestinationRejectedError(f"artifact host resolves to a disallowed address: {host}")
+
+
+def guarded_sync_client(**kwargs: Any) -> httpx.Client:
+    """A synchronous ``httpx.Client`` that checks every request (and redirect hop) like :func:`artifact_http_client`."""
+
+    def guard(request: httpx.Request) -> None:
+        check_destination_sync(request.url)
+
+    return httpx.Client(event_hooks={"request": [guard]}, **kwargs)
+
+
 def _declared_length(response: httpx.Response) -> int | None:
     try:
         return int(response.headers["Content-Length"])

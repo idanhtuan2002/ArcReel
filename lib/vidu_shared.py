@@ -21,7 +21,7 @@ from pathlib import Path
 
 import httpx
 
-from lib.artifact_download_guard import artifact_http_client
+from lib.artifact_download_guard import artifact_http_client, guarded_sync_client
 from lib.data_uri import image_to_data_uri as _image_to_data_uri
 from lib.http_status_errors import raise_for_status_redacted
 from lib.logging_utils import redact_provider_text
@@ -217,7 +217,7 @@ def test_vidu_connection(config: dict[str, str]) -> None:
     base_url = (config.get("base_url") or VIDU_BASE_URL).rstrip("/")
     headers = {"Authorization": f"Token {api_key}"}
     # 用一个语法上合法但极不可能存在的数字 id（避开整数解析失败的 400 CODEC）
-    with httpx.Client(timeout=10.0) as client:
+    with guarded_sync_client(timeout=10.0) as client:
         resp = client.get(f"{base_url}/tasks/0/creations", headers=headers)
     if resp.status_code == 404:
         return

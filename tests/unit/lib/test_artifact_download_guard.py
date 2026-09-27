@@ -215,3 +215,36 @@ def test_provider_backends_build_no_unguarded_http_client():
         if path not in exempt and "httpx.AsyncClient(" in path.read_text(encoding="utf-8")
     ]
     assert offenders == []
+
+
+def test_provider_backends_have_no_unguarded_url_fetch():
+    """同步 httpx.Client 与 urllib 取件同样绕开目的地校验，一律不得出现在供应商代码里。"""
+    lib_root = Path(__file__).resolve().parents[3] / "lib"
+    scanned = [
+        *lib_root.glob("image_backends/*.py"),
+        *lib_root.glob("video_backends/*.py"),
+        *lib_root.glob("audio_backends/*.py"),
+        *lib_root.glob("custom_provider/**/*.py"),
+        *lib_root.glob("*_shared.py"),
+        lib_root / "kling_backend_base.py",
+    ]
+    exempt = {lib_root / "httpx_shared.py"}
+    patterns = ("httpx.Client(", "urlretrieve(", "urlopen(")
+    offenders = [
+        f"{path.relative_to(lib_root)}:{pattern}"
+        for path in scanned
+        if path not in exempt
+        for pattern in patterns
+        if pattern in path.read_text(encoding="utf-8")
+    ]
+    assert offenders == []
+
+
+def test_the_sync_client_refuses_link_local_destinations():
+    from lib.artifact_download_guard import guarded_sync_client
+
+    with capture_http() as router:
+        metadata = router.get(url__regex=r"^http://169\.254\.").mock(return_value=httpx.Response(200))
+        with guarded_sync_client() as client, pytest.raises(ArtifactDestinationRejectedError):
+            client.get("http://169.254.169.254/latest/meta-data/")
+    assert metadata.call_count == 0

@@ -1,7 +1,5 @@
 """GeminiVideoBackend 单元测试 — mock genai SDK。"""
 
-import urllib.error
-from email.message import Message
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +8,7 @@ import httpx
 import pytest
 from google.genai import errors as genai_errors
 
+from lib.artifact_download_guard import ArtifactDestinationRejectedError
 from lib.cost_calculator import cost_calculator
 from lib.gemini_shared import VERTEX_SCOPES
 from lib.video_backends.base import (
@@ -18,6 +17,7 @@ from lib.video_backends.base import (
     VideoGenerationResult,
 )
 from tests.fakes import bounded_poll_clock
+from tests.http_capture import capture_http
 from tests.unit.lib.video_backends.attempt_bound_support import RecordingAttemptSubmitter
 
 
@@ -551,23 +551,50 @@ class TestGeminiResumeVideo:
         assert not isinstance(ei.value, ResumeExpiredError)
 
     async def test_vertex_artifact_404_propagates_as_download_failure(self, gemini_backend, tmp_path):
-        # 远端任务已成功（operation 完成且带成片 URI），取件时产物 URL 返回 404
+        # 远端任务已成功（operation 完成且带成片 URI），取件时产物 URL 返回 404：取件失败不是 operation 过期
         gemini_backend._backend_type = "vertex"
         video_uri = "https://storage.googleapis.com/bucket/video.mp4"
         done_op = _make_done_operation(video_uri=video_uri)
         done_op.response.generated_videos[0].video.video_bytes = None
         gemini_backend._client.aio.operations.get = AsyncMock(return_value=done_op)
-        not_found = urllib.error.HTTPError(video_uri, 404, "Not Found", Message(), None)
 
         request = VideoGenerationRequest(prompt="x", output_path=tmp_path / "out.mp4")
-        with (
-            patch("urllib.request.urlretrieve", side_effect=not_found),
-            pytest.raises(urllib.error.HTTPError) as ei,
-        ):
+        with capture_http() as router, bounded_poll_clock():
+            router.get(video_uri).mock(return_value=httpx.Response(404))
+            with pytest.raises(RuntimeError) as ei:
+                await gemini_backend.resume_video("op-xyz", request)
+
+        assert not isinstance(ei.value, ResumeExpiredError)
+        assert not request.output_path.exists()
+
+    async def test_vertex_artifact_uri_is_downloaded_through_the_destination_guard(self, gemini_backend, tmp_path):
+        """Vertex 成片 URL 走受闸下载：链路本地 / 云元数据地址在发请求前即被拒。"""
+        gemini_backend._backend_type = "vertex"
+        done_op = _make_done_operation(video_uri="http://169.254.169.254/computeMetadata/v1/")
+        done_op.response.generated_videos[0].video.video_bytes = None
+        gemini_backend._client.aio.operations.get = AsyncMock(return_value=done_op)
+
+        request = VideoGenerationRequest(prompt="x", output_path=tmp_path / "out.mp4")
+        with capture_http() as router:
+            metadata = router.get(url__regex=r"^http://169\.254\.").mock(return_value=httpx.Response(200))
+            with pytest.raises(ArtifactDestinationRejectedError):
+                await gemini_backend.resume_video("op-xyz", request)
+
+        assert metadata.call_count == 0
+
+    async def test_vertex_artifact_uri_download_writes_the_video(self, gemini_backend, tmp_path):
+        gemini_backend._backend_type = "vertex"
+        video_uri = "https://storage.googleapis.com/bucket/video.mp4"
+        done_op = _make_done_operation(video_uri=video_uri)
+        done_op.response.generated_videos[0].video.video_bytes = None
+        gemini_backend._client.aio.operations.get = AsyncMock(return_value=done_op)
+
+        request = VideoGenerationRequest(prompt="x", output_path=tmp_path / "out.mp4")
+        with capture_http() as router:
+            router.get(video_uri).mock(return_value=httpx.Response(200, content=b"vertex-video"))
             await gemini_backend.resume_video("op-xyz", request)
 
-        assert ei.value is not_found
-        assert not request.output_path.exists()
+        assert request.output_path.read_bytes() == b"vertex-video"
 
     async def test_aistudio_artifact_404_propagates_as_download_failure(self, gemini_backend, tmp_path):
         # 远端任务已成功，取件时 SDK 的 files.download 返回 404：取件失败不是 operation 过期

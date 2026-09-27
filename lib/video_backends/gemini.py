@@ -27,6 +27,7 @@ from lib.video_backends.base import (
     VideoCapabilityError,
     VideoGenerationRequest,
     VideoGenerationResult,
+    download_video,
     is_retryable_http_status,
     poll_with_retry,
     should_retry_paid_sdk_submit,
@@ -397,8 +398,17 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
     async def _download_video_with_retry(self, video_ref, output_path: Path) -> None:
         """下载视频，重试走共用的产物下载预算。
 
-        SDK 取件抛的不是 ``HTTPStatusError``，故退到按 ``retryable_errors`` 判定。
+        SDK 取件抛的不是 ``HTTPStatusError``，故退到按 ``retryable_errors`` 判定。Vertex 返回成片 URL
+        （无内联字节）时走共用的受闸下载：出站目的地校验、字节上限与同一套重试预算。
         """
+        if (
+            self._backend_type == "vertex"
+            and video_ref is not None
+            and not getattr(video_ref, "video_bytes", None)
+            and getattr(video_ref, "uri", None)
+        ):
+            await download_video(video_ref.uri, output_path, label="Gemini")
+            return
         await with_artifact_retry(
             lambda: asyncio.to_thread(self._download_video, video_ref, output_path),
             label="Gemini",
@@ -411,10 +421,6 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
             if video_ref and hasattr(video_ref, "video_bytes") and video_ref.video_bytes:
                 with open(output_path, "wb") as f:
                     f.write(video_ref.video_bytes)
-            elif video_ref and hasattr(video_ref, "uri") and video_ref.uri:
-                import urllib.request
-
-                urllib.request.urlretrieve(video_ref.uri, str(output_path))
             else:
                 raise RuntimeError("视频生成成功但无法获取视频数据")
         else:
