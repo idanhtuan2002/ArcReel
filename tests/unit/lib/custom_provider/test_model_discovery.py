@@ -445,9 +445,10 @@ class TestDiscoverModelsAnthropic:
 
         with capture_http() as http:
             route = http.get("https://api.anthropic.com/v1/models").respond(json={"data": []})
-            await discover_models(discovery_format="anthropic", base_url=None, api_key="key")
+            result = await discover_models(discovery_format="anthropic", base_url=None, api_key="key")
 
-        only_request(route)
+        assert result == []
+        assert only_request(route).headers["x-api-key"] == "key"
 
     async def test_skips_entries_without_id(self):
         """data 中 id 缺失的条目被跳过；缺 display_name 的条目以 id 作显示名。"""

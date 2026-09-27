@@ -19,7 +19,7 @@ async def test_discover_strips_anthropic_suffix() -> None:
         )
         models = await _discover_anthropic("https://api.deepseek.com/anthropic", "sk")
 
-    only_request(route)
+    assert only_request(route).headers["x-api-key"] == "sk"
     assert models[0]["model_id"] == "claude-x"
 
 
@@ -31,9 +31,10 @@ async def test_discover_keeps_root_when_no_suffix() -> None:
         route = router.get("https://api.anthropic.com/v1/models").mock(
             return_value=httpx.Response(200, json={"data": []})
         )
-        await _discover_anthropic("https://api.anthropic.com", "sk")
+        models = await _discover_anthropic("https://api.anthropic.com", "sk")
 
-    only_request(route)
+    assert models == []
+    assert only_request(route).headers["x-api-key"] == "sk"
 
 
 @pytest.mark.asyncio

@@ -800,7 +800,7 @@ class TestResume:
                 "text2video:task-old", _request(tmp_path, submitted_base_url="https://old.example/v1")
             )
 
-        only_request(poll)
+        assert only_request(poll).url.host == "old.example"
 
     async def test_resume_image2video_subpath_from_encoded_job_id(self, tmp_path):
         # resume 请求不带 start_image（真实重启路径如此）：子路径必须来自持久化 job_id 前缀，
