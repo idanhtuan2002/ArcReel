@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.config.resolver import (
     ConfigResolver,
     VideoCapability,
-    get_provider_fallback,
     video_bucket_for_generation_mode,
 )
 from lib.cost_calculator import cost_calculator
@@ -346,10 +345,12 @@ class CostEstimationService:
                         )
                     except Exception:
                         bucket_resolution = None
+                # 未设分辨率保留 None：分镜图生视频执行时不下发 resolution，结算按同一个 None 交给
+                # 计价策略回落；参考生视频的候选在投影时已补供应商兜底档，与执行下发的档位一致。
                 video_identity[capability] = (
                     bucket_provider,
                     bucket_model,
-                    bucket_resolution or get_provider_fallback(bucket_provider),
+                    bucket_resolution,
                     bucket_audio,
                 )
 
