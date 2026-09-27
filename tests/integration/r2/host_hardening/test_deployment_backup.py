@@ -28,6 +28,7 @@ from r2.host_hardening.deployment_backup import (
     OfflineFenceViolation,
     ReleaseIdentity,
     RestoreTargetNotEmpty,
+    UnsafeBackupPath,
     UnsupportedFileEntry,
     attest_deployment_restore,
     create_deployment_backup,
@@ -141,7 +142,9 @@ async def _seed_source(url: str, data_root: Path) -> None:
         )
         await conn.execute(
             "INSERT INTO system_setting (key, value, updated_at) VALUES "
-            "('anthropic_api_key', $1, $2), ('video_generate_audio', 'true', $2)",
+            "('anthropic_api_key', $1, $2), ('video_generate_audio', 'true', $2), "
+            "('anthropic_base_url', 'https://a:set-pass-1@one.invalid and https://b:set-pass-2@two.invalid "
+            "contact admin@example.invalid', $2)",
             SECRET_CANARY,
             now,
         )
@@ -296,6 +299,8 @@ async def test_round_trip_restores_a_verified_deployment_without_credentials(
     assert {t.table for t in manifest.sanitized_tables} >= {"provider_credential", "custom_provider"}
     assert SECRET_CANARY.encode() not in _bytes_under(backup_dir)
     assert b"proxy-pass-7e21" not in _bytes_under(backup_dir)
+    assert b"set-pass-1" not in _bytes_under(backup_dir)
+    assert b"set-pass-2" not in _bytes_under(backup_dir)
 
     target_root = tmp_path / "restored-data"
     started = datetime.now(UTC)
@@ -334,6 +339,9 @@ async def test_round_trip_restores_a_verified_deployment_without_credentials(
         assert await conn.fetchval("SELECT count(*) FROM custom_provider_model") == 1
         assert await conn.fetchval("SELECT value FROM provider_config WHERE key = 'image_rpm'") == "12"
         assert await conn.fetchval("SELECT value FROM system_setting WHERE key = 'video_generate_audio'") == "true"
+        assert await conn.fetchval("SELECT value FROM system_setting WHERE key = 'anthropic_base_url'") == (
+            "https://one.invalid and https://two.invalid contact admin@example.invalid"
+        )
         assert await conn.fetchval("SELECT api_key FROM provider_credential") is None
     finally:
         await conn.close()
@@ -660,3 +668,39 @@ async def test_an_unreachable_database_rejects_the_set(tmp_path: Path) -> None:
 
     assert read_state(backup_dir) | {"reason": "DATABASE_UNAVAILABLE"} == read_state(backup_dir)
     assert read_state(backup_dir)["state"] == BackupSetState.REJECTED.value
+
+
+async def test_an_attested_target_cannot_be_reverified_and_attested_files_are_tamper_checked(
+    source: tuple[str, Path], target_url: str, tmp_path: Path
+) -> None:
+    backup_dir, target_root = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-8")
+
+    async def _verify(target_id: str) -> None:
+        await verify_restored_deployment(
+            backup_dir=backup_dir,
+            target_database_url=target_url,
+            target_roots={DATA_ROOT: target_root},
+            restore_target_id=target_id,
+            target_release_git_sha=IDENTITY.release_git_sha,
+            media_probe=_always_playable,
+        )
+
+    await _verify(RESTORE_TARGET)
+    attest_deployment_restore(
+        backup_dir=backup_dir, golden_evidence=_golden(backup_dir), measured_rpo_seconds=0, measured_rto_seconds=1
+    )
+    assert read_state(backup_dir)["state"] == BackupSetState.VERIFIED.value
+
+    with pytest.raises(UnsafeBackupPath):
+        await _verify(RESTORE_TARGET)
+    await _verify("drill-target-2")
+    assert (backup_dir / "verdicts" / "drill-target-2.json").is_file()
+
+    verdict_file = backup_dir / "verdicts" / f"{RESTORE_TARGET}.json"
+    verdict = json.loads(verdict_file.read_text(encoding="utf-8"))
+    verdict["checked_file_count"] += 1
+    verdict_file.write_text(json.dumps(verdict), encoding="utf-8")
+    with pytest.raises(BackupIntegrityError):
+        await restore_deployment_backup(
+            backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: tmp_path / "again"}
+        )

@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = asyncio.run(_run(args))
     except DeploymentBackupError as exc:
-        print(json.dumps({"error": exc.reason_code, "detail": str(exc)}), file=sys.stderr)
+        print(json.dumps({"error": exc.reason_code, "detail": redact_provider_text(str(exc))}), file=sys.stderr)
         return 2
     except ValidationError as exc:
         print(

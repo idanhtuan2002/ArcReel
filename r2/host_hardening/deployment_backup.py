@@ -18,7 +18,7 @@ re-enters provider credentials.
 The set directory is the durable ledger of its own lifecycle. ``state.json``
 moves ``PREPARING -> COMPLETE`` (or ``REJECTED`` when capture fails), bound to
 the canonical digest of ``manifest.json``. ``verify`` records a target's
-automated checks in ``verdict.json`` without touching the set's state;
+automated checks in ``verdicts/<restore_target_id>.json`` without touching the set's state;
 ``attest`` moves the set to ``VERIFIED`` only when those checks and the
 no-provider Golden read/review/export evidence both passed.
 """
@@ -29,6 +29,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 from collections.abc import Awaitable, Callable, Mapping
@@ -36,7 +37,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 import asyncpg
 
@@ -58,7 +59,8 @@ from r2.contracts.host_hardening import (
 DATA_ROOT = "data"
 MANIFEST_FILENAME = "manifest.json"
 STATE_FILENAME = "state.json"
-VERDICT_FILENAME = "verdict.json"
+VERDICTS_DIRNAME = "verdicts"
+_RESTORE_TARGET_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 GOLDEN_EVIDENCE_FILENAME = "golden-evidence.json"
 ATTESTATION_FILENAME = "attestation.json"
 # The V1 Golden corpus is two products (factual and drama).
@@ -94,9 +96,11 @@ _SECRET_SETTING_KEY_PATTERN = (
 )
 
 # table -> column -> SQL expression replacing that column in the captured rows.
-# URLs keep scheme, host and path; ``user:password@`` userinfo is removed.
-_STRIP_USERINFO = "regexp_replace({column}, '://[^/@]*@', '://')"
-_HAS_USERINFO = "{column} ~ '://[^/@]*@'"
+# URLs keep scheme, host and path; every ``user:password@`` userinfo is removed.
+# Userinfo never spans whitespace or ``/`` (RFC 3986 requires both to be
+# percent-encoded inside it), so prose after a URL is left alone.
+_STRIP_USERINFO = "regexp_replace({column}, '://[^/@\\s]*@', '://', 'g')"
+_HAS_USERINFO = "{column} ~ '://[^/@\\s]*@'"
 
 SANITIZED_TABLE_POLICY: Mapping[str, Mapping[str, str]] = {
     "provider_credential": {
@@ -111,7 +115,12 @@ SANITIZED_TABLE_POLICY: Mapping[str, Mapping[str, str]] = {
     "provider_config": {
         "value": f"CASE WHEN is_secret THEN '' ELSE {_STRIP_USERINFO.format(column='value')} END",
     },
-    "system_setting": {"value": f"CASE WHEN key ~* '{_SECRET_SETTING_KEY_PATTERN}' THEN '' ELSE value END"},
+    "system_setting": {
+        "value": (
+            f"CASE WHEN key ~* '{_SECRET_SETTING_KEY_PATTERN}' THEN '' "
+            f"ELSE {_STRIP_USERINFO.format(column='value')} END"
+        ),
+    },
 }
 
 # Post-restore proof that no credential value survived, per sanitized column.
@@ -123,7 +132,9 @@ _SECRET_RESIDUE_PREDICATES: Mapping[str, Mapping[str, str]] = {
     "agent_anthropic_credentials": {"api_key": "api_key <> ''", "base_url": _HAS_USERINFO.format(column="base_url")},
     "custom_provider": {"api_key": "api_key <> ''", "base_url": _HAS_USERINFO.format(column="base_url")},
     "provider_config": {"value": f"(is_secret AND value <> '') OR {_HAS_USERINFO.format(column='value')}"},
-    "system_setting": {"value": f"key ~* '{_SECRET_SETTING_KEY_PATTERN}' AND value <> ''"},
+    "system_setting": {
+        "value": f"(key ~* '{_SECRET_SETTING_KEY_PATTERN}' AND value <> '') OR {_HAS_USERINFO.format(column='value')}"
+    },
 }
 
 PROBED_MEDIA_SUFFIXES = frozenset({".mp4", ".mov", ".webm", ".mp3", ".wav", ".m4a", ".png", ".jpg", ".jpeg", ".webp"})
@@ -201,10 +212,18 @@ def libpq_command_target(database_url: str) -> tuple[str, dict[str, str]]:
     the password travels in the child's ``PGPASSWORD`` instead.
     """
     parts = urlsplit(libpq_url(database_url))
-    query = parse_qsl(parts.query, keep_blank_values=True)
-    query_password = next((value for name, value in query if name == "password"), None)
+    # Other query parameters are kept byte-for-byte: libpq decodes them itself, and
+    # re-encoding would change values such as ``options=-c%20...`` or a literal ``+``.
+    kept: list[str] = []
+    query_password: str | None = None
+    for item in parts.query.split("&") if parts.query else ():
+        name, _, value = item.partition("=")
+        if unquote(name) == "password":
+            query_password = unquote(value)
+        else:
+            kept.append(item)
     if query_password is not None:
-        parts = parts._replace(query=urlencode([(name, value) for name, value in query if name != "password"]))
+        parts = parts._replace(query="&".join(kept))
     password = unquote(parts.password) if parts.password is not None else query_password
     if password is None:
         return urlunsplit(parts), {}
@@ -594,8 +613,21 @@ def load_restorable_manifest(backup_dir: Path) -> DeploymentBackupManifest:
     return manifest
 
 
+def _verdict_path(backup_dir: Path, restore_target_id: str) -> Path:
+    if not _RESTORE_TARGET_ID_RE.fullmatch(restore_target_id):
+        raise UnsafeBackupPath("restore target id must be 1-128 of [A-Za-z0-9._-], starting alphanumeric")
+    return backup_dir / VERDICTS_DIRNAME / f"{restore_target_id}.json"
+
+
+def _file_digest_of(path: Path, model: type[DeploymentBackupVerdict] | type[GoldenRestoreEvidence]) -> str | None:
+    if not path.is_file():
+        return None
+    return _digest(model.model_validate_json(path.read_text(encoding="utf-8")))
+
+
 def _verify_attestation_record(backup_dir: Path, manifest: DeploymentBackupManifest, state: Mapping[str, Any]) -> None:
-    """A VERIFIED state must be backed by the attestation it names, for this manifest."""
+    """A VERIFIED state must be backed by the attestation it names, and by the verdict
+    and Golden evidence that attestation names, for this manifest."""
     path = backup_dir / ATTESTATION_FILENAME
     if not path.is_file():
         raise BackupIntegrityError("state is VERIFIED but the set has no attestation")
@@ -603,6 +635,10 @@ def _verify_attestation_record(backup_dir: Path, manifest: DeploymentBackupManif
     recorded = "sha256:" + canonical_json_digest(attestation.model_dump(mode="json"))
     if recorded != state.get("attestation_digest") or attestation.manifest_digest != manifest_digest(manifest):
         raise BackupIntegrityError("the attestation does not match the VERIFIED state")
+    verdict_digest = _file_digest_of(_verdict_path(backup_dir, attestation.restore_target_id), DeploymentBackupVerdict)
+    evidence_digest = _file_digest_of(backup_dir / GOLDEN_EVIDENCE_FILENAME, GoldenRestoreEvidence)
+    if verdict_digest != attestation.verdict_digest or evidence_digest != attestation.golden_evidence_digest:
+        raise BackupIntegrityError("the attested verdict or Golden evidence has changed")
 
 
 def _verify_backup_payload(manifest: DeploymentBackupManifest, backup_dir: Path) -> None:
@@ -841,13 +877,20 @@ async def verify_restored_deployment(
     media_probe: MediaProbe = ffprobe_media,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> DeploymentBackupVerdict:
-    """Run the automated checks on one restored target and record them in ``verdict.json``.
+    """Run the automated checks on one restored target and record them in its verdict file.
 
     The set's lifecycle state is not changed: a failing target says nothing
     about the set, and passing checks alone are not VERIFIED (see
     ``attest_deployment_restore``).
     """
+    verdict_path = _verdict_path(backup_dir, restore_target_id)
     manifest = await asyncio.to_thread(load_restorable_manifest, backup_dir)
+    if read_state(backup_dir).get("state") == BackupSetState.VERIFIED.value:
+        attested = DeploymentBackupAttestation.model_validate_json(
+            (backup_dir / ATTESTATION_FILENAME).read_text(encoding="utf-8")
+        )
+        if attested.restore_target_id == restore_target_id:
+            raise UnsafeBackupPath("this restore target is already attested; verify a new target under a new id")
     reasons: list[str] = []
     if target_release_git_sha != manifest.release_git_sha:
         reasons.append("RELEASE_MISMATCH")
@@ -894,7 +937,8 @@ async def verify_restored_deployment(
         probed_media_count=probed,
         checked_at=clock(),
     )
-    _write_json(backup_dir / VERDICT_FILENAME, verdict.model_dump(mode="json"))
+    verdict_path.parent.mkdir(exist_ok=True)
+    _write_json(verdict_path, verdict.model_dump(mode="json"))
     return verdict
 
 
@@ -927,9 +971,9 @@ def attest_deployment_restore(
     """
     manifest = load_restorable_manifest(backup_dir)
     digest = manifest_digest(manifest)
-    verdict_path = backup_dir / VERDICT_FILENAME
+    verdict_path = _verdict_path(backup_dir, golden_evidence.restore_target_id)
     if not verdict_path.is_file():
-        raise AttestationRejected("no restore verdict has been recorded for this set")
+        raise AttestationRejected("no restore verdict has been recorded for this target")
     verdict = DeploymentBackupVerdict.model_validate_json(verdict_path.read_text(encoding="utf-8"))
     if verdict.manifest_digest != digest or not verdict.checks_passed:
         raise AttestationRejected("the recorded restore verdict did not pass for this manifest")

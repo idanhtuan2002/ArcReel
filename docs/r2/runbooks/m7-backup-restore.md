@@ -21,7 +21,7 @@ A backup set is one directory:
 | `files/<root>/…` | Every regular file under each named root, digest-checked on copy. |
 | `manifest.json` | Release/schema identity, recovery point, per-table row counts, file inventory with SHA-256 digests, sanitized-table list, excluded entries, the non-secret configuration and its digest, fence evidence. |
 | `state.json` | The set's lifecycle ledger: `PREPARING → COMPLETE → VERIFIED`, or `REJECTED` when capture fails. It is bound to the manifest digest. |
-| `verdict.json` | The last restore target's automated checks. A failing target never changes the set's state. |
+| `verdicts/<restore-target-id>.json` | Each restore target's automated checks. A failing target never changes the set's state. |
 | `golden-evidence.json`, `attestation.json` | The Golden read/review/export evidence and the attestation that moved the set to `VERIFIED`. |
 
 **Credentials never enter a set.** The following are handled at capture:
@@ -35,8 +35,10 @@ A backup set is one directory:
   `access_key`, `private_key`, `password`, `credential(s)`, `token`,
   `access_token`, `auth_token` or `refresh_token`. Counters such as
   `max_tokens` keep their values.
-- **URL credentials stripped.** `user:password@` userinfo is removed from the
-  `base_url` columns and from `provider_config` values.
+- **URL credentials stripped.** Every `user:password@` userinfo is removed
+  from the `base_url` columns and from `provider_config` and `system_setting`
+  values. Userinfo must be percent-encoded, as RFC 3986 requires: a raw `/`
+  or whitespace inside it is not recognised as userinfo.
 - **Secret files excluded.** At the top of the `data` root, the capture
   excludes `.system_config.json`, `.system_config.json.bak`, the legacy
   `.arcreel.db*` SQLite files and `logs/`.
@@ -143,9 +145,12 @@ Verification checks the following:
 - that each selected media version decodes with `ffprobe` (`ffprobe` is
   required).
 
-The result is written to `verdict.json`. The exit code is non-zero unless
-`checks_passed` is true. A failing target leaves the set `COMPLETE`, so it can
-still be restored into another clean target.
+The result is written to `verdicts/<restore-target-id>.json`. A target ID is
+1–128 characters from `[A-Za-z0-9._-]` and starts with a letter or digit. The
+exit code is non-zero unless `checks_passed` is true. A failing target leaves
+the set `COMPLETE`, so it can still be restored into another clean target.
+Once a target is attested, its verdict can no longer be rewritten; verify a
+new target under a new ID.
 
 ## 4. Golden review/export, then attest
 

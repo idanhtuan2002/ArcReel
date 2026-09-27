@@ -86,3 +86,12 @@ def test_libpq_command_target_moves_every_password_form_off_argv() -> None:
         {"PGPASSWORD": "q&s"},
     )
     assert libpq_command_target("postgresql://u@h/db") == ("postgresql://u@h/db", {})
+
+
+def test_libpq_command_target_keeps_other_query_parameters_verbatim() -> None:
+    from r2.host_hardening.deployment_backup import libpq_command_target
+
+    assert libpq_command_target("postgresql://u@h/db?options=-c%20statement_timeout%3D0&password=a+b") == (
+        "postgresql://u@h/db?options=-c%20statement_timeout%3D0",
+        {"PGPASSWORD": "a+b"},
+    )
