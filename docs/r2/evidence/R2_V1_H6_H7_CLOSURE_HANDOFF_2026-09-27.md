@@ -423,3 +423,26 @@ Remaining for V1-05:
    HEAD.
 3. **Out of scope here.** Browser/operator workflow checks stay in V1-07
    (E2).
+
+## Full affected gates — 2026-09-27
+
+Evidence: `R2_V1_FULL_GATE_2026-09-27.md`.
+
+- **Gate HEAD:** `78479432`.
+- **Candidate:** `9fd43948`. It fixes one test: the H6 argv check was false
+  when the username equals the password.
+- **Results:**
+  - static gates, frontend, website and migrations all pass;
+  - the backend's one timeout passed on an isolated rerun (806 s);
+  - the H6 PG16 failures were client-version skew; the file passes 23 of 23
+    with PG16 client tools.
+
+Open before push: the CI job budget (25 min) against the real-media M3/M6
+test durations (about 90 min for the M6 file). This is a CI policy decision
+and needs research first.
+
+Next:
+
+1. Run the independent M7-D acceptance review on `9fd43948` or its
+   evidence-only successor.
+2. Research and decide the CI real-media budget before any push.
