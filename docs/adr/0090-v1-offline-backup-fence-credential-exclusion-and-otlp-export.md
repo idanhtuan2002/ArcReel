@@ -82,8 +82,16 @@ accepted option O2a:
   master selection, which is production input, not the Final Cut gate.
 - **The export is a byte-exact copy of the approved final.** It is written to
   `output/`, the host's existing finished-video slot. The operator obtains it
-  through an existing host route (`GET /files/{project}/output/<file>`) or the
-  project ZIP. No new packaging mechanism is added.
+  through the download-token export surface (ADR-0071): the project ZIP
+  (`GET /projects/{name}/export`), which includes `output/`, or a single-file
+  export under the same download-token mechanism, designed in V1-07. It is
+  not served by the anonymous media route. `output/` is not static media, and
+  an unpublished deliverable stays behind the token until Gate D. No new
+  packaging mechanism is added. (Corrected 2026-09-28: the original text named
+  `GET /files/{project}/output/<file>`, which contradicts ADR-0071 and the
+  backported media allowlist. Audit:
+  `docs/research/2026-09-28-r2-v1-decision-audit.md` #1. The sponsor delegated
+  the correction to research.)
 - **The export digest is the sha256 of the bytes the host serves.** It must
   equal the digest of the approved final version. The server checks Gate D's
   `deliverable_digest` against the current Gate C–approved final.
