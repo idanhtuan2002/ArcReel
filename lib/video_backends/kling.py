@@ -452,11 +452,13 @@ class KlingVideoBackend(KlingBackendBase, ProviderJobIdPersistenceMixin):
             bind_provider_job_id(task_id)
             logger.info("Kling 视频任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)
             # 持久化「子路径:task_id:有声标志」而非裸 task_id：resume 据此复原查询端点
-            # 与 submit 时的有声决策（见 _encode_job_id）。
+            # 与 submit 时的有声决策（见 _encode_job_id）。一并写回本次实际请求的域名：
+            # 续跑据此回放，否则在途改了 base_url 会按新域名去查旧任务。
             await self._persist_provider_job_id(
                 request,
                 _encode_job_id(subpath, task_id, generate_audio=generate_audio),
                 provider=PROVIDER_KLING,
+                endpoint=self._base_url,
             )
             return await self._poll_and_build(client, subpath, task_id, request, generate_audio=generate_audio)
 
@@ -553,8 +555,11 @@ class KlingVideoBackend(KlingBackendBase, ProviderJobIdPersistenceMixin):
         *,
         generate_audio: bool,
     ) -> VideoGenerationResult:
+        # 续跑轮询回放提交时的域名（提交路径恒 None）：任务 id 只在创建它的 endpoint 上可查，
+        # 用户在途改 base_url 后按新域名去轮旧任务会 404。
+        base_url = request.submitted_base_url or self._base_url
         final = await self._poll_until_terminal(
-            recording_poll(lambda: self._poll_query(client, f"videos/{subpath}/{task_id}"), request),
+            recording_poll(lambda: self._poll_query(client, f"videos/{subpath}/{task_id}", base_url=base_url), request),
             max_wait=request.poll_timeout_seconds,
         )
 

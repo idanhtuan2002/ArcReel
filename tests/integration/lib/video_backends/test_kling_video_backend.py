@@ -787,6 +787,21 @@ class TestResume:
         assert result.video_uri == "https://x/r.mp4"
         assert result.video_path.read_bytes() == b"resumed"
 
+    async def test_resume_polls_the_submitted_base_url_after_config_change(self, tmp_path):
+        """在途改了 base_url 后续跑：轮询回到提交时的域名，不按当下配置去查旧任务。"""
+        with capture_http() as router:
+            poll = router.get("https://old.example/v1/videos/text2video/task-old").mock(
+                return_value=_resp(_query("succeed", url="https://x/r.mp4"))
+            )
+            router.get(url__regex=r"^https://x/").mock(return_value=httpx.Response(200, content=b"resumed"))
+
+            backend = KlingVideoBackend(auth_mode="bearer", api_key="static-key", base_url="https://new.example/v1")
+            await backend.resume_video(
+                "text2video:task-old", _request(tmp_path, submitted_base_url="https://old.example/v1")
+            )
+
+        only_request(poll)
+
     async def test_resume_image2video_subpath_from_encoded_job_id(self, tmp_path):
         # resume 请求不带 start_image（真实重启路径如此）：子路径必须来自持久化 job_id 前缀，
         # 否则 image2video 任务会误查 text2video 端点取不到。

@@ -837,3 +837,39 @@ class TestArkReferenceAudio:
             )
 
         assert exc.value.code == "video_reference_audio_unreadable"
+
+
+class TestArkResumeReplaysSubmittedBaseUrl:
+    async def test_resume_polls_through_a_client_bound_to_the_submitted_base_url(self, tmp_path):
+        """在途改了 base_url 后续跑：按同一份凭据另建绑定提交域名的 client 轮询，轮询结束即关闭。"""
+        current = MagicMock()
+        current.content_generation.tasks.get = MagicMock(side_effect=AssertionError("不应按当下域名轮询"))
+        replay = MagicMock()
+        done = MagicMock()
+        done.status = "succeeded"
+        done.content.video_url = "https://cdn.example.com/v.mp4"
+        done.seed = None
+        done.usage = None
+        replay.content_generation.tasks.get = MagicMock(return_value=done)
+
+        with patch("lib.video_backends.ark.create_ark_client", return_value=current):
+            backend = ArkVideoBackend(api_key="ark-key", base_url="https://new.example.com/api/v3")
+
+        patcher = _mock_httpx_stream()
+        try:
+            request = VideoGenerationRequest(
+                prompt="p",
+                output_path=tmp_path / "out.mp4",
+                submitted_base_url="https://old.example.com/api/v3",
+            )
+            with (
+                patch("lib.video_backends.ark.create_ark_client", return_value=replay) as factory,
+                bounded_poll_clock(),
+            ):
+                await backend.resume_video("cgt-old", request)
+        finally:
+            patcher.stop()
+
+        factory.assert_called_once_with(api_key="ark-key", base_url="https://old.example.com/api/v3")
+        replay.content_generation.tasks.get.assert_called_with(task_id="cgt-old")
+        replay.close.assert_called_once()

@@ -534,6 +534,33 @@ class TestOpenAIVideoBackend:
         assert result.video_path == output_path
         assert output_path.read_bytes() == video_data
 
+    async def test_resume_polls_and_downloads_from_the_submitted_base_url(self, tmp_path: Path):
+        """在途改了 base_url 后续跑：轮询与取件回到提交时的域名，不按当下配置去查旧任务。"""
+        mock_client = AsyncMock()
+        mock_client.base_url = "https://new.example.com/v1/"
+        mock_client.videos.retrieve = AsyncMock(side_effect=AssertionError("不应按当下域名轮询"))
+        replay_client = AsyncMock()
+        replay_client.videos.retrieve = AsyncMock(return_value=_make_mock_video(status="completed", seconds="8"))
+        replay_client.videos.download_content = AsyncMock(return_value=_make_mock_content(b"replayed"))
+        mock_client.with_options = MagicMock(return_value=replay_client)
+
+        with captured_openai_clients(mock_client), bounded_poll_clock():
+            from lib.video_backends.openai import OpenAIVideoBackend
+
+            backend = OpenAIVideoBackend(api_key="test-key")
+            request = VideoGenerationRequest(
+                prompt="resumed",
+                output_path=tmp_path / "out.mp4",
+                duration_seconds=8,
+                submitted_base_url="https://old.example.com/v1",
+            )
+            await backend.resume_video("vid_old", request)
+
+        mock_client.with_options.assert_called_once_with(base_url="https://old.example.com/v1")
+        replay_client.videos.retrieve.assert_called_with("vid_old")
+        replay_client.videos.download_content.assert_awaited_once()
+        assert (tmp_path / "out.mp4").read_bytes() == b"replayed"
+
     async def test_poll_recognizes_expired_status(self, tmp_path: Path):
         """retrieve 返回 status='expired' → 抛 ResumeExpiredError，而不是白等 max_wait。"""
         from lib.video_backends.base import ResumeExpiredError

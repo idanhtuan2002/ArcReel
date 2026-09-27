@@ -6,6 +6,8 @@ import asyncio
 import logging
 from pathlib import Path
 
+from openai import AsyncOpenAI
+
 from lib.aspect_size import VIDEO_TIER_SHORT_EDGE, parse_aspect_ratio, resolution_to_short_edge
 from lib.config.url_utils import OFFICIAL_OPENAI_BASE_URL
 from lib.logging_utils import format_kwargs_for_log
@@ -160,6 +162,23 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
     def video_capabilities(self) -> VideoCapabilities:
         return self.video_capabilities_for_model(self._model)
 
+    @property
+    def _request_base_url(self) -> str:
+        """本实例请求实际发往的域名，取自 SDK client 的公开属性（SDK 会补尾斜杠，此处去掉）。"""
+        return str(self._client.base_url).rstrip("/")
+
+    def _client_for(self, request: VideoGenerationRequest) -> AsyncOpenAI:
+        """轮询与取件用的 client：续跑且提交域名与当下配置不同时，派生一个绑定提交域名的。
+
+        任务 id 只在创建它的 endpoint 上可查，用户在途改 base_url 后按新域名去轮旧任务会 404，
+        被 ``resume_video`` 误判成过期。``with_options`` 派生的 client 沿用同一份凭据、超时、重试
+        配置与连接池。提交路径的 ``submitted_base_url`` 恒 None，沿用实例 client。
+        """
+        submitted = request.submitted_base_url
+        if not submitted or submitted.rstrip("/") == self._request_base_url:
+            return self._client
+        return self._client.with_options(base_url=submitted)
+
     async def generate(self, request: VideoGenerationRequest) -> VideoGenerationResult:
         kwargs: dict = {
             "prompt": request.prompt,
@@ -187,20 +206,24 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
         video = await self._create_video(request=request, **kwargs)
         # submit 成功立即持久化 job_id；持久化失败抛 → finally mark_failed。
         # 非 worker 路径（grid / 直生 / 测试）request.task_id 为 None，统一点内跳过持久化。
-        await self._persist_provider_job_id(request, video.id, provider=PROVIDER_OPENAI)
-        final = await self._poll_until_complete(video.id, request.poll_timeout_seconds)
+        # 一并写回本次实际请求的域名：续跑据此回放，否则在途改了 base_url 会按新域名去查旧任务。
+        await self._persist_provider_job_id(
+            request, video.id, provider=PROVIDER_OPENAI, endpoint=self._request_base_url
+        )
+        final = await self._poll_until_complete(self._client, video.id, request.poll_timeout_seconds)
 
         # generate 路径下 expired 是「provider 异常 / 输入参数过期」类失败，
         # 抛 RuntimeError 让 worker mark_failed（不带 [resume_expired] 前缀）。
         if _video_status(final) is ProviderJobStatus.EXPIRED:
             raise RuntimeError(f"OpenAI Sora job expired during generate: {final.id}")
 
-        return await self._download_and_build_result(final, request, kwargs)
+        return await self._download_and_build_result(self._client, final, request, kwargs)
 
     async def resume_video(self, job_id: str, request: VideoGenerationRequest) -> VideoGenerationResult:
-        """接续已 submit 的 OpenAI job：仅 poll + 下载，不调 videos.create。"""
+        """接续已 submit 的 OpenAI job：仅 poll + 下载，不调 videos.create；轮询与取件按提交域名回放。"""
+        client = self._client_for(request)
         try:
-            final = await self._poll_until_complete(job_id, request.poll_timeout_seconds)
+            final = await self._poll_until_complete(client, job_id, request.poll_timeout_seconds)
         except Exception as exc:
             if _is_openai_not_found(exc):
                 raise ResumeExpiredError(job_id=job_id, provider=PROVIDER_OPENAI) from exc
@@ -215,12 +238,12 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
                 message="OpenAI Sora job expired",
             )
 
-        return await self._download_and_build_result(final, request, {"seconds": str(request.duration_seconds)})
+        return await self._download_and_build_result(client, final, request, {"seconds": str(request.duration_seconds)})
 
     async def _download_and_build_result(
-        self, final, request: VideoGenerationRequest, kwargs: dict
+        self, client: AsyncOpenAI, final, request: VideoGenerationRequest, kwargs: dict
     ) -> VideoGenerationResult:
-        content = await self._download_content_with_retry(final.id)
+        content = await self._download_content_with_retry(client, final.id)
 
         def _write():
             request.output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -260,7 +283,7 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
             submit=_submit,
         )
 
-    async def _poll_until_complete(self, video_id: str, poll_timeout_seconds: int):
+    async def _poll_until_complete(self, client: AsyncOpenAI, video_id: str, poll_timeout_seconds: int):
         """轮询任务直到状态归一到终态。
 
         不复用 SDK 的 client.videos.poll：它仅识别 in_progress/queued/completed/failed，
@@ -273,7 +296,7 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
         #   - expired   → 在 caller 处按 generate vs resume 上下文抛 RuntimeError / ResumeExpiredError
         # 关键不变量：is_failed 不识别 expired，避免覆盖 caller 分流。
         return await poll_with_retry(
-            poll_fn=lambda: self._client.videos.retrieve(video_id),
+            poll_fn=lambda: client.videos.retrieve(video_id),
             is_done=lambda v: _video_status(v) in TERMINAL_PROVIDER_STATUSES,
             is_failed=lambda v: (
                 f"Sora 视频生成失败: {_video_error_message(v)}"
@@ -288,14 +311,14 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
             ),
         )
 
-    async def _download_content_with_retry(self, video_id: str):
+    async def _download_content_with_retry(self, client: AsyncOpenAI, video_id: str):
         """单独重试内容下载，避免因下载失败重新触发视频生成。
 
         SDK 取件抛的不是 ``HTTPStatusError``，故退到按 ``OPENAI_RETRYABLE_ERRORS`` 判定，
         终止条件仍是共用的产物下载预算。
         """
         return await with_artifact_retry(
-            lambda: self._client.videos.download_content(video_id),
+            lambda: client.videos.download_content(video_id),
             label="OpenAI",
             retry_if=None,
             retryable_errors=OPENAI_RETRYABLE_ERRORS,
