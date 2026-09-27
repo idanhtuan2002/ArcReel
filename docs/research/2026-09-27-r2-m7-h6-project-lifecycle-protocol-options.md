@@ -150,3 +150,25 @@ unresolved. These are candidate constraints, not current route behavior.
    internally, while attempt planning and backup creation use different
    session boundaries. No production code should be wired from this note
    before one coherent writer protocol and adversarial tests are accepted.
+
+## Bounded direct-writer follow-up
+
+A current-worktree Python source sweep under `lib/`, `server/`, `r2/` and
+`scripts/` found the runtime `TaskRepository.enqueue()` call in
+`GenerationQueue.enqueue_task()` (`lib/generation_queue.py:459-482`). It also
+found direct `Task(...)` construction in the offline legacy SQLite-to-ORM
+migration (`scripts/migrate_sqlite_to_orm.py:118-142`). The latter is not a
+normal runtime enqueue, but a V1 lifecycle bootstrap/migration run must
+classify its imported project names and task statuses before treating them as
+admitted live work. `ExecutionAttemptModel` insertion in the inspected
+repository is `ExecutionAttemptRepository.plan()`
+(`lib/db/repositories/host_hardening.py:188-207`); the bounded source search
+found `BackupSetRepository` creation in the legacy `create_backup_set()`
+helper (`r2/host_hardening/backup.py:256-285`) and its integration tests.
+
+This is a positive writer lead, not an exhaustive negative claim about
+dynamic SQL, other repositories, external tools or future code. The M7 graph
+at generation `2026-09-18T10:57:40Z` has metadata-changed repository files,
+does not track the new backup module, and excludes `scripts/`; the named
+paths were read directly from this worktree. A release-pinned full writer
+allowlist and all write directions remain an acceptance gate.
