@@ -353,3 +353,36 @@ Still open (V1-05):
    plus `attest`.
 2. **Full gates.** The full affected gates on the exact candidate HEAD.
 3. **Confirmation review.** `7eadb05f` needs a confirmation review.
+
+## Fourth confirmation review and fixes — 2026-09-27
+
+The fourth confirmation review of `ea16418b` (`R2_V1_H6_H7_CONFIRMATION_REVIEW_4_2026-09-27.md`)
+found H6 acceptable and blocked H7 on N1. Fixes in `06fa5a2d`:
+
+- **N1.** Unquoted values may start with closing brackets.
+- **N2.** `secret_key`/`secretKey` are sensitive on the structured and text
+  paths.
+- **N3.** An unreadable `state.json` raises `BackupIntegrityError`.
+
+Self-run differential against the accepted bar `901b20a0` (harness in the
+session scratchpad):
+
+- 4704 grid cases × 2 functions: 0 regressions; leaks at HEAD 0 (base 1064).
+- 20k random-password fuzz: 0 regressions.
+- Common non-secret text is equal or less masked.
+- The timing sweep stays linear (200k characters: 217 ms).
+
+Verification:
+
+- The unit, `integration/lib`, `integration/server/services`,
+  `integration/server/agent_runtime` and `integration/r2/host_hardening`
+  suites: `12878 passed`. The only failure was the dirty-tree scope check.
+- H6 PostgreSQL, CLI and redaction tests: `116 passed`.
+- Static gates are clean.
+- Drill on `06fa5a2d`: verify `checks_passed`, attest refused without
+  Golden evidence, `COMPLETE`, 0 canaries.
+
+Next: the restore-derived Golden A/B drill
+(`docs/research/2026-09-27-r2-v1-restore-derived-golden-drill.md`), then the
+full gates on the candidate HEAD, then the independent M7-D acceptance
+review.

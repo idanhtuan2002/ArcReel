@@ -1,7 +1,7 @@
 {
   "evidence": "R2 V1 H6 offline whole-deployment backup drill",
   "date": "2026-09-27",
-  "head": "7eadb05f5afd379934ca427de347d0f2023263f4",
+  "head": "06fa5a2d6579b1d4ffdd098e115130fa78a98f37",
   "decisions": "docs/adr/0090-v1-offline-backup-fence-credential-exclusion-and-otlp-export.md",
   "runbook": "docs/r2/runbooks/m7-backup-restore.md",
   "environment": {
@@ -21,8 +21,8 @@
     "output": {
       "state": "COMPLETE",
       "backup_set_id": "bs-drill-20260927",
-      "manifest_digest": "sha256:05faed5c0ee1a5e67b4a7cbddc5874882bcf8443c8fe70e9e044340b0d37d654",
-      "recovery_point": "2026-09-27T11:37:33.550406+00:00",
+      "manifest_digest": "sha256:21ff4ba2280bbfc6faa1e419d007e9dbe68dfb0012bb1de731986a6fbb93abb2",
+      "recovery_point": "2026-09-27T11:59:08.041903+00:00",
       "file_count": 11,
       "table_count": 81,
       "sanitized_tables": [
@@ -49,7 +49,7 @@
     "output": {
       "backup_set_id": "bs-drill-20260927",
       "restored_file_count": 11,
-      "elapsed_seconds": 0.78,
+      "elapsed_seconds": 0.767,
       "credentials_to_reenter": [
         "agent_anthropic_credentials",
         "custom_provider",
@@ -63,16 +63,16 @@
     "exit_code": 0,
     "verdict": {
       "backup_set_id": "bs-drill-20260927",
-      "manifest_digest": "sha256:05faed5c0ee1a5e67b4a7cbddc5874882bcf8443c8fe70e9e044340b0d37d654",
+      "manifest_digest": "sha256:21ff4ba2280bbfc6faa1e419d007e9dbe68dfb0012bb1de731986a6fbb93abb2",
       "restore_target_id": "drill-target-1",
-      "target_release_git_sha": "7eadb05f5afd379934ca427de347d0f2023263f4",
+      "target_release_git_sha": "06fa5a2d6579b1d4ffdd098e115130fa78a98f37",
       "checks_passed": true,
       "reason_codes": [],
       "checked_table_count": 81,
       "checked_file_count": 11,
       "checked_reference_count": 6,
       "probed_media_count": 2,
-      "checked_at": "2026-09-27T11:37:36.001587Z"
+      "checked_at": "2026-09-27T11:59:10.510598Z"
     }
   },
   "attest_without_golden_evidence": {
@@ -84,9 +84,9 @@
   "drill_rpo_seconds": 0,
   "ledger_state": {
     "backup_set_id": "bs-drill-20260927",
-    "manifest_digest": "sha256:05faed5c0ee1a5e67b4a7cbddc5874882bcf8443c8fe70e9e044340b0d37d654",
+    "manifest_digest": "sha256:21ff4ba2280bbfc6faa1e419d007e9dbe68dfb0012bb1de731986a6fbb93abb2",
     "state": "COMPLETE",
-    "updated_at": "2026-09-27T11:37:33.711699+00:00"
+    "updated_at": "2026-09-27T11:59:08.206108+00:00"
   },
   "secret_canary": {
     "files_in_backup_set_containing_canary": 0,
