@@ -50,3 +50,25 @@ def test_malformed_root_is_rejected(monkeypatch, tmp_path: Path) -> None:
         )
 
     assert "NAME=PATH" in str(exited.value)
+
+
+def test_malformed_golden_evidence_is_a_structured_error(tmp_path: Path, capsys) -> None:
+    evidence = tmp_path / "golden.json"
+    evidence.write_text("{}", encoding="utf-8")
+
+    code = main(
+        [
+            "attest",
+            "--backup-dir",
+            str(tmp_path / "set"),
+            "--golden-evidence",
+            str(evidence),
+            "--measured-rpo-seconds",
+            "0",
+            "--measured-rto-seconds",
+            "0",
+        ]
+    )
+
+    assert code == 2
+    assert "INVALID_INPUT" in capsys.readouterr().err

@@ -21,6 +21,8 @@ import sys
 import time
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from r2.contracts.host_hardening import GoldenRestoreEvidence
 from r2.host_hardening.deployment_backup import (
     DeploymentBackupError,
@@ -149,6 +151,12 @@ def main(argv: list[str] | None = None) -> int:
         result = asyncio.run(_run(args))
     except DeploymentBackupError as exc:
         print(json.dumps({"error": exc.reason_code, "detail": str(exc)}), file=sys.stderr)
+        return 2
+    except ValidationError as exc:
+        print(
+            json.dumps({"error": "INVALID_INPUT", "detail": f"{exc.error_count()} validation error(s)"}),
+            file=sys.stderr,
+        )
         return 2
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if args.command == "verify" and not result.get("checks_passed"):
