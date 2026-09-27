@@ -211,17 +211,6 @@ class ProjectArchiveValidationError(ValueError):
 
 
 class ProjectArchiveService:
-    _VERSION_HISTORY_DIRS = frozenset(
-        {
-            "storyboards",
-            "videos",
-            "audio",
-            "characters",
-            "scenes",
-            "props",
-            "reference_videos",
-        }
-    )
     _ROOT_VISIBLE_ENTRIES = frozenset(DataValidator.ALLOWED_ROOT_ENTRIES)
     _TYPED_VERSION_HISTORY_DIRS = frozenset({"audio", "videos", "reference_videos"})
     _AGENT_RUNTIME_EXCLUDES = frozenset({".claude", "CLAUDE.md"})
@@ -550,13 +539,9 @@ class ProjectArchiveService:
             ]
 
             relative_dir = current_path.relative_to(snapshot_dir)
-            if is_current and relative_dir.parts == ("versions",):
-                retained_dirs = {PurePosixPath(path).parts[1] for path in retained_version_files}
-                dirnames[:] = [
-                    name for name in dirnames if name not in self._VERSION_HISTORY_DIRS or name in retained_dirs
-                ]
-            elif is_current and relative_dir.parts[:1] == ("versions",):
-                prefix = relative_dir.as_posix().rstrip("/") + "/"
+            in_version_history = is_current and relative_dir.parts[:1] == ("versions",)
+            if in_version_history:
+                prefix = relative_dir.as_posix() + "/"
                 dirnames[:] = [
                     name
                     for name in dirnames
@@ -570,12 +555,14 @@ class ProjectArchiveService:
                 and not (current_path / name).is_symlink()
                 and not (is_root and name in self._AGENT_RUNTIME_EXCLUDES)
             ]
-            if is_current and len(relative_dir.parts) >= 2 and relative_dir.parts[0] == "versions":
+            if in_version_history:
+                # 版本历史只随包带出保留记录所指的快照，外加根下的 versions.json；其余文件一律不入包，
+                # 包内记录与快照一一对应。
                 visible_files = [
                     name
                     for name in visible_files
-                    if relative_dir.parts[1] not in self._VERSION_HISTORY_DIRS
-                    or (relative_dir / name).as_posix() in retained_version_files
+                    if (relative_dir / name).as_posix() in retained_version_files
+                    or (relative_dir.parts == ("versions",) and name == "versions.json")
                 ]
 
             if relative_dir != Path("."):
@@ -606,14 +593,14 @@ class ProjectArchiveService:
     def _trim_versions_payload(cls, payload: dict[str, Any]) -> dict[str, Any]:
         trimmed = json.loads(json.dumps(payload))
         for resource_type, resource_type_data in tuple(trimmed.items()):
-            # Current-only exports retain canonical non-typed media, not their
-            # version-history snapshots.  Their metadata must leave with those
-            # omitted files; typed selected snapshots remain because artifact
-            # activation uses them as independent provenance evidence.
-            if resource_type in cls._VERSION_HISTORY_DIRS and resource_type not in cls._TYPED_VERSION_HISTORY_DIRS:
+            # Current-only exports retain canonical media, not version history.  Only
+            # the typed buckets keep their selected record and snapshot, because
+            # artifact activation uses them as independent provenance evidence.
+            # Every other bucket -- every other version-managed resource type, any
+            # unknown key, and a typed bucket that is not an object -- leaves with
+            # its snapshots, so no record points at an omitted file.
+            if resource_type not in cls._TYPED_VERSION_HISTORY_DIRS or not isinstance(resource_type_data, dict):
                 del trimmed[resource_type]
-                continue
-            if not isinstance(resource_type_data, dict):
                 continue
             for resource_info in resource_type_data.values():
                 if not isinstance(resource_info, dict):

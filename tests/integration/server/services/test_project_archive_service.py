@@ -2289,3 +2289,44 @@ class TestArchiveDiagnosticsLocalization:
             manifest = json.loads(archive.read(f"demo/{ARCHIVE_MANIFEST_NAME}"))
         messages = [item["message"] for item in manifest["export_diagnostics"]["warnings"]]
         assert any("notes.txt" in message and re.search(r"[一-鿿]", message) for message in messages)
+
+
+class TestCurrentExportVersionHistory:
+    def test_current_export_packs_exactly_the_snapshots_its_records_name(self, tmp_path):
+        """仅当前版本导出：每一类版本管理资源都按保留口径裁剪，包内记录与快照一一对应。
+
+        只有音频、视频、参考视频保留选中记录与其快照；其余全部类型（含后加入版本管理的
+        商品图、宫格图、尾帧与角色衍生资产图）、未知键与非对象桶连同快照一并不入包。
+        """
+        from lib.resource_paths import RESOURCE_TYPES
+
+        pm = ProjectManager(tmp_path / "projects")
+        project_dir = _create_project(pm)
+        payload: dict = {}
+        for resource_type in RESOURCE_TYPES:
+            records = []
+            for version in (1, 2):
+                snapshot = f"versions/{resource_type}/r1_v{version}.bin"
+                _write_bytes(project_dir / snapshot, f"{resource_type}-{version}".encode())
+                records.append({"version": version, "file": snapshot})
+            payload[resource_type] = {"r1": {"current_version": 2, "versions": records}}
+        payload["not_a_resource_type"] = {"r1": {"current_version": 1, "versions": []}}
+        _write_json(project_dir / "versions" / "versions.json", payload)
+
+        archive_path, _ = ProjectArchiveService(pm).export_project("demo", scope="current")
+
+        with zipfile.ZipFile(archive_path) as archive:
+            packed = {name.removeprefix("demo/") for name in archive.namelist()}
+            packed_versions = json.loads(archive.read("demo/versions/versions.json"))
+        packed_snapshots = {name for name in packed if name.startswith("versions/") and not name.endswith("/")}
+        packed_snapshots.discard("versions/versions.json")
+        recorded = {
+            record["file"]
+            for bucket in packed_versions.values()
+            for resource in bucket.values()
+            for record in resource["versions"]
+        }
+
+        assert set(packed_versions) == {"audio", "videos", "reference_videos"}
+        assert recorded == {f"versions/{t}/r1_v2.bin" for t in ("audio", "videos", "reference_videos")}
+        assert packed_snapshots == recorded
