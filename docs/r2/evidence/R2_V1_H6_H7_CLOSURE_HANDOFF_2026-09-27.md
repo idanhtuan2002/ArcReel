@@ -322,3 +322,34 @@ Still open (V1-05):
 2. **Full gates.** The full affected gates on the exact candidate HEAD.
 3. **Fence fix not independently reviewed.** The `c9776606` fence change
    has not been independently reviewed.
+
+## Third confirmation review and fixes — 2026-09-27
+
+The third confirmation review of `a0fe0291` (`R2_V1_H6_H7_CONFIRMATION_REVIEW_3_2026-09-27.md`)
+approved the `c9776606` fence and blocked H7 on R1. Fixes in `7eadb05f`:
+
+- **R1.** Unquoted credentials keep inner brackets.
+- **R2.** The token-count exemption applies only to unquoted numbers under
+  plural `*_tokens` keys.
+- **camelCase `secretKey`.** Now masked.
+- **M1.** The runbook lists fence coverage and its limits.
+- **M2.** The manifest schema is at v2; other versions are
+  `BackupSetNotRestorable`.
+- **M3.** Undecodable files are handled.
+
+Verification:
+
+- The unit, `integration/lib`, `integration/server/services`,
+  `integration/server/agent_runtime` and `integration/r2/host_hardening`
+  suites: `12872 passed`. The only failure was the dirty-tree scope check.
+- H6 PostgreSQL, CLI and redaction tests: `109 passed`.
+- The timing sweep stays linear (200k characters: 223 ms).
+- Drill on `7eadb05f`: verify `checks_passed`, attest refused without Golden
+  evidence, `COMPLETE`, 0 canaries.
+
+Still open (V1-05):
+
+1. **Golden A/B.** The no-provider read/review/export on a restored target,
+   plus `attest`.
+2. **Full gates.** The full affected gates on the exact candidate HEAD.
+3. **Confirmation review.** `7eadb05f` needs a confirmation review.
