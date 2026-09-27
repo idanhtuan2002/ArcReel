@@ -442,7 +442,6 @@ known_first_party = ["lib", "server", "alembic", "scripts", "tests", "r2"]
 # 源码里不会出现 import。
 DEP002 = [
     "aiosqlite",        # SQLAlchemy 的 sqlite+aiosqlite 异步驱动
-    "asyncpg",          # SQLAlchemy 的 postgresql+asyncpg 异步驱动
     "python-multipart", # Starlette 解析 multipart/form-data 的后端
     "socksio",          # httpx 的 SOCKS 代理传输后端
     "lxml",             # BeautifulSoup 的 lxml / lxml-xml 解析器后端

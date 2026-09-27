@@ -360,6 +360,93 @@ class BackupVerdict(R2ContractModel):
     measured_rto_seconds: int | None = Field(default=None, ge=0)
 
 
+DEPLOYMENT_BACKUP_SCHEMA_VERSION = 1
+
+
+class BackupFileEntry(R2ContractModel):
+    """One regular file captured from a named deployment data root."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    root: NonEmptyStr
+    path: NonEmptyStr
+    byte_size: int = Field(ge=0)
+    content_digest: NonEmptyStr
+
+
+class SanitizedTableEntry(R2ContractModel):
+    """A table whose rows are captured with credential columns blanked.
+
+    Its data is excluded from the database dump and stored separately as a
+    PostgreSQL binary COPY of the sanitized rows.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    table: NonEmptyStr
+    blanked_columns: tuple[NonEmptyStr, ...]
+    row_count: int = Field(ge=0)
+    data_ref: NonEmptyStr
+    content_digest: NonEmptyStr
+
+
+class OfflineFenceEvidence(R2ContractModel):
+    """What the offline fence observed before and after capture (ADR-0090)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    other_sessions_before: int = Field(ge=0)
+    other_sessions_after: int = Field(ge=0)
+    active_tasks_before: int = Field(ge=0)
+    active_tasks_after: int = Field(ge=0)
+    write_counter_before: int = Field(ge=0)
+    write_counter_after: int = Field(ge=0)
+    file_fingerprint_before: NonEmptyStr
+    file_fingerprint_after: NonEmptyStr
+
+
+class DeploymentBackupManifest(R2ContractModel):
+    """A whole-deployment backup set: one database recovery point plus every
+    captured data-root file, taken under the offline fence."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_version: Literal[1] = DEPLOYMENT_BACKUP_SCHEMA_VERSION
+    backup_set_id: NonEmptyStr
+    source_deployment_id: NonEmptyStr
+    release_git_sha: NonEmptyStr
+    release_image_digest: NonEmptyStr
+    postgres_version: NonEmptyStr
+    alembic_head: NonEmptyStr
+    recovery_point: AwareDatetime
+    database_backup_ref: NonEmptyStr
+    database_backup_digest: NonEmptyStr
+    table_row_counts: dict[NonEmptyStr, int]
+    sanitized_tables: tuple[SanitizedTableEntry, ...]
+    excluded_data_entries: tuple[NonEmptyStr, ...]
+    files: tuple[BackupFileEntry, ...]
+    configuration_digest: NonEmptyStr
+    fence: OfflineFenceEvidence
+
+
+class DeploymentBackupVerdict(R2ContractModel):
+    """Clean-target verification of one restored deployment backup set."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    backup_set_id: NonEmptyStr
+    manifest_digest: NonEmptyStr
+    state: BackupSetState
+    reason_codes: tuple[NonEmptyStr, ...]
+    checked_table_count: int = Field(ge=0)
+    checked_file_count: int = Field(ge=0)
+    checked_reference_count: int = Field(ge=0)
+    probed_media_count: int = Field(ge=0)
+    verified_at: AwareDatetime
+    measured_rpo_seconds: int | None = Field(default=None, ge=0)
+    measured_rto_seconds: int | None = Field(default=None, ge=0)
+
+
 COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION = 1
 
 
@@ -371,20 +458,25 @@ def command_receipt_result_envelope(*, task_id: str, result: JSONValue) -> dict[
 
 __all__ = [
     "COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION",
+    "DEPLOYMENT_BACKUP_SCHEMA_VERSION",
     "TERMINAL_ATTEMPT_STATES",
     "TERMINAL_OBSERVATION_KINDS",
     "AttemptIntegrityIncident",
     "AttemptLeaseFence",
     "AttemptSnapshot",
+    "BackupFileEntry",
     "BackupSetManifest",
     "BackupSetState",
     "BackupVerdict",
     "CandidateIdentity",
     "CommandReceipt",
+    "DeploymentBackupManifest",
+    "DeploymentBackupVerdict",
     "DurableProjectEvent",
     "ExecutionAttemptState",
     "MasterHeadSnapshot",
     "MediaInventoryEntry",
+    "OfflineFenceEvidence",
     "OperatorResolutionAction",
     "OperatorResolutionReceipt",
     "PersistedProviderObservation",
@@ -400,6 +492,7 @@ __all__ = [
     "ProviderRouteSnapshot",
     "ProviderTokenScope",
     "ReconcileResult",
+    "SanitizedTableEntry",
     "UpstreamDisposition",
     "VerifiedCandidateObject",
     "command_receipt_result_envelope",

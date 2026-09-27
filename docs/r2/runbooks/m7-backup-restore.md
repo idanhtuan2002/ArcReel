@@ -1,125 +1,159 @@
-# M7-D Backup and Restore Runbook
+# V1 Deployment Backup and Restore Runbook
 
-Instructions for a **disposable drill of the current mechanism**, not an
-approved production backup or H6 recovery-closure procedure. They describe
-creating a database+media backup set
-(`r2.host_hardening.backup.create_backup_set`) and restoring it into a
-disposable clean target (`restore_backup_set` /
-`verify_restored_backup_set`). The historical
-`docs/r2/evidence/R2_M7_D_RECOVERY_VERIFIED.json` records a human/self
-override, not independent acceptance of the current H6 requirement. The
-[H6 closure design](../../superpowers/specs/2026-09-25-r2-v1-m7d-recovery-closure-design.md)
-remains a candidate, not an implemented backup workflow. The pure
-`r2.host_hardening.fence_evidence` start/closure verifier is not wired into
-the current disposable `create_backup_set` API and does not enforce its fence.
+This is the V1 H6 procedure (ADR-0078, ADR-0090). It uses one **whole-deployment
+backup set**: one PostgreSQL recovery point plus every regular file under the
+deployment's data roots, captured under an **offline fence**. The mechanism is
+`r2.host_hardening.deployment_backup`. The operator entry point is
+`scripts/r2/deployment_backup.py`.
 
-**Secret-bearing archive:** this function dumps the whole PostgreSQL database
-to an unencrypted `database.dump`, including rows that may contain provider
-API keys and other credentials. Its media copy and manifest are also local
-files; the implementation does not encrypt, sign or place them in an immutable
-custody repository. Use only disposable source data and credentials in a
-restricted, short-lived test location. Do not use this runbook for a production
-backup or restore; a production procedure requires approved custody,
-implementation and the remaining H6 acceptance gates.
+The historical `docs/r2/evidence/R2_M7_D_RECOVERY_VERIFIED.json` described the
+earlier project-scoped mechanism. That mechanism has been removed, and the
+file is not evidence for this procedure.
 
-## Preconditions (write fence)
+## What a backup set contains
 
-`create_backup_set` expects an operator write fence but does not enforce it.
-It fails with `InconsistentRecoveryPointError` if the selected project's
-candidate count changes mid-run. That count check cannot detect every
-creation/deletion pair, promotion, DB or file edit, or prove a
-deployment-wide consistent snapshot. For a disposable drill:
+A backup set is one directory:
 
-1. Stop the application server and `GenerationWorker` (or otherwise pause
-   traffic) before starting the backup. This is a manual step -- V1 does not
-   include an automated maintenance-mode toggle.
-2. Confirm no background job (recovery scanner, cleanup cron) is mid-write.
+| Path | Content |
+|---|---|
+| `database.dump` | `pg_dump --format=custom` of the whole database. Data of credential-bearing tables is excluded. |
+| `sanitized/<table>.copy` | A binary COPY of each credential-bearing table, with its credential columns blanked. |
+| `files/<root>/…` | Every regular file under each named root, digest-checked on copy. |
+| `manifest.json` | Release/schema identity, recovery point, per-table row counts, file inventory with SHA-256 digests, sanitized-table list, excluded entries, fence evidence. |
+| `state.json` | The set's lifecycle ledger: `PREPARING → COMPLETE → VERIFIED` or `REJECTED`, bound to the manifest digest. |
+| `verdict.json` | The last clean-target verification result. |
 
-## Creating a backup set
+**Credentials never enter a set.** The following are handled at capture:
 
-```python
-from pathlib import Path
-from datetime import UTC, datetime
-from r2.host_hardening.backup import create_backup_set
+- **Credential columns blanked.** Blanked columns are
+  `provider_credential.api_key/access_key/secret_key/credentials_path`,
+  `agent_anthropic_credentials.api_key` and `custom_provider.api_key`. Blanked
+  values are `provider_config.value` for `is_secret` rows and
+  `system_setting.value` for keys matching
+  `api_key|apikey|secret|token|password|credential`.
+- **Secret files excluded.** At the top of the `data` root, the capture
+  excludes `.system_config.json`, `.system_config.json.bak`, the legacy
+  `.arcreel.db*` SQLite files and `logs/`.
+- **Credential directory not captured.** `vertex_keys/` is not a root; do not
+  add it.
 
-manifest = await create_backup_set(
-    session=session,                          # bound to the source database
-    user_id="...", project_name="...",
-    backup_set_id="bset-2026-09-21",           # unique, operator-chosen
-    database_url="postgresql+asyncpg://...",   # disposable credential only
-    media_root=Path("/disposable/media"),      # disposable source media
-    backup_dir=Path("/disposable/backups/bset-2026-09-21"),
-    source_deployment_id="disposable-1",
-    release_git_sha="<git rev-parse HEAD>",
-    release_image_digest="sha256:...",
-    configuration={"...": "..."},              # your own config fingerprint
-    now=datetime.now(UTC),
-)
+A set still holds project content (scripts, prompts, media). Store it with
+access control as sensitive data. It is not "secret-free".
+
+## Data roots
+
+- **`data` (required).** The application data directory: `ARCREEL_DATA_DIR`,
+  or `projects/` in the Compose deployment. It holds every project,
+  `_global_assets/` and runtime state files.
+- **Optional extra roots.** Name any other directory the deployment persists
+  and wants restored, for example the Agent session store mounted at
+  `claude_data`. A directory that is not named is not captured.
+
+Capture refuses symlinks, sockets and other non-regular entries under a root
+(`UNSUPPORTED_FILE_ENTRY`); resolve them before retrying.
+
+## 1. Create (offline fence)
+
+1. **Stop the application and worker.** Stop the application server; the
+   generation worker runs in-process. V1 has no automated maintenance mode.
+2. **Drain the queue first.** Capture refuses while any Task is `queued`,
+   `running` or `cancelling`. Let work finish, or cancel it, before stopping
+   the application.
+3. **Run the capture:**
+
+   ```bash
+   export ARCREEL_BACKUP_SOURCE_URL='postgresql://…'   # never passed on argv
+   uv run python -m scripts.r2.deployment_backup create \
+     --backup-set-id bs-$(date -u +%Y%m%dT%H%M%SZ) \
+     --backup-dir /backups/bs-… \
+     --root data=/srv/arcreel/projects \
+     --database-url-env ARCREEL_BACKUP_SOURCE_URL \
+     --deployment-id prod-1 \
+     --release-git-sha "$(git rev-parse HEAD)" \
+     --release-image-digest sha256:… \
+     --configuration-json /srv/arcreel/non-secret-config.json
+   ```
+
+The command fails closed, and marks the set `REJECTED` with
+`OFFLINE_FENCE_VIOLATED`, in any of these cases, whether seen before or after
+the copy:
+
+- another client session is connected to the database;
+- a Task is active;
+- the database write counter moved;
+- the data-root file fingerprint changed.
+
+On success it prints the manifest digest and recovery point. Restart the
+application afterwards.
+
+## 2. Restore into a clean target
+
+The target database must have no tables. Every target root must be an empty
+or absent directory that does not overlap the backup set. Restore first checks
+the ledger state (`COMPLETE`/`VERIFIED`), the manifest digest and the digest
+of every payload file. It changes nothing if any of these checks fails.
+
+```bash
+export ARCREEL_RESTORE_TARGET_URL='postgresql://…/fresh_empty_db'
+uv run python -m scripts.r2.deployment_backup restore \
+  --backup-dir /backups/bs-… \
+  --target-root data=/srv/arcreel-restore/projects \
+  --target-database-url-env ARCREEL_RESTORE_TARGET_URL
 ```
 
-`backup_dir` afterward contains `database.dump` (a `pg_dump --format=custom`
-archive) and `media/` (a checksummed copy of the selected project's candidate
-objects). Both may contain sensitive data. Persist
-`manifest` (e.g. as JSON) alongside `backup_dir` -- `restore_backup_set` and
-`verify_restored_backup_set` both need it.
+Restore runs `pg_restore` pre-data and data, then loads the sanitized tables,
+then runs post-data, so constraints are validated against the complete data.
+It prints the elapsed seconds; record them for the RTO.
 
-**Never store a raw `database_url` (with password) in the manifest, in
-`backup_dir`, or in any log.** The current implementation passes source and
-target URLs to `pg_dump`/`pg_restore` as subprocess arguments; do not supply
-production passwords or assume that excluding URLs from the manifest protects
-process arguments.
+## 3. Verify, then re-enter credentials
 
-## Restoring into a target
-
-The target database and target media root **must both already be empty** --
-`restore_backup_set` refuses (`NonEmptyRestoreTargetError`) otherwise, and
-refuses (`SourceTargetAliasError`) if the target media root is the same path
-as `backup_dir`.
-
-```python
-from r2.host_hardening.backup import restore_backup_set, verify_restored_backup_set
-
-await restore_backup_set(
-    manifest=manifest,
-    backup_dir=Path("/disposable/backups/bset-2026-09-21"),
-    target_database_url="postgresql+asyncpg://...",  # a fresh, empty database
-    target_session=target_session,                    # bound to that database
-    target_media_root=Path("/disposable/restore/media"),  # a fresh, empty directory
-)
-
-verdict = await verify_restored_backup_set(
-    manifest=manifest,
-    session=target_session,
-    media_root=Path("/disposable/restore/media"),
-    now=datetime.now(UTC),
-    measured_rpo_seconds=...,   # your own measured timing, not assumed
-    measured_rto_seconds=...,
-)
-assert verdict.accepted, verdict.reason_codes
+```bash
+uv run python -m scripts.r2.deployment_backup verify \
+  --backup-dir /backups/bs-… \
+  --target-root data=/srv/arcreel-restore/projects \
+  --target-database-url-env ARCREEL_RESTORE_TARGET_URL \
+  --measured-rpo-seconds <incident time − recovery_point> \
+  --measured-rto-seconds <restore start → verify end>
 ```
 
-`verdict.accepted` is `False` if the restored schema's Alembic head does not
-match the manifest, or if any media file is missing, wrong-sized, or
-digest-mismatched -- `verdict.reason_codes` names each failure.
+Verification checks the following:
+
+- the Alembic head;
+- the exact per-table row counts;
+- that no credential value is left in any sanitized column;
+- every restored file's size and digest;
+- that each `project.json` parses and each `versions/versions.json` version
+  file exists;
+- that every `assets`/`asset_derivatives` path resolves;
+- that each selected (current) media version decodes with `ffprobe`
+  (`ffprobe` is required).
+
+The result is written to `verdict.json`, and `state.json` moves to `VERIFIED`
+or `REJECTED`. The exit code is non-zero unless the set is `VERIFIED`.
+
+Only after `VERIFIED` should you start the restored application. Then
+re-enter provider credentials in Settings, re-upload the Vertex credentials
+file if it is used, and re-enter the Agent credentials. Keep the restored
+target from reaching paid providers until credentials are re-entered on
+purpose.
 
 ## Client/server version compatibility
 
-`pg_dump`/`pg_restore` are libpq client tools: their major version must be
-compatible with the target PostgreSQL server's major version. A newer
-client can emit session setup an older server rejects (observed: a PG18
-`pg_restore` unconditionally sends `SET transaction_timeout = 0`, a GUC
-PG16 does not have, failing the restore with a nonzero exit even though the
-data itself would have restored correctly). Keep the `postgresql-client`
-package installed on any host that runs these functions tracking the actual
-PostgreSQL server's major version.
+`pg_dump`/`pg_restore` must be compatible with the server's major version. A
+newer client can emit session setup that an older server rejects. For example,
+PG18 `pg_restore` sends `SET transaction_timeout = 0`, which PG16 lacks. Keep
+the installed `postgresql-client` on the server's major version. The Compose
+deployment uses the floating `postgres:18-alpine` tag; pin the exact image
+digest in the deployment before relying on restores across upgrades.
 
-## Operational limits (V1)
+## Limits (V1)
 
-- No point-in-time recovery (PITR): a backup set is a snapshot at its
-  `recovery_target` timestamp, not a continuous log. PITR is an optional
-  production-candidate profile for a later milestone, never assumed here.
-- No automated write-fence: see Preconditions above.
-- The whole-database dump includes credential-bearing tables. A restore can
-  reintroduce captured secrets; use disposable credentials and keep the
-  restored target isolated from production egress. The draft H6 design requires
-  a separately approved encrypted custody and isolated-restore procedure.
+- **Planned downtime.** The offline fence stops the application for the
+  duration of capture.
+- **Snapshot only.** A backup set is a snapshot at `recovery_point`. There is
+  no PITR.
+- **Credentials re-entered by the operator.** Credentials are re-entered after
+  restore; there is no encrypted credential custody.
+- **Golden review/export is separate.** The no-provider Golden A/B review and
+  export on the restored target, and the browser checks, belong to the E2
+  packet. They are not part of `verify`.

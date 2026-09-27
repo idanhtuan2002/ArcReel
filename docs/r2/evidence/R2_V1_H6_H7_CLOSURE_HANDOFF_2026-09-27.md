@@ -21,12 +21,12 @@ Live Git state is authoritative. Read `git log` and `git status` on resume.
 
 ## H6 work packets (offline fence, ADR-0090)
 
-- [ ] H6-1 fence probe: no other DB sessions; no queued/running/cancelling tasks; before and after
-- [ ] H6-2 deployment-wide capture: every data root file tree (projects, global assets), not only candidate_objects
-- [ ] H6-3 credential exclusion: exclude pure-credential table data; sanitized copy for mixed tables; exclude credential files
-- [ ] H6-4 restore + closure verify: DB-driven reference closure, digests, media playability probe
-- [ ] H6-5 persisted VERIFIED/REJECTED transition + measured RPO/RTO
-- [ ] H6-6 operator CLI scripts + runbook rewrite
+- [x] H6-1 fence probe: no other DB sessions; no queued/running/cancelling tasks; before and after
+- [x] H6-2 deployment-wide capture: every data root file tree (projects, global assets), not only candidate_objects
+- [x] H6-3 credential exclusion: exclude pure-credential table data; sanitized copy for mixed tables; exclude credential files
+- [x] H6-4 restore + closure verify: DB-driven reference closure, digests, media playability probe
+- [x] H6-5 persisted VERIFIED/REJECTED transition + measured RPO/RTO
+- [x] H6-6 operator CLI scripts + runbook rewrite
 - [ ] H6-7 disposable clean-target drill evidence
 
 ## Progress log
