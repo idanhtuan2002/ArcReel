@@ -107,11 +107,6 @@ async def test_the_reservation_is_claimed_before_submit_and_reconciled_to_the_se
     reservation = await _reservation(db_factory, row.id)
     scope = await _scope(db_factory)
     assert reservation is not None
-    assert (
-        reservation.state is BudgetReservationState.RECONCILED
-        if hasattr(BudgetReservationState, "RECONCILED")
-        else True
-    )
     assert reservation.reconciled_at is not None
     assert scope is not None
     assert (scope.reserved_total, scope.committed_total) == (Decimal("0"), Decimal(str(row.cost_amount)))
@@ -166,3 +161,77 @@ async def test_a_resumed_call_reconciles_its_claimed_reservation(db_factory: asy
     assert reservation.reconciled_at is not None
     assert scope is not None
     assert scope.committed_total == Decimal(str(settled.cost_amount))
+
+
+async def _create_cny_scope(db_factory: async_sessionmaker, limit: str) -> None:
+    async with db_factory() as session:
+        await BudgetReservationRepository(session).create_scope(
+            budget_scope_ref=budget_scope_ref("CNY"),
+            currency="CNY",
+            authorized_limit=Decimal(limit),
+            now=datetime.now(UTC),
+        )
+
+
+_ARK_VIDEO = {"provider": "ark", "model": "doubao-seedance-1-0-pro-250528"}
+
+
+async def test_a_failed_call_in_a_non_usd_scope_releases_its_hold(db_factory: async_sessionmaker, release_mode) -> None:
+    """失败行按 0 结算、币种列取缺省 USD：核销按预留币种进行，占用不会永久留在 CNY 范围里。"""
+    await _create_cny_scope(db_factory, "100")
+    ledger = Ledger(session_factory=db_factory)
+    with pytest.raises(RuntimeError, match="provider failed"):
+        async with ledger.record(project_name="demo", call_type="video", duration_seconds=5, **_ARK_VIDEO):
+            raise RuntimeError("provider failed")
+
+    call = await _only_call(db_factory)
+    reservation = await _reservation(db_factory, call.id)
+    async with db_factory() as session:
+        scope = await BudgetReservationRepository(session).get_scope(budget_scope_ref("CNY"))
+    assert call.status == "failed"
+    assert reservation is not None
+    assert reservation.reconciled_at is not None
+    assert scope is not None
+    assert (scope.reserved_total, scope.committed_total) == (Decimal("0"), Decimal("0"))
+
+
+async def test_a_resume_failed_call_in_a_non_usd_scope_releases_its_hold(
+    db_factory: async_sessionmaker, release_mode
+) -> None:
+    await _create_cny_scope(db_factory, "100")
+    ledger = Ledger(session_factory=db_factory)
+    with pytest.raises(asyncio.CancelledError):
+        async with ledger.record(project_name="demo", call_type="video", duration_seconds=5, **_ARK_VIDEO):
+            raise asyncio.CancelledError
+
+    pending = await _only_call(db_factory)
+    await ledger.resume_failed(call_id=pending.id)
+
+    async with db_factory() as session:
+        scope = await BudgetReservationRepository(session).get_scope(budget_scope_ref("CNY"))
+    assert scope is not None
+    assert scope.reserved_total == Decimal("0")
+
+
+async def test_an_unclaimed_hold_expires_after_the_claim_window(db_factory: async_sessionmaker, release_mode) -> None:
+    """预留后、确认前崩溃留下的 ACTIVE 占用带过期时间，范围下次写入时即被回收。"""
+    from lib.budget_guard import CLAIM_WINDOW
+
+    await _create_scope(db_factory, "5")
+    now = datetime.now(UTC)
+    async with db_factory() as session:
+        await BudgetReservationRepository(session).reserve(
+            budget_scope_ref=budget_scope_ref("USD"),
+            reservation_ref="api_call:999",
+            execution_decision_ref="api_call:999",
+            requested_amount=Decimal("4"),
+            expires_at=now + CLAIM_WINDOW,
+            provenance_json={},
+            now=now,
+            currency="USD",
+        )
+    async with db_factory() as session:
+        expired = await BudgetReservationRepository(session).expire_active(
+            budget_scope_ref=budget_scope_ref("USD"), now=now + CLAIM_WINDOW
+        )
+    assert [r.reservation_ref for r in expired] == ["api_call:999"]

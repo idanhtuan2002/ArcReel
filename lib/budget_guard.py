@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -43,6 +43,9 @@ logger = logging.getLogger(__name__)
 BUDGET_SCOPE_ENV = "ARCREEL_BUDGET_SCOPE"
 DEFAULT_BUDGET_SCOPE_PREFIX = "release"
 MIN_RESERVATION = Decimal("0.01")
+#: An unclaimed hold (a crash or claim failure between reserve and claim) expires after this window;
+#: a claimed hold never expires and is released only by reconciliation.
+CLAIM_WINDOW = timedelta(minutes=10)
 _MONEY_QUANTUM = Decimal("0.000001")
 
 
@@ -110,7 +113,7 @@ async def reserve_for_call(session_factory, *, call_id: int, provider: str, para
                 reservation_ref=ref,
                 execution_decision_ref=ref,
                 requested_amount=amount,
-                expires_at=None,
+                expires_at=now + CLAIM_WINDOW,
                 provenance_json={"provider": provider, "call_type": params.call_type, "model": params.model},
                 now=now,
                 currency=currency,
@@ -142,13 +145,17 @@ async def reconcile_call(session_factory, *, call_id: int) -> None:
             ).one_or_none()
         if row is None or row.cost_amount is None:
             return
+        actual = Decimal(str(row.cost_amount))
+        # 失败 / 过期行按 0 结算，币种列只是缺省值：零金额没有币种，按预留币种核销，否则每次失败都会
+        # 因「币种不符」把占用永久留在范围里。非零金额币种不符是真实的数据不一致，留待人工核查。
+        evidence_currency = reservation.currency if actual == 0 else (row.currency or reservation.currency)
         async with session_factory() as session:
             await BudgetReservationRepository(session).reconcile(
                 reservation_ref=ref,
                 execution_decision_ref=ref,
                 cost_record_ref=ref,
-                actual_cost=Decimal(str(row.cost_amount)),
-                evidence_currency=row.currency or reservation.currency,
+                actual_cost=actual,
+                evidence_currency=evidence_currency,
                 now=datetime.now(UTC),
             )
     except Exception:
@@ -157,6 +164,7 @@ async def reconcile_call(session_factory, *, call_id: int) -> None:
 
 __all__ = [
     "BUDGET_SCOPE_ENV",
+    "CLAIM_WINDOW",
     "DEFAULT_BUDGET_SCOPE_PREFIX",
     "MIN_RESERVATION",
     "BudgetExceededError",
