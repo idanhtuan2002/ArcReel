@@ -398,6 +398,13 @@ disposition; there is no fabricated window end at capture entry.
    project/global-asset/candidate file, and perform the capture-time media
    probe that will be recorded in the inventory. Preserve directory and
    absent-versus-empty presence separately from file hashes.
+   Candidate V1-01 quiescent admission rejects any `queued`, `running` or
+   `cancelling` Task and any non-terminal execution attempt (including
+   `NEEDS_OPERATOR`) in the source DB, including DB-only project names, plus
+   an unresolved prior backup/recovery claim for this deployment. A terminal
+   Task does not imply a terminal attempt; zero active rows at one instant
+   does not replace the signed writer fence. The exact cross-row predicate
+   and historical-row disposition remain for review.
    Refuse missing owners, divergent master projections,
    paths outside approved roots, symlinks/junctions, duplicate refs with
    unequal bytes, or mutable/unversioned media that cannot be pinned.
@@ -406,7 +413,10 @@ disposition; there is no fabricated window end at capture entry.
    candidate retention refs, then **commit before copying any bytes**. A
    separate transaction must be able to observe the refs. A crash leaves a
    visible PREPARING set whose media refs continue to block GC without a time
-   limit until an explicit inspected rejection; a new backup attempt is a
+   limit until an explicit inspected rejection. The M7-B
+   `create_backup_set()` helper only flushes PREPARING in its supplied session
+   before copy and dump; it cannot implement this committed-admission step
+   without a reviewed transaction change. A new backup attempt is a
    separate operation, not a prerequisite for releasing rejected refs. There
    is no timeout-based or silent cleanup. The only source-row transitions are
    `PREPARING -> COMPLETE`, `PREPARING -> REJECTED`, and

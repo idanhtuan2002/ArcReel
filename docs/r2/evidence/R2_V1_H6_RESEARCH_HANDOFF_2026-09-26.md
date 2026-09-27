@@ -23,6 +23,10 @@ execution-attempt state, that attempt plan/lease/transition commits span
 separate phases, and that the legacy backup helper flushes `PREPARING` before
 copying and dumping without itself committing that admission. A future H6
 adapter cannot use the uncommitted row as a cross-transaction blocker.
+The H6 draft now explicitly carries the candidate Task/attempt/old-claim
+quiescence check and identifies the M7-B backup helper's flush-only admission
+as insufficient for the draft's commit-before-copy requirement. This is a
+draft reconciliation, not acceptance of the V1-01 predicate.
 These are source-backed candidate rules, not H6 acceptance or production code.
 
 The isolated checkpoint-state test passed (1); `git diff --check` and the
