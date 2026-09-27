@@ -3,8 +3,9 @@
 import asyncio
 
 import pytest
-from sqlalchemy import event, update
+from sqlalchemy import event, select, update
 
+from lib.db.models.api_call import ApiCall
 from lib.db.models.task import Task
 from lib.db.repositories.task_repo import TaskRepository
 from lib.db.repositories.usage_repo import SettlementInput, UsageRepository
@@ -906,6 +907,7 @@ class TestRetryDownloadRespectsScope:
             settlement=SettlementInput(cost_amount=0),
             error_message="download failed",
         )
+        await repo.persist_api_call_id(task["task_id"], call_id)
         await repo.claim_next("video")
         await repo.persist_provider_job_id(task["task_id"], f"job-{resource_id}", endpoint="ce-1")
         await repo.mark_failed(task["task_id"], encode_failure("artifact_download_failed", detail="403"))
@@ -932,7 +934,7 @@ class TestRetryDownloadRespectsScope:
         retried = await ResourceScopedTaskRepository(db_session).retry_artifact_download(visible)
 
         assert (retried["status"], retried["error_message"]) == ("running", None)
-        calls = await stored_calls(db_session)
+        calls = list((await db_session.execute(select(ApiCall).order_by(ApiCall.id))).scalars().all())
         assert [(row.id, row.status, row.error_message) for row in calls] == [(call_id, "pending", None)]
 
 
