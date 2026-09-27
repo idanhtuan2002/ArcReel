@@ -14,6 +14,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 import asyncpg
 import pytest
@@ -533,8 +534,6 @@ def _tool_wrapper(tmp_path: Path, name: str, before_real_tool: str) -> str:
 
 
 def _url_password(url: str) -> str:
-    from urllib.parse import unquote, urlsplit
-
     return unquote(urlsplit(libpq_url(url)).password or "")
 
 
@@ -553,7 +552,13 @@ async def test_database_password_never_reaches_tool_argv(source: tuple[str, Path
         pg_dump_path=_tool_wrapper(tmp_path, "dump", ":"),
     )
 
-    assert password not in (tmp_path / "dump.argv").read_text(encoding="utf-8")
+    for arg in (tmp_path / "dump.argv").read_text(encoding="utf-8").splitlines():
+        # The username may equal the password; only userinfo and conninfo password fields are checked.
+        if "://" in arg:
+            assert urlsplit(arg).password is None
+            arg = arg.replace(f"{unquote(urlsplit(arg).username or '')}@", "@")
+        assert "password=" not in arg.lower()
+        assert password not in arg
     assert (tmp_path / "dump.pgpassword").read_text(encoding="utf-8") == password
 
 
