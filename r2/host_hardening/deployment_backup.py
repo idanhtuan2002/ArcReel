@@ -4,20 +4,23 @@ A deployment backup set binds one PostgreSQL recovery point to every regular
 file under the deployment's named data roots. It is captured only while the
 operator has stopped the application and worker. Capture proves that fence
 instead of trusting it: before and after the copy it requires zero other
-client sessions on the database, no queued/running/cancelling Task, an
-unchanged database write counter and an unchanged file-tree fingerprint.
-Capture never writes to the source database.
+client sessions on the database, no queued/running/cancelling Task, and
+unchanged database write counter, sequence positions and file-tree
+fingerprint. Capture never writes to the source database.
 
 Credential-bearing rows never enter the set. Their table data is excluded from
 ``pg_dump`` and captured separately as a binary COPY of the rows with credential
-columns blanked (``SANITIZED_TABLE_POLICY``). Known secret files at the top of
-the data root are excluded and named in the manifest. After a restore the
-operator re-enters provider credentials.
+columns blanked (``SANITIZED_TABLE_POLICY``). Known secret files are excluded
+and named in the manifest. Database passwords reach ``pg_dump``/``pg_restore``
+through the child environment, never argv. After a restore the operator
+re-enters provider credentials.
 
-The set directory is the durable ledger of its own lifecycle: ``state.json``
-moves ``PREPARING -> COMPLETE -> VERIFIED`` or to ``REJECTED``, bound to the
-canonical digest of ``manifest.json``; ``verdict.json`` records the
-clean-target verification.
+The set directory is the durable ledger of its own lifecycle. ``state.json``
+moves ``PREPARING -> COMPLETE`` (or ``REJECTED`` when capture fails), bound to
+the canonical digest of ``manifest.json``. ``verify`` records a target's
+automated checks in ``verdict.json`` without touching the set's state;
+``attest`` moves the set to ``VERIFIED`` only when those checks and the
+no-provider Golden read/review/export evidence both passed.
 """
 
 from __future__ import annotations
@@ -33,16 +36,21 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 import asyncpg
 
+from lib.artifact_manifest import MANIFEST_FILENAME as ARTIFACT_MANIFEST_FILENAME
+from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifestAdapter
 from lib.content_digest import canonical_json_digest
 from lib.json_io import atomic_write_bytes
 from r2.contracts.host_hardening import (
     BackupFileEntry,
     BackupSetState,
+    DeploymentBackupAttestation,
     DeploymentBackupManifest,
     DeploymentBackupVerdict,
+    GoldenRestoreEvidence,
     OfflineFenceEvidence,
     SanitizedTableEntry,
 )
@@ -51,6 +59,10 @@ DATA_ROOT = "data"
 MANIFEST_FILENAME = "manifest.json"
 STATE_FILENAME = "state.json"
 VERDICT_FILENAME = "verdict.json"
+GOLDEN_EVIDENCE_FILENAME = "golden-evidence.json"
+ATTESTATION_FILENAME = "attestation.json"
+# The V1 Golden corpus is two products (factual and drama).
+MIN_GOLDEN_PRODUCTS = 2
 DUMP_FILENAME = "database.dump"
 SANITIZED_DIRNAME = "sanitized"
 FILES_DIRNAME = "files"
@@ -70,7 +82,16 @@ EXCLUDED_DATA_ENTRIES = (
     "logs",
 )
 
-_SECRET_SETTING_KEY_PATTERN = "(api_key|apikey|secret|token|password|credential)"
+# File names never captured at any depth of any root: CLI credential stores (the
+# Claude CLI keeps its OAuth credentials in ``.credentials.json``).
+EXCLUDED_FILE_NAMES = (".credentials.json",)
+
+# ``system_setting`` keys whose values are credentials: matched on the key's final
+# segment so counters such as ``max_tokens`` stay intact.
+_SECRET_SETTING_KEY_PATTERN = (
+    "(^|_)(api_?key|apikey|secret|secret_key|access_key|private_key|password|passwd"
+    "|credentials?|token|access_token|auth_token|refresh_token)$"
+)
 
 # table -> column -> SQL expression replacing that column in the captured rows.
 SANITIZED_TABLE_POLICY: Mapping[str, Mapping[str, str]] = {
@@ -136,6 +157,10 @@ class ExternalToolFailed(DeploymentBackupError):
     reason_code = "EXTERNAL_TOOL_FAILED"
 
 
+class AttestationRejected(DeploymentBackupError):
+    reason_code = "ATTESTATION_REJECTED"
+
+
 @dataclass(frozen=True)
 class ReleaseIdentity:
     source_deployment_id: str
@@ -150,6 +175,7 @@ class _FenceSnapshot:
     active_tasks: int
     write_counter: int
     file_fingerprint: str
+    sequence_fingerprint: str
 
 
 # --------------------------------------------------------------------------- paths
@@ -158,6 +184,25 @@ class _FenceSnapshot:
 def libpq_url(database_url: str) -> str:
     """``pg_dump``/asyncpg understand ``postgresql://``, not SQLAlchemy's driver-qualified form."""
     return database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+
+
+def libpq_command_target(database_url: str) -> tuple[str, dict[str, str]]:
+    """A password-free connection URL for a libpq tool's argv, plus the environment carrying the password.
+
+    Command lines are visible to every local user (``ps``, ``/proc/<pid>/cmdline``);
+    the password travels in the child's ``PGPASSWORD`` instead.
+    """
+    parts = urlsplit(libpq_url(database_url))
+    password = parts.password
+    if password is None:
+        return urlunsplit(parts), {}
+    host = parts.hostname or ""
+    if ":" in host:
+        host = f"[{host}]"
+    netloc = host if parts.port is None else f"{host}:{parts.port}"
+    if parts.username:
+        netloc = f"{parts.username}@{netloc}"
+    return urlunsplit(parts._replace(netloc=netloc)), {"PGPASSWORD": unquote(password)}
 
 
 def _paths_alias(a: Path, b: Path) -> bool:
@@ -217,7 +262,8 @@ def _walk_regular_files(root_name: str, root: Path) -> list[tuple[str, os.stat_r
                 if stat.S_ISDIR(info.st_mode):
                     _visit(Path(entry.path), child_relative)
                 elif stat.S_ISREG(info.st_mode):
-                    found.append((child_relative.as_posix(), info))
+                    if entry.name not in EXCLUDED_FILE_NAMES:
+                        found.append((child_relative.as_posix(), info))
                 else:
                     raise UnsupportedFileEntry(f"{root_name}:{child_relative.as_posix()} is not a regular file")
 
@@ -282,11 +328,22 @@ async def _write_counter(conn: asyncpg.Connection) -> int:
     return int(value or 0)
 
 
+async def _sequence_fingerprint(conn: asyncpg.Connection) -> str:
+    """Digest of every sequence's position: ``nextval``/``setval`` do not move the tuple counters."""
+    rows = await conn.fetch(
+        "SELECT schemaname, sequencename, last_value FROM pg_sequences ORDER BY schemaname, sequencename"
+    )
+    return "sha256:" + canonical_json_digest(
+        [[str(row["schemaname"]), str(row["sequencename"]), row["last_value"]] for row in rows]
+    )
+
+
 async def _fence_snapshot(conn: asyncpg.Connection, roots: Mapping[str, Path]) -> _FenceSnapshot:
     return _FenceSnapshot(
         other_sessions=await _other_client_sessions(conn),
         active_tasks=await _active_tasks(conn),
         write_counter=await _write_counter(conn),
+        sequence_fingerprint=await _sequence_fingerprint(conn),
         file_fingerprint=await asyncio.to_thread(_file_fingerprint, roots),
     )
 
@@ -319,9 +376,10 @@ async def _table_columns(conn: asyncpg.Connection, table: str) -> list[str]:
     return [str(row["column_name"]) for row in rows]
 
 
-async def _run_tool(argv: list[str]) -> None:
+async def _run_tool(argv: list[str], *, extra_env: Mapping[str, str] | None = None) -> None:
+    env = None if not extra_env else {**os.environ, **extra_env}
     process = await asyncio.create_subprocess_exec(
-        *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env
     )
     _, stderr = await process.communicate()
     if process.returncode != 0:
@@ -394,6 +452,7 @@ async def create_deployment_backup(
 
         dump_path = backup_dir / DUMP_FILENAME
         exclude_args = [f"--exclude-table-data={table}" for table in sorted(SANITIZED_TABLE_POLICY)]
+        dump_target, dump_env = libpq_command_target(database_url)
         await _run_tool(
             [
                 pg_dump_path,
@@ -403,8 +462,9 @@ async def create_deployment_backup(
                 "--no-password",
                 *exclude_args,
                 f"--file={dump_path}",
-                libpq_url(database_url),
-            ]
+                dump_target,
+            ],
+            extra_env=dump_env,
         )
 
         present_tables = set(await _user_tables(conn))
@@ -439,6 +499,8 @@ async def create_deployment_backup(
         _assert_quiescent(after, phase="after capture")
         if after.write_counter != before.write_counter:
             raise OfflineFenceViolation("the database was written while capturing")
+        if after.sequence_fingerprint != before.sequence_fingerprint:
+            raise OfflineFenceViolation("a sequence advanced while capturing")
         if after.file_fingerprint != before.file_fingerprint:
             raise OfflineFenceViolation("data-root files changed while capturing")
 
@@ -455,7 +517,9 @@ async def create_deployment_backup(
             table_row_counts=row_counts,
             sanitized_tables=tuple(sanitized),
             excluded_data_entries=EXCLUDED_DATA_ENTRIES,
+            excluded_file_names=EXCLUDED_FILE_NAMES,
             files=tuple(files),
+            configuration=dict(identity.configuration),
             configuration_digest="sha256:" + canonical_json_digest(dict(identity.configuration)),
             fence=OfflineFenceEvidence(
                 other_sessions_before=before.other_sessions,
@@ -466,6 +530,8 @@ async def create_deployment_backup(
                 write_counter_after=after.write_counter,
                 file_fingerprint_before=before.file_fingerprint,
                 file_fingerprint_after=after.file_fingerprint,
+                sequence_fingerprint_before=before.sequence_fingerprint,
+                sequence_fingerprint_after=after.sequence_fingerprint,
             ),
         )
         _write_json(backup_dir / MANIFEST_FILENAME, manifest.model_dump(mode="json"))
@@ -545,15 +611,16 @@ async def restore_deployment_backup(
             raise RestoreTargetNotEmpty("target database already has tables")
         dump = str(backup_dir / manifest.database_backup_ref)
         base = [pg_restore_path, "--no-owner", "--no-privileges", "--no-password", "--exit-on-error"]
-        target = f"--dbname={libpq_url(target_database_url)}"
-        await _run_tool([*base, "--section=pre-data", target, dump])
-        await _run_tool([*base, "--section=data", target, dump])
+        restore_target, restore_env = libpq_command_target(target_database_url)
+        target = f"--dbname={restore_target}"
+        await _run_tool([*base, "--section=pre-data", target, dump], extra_env=restore_env)
+        await _run_tool([*base, "--section=data", target, dump], extra_env=restore_env)
         for table in manifest.sanitized_tables:
             columns = await _table_columns(conn, table.table)
             await conn.copy_to_table(
                 table.table, source=str(backup_dir / table.data_ref), columns=columns, format="binary"
             )
-        await _run_tool([*base, "--section=post-data", target, dump])
+        await _run_tool([*base, "--section=post-data", target, dump], extra_env=restore_env)
     finally:
         await conn.close()
 
@@ -615,10 +682,32 @@ def _verify_files(manifest: DeploymentBackupManifest, target_roots: Mapping[str,
     return reasons
 
 
-def _project_references(data_root: Path) -> tuple[int, list[str], list[Path]]:
-    """Check every project's metadata and version history resolves.
+def _artifact_manifest_references(project_dir: Path) -> tuple[int, list[str]]:
+    """Every Artifact Manifest entry of one project must point to an existing file."""
+    if not (project_dir / ARTIFACT_MANIFEST_FILENAME).is_file():
+        return 0, []
+    try:
+        entries = ProjectArtifactManifestAdapter(project_dir).snapshot_entries()
+    except ArtifactManifestError:
+        return 0, [f"ARTIFACT_MANIFEST_INVALID:{project_dir.name}"]
+    reasons: list[str] = []
+    for entry in entries.values():
+        try:
+            path = _safe_relative(project_dir, entry.artifact_path)
+        except UnsafeBackupPath:
+            reasons.append(f"ARTIFACT_REF_UNSAFE:{project_dir.name}")
+            continue
+        if not path.is_file():
+            reasons.append(f"ARTIFACT_FILE_MISSING:{project_dir.name}:{entry.artifact_path}")
+    return len(entries), reasons
 
-    Returns (checked reference count, reason codes, selected media to probe).
+
+def _project_references(data_root: Path) -> tuple[int, list[str], list[Path]]:
+    """Check every project's metadata, Artifact Manifest and version history resolves.
+
+    A resource's ``current_version`` (its selected master) must name an existing
+    version record whose file exists. Returns (checked reference count, reason
+    codes, selected media to probe).
     """
     checked = 0
     reasons: list[str] = []
@@ -633,6 +722,9 @@ def _project_references(data_root: Path) -> tuple[int, list[str], list[Path]]:
                 reasons.append(f"PROJECT_JSON_INVALID:{project_dir.name}")
         except ValueError:
             reasons.append(f"PROJECT_JSON_INVALID:{project_dir.name}")
+        artifact_checked, artifact_reasons = _artifact_manifest_references(project_dir)
+        checked += artifact_checked
+        reasons.extend(artifact_reasons)
         versions_file = project_dir / "versions" / "versions.json"
         if not versions_file.is_file():
             continue
@@ -647,21 +739,24 @@ def _project_references(data_root: Path) -> tuple[int, list[str], list[Path]]:
             for resource_id, resource in bucket.items():
                 if not isinstance(resource, dict):
                     continue
+                label = f"{project_dir.name}:{resource_type}/{resource_id}"
                 current = resource.get("current_version")
-                for record in resource.get("versions") or ():
-                    ref = record.get("file") if isinstance(record, dict) else None
+                records = [record for record in resource.get("versions") or () if isinstance(record, dict)]
+                if current and not any(record.get("version") == current for record in records):
+                    checked += 1
+                    reasons.append(f"CURRENT_VERSION_MISSING:{label}/v{current}")
+                for record in records:
+                    ref = record.get("file")
                     if not ref:
                         continue
                     checked += 1
                     try:
                         path = _safe_relative(project_dir, str(ref))
                     except UnsafeBackupPath:
-                        reasons.append(f"VERSION_REF_UNSAFE:{project_dir.name}:{resource_type}/{resource_id}")
+                        reasons.append(f"VERSION_REF_UNSAFE:{label}")
                         continue
                     if not path.is_file():
-                        reasons.append(
-                            f"VERSION_FILE_MISSING:{project_dir.name}:{resource_type}/{resource_id}/v{record.get('version')}"
-                        )
+                        reasons.append(f"VERSION_FILE_MISSING:{label}/v{record.get('version')}")
                     elif record.get("version") == current and path.suffix.lower() in PROBED_MEDIA_SUFFIXES:
                         selected_media.append(path)
     return checked, reasons, selected_media
@@ -705,14 +800,20 @@ async def verify_restored_deployment(
     backup_dir: Path,
     target_database_url: str,
     target_roots: Mapping[str, Path],
+    target_release_git_sha: str,
     media_probe: MediaProbe = ffprobe_media,
-    measured_rpo_seconds: int | None = None,
-    measured_rto_seconds: int | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> DeploymentBackupVerdict:
-    """Verify a restored target against its set and record VERIFIED or REJECTED in the set's ledger."""
+    """Run the automated checks on one restored target and record them in ``verdict.json``.
+
+    The set's lifecycle state is not changed: a failing target says nothing
+    about the set, and passing checks alone are not VERIFIED (see
+    ``attest_deployment_restore``).
+    """
     manifest = await asyncio.to_thread(load_restorable_manifest, backup_dir)
     reasons: list[str] = []
+    if target_release_git_sha != manifest.release_git_sha:
+        reasons.append("RELEASE_MISMATCH")
 
     conn = await asyncpg.connect(libpq_url(target_database_url))
     try:
@@ -743,37 +844,88 @@ async def verify_restored_deployment(
         if not await media_probe(path):
             reasons.append(f"MEDIA_UNPLAYABLE:{path.relative_to(target_roots[DATA_ROOT]).as_posix()}")
 
-    state = BackupSetState.REJECTED if reasons else BackupSetState.VERIFIED
     verdict = DeploymentBackupVerdict(
         backup_set_id=manifest.backup_set_id,
         manifest_digest=manifest_digest(manifest),
-        state=state,
+        target_release_git_sha=target_release_git_sha,
+        checks_passed=not reasons,
         reason_codes=tuple(reasons),
         checked_table_count=len(manifest.table_row_counts),
         checked_file_count=len(manifest.files),
         checked_reference_count=asset_checked + project_checked,
         probed_media_count=probed,
-        verified_at=clock(),
-        measured_rpo_seconds=measured_rpo_seconds,
-        measured_rto_seconds=measured_rto_seconds,
+        checked_at=clock(),
     )
     _write_json(backup_dir / VERDICT_FILENAME, verdict.model_dump(mode="json"))
+    return verdict
+
+
+def _digest(model: DeploymentBackupVerdict | GoldenRestoreEvidence) -> str:
+    return "sha256:" + canonical_json_digest(model.model_dump(mode="json"))
+
+
+def attest_deployment_restore(
+    *,
+    backup_dir: Path,
+    golden_evidence: GoldenRestoreEvidence,
+    measured_rpo_seconds: int,
+    measured_rto_seconds: int,
+    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> DeploymentBackupAttestation:
+    """Move a set to VERIFIED once its restore checks and Golden evidence both passed.
+
+    Spec §8 step 7 marks a set VERIFIED only after clean-target restore, reference
+    and media checks *and* the no-provider Golden A/B read/review/export pass,
+    with measured RPO/RTO. Anything missing or mismatched raises
+    ``AttestationRejected`` and leaves the set's state unchanged.
+    """
+    manifest = load_restorable_manifest(backup_dir)
+    digest = manifest_digest(manifest)
+    verdict_path = backup_dir / VERDICT_FILENAME
+    if not verdict_path.is_file():
+        raise AttestationRejected("no restore verdict has been recorded for this set")
+    verdict = DeploymentBackupVerdict.model_validate_json(verdict_path.read_text(encoding="utf-8"))
+    if verdict.manifest_digest != digest or not verdict.checks_passed:
+        raise AttestationRejected("the recorded restore verdict did not pass for this manifest")
+    if golden_evidence.backup_set_id != manifest.backup_set_id or golden_evidence.manifest_digest != digest:
+        raise AttestationRejected("Golden evidence belongs to another backup set")
+    if (
+        not golden_evidence.passed
+        or len(golden_evidence.products) < MIN_GOLDEN_PRODUCTS
+        or not all(product.reviewed for product in golden_evidence.products)
+    ):
+        raise AttestationRejected("Golden read/review/export did not pass for every product")
+
+    attestation = DeploymentBackupAttestation(
+        backup_set_id=manifest.backup_set_id,
+        manifest_digest=digest,
+        verdict_digest=_digest(verdict),
+        golden_evidence_digest=_digest(golden_evidence),
+        measured_rpo_seconds=measured_rpo_seconds,
+        measured_rto_seconds=measured_rto_seconds,
+        verified_at=clock(),
+    )
+    _write_json(backup_dir / GOLDEN_EVIDENCE_FILENAME, golden_evidence.model_dump(mode="json"))
+    _write_json(backup_dir / ATTESTATION_FILENAME, attestation.model_dump(mode="json"))
     _write_state(
         backup_dir,
-        state,
-        now=verdict.verified_at,
+        BackupSetState.VERIFIED,
+        now=attestation.verified_at,
         backup_set_id=manifest.backup_set_id,
-        manifest_digest=verdict.manifest_digest,
-        verdict_digest="sha256:" + canonical_json_digest(verdict.model_dump(mode="json")),
+        manifest_digest=digest,
+        attestation_digest="sha256:" + canonical_json_digest(attestation.model_dump(mode="json")),
     )
-    return verdict
+    return attestation
 
 
 __all__ = [
     "ACTIVE_TASK_STATUSES",
     "DATA_ROOT",
     "EXCLUDED_DATA_ENTRIES",
+    "EXCLUDED_FILE_NAMES",
+    "MIN_GOLDEN_PRODUCTS",
     "SANITIZED_TABLE_POLICY",
+    "AttestationRejected",
     "BackupIntegrityError",
     "BackupSetNotRestorable",
     "DeploymentBackupError",
@@ -783,8 +935,10 @@ __all__ = [
     "RestoreTargetNotEmpty",
     "UnsafeBackupPath",
     "UnsupportedFileEntry",
+    "attest_deployment_restore",
     "create_deployment_backup",
     "ffprobe_media",
+    "libpq_command_target",
     "libpq_url",
     "load_restorable_manifest",
     "manifest_digest",

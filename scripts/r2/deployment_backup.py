@@ -7,7 +7,8 @@ configuration. Stop the application and worker before ``create``.
 
     create   capture a backup set under the offline fence
     restore  restore a set into an empty database and empty roots
-    verify   verify a restored target and record VERIFIED/REJECTED in the set
+    verify   run the automated checks on a restored target (verdict.json)
+    attest   mark the set VERIFIED from a passing verdict plus Golden evidence
 """
 
 from __future__ import annotations
@@ -20,9 +21,11 @@ import sys
 import time
 from pathlib import Path
 
+from r2.contracts.host_hardening import GoldenRestoreEvidence
 from r2.host_hardening.deployment_backup import (
     DeploymentBackupError,
     ReleaseIdentity,
+    attest_deployment_restore,
     create_deployment_backup,
     manifest_digest,
     restore_deployment_backup,
@@ -72,8 +75,13 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--backup-dir", required=True, type=Path)
     verify.add_argument("--target-root", action="append", required=True)
     verify.add_argument("--target-database-url-env", required=True)
-    verify.add_argument("--measured-rpo-seconds", type=int)
-    verify.add_argument("--measured-rto-seconds", type=int)
+    verify.add_argument("--target-release-git-sha", required=True, help="release running on the restored target")
+
+    attest = sub.add_parser("attest")
+    attest.add_argument("--backup-dir", required=True, type=Path)
+    attest.add_argument("--golden-evidence", required=True, type=Path, help="GoldenRestoreEvidence JSON")
+    attest.add_argument("--measured-rpo-seconds", required=True, type=int)
+    attest.add_argument("--measured-rto-seconds", required=True, type=int)
     return parser
 
 
@@ -117,14 +125,22 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
             "elapsed_seconds": round(time.monotonic() - started, 3),
             "credentials_to_reenter": [t.table for t in manifest.sanitized_tables],
         }
-    verdict = await verify_restored_deployment(
+    if args.command == "verify":
+        verdict = await verify_restored_deployment(
+            backup_dir=args.backup_dir.resolve(),
+            target_database_url=_env_url(args.target_database_url_env),
+            target_roots=_roots(args.target_root),
+            target_release_git_sha=args.target_release_git_sha,
+        )
+        return verdict.model_dump(mode="json")
+    evidence = GoldenRestoreEvidence.model_validate_json(args.golden_evidence.read_text(encoding="utf-8"))
+    attestation = attest_deployment_restore(
         backup_dir=args.backup_dir.resolve(),
-        target_database_url=_env_url(args.target_database_url_env),
-        target_roots=_roots(args.target_root),
+        golden_evidence=evidence,
         measured_rpo_seconds=args.measured_rpo_seconds,
         measured_rto_seconds=args.measured_rto_seconds,
     )
-    return verdict.model_dump(mode="json")
+    return {"state": "VERIFIED", **attestation.model_dump(mode="json")}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -135,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"error": exc.reason_code, "detail": str(exc)}), file=sys.stderr)
         return 2
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    if args.command == "verify" and result.get("state") != "VERIFIED":
+    if args.command == "verify" and not result.get("checks_passed"):
         return 1
     return 0
 

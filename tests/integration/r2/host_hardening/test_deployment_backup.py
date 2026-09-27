@@ -19,16 +19,20 @@ import asyncpg
 import pytest
 from PIL import Image
 
-from r2.contracts.host_hardening import BackupSetState
+from lib.artifact_manifest import ArtifactKey, ArtifactManifestEntry, ProjectArtifactManifestAdapter
+from r2.contracts.host_hardening import BackupSetState, GoldenProductResult, GoldenRestoreEvidence
 from r2.host_hardening.deployment_backup import (
     DATA_ROOT,
+    AttestationRejected,
     BackupIntegrityError,
     OfflineFenceViolation,
     ReleaseIdentity,
     RestoreTargetNotEmpty,
     UnsupportedFileEntry,
+    attest_deployment_restore,
     create_deployment_backup,
     libpq_url,
+    manifest_digest,
     read_state,
     restore_deployment_backup,
     verify_restored_deployment,
@@ -160,6 +164,12 @@ async def _seed_source(url: str, data_root: Path) -> None:
     Image.new("RGB", (8, 8), "red").save(project / "characters" / "Hero.png")
     Image.new("RGB", (8, 8), "red").save(project / "versions" / "characters" / "Hero_v1.png")
     (project / "project.json").write_text(json.dumps({"title": "Demo"}), encoding="utf-8")
+    (project / "scripts").mkdir()
+    (project / "scripts" / "episode_1.json").write_text("{}", encoding="utf-8")
+    ProjectArtifactManifestAdapter(project).put_entry(
+        ArtifactKey.episode_script(1),
+        ArtifactManifestEntry(artifact_path="scripts/episode_1.json", basis_digest="sha256-v1:" + "a" * 64),
+    )
     (project / "versions" / "versions.json").write_text(
         json.dumps(
             {
@@ -184,6 +194,40 @@ async def _always_playable(_path: Path) -> bool:
     return True
 
 
+def _golden(backup_dir: Path, *, products: int = 2, passed: bool = True) -> GoldenRestoreEvidence:
+    from r2.host_hardening.deployment_backup import read_manifest
+
+    manifest = read_manifest(backup_dir)
+    return GoldenRestoreEvidence(
+        backup_set_id=manifest.backup_set_id,
+        manifest_digest=manifest_digest(manifest),
+        passed=passed,
+        products=tuple(
+            GoldenProductResult(project_name=f"golden-{index}", reviewed=True, export_digest="sha256:" + "e" * 64)
+            for index in range(products)
+        ),
+    )
+
+
+async def _backup_restore_verify(
+    source: tuple[str, Path], target_url: str, tmp_path: Path, *, backup_set_id: str
+) -> tuple[Path, Path]:
+    source_url, data_root = source
+    backup_dir = tmp_path / "backup-set"
+    await create_deployment_backup(
+        backup_set_id=backup_set_id,
+        database_url=source_url,
+        roots={DATA_ROOT: data_root},
+        backup_dir=backup_dir,
+        identity=IDENTITY,
+    )
+    target_root = tmp_path / "restored-data"
+    await restore_deployment_backup(
+        backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: target_root}
+    )
+    return backup_dir, target_root
+
+
 @pytest.fixture
 async def source(tmp_path: Path) -> AsyncIterator[tuple[str, Path]]:
     name = f"h6_src_{uuid.uuid4().hex[:10]}"
@@ -205,6 +249,12 @@ async def target_url() -> AsyncIterator[str]:
         yield url
     finally:
         await _drop_database(name)
+
+
+async def _drop_and_recreate(url: str) -> None:
+    name = url.rsplit("/", 1)[1]
+    await _drop_database(name)
+    await _admin_execute(f'CREATE DATABASE "{name}"')
 
 
 def _bytes_under(root: Path) -> bytes:
@@ -243,15 +293,25 @@ async def test_round_trip_restores_a_verified_deployment_without_credentials(
         backup_dir=backup_dir,
         target_database_url=target_url,
         target_roots={DATA_ROOT: target_root},
+        target_release_git_sha=IDENTITY.release_git_sha,
         media_probe=_always_playable,
-        measured_rto_seconds=int((datetime.now(UTC) - started).total_seconds()),
     )
 
     assert verdict.reason_codes == ()
-    assert verdict.state is BackupSetState.VERIFIED
-    assert read_state(backup_dir)["state"] == BackupSetState.VERIFIED.value
+    assert verdict.checks_passed
+    assert read_state(backup_dir)["state"] == BackupSetState.COMPLETE.value
     assert verdict.probed_media_count == 1
-    assert verdict.checked_reference_count >= 3
+    assert verdict.checked_reference_count >= 4
+    assert manifest.configuration == {"profile": "drill"}
+
+    attestation = attest_deployment_restore(
+        backup_dir=backup_dir,
+        golden_evidence=_golden(backup_dir),
+        measured_rpo_seconds=0,
+        measured_rto_seconds=int((datetime.now(UTC) - started).total_seconds()),
+    )
+    assert attestation.backup_set_id == "bs-1"
+    assert read_state(backup_dir)["state"] == BackupSetState.VERIFIED.value
     conn = await asyncpg.connect(libpq_url(target_url))
     try:
         assert await conn.fetchval("SELECT request_id FROM tasks WHERE task_id = 'T-done'") == "req-seed-0001"
@@ -346,32 +406,182 @@ async def test_restore_refuses_an_altered_set_and_a_non_empty_target(
         )
 
 
-async def test_verification_rejects_a_restore_missing_a_selected_version(
+async def test_failed_verification_does_not_poison_the_set(
     source: tuple[str, Path], target_url: str, tmp_path: Path
 ) -> None:
-    source_url, data_root = source
-    backup_dir = tmp_path / "backup-set"
-    await create_deployment_backup(
-        backup_set_id="bs-3",
-        database_url=source_url,
-        roots={DATA_ROOT: data_root},
-        backup_dir=backup_dir,
-        identity=IDENTITY,
-    )
-    target_root = tmp_path / "restored-data"
-    await restore_deployment_backup(
-        backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: target_root}
-    )
+    backup_dir, target_root = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-3")
     (target_root / "demo" / "versions" / "characters" / "Hero_v1.png").unlink()
 
     verdict = await verify_restored_deployment(
         backup_dir=backup_dir,
         target_database_url=target_url,
         target_roots={DATA_ROOT: target_root},
+        target_release_git_sha="f" * 40,
         media_probe=_always_playable,
     )
 
-    assert verdict.state is BackupSetState.REJECTED
+    assert not verdict.checks_passed
     assert "FILE_MISSING:data:demo/versions/characters/Hero_v1.png" in verdict.reason_codes
     assert "VERSION_FILE_MISSING:demo:characters/Hero/v1" in verdict.reason_codes
+    assert "RELEASE_MISMATCH" in verdict.reason_codes
+    assert read_state(backup_dir)["state"] == BackupSetState.COMPLETE.value
+    with pytest.raises(AttestationRejected):
+        attest_deployment_restore(
+            backup_dir=backup_dir, golden_evidence=_golden(backup_dir), measured_rpo_seconds=0, measured_rto_seconds=1
+        )
+    assert read_state(backup_dir)["state"] == BackupSetState.COMPLETE.value
+    # The set stays restorable into another clean target.
+    await _drop_and_recreate(target_url)
+    await restore_deployment_backup(
+        backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: tmp_path / "second-target"}
+    )
+
+
+async def test_verification_resolves_selected_versions_and_artifact_manifests(
+    source: tuple[str, Path], target_url: str, tmp_path: Path
+) -> None:
+    backup_dir, target_root = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-4")
+    versions_file = target_root / "demo" / "versions" / "versions.json"
+    history = json.loads(versions_file.read_text(encoding="utf-8"))
+    history["characters"]["Hero"]["current_version"] = 7
+    versions_file.write_text(json.dumps(history), encoding="utf-8")
+    (target_root / "demo" / "scripts" / "episode_1.json").unlink()
+
+    verdict = await verify_restored_deployment(
+        backup_dir=backup_dir,
+        target_database_url=target_url,
+        target_roots={DATA_ROOT: target_root},
+        target_release_git_sha=IDENTITY.release_git_sha,
+        media_probe=_always_playable,
+    )
+
+    assert "CURRENT_VERSION_MISSING:demo:characters/Hero/v7" in verdict.reason_codes
+    assert "ARTIFACT_FILE_MISSING:demo:scripts/episode_1.json" in verdict.reason_codes
+
+
+async def test_attestation_requires_matching_passing_golden_evidence(
+    source: tuple[str, Path], target_url: str, tmp_path: Path
+) -> None:
+    backup_dir, target_root = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-5")
+    with pytest.raises(AttestationRejected):
+        attest_deployment_restore(
+            backup_dir=backup_dir, golden_evidence=_golden(backup_dir), measured_rpo_seconds=0, measured_rto_seconds=1
+        )
+    await verify_restored_deployment(
+        backup_dir=backup_dir,
+        target_database_url=target_url,
+        target_roots={DATA_ROOT: target_root},
+        target_release_git_sha=IDENTITY.release_git_sha,
+        media_probe=_always_playable,
+    )
+
+    for evidence in (
+        _golden(backup_dir, products=1),
+        _golden(backup_dir, passed=False),
+        _golden(backup_dir).model_copy(update={"manifest_digest": "sha256:" + "0" * 64}),
+    ):
+        with pytest.raises(AttestationRejected):
+            attest_deployment_restore(
+                backup_dir=backup_dir, golden_evidence=evidence, measured_rpo_seconds=0, measured_rto_seconds=1
+            )
+        assert read_state(backup_dir)["state"] == BackupSetState.COMPLETE.value
+
+
+def _tool_wrapper(tmp_path: Path, name: str, before_real_tool: str) -> str:
+    """A pg_dump stand-in that records its argv and environment, runs a shell step, then the real tool."""
+    wrapper = tmp_path / f"{name}.sh"
+    wrapper.write_text(
+        "#!/bin/sh\n"
+        f'printf "%s\\n" "$@" > "{tmp_path}/{name}.argv"\n'
+        f'printf "%s" "${{PGPASSWORD:-}}" > "{tmp_path}/{name}.pgpassword"\n'
+        f"{before_real_tool}\n"
+        'exec pg_dump "$@"\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    return str(wrapper)
+
+
+def _url_password(url: str) -> str:
+    from urllib.parse import unquote, urlsplit
+
+    return unquote(urlsplit(libpq_url(url)).password or "")
+
+
+async def test_database_password_never_reaches_tool_argv(source: tuple[str, Path], tmp_path: Path) -> None:
+    source_url, data_root = source
+    password = _url_password(source_url)
+    if not password:
+        pytest.skip("DATABASE_URL carries no password")
+
+    await create_deployment_backup(
+        backup_set_id="bs-argv",
+        database_url=source_url,
+        roots={DATA_ROOT: data_root},
+        backup_dir=tmp_path / "backup-set",
+        identity=IDENTITY,
+        pg_dump_path=_tool_wrapper(tmp_path, "dump", ":"),
+    )
+
+    assert password not in (tmp_path / "dump.argv").read_text(encoding="utf-8")
+    assert (tmp_path / "dump.pgpassword").read_text(encoding="utf-8") == password
+
+
+@pytest.mark.parametrize(
+    ("change", "detail"),
+    [
+        ("sequence", "a sequence advanced"),
+        ("row", "the database was written"),
+        ("file", "data-root files changed"),
+    ],
+)
+async def test_capture_detects_changes_made_while_capturing(
+    source: tuple[str, Path], tmp_path: Path, change: str, detail: str
+) -> None:
+    source_url, data_root = source
+    target, env = __import__("r2.host_hardening.deployment_backup", fromlist=["x"]).libpq_command_target(source_url)
+    password = env.get("PGPASSWORD", "")
+    steps = {
+        "sequence": f"PGPASSWORD='{password}' psql -q '{target}' -c \"SELECT nextval('api_calls_id_seq')\" >/dev/null",
+        "row": (
+            f"PGPASSWORD='{password}' psql -q '{target}' -c \"UPDATE system_setting SET value = 'false' "
+            "WHERE key = 'video_generate_audio'\" >/dev/null"
+        ),
+        "file": f"echo changed > '{data_root}/demo/project.json'",
+    }
+    backup_dir = tmp_path / "backup-set"
+
+    with pytest.raises(OfflineFenceViolation, match=detail):
+        await create_deployment_backup(
+            backup_set_id=f"bs-{change}",
+            database_url=source_url,
+            roots={DATA_ROOT: data_root},
+            backup_dir=backup_dir,
+            identity=IDENTITY,
+            pg_dump_path=_tool_wrapper(tmp_path, "dump", steps[change]),
+        )
+
     assert read_state(backup_dir)["state"] == BackupSetState.REJECTED.value
+
+
+async def test_credential_files_are_never_captured_in_any_root(source: tuple[str, Path], tmp_path: Path) -> None:
+    source_url, data_root = source
+    agent_root = tmp_path / "claude-data"
+    agent_root.mkdir()
+    (agent_root / ".credentials.json").write_text(json.dumps({"token": SECRET_CANARY}), encoding="utf-8")
+    (agent_root / "projects").mkdir()
+    (agent_root / "projects" / "session.jsonl").write_text("{}", encoding="utf-8")
+    (data_root / "demo" / ".credentials.json").write_text(SECRET_CANARY, encoding="utf-8")
+
+    manifest = await create_deployment_backup(
+        backup_set_id="bs-creds",
+        database_url=source_url,
+        roots={DATA_ROOT: data_root, "claude_data": agent_root},
+        backup_dir=tmp_path / "backup-set",
+        identity=IDENTITY,
+    )
+
+    captured = {(entry.root, entry.path) for entry in manifest.files}
+    assert ("claude_data", "projects/session.jsonl") in captured
+    assert not any(path.endswith(".credentials.json") for _, path in captured)
+    assert SECRET_CANARY.encode() not in _bytes_under(tmp_path / "backup-set")

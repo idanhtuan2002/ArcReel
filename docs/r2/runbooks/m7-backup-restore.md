@@ -19,9 +19,10 @@ A backup set is one directory:
 | `database.dump` | `pg_dump --format=custom` of the whole database. Data of credential-bearing tables is excluded. |
 | `sanitized/<table>.copy` | A binary COPY of each credential-bearing table, with its credential columns blanked. |
 | `files/<root>/…` | Every regular file under each named root, digest-checked on copy. |
-| `manifest.json` | Release/schema identity, recovery point, per-table row counts, file inventory with SHA-256 digests, sanitized-table list, excluded entries, fence evidence. |
-| `state.json` | The set's lifecycle ledger: `PREPARING → COMPLETE → VERIFIED` or `REJECTED`, bound to the manifest digest. |
-| `verdict.json` | The last clean-target verification result. |
+| `manifest.json` | Release/schema identity, recovery point, per-table row counts, file inventory with SHA-256 digests, sanitized-table list, excluded entries, the non-secret configuration and its digest, fence evidence. |
+| `state.json` | The set's lifecycle ledger: `PREPARING → COMPLETE → VERIFIED`, or `REJECTED` when capture fails. It is bound to the manifest digest. |
+| `verdict.json` | The last restore target's automated checks. A failing target never changes the set's state. |
+| `golden-evidence.json`, `attestation.json` | The Golden read/review/export evidence and the attestation that moved the set to `VERIFIED`. |
 
 **Credentials never enter a set.** The following are handled at capture:
 
@@ -34,8 +35,13 @@ A backup set is one directory:
 - **Secret files excluded.** At the top of the `data` root, the capture
   excludes `.system_config.json`, `.system_config.json.bak`, the legacy
   `.arcreel.db*` SQLite files and `logs/`.
+- **CLI credential files excluded.** A file named `.credentials.json` (the
+  Claude CLI's OAuth store) is never captured, at any depth of any root.
 - **Credential directory not captured.** `vertex_keys/` is not a root; do not
   add it.
+- **Passwords kept off command lines.** Database passwords reach `pg_dump` and
+  `pg_restore` through `PGPASSWORD` in the child environment, never on the
+  command line.
 
 A set still holds project content (scripts, prompts, media). Store it with
 access control as sensitive data. It is not "secret-free".
@@ -81,6 +87,7 @@ the copy:
 - another client session is connected to the database;
 - a Task is active;
 - the database write counter moved;
+- a sequence advanced;
 - the data-root file fingerprint changed.
 
 On success it prints the manifest digest and recovery point. Restart the
@@ -105,37 +112,73 @@ Restore runs `pg_restore` pre-data and data, then loads the sanitized tables,
 then runs post-data, so constraints are validated against the complete data.
 It prints the elapsed seconds; record them for the RTO.
 
-## 3. Verify, then re-enter credentials
+## 3. Verify the restored target
 
 ```bash
 uv run python -m scripts.r2.deployment_backup verify \
   --backup-dir /backups/bs-… \
   --target-root data=/srv/arcreel-restore/projects \
   --target-database-url-env ARCREEL_RESTORE_TARGET_URL \
-  --measured-rpo-seconds <incident time − recovery_point> \
-  --measured-rto-seconds <restore start → verify end>
+  --target-release-git-sha "$(git rev-parse HEAD)"
 ```
 
 Verification checks the following:
 
+- that the target release matches the set;
 - the Alembic head;
 - the exact per-table row counts;
 - that no credential value is left in any sanitized column;
 - every restored file's size and digest;
-- that each `project.json` parses and each `versions/versions.json` version
-  file exists;
+- that each `project.json` parses and every Artifact Manifest entry points to
+  an existing file;
+- that every resource's `current_version` (its selected master) names an
+  existing version record, and that every version file exists;
 - that every `assets`/`asset_derivatives` path resolves;
-- that each selected (current) media version decodes with `ffprobe`
-  (`ffprobe` is required).
+- that each selected media version decodes with `ffprobe` (`ffprobe` is
+  required).
 
-The result is written to `verdict.json`, and `state.json` moves to `VERIFIED`
-or `REJECTED`. The exit code is non-zero unless the set is `VERIFIED`.
+The result is written to `verdict.json`. The exit code is non-zero unless
+`checks_passed` is true. A failing target leaves the set `COMPLETE`, so it can
+still be restored into another clean target.
 
-Only after `VERIFIED` should you start the restored application. Then
-re-enter provider credentials in Settings, re-upload the Vertex credentials
-file if it is used, and re-enter the Agent credentials. Keep the restored
-target from reaching paid providers until credentials are re-entered on
-purpose.
+## 4. Golden review/export, then attest
+
+Passing checks are not `VERIFIED` by themselves. On the restored target, run
+the no-provider Golden A/B read, review and export for both V1 products. Record
+the results as `GoldenRestoreEvidence` JSON, with this shape:
+
+- `backup_set_id` and `manifest_digest` of this set;
+- `passed`;
+- one product entry per product, each with `project_name`, `reviewed` and
+  `export_digest`.
+
+Then attest:
+
+```bash
+uv run python -m scripts.r2.deployment_backup attest \
+  --backup-dir /backups/bs-… \
+  --golden-evidence golden-evidence.json \
+  --measured-rpo-seconds <incident time − recovery_point> \
+  --measured-rto-seconds <incident time → Golden export passed>
+```
+
+`attest` refuses in any of these cases, and the set stays `COMPLETE`:
+
+- the recorded verdict did not pass for this manifest;
+- the evidence belongs to another set;
+- fewer than two products passed read/review/export.
+
+When it succeeds, it writes `attestation.json` and moves the set to
+`VERIFIED`.
+
+Only after `VERIFIED` should you start the restored application for use. Then:
+
+1. Re-enter provider credentials in Settings.
+2. Re-upload the Vertex credentials file if it is used.
+3. Re-enter the Agent credentials.
+
+Keep the restored target from reaching paid providers until credentials are
+re-entered on purpose.
 
 ## Client/server version compatibility
 
@@ -154,6 +197,6 @@ digest in the deployment before relying on restores across upgrades.
   no PITR.
 - **Credentials re-entered by the operator.** Credentials are re-entered after
   restore; there is no encrypted credential custody.
-- **Golden review/export is separate.** The no-provider Golden A/B review and
-  export on the restored target, and the browser checks, belong to the E2
-  packet. They are not part of `verify`.
+- **Golden run is not built in.** `attest` records Golden A/B evidence
+  produced on the restored target; the tool does not run the Golden flow
+  itself. The browser/operator workflow checks remain the E2 packet.

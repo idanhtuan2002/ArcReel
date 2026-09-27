@@ -403,6 +403,8 @@ class OfflineFenceEvidence(R2ContractModel):
     write_counter_after: int = Field(ge=0)
     file_fingerprint_before: NonEmptyStr
     file_fingerprint_after: NonEmptyStr
+    sequence_fingerprint_before: NonEmptyStr
+    sequence_fingerprint_after: NonEmptyStr
 
 
 class DeploymentBackupManifest(R2ContractModel):
@@ -424,27 +426,68 @@ class DeploymentBackupManifest(R2ContractModel):
     table_row_counts: dict[NonEmptyStr, int]
     sanitized_tables: tuple[SanitizedTableEntry, ...]
     excluded_data_entries: tuple[NonEmptyStr, ...]
+    excluded_file_names: tuple[NonEmptyStr, ...]
     files: tuple[BackupFileEntry, ...]
+    configuration: dict[NonEmptyStr, JSONValue]
     configuration_digest: NonEmptyStr
     fence: OfflineFenceEvidence
 
 
 class DeploymentBackupVerdict(R2ContractModel):
-    """Clean-target verification of one restored deployment backup set."""
+    """Automated clean-target checks of one restored deployment backup set.
+
+    A verdict describes one restore target; it never changes the set's own
+    lifecycle state. Passing checks are a precondition of attestation, not
+    VERIFIED by themselves.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     backup_set_id: NonEmptyStr
     manifest_digest: NonEmptyStr
-    state: BackupSetState
+    target_release_git_sha: NonEmptyStr
+    checks_passed: bool
     reason_codes: tuple[NonEmptyStr, ...]
     checked_table_count: int = Field(ge=0)
     checked_file_count: int = Field(ge=0)
     checked_reference_count: int = Field(ge=0)
     probed_media_count: int = Field(ge=0)
+    checked_at: AwareDatetime
+
+
+class GoldenProductResult(R2ContractModel):
+    """No-provider read/review/export of one Golden product on the restored target."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    project_name: NonEmptyStr
+    reviewed: bool
+    export_digest: NonEmptyStr
+
+
+class GoldenRestoreEvidence(R2ContractModel):
+    """Evidence that the Golden products were read, reviewed and exported on the restored target."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    backup_set_id: NonEmptyStr
+    manifest_digest: NonEmptyStr
+    passed: bool
+    products: tuple[GoldenProductResult, ...]
+
+
+class DeploymentBackupAttestation(R2ContractModel):
+    """The record that moves a backup set to VERIFIED (spec §8 step 7)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    backup_set_id: NonEmptyStr
+    manifest_digest: NonEmptyStr
+    verdict_digest: NonEmptyStr
+    golden_evidence_digest: NonEmptyStr
+    measured_rpo_seconds: int = Field(ge=0)
+    measured_rto_seconds: int = Field(ge=0)
     verified_at: AwareDatetime
-    measured_rpo_seconds: int | None = Field(default=None, ge=0)
-    measured_rto_seconds: int | None = Field(default=None, ge=0)
 
 
 COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION = 1
@@ -470,10 +513,13 @@ __all__ = [
     "BackupVerdict",
     "CandidateIdentity",
     "CommandReceipt",
+    "DeploymentBackupAttestation",
     "DeploymentBackupManifest",
     "DeploymentBackupVerdict",
     "DurableProjectEvent",
     "ExecutionAttemptState",
+    "GoldenProductResult",
+    "GoldenRestoreEvidence",
     "MasterHeadSnapshot",
     "MediaInventoryEntry",
     "OfflineFenceEvidence",
