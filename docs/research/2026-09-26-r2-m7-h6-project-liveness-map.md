@@ -335,7 +335,11 @@ preflight can be composed with a future lifecycle protocol, but it cannot
 replace the missing transaction/admission boundary while the application is
 running. The candidate should compare a root-stable project-name lock plus
 durable lifecycle version/CAS against a DB transaction/advisory-lock design;
-neither alternative is selected by this note.
+neither alternative is selected by this note. The
+[transactional protocol options](2026-09-27-r2-m7-h6-project-lifecycle-protocol-options.md)
+work through a candidate lifecycle-row update, both race orders, its reuse
+limits and the PostgreSQL tests required before selection. They do not approve
+a migration or production writer changes.
 
 ## Unknowns and required decision checks
 

@@ -902,7 +902,9 @@ capture-fence verifier validates stop evidence but does not serialize Task,
 attempt or backup row admission. V1-01 therefore needs an explicitly reviewed
 project-wide, root-stable lifecycle/CAS boundary shared by those writers and
 the create/delete/replace commands; the lock and transaction design remains
-open.
+open. The [candidate transaction analysis](../../research/2026-09-27-r2-m7-h6-project-lifecycle-protocol-options.md)
+identifies a conditional lifecycle-row update and real PostgreSQL race tests
+as one review option, not an approved schema or writer implementation.
 It also needs a release-versioned reference field map, bounded lock-writer
 map for the fence and a post-restore lock-use test,
 approved census bounds, profile/secret custody disposition, and explicit
