@@ -474,8 +474,9 @@ Evidence: `R2_V1_M7D_ACCEPTANCE_REVIEW_2026-09-27.md` (HEAD `836200bf`).
   finding.
 - **Condition 1 (F2–F5, F11): wording.** Fix the evidence wording. Done
   above and in `R2_V1_FULL_GATE_2026-09-27.md`.
-- **Condition 2 (F12): "export".** Record the V1 meaning of "export". This
-  is pending a sponsor decision; it is not recorded yet.
+- **Condition 2 (F12): "export".** Recorded on 2026-09-28 as the ADR-0090
+  follow-up decision O2a, accepted by the sponsor. Research:
+  `docs/research/2026-09-28-r2-v1-export-definition.md`.
 - **Other minor findings, left open:**
   - F1: attest does not bind `export_digest` to captured file digests;
   - F6: no committed H6 drill script;
@@ -485,3 +486,38 @@ Evidence: `R2_V1_M7D_ACCEPTANCE_REVIEW_2026-09-27.md` (HEAD `836200bf`).
   - F13: the runbook ordering and restored-app startup.
 - **Before push:** the CI budget, plus F10 (the CI `postgresql-client`
   version).
+
+## V1-05 status — 2026-09-28: ACCEPTED
+
+Both review conditions are met: the evidence wording is corrected, and the
+export definition is recorded (ADR-0090, O2a).
+
+**V1-05 is accepted on this branch.** The basis is:
+
+- the Golden drill at `b088f238`;
+- the full gates at `78479432` and `9fd43948`;
+- the independent review at `836200bf`;
+- the documentation-only commits since then.
+
+Accepted with these limits:
+
+- **Recovery only.** The export's host ownership and its Gate C/D binding
+  are V1-07's first packet.
+- **V1-04.** There is no encrypted custody; attestation trusts the operator.
+- **V1-07.** Browser and operator checks belong there.
+- **Minor findings left open:**
+  - F1: attest does not bind `export_digest` to captured digests;
+  - F6: no committed H6 drill script;
+  - F7: log lines carry no request or task ID;
+  - F8: redactor shapes;
+  - F9: operator configuration stored verbatim;
+  - F13: runbook ordering and restored-app startup.
+
+**Open before push:**
+
+- the CI real-media budget, deferred by the sponsor
+  (`docs/research/2026-09-27-r2-v1-ci-real-media-test-budget.md`);
+- F10, the CI `postgresql-client` version.
+
+**Next packet:** V1-06 (E1 remediation), or V1-07 starting with the O2a
+export packet, per the backlog order.
