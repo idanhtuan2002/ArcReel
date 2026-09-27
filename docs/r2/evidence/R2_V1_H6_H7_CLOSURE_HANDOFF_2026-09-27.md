@@ -36,6 +36,7 @@ Live Git state is authoritative. Read `git log` and `git status` on resume.
 - `66d0cf5a`: H7-1..3 correlation columns (Alembic `a7c3e9d1f200`), request binding, usage/version task attribution.
 - `08102ffd`: H7-4 OTLP/HTTP tracer from the environment.
 - `0e37b517`: H7-5/6 correlation spans, message-free failure logs, end-to-end canary test.
+- `5b99f85d`: H7 residuals (propagator, lib boundaries, log redaction).
 - `4c68f449`: H6-1..6 deployment backup, CLI and runbook; the project-scoped helper was removed.
 - H6-7 drill evidence: `docs/r2/evidence/R2_V1_H6_OFFLINE_BACKUP_DRILL_2026-09-27.json` (VERIFIED on `4c68f449`, disposable postgres:18 container).
 
@@ -59,8 +60,22 @@ not run.
   claimed by this handoff.
 - E2: no-provider Golden A/B review/export and browser checks on a restored
   target.
-- H7 residual: Agent/text calls made outside the queue are not wrapped by the
-  baggage boundary. Provider SDK error text inside intermediate backend logs
-  was not audited exhaustively; the terminal task-failure logs, spans and
-  public events are covered.
+- H7 residuals closed in `5b99f85d`:
+  - The propagator is trace-context only. Baggage is cleared at every lib
+    provider boundary: text, media, trial run and discovery.
+  - `RedactingFormatter` masks credentials, signed URL parameters and URL
+    userinfo in all console and file log output, tracebacks included.
+  - Verification: unit, `integration/lib`, `integration/server/services` and
+    `integration/server/agent_runtime` suites: `12755 passed`. The only
+    failure was the dirty-tree scope check, which passed after commit.
+  - Static gates are clean.
+- Pending sponsor confirmation: application logs still carry non-credential
+  content by design. This covers prompt excerpts (at most 120 characters in
+  request-body logs), local file paths and truncated raw model output in
+  structured-output fallback warnings. Exported spans carry none of these; the
+  allowlist is enforced. Removing content from logs would reduce provider
+  debugging ability, so it is left as a sponsor decision.
+- The Agent runtime's own Anthropic calls run in the Claude SDK subprocess.
+  Process-level OpenTelemetry context, including baggage, is not propagated
+  into that subprocess.
 - The production Compose image tag `postgres:18-alpine` is not digest-pinned.
