@@ -27,11 +27,11 @@ _LIST_TAIL = 2
 
 _SEPARATED_SENSITIVE_KEY_PATTERN = (
     r"(?:[A-Za-z][A-Za-z0-9]*[_-])*"
-    r"(?:api[_-]?key|authorization|cookie|password|passwd|pwd|secret[_-]?access[_-]?keys?|secrets?|"
+    r"(?:api[_-]?key|authorization|cookie|password|passwd|pwd|secret[_-]?access[_-]?keys?|secret[_-]?keys?|secrets?|"
     r"access[_-]?tokens?|auth[_-]?tokens?|"
     r"bearer[_-]?tokens?|private[_-]?keys?|signing[_-]?keys?|tokens?)"
 )
-_CAMEL_SENSITIVE_KEY_PATTERN = r"(?:apiKey|privateKey|signingKey|[A-Za-z][A-Za-z0-9]*(?:ApiKey|PrivateKey|SigningKey|SecretAccessKey|Secret|Token))"
+_CAMEL_SENSITIVE_KEY_PATTERN = r"(?:apiKey|privateKey|signingKey|secretKey|[A-Za-z][A-Za-z0-9]*(?:ApiKey|PrivateKey|SigningKey|SecretKey|SecretAccessKey|Secret|Token))"
 _SENSITIVE_KEY_RE = re.compile(_SEPARATED_SENSITIVE_KEY_PATTERN, re.IGNORECASE)
 _CAMEL_SENSITIVE_KEY_RE = re.compile(_CAMEL_SENSITIVE_KEY_PATTERN)
 # Line-anchored header patterns keep their leading whitespace on one line and
@@ -65,10 +65,11 @@ _SINGLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_KV_SEP}['\"]?{_KV_SEP}[=:]
 _SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\])*", re.DOTALL)
 _SINGLE_QUOTED_LINE_VALUE_RE = re.compile(r"(?:\\.|[^'\\\n])*")
 _INLINE_SECRET_RE = re.compile(rf"{_TEXT_KEY}['\"]?{_KV_SEP}[=:]{_KV_SEP}(?=[^\s,;&'\"])")
-# An unquoted value keeps brackets inside it (``abc)def``) and stops only before a
-# trailing run of closing brackets, so JSON/repr structure survives. The two
-# character classes are disjoint, so matching stays linear.
-_INLINE_VALUE_RE = re.compile(r"[^\s,;&}\])]+(?:[}\])]+[^\s,;&}\])]+)*")
+# An unquoted value keeps brackets at its start and inside it (``)abc``,
+# ``abc)def``) and stops only before a trailing run of closing brackets, so
+# JSON/repr structure survives. The two character classes are disjoint, so
+# matching stays linear.
+_INLINE_VALUE_RE = re.compile(r"[}\])]*[^\s,;&}\])]+(?:[}\])]+[^\s,;&}\])]+)*")
 _NUMERIC_VALUE_RE = re.compile(r"-?\d+(?:\.\d+)?")
 _SIGNED_QUERY_RE = re.compile(
     r"(?i)([?&](?:x-amz-signature|x-goog-signature|signature|sig|access_token|auth_token|token|api_key|key|password)=)([^&#\s]*)"
@@ -87,7 +88,7 @@ _PEM_END_RE = re.compile(r"-----END (?P<label>(?:[A-Z0-9]+ )*PRIVATE KEY)-----")
 _PEM_MAX_BODY = 16384
 _MASKED = "••••"
 _SENSITIVE_KEY_SUFFIX_RE = re.compile(
-    r"(?i)(?:^|[_-])(?:api[_-]?key|authorization|cookie|password|passwd|pwd|secret[_-]?access[_-]?keys?|secrets?|"
+    r"(?i)(?:^|[_-])(?:api[_-]?key|authorization|cookie|password|passwd|pwd|secret[_-]?access[_-]?keys?|secret[_-]?keys?|secrets?|"
     r"access[_-]?tokens?|auth[_-]?tokens?|bearer[_-]?tokens?|private[_-]?keys?|signing[_-]?keys?|tokens?)$"
 )
 _CAMEL_SENSITIVE_KEY_SUFFIX_RE = re.compile(

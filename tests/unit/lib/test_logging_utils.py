@@ -535,3 +535,31 @@ def test_bracketed_and_numeric_credentials_are_fully_masked(text, secret):
     from lib.logging_utils import redact_diagnostic_text
 
     assert secret not in redact_diagnostic_text(text)
+
+
+@pytest.mark.parametrize(
+    ("text", "secret"),
+    [
+        ("password=)Zq9XwV7kLm", "Zq9XwV7kLm"),
+        ("Foo(password=}Zq9XwV7, x=1)", "Zq9XwV7"),
+        ('{"token": ])}Zq9XwV7}', "Zq9XwV7"),
+        ('"secret_key": "abcdef12"', "abcdef12"),
+        ("aws_secret_key: abcdef12", "abcdef12"),
+    ],
+    ids=["leading-paren", "leading-brace-in-repr", "leading-bracket-run", "secret_key-json", "aws_secret_key"],
+)
+def test_leading_bracket_values_and_secret_key_names_are_masked(text, secret):
+    from lib.logging_utils import redact_diagnostic_text
+
+    assert secret not in redact_diagnostic_text(text)
+
+
+def test_structured_payloads_mask_secret_key_names():
+    payload = {"secretKey": "v1v1v1v1", "awsSecretKey": "v2v2v2v2", "secret_key": "v3v3v3v3", "SECRET_KEY": "v4v4v4v4"}
+
+    rendered = format_kwargs_for_log(payload)
+    sanitized = sanitize_diagnostic_payload(payload)
+
+    for secret in ("v1v1v1v1", "v2v2v2v2", "v3v3v3v3", "v4v4v4v4"):
+        assert secret not in rendered
+        assert secret not in str(sanitized)

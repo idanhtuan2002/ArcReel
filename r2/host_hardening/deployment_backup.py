@@ -470,7 +470,13 @@ def _open_backup_dir(backup_dir: Path, backup_set_id: str, now: datetime) -> Non
 
 
 def read_state(backup_dir: Path) -> dict[str, Any]:
-    return json.loads((backup_dir / STATE_FILENAME).read_text(encoding="utf-8"))
+    try:
+        state = json.loads((backup_dir / STATE_FILENAME).read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise BackupIntegrityError("state.json is not a readable ledger") from exc
+    if not isinstance(state, dict):
+        raise BackupIntegrityError("state.json is not a readable ledger")
+    return state
 
 
 def read_manifest(backup_dir: Path) -> DeploymentBackupManifest:

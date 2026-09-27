@@ -780,3 +780,13 @@ async def test_a_manifest_of_an_older_schema_version_is_not_restorable(
         await restore_deployment_backup(
             backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: tmp_path / "again"}
         )
+
+
+async def test_an_unreadable_state_ledger_is_reported_as_an_integrity_error(
+    source: tuple[str, Path], target_url: str, tmp_path: Path
+) -> None:
+    backup_dir, _ = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-11")
+    for corrupt in (b"\xff\xfe", b"{not json", b"[1, 2]"):
+        (backup_dir / "state.json").write_bytes(corrupt)
+        with pytest.raises(BackupIntegrityError):
+            read_state(backup_dir)
