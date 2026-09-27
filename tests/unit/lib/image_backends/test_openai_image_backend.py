@@ -16,7 +16,7 @@ from lib.image_backends.base import (
     ReferenceImage,
 )
 from lib.providers import PROVIDER_OPENAI
-from tests.fakes import captured_openai_clients
+from tests.fakes import bounded_poll_clock, captured_openai_clients
 from tests.http_capture import capture_http, only_request
 
 
@@ -516,3 +516,30 @@ class TestModeGating:
             assert excinfo.value.code == "image_endpoint_mismatch_no_i2i"
             assert excinfo.value.params.get("model") == "m"
             assert excinfo.value.params.get("detail") == "all reference images failed to open"
+
+
+class TestAmbiguousSubmitIsNotResent:
+    async def test_timeout_after_the_request_was_sent_is_not_retried(self, tmp_path: Path):
+        """读超时时请求可能已被受理并扣费：不自动重发，异常原样上抛（ADR-0078）。"""
+        import openai
+
+        request_ref = httpx.Request("POST", "https://api.openai.com/v1/images/generations")
+        try:
+            try:
+                raise httpx.ReadTimeout("read timed out", request=request_ref)
+            except httpx.ReadTimeout as inner:
+                raise openai.APITimeoutError(request=request_ref) from inner
+        except openai.APITimeoutError as exc:
+            ambiguous = exc
+        mock_client = AsyncMock()
+        mock_client.images.generate = AsyncMock(side_effect=ambiguous)
+
+        with captured_openai_clients(mock_client), bounded_poll_clock():
+            from lib.image_backends.openai import OpenAIImageBackend
+
+            backend = OpenAIImageBackend(api_key="test-key")
+            with pytest.raises(openai.APITimeoutError) as raised:
+                await backend.generate(ImageGenerationRequest(prompt="一只猫", output_path=tmp_path / "out.png"))
+
+        assert raised.value is ambiguous
+        assert mock_client.images.generate.await_count == 1

@@ -8,7 +8,7 @@ from openai import AsyncOpenAI, BadRequestError
 
 from lib.config.url_utils import is_official_openai_base_url
 from lib.logging_utils import format_kwargs_for_log
-from lib.openai_shared import OPENAI_RETRYABLE_ERRORS, create_openai_client
+from lib.openai_shared import create_openai_client
 from lib.providers import PROVIDER_OPENAI
 from lib.retry import with_retry_async
 from lib.text_backends.base import (
@@ -22,6 +22,7 @@ from lib.text_backends.base import (
     structured_fallback_reason,
     truncate_for_log,
 )
+from lib.video_backends.base import should_retry_paid_sdk_submit
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ class OpenAITextBackend:
 
         return native
 
-    @with_retry_async(max_attempts=4, backoff_seconds=(2, 4, 8), retryable_errors=OPENAI_RETRYABLE_ERRORS)
+    @with_retry_async(max_attempts=4, backoff_seconds=(2, 4, 8), retry_if=should_retry_paid_sdk_submit)
     async def _generate_native(
         self, request: TextGenerationRequest, messages: list[dict]
     ) -> TextGenerationResult | None:
@@ -219,7 +220,7 @@ def _is_schema_error(exc: BaseException) -> bool:
     return any(kw in error_str for kw in _SCHEMA_ERROR_KEYWORDS)
 
 
-@with_retry_async(max_attempts=4, backoff_seconds=(2, 4, 8), retryable_errors=OPENAI_RETRYABLE_ERRORS)
+@with_retry_async(max_attempts=4, backoff_seconds=(2, 4, 8), retry_if=should_retry_paid_sdk_submit)
 async def _instructor_fallback(
     client: AsyncOpenAI,
     model: str,

@@ -17,6 +17,7 @@ from lib.image_backends.base import (
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_ARK
 from lib.retry import with_retry_async
+from lib.video_backends.base import should_retry_paid_sdk_submit
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ class ArkImageBackend:
     def capabilities(self) -> set[ImageCapability]:
         return self._capabilities
 
-    @with_retry_async()
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
         """异步生成图片（T2I / I2I）。"""
         # 构建 SDK 参数

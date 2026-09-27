@@ -56,7 +56,7 @@ class TestWhitelistAndExport:
     def test_audio_in_version_history_dirs(self):
         from server.services.project_archive import ProjectArchiveService
 
-        assert "audio" in ProjectArchiveService._VERSION_HISTORY_DIRS
+        assert "audio" in ProjectArchiveService._TYPED_VERSION_HISTORY_DIRS
 
 
 class TestGeneratedAssetsNarrationAudio:

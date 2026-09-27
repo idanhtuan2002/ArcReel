@@ -18,9 +18,10 @@ from lib.audio_backends.base import (
     AudioSynthesisResult,
     VoiceOption,
 )
-from lib.openai_shared import OPENAI_RETRYABLE_ERRORS, create_openai_client
+from lib.openai_shared import create_openai_client
 from lib.providers import PROVIDER_OPENAI
 from lib.retry import with_retry_async
+from lib.video_backends.base import should_retry_paid_sdk_submit
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +117,7 @@ class OpenAIAudioBackend:
             output_path=request.output_path,
         )
 
-    @with_retry_async(retryable_errors=OPENAI_RETRYABLE_ERRORS)
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def _request_speech(self, request: AudioSynthesisRequest) -> bytes:
         """提交合成请求（计费段），返回音频字节。"""
         kwargs: dict = {

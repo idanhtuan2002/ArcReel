@@ -17,6 +17,7 @@ from lib.text_backends.base import (
     TextGenerationResult,
     merge_billed_tokens,
 )
+from lib.video_backends.base import should_retry_paid_sdk_submit
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class ArkTextBackend:
         resolved_key = resolve_ark_api_key(api_key)
         effective_base_url = ark_base_url(base_url)
         self._client = create_ark_client(api_key=resolved_key, base_url=effective_base_url)
-        self._openai_client = OpenAI(base_url=effective_base_url, api_key=resolved_key)
+        self._openai_client = OpenAI(base_url=effective_base_url, api_key=resolved_key, max_retries=0)
         self._model = model or DEFAULT_MODEL
         self._capabilities: set[TextCapability] = self._resolve_capabilities()
 
@@ -83,7 +84,7 @@ class ArkTextBackend:
             return await self._generate_structured(request)
         return await self._generate_plain(request)
 
-    @with_retry_async()
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def _call_chat_completions(self, kwargs: dict, *, structured: bool) -> TextGenerationResult:
         """单次 chat.completions 调用：日志、发请求、解析与截断处理，瞬态错误重试。"""
         logger.info("调用 %s 文本 SDK kwargs=%s", self.name, format_kwargs_for_log(kwargs))
@@ -152,7 +153,7 @@ class ArkTextBackend:
 
         return await self._structured_fallback(request, messages)
 
-    @with_retry_async()
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def _structured_fallback(self, request: TextGenerationRequest, messages: list[dict]) -> TextGenerationResult:
         """Instructor / json_object 降级路径。
 

@@ -15,6 +15,7 @@ from ..gemini_shared import VERTEX_SCOPES, with_retry_async
 from ..logging_utils import format_kwargs_for_log
 from ..providers import PROVIDER_GEMINI
 from ..text_utils import strip_json_code_fences
+from ..video_backends.base import should_retry_paid_sdk_submit
 from .base import (
     StructuredOutputExhaustedError,
     TextCapability,
@@ -232,7 +233,7 @@ class GeminiTextBackend:
 
         return native
 
-    @with_retry_async()
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def _generate_native(self, request: TextGenerationRequest, *, structured: bool) -> TextGenerationResult:
         """单次原生 SDK 调用：构造 config/contents、发请求、截断处理与瞬态错误重试。
 

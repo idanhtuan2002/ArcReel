@@ -6,7 +6,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from lib.grok_shared import create_grok_client, grok_should_retry
+from lib.grok_shared import create_grok_client
 from lib.image_backends.base import (
     ImageCapability,
     ImageGenerationRequest,
@@ -17,6 +17,7 @@ from lib.image_backends.base import (
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_GROK
 from lib.retry import with_retry_async
+from lib.video_backends.base import should_retry_paid_sdk_submit
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class GrokImageBackend:
     def capabilities(self) -> set[ImageCapability]:
         return self._capabilities
 
-    @with_retry_async(retry_if=grok_should_retry)
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
         """生成图片（T2I 或 I2I）。"""
         generate_kwargs: dict = {

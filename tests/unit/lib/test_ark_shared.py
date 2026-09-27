@@ -70,9 +70,9 @@ class TestCreateArkClient:
     def test_trailing_slash_normalized_before_client_construction(self):
         with _recorded_ark_sdk() as created:
             create_ark_client(api_key="k", base_url="https://ark.cn-beijing.volces.com/api/v3/")
-        assert created == [{"base_url": ARK_BASE_URL, "api_key": "k"}]
+        assert created == [{"base_url": ARK_BASE_URL, "api_key": "k", "max_retries": 0}]
 
     def test_default_base_url_when_omitted(self):
         with _recorded_ark_sdk() as created:
             create_ark_client(api_key="k")
-        assert created == [{"base_url": ARK_BASE_URL, "api_key": "k"}]
+        assert created == [{"base_url": ARK_BASE_URL, "api_key": "k", "max_retries": 0}]

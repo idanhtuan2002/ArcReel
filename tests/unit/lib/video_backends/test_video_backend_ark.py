@@ -375,9 +375,9 @@ class TestArkRetryBehavior:
 
         create_result = MagicMock()
         create_result.id = "cgt-create-retry"
-        # 第一次创建抛 ConnectionError，第二次成功
+        # 第一次创建连接即失败（请求未送达），第二次成功
         ark_backend._client.content_generation.tasks.create = MagicMock(
-            side_effect=[ConnectionError("connection reset"), create_result]
+            side_effect=[httpx.ConnectError("connection refused"), create_result]
         )
 
         get_result = MagicMock()

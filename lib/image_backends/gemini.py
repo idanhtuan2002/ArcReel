@@ -25,6 +25,7 @@ from lib.image_backends.base import (
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_GEMINI
 from lib.system_config import resolve_vertex_credentials_path
+from lib.video_backends.base import should_retry_paid_sdk_submit
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ class GeminiImageBackend:
     def capabilities(self) -> set[ImageCapability]:
         return self._capabilities
 
-    @with_retry_async(max_attempts=5, backoff_seconds=(2, 4, 8, 16, 32))
+    @with_retry_async(max_attempts=5, backoff_seconds=(2, 4, 8, 16, 32), retry_if=should_retry_paid_sdk_submit)
     async def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
         """异步生成图片。"""
         # 1. 限流

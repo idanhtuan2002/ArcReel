@@ -29,6 +29,7 @@ from lib.video_backends.base import (
     VideoGenerationResult,
     is_retryable_http_status,
     poll_with_retry,
+    should_retry_paid_sdk_submit,
     should_retry_poll,
     with_artifact_retry,
 )
@@ -220,7 +221,7 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
                 supported=_format_durations(allowed),
             )
 
-    @with_retry_async()
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def _create_task(self, request: VideoGenerationRequest) -> Any:
         """创建 Gemini 视频生成任务（带重试保护）。"""
         # 1. 限流

@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from google.genai import errors as genai_errors
 
@@ -310,7 +311,7 @@ class TestGeminiRetryBehavior:
         gemini_backend._client.aio.models.generate_videos = AsyncMock(return_value=pending_op)
         # 第一次轮询抛 ConnectionError，第二次返回完成
         gemini_backend._client.aio.operations.get = AsyncMock(
-            side_effect=[ConnectionError("connection reset"), done_op]
+            side_effect=[httpx.ConnectError("connection refused"), done_op]
         )
 
         request = VideoGenerationRequest(prompt="test", output_path=output)
@@ -330,7 +331,7 @@ class TestGeminiRetryBehavior:
         done_op = _make_done_operation()
         # 第一次创建抛 ConnectionError，第二次成功
         gemini_backend._client.aio.models.generate_videos = AsyncMock(
-            side_effect=[ConnectionError("connection reset"), done_op]
+            side_effect=[httpx.ConnectError("connection refused"), done_op]
         )
 
         request = VideoGenerationRequest(prompt="test", output_path=output)

@@ -30,6 +30,7 @@ from lib.video_backends.base import (
     poll_with_retry,
     reference_audio_to_data_uri,
     should_retry_download,
+    should_retry_paid_sdk_submit,
 )
 from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
 
@@ -310,7 +311,7 @@ class ArkVideoBackend(ProviderJobIdPersistenceMixin):
                 raise ResumeExpiredError(job_id=job_id, provider=PROVIDER_ARK) from exc
             raise
 
-    @with_retry_async()
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def _create_task(self, request: VideoGenerationRequest) -> str:
         """创建 Ark 视频生成任务（带重试保护）。"""
         # 1. Build content list

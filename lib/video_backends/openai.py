@@ -26,6 +26,7 @@ from lib.video_backends.base import (
     VideoGenerationResult,
     normalize_provider_status,
     poll_with_retry,
+    should_retry_paid_sdk_submit,
     with_artifact_retry,
 )
 from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
@@ -133,7 +134,7 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
     """OpenAI Sora 视频生成后端。"""
 
     def __init__(self, *, api_key: str | None = None, model: str | None = None, base_url: str | None = None):
-        self._client = create_openai_client(api_key=api_key, base_url=base_url)
+        self._client = create_openai_client(api_key=api_key, base_url=base_url, max_retries=0)
         self._base_url = (base_url or "").strip().rstrip("/") or OFFICIAL_OPENAI_BASE_URL
         self._model = model or DEFAULT_MODEL
 
@@ -263,7 +264,7 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
             task_id=final.id,
         )
 
-    @with_retry_async(retryable_errors=OPENAI_RETRYABLE_ERRORS)
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def _create_video(self, *, request: VideoGenerationRequest | None = None, **kwargs):
         """仅创建视频任务（带重试）；轮询交由 _poll_until_complete 自管。"""
 

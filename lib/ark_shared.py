@@ -34,7 +34,11 @@ def ark_base_url(configured: str | None = None) -> str:
 
 
 def create_ark_client(*, api_key: str | None = None, base_url: str | None = None):
-    """创建 Ark 客户端；base_url 缺省走 ARK_BASE_URL（即 /api/v3），经 ark_base_url 归一化。"""
+    """创建 Ark 客户端；base_url 缺省走 ARK_BASE_URL（即 /api/v3），经 ark_base_url 归一化。
+
+    关掉 SDK 自带的重试（缺省 2 次，含读超时这类「请求可能已被处理」的歧义态）：付费提交的
+    重试只由调用方的谓词决定（ADR-0078），轮询与取件各自有幂等重试。
+    """
     from volcenginesdkarkruntime import Ark
 
-    return Ark(base_url=ark_base_url(base_url), api_key=resolve_ark_api_key(api_key))
+    return Ark(base_url=ark_base_url(base_url), api_key=resolve_ark_api_key(api_key), max_retries=0)

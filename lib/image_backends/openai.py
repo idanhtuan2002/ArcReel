@@ -21,11 +21,11 @@ from lib.openai_shared import (
     OPENAI_IMAGE_QUALITY_MAP as _QUALITY_MAP,
 )
 from lib.openai_shared import (
-    OPENAI_RETRYABLE_ERRORS,
     create_openai_client,
 )
 from lib.providers import PROVIDER_OPENAI
 from lib.retry import with_retry_async
+from lib.video_backends.base import should_retry_paid_sdk_submit
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ class OpenAIImageBackend:
         base_url: str | None = None,
         mode: ImageBackendMode = "both",
     ):
-        self._client = create_openai_client(api_key=api_key, base_url=base_url)
+        self._client = create_openai_client(api_key=api_key, base_url=base_url, max_retries=0)
         self._model = model or DEFAULT_MODEL
         self._capabilities = set(self._MODE_TO_CAPS[mode])
 
@@ -113,7 +113,7 @@ class OpenAIImageBackend:
     def capabilities(self) -> set[ImageCapability]:
         return self._capabilities
 
-    @with_retry_async(retryable_errors=OPENAI_RETRYABLE_ERRORS)
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
         has_refs = bool(request.reference_images)
         if has_refs and ImageCapability.IMAGE_TO_IMAGE not in self._capabilities:

@@ -312,6 +312,56 @@ def should_retry_submit(exc: Exception) -> bool:
     return isinstance(exc, _NOT_SENT_TRANSPORT_ERRORS)
 
 
+def _exception_chain(exc: BaseException) -> list[BaseException]:
+    """``exc`` 及其 ``__cause__`` / ``__context__`` 链（去环）。"""
+    chain: list[BaseException] = []
+    current: BaseException | None = exc
+    while current is not None and all(current is not seen for seen in chain):
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return chain
+
+
+def _sdk_status_code(exc: BaseException) -> int | None:
+    """SDK 异常携带的 HTTP 状态码：OpenAI / Ark 兼容 SDK 的 ``status_code``，google-genai 的 ``code``。"""
+    for attr in ("status_code", "code"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    return None
+
+
+def should_retry_paid_sdk_submit(exc: Exception) -> bool:
+    """经供应商 SDK 发出的付费提交（同步出图 / 文本 / 语音，或异步视频建任务）的重试谓词。
+
+    与 :func:`should_retry_submit` 同一口径（ADR-0078：没有已证实的原生幂等或按 id 查询能力时，
+    歧义态不自动重发）：
+
+    - 供应商明示的状态码按 :func:`is_retryable_http_status` 判定（429 / 5xx 等重试，404 与其余 4xx 不重试）；
+    - 传输错误只在异常链上能找到「请求确定未送达」的 httpx 连接期错误时重试；读超时、中途断连等
+      「请求可能已被处理」的歧义态一律不重试，宁可让一次可能的扣费可见，也不产生看不见的重复扣费；
+    - gRPC（xAI）只重试 ``RESOURCE_EXHAUSTED``（限流，服务端明示未受理）；``UNAVAILABLE`` /
+      ``DEADLINE_EXCEEDED`` 分不清请求是否已被处理，不重试；
+    - 其余异常（业务异常、``NonRetryableError``、SDK 自报的超时与连接错误）一律不重试。
+    """
+    if isinstance(exc, NonRetryableError):
+        return False
+    for link in _exception_chain(exc):
+        if isinstance(link, httpx.HTTPStatusError):
+            return is_retryable_http_status(link.response.status_code, retry_not_found=False)
+        if isinstance(link, httpx.TransportError):
+            return isinstance(link, _NOT_SENT_TRANSPORT_ERRORS)
+        grpc_code = getattr(link, "code", None)
+        if callable(grpc_code):
+            name = getattr(grpc_code(), "name", None)
+            if isinstance(name, str):
+                return name == "RESOURCE_EXHAUSTED"
+        status = _sdk_status_code(link)
+        if status is not None and status >= 400:
+            return is_retryable_http_status(status, retry_not_found=False)
+    return False
+
+
 def should_retry_poll(exc: Exception) -> bool:
     """轮询/下载阶段（幂等 GET）重试谓词。
 

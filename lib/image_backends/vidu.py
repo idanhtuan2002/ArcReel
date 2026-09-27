@@ -31,6 +31,7 @@ from lib.video_backends.base import (
     provider_reason_summary,
     redact_provider_text,
     redacted_status_error,
+    should_retry_submit,
 )
 from lib.vidu_shared import (
     VIDU_RETRYABLE_ERRORS,
@@ -183,7 +184,7 @@ class ViduImageBackend:
             usage_tokens=int(actual_credits) if actual_credits is not None else None,
         )
 
-    @with_retry_async(retryable_errors=VIDU_RETRYABLE_ERRORS)
+    @with_retry_async(retry_if=should_retry_submit)
     async def _create_task(self, client, body: dict) -> dict:
         assert_vidu_body_size(body)
         logger.info("调用 Vidu 图片 API kwargs=%s", format_kwargs_for_log(safe_body_for_log(body)))

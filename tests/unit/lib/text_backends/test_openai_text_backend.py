@@ -562,7 +562,7 @@ class TestInstructorFallback:
             captured_openai_clients(mock_client),
             patch(
                 "lib.text_backends.instructor_support.instructor_fallback_async",
-                new=AsyncMock(side_effect=ConnectionError("503 service unavailable")),
+                new=AsyncMock(side_effect=httpx.ConnectError("connection refused")),
             ) as mock_instructor,
             bounded_poll_clock(),
         ):
@@ -570,7 +570,7 @@ class TestInstructorFallback:
 
             backend = OpenAITextBackend(api_key="test-key")
             request = TextGenerationRequest(prompt="Extract info", response_schema=_PersonSchema)
-            with pytest.raises(ConnectionError):
+            with pytest.raises(httpx.ConnectError):
                 await backend.generate(request)
 
         # 原生 200 调用只发生一次；降级层自身重试 4 次穷尽

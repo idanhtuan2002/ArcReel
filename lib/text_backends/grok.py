@@ -6,7 +6,7 @@ import logging
 
 from xai_sdk import chat as xai_chat
 
-from lib.grok_shared import create_grok_client, grok_should_retry
+from lib.grok_shared import create_grok_client
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_GROK
 from lib.retry import with_retry_async
@@ -16,6 +16,7 @@ from lib.text_backends.base import (
     TextGenerationResult,
     check_truncation,
 )
+from lib.video_backends.base import should_retry_paid_sdk_submit
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class GrokTextBackend:
     def capabilities(self) -> set[TextCapability]:
         return self._capabilities
 
-    @with_retry_async(retry_if=grok_should_retry)
+    @with_retry_async(retry_if=should_retry_paid_sdk_submit)
     async def generate(self, request: TextGenerationRequest) -> TextGenerationResult:
         chat_kwargs: dict = {"model": self._model}
         if request.max_output_tokens is not None:

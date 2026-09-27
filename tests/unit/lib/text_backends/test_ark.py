@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from lib.text_backends.ark import ArkTextBackend
@@ -622,10 +623,10 @@ class TestSuccessPathReverify:
         with (
             patch(
                 "lib.text_backends.instructor_support.instructor_fallback_sync",
-                side_effect=ConnectionError("503 service unavailable"),
+                side_effect=httpx.ConnectError("connection refused"),
             ) as mock_instructor,
             bounded_poll_clock(),
-            pytest.raises(ConnectionError),
+            pytest.raises(httpx.ConnectError),
         ):
             await backend.generate(TextGenerationRequest(prompt="x", response_schema=Person))
 
@@ -640,7 +641,7 @@ class TestBaseUrl:
         with captured_ark_clients("lib.text_backends.ark") as ark_created, _recorded_openai_clients() as oa_created:
             ArkTextBackend(api_key="k", base_url=url)
         assert ark_created == [{"api_key": "k", "base_url": url}]
-        assert oa_created == [{"base_url": url, "api_key": "k"}]
+        assert oa_created == [{"base_url": url, "api_key": "k", "max_retries": 0}]
 
     def test_default_base_url_keeps_ark_v3(self):
         from lib.ark_shared import ARK_BASE_URL
@@ -648,4 +649,4 @@ class TestBaseUrl:
         with captured_ark_clients("lib.text_backends.ark") as ark_created, _recorded_openai_clients() as oa_created:
             ArkTextBackend(api_key="k")
         assert ark_created == [{"api_key": "k", "base_url": ARK_BASE_URL}]
-        assert oa_created == [{"base_url": ARK_BASE_URL, "api_key": "k"}]
+        assert oa_created == [{"base_url": ARK_BASE_URL, "api_key": "k", "max_retries": 0}]
