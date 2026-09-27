@@ -562,6 +562,8 @@ async def test_database_password_never_reaches_tool_argv(source: tuple[str, Path
         ("sequence", "a sequence advanced"),
         ("row", "the database was written"),
         ("file", "data-root files changed"),
+        ("truncate", "truncated, rewritten or altered"),
+        ("alter", "truncated, rewritten or altered"),
     ],
 )
 async def test_capture_detects_changes_made_while_capturing(
@@ -577,6 +579,8 @@ async def test_capture_detects_changes_made_while_capturing(
             "WHERE key = 'video_generate_audio'\" >/dev/null"
         ),
         "file": f"echo changed > '{data_root}/demo/project.json'",
+        "truncate": f"PGPASSWORD='{password}' psql -q '{target}' -c 'TRUNCATE api_keys' >/dev/null",
+        "alter": f"PGPASSWORD='{password}' psql -q '{target}' -c 'ALTER TABLE api_keys ADD COLUMN probe int' >/dev/null",
     }
     backup_dir = tmp_path / "backup-set"
 
@@ -733,3 +737,24 @@ async def test_attesting_with_a_corrupt_verdict_is_rejected(
             backup_dir=backup_dir, golden_evidence=_golden(backup_dir), measured_rpo_seconds=0, measured_rto_seconds=1
         )
     assert read_state(backup_dir)["state"] == BackupSetState.COMPLETE.value
+
+
+async def test_autovacuum_style_maintenance_during_capture_is_not_a_write(
+    source: tuple[str, Path], tmp_path: Path
+) -> None:
+    source_url, data_root = source
+    target, env = __import__("r2.host_hardening.deployment_backup", fromlist=["x"]).libpq_command_target(source_url)
+    password = env.get("PGPASSWORD", "")
+    maintenance = f"PGPASSWORD='{password}' psql -q '{target}' -c 'ANALYZE' -c 'VACUUM tasks' >/dev/null"
+
+    manifest = await create_deployment_backup(
+        backup_set_id="bs-analyze",
+        database_url=source_url,
+        roots={DATA_ROOT: data_root},
+        backup_dir=tmp_path / "backup-set",
+        identity=IDENTITY,
+        pg_dump_path=_tool_wrapper(tmp_path, "dump", maintenance),
+    )
+
+    assert manifest.fence.write_counter_before == manifest.fence.write_counter_after
+    assert read_state(tmp_path / "backup-set")["state"] == BackupSetState.COMPLETE.value

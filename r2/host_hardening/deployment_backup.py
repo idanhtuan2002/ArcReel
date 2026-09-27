@@ -5,8 +5,8 @@ file under the deployment's named data roots. It is captured only while the
 operator has stopped the application and worker. Capture proves that fence
 instead of trusting it: before and after the copy it requires zero other
 client sessions on the database, no queued/running/cancelling Task, and
-unchanged database write counter, sequence positions and file-tree
-fingerprint. Capture never writes to the source database.
+unchanged user-table write counters, relation storage and definitions, sequence
+positions and file-tree fingerprint. Capture never writes to the source database.
 
 Credential-bearing rows never enter the set. Their table data is excluded from
 ``pg_dump`` and captured separately as a binary COPY of the rows with credential
@@ -197,6 +197,7 @@ class _FenceSnapshot:
     write_counter: int
     file_fingerprint: str
     sequence_fingerprint: str
+    relation_fingerprint: str
 
 
 # --------------------------------------------------------------------------- paths
@@ -355,12 +356,36 @@ async def _active_tasks(conn: asyncpg.Connection) -> int:
 
 
 async def _write_counter(conn: asyncpg.Connection) -> int:
+    """Rows inserted, updated or deleted in user tables.
+
+    Database-wide counters also count system-catalog writes, which autovacuum and
+    autoanalyze make on their own (``pg_statistic``, ``pg_class``); user-table
+    counters move only when data changes.
+    """
     await conn.execute("SELECT pg_stat_clear_snapshot()")
-    value = await conn.fetchval(
-        "SELECT coalesce(tup_inserted + tup_updated + tup_deleted, 0) FROM pg_stat_database "
-        "WHERE datname = current_database()"
+    return await _fetch_int(conn, "SELECT coalesce(sum(n_tup_ins + n_tup_upd + n_tup_del), 0) FROM pg_stat_user_tables")
+
+
+async def _relation_fingerprint(conn: asyncpg.Connection) -> str:
+    """Digest of every relation's storage file and column definitions.
+
+    ``TRUNCATE`` and table rewrites give a relation a new ``relfilenode`` without
+    moving the row counters; DDL changes the column definitions. Autovacuum and
+    ``ANALYZE`` change neither.
+    """
+    relations = await conn.fetch(
+        "SELECT c.relname, c.relkind, c.relfilenode FROM pg_class c "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = current_schema() ORDER BY c.relname"
     )
-    return int(value or 0)
+    columns = await conn.fetch(
+        "SELECT table_name, ordinal_position, column_name, data_type, is_nullable, column_default "
+        "FROM information_schema.columns WHERE table_schema = current_schema() "
+        "ORDER BY table_name, ordinal_position"
+    )
+    return "sha256:" + canonical_json_digest(
+        [[list(map(str, row.values())) for row in relations], [list(map(str, row.values())) for row in columns]]
+    )
 
 
 async def _sequence_fingerprint(conn: asyncpg.Connection) -> str:
@@ -379,6 +404,7 @@ async def _fence_snapshot(conn: asyncpg.Connection, roots: Mapping[str, Path]) -
         active_tasks=await _active_tasks(conn),
         write_counter=await _write_counter(conn),
         sequence_fingerprint=await _sequence_fingerprint(conn),
+        relation_fingerprint=await _relation_fingerprint(conn),
         file_fingerprint=await asyncio.to_thread(_file_fingerprint, roots),
     )
 
@@ -540,6 +566,8 @@ async def create_deployment_backup(
         _assert_quiescent(after, phase="after capture")
         if after.write_counter != before.write_counter:
             raise OfflineFenceViolation("the database was written while capturing")
+        if after.relation_fingerprint != before.relation_fingerprint:
+            raise OfflineFenceViolation("a table was truncated, rewritten or altered while capturing")
         if after.sequence_fingerprint != before.sequence_fingerprint:
             raise OfflineFenceViolation("a sequence advanced while capturing")
         if after.file_fingerprint != before.file_fingerprint:
@@ -573,6 +601,8 @@ async def create_deployment_backup(
                 file_fingerprint_after=after.file_fingerprint,
                 sequence_fingerprint_before=before.sequence_fingerprint,
                 sequence_fingerprint_after=after.sequence_fingerprint,
+                relation_fingerprint_before=before.relation_fingerprint,
+                relation_fingerprint_after=after.relation_fingerprint,
             ),
         )
         _write_json(backup_dir / MANIFEST_FILENAME, manifest.model_dump(mode="json"))

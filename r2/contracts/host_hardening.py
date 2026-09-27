@@ -405,6 +405,8 @@ class OfflineFenceEvidence(R2ContractModel):
     file_fingerprint_after: NonEmptyStr
     sequence_fingerprint_before: NonEmptyStr
     sequence_fingerprint_after: NonEmptyStr
+    relation_fingerprint_before: NonEmptyStr
+    relation_fingerprint_after: NonEmptyStr
 
 
 class DeploymentBackupManifest(R2ContractModel):

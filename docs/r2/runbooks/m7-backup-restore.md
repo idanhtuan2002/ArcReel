@@ -95,7 +95,8 @@ the copy:
 
 - another client session is connected to the database;
 - a Task is active;
-- the database write counter moved;
+- a user table's row counters moved (autovacuum and `ANALYZE` do not count);
+- a table was truncated, rewritten or altered;
 - a sequence advanced;
 - the data-root file fingerprint changed.
 
