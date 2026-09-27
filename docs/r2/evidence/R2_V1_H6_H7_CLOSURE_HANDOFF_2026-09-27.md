@@ -386,3 +386,40 @@ Next: the restore-derived Golden A/B drill
 (`docs/research/2026-09-27-r2-v1-restore-derived-golden-drill.md`), then the
 full gates on the candidate HEAD, then the independent M7-D acceptance
 review.
+
+## Restore-derived Golden A/B drill — 2026-09-27
+
+Evidence: `R2_V1_GOLDEN_RESTORE_DRILL_2026-09-27.json` (HEAD `b088f238`,
+drill `tests/drills/r2/golden_restore_drill.py`, research
+`docs/research/2026-09-27-r2-v1-restore-derived-golden-drill.md`).
+
+The run used a disposable PostgreSQL 18 server and no provider credentials:
+
+1. **Materialize.** The drill created three real Host projects through the
+   HTTP API with a real JWT: `golden-a-h264`, `golden-b-western` and
+   `golden-b-shuangwen`. They were rendered with the no-provider fixture
+   pipelines and Remotion (967 s), and went through Gates A, B (Golden B),
+   C (per shot) and D.
+2. **Backup.** An offline backup was taken, then the source database and
+   data root were destroyed.
+3. **Restore and verify.** The set was restored to a clean target. `verify`
+   passed: 156 files, 33 references, 15 media probed.
+4. **Check.** On the restored target, each project and its gate history
+   were read through the API, and the approved masters and Gate C receipts
+   were resolved. The stored deliverable decodes. The final cut
+   re-composed from the restored masters hashes to the Gate D
+   `deliverable_digest` for all three products.
+5. **Attest.** `attest` succeeded and the set is **VERIFIED**. Measured
+   RPO 0 s and RTO 8 s on a single machine; the RTO spans restore, verify,
+   the Golden check and the re-export.
+
+Remaining for V1-05:
+
+1. **Full gates.** The full affected gates on the exact candidate HEAD:
+   - the backend full suite;
+   - frontend and website `pnpm check`;
+   - the migration round trip.
+2. **Independent review.** An independent M7-D acceptance review on that
+   HEAD.
+3. **Out of scope here.** Browser/operator workflow checks stay in V1-07
+   (E2).
