@@ -41,6 +41,7 @@ from lib.ledger import Ledger
 from lib.path_safety import PathTraversalError, safe_join
 from lib.providers import CallType, require_provider_pair
 from lib.resource_paths import resource_relative_path
+from lib.telemetry import clears_baggage_at_provider_boundary
 from lib.version_manager import PaidVersionCommit, VersionManager
 
 logger = logging.getLogger(__name__)
@@ -521,6 +522,7 @@ class MediaGenerator:
             )
         )
 
+    @clears_baggage_at_provider_boundary
     async def generate_image_async(
         self,
         prompt: str,
@@ -675,6 +677,7 @@ class MediaGenerator:
 
         return output_path, new_version
 
+    @clears_baggage_at_provider_boundary
     async def generate_audio_async(
         self,
         text: str,
@@ -834,6 +837,7 @@ class MediaGenerator:
             )
         )
 
+    @clears_baggage_at_provider_boundary
     async def generate_video_async(
         self,
         prompt: str,
@@ -1122,6 +1126,7 @@ class MediaGenerator:
 
         return output_path, committed.version, video_ref, video_uri
 
+    @clears_baggage_at_provider_boundary
     async def resume_video_async(
         self,
         *,

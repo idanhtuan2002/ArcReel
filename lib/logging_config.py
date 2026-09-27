@@ -10,6 +10,7 @@ from pathlib import Path
 
 from lib.app_data_dir import app_data_dir
 from lib.env_init import PROJECT_ROOT
+from lib.logging_utils import redact_provider_text
 
 _HANDLER_ATTR = "_arcreel_logging"
 _FILE_HANDLER_ATTR = "_arcreel_file_logging"
@@ -104,6 +105,28 @@ def migrate_legacy_log_dir() -> None:
         )
 
 
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+class RedactingFormatter(logging.Formatter):
+    """Mask credentials and URL query/userinfo in every rendered record, tracebacks included.
+
+    Applied at the handler, so a log call anywhere -- an echoed provider error,
+    a retried exception message, a traceback -- cannot write an API key, bearer
+    token, signed URL parameter or URL-embedded credential to the console or
+    the log file. Uses the same rules as provider error summaries
+    (``redact_provider_text``).
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        return redact_provider_text(super().format(record))
+
+
+def _default_formatter() -> logging.Formatter:
+    return RedactingFormatter(fmt=_LOG_FORMAT, datefmt=_LOG_DATE_FORMAT)
+
+
 def setup_logging(level: str | None = None, *, file: bool = True) -> None:
     """配置根 logger。
 
@@ -122,10 +145,7 @@ def setup_logging(level: str | None = None, *, file: bool = True) -> None:
     root = logging.getLogger()
     root.setLevel(numeric_level)
 
-    formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    formatter = _default_formatter()
 
     # 幂等：避免重复添加 stream handler
     if not any(getattr(h, _HANDLER_ATTR, False) for h in root.handlers):
@@ -167,10 +187,7 @@ def attach_file_handler(formatter: logging.Formatter | None = None) -> None:
         return
 
     if formatter is None:
-        formatter = logging.Formatter(
-            fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        formatter = _default_formatter()
 
     try:
         log_dir = resolve_log_dir()

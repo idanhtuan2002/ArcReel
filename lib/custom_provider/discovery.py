@@ -12,6 +12,7 @@ from lib.config.anthropic_url import anthropic_auth_headers, derive_anthropic_en
 from lib.custom_provider.endpoints import endpoint_to_media_type, infer_endpoint
 from lib.http_status_errors import raise_for_status_redacted
 from lib.httpx_shared import get_http_client
+from lib.telemetry import clears_baggage_at_provider_boundary
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class UnsupportedDiscoveryFormatError(ValueError):
     """discovery_format 取值不在受支持集合内，与 SDK 调用期的凭证/网络类 ValueError 区分。"""
 
 
+@clears_baggage_at_provider_boundary
 async def discover_models(
     *,
     discovery_format: str,

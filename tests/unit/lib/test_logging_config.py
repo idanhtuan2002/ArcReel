@@ -1,5 +1,7 @@
 import logging
 
+import pytest
+
 from lib.logging_config import _HANDLER_ATTR, setup_logging
 
 
@@ -53,3 +55,38 @@ class TestSetupLogging:
         root = logging.getLogger()
         root.handlers = [h for h in root.handlers if not getattr(h, _HANDLER_ATTR, False)]
         root.setLevel(logging.WARNING)
+
+
+def test_redacting_formatter_masks_credentials_and_signed_urls_in_messages_and_tracebacks() -> None:
+    import logging
+
+    from lib.logging_config import RedactingFormatter
+
+    formatter = RedactingFormatter(fmt="%(message)s")
+    secret = "sk-proj-" + "a1b2c3d4e5f6g7h8"
+
+    def _fail() -> None:
+        raise RuntimeError(
+            f"401 Authorization: Bearer {secret} for https://cdn.invalid/obj.mp4?X-Amz-Signature=deadbeef"
+        )
+
+    with pytest.raises(RuntimeError) as raised:
+        _fail()
+    record = logging.LogRecord(
+        "lib.video_backends.base",
+        logging.WARNING,
+        __file__,
+        1,
+        "provider said %s via %s",
+        (f"api_key={secret}", "https://user:hunter2@host.invalid/path?token=abc"),
+        (raised.type, raised.value, raised.tb),
+    )
+
+    rendered = formatter.format(record)
+
+    assert secret not in rendered
+    assert "deadbeef" not in rendered
+    assert "hunter2" not in rendered
+    assert "token=abc" not in rendered
+    assert "RuntimeError" in rendered
+    assert "https://cdn.invalid/obj.mp4" in rendered

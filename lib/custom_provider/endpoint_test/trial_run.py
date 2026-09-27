@@ -35,6 +35,7 @@ from lib.db.base import DEFAULT_USER_ID
 from lib.db.repositories.usage_repo import bound_provider_response
 from lib.ledger import Ledger
 from lib.task_failure import encode_failure
+from lib.telemetry import clears_baggage_at_provider_boundary
 from lib.video_backends.base import ProviderResponseStage, VideoGenerationRequest
 from lib.video_frame_slots import resolve_first_frame_aspect_ratio
 
@@ -348,6 +349,7 @@ class TrialRunManager:
             _remove_tree(self.root / run_id)
         return True
 
+    @clears_baggage_at_provider_boundary
     async def _execute(
         self,
         run: TrialRun,

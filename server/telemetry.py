@@ -1,20 +1,19 @@
-"""OpenTelemetry installation and provider-boundary baggage for H7 (spec section 9).
+"""OpenTelemetry installation for H7 (spec section 9).
 
-Span emission and the HMAC provider-job reference live in ``lib.telemetry`` so
-``lib`` seams can emit spans; they are re-exported here for existing callers.
-This module owns tracer-provider installation (OTLP from the environment, or an
-in-memory exporter for tests) and baggage clearing at provider entrypoints.
+Span emission, the HMAC provider-job reference and provider-boundary baggage
+clearing live in ``lib.telemetry`` so ``lib`` seams can use them; they are
+re-exported here for existing callers. This module owns tracer-provider and
+propagator installation (OTLP from the environment, or an in-memory exporter
+for tests).
 """
 
 from __future__ import annotations
 
-import functools
 import logging
 import os
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 
-from opentelemetry import baggage, trace
-from opentelemetry import context as otel_context
+from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -24,9 +23,12 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from lib.telemetry import (
     DEFAULT_TELEMETRY_HMAC_KEY_VERSION,
     SERVICE_NAME,
+    clear_baggage_for_provider_call,
+    clears_baggage_at_provider_boundary,
     deployment_environment,
     execution_span,
     get_tracer,
+    install_baggage_free_propagator,
     public_job_ref,
 )
 
@@ -61,6 +63,7 @@ def configure_tracer_from_env(
     because it may embed credentials.
     """
     env = os.environ if environ is None else environ
+    install_baggage_free_propagator()
     if not any(env.get(name) for name in OTLP_ENDPOINT_ENV_VARS):
         logger.info("OTLP 追踪导出未配置，跳过")
         return None
@@ -85,38 +88,6 @@ def configure_test_tracer() -> InMemorySpanExporter:
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     _install_tracer_provider(provider)
     return exporter
-
-
-def clear_baggage_for_provider_call() -> otel_context.Context:
-    """Return a context with W3C baggage cleared for one outbound provider call.
-
-    Baggage propagates to whatever the provider's own tracing picks up from
-    request headers; it must never carry user/project/provider identity
-    across that boundary, so this clears whatever the ambient context holds
-    rather than trusting it was never set in the first place.
-    """
-    return baggage.clear(context=otel_context.get_current())
-
-
-def clears_baggage_at_provider_boundary[**P, R](
-    func: Callable[P, Awaitable[R]],
-) -> Callable[P, Awaitable[R]]:
-    """Run an async provider-boundary entrypoint inside a baggage-cleared context.
-
-    Every provider call made while the wrapped coroutine runs sees an empty W3C
-    baggage set; the caller's ambient context is restored when it returns or
-    raises.
-    """
-
-    @functools.wraps(func)
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        token = otel_context.attach(clear_baggage_for_provider_call())
-        try:
-            return await func(*args, **kwargs)
-        finally:
-            otel_context.detach(token)
-
-    return wrapper
 
 
 __all__ = [

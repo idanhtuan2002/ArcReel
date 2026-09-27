@@ -136,3 +136,47 @@ def test_tracer_exports_allowlisted_spans_when_an_otlp_endpoint_is_configured(en
     assert span.resource.attributes["deployment.environment"] == "staging"
     assert dict(span.attributes or {})["task_id"] == "T-1"
     provider.shutdown()
+
+
+def test_configured_propagator_never_injects_baggage_into_outbound_headers() -> None:
+    from opentelemetry import propagate
+
+    configure_tracer_from_env({}, exporter_factory=InMemorySpanExporter)
+    configure_test_tracer()
+    carrier: dict[str, str] = {}
+    token = otel_context.attach(baggage.set_baggage("project_name", "demo"))
+    try:
+        with execution_span("unit.op", deployment_environment="test"):
+            propagate.inject(carrier)
+    finally:
+        otel_context.detach(token)
+
+    assert "traceparent" in carrier
+    assert "baggage" not in carrier
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    [
+        "lib.text_generator:TextGenerator.generate",
+        "lib.media_generator:MediaGenerator.generate_image_async",
+        "lib.media_generator:MediaGenerator.generate_audio_async",
+        "lib.media_generator:MediaGenerator.generate_video_async",
+        "lib.media_generator:MediaGenerator.resume_video_async",
+        "lib.custom_provider.endpoint_test.trial_run:TrialRunManager._execute",
+        "lib.custom_provider.discovery:discover_models",
+        "server.services.generation_tasks:execute_generation_task",
+        "server.services.resume_executor:execute_resume_video_task",
+    ],
+)
+def test_every_provider_boundary_clears_baggage(boundary: str) -> None:
+    import importlib
+
+    module_name, qualname = boundary.split(":")
+    target: object = importlib.import_module(module_name)
+    for part in qualname.split("."):
+        target = getattr(target, part)
+
+    code = getattr(target, "__code__", None)
+    assert code is not None, boundary
+    assert code.co_name == "_cleared", boundary

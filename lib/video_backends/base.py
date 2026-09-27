@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import re
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -21,7 +20,7 @@ from lib.data_uri import file_to_data_uri
 from lib.http_status_errors import ProviderRejectedError as ProviderRejectedError
 from lib.http_status_errors import provider_rejected_error, redacted_status_error
 from lib.http_status_errors import raise_for_status_redacted as raise_for_status_redacted
-from lib.logging_utils import redact_diagnostic_text, sanitize_diagnostic_payload
+from lib.logging_utils import redact_provider_text, sanitize_diagnostic_payload
 from lib.retry import BASE_RETRYABLE_ERRORS, AsyncClock, SystemClock, _should_retry, with_retry_async
 from lib.telemetry import public_job_ref, record_correlation_span
 
@@ -660,9 +659,6 @@ _CREDENTIAL_STATUS_CODES = frozenset({401, 407})
 #: 容器下钻深度上限，防畸形错误体上的深递归。
 _REASON_MAX_DEPTH = 3
 
-#: URL 或任何带查询串的 URL-like token。供应商偶尔省略 scheme；query 仍可能是凭证或签名参数。
-_REASON_URL_RE = re.compile(r"https?://[^\s\"'<>]+|[^\s\"'<>?]+\?[^\s\"'<>]+", re.IGNORECASE)
-
 
 def _reason_code(body: Mapping[str, object]) -> str | None:
     """取与拒因同层的机器码；``bool`` 不算码（JSON 里 ``True`` 是标志位而非错误号）。"""
@@ -702,35 +698,6 @@ def _reason_text(payload: object, depth: int = 0) -> str | None:
         return None
     code = _reason_code(body)
     return f"{code}: {text}" if code and code not in text else text
-
-
-def _strip_url_queries(text: str) -> str:
-    """去掉文本里每个绝对 URL 的查询串、片段与 userinfo：预签名参数与按 query 传的凭证都在
-    查询串里，而 ``https://TOKEN@host`` 这种把令牌塞进权限段的写法只有整段清掉才拦得住——
-    随后的通用脱敏只认得出 ``user:password@`` 形态，遮不住没有冒号的裸令牌。"""
-
-    def _replace(match: re.Match[str]) -> str:
-        raw = match.group(0).rstrip(".,;:!?)]}\"'")
-        trailing = match.group(0)[len(raw) :]
-        try:
-            stripped = str(httpx.URL(raw).copy_with(query=None, fragment=None, userinfo=b""))
-        except (httpx.InvalidURL, ValueError, UnicodeError):
-            stripped = "<url>"
-        return stripped + trailing
-
-    return _REASON_URL_RE.sub(_replace, text)
-
-
-def redact_provider_text(value: object) -> str:
-    """供应商原文的脱敏形态：先剥掉每个 URL 的查询串，再遮蔽凭证。
-
-    两层缺一不可：``redact_diagnostic_text`` 只认得出常见的凭证参数名，预签名 URL 上
-    的厂商私有参数要靠查询串整体剥离兜住；而查询串之外的凭证回显只有前者认得出。
-    """
-    if not isinstance(value, str):
-        # 非字符串只出现在留痕的兜底分支：没有 URL 文本可剥，交通用遮蔽器统一 str 化
-        return redact_diagnostic_text(value)
-    return redact_diagnostic_text(_strip_url_queries(value))
 
 
 def is_provider_rejection(status_code: int) -> bool:

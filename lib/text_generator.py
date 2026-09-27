@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from lib.ledger import Ledger
 from lib.providers import require_provider_pair
+from lib.telemetry import clears_baggage_at_provider_boundary
 from lib.text_backends.base import (
     TextGenerationRequest,
     TextGenerationResult,
@@ -48,6 +49,7 @@ class TextGenerator:
         backend, provider_id = await create_text_backend_for_task(task_type, project_name)
         return cls(backend, Ledger(), provider_id)
 
+    @clears_baggage_at_provider_boundary
     async def generate(
         self,
         request: TextGenerationRequest,

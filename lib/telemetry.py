@@ -15,14 +15,18 @@ provider these spans go to the OpenTelemetry API's no-op tracer.
 
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import secrets
-from collections.abc import Generator, Mapping
+from collections.abc import Callable, Coroutine, Generator, Mapping
 from contextlib import contextmanager
+from typing import Any
 
-from opentelemetry import trace
+from opentelemetry import baggage, propagate, trace
+from opentelemetry import context as otel_context
 from opentelemetry.trace import Link, Span, SpanContext, Status, StatusCode, TraceFlags
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from r2.host_hardening.telemetry import assert_span_attributes_allowed, public_provider_job_ref
 
@@ -175,15 +179,60 @@ def correlation_span(
         yield span
 
 
+def clear_baggage_for_provider_call() -> otel_context.Context:
+    """Return a context with W3C baggage cleared for one outbound provider call.
+
+    Baggage propagates to whatever the provider's own tracing picks up from
+    request headers; it must never carry user/project/provider identity
+    across that boundary, so this clears whatever the ambient context holds
+    rather than trusting it was never set in the first place.
+    """
+    return baggage.clear(context=otel_context.get_current())
+
+
+def clears_baggage_at_provider_boundary[**P, R](
+    func: Callable[P, Coroutine[Any, Any, R]],
+) -> Callable[P, Coroutine[Any, Any, R]]:
+    """Run an async provider-boundary entrypoint inside a baggage-cleared context.
+
+    Every provider call made while the wrapped coroutine runs sees an empty W3C
+    baggage set; the caller's ambient context is restored when it returns or
+    raises.
+    """
+
+    @functools.wraps(func)
+    async def _cleared(*args: P.args, **kwargs: P.kwargs) -> R:
+        token = otel_context.attach(clear_baggage_for_provider_call())
+        try:
+            return await func(*args, **kwargs)
+        finally:
+            otel_context.detach(token)
+
+    return _cleared
+
+
+def install_baggage_free_propagator() -> None:
+    """Propagate W3C trace context only, never W3C baggage, on every outbound carrier.
+
+    The OpenTelemetry default propagator injects both ``traceparent`` and
+    ``baggage``; with this installed, no instrumented client in the process can
+    forward ambient baggage to a provider, whatever calls it.
+    """
+    propagate.set_global_textmap(TraceContextTextMapPropagator())
+
+
 __all__ = [
     "DEFAULT_DEPLOYMENT_ENVIRONMENT",
     "DEFAULT_TELEMETRY_HMAC_KEY_VERSION",
     "DEPLOYMENT_ENVIRONMENT_ENV",
     "SERVICE_NAME",
+    "clear_baggage_for_provider_call",
+    "clears_baggage_at_provider_boundary",
     "correlation_span",
     "deployment_environment",
     "execution_span",
     "get_tracer",
+    "install_baggage_free_propagator",
     "public_job_ref",
     "record_correlation_span",
 ]

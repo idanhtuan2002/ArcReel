@@ -14,6 +14,8 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
+import httpx
+
 _STR_TRUNCATE_AT = 500
 _STR_TRUNCATE_PREFIX = 200
 _LIST_TRUNCATE_AT = 10
@@ -246,3 +248,36 @@ def format_kwargs_for_log(payload: Any) -> str:
         # 不能回退到 repr(payload)：原始对象未经脱敏，可能把敏感字段
         # 字面量重新带回日志，绕过前面所有的脱敏逻辑。固定占位符更安全。
         return "<unserializable>"
+
+
+#: URL 或任何带查询串的 URL-like token。供应商偶尔省略 scheme；query 仍可能是凭证或签名参数。
+_REASON_URL_RE = re.compile(r"https?://[^\s\"'<>]+|[^\s\"'<>?]+\?[^\s\"'<>]+", re.IGNORECASE)
+
+
+def _strip_url_queries(text: str) -> str:
+    """去掉文本里每个绝对 URL 的查询串、片段与 userinfo：预签名参数与按 query 传的凭证都在
+    查询串里，而 ``https://TOKEN@host`` 这种把令牌塞进权限段的写法只有整段清掉才拦得住——
+    随后的通用脱敏只认得出 ``user:password@`` 形态，遮不住没有冒号的裸令牌。"""
+
+    def _replace(match: re.Match[str]) -> str:
+        raw = match.group(0).rstrip(".,;:!?)]}\"'")
+        trailing = match.group(0)[len(raw) :]
+        try:
+            stripped = str(httpx.URL(raw).copy_with(query=None, fragment=None, userinfo=b""))
+        except (httpx.InvalidURL, ValueError, UnicodeError):
+            stripped = "<url>"
+        return stripped + trailing
+
+    return _REASON_URL_RE.sub(_replace, text)
+
+
+def redact_provider_text(value: object) -> str:
+    """供应商原文的脱敏形态：先剥掉每个 URL 的查询串，再遮蔽凭证。
+
+    两层缺一不可：``redact_diagnostic_text`` 只认得出常见的凭证参数名，预签名 URL 上
+    的厂商私有参数要靠查询串整体剥离兜住；而查询串之外的凭证回显只有前者认得出。
+    """
+    if not isinstance(value, str):
+        # 非字符串只出现在留痕的兜底分支：没有 URL 文本可剥，交通用遮蔽器统一 str 化
+        return redact_diagnostic_text(value)
+    return redact_diagnostic_text(_strip_url_queries(value))

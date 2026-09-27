@@ -99,3 +99,28 @@ class TestTextGenerator:
         assert calls["total"] == 1
         item = calls["items"][0]
         assert item["project_name"] == ""
+
+
+async def test_generate_calls_the_backend_without_ambient_baggage(wired):
+    from opentelemetry import baggage
+    from opentelemetry import context as otel_context
+
+    backend = _make_backend()
+    seen: list[dict] = []
+    result = backend.generate.return_value
+
+    async def _observe(_request):
+        seen.append(dict(baggage.get_all()))
+        return result
+
+    backend.generate = AsyncMock(side_effect=_observe)
+    gen = TextGenerator(backend, wired.ledger, "gemini-aistudio")
+
+    token = otel_context.attach(baggage.set_baggage("user_id", "u1"))
+    try:
+        await gen.generate(TextGenerationRequest(prompt="测试"), project_name="demo")
+        assert baggage.get_all() == {"user_id": "u1"}
+    finally:
+        otel_context.detach(token)
+
+    assert seen == [{}]
