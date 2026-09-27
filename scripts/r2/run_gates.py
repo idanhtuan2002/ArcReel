@@ -9,8 +9,10 @@ the run.
     uv run python -m scripts.r2.run_gates --config gates.json --out docs/r2/evidence/gate-run-<id> \\
         [--changes changes.json]
 
-``gates.json`` maps each gate name to a command string, split with ``shlex``. ``changes.json``
-maps upstream commit SHAs to dispositions for the report's change inventory. The manifest's
+``gates.json`` maps each gate name to a command string (split with ``shlex``) or to
+``{"command": ..., "allowed_skips": N}``. A skip the verifier accepts must be declared here, up
+front, and ships in the manifest; every other skip is a required skip and fails the gate.
+``changes.json`` maps upstream commit SHAs to dispositions for the report's change inventory. The manifest's
 ``target_sha`` is the current ``HEAD``, and the working tree must be clean before the run.
 """
 
@@ -34,7 +36,9 @@ def _tool_versions() -> str:
     return f"python {platform.python_version()}; git {_git('--version').removeprefix('git version ')}"
 
 
-def run_gate(name: str, command: str, out_dir: Path) -> dict[str, object]:
+def run_gate(name: str, spec: str | dict[str, object], out_dir: Path) -> dict[str, object]:
+    command = spec if isinstance(spec, str) else str(spec["command"])
+    allowed_skips = 0 if isinstance(spec, str) else int(str(spec.get("allowed_skips", 0)))
     completed = subprocess.run(shlex.split(command), capture_output=True, text=True, check=False)
     header = f"# command: {command}\n# exit_code: {completed.returncode}\n# tool_versions: {_tool_versions()}\n"
     text = header + completed.stdout + completed.stderr
@@ -43,6 +47,7 @@ def run_gate(name: str, command: str, out_dir: Path) -> dict[str, object]:
     return {
         "status": "PASS" if completed.returncode == 0 else "FAIL",
         "required_skips": 0,
+        "allowed_skips": allowed_skips,
         "exit_code": completed.returncode,
         "command": command,
         "log_path": log_path.as_posix(),
@@ -60,11 +65,11 @@ def main(argv: list[str] | None = None) -> int:
     if _git("status", "--porcelain=v1"):
         print(json.dumps({"error": "DIRTY_TREE", "detail": "commit or discard changes before a gate run"}))
         return 2
-    gates: dict[str, str] = json.loads(args.config.read_text(encoding="utf-8"))
+    gates: dict[str, str | dict[str, object]] = json.loads(args.config.read_text(encoding="utf-8"))
     changes: dict[str, str] = json.loads(args.changes.read_text(encoding="utf-8")) if args.changes else {}
     args.out.mkdir(parents=True, exist_ok=True)
     target_sha = _git("rev-parse", "HEAD")
-    results = {name: run_gate(name, command, args.out) for name, command in gates.items()}
+    results = {name: run_gate(name, spec, args.out) for name, spec in gates.items()}
     manifest = {"schema_version": 1, "target_sha": target_sha, "changes": changes, "results": results}
     manifest_path = args.out / "manifest.json"
     manifest_text = json.dumps(manifest, sort_keys=True)

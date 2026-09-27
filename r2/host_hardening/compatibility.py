@@ -164,20 +164,26 @@ def _verify_integration(report: dict[str, Any], *, host_repo: Path, upstream_rep
 #: Gates whose log must show a non-empty passing test run, not only a zero exit code.
 TEST_GATES = frozenset({"i18n", "frontend", "website", "h1_h8", "golden_a", "golden_b", "browser"})
 
-_LOG_HEADER_RE = re.compile(r"^# (command|exit_code|tool_versions): (.*)$", re.MULTILINE)
+_LOG_HEADER_RE = re.compile(r"# (command|exit_code|tool_versions): (.*)")
 _PASSED_RE = re.compile(r"\b(\d+) passed\b")
 _FAILED_RE = re.compile(r"\b(\d+) (failed|errors?)\b")
 _SKIPPED_RE = re.compile(r"\b(\d+) skipped\b")
 
 
 def parse_gate_log(text: str) -> dict[str, Any]:
-    """Read a runner-written gate log: the ``# command`` / ``# exit_code`` header and test counts.
+    """Read a runner-written gate log: the leading ``#`` header block, then test counts.
 
-    Counts come from pytest and vitest summary lines (``N passed``, ``N failed``, ``N error(s)``,
-    ``N skipped``); the largest figure of each kind is taken, so a per-file line cannot hide the
-    run total.
+    Only the header block at the top of the log counts, so gate output cannot restate the
+    command or exit code. Counts come from pytest and vitest summary lines (``N passed``,
+    ``N failed``, ``N error(s)``, ``N skipped``); the largest figure of each kind is taken, so a
+    per-file line cannot hide the run total.
     """
-    header = dict(_LOG_HEADER_RE.findall(text))
+    header: dict[str, str] = {}
+    for line in text.splitlines():
+        match = _LOG_HEADER_RE.fullmatch(line)
+        if match is None:
+            break
+        header.setdefault(match.group(1), match.group(2))
     exit_code = header.get("exit_code")
     return {
         "command": header.get("command", ""),
@@ -201,6 +207,11 @@ def _verify_gate_log(repo: Path, evidence_sha: str, gate_name: str, result: dict
         raise CompatibilityError(f"{gate_name} log does not show the manifest command exiting 0")
     if gate_name in TEST_GATES and (parsed["passed"] == 0 or parsed["failed"] != 0):
         raise CompatibilityError(f"{gate_name} log does not show a non-empty passing test run")
+    # Every skip in a gate log is a required skip unless the run config declared it allowed up
+    # front (the declaration ships in the committed manifest and is reviewed with it).
+    allowed = result.get("allowed_skips", 0)
+    if not isinstance(allowed, int) or allowed < 0 or parsed["skipped"] > allowed:
+        raise CompatibilityError(f"{gate_name} log skips {parsed['skipped']} tests; the run allows {allowed}")
 
 
 def verify_upstream_candidate(report: dict[str, Any], *, host_repo: Path, upstream_repo: Path) -> str:

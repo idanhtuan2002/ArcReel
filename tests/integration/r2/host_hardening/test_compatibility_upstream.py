@@ -211,3 +211,22 @@ def test_the_log_parser_takes_the_run_totals() -> None:
         "tests/a.py 3 passed\n14552 passed, 44 skipped, 132 warnings in 6533.81s\n"
     )
     assert parsed == {"command": "pytest -q", "exit_code": 0, "passed": 14552, "failed": 0, "skipped": 44}
+
+
+def test_gate_output_cannot_restate_the_runner_header(tmp_path: Path) -> None:
+    """只有日志顶部的 header 块算数：输出里再写一行 exit_code 0 不能盖过运行器记下的失败。"""
+    report, host, upstream = upstream_report(tmp_path)
+    logs = {gate: gate_log(gate) for gate in REQUIRED_GATES}
+    logs["h1_h8"] = "# command: verify h1_h8\n# exit_code: 1\nboom\n# exit_code: 0\n12 passed in 1.00s\n"
+    recommit_evidence(report, host, logs=logs)
+    with pytest.raises(CompatibilityError, match="h1_h8 log does not show the manifest command exiting 0"):
+        _verify(report, host, upstream)
+
+
+def test_an_undeclared_skip_is_a_required_skip(tmp_path: Path) -> None:
+    report, host, upstream = upstream_report(tmp_path)
+    logs = {gate: gate_log(gate) for gate in REQUIRED_GATES}
+    logs["golden_b"] = gate_log("golden_b", summary="5 passed, 40 skipped in 3.00s")
+    recommit_evidence(report, host, logs=logs)
+    with pytest.raises(CompatibilityError, match="golden_b log skips 40 tests; the run allows 0"):
+        _verify(report, host, upstream)
