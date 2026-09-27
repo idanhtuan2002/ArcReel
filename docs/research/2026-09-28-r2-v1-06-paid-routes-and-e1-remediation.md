@@ -411,3 +411,125 @@ as the upgrade path once CI is enabled.
 **Recommendation: U3.** It removes known vulnerabilities, keeps M7's accepted
 execution design, and gives E1 a concrete, reviewable use. The full upstream
 merge becomes a post-V1 packet, verified with the same tool.
+
+## Addendum 2 (2026-09-28): the sponsor's production requirement and a second upstream pass
+
+**Sponsor requirement (R2):** "khi sản xuất sản phẩm thật, sẽ có thể vừa chạy
+local vừa chạy cloud trả phí". When real products are made, the release must
+be able to run both local rendering and paid cloud generation. R2a (no
+enabled route) therefore does not meet the requirement.
+
+The V1 policy still applies: an enabled paid route must be `QUALIFIED`
+(strategy §5/§6, spec §10). V1-06 therefore has to deliver three things:
+
+1. a working **qualification path**;
+2. the routes the operator will actually use, **qualified**;
+3. every other route **disabled** in release mode.
+
+### New facts
+
+- **Synchronous paid routes auto-retry on ambiguous outcomes.**
+  - `lib/retry.py` retries on `TimeoutError` and on messages that contain
+    "timeout" or "gateway timeout". It is applied to paid image submits:
+    Gemini (5 attempts), OpenAI, Ark, DashScope, MiniMax and Agnes. It is
+    also applied to Grok text.
+  - A timeout after the request was sent is an ambiguous outcome: the
+    provider may have processed and billed the request. A blind retry can
+    charge twice.
+  - Only async video has the M7 attempt layer, with submit receipts and
+    reconciliation.
+- **Anonymous project file read.** Probe run on the V1 lineage with the real
+  ASGI app and no credentials:
+  - `GET /api/v1/files/demo/project.json` returned 200 with its content;
+  - `GET /api/v1/files/demo/source/novel.txt` returned 200 with the source
+    text.
+  - `files.public_router` is mounted without authentication
+    (`server/app.py:710`) and serves any file under the project directory.
+  - Upstream `c1cf1c62` (#2601) restricts it to media directories and media
+    extensions, and adds `nosniff`. This is the **eighth** confirmed security
+    defect. It also bears on the O2a export route: the export copy must sit
+    in an allow-listed media location.
+- **Second pass over upstream fixes.** There are 100 fix/revert commits since
+  the merge base (up to `upstream/main`). V1-relevant candidates beyond the
+  eight security fixes:
+  - **paid-route cost correctness:**
+    - `3ff6127f`: a Gemini paid job misjudged as expired;
+    - `7e994e5f`: reuse a manual upload instead of a paid regeneration;
+    - `0f8a4e1f`, `39fe7611`: price estimates;
+    - `70e1db92`, `d42226d5`, `7f3dfa14`: request facts;
+    - `6676f109`: telling an interrupted task from a user-cancelled one;
+    - `1cf17bfa`: cascading cancel of `cancelling`;
+    - `91b50681`;
+  - **scope and authorization:**
+    - `5839ef3b`: retry-download lookup through `_scope_query`;
+    - `31c5e985`;
+    - `e6e60d0c`: project-name validation on routes;
+  - **data integrity:**
+    - `29c778f0`: a current-scope archive export leaves no orphan
+      snapshots;
+    - `6a3e6cd8`: source symlink handling;
+    - `11f77f8f`: migrating old video version records.
+
+  The remaining fixes are ComfyUI, market, the data-root relocation
+  (a large layout change), UX and i18n, and development skills. Those are not
+  V1 needs.
+
+### R3: decision by research
+
+The sponsor delegated this choice to research. **T1 is selected**, for the
+reasons in Addendum 1, which the sponsor's R2 requirement strengthens:
+
+- Paid canaries run on the operator machine with the operator's
+  credentials, so a hosted-CI identity (T3) cannot cover them without
+  moving provider secrets into CI.
+- Signing on the same workstation (T2) stays at SLSA L1 and does not prove
+  that the gates ran.
+- T1's runner-generated, log-parsed evidence directly closes E1 finding S3,
+  within the ADR-0090 trust model.
+- Tag signing is decided at V1-08. CI attestation (T3) is the upgrade path
+  once CI is enabled.
+
+### R2: what qualifying a route requires (per route)
+
+1. **An exact profile.** Provider id, API version, adapter version and
+   endpoint, in the registry with its `entry_digest`.
+2. **Safe execution.**
+   - *Async video:* the existing M7 attempt layer. It still needs a test
+     that proves duplicate submission, restart and an ambiguous outcome
+     against the qualified adapter version.
+   - *Synchronous image, text or audio:* no automatic retry after an
+     ambiguous outcome, and the ambiguity recorded as a failed attempt for
+     the operator to decide on. A provider-documented idempotency key is the
+     exception, and it must be cited per provider.
+3. **A paid canary.** Authorized by the sponsor with a spend bound, run by
+   the T1 runner, and its evidence content-verified by the fixed E1
+   verifier.
+4. **An expiry.** Evidence carries `expires_at`, so an upgraded provider or
+   adapter needs requalification.
+
+**Open input from the sponsor:** which exact providers and models the
+operator will use in production, per modality (Agent/text, image, video,
+TTS). Only those are qualified; all others are disabled in release mode.
+
+### R4: options restated with the new evidence
+
+- **U1: pin with no backport.** Rejected: eight confirmed security defects,
+  including an anonymous source/script read.
+- **U2: integrate `v0.31.0`.** Brings every fix, with about 1600 files of
+  unneeded feature work. It also re-architects the executor that M7-A/B/C
+  accepted, and brings the data-root layout relocation.
+- **U3: pin and backport a selected set (recommended).**
+  - All eight security fixes.
+  - The paid-route cost-correctness fixes for the routes that will be
+    qualified.
+  - The scope and data-integrity fixes listed above.
+  - Each commit carries an E1 disposition: `CHERRY_PICK`, verified by
+    stable patch-id, or `ADAPTED`, re-implemented with the upstream tests
+    ported. Everything else is `DEFERRED` to a post-V1 upstream merge.
+  - Cost is roughly 20–25 commits. Several conflict with the upstream
+    `lib/backends/` restructure; the dry run showed 0–36 conflicts per
+    commit.
+- **U3 versus U2.** U3 keeps M7's accepted execution design and a bounded
+  review surface. U2 is simpler to describe but re-opens every accepted
+  gate. With paid cloud in scope, U3's paid-route fixes must be chosen per
+  qualified route, so the route list also shapes the backport set.
