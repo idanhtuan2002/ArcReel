@@ -526,6 +526,25 @@ that was changed or deleted after the immutable staging copy. Do not treat
 the hidden `.arcreel/` subtree as disposable by name while active resume can
 read it, and do not fabricate missing staged files from mutable source inputs.
 
+Candidate V1-02 classification for review (not an approved inventory schema):
+
+| Persisted state | Binding and byte disposition | Existing boundary to reuse |
+| --- | --- | --- |
+| A persisted subtitle/presentation pair | Capture both files exactly. Parse the presentation's top-level `script_file`, subtitle/presentation paths, and nested video plus optional narration `artifact_path`; bind each declared local path to the project census and its owning script/media identity. A raw-video projection still has a video path. Missing or inconsistent declared bytes block the exact-recovery claim for this pair. | `MaterializedPresentation.to_dict()` and the `SpeechPresentation`/raw-video serializers enumerate the fields; `ArtifactPlanner._prove_persisted_presentation()` recomputes the expected object. Its `CURRENT` result can support consistency, but is not by itself a backup byte or fence proof. |
+| No persisted pair | Record the observed absence or partial pair state explicitly. Do not invent a presentation file or infer one from the live UI projection. A partial pair requires a reviewed invalid/orphan disposition before exact recovery. | `ArtifactPlanner` skips absent optional pair members; its behavior does not settle backup authority. |
+| Video task with a valid checkpoint and a V1-01-approved resumable state | Bind checkpoint identity to the DB task row; require every checkpoint-declared staged file and the staging `manifest.json` in the same fenced project capture, verify the manifest records equal the checkpoint records, and hash/size-check each staged file. Bind `script_file` and nonempty narration `artifact_path` separately. Preserve the `source_locator` binding as provenance; do not reconstruct missing staging bytes from a changed source. | `load_task_video_checkpoint()`, `_load_staging_manifest()`, `_verify_staged_files()` and the project census provide parsers and physical observations. The production loader currently binds task coordinates, while staging equality is checked on the stage/reuse path, so recovery must compose those checks explicitly. |
+| Terminal task, absent checkpoint, or an unapproved/ambiguous task state | Retain any existing staging in the physical census. Do not require or discard staging merely because a checkpoint column is populated or a directory is hidden. V1-01 must decide whether the task can resume and whether absent staging is valid after cleanup. A malformed checkpoint is an explicit invalid-state finding, not an empty checkpoint. | `TaskRepository.persist_execution_checkpoint()` guards the pre-submit transition; normal finalization and worker cleanup can remove staging. |
+
+Fixtures for the review must cover both presentation variants, missing one member
+of a persisted pair, a nested media path that points to a different existing
+file, a checkpoint whose task coordinates disagree with its row, malformed and
+absent checkpoints, an active checkpoint with missing or corrupt staged bytes,
+checkpoint/manifest record mismatch, source changed after staging, a terminal
+checkpoint with staging already cleaned, and a terminal orphan staging tree.
+The task-state predicate, partial-pair policy, and a fence that keeps DB rows
+and project files coherent are still open; this table cannot authorize capture
+or restore adapters on its own.
+
 ### Quarantined draft source selectors
 
 Quarantine drafts are persisted as versioned envelopes with `meta` and
