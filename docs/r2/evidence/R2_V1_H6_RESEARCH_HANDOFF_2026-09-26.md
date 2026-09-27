@@ -1,5 +1,38 @@
 # R2 V1 H6 research handoff — 2026-09-26
 
+## Continuation checkpoint — 2026-09-27
+
+The live M7-D worktree was clean at `b586b3c3b22cb411682aa8f5f3dd291232f0e83e`
+before this handoff edit. Later Git state must be read live rather than inferred
+from this paragraph. `b586b3c3` adds the legacy bootstrap/deployment-identity
+matrix to the [lifecycle protocol note](../../research/2026-09-27-r2-m7-h6-project-lifecycle-protocol-options.md).
+Earlier `6286b9e8` records the isolated PostgreSQL 18.6 two-connection
+admission/deletion/rollback probe; `053546b1` records the bounded Task,
+attempt and backup writer survey. The probe tested scratch SQL ordering, not
+repository integration. The graph generation was `2026-09-18T10:57:40Z` from
+the separate M7 worktree; current source was read where coverage was stale or
+missing. No production schema, backup, restore or lifecycle adapter was added.
+
+The bootstrap matrix identifies incomplete HTTP creation, older/migrating
+metadata, DB-only historical names, conflicting users, hidden swap/import
+siblings and retained retired names as distinct review cases. The current
+`RecoveryConfigV1` parser accepts `source_deployment_id` but does not itself
+prove a runtime binding to the DB and project root. A bounded literal search
+did not find such a resolver in the inspected runtime paths. Source identity,
+signed pre-bootstrap census, legacy row dispositions and all-writer admission
+coverage remain open V1-01 gates.
+
+`git diff --check` passed for the research note before commit. On clean
+`b586b3c3`, the real-baseline M7 scope verifier passed (`1 passed, 17
+deselected`). The backend full suite remains incomplete from the earlier
+interrupted unrelated render. V1-02 still needs a release-pinned classifier
+for every declared reference and status-dependent pending/required rule; the
+existing `r2/host_hardening/grid_reference_probe.py` only extracts raw grid
+fields and grants no capture authority. Next, review V1-01 and V1-02 together
+against the exact candidate HEAD, resolve their open contract gates and obtain
+sponsor/independent acceptance before production H6 code. Preserve unrelated
+root-checkout changes. No license analysis is in scope.
+
 ## Current checkpoint after resumed work
 
 This section supersedes the older Git-state and resume instructions below;
