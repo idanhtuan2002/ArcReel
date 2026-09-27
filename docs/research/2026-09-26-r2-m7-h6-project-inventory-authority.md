@@ -521,10 +521,15 @@ paths and cancellation/error paths can remove staging
 `lib/reference_video/execution_checkpoint.py:361-425`). Therefore a retained
 checkpoint row is not unconditional proof that its staged file should still
 exist. V1-01 task-state disposition and V1-02 reference classification must
-jointly define active-versus-terminal required bytes, including source input
-that was changed or deleted after the immutable staging copy. Do not treat
-the hidden `.arcreel/` subtree as disposable by name while active resume can
-read it, and do not fabricate missing staged files from mutable source inputs.
+jointly define pre-submit, submitted and terminal dispositions. In particular,
+`classify_video_resume_state()` distinguishes checkpoint/no-job from a valid
+checkpoint/job pair (`lib/reference_video/execution_checkpoint.py:997-1021`).
+The submitted-job resume path uses the checkpoint and provider job, does not
+read the staged provider inputs, and cleans staging on exit
+(`server/services/resume_executor.py:96-166,232-239`). A still-running initial
+submit can read those files; its state cannot be inferred from the DB row
+alone. Do not treat the hidden `.arcreel/` subtree as disposable by name or
+fabricate missing staged files from mutable source inputs.
 
 Candidate V1-02 classification for review (not an approved inventory schema):
 
@@ -532,14 +537,16 @@ Candidate V1-02 classification for review (not an approved inventory schema):
 | --- | --- | --- |
 | A persisted subtitle/presentation pair | Capture both files exactly. Parse the presentation's top-level `script_file`, subtitle/presentation paths, and nested video plus optional narration `artifact_path`; bind each declared local path to the project census and its owning script/media identity. A raw-video projection still has a video path. Missing or inconsistent declared bytes block the exact-recovery claim for this pair. | `MaterializedPresentation.to_dict()` and the `SpeechPresentation`/raw-video serializers enumerate the fields; `ArtifactPlanner._prove_persisted_presentation()` recomputes the expected object. Its `CURRENT` result can support consistency, but is not by itself a backup byte or fence proof. |
 | No persisted pair | Record the observed absence or partial pair state explicitly. Do not invent a presentation file or infer one from the live UI projection. A partial pair requires a reviewed invalid/orphan disposition before exact recovery. | `ArtifactPlanner` skips absent optional pair members; its behavior does not settle backup authority. |
-| Video task with a valid checkpoint and a V1-01-approved resumable state | Bind checkpoint identity to the DB task row; require every checkpoint-declared staged file and the staging `manifest.json` in the same fenced project capture, verify the manifest records equal the checkpoint records, and hash/size-check each staged file. Bind `script_file` and nonempty narration `artifact_path` separately. Preserve the `source_locator` binding as provenance; do not reconstruct missing staging bytes from a changed source. | `load_task_video_checkpoint()`, `_load_staging_manifest()`, `_verify_staged_files()` and the project census provide parsers and physical observations. The production loader currently binds task coordinates, while staging equality is checked on the stage/reuse path, so recovery must compose those checks explicitly. |
-| Terminal task, absent checkpoint, or an unapproved/ambiguous task state | Retain any existing staging in the physical census. Do not require or discard staging merely because a checkpoint column is populated or a directory is hidden. V1-01 must decide whether the task can resume and whether absent staging is valid after cleanup. A malformed checkpoint is an explicit invalid-state finding, not an empty checkpoint. | `TaskRepository.persist_execution_checkpoint()` guards the pre-submit transition; normal finalization and worker cleanup can remove staging. |
+| Running video task, before or during initial submit | Treat as an active-writer blocker for a quiescent exact capture unless V1-01 proves a stronger fence. A checkpoint without a job ID cannot resume after restart. If a staging tree exists, census it and verify its manifest and bytes before assigning any reference binding; missing staging is not repaired from mutable sources. | `TaskRepository.persist_execution_checkpoint()` guards the pre-submit transition; `stage_provider_media()` reads the staged inputs for first submission; `classify_video_resume_state()` marks checkpoint/no-job separately. |
+| Running video task with valid checkpoint and provider job ID | `READY` means its execution identity is parseable and bound to the DB row, not that staged bytes are required for provider polling. Candidate quiescent capture still blocks this active task. If a staging tree exists, retain and verify it; if absent, record absence separately rather than claiming missing required resume input. Bind `script_file` and nonempty narration `artifact_path` under their own file rules. | `load_task_video_checkpoint()` and `classify_video_resume_state()` classify DB facts. `execute_resume_video_task()` resumes the provider job from checkpoint data and cleans staging; it does not reopen staged inputs. |
+| Terminal task, absent checkpoint, or an unapproved/ambiguous task state | Retain any existing staging in the physical census pending an orphan/cleanup disposition. Do not require or discard staging merely because a checkpoint column is populated or a directory is hidden. A malformed checkpoint is an explicit invalid-state finding, not an empty checkpoint. | Normal finalization and worker cleanup can remove staging. The existing `_load_staging_manifest()` and `_verify_staged_files()` can validate a present tree, but their ordinary-stage behavior does not establish H6 capture authority. |
 
 Fixtures for the review must cover both presentation variants, missing one member
 of a persisted pair, a nested media path that points to a different existing
 file, a checkpoint whose task coordinates disagree with its row, malformed and
-absent checkpoints, an active checkpoint with missing or corrupt staged bytes,
-checkpoint/manifest record mismatch, source changed after staging, a terminal
+absent checkpoints, checkpoint/no-job with missing staged bytes, a valid
+checkpoint/job pair with staging absent, checkpoint/manifest record mismatch,
+source changed after staging, a terminal
 checkpoint with staging already cleaned, and a terminal orphan staging tree.
 The task-state predicate, partial-pair policy, and a fence that keeps DB rows
 and project files coherent are still open; this table cannot authorize capture

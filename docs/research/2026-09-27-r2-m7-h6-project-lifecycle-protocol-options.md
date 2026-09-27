@@ -97,6 +97,36 @@ and reject `RETIRED`. Whole-tree v5-to-v6 migration similarly requires a
 its two renames; hidden rollback/staging siblings block capture when
 unresolved. These are candidate constraints, not current route behavior.
 
+### Candidate task-state gate for a quiescent H6 capture
+
+The current Task active set is `queued`, `running`, `cancelling`
+(`lib/db/repositories/task_repo.py:31,54-61`). A running video task can be
+between local staging, checkpoint persistence and provider job-ID persistence.
+On restart, `classify_video_resume_state()` treats checkpoint-without-job as
+unresumable, while a valid checkpoint/job pair is `READY` for provider polling
+(`lib/reference_video/execution_checkpoint.py:997-1016`). The resume executor
+does not reopen staged provider inputs and removes staging on exit
+(`server/services/resume_executor.py:96-166,232-239`). Worker restart cancels
+`cancelling` tasks, marks unresumable running tasks failed, and dispatches
+eligible submitted jobs (`lib/generation_worker.py:1115-1299`). A task marked
+`failed` may later return to `running` through artifact-download retry
+(`lib/db/repositories/task_repo.py:665-717`). These are execution behaviors,
+not a lifecycle capture predicate.
+
+Candidate V1-01 rule: a project with any `queued`, `running` or `cancelling`
+Task blocks exact quiescent capture until a reviewed fence proves those tasks
+terminal or a separate in-flight recovery protocol is accepted. Do not infer
+capture eligibility from `READY`, `provider_job_id`, worker inactivity or
+staging-directory presence. The fence must also prevent a failed-to-running
+retry from entering between the task census and DB dump. Terminal task rows
+and their checkpoints remain historical DB bytes; any project-local staging
+left behind gets an explicit physical-census/orphan disposition, not a
+checkpoint-based requirement to reconstruct or delete it. Fixtures must race
+capture with enqueue, first submit, cancel, orphan recovery and
+artifact-download retry, including a checkpoint/job pair with no staging.
+This gate is a design candidate pending complete writer enumeration and
+sponsor review; it does not authorize a production capture path.
+
 ## Why the other mechanisms are insufficient alone
 
 | Mechanism | Useful part | Missing proof for V1-01 |

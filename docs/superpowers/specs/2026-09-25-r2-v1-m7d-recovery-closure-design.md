@@ -248,8 +248,10 @@ rules remain a V1-02 approval item; a UI list that skips malformed grid JSON
 is not evidence of complete capture.
 Presentation and task-checkpoint paths need their own versioned field maps:
 an absent optional presentation differs from a present but divergent
-projection, and a cleaned terminal task differs from an active checkpoint
-whose immutable staged media is missing. The V1-01 task-state disposition and
+projection. A running pre-submit task can depend on staged media, whereas a
+submitted provider job resumes from its checkpoint without reopening staged
+inputs and may have cleaned them; a terminal task can also retain its
+checkpoint after staging cleanup. The V1-01 task-state disposition and
 V1-02 file rule must agree before either is admission authority.
 Quarantine-draft `meta.source` can name a project file or select the derived
 episode source when null; malformed or obsolete drafts need an explicit
@@ -843,8 +845,9 @@ cases include a pending record with no composite, a ready record whose
 composite is missing, a missing split-frame or reference-image target, and
 malformed grid JSON that the UI list would skip.
 They also include optional presentation absence versus divergent persisted
-media paths, an active checkpoint missing staged bytes, and a terminal
-checkpoint after legitimate staging cleanup. Draft cases include a named
+media paths, checkpoint/no-job with missing staged bytes, a valid
+checkpoint/job pair with staging absent, and a terminal checkpoint after
+legitimate staging cleanup. Draft cases include a named
 source file, a null selector with missing derived source, and a corrupt
 envelope retained by the physical census. Diagnostic cases include a
 `.migration_failure.json` record whose repair pointer names a rejected input,
