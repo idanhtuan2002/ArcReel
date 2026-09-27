@@ -24,6 +24,7 @@ from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifest
 from lib.asset_types import resolve_asset_key
 from lib.formal_write import formal_write_transaction
 from lib.json_io import atomic_write_bytes, atomic_write_json
+from lib.request_context import task_attribution
 from lib.resource_paths import RESOURCE_TYPES as _RESOURCE_TYPES
 from lib.resource_paths import (
     resource_extension,
@@ -420,6 +421,7 @@ class VersionManager:
                 "file": version_rel_path,
                 "prompt": prompt,
                 "created_at": self._generate_iso_timestamp(),
+                **task_attribution(),
                 **metadata,
                 _PREVIOUS_CURRENT_VERSION: previous_current_version,
             }
@@ -488,6 +490,7 @@ class VersionManager:
                         "file": rel_path,
                         "prompt": version_prompt,
                         "created_at": self._generate_iso_timestamp(),
+                        **task_attribution(),
                         **version_metadata,
                         _PREVIOUS_CURRENT_VERSION: previous_current_version,
                     }
@@ -611,6 +614,7 @@ class VersionManager:
                         "file": rel_path,
                         "prompt": prompt,
                         "created_at": self._generate_iso_timestamp(),
+                        **task_attribution(),
                         **dict(metadata),
                         _PREVIOUS_CURRENT_VERSION: previous,
                     }
@@ -772,6 +776,7 @@ class VersionManager:
                         "file": rel_path,
                         "prompt": version_prompt,
                         "created_at": self._generate_iso_timestamp(),
+                        **task_attribution(),
                         **version_metadata,
                         _PREVIOUS_CURRENT_VERSION: previous,
                     }

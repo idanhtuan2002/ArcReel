@@ -18,6 +18,7 @@ from typing import Any
 from claude_agent_sdk import create_sdk_mcp_server
 
 from lib.db.base import DEFAULT_USER_ID
+from lib.request_context import bound_request_id, new_request_id
 from server.agent_runtime.sdk_tools.asset_inventory import complete_asset_inventory_tool
 from server.agent_runtime.sdk_tools.content_read import (
     get_episode_script_tool,
@@ -183,6 +184,23 @@ def _refuse_while_migration_failed(sdk_tool: Any, ctx: ToolContext) -> Any:
     return replace(sdk_tool, handler=_guarded)
 
 
+def bind_tool_request_id(sdk_tool: Any) -> Any:
+    """Wrap one tool so each invocation is its own entry request.
+
+    Every generation a tool call enqueues shares that call's ``request_id``;
+    an ambient ID inherited from the HTTP request that started the session is
+    never reused across tool calls.
+    """
+
+    inner = sdk_tool.handler
+
+    async def _bound(args: Any) -> dict[str, Any]:
+        with bound_request_id(new_request_id()):
+            return await inner(args)
+
+    return replace(sdk_tool, handler=_bound)
+
+
 def build_arcreel_mcp_server(*, project_name: str, projects_root: Path, user_id: str = DEFAULT_USER_ID) -> Any:
     """Build the per-session in-process MCP server with all ArcReel tools."""
     ctx = ToolContext(
@@ -234,7 +252,11 @@ def build_arcreel_mcp_server(*, project_name: str, projects_root: Path, user_id:
         name="arcreel",
         version="1.0.0",
         tools=[
-            _refuse_while_migration_failed(sdk_tool, ctx) if sdk_tool.name in MIGRATION_BLOCKED_TOOL_IDS else sdk_tool
+            bind_tool_request_id(
+                _refuse_while_migration_failed(sdk_tool, ctx)
+                if sdk_tool.name in MIGRATION_BLOCKED_TOOL_IDS
+                else sdk_tool
+            )
             for sdk_tool in tools
         ],
     )

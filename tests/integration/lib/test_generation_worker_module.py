@@ -1022,6 +1022,24 @@ class TestGenerationWorker:
         assert queue.failed[0][0] == "t2"
 
     @pytest.mark.asyncio
+    async def test_process_task_binds_the_task_and_its_origin_request_while_executing(self, monkeypatch):
+        from lib.request_context import current_request_id, current_task_id
+
+        queue = _FakeQueue()
+        worker = GenerationWorker(queue=queue)
+        seen: list[tuple[str | None, str | None]] = []
+
+        async def _fake_execute(_task):
+            seen.append((current_task_id(), current_request_id()))
+            return {"ok": True}
+
+        monkeypatch.setattr("server.services.generation_tasks.execute_generation_task", _fake_execute)
+        await worker._process_task({"task_id": "t-bound", "request_id": "req-origin-0001"})
+
+        assert seen == [("t-bound", "req-origin-0001")]
+        assert current_task_id() is None
+
+    @pytest.mark.asyncio
     async def test_reused_video_result_reaches_the_normal_succeeded_terminal_state(self, monkeypatch):
         queue = _FakeQueue()
         worker = GenerationWorker(queue=queue)

@@ -31,6 +31,7 @@ from lib.generation_batch import (
     validate_blocked_items,
 )
 from lib.project_migration_guard import assert_project_migration_ok
+from lib.request_context import current_request_id
 from lib.task_terminal_events import TERMINAL_TASK_STATUSES, emit_task_terminal_events
 from r2.contracts.host_hardening import (
     TERMINAL_ATTEMPT_STATES,
@@ -479,6 +480,7 @@ class GenerationQueue:
                     command_id=command_id,
                     actor_scope=actor_scope,
                     command_digest=command_digest,
+                    request_id=current_request_id(),
                 )
 
         # Audio restoration observes active TTS/video consumers while holding the

@@ -44,6 +44,8 @@ class Task(UserOwnedMixin, Base):
     # 参考生视频首次提交前冻结的严格执行事实。独立列避免与可变 enqueue payload 混合，且让
     # checkpoint/job 组合在重启时可无歧义分流；只由 worker 内部消费，不属于 tasks API 契约。
     execution_checkpoint_json: Mapped[str | None] = mapped_column(Text)
+    # 发起本任务的入口请求标识（HTTP 请求或 Agent 工具调用），H7 关联链 request -> task 的持久连接。
+    request_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     queued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -51,6 +53,7 @@ class Task(UserOwnedMixin, Base):
 
     __table_args__ = (
         Index("idx_tasks_status_queued_at", "status", "queued_at"),
+        Index("idx_tasks_request_id", "request_id"),
         Index("idx_tasks_project_updated_at", "project_name", "updated_at"),
         Index("idx_tasks_dependency_task_id", "dependency_task_id"),
         Index("idx_tasks_status_provider_queued", "status", "provider_id", "queued_at"),

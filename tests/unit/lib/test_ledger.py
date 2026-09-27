@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from lib.db.models.api_call import ApiCall
 from lib.ledger import Ledger, _settlement_from_result
+from lib.request_context import bound_task
 
 
 async def _only_row(db_factory: async_sessionmaker) -> ApiCall:
@@ -290,3 +291,24 @@ class TestResumeAndBackfill:
         assert row.status == "success"
         assert row.cost_amount == pytest.approx(0.123)  # SDK 直报费用优先
         assert row.usage_tokens == 1_200_000
+
+
+class TestLedgerTaskAttribution:
+    async def test_call_started_while_a_task_executes_records_its_task_id(self, db_factory: async_sessionmaker) -> None:
+        ledger = Ledger(session_factory=db_factory)
+
+        with bound_task("T-usage-1", request_id=None):
+            async with ledger.record(project_name="demo", call_type="image", model="m") as call:
+                call.success(_ImgResult())
+
+        row = await _only_row(db_factory)
+        assert row.task_id == "T-usage-1"
+
+    async def test_call_started_outside_a_task_leaves_task_id_null(self, db_factory: async_sessionmaker) -> None:
+        ledger = Ledger(session_factory=db_factory)
+
+        async with ledger.record(project_name="demo", call_type="image", model="m") as call:
+            call.success(_ImgResult())
+
+        row = await _only_row(db_factory)
+        assert row.task_id is None

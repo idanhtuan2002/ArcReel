@@ -41,3 +41,26 @@ def test_retired_tool_names_are_not_registered() -> None:
         "validate_and_promote_draft",
         "get_episode_script_revision",
     }.isdisjoint(ARCREEL_MCP_TOOL_IDS)
+
+
+async def test_each_tool_invocation_binds_its_own_request_id() -> None:
+    from claude_agent_sdk import tool
+
+    from lib.request_context import bound_request_id, current_request_id
+    from server.agent_runtime.sdk_tools import bind_tool_request_id
+
+    seen: list[str | None] = []
+
+    @tool("probe", "records the bound request id", {"type": "object", "properties": {}})
+    async def _probe(_args: dict) -> dict:
+        seen.append(current_request_id())
+        return {"content": []}
+
+    wrapped = bind_tool_request_id(_probe)
+    with bound_request_id("req-http-session-start"):
+        await wrapped.handler({})
+        await wrapped.handler({})
+
+    assert len(seen) == 2
+    assert seen[0] != seen[1]
+    assert all(value is not None and value.startswith("req_") for value in seen)

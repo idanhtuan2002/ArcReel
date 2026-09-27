@@ -121,6 +121,7 @@ def _task_to_dict(row: Task) -> dict[str, Any]:
         "provider_endpoint": row.provider_endpoint,
         "submitted_base_url": row.submitted_base_url,
         "execution_checkpoint_json": row.execution_checkpoint_json,
+        "request_id": row.request_id,
         "queued_at": dt_to_iso(row.queued_at),
         "started_at": dt_to_iso(row.started_at),
         "finished_at": dt_to_iso(row.finished_at),
@@ -209,6 +210,7 @@ class TaskRepository(BaseRepository):
         command_id: str | None = None,
         actor_scope: str | None = None,
         command_digest: str | None = None,
+        request_id: str | None = None,
     ) -> dict[str, Any]:
         # Actor-scoped command replay is opt-in and independent of resource-based
         # active-task deduplication. All three or none -- a partial set
@@ -255,6 +257,7 @@ class TaskRepository(BaseRepository):
             dependency_group=dependency_group,
             dependency_index=dependency_index,
             provider_id=provider_id,
+            request_id=request_id,
             queued_at=now,
             updated_at=now,
             user_id=user_id,

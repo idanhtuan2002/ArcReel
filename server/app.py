@@ -39,6 +39,7 @@ from lib.httpx_shared import shutdown_http_client, startup_http_client
 from lib.logging_config import attach_file_handler, migrate_legacy_log_dir, setup_logging
 from lib.path_safety import try_safe_join
 from lib.project_migrations import cleanup_stale_backups, run_project_migrations
+from lib.request_context import accept_or_mint_request_id, bound_request_id
 from lib.source_loader.migration import migrate_project_source_encoding
 from server.auth import ensure_auth_password, get_current_user
 from server.cors_config import resolve_cors_policy
@@ -552,6 +553,8 @@ def _resolve_listen_addr() -> tuple[str, int]:
 
 # 前端每 3s 轮询下述接口获取任务状态；稳态下成功响应会把真正的错误/慢请求淹没，
 # 所以对 2xx + 快速响应降级到 DEBUG，异常/慢响应仍走 INFO 保证可观测。
+REQUEST_ID_HEADER = "X-Request-ID"
+
 _QUIET_POLL_ENDPOINTS: frozenset[tuple[str, str]] = frozenset(
     {
         ("GET", "/api/v1/tasks"),
@@ -559,6 +562,16 @@ _QUIET_POLL_ENDPOINTS: frozenset[tuple[str, str]] = frozenset(
     }
 )
 _QUIET_SLOW_THRESHOLD_MS = 500.0
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Bind one ``request_id`` per HTTP request and echo it as ``X-Request-ID``."""
+    request_id = accept_or_mint_request_id(request.headers.get(REQUEST_ID_HEADER))
+    with bound_request_id(request_id):
+        response: Response = await call_next(request)
+    response.headers[REQUEST_ID_HEADER] = request_id
+    return response
 
 
 @app.middleware("http")

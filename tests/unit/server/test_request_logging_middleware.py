@@ -89,3 +89,43 @@ async def test_non_quiet_endpoint_200_still_info(caplog: pytest.LogCaptureFixtur
     records = _access_log_records(caplog.records)
     assert len(records) == 1
     assert records[0].levelno == logging.INFO
+
+
+def _build_app_with_request_id_probe() -> FastAPI:
+    from lib.request_context import current_request_id
+    from server.app import request_id_middleware
+
+    app = FastAPI()
+    app.middleware("http")(request_id_middleware)
+
+    @app.get("/probe")
+    async def _probe() -> dict:  # pyright: ignore[reportUnusedFunction]
+        return {"request_id": current_request_id()}
+
+    return app
+
+
+@pytest.mark.asyncio
+async def test_request_id_middleware_binds_and_echoes_a_minted_id() -> None:
+    app = _build_app_with_request_id_probe()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/probe")
+
+    minted = resp.headers["X-Request-ID"]
+    assert minted.startswith("req_")
+    assert resp.json() == {"request_id": minted}
+
+
+@pytest.mark.asyncio
+async def test_request_id_middleware_reuses_well_formed_caller_id_and_replaces_malformed() -> None:
+    app = _build_app_with_request_id_probe()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        reused = await client.get("/probe", headers={"X-Request-ID": "client-trace-0001"})
+        replaced = await client.get("/probe", headers={"X-Request-ID": "Bearer sk-live-secret"})
+
+    assert reused.headers["X-Request-ID"] == "client-trace-0001"
+    assert reused.json() == {"request_id": "client-trace-0001"}
+    assert replaced.headers["X-Request-ID"] != "Bearer sk-live-secret"
+    assert replaced.json() == {"request_id": replaced.headers["X-Request-ID"]}

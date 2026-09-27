@@ -691,3 +691,21 @@ class TestVersionManager:
         history = vm.get_versions("videos", "E1S01")
         assert history["current_version"] == user_selection
         assert (project / history["versions"][-1]["file"]).read_bytes() == b"late-paid"
+
+
+def test_version_recorded_while_a_task_executes_carries_its_task_id(tmp_path):
+    from lib.request_context import bound_task
+
+    project = tmp_path / "demo"
+    vm = VersionManager(project)
+    current = project / "characters" / "Alice.png"
+    current.parent.mkdir(parents=True, exist_ok=True)
+    current.write_bytes(b"png-v1")
+
+    assert vm.add_version("characters", "Alice", "p1", source_file=current) == 1
+    with bound_task("T-version-2", request_id=None):
+        assert vm.add_version("characters", "Alice", "p2", source_file=current) == 2
+
+    versions = {v["version"]: v for v in vm.get_versions("characters", "Alice")["versions"]}
+    assert "task_id" not in versions[1]
+    assert versions[2]["task_id"] == "T-version-2"

@@ -63,6 +63,7 @@ from lib.reference_video.execution_checkpoint import (
     cleanup_staged_provider_media,
 )
 from lib.reference_video.request_projection import ReferenceProjectionBlockedError
+from lib.request_context import bound_task
 from lib.script_editor import ScriptEditError
 from lib.task_failure import encode_failure
 from lib.video_backends.base import ArtifactDownloadError, ProviderRejectedError, VideoCapabilityError
@@ -855,7 +856,8 @@ class GenerationWorker:
         logger.info("开始处理任务 %s (type=%s, provider=%s)", task_id, task_type, provider_id)
 
         try:
-            result = await self._executor(task, claimed_provider_id=provider_id)
+            with bound_task(task["task_id"], request_id=task.get("request_id")):
+                result = await self._executor(task, claimed_provider_id=provider_id)
         except asyncio.CancelledError:
             # 用户/级联取消：worker.request_cancel 触发 asyncio.Task.cancel()
             await asyncio.shield(self.queue.mark_task_cancelled(task_id, cancelled_by="user"))
@@ -998,7 +1000,8 @@ class GenerationWorker:
 
         async def _execute_with_video_cleanup() -> dict[str, Any]:
             try:
-                return await execute_resume_video_task(task, job_id=job_id)
+                with bound_task(task_id, request_id=task.get("request_id")):
+                    return await execute_resume_video_task(task, job_id=job_id)
             finally:
                 if checkpoint is not None:
                     await asyncio.shield(self._cleanup_video_staging(task))

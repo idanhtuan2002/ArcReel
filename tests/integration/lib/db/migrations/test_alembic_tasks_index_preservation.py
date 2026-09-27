@@ -24,6 +24,7 @@ INTENTIONAL_TASKS_INDEX_DROPS = {
     "26c2f9d11c8e": frozenset({"ix_tasks_batch_id"}),
     "285dbe1e9824": frozenset({"idx_tasks_status_provider_queued"}),
     "ea2e1a477bbf": frozenset({"ix_tasks_user_id"}),
+    "a7c3e9d1f200": frozenset({"idx_tasks_request_id"}),
 }
 
 # downgrade 走 batch 重建 tasks 表的迁移。
@@ -34,6 +35,7 @@ REBUILD_MIGRATIONS = [
     "285dbe1e9824",
     "548f6ca3e91c",
     "ea2e1a477bbf",
+    "a7c3e9d1f200",
 ]
 
 # initial schema，其 downgrade 删掉 tasks 表本身，全链走查到此为止。

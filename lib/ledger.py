@@ -33,6 +33,7 @@ from lib.db import safe_session_factory
 from lib.db.base import DEFAULT_USER_ID
 from lib.db.repositories.usage_repo import SettlementInput, UsageRepository
 from lib.providers import PROVIDER_GEMINI, CallType
+from lib.request_context import current_task_id
 
 logger = logging.getLogger(__name__)
 
@@ -212,7 +213,7 @@ class Ledger:
 
     async def _start_call(self, **kwargs: Any) -> int:
         async with self._session_factory() as session:
-            return await UsageRepository(session).start_call(**kwargs)
+            return await UsageRepository(session).start_call(task_id=current_task_id(), **kwargs)
 
     async def _finish_success(self, call_id: int, settlement: SettlementInput, *, output_path: str | None) -> None:
         async with self._session_factory() as session:
