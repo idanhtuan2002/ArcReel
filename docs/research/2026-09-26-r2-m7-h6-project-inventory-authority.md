@@ -453,13 +453,18 @@ have a formal Manifest entry.
 directory; its `list_all()` uses `glob("grid_*.json")` and logs/skips invalid
 JSON (`lib/grid_manager.py:23-29,157-165`). Therefore neither invoking that
 constructor during read-only capture nor using `list_all()` as a complete
-grid-record proof is safe. The physical tree census preserves the bytes, but
-it does not classify record references. V1-02 must define a read-only parser,
-version/shape acceptance, and status-sensitive rules for pending composite,
-split-frame and reference-image paths. It must test a malformed record and
-missing referenced bytes without silently dropping either. This is a
-bounded current-source finding, not an exhaustive grid-history audit or an
-approved capture rule.
+grid-record proof is safe. The existing pure
+`r2/host_hardening/grid_reference_probe.py:97-166` reads supplied bytes and
+extracts all declared grid paths while preserving absent/null/present states;
+the existing `scan_project_tree()` retains and hashes physical bytes. Reuse
+both under an approved fence instead of adding another grid parser or tree
+scanner. Neither supplies status-sensitive file authority: regeneration can
+leave an old composite path in `pending`, and composite replacement can leave
+old frame paths with null `split_at`. The [grid state matrix](2026-09-27-r2-m7-h6-grid-reference-state-matrix.md)
+records those counterexamples; the [reuse audit](2026-09-27-r2-m7-h6-v102-reuse-audit.md)
+bounds the other readers. V1-02 still must approve version/shape, Task/attempt
+and Manifest reconciliation, missing-byte results, and complete malformed-grid
+coverage. This is bounded current-source evidence, not an approved capture rule.
 
 ### Presentation projections and provider-media staging
 
