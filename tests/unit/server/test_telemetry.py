@@ -180,3 +180,13 @@ def test_every_provider_boundary_clears_baggage(boundary: str) -> None:
     code = getattr(target, "__code__", None)
     assert code is not None, boundary
     assert code.co_name == "_cleared", boundary
+
+
+def test_job_ref_for_log_hides_the_raw_id_and_tolerates_absence() -> None:
+    from lib.telemetry import job_ref_for_log
+
+    assert job_ref_for_log(None) == "<none>"
+    assert job_ref_for_log("") == "<none>"
+    ref = job_ref_for_log("job-canary-2")
+    assert ref == public_job_ref("job-canary-2")
+    assert "job-canary-2" not in ref

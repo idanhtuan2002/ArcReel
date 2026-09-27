@@ -40,6 +40,7 @@ from lib.retry import (
     DEFAULT_MAX_ATTEMPTS,
     with_retry_async,
 )
+from lib.telemetry import job_ref_for_log
 from lib.video_backends.base import (
     ProviderJobIdPersistenceMixin,
     ResumeExpiredError,
@@ -298,7 +299,7 @@ class AgnesVideoBackend(ProviderJobIdPersistenceMixin):
         )
         async with httpx.AsyncClient(timeout=self._http_timeout) as client:
             task_id = await self._create_task(client, payload, request)
-            logger.info("Agnes 视频任务已创建: task_id=%s model=%s", task_id, self._model)
+            logger.info("Agnes 视频任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)
             await self._persist_provider_job_id(request, task_id, provider=PROVIDER_AGNES)
             return await self._poll_and_build(client, task_id, request, is_resume=False)
 

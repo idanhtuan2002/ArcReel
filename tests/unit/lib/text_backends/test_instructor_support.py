@@ -691,7 +691,8 @@ class TestStructuredModeChainSync:
 
         assert self._modes(mock_gen) == [Mode.TOOLS]
 
-    def test_downgrade_logs_raw_model_output(self, caplog):
+    def test_downgrade_logs_raw_model_output(self, caplog, monkeypatch):
+        monkeypatch.setenv("ARCREEL_LOG_GENERATION_CONTENT", "1")
         """降档触发点以 warning 记录截断后的模型原始输出。"""
         sample = SampleModel(name="Dave", age=33)
         raw = "抱歉，我无法按要求输出 JSON。"

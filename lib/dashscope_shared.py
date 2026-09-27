@@ -238,7 +238,7 @@ _SAFE_LOG_KEYS: frozenset[str] = frozenset(
 
 
 def safe_body_for_log(body: dict) -> dict:
-    """生成安全日志视图：白名单标量 + prompt 截断 + media/messages 仅计数。
+    """生成安全日志视图：白名单标量 + prompt（由 format_kwargs_for_log 按内容策略摘要）+ media/messages 仅计数。
 
     body 含 input.messages（图像）或 input.media（视频），内部嵌 base64/URL；
     一律不展开，避免敏感数据进日志（对齐 CodeQL clear-text-logging 约束）。

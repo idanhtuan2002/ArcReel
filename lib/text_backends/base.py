@@ -11,6 +11,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ValidationError
 
+from lib.logging_utils import content_summary, generation_content_logging_enabled
 from lib.retry import NonRetryableError
 
 _logger = logging.getLogger(__name__)
@@ -99,12 +100,16 @@ RAW_OUTPUT_LOG_LIMIT = 500
 def truncate_for_log(text: str | None, limit: int = RAW_OUTPUT_LOG_LIMIT) -> str:
     """把模型原始输出压到可入日志的长度。
 
+    默认只记长度与摘要；运维设置 ``ARCREEL_LOG_GENERATION_CONTENT=1`` 时保留截断原文。
+
     结构化输出降级与解析拒绝由「模型实际输出了什么」决定，只记摘要（字段路径、错误类型）
     事后无法复盘，故这里刻意保留原文片段。与 :func:`summarize_validation_error` 的取舍不同：
     后者是每次校验失败都会走的高频路径，本函数只用在 warning 级的降级 / 拒绝分支。
     """
     if not text:
         return "<空>"
+    if not generation_content_logging_enabled():
+        return content_summary(text)
     if len(text) > limit:
         return f"{text[:limit]}…（截断，共 {len(text)} 字符）"
     return text

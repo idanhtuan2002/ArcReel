@@ -45,6 +45,7 @@ from lib.retry import (
     DEFAULT_MAX_ATTEMPTS,
     with_retry_async,
 )
+from lib.telemetry import job_ref_for_log
 from lib.video_backends.base import (
     ProviderJobIdPersistenceMixin,
     ReferenceAudioMode,
@@ -496,7 +497,7 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
         )
         async with httpx.AsyncClient(timeout=self._http_timeout) as client:
             task_id = await self._create_task(client, payload, request)
-            logger.info("DashScope 视频任务已创建: task_id=%s model=%s", task_id, self._model)
+            logger.info("DashScope 视频任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)
             # 一并写回实际提交域名（wan3.0 走独立 maas 域名，且两者都随用户配置可变）：
             # 续跑据此回放原域名，不然改配置后轮询会打到查不到该任务的主机。
             await self._persist_provider_job_id(

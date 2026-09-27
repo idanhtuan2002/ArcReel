@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import os
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass
@@ -39,18 +41,18 @@ _INLINE_AUTH_RE = re.compile(
 _BEARER_RE = re.compile(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]+")
 _SENSITIVE_TEXT_KEY_PATTERN = rf"(?:(?i:{_SEPARATED_SENSITIVE_KEY_PATTERN})|{_CAMEL_SENSITIVE_KEY_PATTERN})"
 _DOUBLE_QUOTED_SECRET_RE = re.compile(
-    rf"((?<![A-Za-z0-9]){_SENSITIVE_TEXT_KEY_PATTERN}\s*[\'\"]?\s*[=:]\s*\")"
+    rf"((?<![A-Za-z0-9_-]){_SENSITIVE_TEXT_KEY_PATTERN}\s*[\'\"]?\s*[=:]\s*\")"
     r'((?:\\.|[^"\\])*)(\")'
 )
 _SINGLE_QUOTED_SECRET_RE = re.compile(
-    rf"((?<![A-Za-z0-9]){_SENSITIVE_TEXT_KEY_PATTERN}\s*['\"]?\s*[=:]\s*')"
+    rf"((?<![A-Za-z0-9_-]){_SENSITIVE_TEXT_KEY_PATTERN}\s*['\"]?\s*[=:]\s*')"
     r"((?:\\.|[^'\\])*)(')"
 )
-_INLINE_SECRET_RE = re.compile(rf"((?<![A-Za-z0-9]){_SENSITIVE_TEXT_KEY_PATTERN}\s*[=:]\s*)" r"(?!['\"])([^\s,;&]+)")
+_INLINE_SECRET_RE = re.compile(rf"((?<![A-Za-z0-9_-]){_SENSITIVE_TEXT_KEY_PATTERN}\s*[=:]\s*)" r"(?!['\"])([^\s,;&]+)")
 _SIGNED_QUERY_RE = re.compile(
     r"(?i)([?&](?:x-amz-signature|x-goog-signature|signature|sig|access_token|auth_token|token|api_key|key|password)=)([^&#\s]*)"
 )
-_URL_PASSWORD_RE = re.compile(r"(?i)([a-z][a-z0-9+.-]*://[^/@\s:]*:)([^@/\s]+)(@)")
+_URL_PASSWORD_RE = re.compile(r"(?i)(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*://[^/@\s:]*:)([^@/\s]+)(@)")
 _API_KEY_VALUE_RE = re.compile(r"(?<![A-Za-z0-9])sk-(?:ant-|proj-)?[A-Za-z0-9_-]{8,}")
 # 散文里的凭证：上游 4xx 常把密钥连同一句话回显（"Incorrect API key provided: <key>"），
 # 标签与值之间隔着普通词，键值型规则匹配不到。标签后最多跨两个词再遇到 : / = 即遮蔽其后的值。
@@ -63,6 +65,27 @@ _PEM_PRIVATE_KEY_RE = re.compile(
     re.DOTALL,
 )
 _MASKED = "••••"
+
+
+#: Operator opt-in that restores generation content (prompts, model output) in logs.
+GENERATION_CONTENT_LOG_ENV = "ARCREEL_LOG_GENERATION_CONTENT"
+_CONTENT_KEY_RE = re.compile(
+    r"(?i)(?:[a-z0-9]+[_-])*(?:prompt|prompts|messages?|content|contents|text|instructions?|input_text|query)"
+)
+
+
+def generation_content_logging_enabled() -> bool:
+    return os.environ.get(GENERATION_CONTENT_LOG_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def content_summary(text: str) -> str:
+    """Stand-in for generation content in logs: length plus a short digest for correlation."""
+    digest = hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()[:12]
+    return f"<content len={len(text)} sha256={digest}>"
+
+
+def _is_content_key(key: str | None) -> bool:
+    return bool(key and _CONTENT_KEY_RE.fullmatch(key))
 
 
 def _is_sensitive_key(key: str | None) -> bool:
@@ -192,6 +215,8 @@ def _to_safe(obj: Any, key_hint: str | None = None) -> Any:
         data_uri = re.match(r"^data:([^;,]+);base64,(.*)$", obj, re.DOTALL)
         if data_uri:
             return f"<data-uri:mime={data_uri.group(1)},chars={len(data_uri.group(2))}>"
+        if _is_content_key(key_hint) and not generation_content_logging_enabled():
+            return content_summary(obj)
         return _truncate_str(obj)
 
     if isinstance(obj, bytes | bytearray):
@@ -236,6 +261,8 @@ def format_kwargs_for_log(payload: Any) -> str:
     - bytes/bytearray 替换为 ``<bytes:N>``
     - 嵌套 dict/list 递归处理
     - 敏感 key（api_key/secret/token/password/authorization）整体脱敏
+    - 生成内容 key（prompt/messages/content/text 等）下的字符串默认只记长度与摘要，
+      运维显式设置 ``ARCREEL_LOG_GENERATION_CONTENT=1`` 时才保留截断原文
     - Pydantic / dataclass 自动转 dict
 
     "失败不影响主流程"：日志辅助逻辑任何异常都吞掉，最差也只返回 ``<unserializable>``，
@@ -251,7 +278,7 @@ def format_kwargs_for_log(payload: Any) -> str:
 
 
 #: URL 或任何带查询串的 URL-like token。供应商偶尔省略 scheme；query 仍可能是凭证或签名参数。
-_REASON_URL_RE = re.compile(r"https?://[^\s\"'<>]+|[^\s\"'<>?]+\?[^\s\"'<>]+", re.IGNORECASE)
+_REASON_URL_RE = re.compile(r"https?://[^\s\"'<>]+|(?<![^\s\"'<>])[^\s\"'<>?]+\?[^\s\"'<>]+", re.IGNORECASE)
 
 
 def _strip_url_queries(text: str) -> str:

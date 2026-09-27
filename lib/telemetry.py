@@ -68,6 +68,13 @@ def public_job_ref(raw_provider_job_id: str) -> str:
     return public_provider_job_ref(raw_provider_job_id, key=key, key_version=version)
 
 
+def job_ref_for_log(raw_provider_job_id: str | None) -> str:
+    """The HMAC provider-job reference for log lines; tolerant of a missing ID."""
+    if not raw_provider_job_id:
+        return "<none>"
+    return public_job_ref(str(raw_provider_job_id))
+
+
 def deployment_environment(environ: Mapping[str, str] | None = None) -> str:
     env = os.environ if environ is None else environ
     return env.get(DEPLOYMENT_ENVIRONMENT_ENV) or DEFAULT_DEPLOYMENT_ENVIRONMENT
@@ -233,6 +240,7 @@ __all__ = [
     "execution_span",
     "get_tracer",
     "install_baggage_free_propagator",
+    "job_ref_for_log",
     "public_job_ref",
     "record_correlation_span",
 ]

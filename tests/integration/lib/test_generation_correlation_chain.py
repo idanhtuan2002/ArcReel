@@ -1,7 +1,11 @@
 """H7 end-to-end correlation: one generation joins request -> task -> provider job
--> usage -> version/master through durable columns and exported spans, and no
-planted secret canary reaches application logs, exported spans or durable
-public event payloads."""
+-> usage -> version/master through durable columns and exported spans.
+
+No planted canary reaches exported spans or durable public event payloads.
+Application logs, rendered by the production ``RedactingFormatter``, never carry
+a credential, bearer header, signed-URL parameter or raw provider job ID.
+Received failure detail (paths, provider text) stays in logs with credentials
+masked (ADR-0052); generation content is not copied into logs by default."""
 
 from __future__ import annotations
 
@@ -22,6 +26,7 @@ from lib.db.models.host_hardening import ProjectEventModel
 from lib.generation_queue import GenerationQueue
 from lib.generation_worker import GenerationWorker
 from lib.ledger import Ledger
+from lib.logging_config import RedactingFormatter
 from lib.request_context import bound_request_id
 from lib.version_manager import VersionManager
 from lib.video_backends.base import persist_provider_job_id
@@ -49,9 +54,14 @@ ALL_CANARIES = (
     "body-canary-h7-5d1e",
     CANARY_PATH_SEGMENT,
 )
-# The prompt is project content that the usage row and version history store by
-# design; it must still never reach telemetry.
-TELEMETRY_ONLY_CANARIES = ALL_CANARIES
+# The secret parts of the credential, header and signed-URL canaries: what the log
+# formatter must mask wherever they appear.
+LOG_SECRET_CANARIES = (
+    CANARY_CREDENTIAL,
+    "header-canary-h7-5d1e",
+    "url-canary-h7-5d1e",
+    CANARY_JOB_ID,
+)
 
 
 @dataclass
@@ -72,12 +82,8 @@ def _span_text(span: Any) -> str:
 
 
 def _log_text(records: list[logging.LogRecord]) -> str:
-    lines = []
-    for record in records:
-        lines.append(record.getMessage())
-        if record.exc_info is not None:
-            lines.append(logging.Formatter().formatException(record.exc_info))
-    return "\n".join(lines)
+    formatter = RedactingFormatter("%(name)s: %(message)s")
+    return "\n".join(formatter.format(record) for record in records)
 
 
 async def _enqueue_and_claim(queue: GenerationQueue, *, resource_id: str) -> dict[str, Any]:
@@ -163,14 +169,16 @@ async def test_successful_generation_closes_the_chain_without_leaking_canaries(
         assert spans[name].context.trace_id == task_span.context.trace_id
         assert spans[name].parent is not None
 
-    # Canaries: telemetry never carries any; logs and public events never do either.
+    # Canaries: telemetry and public events never carry any; rendered logs carry no
+    # secret and, with nothing failing, no generation content either.
     telemetry = "\n".join(_span_text(span) for span in exporter.get_finished_spans())
     logs = _log_text(caplog.records)
     public_events = "\n".join(json.dumps(event.public_payload, default=str) for event in events)
-    for canary in TELEMETRY_ONLY_CANARIES:
+    for canary in ALL_CANARIES:
         assert canary not in telemetry, canary
-        assert canary not in logs, canary
         assert canary not in public_events, canary
+    for canary in (*LOG_SECRET_CANARIES, CANARY_PROMPT):
+        assert canary not in logs, canary
 
 
 @pytest.mark.asyncio
@@ -203,5 +211,8 @@ async def test_failed_generation_keeps_secrets_out_of_spans_and_logs(
     for canary in ALL_CANARIES:
         assert canary not in telemetry, canary
     logs = _log_text(caplog.records)
-    for canary in ALL_CANARIES:
+    for canary in LOG_SECRET_CANARIES:
         assert canary not in logs, canary
+    # The failure is still diagnosable from the rendered log (ADR-0052).
+    assert "RuntimeError" in logs
+    assert "provider rejected" in logs

@@ -23,6 +23,7 @@ from lib.image_backends.base import (
 from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_VIDU
 from lib.retry import with_retry_async
+from lib.telemetry import job_ref_for_log
 from lib.video_backends.base import (
     is_provider_rejection,
     poll_with_retry,
@@ -150,7 +151,7 @@ class ViduImageBackend:
             payload = await self._create_task(client, body)
             task_id = payload["task_id"]
             credits = payload.get("credits")
-            logger.info("Vidu 图片任务已创建: task_id=%s credits=%s", task_id, credits)
+            logger.info("Vidu 图片任务已创建: job_ref=%s credits=%s", job_ref_for_log(task_id), credits)
 
             final = await poll_with_retry(
                 poll_fn=lambda: fetch_vidu_task(client, task_id),

@@ -390,7 +390,8 @@ class TestStructuredFallback:
         # reason 写明降级尝试次数与最后一次校验失败的原因
         assert exc_info.value.reason == "prompt 注入降级 2 次尝试后输出仍不合规（1 处字段不符（<root>））"
 
-    async def test_fallback_logs_raw_model_output(self, backend, caplog):
+    async def test_fallback_logs_raw_model_output(self, backend, caplog, monkeypatch):
+        monkeypatch.setenv("ARCREEL_LOG_GENERATION_CONTENT", "1")
         """降级触发点以 warning 记录模型原始输出，供事后诊断模型实际吐了什么。"""
         gc = AsyncMock(side_effect=[_resp(_PROSE), _resp(_VALID_JSON)])
         backend._test_client.aio.models.generate_content = gc

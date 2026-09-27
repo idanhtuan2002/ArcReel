@@ -161,7 +161,8 @@ class TestFindAllOverlapping:
 class TestParseDraft:
     """解析层的拒绝行为：两类失败都要变成可回传给模型的 _DraftRejected，且日志留下原始输出。"""
 
-    def test_rejects_malformed_json_with_unescaped_quote(self, caplog):
+    def test_rejects_malformed_json_with_unescaped_quote(self, caplog, monkeypatch):
+        monkeypatch.setenv("ARCREEL_LOG_GENERATION_CONTENT", "1")
         """字符串里带未转义引号 → 非法 JSON，拒绝并记录原始输出。"""
         raw = '{"episodes": [{"title": "他说"你好"", "hook": "h", "end_anchor": "锚点"}]}'
 
@@ -171,7 +172,8 @@ class TestParseDraft:
         assert "不是合法 JSON" in exc_info.value.reasons[0]
         assert any(raw[:20] in record.getMessage() for record in caplog.records)
 
-    def test_rejects_bare_episode_dict_at_top_level(self, caplog):
+    def test_rejects_bare_episode_dict_at_top_level(self, caplog, monkeypatch):
+        monkeypatch.setenv("ARCREEL_LOG_GENERATION_CONTENT", "1")
         """顶层是裸 episode 对象（缺 episodes wrapper）→ 结构错误，拒绝而不机械补 wrapper。"""
         raw = json.dumps({"title": "山村少年", "hook": "h", "end_anchor": ANCHOR_EP1}, ensure_ascii=False)
 

@@ -39,6 +39,7 @@ from lib.kling_shared import (
     kling_task_status,
 )
 from lib.providers import PROVIDER_KLING
+from lib.telemetry import job_ref_for_log
 from lib.video_backends.base import (
     ProviderJobIdPersistenceMixin,
     VideoAudioMode,
@@ -446,7 +447,7 @@ class KlingVideoBackend(KlingBackendBase, ProviderJobIdPersistenceMixin):
         logger.info("调用 Kling 视频 API payload=%s", self._safe_log_view(subpath, payload))
         async with httpx.AsyncClient(timeout=self._http_timeout) as client:
             task_id = await self._submit_task(client, f"videos/{subpath}", payload, request)
-            logger.info("Kling 视频任务已创建: task_id=%s model=%s", task_id, self._model)
+            logger.info("Kling 视频任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)
             # 持久化「子路径:task_id:有声标志」而非裸 task_id：resume 据此复原查询端点
             # 与 submit 时的有声决策（见 _encode_job_id）。
             await self._persist_provider_job_id(

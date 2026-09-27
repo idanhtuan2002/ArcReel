@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import re
-import traceback
 from collections.abc import Callable
 from typing import Any, TypeGuard
 
@@ -345,35 +344,3 @@ def parse_failure(error_message: str | None) -> tuple[str, dict[str, Any]] | Non
     if not isinstance(parsed, dict):
         return None
     return code, parsed
-
-
-def failure_log_label(error_message: str) -> str:
-    """The ``[code]`` of a stored failure reason, for logs.
-
-    Parameters and unstructured reasons (raw exception text) can carry prompts,
-    URLs, provider identifiers or credentials echoed by an upstream, so logs name
-    the failure class only; the stored reason stays the durable detail.
-    """
-    parsed = parse_failure(error_message)
-    return "unstructured" if parsed is None else f"[{parsed[0]}]"
-
-
-def format_exception_without_messages(exc: BaseException) -> str:
-    """Traceback frames and exception class names for ``exc`` and its chain, without messages.
-
-    Keeps where a failure happened for debugging while dropping message text,
-    which may echo secret-bearing request or response content.
-    """
-    lines: list[str] = []
-    seen: set[int] = set()
-    current: BaseException | None = exc
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        if lines:
-            lines.append("-- chained from --")
-        lines.append("Traceback (most recent call last):")
-        lines.extend(line.rstrip("\n") for line in traceback.extract_tb(current.__traceback__).format())
-        exc_type = type(current)
-        lines.append(f"{exc_type.__module__}.{exc_type.__qualname__}")
-        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
-    return "\n".join(lines)

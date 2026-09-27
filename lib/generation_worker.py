@@ -65,7 +65,7 @@ from lib.reference_video.execution_checkpoint import (
 from lib.reference_video.request_projection import ReferenceProjectionBlockedError
 from lib.request_context import bound_task
 from lib.script_editor import ScriptEditError
-from lib.task_failure import encode_failure, format_exception_without_messages
+from lib.task_failure import encode_failure
 from lib.telemetry import correlation_span
 from lib.video_backends.base import ArtifactDownloadError, ProviderRejectedError, VideoCapabilityError
 
@@ -913,13 +913,7 @@ class GenerationWorker:
             )
             return
         except Exception as exc:
-            logger.error(
-                "任务失败 %s (type=%s, provider=%s)\n%s",
-                task_id,
-                task_type,
-                provider_id,
-                format_exception_without_messages(exc),
-            )
+            logger.exception("任务失败 %s (type=%s, provider=%s)", task_id, task_type, provider_id)
             rows = await asyncio.shield(self.queue.mark_task_failed(task_id, _encode_task_failure_message(exc)))
             if rows == 0:
                 # 外部已抢先翻 cancelling → 落地 cancelled 终态
@@ -1066,13 +1060,7 @@ class GenerationWorker:
             await asyncio.shield(self._settle_unresumable_call(task))
             return
         except Exception as exc:
-            logger.error(
-                "resume 失败 %s (type=%s, provider=%s)\n%s",
-                task_id,
-                task_type,
-                provider_id,
-                format_exception_without_messages(exc),
-            )
+            logger.exception("resume 失败 %s (type=%s, provider=%s)", task_id, task_type, provider_id)
             rows = await asyncio.shield(self.queue.mark_task_failed(task_id, _encode_task_failure_message(exc)))
             if rows == 0:
                 await asyncio.shield(self.queue.mark_task_cancelled(task_id, cancelled_by="user"))

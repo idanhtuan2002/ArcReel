@@ -17,6 +17,7 @@ from lib.logging_utils import format_kwargs_for_log
 from lib.providers import PROVIDER_GEMINI
 from lib.retry import with_retry_async
 from lib.system_config import resolve_vertex_credentials_path
+from lib.telemetry import job_ref_for_log
 from lib.video_backends.base import (
     ProviderJobIdPersistenceMixin,
     ResumeExpiredError,
@@ -300,13 +301,13 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
             submit=_submit,
         )
         op_name = getattr(operation, "name", "unknown")
-        logger.info("视频生成已提交, operation=%s", op_name)
+        logger.info("视频生成已提交, job_ref=%s", job_ref_for_log(op_name))
         return operation
 
     async def _poll_until_done(self, operation: Any, request: VideoGenerationRequest) -> VideoGenerationResult:
         """轮询任务状态直到完成，瞬态错误仅重试当次轮询请求。"""
         op_name = getattr(operation, "name", "unknown")
-        logger.info("开始轮询 operation=%s ...", op_name)
+        logger.info("开始轮询 job_ref=%s ...", job_ref_for_log(op_name))
 
         if not operation.done:
             operation = await poll_with_retry(
@@ -317,19 +318,19 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
                 max_wait=request.poll_timeout_seconds,
                 label="Gemini",
                 on_progress=lambda op, elapsed: logger.info(
-                    "视频生成中... 已等待 %.0f 秒 (operation=%s)", elapsed, op_name
+                    "视频生成中... 已等待 %.0f 秒 (job_ref=%s)", elapsed, job_ref_for_log(op_name)
                 ),
             )
 
-        logger.info("视频生成完成 (operation=%s)", op_name)
+        logger.info("视频生成完成 (job_ref=%s)", job_ref_for_log(op_name))
 
         # 检查结果
         if not operation.response or not operation.response.generated_videos:
             error_detail = getattr(operation, "error", None)
             metadata = getattr(operation, "metadata", None)
             logger.error(
-                "视频生成返回空结果: operation=%s, error=%s, metadata=%s",
-                op_name,
+                "视频生成返回空结果: job_ref=%s, error=%s, metadata=%s",
+                job_ref_for_log(op_name),
                 error_detail,
                 metadata,
             )

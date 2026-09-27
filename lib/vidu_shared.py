@@ -84,7 +84,7 @@ _SAFE_LOG_KEYS: frozenset[str] = frozenset(
 
 
 def safe_body_for_log(body: dict) -> dict:
-    """生成安全的日志视图：仅保留白名单字段 + prompt 截断 + images 仅计数。"""
+    """生成安全的日志视图：仅保留白名单字段 + prompt（由 format_kwargs_for_log 按内容策略摘要）+ images 仅计数。"""
     view: dict = {k: body[k] for k in _SAFE_LOG_KEYS if k in body}
     if "prompt" in body:
         prompt = body["prompt"] or ""

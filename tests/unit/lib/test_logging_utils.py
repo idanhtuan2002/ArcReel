@@ -125,16 +125,16 @@ def test_diagnostic_payload_redacts_cloud_credentials_and_url_userinfo():
 
 
 def test_short_string_passthrough():
-    out = format_kwargs_for_log({"prompt": "hello"})
-    assert json.loads(out) == {"prompt": "hello"}
+    out = format_kwargs_for_log({"size": "1024x1024"})
+    assert json.loads(out) == {"size": "1024x1024"}
 
 
 def test_long_string_truncated():
     long_text = "a" * 1500
-    out = format_kwargs_for_log({"prompt": long_text})
+    out = format_kwargs_for_log({"detail": long_text})
     payload = json.loads(out)
-    assert payload["prompt"].startswith("a" * 200)
-    assert "truncated, total 1500 chars" in payload["prompt"]
+    assert payload["detail"].startswith("a" * 200)
+    assert "truncated, total 1500 chars" in payload["detail"]
 
 
 def test_bytes_summarized():
@@ -153,19 +153,19 @@ def test_bytearray_summarized():
 
 
 def test_nested_dict_recursion():
-    payload = {"outer": {"inner": {"prompt": "x" * 1000}}}
+    payload = {"outer": {"inner": {"detail": "x" * 1000}}}
     out = format_kwargs_for_log(payload)
     parsed = json.loads(out)
-    assert "truncated" in parsed["outer"]["inner"]["prompt"]
+    assert "truncated" in parsed["outer"]["inner"]["detail"]
 
 
 def test_pydantic_model_dump():
     class Req(BaseModel):
-        prompt: str
+        style: str
         size: str
 
-    out = format_kwargs_for_log(Req(prompt="hi", size="1024x1024"))
-    assert json.loads(out) == {"prompt": "hi", "size": "1024x1024"}
+    out = format_kwargs_for_log(Req(style="ink", size="1024x1024"))
+    assert json.loads(out) == {"style": "ink", "size": "1024x1024"}
 
 
 def test_sensitive_key_masked():
@@ -191,9 +191,44 @@ def test_long_list_truncated():
 
 
 def test_short_list_kept_as_is():
-    out = format_kwargs_for_log({"messages": [{"role": "user", "content": "hi"}]})
+    out = format_kwargs_for_log({"sizes": ["1024x1024", "512x512"]})
     parsed = json.loads(out)
-    assert parsed["messages"] == [{"role": "user", "content": "hi"}]
+    assert parsed["sizes"] == ["1024x1024", "512x512"]
+
+
+def test_generation_content_is_summarized_by_default(monkeypatch):
+    monkeypatch.delenv("ARCREEL_LOG_GENERATION_CONTENT", raising=False)
+    out = format_kwargs_for_log(
+        {"prompt": "a red paper boat", "messages": [{"role": "user", "content": "hi there"}], "size": "1024x1024"}
+    )
+    parsed = json.loads(out)
+
+    assert "red paper boat" not in out
+    assert "hi there" not in out
+    assert parsed["prompt"].startswith("<content len=16 sha256=")
+    assert parsed["messages"][0]["role"] == "user"
+    assert parsed["messages"][0]["content"].startswith("<content len=8 ")
+    assert parsed["size"] == "1024x1024"
+
+
+def test_generation_content_opt_in_restores_excerpts(monkeypatch):
+    monkeypatch.setenv("ARCREEL_LOG_GENERATION_CONTENT", "1")
+    out = format_kwargs_for_log({"prompt": "a red paper boat", "messages": [{"role": "user", "content": "hi"}]})
+
+    assert json.loads(out) == {"prompt": "a red paper boat", "messages": [{"role": "user", "content": "hi"}]}
+
+
+def test_redaction_is_linear_on_long_unbroken_tokens():
+    import time
+
+    from lib.logging_utils import redact_provider_text
+
+    hyphenated = "observed-upstream-detail-" * 3200
+    started = time.perf_counter()
+    redact_provider_text(hyphenated)
+    redact_provider_text("A" * 200_000)
+    redact_provider_text(" ".join(["aB3_-." * 340] * 50))
+    assert time.perf_counter() - started < 2.0
 
 
 def test_image_part_with_mime_type():
