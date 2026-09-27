@@ -186,8 +186,9 @@ Golden A/B. Fixes:
 
 - `869f1351`:
   - F1: bounded one-line separator whitespace; linear PEM pairing; masking
-    of unterminated quoted credentials. The sweep stays under 30 ms at 20k
-    characters.
+    of unterminated quoted credentials. Timing is linear across the sweep.
+    Correction from the confirmation review: URL-dense text costs about
+    86 ms at 20k characters (`httpx.URL` parsing), not under 30 ms.
   - F3: job IDs are bound outside queued tasks too.
 - `e2463c61`:
   - F4: global, whitespace-safe userinfo stripping, including
@@ -226,3 +227,50 @@ Still open:
    attestation and measured RPO/RTO (V1-05/E2).
 2. The full affected gates on the exact candidate HEAD, as V1-05 requires.
 3. A confirmation review of these fixes.
+
+## Confirmation review — 2026-09-27
+
+The confirmation review of `8a8ea340` returned **APPROVED_WITH_FOLLOWUPS**
+(`R2_V1_H6_H7_CONFIRMATION_REVIEW_2026-09-27.md`). H6/H7 are acceptable
+pending only two steps:
+
+- the Golden A/B restored-target run;
+- the full affected gates on the exact candidate HEAD.
+
+The follow-ups were applied in `7f145dd3`:
+
+- N1: possessive, line-spanning key/value separators restore masking for
+  YAML, next-line and multi-line values, and stay linear.
+- N2: CLI help.
+- N3: `?`/`#` end the userinfo match.
+- N4: no re-attestation of a VERIFIED set.
+- N5: case-insensitive target guard.
+- N6: invalid JSON raises `BackupIntegrityError`.
+
+Remaining accepted limit:
+
+- An `Authorization:` header continued on a new line stays unmasked on its
+  continuation line.
+
+Drill evidence was regenerated on `7f145dd3`:
+
+- verify `checks_passed`;
+- attest refused without Golden evidence;
+- the set stays `COMPLETE`;
+- 0 canaries.
+
+Verification:
+
+- The unit, `integration/lib`, `integration/server/services`,
+  `integration/server/agent_runtime` and `integration/r2/host_hardening`
+  suites: `12856 passed`. The only failure was the dirty-tree scope check.
+- H6 PostgreSQL plus CLI: `23 passed`.
+- Static gates are clean.
+- The full suite was not run.
+
+Open for H6/H7 acceptance (V1-05):
+
+1. **Golden A/B on a restored target.** Run the no-provider
+   read/review/export for the two Golden products on a restored target,
+   then `attest` with measured RPO/RTO.
+2. **Full affected gates** on that exact candidate HEAD.
