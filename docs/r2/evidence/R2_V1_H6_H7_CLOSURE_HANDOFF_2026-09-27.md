@@ -15,7 +15,7 @@ Live Git state is authoritative. Read `git log` and `git status` on resume.
 - [x] H7-1 Alembic: `tasks.request_id`, `api_calls.task_id` (nullable)
 - [x] H7-2 request_id minting (HTTP middleware + agent entry) → enqueue → task row
 - [x] H7-3 `api_calls.task_id` from ledger start; version metadata `task_id`
-- [ ] H7-4 production tracer from env (OTLP/HTTP), wired at app/worker startup
+- [x] H7-4 production tracer from env (OTLP/HTTP), wired at app/worker startup
 - [ ] H7-5 spans at enqueue / execution / provider-job / version / usage seams
 - [ ] H7-6 end-to-end secret-canary + chain-closure test
 

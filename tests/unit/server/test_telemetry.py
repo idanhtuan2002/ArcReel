@@ -6,12 +6,14 @@ from __future__ import annotations
 import pytest
 from opentelemetry import baggage
 from opentelemetry import context as otel_context
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from r2.host_hardening.telemetry import TelemetryPolicyError
 from server.telemetry import (
     clear_baggage_for_provider_call,
     clears_baggage_at_provider_boundary,
     configure_test_tracer,
+    configure_tracer_from_env,
     execution_span,
     public_job_ref,
 )
@@ -110,3 +112,27 @@ def test_public_job_ref_is_stable_within_a_process() -> None:
     b = public_job_ref("job-canary-1")
     assert a == b
     assert "job-canary-1" not in a
+
+
+def test_tracer_is_not_installed_without_an_otlp_endpoint() -> None:
+    assert configure_tracer_from_env({}, exporter_factory=InMemorySpanExporter) is None
+
+
+@pytest.mark.parametrize("endpoint_var", ["OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"])
+def test_tracer_exports_allowlisted_spans_when_an_otlp_endpoint_is_configured(endpoint_var: str) -> None:
+    exporter = InMemorySpanExporter()
+    provider = configure_tracer_from_env(
+        {endpoint_var: "http://collector.invalid:4318", "DEPLOYMENT_ENVIRONMENT": "staging"},
+        exporter_factory=lambda: exporter,
+    )
+    assert provider is not None
+
+    with execution_span("unit.op", deployment_environment="staging", task_id="T-1"):
+        pass
+    provider.force_flush()
+
+    (span,) = exporter.get_finished_spans()
+    assert span.resource.attributes["service.name"] == "arcreel-host"
+    assert span.resource.attributes["deployment.environment"] == "staging"
+    assert dict(span.attributes or {})["task_id"] == "T-1"
+    provider.shutdown()

@@ -17,14 +17,15 @@ import functools
 import logging
 import os
 import secrets
-from collections.abc import Awaitable, Callable, Generator
+from collections.abc import Awaitable, Callable, Generator, Mapping
 from contextlib import contextmanager
 
 from opentelemetry import baggage, trace
 from opentelemetry import context as otel_context
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor, SpanExporter
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import Link, Span, SpanContext, TraceFlags
 
@@ -34,6 +35,10 @@ logger = logging.getLogger(__name__)
 
 SERVICE_NAME = "arcreel-host"
 DEFAULT_TELEMETRY_HMAC_KEY_VERSION = "v1"
+DEPLOYMENT_ENVIRONMENT_ENV = "DEPLOYMENT_ENVIRONMENT"
+DEFAULT_DEPLOYMENT_ENVIRONMENT = "development"
+# Standard OpenTelemetry variables; either one enables OTLP/HTTP trace export.
+OTLP_ENDPOINT_ENV_VARS = ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_ENDPOINT")
 
 _cached_hmac_key: bytes | None = None
 
@@ -66,6 +71,48 @@ def public_job_ref(raw_provider_job_id: str) -> str:
     return public_provider_job_ref(raw_provider_job_id, key=key, key_version=version)
 
 
+def deployment_environment(environ: Mapping[str, str] | None = None) -> str:
+    env = os.environ if environ is None else environ
+    return env.get(DEPLOYMENT_ENVIRONMENT_ENV) or DEFAULT_DEPLOYMENT_ENVIRONMENT
+
+
+def _install_tracer_provider(provider: TracerProvider) -> None:
+    # The OTel API refuses to override an already-set global TracerProvider:
+    # a one-shot `Once` guard (independent of the stored value) makes every
+    # call after the first a no-op with a warning. Installing a provider more
+    # than once per process needs a genuine reset of both.
+    trace._TRACER_PROVIDER = None
+    trace._TRACER_PROVIDER_SET_ONCE._done = False
+    trace.set_tracer_provider(provider)
+
+
+def configure_tracer_from_env(
+    environ: Mapping[str, str] | None = None,
+    *,
+    exporter_factory: Callable[[], SpanExporter] = OTLPSpanExporter,
+) -> TracerProvider | None:
+    """Install the production tracer when an OTLP endpoint is configured.
+
+    With neither ``OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`` nor
+    ``OTEL_EXPORTER_OTLP_ENDPOINT`` set, nothing is installed: spans stay on the
+    API's no-op tracer and correlation relies on the durable IDs in the
+    database. The default exporter reads endpoint, headers and timeout from the
+    standard OTEL environment variables itself; the endpoint is never logged
+    because it may embed credentials.
+    """
+    env = os.environ if environ is None else environ
+    if not any(env.get(name) for name in OTLP_ENDPOINT_ENV_VARS):
+        logger.info("OTLP 追踪导出未配置，跳过")
+        return None
+    provider = TracerProvider(
+        resource=Resource.create({"service.name": SERVICE_NAME, "deployment.environment": deployment_environment(env)})
+    )
+    provider.add_span_processor(BatchSpanProcessor(exporter_factory()))
+    _install_tracer_provider(provider)
+    logger.info("OTLP 追踪导出已启用")
+    return provider
+
+
 def configure_test_tracer() -> InMemorySpanExporter:
     """Install a fresh in-memory exporter as the active tracer provider.
 
@@ -76,13 +123,7 @@ def configure_test_tracer() -> InMemorySpanExporter:
     exporter = InMemorySpanExporter()
     provider = TracerProvider(resource=Resource.create({"service.name": SERVICE_NAME}))
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    # The OTel API refuses to override an already-set global TracerProvider:
-    # a one-shot `Once` guard (independent of the stored value) makes every
-    # call after the first a no-op with a warning. Tests calling this more
-    # than once per process need a genuine reset of both.
-    trace._TRACER_PROVIDER = None
-    trace._TRACER_PROVIDER_SET_ONCE._done = False
-    trace.set_tracer_provider(provider)
+    _install_tracer_provider(provider)
     return exporter
 
 
@@ -185,6 +226,8 @@ __all__ = [
     "clear_baggage_for_provider_call",
     "clears_baggage_at_provider_boundary",
     "configure_test_tracer",
+    "configure_tracer_from_env",
+    "deployment_environment",
     "execution_span",
     "get_tracer",
     "public_job_ref",

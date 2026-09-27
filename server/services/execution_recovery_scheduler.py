@@ -24,17 +24,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import os
 
 from lib.db import safe_session_factory
 from r2.contracts.host_hardening import ReconcileResult
 from server.services.execution_attempts import AdapterRegistry, build_execution_attempt_service
-from server.telemetry import execution_span, public_job_ref
+from server.telemetry import deployment_environment, execution_span, public_job_ref
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SCAN_INTERVAL_SECONDS = 60.0
-_DEPLOYMENT_ENVIRONMENT = os.environ.get("DEPLOYMENT_ENVIRONMENT", "development")
 
 
 def _span_for_reconcile_result(operation_name: str, result: ReconcileResult) -> None:
@@ -49,7 +47,7 @@ def _span_for_reconcile_result(operation_name: str, result: ReconcileResult) -> 
         durable_ids["provider_job_ref"] = public_job_ref(result.provider_job_id)
     with execution_span(
         operation_name,
-        deployment_environment=_DEPLOYMENT_ENVIRONMENT,
+        deployment_environment=deployment_environment(),
         attempt_state=result.state.value,
         **durable_ids,
     ):

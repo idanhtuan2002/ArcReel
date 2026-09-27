@@ -83,6 +83,7 @@ from server.routers import auth as auth_router
 from server.services.execution_events import DurableEventStreamService
 from server.services.execution_recovery_scheduler import ExecutionRecoveryScheduler
 from server.services.project_events import ProjectEventService
+from server.telemetry import configure_tracer_from_env
 
 
 def assert_no_provider_secrets_in_environ() -> None:
@@ -437,6 +438,8 @@ async def lifespan(app: FastAPI):
     _profile_sync_stats = await asyncio.to_thread(_pm.sync_all_agent_profiles)
     _log_profile_sync_outcome(_profile_sync_stats)
 
+    tracer_provider = configure_tracer_from_env()
+
     # 启动共享 httpx 客户端（用于版本检查等外部 API 调用）
     await startup_http_client()
 
@@ -507,6 +510,8 @@ async def lifespan(app: FastAPI):
     await shutdown_trial_runs()
     await shutdown_http_client()
     await close_db()
+    if tracer_provider is not None:
+        tracer_provider.shutdown()
 
 
 # 创建 FastAPI 应用
