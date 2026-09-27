@@ -578,6 +578,18 @@ deployment inventory; it needs a fenced, complete row scan, including every
 derivative row. The exact query/transaction strategy remains a V1-03 design
 decision.
 
+Reuse the ORM field definitions and `list_derivatives_by_asset_ids()` only
+after the complete set of asset IDs is established; that method returns
+derivatives for the IDs supplied, not an independent full-table census
+(`lib/db/repositories/asset_repo.py:96-111`). Likewise,
+`CandidateObjectRepository.list_all()` is complete **within one**
+`(user_id, project_name)` pair, while the current disposable backup invokes it
+for exactly one such pair (`lib/db/repositories/host_hardening.py:820-835`;
+`r2/host_hardening/backup.py:282-295`). Neither reader by itself proves
+whole-deployment media coverage. V1-03 must establish the complete scoped-row
+set in a fenced DB snapshot before reusing those per-scope readers, or use a
+reviewed full-scan query with equivalent row identity checks.
+
 ## Project-local version history is another file authority
 
 `VersionManager` keeps `versions/versions.json` under each project and records
