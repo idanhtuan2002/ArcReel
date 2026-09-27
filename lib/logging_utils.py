@@ -40,8 +40,10 @@ _SEP = r"[ \t]{0,16}"
 # Key/value separators may span blank runs and line breaks (YAML ``key:\n  value``);
 # possessive ``\s*+`` never gives whitespace back, so long runs stay linear.
 _KV_SEP = r"\s*+"
-_COOKIE_LINE_RE = re.compile(rf"(?im)^({_SEP}(?:set-)?cookie{_SEP}:{_SEP}).*$")
-_AUTH_LINE_RE = re.compile(rf"(?im)^({_SEP}(?:proxy-)?authorization{_SEP}:{_SEP}).*$")
+# A header whose value is on the same line is masked to the end of that line; an
+# empty value leaves the header to the key/value pass, which masks the next line.
+_COOKIE_LINE_RE = re.compile(rf"(?im)^({_SEP}(?:set-)?cookie{_SEP}:{_SEP})(?=\S).*$")
+_AUTH_LINE_RE = re.compile(rf"(?im)^({_SEP}(?:proxy-)?authorization{_SEP}:{_SEP})(?=\S).*$")
 _INLINE_AUTH_RE = re.compile(
     r"(?i)(?<![A-Za-z0-9])((?:proxy-)?authorization\s*[=:]\s*)(?:(?:basic|bearer)\s+)?[^\s,;&]+"
 )
@@ -54,14 +56,18 @@ _TEXT_KEY = r"(?<![A-Za-z0-9_.-])(?P<key>[A-Za-z0-9_.-]+)"
 # Each pattern ends where the value begins; the value is measured only for a
 # sensitive key, so non-sensitive pairs cost only their key and separator.
 _DOUBLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_KV_SEP}['\"]?{_KV_SEP}[=:]{_KV_SEP}\"")
-# A quoted value ends at its closing quote, or at the end of the text when it was
-# cut before the quote closed; either way the whole value, line breaks included,
-# is masked.
-_DOUBLE_QUOTED_VALUE_RE = re.compile(r'(?:\\.|[^"\\])*')
+# A quoted value runs to its closing quote across line breaks (escaped line
+# breaks included). When the text was cut before the quote closed, only the rest
+# of that line is masked, so later lines of a log record survive.
+_DOUBLE_QUOTED_VALUE_RE = re.compile(r'(?:\\.|[^"\\])*', re.DOTALL)
+_DOUBLE_QUOTED_LINE_VALUE_RE = re.compile(r'(?:\\.|[^"\\\n])*')
 _SINGLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_KV_SEP}['\"]?{_KV_SEP}[=:]{_KV_SEP}'")
-_SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\])*")
+_SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\])*", re.DOTALL)
+_SINGLE_QUOTED_LINE_VALUE_RE = re.compile(r"(?:\\.|[^'\\\n])*")
 _INLINE_SECRET_RE = re.compile(rf"{_TEXT_KEY}['\"]?{_KV_SEP}[=:]{_KV_SEP}(?=[^\s,;&'\"])")
-_INLINE_VALUE_RE = re.compile(r"[^\s,;&]+")
+# An unquoted value stops before closing brackets so JSON/repr structure survives.
+_INLINE_VALUE_RE = re.compile(r"[^\s,;&}\])]+")
+_NUMERIC_VALUE_RE = re.compile(r"-?\d+(?:\.\d+)?")
 _SIGNED_QUERY_RE = re.compile(
     r"(?i)([?&](?:x-amz-signature|x-goog-signature|signature|sig|access_token|auth_token|token|api_key|key|password)=)([^&#\s]*)"
 )
@@ -117,22 +123,38 @@ def _is_sensitive_text_key(key: str) -> bool:
     return bool(_SENSITIVE_KEY_SUFFIX_RE.search(segment) or _CAMEL_SENSITIVE_KEY_SUFFIX_RE.search(segment))
 
 
-def _mask_sensitive_pairs(key_pattern: re.Pattern[str], value_pattern: re.Pattern[str], text: str) -> str:
+def _mask_sensitive_pairs(
+    key_pattern: re.Pattern[str],
+    value_pattern: re.Pattern[str],
+    text: str,
+    *,
+    unterminated_pattern: re.Pattern[str] | None = None,
+) -> str:
     """Mask the value after every sensitive key that ``key_pattern`` finds.
 
     Scanning resumes right after each key/separator, so a sensitive pair that
     follows a non-sensitive one inside the same token (``a=token=secret``) is
     still found, and every character is examined a bounded number of times.
+    A quoted value that reaches the end of the text without its closing quote is
+    re-measured with ``unterminated_pattern``. A numeric value under a token-count
+    key (``prompt_tokens: 128``) is usage, not a credential, and is left alone.
     """
     parts: list[str] = []
     copied = 0
     position = 0
     while (match := key_pattern.search(text, position)) is not None:
         position = match.end()
-        if not _is_sensitive_text_key(match.group("key")):
+        key = match.group("key")
+        if not _is_sensitive_text_key(key):
             continue
         value = value_pattern.match(text, match.end())
+        if value is not None and unterminated_pattern is not None and value.end() == len(text):
+            value = unterminated_pattern.match(text, match.end())
         if value is None or not value.group(0):
+            continue
+        if _NUMERIC_VALUE_RE.fullmatch(value.group(0)) and _is_token_count(
+            key.rsplit(".", 1)[-1].strip("_-"), float(value.group(0))
+        ):
             continue
         parts.append(text[copied : value.start()])
         parts.append(_MASKED)
@@ -203,8 +225,18 @@ def redact_diagnostic_text(value: object) -> str:
     rendered = _AUTH_LINE_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
     rendered = _INLINE_AUTH_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
     rendered = _BEARER_RE.sub(lambda match: f"{match.group(1)}{_MASKED}", rendered)
-    rendered = _mask_sensitive_pairs(_DOUBLE_QUOTED_SECRET_RE, _DOUBLE_QUOTED_VALUE_RE, rendered)
-    rendered = _mask_sensitive_pairs(_SINGLE_QUOTED_SECRET_RE, _SINGLE_QUOTED_VALUE_RE, rendered)
+    rendered = _mask_sensitive_pairs(
+        _DOUBLE_QUOTED_SECRET_RE,
+        _DOUBLE_QUOTED_VALUE_RE,
+        rendered,
+        unterminated_pattern=_DOUBLE_QUOTED_LINE_VALUE_RE,
+    )
+    rendered = _mask_sensitive_pairs(
+        _SINGLE_QUOTED_SECRET_RE,
+        _SINGLE_QUOTED_VALUE_RE,
+        rendered,
+        unterminated_pattern=_SINGLE_QUOTED_LINE_VALUE_RE,
+    )
     rendered = _mask_sensitive_pairs(_INLINE_SECRET_RE, _INLINE_VALUE_RE, rendered)
     rendered = _PROSE_CREDENTIAL_RE.sub(
         lambda match: f"{match.group(1)}{match.group(2)}{_MASKED}{match.group(2)}", rendered

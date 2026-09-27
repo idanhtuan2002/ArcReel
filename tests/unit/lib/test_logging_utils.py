@@ -467,3 +467,44 @@ def test_credentials_separated_by_blank_runs_or_line_breaks_are_masked(text, sec
 
     assert secret not in redact_diagnostic_text(text)
     assert secret not in redact_provider_text(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"usage":{"prompt_tokens":128,"completion_tokens":50,"total_tokens":178}}',
+        "{'max_tokens': 4096}",
+        '{"input_tokens": 12}',
+    ],
+)
+def test_token_counts_and_json_structure_are_left_intact(text):
+    from lib.logging_utils import redact_diagnostic_text
+
+    assert redact_diagnostic_text(text) == text
+
+
+@pytest.mark.parametrize(
+    ("text", "secret"),
+    [
+        ("Authorization:\r\nsecretAUTH1", "secretAUTH1"),
+        ("Authorization:\n secretAUTH2", "secretAUTH2"),
+        ("cookie:\n sid=secretCOOK", "secretCOOK"),
+        ('{"access_token": 12345678}', "12345678"),
+        ('password="abc\\\nsecondBS"', "secondBS"),
+    ],
+    ids=["auth-crlf", "auth-next-line", "cookie-next-line", "numeric-credential", "escaped-newline"],
+)
+def test_next_line_headers_and_numeric_credentials_are_masked(text, secret):
+    from lib.logging_utils import redact_diagnostic_text, redact_provider_text
+
+    assert secret not in redact_diagnostic_text(text)
+    assert secret not in redact_provider_text(text)
+
+
+def test_an_unterminated_quoted_credential_masks_only_the_rest_of_its_line():
+    from lib.logging_utils import redact_diagnostic_text
+
+    rendered = redact_diagnostic_text('log: password="abcdef123456\nTraceback line 2\nline 3')
+
+    assert "abcdef123456" not in rendered
+    assert rendered.endswith("\nTraceback line 2\nline 3")

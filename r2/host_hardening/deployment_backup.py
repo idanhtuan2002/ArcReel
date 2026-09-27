@@ -987,7 +987,10 @@ def attest_deployment_restore(
     verdict_path = _verdict_path(backup_dir, golden_evidence.restore_target_id)
     if not verdict_path.is_file():
         raise AttestationRejected("no restore verdict has been recorded for this target")
-    verdict = DeploymentBackupVerdict.model_validate_json(verdict_path.read_text(encoding="utf-8"))
+    try:
+        verdict = DeploymentBackupVerdict.model_validate_json(verdict_path.read_text(encoding="utf-8"))
+    except ValidationError as exc:
+        raise AttestationRejected("the recorded restore verdict is not a valid record") from exc
     if verdict.manifest_digest != digest or not verdict.checks_passed:
         raise AttestationRejected("the recorded restore verdict did not pass for this manifest")
     if golden_evidence.backup_set_id != manifest.backup_set_id or golden_evidence.manifest_digest != digest:

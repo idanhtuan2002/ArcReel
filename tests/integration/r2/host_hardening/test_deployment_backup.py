@@ -712,3 +712,24 @@ async def test_an_attested_target_cannot_be_reverified_and_attested_files_are_ta
             await restore_deployment_backup(
                 backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: tmp_path / "again"}
             )
+
+
+async def test_attesting_with_a_corrupt_verdict_is_rejected(
+    source: tuple[str, Path], target_url: str, tmp_path: Path
+) -> None:
+    backup_dir, target_root = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-9")
+    await verify_restored_deployment(
+        backup_dir=backup_dir,
+        target_database_url=target_url,
+        target_roots={DATA_ROOT: target_root},
+        restore_target_id=RESTORE_TARGET,
+        target_release_git_sha=IDENTITY.release_git_sha,
+        media_probe=_always_playable,
+    )
+    (backup_dir / "verdicts" / f"{RESTORE_TARGET}.json").write_text("{not json", encoding="utf-8")
+
+    with pytest.raises(AttestationRejected):
+        attest_deployment_restore(
+            backup_dir=backup_dir, golden_evidence=_golden(backup_dir), measured_rpo_seconds=0, measured_rto_seconds=1
+        )
+    assert read_state(backup_dir)["state"] == BackupSetState.COMPLETE.value
