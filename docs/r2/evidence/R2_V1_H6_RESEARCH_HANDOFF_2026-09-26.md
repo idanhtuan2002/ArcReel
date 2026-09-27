@@ -1,5 +1,27 @@
 # R2 V1 H6 research handoff — 2026-09-26
 
+## V1-01 task gate and V1-02 staging correction — 2026-09-27
+
+Live clean HEAD before this checkpoint edit was `cda38fcd` on
+`feat/r2-m7e-v1-lineage`. Commit `af30ac6e` added presentation/checkpoint
+field candidates; `cda38fcd` corrected the staging rule after checking the
+actual submitted-job resume reader. A valid checkpoint plus provider job
+allows provider polling without reopening staged inputs. The V1-01 draft now
+proposes that all `queued`, `running` and `cancelling` tasks block a quiescent
+exact capture pending a reviewed fence. A later failed-to-running
+artifact-download retry is a separate DB writer that must join that fence.
+These are source-backed candidate rules, not H6 acceptance or production code.
+
+The isolated checkpoint-state test passed (1); `git diff --check` and the
+M7 real-baseline scope test passed on clean `cda38fcd` (1). The isolated
+reference-resume test did not finish under a bounded run; pytest-timeout
+marked it failed, and the run was interrupted during teardown. Do not count
+that test or the full backend suite as green. No source code, schema, capture
+or restore adapter was changed. On resume inspect live Git, complete the
+task-writer/fence inventory and resolve the still-open lifecycle, file
+authority, custody, sponsor and independent review gates. Preserve unrelated
+root-checkout work. No license analysis is in scope.
+
 ## V1-02 field-map continuation — 2026-09-27
 
 Live clean HEAD before this checkpoint edit: `d1339025` on

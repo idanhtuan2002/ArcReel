@@ -127,6 +127,17 @@ artifact-download retry, including a checkpoint/job pair with no staging.
 This gate is a design candidate pending complete writer enumeration and
 sponsor review; it does not authorize a production capture path.
 
+The current retry writer is a separate admission seam: the HTTP
+`/tasks/{task_id}/retry-download` route calls `GenerationQueue`, then
+`TaskRepository.retry_artifact_download()` commits the `ApiCall` reopen and
+Task `failed -> running` update before the worker dispatches polling
+(`server/routers/tasks.py:192-207`; `lib/generation_queue.py:872-874`;
+`lib/db/repositories/task_repo.py:665-717`). A future V1-01 lifecycle check
+must participate in that same repository transaction; a route-only check
+would leave a race and a post-commit dispatch failure can leave `running`
+without an in-process poller. This is a positive writer finding, not a
+complete task-writer inventory.
+
 ## Why the other mechanisms are insufficient alone
 
 | Mechanism | Useful part | Missing proof for V1-01 |
