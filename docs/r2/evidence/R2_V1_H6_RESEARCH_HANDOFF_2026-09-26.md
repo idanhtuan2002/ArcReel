@@ -18,6 +18,11 @@ terminalization, retry, same-status checkpoint/job/payload writes, offline
 legacy import, and Alembic data migration/downgrade. This is a bounded
 positive writer list, not a release-complete allowlist; an active-row count
 alone cannot prove a stable DB dump.
+The next V1-01 follow-up records that `NEEDS_OPERATOR` is a non-terminal
+execution-attempt state, that attempt plan/lease/transition commits span
+separate phases, and that the legacy backup helper flushes `PREPARING` before
+copying and dumping without itself committing that admission. A future H6
+adapter cannot use the uncommitted row as a cross-transaction blocker.
 These are source-backed candidate rules, not H6 acceptance or production code.
 
 The isolated checkpoint-state test passed (1); `git diff --check` and the

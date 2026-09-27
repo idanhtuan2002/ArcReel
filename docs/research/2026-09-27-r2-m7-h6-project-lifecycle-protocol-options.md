@@ -175,6 +175,39 @@ not a complete release allowlist. It does not prove that every SQL writer,
 file finalizer, process or deployment job participates. The project/deployment
 identity and signed stop protocol remain open V1-01 gates.
 
+### Attempt and backup-row writer leads
+
+`ExecutionAttemptModel` enforces a terminal timestamp exactly for
+`SUCCEEDED`, `FAILED_BEFORE_ACCEPTANCE`, `FAILED` and `CANCELLED`; every other
+state, including `NEEDS_OPERATOR`, is non-terminal
+(`lib/db/models/host_hardening.py:42,50-81`;
+`r2/contracts/host_hardening.py:20-33,98-105`). The repository can insert a
+`PLANNED` row, advance worker/provider/operator/cancel state, or change its
+lease version without changing state (`lib/db/repositories/host_hardening.py:188-235,265-402,446-725`). The service built by
+`build_execution_attempt_service()` passes `session.commit` and commits
+planning, leasing and transitions in separate phases around provider work
+(`server/services/execution_attempts.py:99-114`;
+`r2/host_hardening/execution.py:111-188`). A V1-01 capture predicate cannot
+equate a terminal Task with a terminal attempt, or infer no writer from an
+unchanged attempt state. Candidate quiescent capture blocks every non-terminal
+attempt in the scoped project and requires the fence to stop new planning,
+lease, observation and operator writes; the exact retention and recovery
+disposition remains a review gate.
+
+`BackupSetModel` allows `PREPARING`, `COMPLETE`, `VERIFIED` and `REJECTED`
+(`lib/db/models/host_hardening.py:419-438`). The existing M7-B
+`BackupSetRepository` insert and media-ref methods only flush; `mark_state()`
+updates the row without committing (`lib/db/repositories/host_hardening.py:1100-1128`).
+The legacy `create_backup_set()` helper inserts `PREPARING`, then copies media
+and runs `pg_dump` before marking `COMPLETE` or `REJECTED` in the supplied
+session (`r2/host_hardening/backup.py:256-334`). Its own docstring requires
+application/worker stop. Thus another transaction cannot be assumed to see
+that helper's `PREPARING` row while it copies. The H6 adapter needs a separately
+committed, fenced admission or equivalent reviewed ordering; the legacy
+helper is reuse evidence, not the approved production V1 capture protocol.
+No rule here treats a historical `COMPLETE` or `VERIFIED` row as proof that
+the source project is live.
+
 ## Why the other mechanisms are insufficient alone
 
 | Mechanism | Useful part | Missing proof for V1-01 |
