@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -851,8 +852,6 @@ class TestCapacityTable:
     @pytest.mark.parametrize("dirty", ["", "3.7", "abc"])
     async def test_from_db_dirty_value_falls_back_per_key(self, monkeypatch, caplog, dirty):
         """单个 key 的存量脏值只回退该 key 默认值并告警，不拖垮整表加载。"""
-        import logging
-
         self._stub_from_db_sources(
             monkeypatch,
             {
@@ -873,8 +872,6 @@ class TestCapacityTable:
 
     async def test_from_db_negative_value_clamps_to_zero(self, monkeypatch, caplog):
         """可解析的负数沿用 clamp 语义（→0），不视为脏值回退默认，但留告警可观测。"""
-        import logging
-
         self._stub_from_db_sources(monkeypatch, {"ark": {"video_max_workers": "-1"}})
 
         with caplog.at_level(logging.WARNING, logger="lib.generation_worker"):
@@ -2201,8 +2198,8 @@ class TestGenerationWorker:
         assert queue.succeeded == [("resume-locked", {"ok": True})]
 
     @pytest.mark.asyncio
-    async def test_process_resume_task_resume_expired(self, monkeypatch):
-        """ResumeExpiredError → mark_failed [resume_expired]。"""
+    async def test_process_resume_task_resume_expired(self, monkeypatch, caplog):
+        """ResumeExpiredError → mark_failed [resume_expired]；失败原因与日志不含供应商 job ID。"""
         from lib.video_backends.base import ResumeExpiredError
 
         queue = _FakeQueue()
@@ -2212,11 +2209,14 @@ class TestGenerationWorker:
             raise ResumeExpiredError(job_id=job_id, provider="ark")
 
         monkeypatch.setattr("server.services.resume_executor.execute_resume_video_task", _expire)
-        task = _storyboard_resume_task("exp", job_id="x")
-        await worker._process_resume_task(task)
+        task = _storyboard_resume_task("exp", job_id="provider-job-secret-canary")
+        with caplog.at_level(logging.INFO, logger="lib.generation_worker"):
+            await worker._process_resume_task(task)
         assert queue.failed
         assert queue.failed[0][0] == "exp"
         assert "[resume_expired_detail]" in queue.failed[0][1]
+        assert "provider-job-secret-canary" not in queue.failed[0][1]
+        assert all("provider-job-secret-canary" not in r.getMessage() for r in caplog.records)
 
     @pytest.mark.asyncio
     async def test_process_resume_task_endpoint_changed(self, monkeypatch):

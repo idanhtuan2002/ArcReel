@@ -800,9 +800,9 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
                 raise ResumeExpiredError(
                     job_id=task_id,
                     provider=PROVIDER_DASHSCOPE,
-                    message=f"DashScope task expired: {task_id}",
+                    message="DashScope task expired",
                 )
-            raise RuntimeError(f"DashScope task expired during generate: {task_id}")
+            raise RuntimeError("DashScope task expired during generate")
 
         video_url = extract_video_url(final)
         await self._download_with_retry(video_url, request.output_path)

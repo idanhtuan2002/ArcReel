@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -458,17 +459,20 @@ async def test_resume_missing_api_call_id_warns_does_not_crash(tmp_path, caplog)
     """旧任务 task.payload 无 api_call_id → resume 仍成功，仅 warning。"""
     gen = _build_generator(tmp_path)
 
-    output_path, version, _, _ = await gen.resume_video_async(
-        job_id="provider-job-1",
-        resource_type="videos",
-        resource_id="E1S01",
-        task_id="T-1",
-        api_call_id=None,
-    )
+    with caplog.at_level(logging.WARNING, logger="lib.media_generator"):
+        output_path, version, _, _ = await gen.resume_video_async(
+            job_id="provider-job-secret-canary",
+            resource_type="videos",
+            resource_id="E1S01",
+            task_id="T-1",
+            api_call_id=None,
+        )
 
     assert output_path.exists()
     assert version == 1
     assert gen.ledger.resumed == [], "无 api_call_id 时不应 finalize"
+    assert any("task_id=T-1" in r.getMessage() for r in caplog.records)
+    assert all("provider-job-secret-canary" not in r.getMessage() for r in caplog.records)
 
 
 class _FailingResumeLedger(_FakeLedger):
@@ -729,3 +733,21 @@ async def test_resume_forwards_submitted_base_url_to_request(tmp_path):
     _, request = backend.calls[0]
     assert request.submitted_base_url == "https://maas-a.example.com/ws-1/api/v1"
     assert all("submitted_base_url" not in kwargs for kwargs in gen.versions.add_calls)
+
+
+@pytest.mark.asyncio
+async def test_resume_failure_log_omits_provider_job_id(tmp_path, caplog):
+    gen = _build_generator(tmp_path)
+    gen._video_backend = _FakeVideoBackend(raises=RuntimeError("network timeout"))
+
+    with caplog.at_level(logging.ERROR, logger="lib.media_generator"), pytest.raises(RuntimeError):
+        await gen.resume_video_async(
+            job_id="provider-job-secret-canary",
+            resource_type="videos",
+            resource_id="E1S01",
+            task_id="T-1",
+            api_call_id=42,
+        )
+
+    assert any("task_id=T-1" in r.getMessage() for r in caplog.records)
+    assert all("provider-job-secret-canary" not in r.getMessage() for r in caplog.records)

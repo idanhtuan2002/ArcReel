@@ -987,11 +987,10 @@ class GenerationWorker:
 
         provider_id = checkpoint.provider_id if checkpoint is not None else await self._provider_projection(task)
         logger.info(
-            "重启自愈处理任务 %s (type=%s, provider=%s, job=%s)",
+            "重启自愈处理任务 %s (type=%s, provider=%s)",
             task_id,
             task_type,
             provider_id,
-            job_id,
         )
 
         from lib.video_backends.base import ResumeEndpointChangedError, ResumeExpiredError

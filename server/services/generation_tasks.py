@@ -157,6 +157,7 @@ from server.services.video_artifact_currency import (
     complete_video_artifact_commit,
     freeze_video_speech_facts,
 )
+from server.telemetry import clears_baggage_at_provider_boundary
 
 logger = logging.getLogger(__name__)
 
@@ -3557,6 +3558,7 @@ _TASK_EXECUTORS = {
 }
 
 
+@clears_baggage_at_provider_boundary
 async def execute_generation_task(task: dict[str, Any], *, claimed_provider_id: str | None = None) -> dict[str, Any]:
     task_type = task.get("task_type")
     project_name = task.get("project_name")

@@ -1411,3 +1411,13 @@ class TestRecordingPoll:
         )
 
         assert await recording_poll(AsyncMock(return_value={"status": "ok"}), request)() == {"status": "ok"}
+
+
+def test_resume_expired_error_message_omits_provider_job_id():
+    from lib.video_backends.base import ResumeExpiredError
+
+    exc = ResumeExpiredError(job_id="provider-job-secret-canary", provider="openai")
+
+    assert exc.job_id == "provider-job-secret-canary"
+    assert "provider-job-secret-canary" not in str(exc)
+    assert "openai" in str(exc)

@@ -1224,7 +1224,7 @@ class MediaGenerator:
                 staged_output_path.unlink(missing_ok=True)
             raise
         except Exception:
-            logger.exception("resume 失败 (video) task_id=%s job_id=%s", task_id, job_id)
+            logger.exception("resume 失败 (video) task_id=%s", task_id)
             if staged_output_path is not None:
                 staged_output_path.unlink(missing_ok=True)
             raise
@@ -1246,9 +1246,8 @@ class MediaGenerator:
                 )
         else:
             logger.warning(
-                "resume 缺 api_call_id task_id=%s job_id=%s (旧任务未持久化 payload)",
+                "resume 缺 api_call_id task_id=%s (旧任务未持久化 payload)",
                 task_id,
-                job_id,
             )
 
         # backend.resume_video 已将付费结果下载到请求路径。正式媒体请求写入 staging，随后由

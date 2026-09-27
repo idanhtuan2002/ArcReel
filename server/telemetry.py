@@ -13,10 +13,11 @@ never re-decides what is safe to attach, only how to attach it.
 
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import secrets
-from collections.abc import Generator
+from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 
 from opentelemetry import baggage, trace
@@ -157,10 +158,32 @@ def clear_baggage_for_provider_call() -> otel_context.Context:
     return baggage.clear(context=otel_context.get_current())
 
 
+def clears_baggage_at_provider_boundary[**P, R](
+    func: Callable[P, Awaitable[R]],
+) -> Callable[P, Awaitable[R]]:
+    """Run an async provider-boundary entrypoint inside a baggage-cleared context.
+
+    Every provider call made while the wrapped coroutine runs sees an empty W3C
+    baggage set; the caller's ambient context is restored when it returns or
+    raises.
+    """
+
+    @functools.wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        token = otel_context.attach(clear_baggage_for_provider_call())
+        try:
+            return await func(*args, **kwargs)
+        finally:
+            otel_context.detach(token)
+
+    return wrapper
+
+
 __all__ = [
     "DEFAULT_TELEMETRY_HMAC_KEY_VERSION",
     "SERVICE_NAME",
     "clear_baggage_for_provider_call",
+    "clears_baggage_at_provider_boundary",
     "configure_test_tracer",
     "execution_span",
     "get_tracer",

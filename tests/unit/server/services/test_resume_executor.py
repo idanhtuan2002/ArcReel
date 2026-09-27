@@ -15,6 +15,8 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from opentelemetry import baggage
+from opentelemetry import context as otel_context
 
 from lib.artifact_manifest import ArtifactBasis, compose_video_artifact_basis
 from lib.narration_delivery import TtsSynthesisSettings
@@ -362,6 +364,29 @@ async def test_execute_resume_expired_propagates(monkeypatch, fake_pm, video_tas
 
     with pytest.raises(ResumeExpiredError):
         await execute_resume_video_task(video_task, job_id="openai-job-1")
+
+
+@pytest.mark.asyncio
+async def test_execute_resume_runs_provider_work_without_ambient_baggage(monkeypatch, fake_pm, video_task):
+    from server.services.resume_executor import execute_resume_video_task
+
+    seen: list[dict[str, object]] = []
+
+    class _BaggageObservingGenerator(_FakeGenerator):
+        async def resume_video_async(self, **kwargs: Any) -> tuple[Path, int, Any, str | None]:
+            seen.append(dict(baggage.get_all()))
+            return await super().resume_video_async(**kwargs)
+
+    _patch_resume_executor_deps(monkeypatch, fake_pm, _BaggageObservingGenerator())
+
+    token = otel_context.attach(baggage.set_baggage("project_name", "demo"))
+    try:
+        await execute_resume_video_task(video_task, job_id="openai-job-1")
+        assert baggage.get_all() == {"project_name": "demo"}
+    finally:
+        otel_context.detach(token)
+
+    assert seen == [{}]
 
 
 @pytest.mark.asyncio

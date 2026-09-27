@@ -181,7 +181,7 @@ class ResumeExpiredError(RuntimeError):
     def __init__(self, *, job_id: str, provider: str, message: str = "") -> None:
         self.job_id = job_id
         self.provider = provider
-        super().__init__(message or f"resume job {job_id} expired or not found on provider {provider}")
+        super().__init__(message or f"resume job expired or not found on provider {provider}")
 
 
 class ResumeEndpointChangedError(RuntimeError):

@@ -8,7 +8,13 @@ from opentelemetry import baggage
 from opentelemetry import context as otel_context
 
 from r2.host_hardening.telemetry import TelemetryPolicyError
-from server.telemetry import clear_baggage_for_provider_call, configure_test_tracer, execution_span, public_job_ref
+from server.telemetry import (
+    clear_baggage_for_provider_call,
+    clears_baggage_at_provider_boundary,
+    configure_test_tracer,
+    execution_span,
+    public_job_ref,
+)
 
 
 def test_execution_span_exports_only_the_attributes_it_was_given() -> None:
@@ -63,6 +69,38 @@ def test_clear_baggage_for_provider_call_removes_every_entry() -> None:
     try:
         cleared = clear_baggage_for_provider_call()
         assert baggage.get_all(cleared) == {}
+    finally:
+        otel_context.detach(token)
+
+
+async def test_provider_boundary_decorator_clears_baggage_and_restores_ambient_context() -> None:
+    seen: list[dict[str, object]] = []
+
+    @clears_baggage_at_provider_boundary
+    async def _provider_entrypoint() -> str:
+        seen.append(dict(baggage.get_all()))
+        return "done"
+
+    token = otel_context.attach(baggage.set_baggage("user_id", "u1"))
+    try:
+        assert await _provider_entrypoint() == "done"
+        assert baggage.get_all() == {"user_id": "u1"}
+    finally:
+        otel_context.detach(token)
+
+    assert seen == [{}]
+
+
+async def test_provider_boundary_decorator_restores_ambient_context_on_error() -> None:
+    @clears_baggage_at_provider_boundary
+    async def _failing_entrypoint() -> None:
+        raise RuntimeError("provider failed")
+
+    token = otel_context.attach(baggage.set_baggage("project_name", "demo"))
+    try:
+        with pytest.raises(RuntimeError, match="provider failed"):
+            await _failing_entrypoint()
+        assert baggage.get_all() == {"project_name": "demo"}
     finally:
         otel_context.detach(token)
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pytest
+from opentelemetry import baggage
+from opentelemetry import context as otel_context
 
 from lib.image_backends.base import ImageCapabilityError
 from lib.reference_compression import ReferencePayloadFloorError
@@ -146,3 +148,38 @@ async def test_execute_generation_task_propagates_other_exceptions(monkeypatch):
                 "payload": {},
             }
         )
+
+
+@pytest.mark.asyncio
+async def test_execute_generation_task_runs_provider_work_without_ambient_baggage(monkeypatch):
+    from server.services import generation_tasks
+
+    seen: list[dict[str, object]] = []
+
+    async def _fake_reference_proxy(*_args, **_kwargs):
+        seen.append(dict(baggage.get_all()))
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        "server.services.reference_video_tasks.execute_reference_video_task",
+        _fake_reference_proxy,
+    )
+
+    token = otel_context.attach(baggage.set_baggage("user_id", "u1"))
+    try:
+        await generation_tasks.execute_generation_task(
+            {
+                "task_id": "ref-1",
+                "task_type": "reference_video",
+                "project_name": "demo",
+                "resource_id": "E1U1",
+                "payload": {"script_file": "episode_1.json"},
+                "user_id": "u1",
+            },
+            claimed_provider_id="ark",
+        )
+        assert baggage.get_all() == {"user_id": "u1"}
+    finally:
+        otel_context.detach(token)
+
+    assert seen == [{}]

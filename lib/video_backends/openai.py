@@ -212,7 +212,7 @@ class OpenAIVideoBackend(ProviderJobIdPersistenceMixin):
             raise ResumeExpiredError(
                 job_id=job_id,
                 provider=PROVIDER_OPENAI,
-                message=f"OpenAI Sora job expired: {final.id}",
+                message="OpenAI Sora job expired",
             )
 
         return await self._download_and_build_result(final, request, {"seconds": str(request.duration_seconds)})
