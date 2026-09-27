@@ -171,18 +171,30 @@ def _batch_video_is_reusable(
     )
 
 
+def _missing_only_reusable_ids(
+    states: dict[str, GenerationTargetState],
+    versions: VersionManager,
+) -> list[str]:
+    """Missing-only ids to keep: currency reports current/stale, or the selected manual upload matches exactly.
+
+    Mirrors the all-scope selection's ``reusable_override`` so an episode run never pays to
+    regenerate a storyboard video the operator uploaded and selected.
+    """
+
+    return [
+        unit_id
+        for unit_id, state in states.items()
+        if artifact_is_reusable(state)
+        or versions.selected_manual_upload_matches_current_file(
+            "videos",
+            unit_id,
+            state.candidate.artifact_path,
+        )
+    ]
+
+
 def _state_for(states: dict[str, GenerationTargetState], unit_id: str) -> GenerationTargetState:
     return states.get(unit_id) or GenerationTargetState(candidate=GenerationCandidate(unit_id=unit_id))
-
-
-def _currency_reusable_ids(
-    states: dict[str, GenerationTargetState],
-    already_done: list[str],
-) -> list[str]:
-    """Missing-only ids that active currency already reports current/stale."""
-
-    done = set(already_done)
-    return [unit_id for unit_id, state in states.items() if unit_id not in done and artifact_is_reusable(state)]
 
 
 def _sole_speech_admission(result: GenerationBatchResult) -> dict[str, Any]:
@@ -1206,8 +1218,8 @@ def _episode_scope_tool(ctx: ToolContext):
 
             currency = active_artifact_currency_resolver(project_dir, sb.project)
             states = video_target_states(items, id_field, episode=episode, resolver=currency)
-            # 整集生成始终复用仍可用的旧分镜（含 stale），从不强制重生——所以
-            already_done = _currency_reusable_ids(states, [])
+            # 整集生成只补缺失，从不强制重生：仍可用的旧分镜（含 stale）与选中的手动上传原样保留。
+            already_done = _missing_only_reusable_ids(states, VersionManager(project_dir))
             builder = GenerationResultBuilder(_OPERATION, GenerationSelectionMode.MISSING_ONLY)
             batch = _StoryboardBatch(
                 ctx=ctx,

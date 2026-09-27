@@ -2052,6 +2052,67 @@ async def test_generate_videos_all_scope_preserves_the_selected_manual_upload(
     enqueue.assert_not_awaited()
 
 
+@pytest.mark.parametrize("source", ["embedded", "mcp"])
+async def test_generate_videos_episode_scope_preserves_the_selected_manual_upload(
+    fake_ctx: ToolContext,
+    monkeypatch: pytest.MonkeyPatch,
+    db_factory,
+    source: Any,
+) -> None:
+    from lib.db.base import DEFAULT_USER_ID
+    from lib.generation_queue_client import TaskSpec
+    from server.media_tools import videos as mod
+    from server.tool_runtime import CallerContext
+
+    fake_ctx.queue = GenerationQueue(session_factory=db_factory)
+    fake_ctx.caller = CallerContext(user_id=DEFAULT_USER_ID, source=source)
+
+    project_path = fake_ctx.project_path
+    fake_ctx.pm.project_payload.update(
+        {
+            "schema_version": CURRENT_PROJECT_SCHEMA_VERSION,
+            "episodes": [{"episode": 1, "script_file": "scripts/episode_1.json"}],
+        }
+    )
+    artifact_path = _select_manual_video(
+        project_path,
+        resource_type="videos",
+        resource_id="E1S01",
+        content=b"manual-video",
+    )
+    fake_ctx.pm.script_payload["segments"][0]["generated_assets"]["video_clip"] = artifact_path
+    enqueue = AsyncMock(return_value=([], []))
+    spec = TaskSpec.from_request(
+        task_type="video",
+        media_type="video",
+        resource_id="E1S01",
+        prompt="manual upload must not be replaced",
+        script_file="episode_1.json",
+    )
+    monkeypatch.setattr(mod, "active_artifact_currency_resolver", lambda *_args: _MissingEverythingResolver())
+    monkeypatch.setattr(mod, "artifact_is_usable", lambda *_args: False)
+    monkeypatch.setattr(
+        mod,
+        "build_storyboard_video_specs",
+        lambda **kwargs: ([] if "E1S01" in (kwargs["skip_ids"] or []) else [spec], []),
+    )
+    monkeypatch.setattr(mod, "batch_enqueue_and_wait", enqueue)
+
+    out = await call(_episode_scope(fake_ctx), {"script": "episode_1.json"})
+
+    assert out.get("is_error") is not True, out
+    # 整集生成与 all scope 同口径：选中的手动上传既不进 requested 也不付费重生。
+    if source == "mcp":
+        assert out["generation_batch"]["members"] == []
+        assert [entry["unit_id"] for entry in out["generation_batch"]["skipped"]] == ["E1S01"]
+    else:
+        result = read_generation_result(out)
+        assert result.requested == []
+        assert [entry.unit_id for entry in result.skipped] == ["E1S01"]
+        assert out["batch_id"]
+    enqueue.assert_not_awaited()
+
+
 async def test_generate_videos_all_scope_error(fake_ctx: ToolContext) -> None:
     def boom(*a, **kw):
         raise RuntimeError("broken")
