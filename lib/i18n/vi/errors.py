@@ -46,6 +46,8 @@ MESSAGES = {
     "task_retry_download_unavailable": "Tác vụ '{id}' hiện không thể thử tải lại",
     # Lý do tác vụ thất bại (GenerationWorker lưu mã lỗi + tham số; tasks API kết xuất theo ngôn ngữ khi đọc)
     "task_fail_provider_unsupported_media": "Nhà cung cấp {provider_id} không hỗ trợ tạo {media_type}",
+    "budget_scope_missing": "Bản triển khai release chưa có budget scope {scope} nên lệnh gọi trả phí bị từ chối. Hãy tạo ngân sách cho loại tiền tệ này bằng script budget_scope trước",
+    "budget_exceeded": "Budget scope {scope} không còn đủ hạn mức cho lệnh gọi này (ước tính {requested}) nên bị từ chối. Hãy nâng ngân sách rồi thử lại",
     "paid_route_unqualified": "Tuyến trả phí {route} (model {model}) chưa được qualify trong bản triển khai release nên lệnh gọi bị từ chối. Hãy qualify tuyến này trước",
     "task_fail_provider_rejected": "Nhà cung cấp đã từ chối yêu cầu tạo này (HTTP {status})",
     "task_fail_dispatch_provider_requeue_failed": "Nhà cung cấp tác vụ đã đổi từ {claimed_provider_id} sang {actual_provider_id}, nhưng không thể đưa tác vụ trở lại hàng đợi để nhận khe mới; vui lòng thử lại",

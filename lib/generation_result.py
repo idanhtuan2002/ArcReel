@@ -165,6 +165,9 @@ _TASK_FAILURE_ACTIONS: dict[str, GenerationAction] = {
     "provider_rejected": GenerationAction.FIX_INPUT,
     # 发布部署下路线没有资质：换一条已有资质的路线或先完成资质验证，重试同一路线必然再被拒。
     "paid_route_unqualified": GenerationAction.CONFIGURE_PROVIDER,
+    # 预算未建或已用尽：由操作员新建 / 放宽预算范围，原样重试必然再被拒。
+    "budget_scope_missing": GenerationAction.CONFIGURE_PROVIDER,
+    "budget_exceeded": GenerationAction.CONFIGURE_PROVIDER,
     "declarative_template_render_failed": GenerationAction.CONFIGURE_PROVIDER,
     "declarative_response_extract_failed": GenerationAction.CONFIGURE_PROVIDER,
     # 供应商已出片、只是没取回来：重发同一请求会再建一个付费任务，正确的一步是接续取件。

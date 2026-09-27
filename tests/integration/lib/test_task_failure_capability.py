@@ -819,3 +819,27 @@ def test_a_refused_paid_route_is_stored_structured_and_renders_per_locale():
     for locale in ("zh", "en", "vi"):
         expected = MESSAGES[locale]["paid_route_unqualified"].format(route="media:openai:video", model="sora-2")
         assert render_failure(stored, _translator(locale)) == expected
+
+
+@pytest.mark.parametrize(
+    ("error", "code", "params"),
+    [
+        ("missing", "budget_scope_missing", {"scope": "release:USD"}),
+        ("exceeded", "budget_exceeded", {"scope": "release:USD", "requested": "0.400000"}),
+    ],
+)
+def test_a_budget_refusal_is_stored_structured_and_renders_per_locale(error, code, params):
+    from decimal import Decimal
+
+    from lib.budget_guard import BudgetExceededError, BudgetScopeMissingError
+
+    exc = (
+        BudgetScopeMissingError("release:USD")
+        if error == "missing"
+        else BudgetExceededError("release:USD", Decimal("0.400000"), "requested 0.4; available 0.1")
+    )
+    stored = _encode_task_failure_message(exc)
+    assert stored.startswith(f"[{code}] ")
+
+    for locale in ("zh", "en", "vi"):
+        assert render_failure(stored, _translator(locale)) == MESSAGES[locale][code].format(**params)

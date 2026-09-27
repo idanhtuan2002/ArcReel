@@ -95,8 +95,12 @@ NARRATION_DELIVERY_FAILURE_CODES: frozenset[str] = frozenset(
     }
 )
 
-# Release-mode refusal of a paid route that has no current qualification (ADR-0091).
-PAID_ROUTE_FAILURE_CODES: frozenset[str] = frozenset({"paid_route_unqualified"})
+# Release-deployment refusals before a paid provider request (ADR-0091): a route without a
+# current qualification, a missing budget scope for the call's currency, or a reservation
+# that does not fit in the remaining authorization.
+PAID_ROUTE_FAILURE_CODES: frozenset[str] = frozenset(
+    {"paid_route_unqualified", "budget_scope_missing", "budget_exceeded"}
+)
 
 # Stable failure code -> i18n errors key. The code is agent-facing and persisted
 # in the DB; the key resolves to zh/en/vi templates rendered at read time.

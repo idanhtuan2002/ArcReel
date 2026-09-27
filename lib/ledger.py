@@ -29,9 +29,11 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, Literal, assert_never
 
+from lib.budget_guard import reconcile_call, reserve_for_call
 from lib.db import safe_session_factory
 from lib.db.base import DEFAULT_USER_ID
 from lib.db.repositories.usage_repo import SettlementInput, UsageRepository
+from lib.pricing.strategies import PricingParams
 from lib.providers import PROVIDER_GEMINI, CallType
 from lib.request_context import current_request_id, current_task_id
 from lib.telemetry import record_correlation_span
@@ -140,6 +142,25 @@ class Ledger:
             task_id=current_task_id(),
             usage_entry_id=str(call_id),
         )
+        # 发布部署下先按预估占用预算并确认，再放行供应商请求；占用失败即本次调用失败、不发请求。
+        try:
+            reservation = await reserve_for_call(
+                self._session_factory,
+                call_id=call_id,
+                provider=provider,
+                params=PricingParams(
+                    call_type=call_type,
+                    model=model,
+                    resolution=resolution,
+                    aspect_ratio=aspect_ratio,
+                    duration_seconds=duration_seconds,
+                    generate_audio=generate_audio,
+                    service_tier=service_tier,
+                ),
+            )
+        except Exception as exc:
+            await self._finish_failed(call_id, exc)
+            raise
         call = LedgerCall(call_id, call_type=call_type, service_tier=service_tier)
         try:
             yield call
@@ -151,6 +172,8 @@ class Ledger:
         except Exception as exc:
             # 自动翻 failed（错误信息截断由仓储承担）后原样重抛。
             await self._finish_failed(call_id, exc)
+            if reservation is not None:
+                await reconcile_call(self._session_factory, call_id=call_id)
             raise
         else:
             if call._settlement is None:
@@ -161,6 +184,9 @@ class Ledger:
                 # 成功结算写入本身失败：不留永久 pending，尝试翻 failed 后原样重抛。
                 await self._finish_failed(call_id, exc)
                 raise
+            finally:
+                if reservation is not None:
+                    await reconcile_call(self._session_factory, call_id=call_id)
 
     async def resume_success(self, *, call_id: int, result: Any, service_tier: str = "default") -> int:
         """resume 成功补账：按 call_id 精准翻 pending → success，返回受影响行数（幂等 0/1）。
@@ -168,11 +194,15 @@ class Ledger:
         finalize 自身异常不吞、直接冒泡（交 worker finally 兜底），避免 ApiCall 永久卡 pending。
         """
         settlement = _settlement_from_result("video", result, service_tier=service_tier)
-        return await self._finalize(call_id=call_id, status="success", settlement=settlement)
+        affected = await self._finalize(call_id=call_id, status="success", settlement=settlement)
+        await reconcile_call(self._session_factory, call_id=call_id)
+        return affected
 
     async def resume_failed(self, *, call_id: int) -> int:
         """resume 过期/失败补账：翻 pending → failed，零费用不重扣（幂等 0/1）。"""
-        return await self._finalize(call_id=call_id, status="failed", settlement=SettlementInput(cost_amount=0.0))
+        affected = await self._finalize(call_id=call_id, status="failed", settlement=SettlementInput(cost_amount=0.0))
+        await reconcile_call(self._session_factory, call_id=call_id)
+        return affected
 
     async def record_provider_response(self, *, call_id: int, body: object) -> None:
         """覆盖保存该供应商调用最后一次收到的响应体。"""
