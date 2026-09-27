@@ -36,7 +36,18 @@ def test_minted_ids_are_unique_and_accepted_when_echoed() -> None:
 
 @pytest.mark.parametrize(
     "candidate",
-    [None, "", "short", "has space inside", "a/b/../etc/passwd", "x" * 129, "Bearer sk-live-secret"],
+    [
+        None,
+        "",
+        "short",
+        "has space inside",
+        "a/b/../etc/passwd",
+        "x" * 129,
+        "Bearer sk-live-secret",
+        "sk-proj-abcdefghijklmnopqrstuvwxyz012345",
+        "client-trace-0001",
+        "Hero-Alice-scene-01",
+    ],
 )
 def test_malformed_caller_ids_are_replaced(candidate: str | None) -> None:
     minted = accept_or_mint_request_id(candidate)
@@ -53,3 +64,11 @@ def test_bound_task_binds_task_and_its_request_then_restores() -> None:
             assert task_attribution() == {"task_id": "T-1"}
         assert current_task_id() is None
         assert current_request_id() == "req-http-000001"
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    ["4bf92f3577b34da6a3ce929d0e0e4736", "123e4567-e89b-12d3-a456-426614174000", "req_" + "a" * 32],
+)
+def test_opaque_caller_ids_are_reused(candidate: str) -> None:
+    assert accept_or_mint_request_id(candidate) == candidate

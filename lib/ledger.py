@@ -33,7 +33,7 @@ from lib.db import safe_session_factory
 from lib.db.base import DEFAULT_USER_ID
 from lib.db.repositories.usage_repo import SettlementInput, UsageRepository
 from lib.providers import PROVIDER_GEMINI, CallType
-from lib.request_context import current_task_id
+from lib.request_context import current_request_id, current_task_id
 from lib.telemetry import record_correlation_span
 
 logger = logging.getLogger(__name__)
@@ -136,6 +136,7 @@ class Ledger:
         record_correlation_span(
             "usage.recorded",
             provider_id=provider,
+            request_id=current_request_id(),
             task_id=current_task_id(),
             usage_entry_id=str(call_id),
         )
@@ -220,7 +221,9 @@ class Ledger:
 
     async def _start_call(self, **kwargs: Any) -> int:
         async with self._session_factory() as session:
-            return await UsageRepository(session).start_call(task_id=current_task_id(), **kwargs)
+            return await UsageRepository(session).start_call(
+                task_id=current_task_id(), request_id=current_request_id(), **kwargs
+            )
 
     async def _finish_success(self, call_id: int, settlement: SettlementInput, *, output_path: str | None) -> None:
         async with self._session_factory() as session:

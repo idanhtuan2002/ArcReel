@@ -18,9 +18,12 @@ from contextvars import ContextVar
 _REQUEST_ID: ContextVar[str | None] = ContextVar("arcreel_request_id", default=None)
 _TASK_ID: ContextVar[str | None] = ContextVar("arcreel_task_id", default=None)
 
-# Accepted shape for a caller-supplied ``X-Request-ID``: bounded, header-safe and
-# free of anything that could carry content, paths or credentials.
-_ACCEPTED_REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
+# Caller-supplied ``X-Request-ID`` values are reused only in opaque identifier
+# shapes (a UUID, 32 hex digits as in a W3C trace ID, or an ID this module
+# minted), so no free text, name or credential-shaped value is persisted or exported.
+_ACCEPTED_REQUEST_ID = re.compile(
+    r"(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|(?:req_)?[0-9a-f]{32})"
+)
 
 
 def new_request_id() -> str:

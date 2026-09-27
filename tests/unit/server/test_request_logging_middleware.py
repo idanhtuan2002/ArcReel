@@ -122,10 +122,10 @@ async def test_request_id_middleware_reuses_well_formed_caller_id_and_replaces_m
     app = _build_app_with_request_id_probe()
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        reused = await client.get("/probe", headers={"X-Request-ID": "client-trace-0001"})
+        reused = await client.get("/probe", headers={"X-Request-ID": "4bf92f3577b34da6a3ce929d0e0e4736"})
         replaced = await client.get("/probe", headers={"X-Request-ID": "Bearer sk-live-secret"})
 
-    assert reused.headers["X-Request-ID"] == "client-trace-0001"
-    assert reused.json() == {"request_id": "client-trace-0001"}
+    assert reused.headers["X-Request-ID"] == "4bf92f3577b34da6a3ce929d0e0e4736"
+    assert reused.json() == {"request_id": "4bf92f3577b34da6a3ce929d0e0e4736"}
     assert replaced.headers["X-Request-ID"] != "Bearer sk-live-secret"
     assert replaced.json() == {"request_id": replaced.headers["X-Request-ID"]}

@@ -19,6 +19,8 @@ class ApiCall(TimestampMixin, UserOwnedMixin, Base):
     execution_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # 产生本次调用的队列任务，H7 关联链 task -> usage 的持久连接；非队列调用为 NULL。
     task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # 发起本次调用的入口请求（HTTP 请求或 Agent 工具调用）；队列任务与请求内直接调用都记录，入口外为 NULL。
+    request_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     call_type: Mapped[str] = mapped_column(String, nullable=False)
     model: Mapped[str] = mapped_column(String, nullable=False)
     prompt: Mapped[str | None] = mapped_column(Text)
@@ -51,6 +53,7 @@ class ApiCall(TimestampMixin, UserOwnedMixin, Base):
         Index("idx_api_calls_status", "status"),
         Index("idx_api_calls_started_at", "started_at"),
         Index("idx_api_calls_task_id", "task_id"),
+        Index("idx_api_calls_request_id", "request_id"),
         Index(
             "uq_api_calls_execution_id",
             "execution_id",

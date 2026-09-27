@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from lib.db.models.api_call import ApiCall
 from lib.ledger import Ledger, _settlement_from_result
-from lib.request_context import bound_task
+from lib.request_context import bound_request_id, bound_task
 
 
 async def _only_row(db_factory: async_sessionmaker) -> ApiCall:
@@ -311,4 +311,17 @@ class TestLedgerTaskAttribution:
             call.success(_ImgResult())
 
         row = await _only_row(db_factory)
+        assert row.task_id is None
+
+    async def test_inline_call_inside_an_entry_request_records_its_request_id(
+        self, db_factory: async_sessionmaker
+    ) -> None:
+        ledger = Ledger(session_factory=db_factory)
+
+        with bound_request_id("req_" + "b" * 32):
+            async with ledger.record(project_name="demo", call_type="text", model="m") as call:
+                call.success(_TextResult())
+
+        row = await _only_row(db_factory)
+        assert row.request_id == "req_" + "b" * 32
         assert row.task_id is None

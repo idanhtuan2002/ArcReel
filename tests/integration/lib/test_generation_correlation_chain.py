@@ -28,7 +28,7 @@ from lib.generation_worker import GenerationWorker
 from lib.ledger import Ledger
 from lib.logging_config import RedactingFormatter
 from lib.request_context import bound_request_id
-from lib.version_manager import VersionManager
+from lib.version_manager import VersionManager, version_candidate_ref
 from lib.video_backends.base import persist_provider_job_id
 from server.telemetry import configure_test_tracer, public_job_ref
 
@@ -147,6 +147,7 @@ async def test_successful_generation_closes_the_chain_without_leaking_canaries(
         api_call = (await session.execute(select(ApiCall).where(ApiCall.id == recorded["api_call_id"]))).scalar_one()
         events = (await session.execute(select(ProjectEventModel))).scalars().all()
     assert api_call.task_id == task_id
+    assert api_call.request_id == REQUEST_ID
     version_record = versions.get_versions("characters", "Hero")["versions"][-1]
     assert version_record["task_id"] == task_id
 
@@ -163,7 +164,8 @@ async def test_successful_generation_closes_the_chain_without_leaking_canaries(
     assert usage_span == {**usage_span, "task_id": task_id, "usage_entry_id": str(recorded["api_call_id"])}
     version_span = dict(spans["version.recorded"].attributes or {})
     assert version_span["task_id"] == task_id
-    assert version_span["candidate_id"] == f"characters/Hero/v{recorded['version']}"
+    assert version_span["candidate_id"] == version_candidate_ref("characters", "Hero", recorded["version"])
+    assert "Hero" not in version_span["candidate_id"]
     assert version_span["master_version"] == str(recorded["version"])
     for name in ("provider.job_accepted", "usage.recorded", "version.recorded"):
         assert spans[name].context.trace_id == task_span.context.trace_id

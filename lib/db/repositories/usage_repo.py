@@ -137,6 +137,7 @@ def _row_to_dict(row: ApiCall) -> dict[str, Any]:
         "project_name": row.project_name,
         "execution_id": row.execution_id,
         "task_id": row.task_id,
+        "request_id": row.request_id,
         "call_type": row.call_type,
         "model": row.model,
         "prompt": row.prompt,
@@ -207,6 +208,7 @@ class UsageRepository(BaseRepository):
         user_id: str = DEFAULT_USER_ID,
         segment_id: str | None = None,
         task_id: str | None = None,
+        request_id: str | None = None,
     ) -> int:
         now = utc_now()
         prompt_truncated = prompt[:500] if prompt else None
@@ -214,6 +216,7 @@ class UsageRepository(BaseRepository):
         row = ApiCall(
             project_name=project_name,
             task_id=task_id,
+            request_id=request_id,
             call_type=call_type,
             model=model,
             prompt=prompt_truncated,

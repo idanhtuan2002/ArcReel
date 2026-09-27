@@ -38,14 +38,15 @@ logger = logging.getLogger(__name__)
 OTLP_ENDPOINT_ENV_VARS = ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_ENDPOINT")
 
 
-def _install_tracer_provider(provider: TracerProvider) -> None:
-    # The OTel API refuses to override an already-set global TracerProvider:
-    # a one-shot `Once` guard (independent of the stored value) makes every
-    # call after the first a no-op with a warning. Installing a provider more
-    # than once per process needs a genuine reset of both.
+def reset_tracer_provider_for_tests() -> None:
+    """Forget the installed global TracerProvider so a test can install its own.
+
+    The OTel API installs a global provider at most once per process (a one-shot
+    ``Once`` guard independent of the stored value); tests that install several
+    providers need a genuine reset of both. Production never calls this.
+    """
     trace._TRACER_PROVIDER = None
     trace._TRACER_PROVIDER_SET_ONCE._done = False
-    trace.set_tracer_provider(provider)
 
 
 def configure_tracer_from_env(
@@ -71,7 +72,7 @@ def configure_tracer_from_env(
         resource=Resource.create({"service.name": SERVICE_NAME, "deployment.environment": deployment_environment(env)})
     )
     provider.add_span_processor(BatchSpanProcessor(exporter_factory()))
-    _install_tracer_provider(provider)
+    trace.set_tracer_provider(provider)
     logger.info("OTLP 追踪导出已启用")
     return provider
 
@@ -86,7 +87,8 @@ def configure_test_tracer() -> InMemorySpanExporter:
     exporter = InMemorySpanExporter()
     provider = TracerProvider(resource=Resource.create({"service.name": SERVICE_NAME}))
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    _install_tracer_provider(provider)
+    reset_tracer_provider_for_tests()
+    trace.set_tracer_provider(provider)
     return exporter
 
 
@@ -101,4 +103,5 @@ __all__ = [
     "execution_span",
     "get_tracer",
     "public_job_ref",
+    "reset_tracer_provider_for_tests",
 ]

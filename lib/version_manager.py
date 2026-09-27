@@ -5,6 +5,7 @@
 支持版本备份、切换当前版本、记录和查询。
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -118,6 +119,17 @@ def _create_rollback_backup(current_file: Path) -> Path:
     return candidate
 
 
+def version_candidate_ref(resource_type: str, resource_id: str, version: int) -> str:
+    """Telemetry reference for one version record.
+
+    ``resource_id`` is a user-authored name (a character, scene or prop), so the
+    exported reference carries its digest; the version record itself is found
+    through the span's ``task_id``, which ``versions.json`` also stores.
+    """
+    digest = hashlib.sha256(resource_id.encode("utf-8")).hexdigest()[:16]
+    return f"{resource_type}/{digest}/v{version}"
+
+
 def _record_version_span(resource_type: str, resource_id: str, version: int, *, selected: bool) -> None:
     """Join a durably recorded version (the V1 candidate) to the executing task.
 
@@ -126,7 +138,7 @@ def _record_version_span(resource_type: str, resource_id: str, version: int, *, 
     record_correlation_span(
         "version.recorded",
         task_id=current_task_id(),
-        candidate_id=f"{resource_type}/{resource_id}/v{version}",
+        candidate_id=version_candidate_ref(resource_type, resource_id, version),
         master_version=str(version) if selected else None,
     )
 

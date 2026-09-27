@@ -120,6 +120,9 @@ def test_tracer_is_not_installed_without_an_otlp_endpoint() -> None:
 
 @pytest.mark.parametrize("endpoint_var", ["OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"])
 def test_tracer_exports_allowlisted_spans_when_an_otlp_endpoint_is_configured(endpoint_var: str) -> None:
+    from server.telemetry import reset_tracer_provider_for_tests
+
+    reset_tracer_provider_for_tests()
     exporter = InMemorySpanExporter()
     provider = configure_tracer_from_env(
         {endpoint_var: "http://collector.invalid:4318", "DEPLOYMENT_ENVIRONMENT": "staging"},
