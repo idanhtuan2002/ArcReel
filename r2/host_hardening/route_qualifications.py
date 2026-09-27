@@ -22,13 +22,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import os
+import time
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from lib.app_data_dir import app_data_dir
-from lib.json_io import atomic_write_json
+from lib.json_io import atomic_write_bytes, atomic_write_json
 from r2.contracts.host_hardening import ProviderQualificationStatus
 from r2.host_hardening.paid_routes import PaidRoute, set_qualification_lookup
 from r2.host_hardening.provider_capabilities import ProviderCapabilityError, capability_qualification_status
@@ -38,6 +43,8 @@ from r2.host_hardening.route_inventory import (
     HOST_VIDEO_ADAPTER_VERSION,
     PAID_ASYNC_SUBMIT_FAMILIES,
 )
+
+logger = logging.getLogger(__name__)
 
 QUALIFICATIONS_DIRNAME = ".route_qualifications"
 _RECORDS_FILE = "qualifications.json"
@@ -73,6 +80,7 @@ def adapter_version_for(route: PaidRoute) -> str:
 class RouteQualification:
     route_ref: str
     model_id: str
+    binding: str
     adapter_version: str
     qualified_at: str
     expires_at: str
@@ -86,12 +94,42 @@ def qualifications_dir(root: Path | None = None) -> Path:
     return (root or app_data_dir()) / QUALIFICATIONS_DIRNAME
 
 
+#: Route classes that cannot be qualified: the Agent's spend is recorded after the fact, so it has
+#: no budget-before-submit (ADR-0091 invariant 1), and trial runs are a setup tool.
+UNQUALIFIABLE_ROUTE_KINDS = frozenset({"agent", "trial_run"})
+
+
 def load_qualifications(root: Path | None = None) -> list[RouteQualification]:
+    """Current records; an unreadable or malformed records file counts as no qualifications (fail closed)."""
     path = qualifications_dir(root) / _RECORDS_FILE
     if not path.is_file():
         return []
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return [RouteQualification(**item) for item in raw.get("qualifications", [])]
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        return [RouteQualification(**item) for item in raw.get("qualifications", [])]
+    except (OSError, ValueError, TypeError, AttributeError):
+        logger.error("route qualification records at %s are unreadable; treating every route as unqualified", path)
+        return []
+
+
+@contextmanager
+def _exclusive(directory: Path, *, timeout: float = 30.0) -> Generator[None]:
+    """Cross-process exclusion for the records read-modify-write, via an ``O_EXCL`` lock file."""
+    lock = directory / ".lock"
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"route qualification store is locked: {lock}") from None
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        os.close(fd)
+        lock.unlink(missing_ok=True)
 
 
 def _digest(data: bytes) -> str:
@@ -102,6 +140,7 @@ def record_qualification(
     *,
     route: PaidRoute,
     model_id: str,
+    binding: str,
     evidence: dict[str, Any],
     expires_at: datetime,
     cost_record_ref: str | None,
@@ -110,6 +149,8 @@ def record_qualification(
     root: Path | None = None,
 ) -> RouteQualification:
     """Write the canary evidence and replace any earlier record for the same route and model."""
+    if route.kind in UNQUALIFIABLE_ROUTE_KINDS:
+        raise ValueError(f"route class {route.kind!r} cannot be qualified")
     directory = qualifications_dir(root)
     evidence_dir = directory / _EVIDENCE_DIR
     evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -117,10 +158,11 @@ def record_qualification(
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
     safe_ref = route.ref.replace(":", "_").replace("/", "_")
     evidence_path = evidence_dir / f"{safe_ref}__{model_id.replace('/', '_')}__{stamp}.json"
-    evidence_path.write_bytes(evidence_bytes)
+    atomic_write_bytes(evidence_path, evidence_bytes)
     record = RouteQualification(
         route_ref=route.ref,
         model_id=model_id,
+        binding=binding,
         adapter_version=adapter_version_for(route),
         qualified_at=now.isoformat(),
         expires_at=expires_at.isoformat(),
@@ -129,11 +171,12 @@ def record_qualification(
         cost_record_ref=cost_record_ref,
         recorded_by=recorded_by,
     )
-    kept = [q for q in load_qualifications(root) if (q.route_ref, q.model_id) != (route.ref, model_id)]
-    atomic_write_json(
-        directory / _RECORDS_FILE,
-        {"schema_version": 1, "qualifications": [asdict(q) for q in [*kept, record]]},
-    )
+    with _exclusive(directory):
+        kept = [q for q in load_qualifications(root) if (q.route_ref, q.model_id) != (route.ref, model_id)]
+        atomic_write_json(
+            directory / _RECORDS_FILE,
+            {"schema_version": 1, "qualifications": [asdict(q) for q in [*kept, record]]},
+        )
     return record
 
 
@@ -156,12 +199,22 @@ def _adapter_level_holds(route: PaidRoute, now: datetime) -> bool:
         return False
 
 
-def is_route_qualified(route: PaidRoute, model_id: str | None, *, now: datetime, root: Path | None = None) -> bool:
+def is_route_qualified(
+    route: PaidRoute,
+    model_id: str | None,
+    binding: str | None,
+    *,
+    now: datetime,
+    root: Path | None = None,
+) -> bool:
+    """The single registry read for release gates: static adapter level plus runtime route record."""
+    if route.kind in UNQUALIFIABLE_ROUTE_KINDS or binding is None:
+        return False
     if not _adapter_level_holds(route, now):
         return False
     directory = qualifications_dir(root)
     for record in load_qualifications(root):
-        if (record.route_ref, record.model_id) != (route.ref, model_id or ""):
+        if (record.route_ref, record.model_id, record.binding) != (route.ref, model_id or "", binding):
             continue
         if record.adapter_version != adapter_version_for(route):
             continue
@@ -176,12 +229,15 @@ def is_route_qualified(route: PaidRoute, model_id: str | None, *, now: datetime,
 
 def install_runtime_qualification_lookup(root: Path | None = None) -> None:
     """Make release-mode gates consult the runtime records (called at app startup)."""
-    set_qualification_lookup(lambda route, model: is_route_qualified(route, model, now=datetime.now(UTC), root=root))
+    set_qualification_lookup(
+        lambda route, model, binding: is_route_qualified(route, model, binding, now=datetime.now(UTC), root=root)
+    )
 
 
 __all__ = [
     "QUALIFICATIONS_DIRNAME",
     "ROUTE_ADAPTER_VERSIONS",
+    "UNQUALIFIABLE_ROUTE_KINDS",
     "RouteQualification",
     "adapter_version_for",
     "install_runtime_qualification_lookup",

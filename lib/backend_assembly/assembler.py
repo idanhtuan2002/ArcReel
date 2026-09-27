@@ -13,7 +13,8 @@ from lib.backend_assembly.loaded_config import LoadedConfig
 from lib.backend_assembly.specs import get_provider_spec
 from lib.config.registry import PROVIDER_REGISTRY
 from lib.custom_provider import is_custom_provider
-from r2.host_hardening.paid_routes import media_route, require_paid_route
+from r2.host_hardening.paid_routes import current_release_mode, media_route, require_paid_route, route_binding
+from r2.host_hardening.provider_capabilities import ReleaseMode
 
 if TYPE_CHECKING:
     from lib.config.resolver import ConfigResolver
@@ -34,6 +35,28 @@ async def _load_builtin_config(resolver: ConfigResolver, provider_id: str, rate_
     )
 
 
+async def paid_route_binding(*, provider_id: str, media_type: str, resolver: ConfigResolver) -> str:
+    """The provider configuration a route qualification is bound to: provider, base URL and credentials.
+
+    Built-in providers bind their stored provider config; custom providers bind their provider row's
+    base URL and key. Only :func:`route_binding`'s digest leaves this function.
+    """
+    if is_custom_provider(provider_id):
+        from lib.custom_provider import parse_provider_id
+        from lib.db.repositories.custom_provider_repo import CustomProviderRepository
+
+        async with resolver._open_session() as (session, _):
+            provider = await CustomProviderRepository(session).get_provider(parse_provider_id(provider_id))
+        fields = (
+            {"base_url": provider.base_url, "api_key": provider.api_key, "discovery_format": provider.discovery_format}
+            if provider is not None
+            else {}
+        )
+        return route_binding(provider_id=provider_id, media_type=media_type, **fields)
+    config = await resolver.provider_config(provider_id)
+    return route_binding(provider_id=provider_id, media_type=media_type, **dict(config))
+
+
 async def assemble_backend(
     *,
     provider_id: str,
@@ -45,9 +68,14 @@ async def assemble_backend(
     """统一构造入口。按 provider_id 是否自定义分流；未登记的内置 provider × media fail-loud。
 
     发布部署（``ARCREEL_RELEASE_MODE=PRODUCTION_CANDIDATE``）下，没有当前资质的付费路线在构造
-    backend 之前即被拒绝，不会发出任何供应商请求（ADR-0091）。
+    backend 之前即被拒绝，不会发出任何供应商请求（ADR-0091）。资质绑定到这条路线当下的供应商
+    配置（base URL、凭证）；DEV 不读取、不计算绑定。
     """
-    require_paid_route(media_route(provider_id, media_type), model_id=model_id)
+    route = media_route(provider_id, media_type)
+    binding = None
+    if current_release_mode() is not ReleaseMode.DEV:
+        binding = await paid_route_binding(provider_id=provider_id, media_type=media_type, resolver=resolver)
+    require_paid_route(route, model_id=model_id, binding=binding)
     if is_custom_provider(provider_id):
         from lib.custom_provider.loader import load_custom_backend
 

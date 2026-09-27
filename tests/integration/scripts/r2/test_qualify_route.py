@@ -10,7 +10,9 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
+from lib.backend_assembly.assembler import paid_route_binding
 from lib.budget_guard import budget_scope_ref
+from lib.config.resolver import ConfigResolver
 from lib.config.service import ConfigService
 from lib.db.models.api_call import ApiCall
 from lib.db.repositories.budget_reservation_repo import BudgetReservationRepository
@@ -79,7 +81,8 @@ async def test_the_canary_is_the_one_call_an_unqualified_route_may_make(
     result = await qualify_route.run_media_canary(_args(), session_factory=db_factory)
 
     assert result["qualified"] == "media:ark:image"
-    assert is_route_qualified(route, "doubao-x", now=datetime.now(UTC), root=release_deployment)
+    binding = await paid_route_binding(provider_id="ark", media_type="image", resolver=ConfigResolver(db_factory))
+    assert is_route_qualified(route, "doubao-x", binding, now=datetime.now(UTC), root=release_deployment)
     async with db_factory() as session:
         call = (await session.execute(select(ApiCall))).scalar_one()
     assert (call.status, call.project_name) == ("success", qualify_route.CANARY_PROJECT)
@@ -96,6 +99,19 @@ async def test_a_canary_without_usable_output_records_nothing(
         await qualify_route.run_media_canary(_args(), session_factory=db_factory)
 
     assert load_qualifications(release_deployment) == []
+
+
+async def test_a_new_api_key_needs_a_new_canary(db_factory, release_deployment: Path, monkeypatch) -> None:
+    """资质绑定到供应商当下的配置：换了凭证即不再有效，旧 canary 不能带到新账户上。"""
+    monkeypatch.setitem(image_registry._BACKEND_FACTORIES, "ark", lambda **kw: _FakeImageBackend(**kw))
+    await qualify_route.run_media_canary(_args(), session_factory=db_factory)
+    resolver = ConfigResolver(db_factory)
+
+    async with db_factory() as session:
+        await ConfigService(session).set_provider_config("ark", "api_key", "another-account-key")
+        await session.commit()
+    binding = await paid_route_binding(provider_id="ark", media_type="image", resolver=resolver)
+
     assert not is_route_qualified(
-        media_route("ark", "image"), "doubao-x", now=datetime.now(UTC), root=release_deployment
+        media_route("ark", "image"), "doubao-x", binding, now=datetime.now(UTC), root=release_deployment
     )

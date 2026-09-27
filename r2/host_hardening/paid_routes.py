@@ -16,6 +16,8 @@ consulted without this module owning their storage.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
@@ -76,11 +78,12 @@ class PaidRouteUnqualifiedError(RuntimeError):
         super().__init__(f"{self.code}: {route.ref} model={model_id or '-'}")
 
 
-#: ``(route, model_id) -> bool``: whether the route currently holds a qualification.
-QualificationLookup = Callable[[PaidRoute, "str | None"], bool]
+#: ``(route, model_id, binding) -> bool``: whether the route currently holds a qualification for
+#: this exact model and provider configuration (``binding``, see :func:`route_binding`).
+QualificationLookup = Callable[[PaidRoute, "str | None", "str | None"], bool]
 
 
-def _no_qualifications(_route: PaidRoute, _model_id: str | None) -> bool:
+def _no_qualifications(_route: PaidRoute, _model_id: str | None, _binding: str | None) -> bool:
     return False
 
 
@@ -109,14 +112,31 @@ def qualification_canary(route: PaidRoute, model_id: str | None) -> Generator[No
         _canary.reset(token)
 
 
-def require_paid_route(route: PaidRoute, *, model_id: str | None, release_mode: ReleaseMode | None = None) -> None:
-    """Refuse ``route`` in a release deployment unless it is currently qualified."""
+def route_binding(**fields: object) -> str:
+    """Digest of the provider configuration a route is qualified for (base URL, credentials, account).
+
+    Only the digest is stored, never a credential. A changed key, base URL or account yields a
+    different binding, so a qualification does not carry over to another configuration or to a
+    deployment restored from backup with other credentials.
+    """
+    payload = json.dumps({key: fields[key] for key in sorted(fields)}, sort_keys=True, default=str)
+    return "sha256:" + hashlib.sha256(b"arcreel-route-binding\0" + payload.encode("utf-8")).hexdigest()
+
+
+def require_paid_route(
+    route: PaidRoute,
+    *,
+    model_id: str | None,
+    binding: str | None = None,
+    release_mode: ReleaseMode | None = None,
+) -> None:
+    """Refuse ``route`` in a release deployment unless it is currently qualified for ``binding``."""
     mode = release_mode if release_mode is not None else current_release_mode()
     if mode is ReleaseMode.DEV:
         return
     if _canary.get() == (route, model_id):
         return
-    if not _qualification_lookup(route, model_id):
+    if not _qualification_lookup(route, model_id, binding):
         raise PaidRouteUnqualifiedError(route, model_id)
 
 
@@ -125,7 +145,7 @@ def media_route(provider_id: str, media_type: str) -> PaidRoute:
     # Duplicates lib.custom_provider's "custom-" prefix instead of importing it, matching
     # route_inventory: lib.backend_assembly reaches this module.
     if provider_id.startswith("custom-"):
-        return PaidRoute("custom_media", media_type=media_type)
+        return PaidRoute("custom_media", provider_id=provider_id, media_type=media_type)
     return PaidRoute("media", provider_id=provider_id, media_type=media_type)
 
 
@@ -152,5 +172,6 @@ __all__ = [
     "paid_route_inventory",
     "qualification_canary",
     "require_paid_route",
+    "route_binding",
     "set_qualification_lookup",
 ]

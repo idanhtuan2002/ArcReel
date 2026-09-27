@@ -580,3 +580,25 @@ class TestValueObjectAssembly:
             voices=(),
         )
         assert lane.narration_voice == "Cherry"
+
+
+async def test_a_cached_backend_is_re_gated_in_a_release_deployment(
+    patched_session_factory, fake_assemble, monkeypatch
+) -> None:
+    """缓存命中不绕开发布闸门：资质过期或撤销后，已缓存的 backend 也不再被取用。"""
+    from r2.host_hardening.paid_routes import RELEASE_MODE_ENV, PaidRouteUnqualifiedError, set_qualification_lookup
+
+    monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+    qualified = {"now": True}
+    set_qualification_lookup(lambda _route, _model, _binding: qualified["now"])
+    resolver = ConfigResolver(patched_session_factory)
+    try:
+        first = await generation_context._get_or_create_backend("image", "ark", {"model": "m1"}, resolver, None)
+        qualified["now"] = False
+        with pytest.raises(PaidRouteUnqualifiedError):
+            await generation_context._get_or_create_backend("image", "ark", {"model": "m1"}, resolver, None)
+    finally:
+        set_qualification_lookup(None)
+
+    assert first.name == "ark"
+    assert fake_assemble == [("ark", "image", "m1")]

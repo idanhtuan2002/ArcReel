@@ -9,9 +9,10 @@ until the expiry. A failure records nothing.
 
     uv run python -m scripts.r2.qualify_route --provider openai --media image --model gpt-image-2
     uv run python -m scripts.r2.qualify_route --provider custom-7 --media video --model relay-video --duration 5
-    uv run python -m scripts.r2.qualify_route --agent
 
-Trial runs cannot be qualified here; in a release deployment they stay refused.
+The qualification is bound to the provider's current configuration (base URL and credentials, by
+digest): changing either needs a new canary. The Agent route and trial runs cannot be qualified;
+in a release deployment they stay refused.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.backend_assembly import assemble_backend
+from lib.backend_assembly.assembler import paid_route_binding
 from lib.budget_guard import call_reference
 from lib.config.resolver import ConfigResolver
 from lib.db import async_session_factory
@@ -86,13 +88,15 @@ async def _generate(backend: Any, media: str, workdir: Path, args: argparse.Name
 
 async def run_media_canary(args: argparse.Namespace, *, session_factory=async_session_factory) -> dict[str, Any]:
     route = media_route(args.provider, args.media)
+    resolver = ConfigResolver(session_factory)
+    binding = await paid_route_binding(provider_id=args.provider, media_type=args.media, resolver=resolver)
     started = datetime.now(UTC)
     with tempfile.TemporaryDirectory(prefix="arcreel-canary-") as tmp, qualification_canary(route, args.model):
         backend = await assemble_backend(
             provider_id=args.provider,
             media_type=args.media,
             model_id=args.model,
-            resolver=ConfigResolver(session_factory),
+            resolver=resolver,
         )
         ledger = Ledger(session_factory=session_factory)
         async with ledger.record(
@@ -105,35 +109,14 @@ async def run_media_canary(args: argparse.Namespace, *, session_factory=async_se
             result, output = await _generate(backend, args.media, Path(tmp), args)
             call.success(result)
         cost_record_ref = call_reference(call.call_id)
-    return _finish(route, args, started=started, output=output, cost_record_ref=cost_record_ref)
-
-
-async def run_agent_canary(args: argparse.Namespace, *, session_factory=async_session_factory) -> dict[str, Any]:
-    from lib.config.anthropic_probe import run_test
-    from lib.db.repositories.agent_credential_repo import AgentCredentialRepository
-
-    async with session_factory() as session:
-        credential = await AgentCredentialRepository(session).get_active()
-    if credential is None:
-        raise CanaryFailedError("no active Agent credential")
-    route = PaidRoute("agent", provider_id=credential.preset_id)
-    started = datetime.now(UTC)
-    result = await run_test(
-        preset_id=credential.preset_id,
-        base_url=credential.base_url,
-        api_key=credential.api_key,
-        model=credential.model,
-    )
-    if result.overall == "fail" or not result.messages_probe.success:
-        raise CanaryFailedError("the Agent provider's message test did not pass")
-    args.model = credential.model or ""
-    return _finish(route, args, started=started, output={"messages_ok": True}, cost_record_ref=None)
+    return _finish(route, args, binding=binding, started=started, output=output, cost_record_ref=cost_record_ref)
 
 
 def _finish(
     route: PaidRoute,
     args: argparse.Namespace,
     *,
+    binding: str,
     started: datetime,
     output: dict[str, Any],
     cost_record_ref: str | None,
@@ -155,6 +138,7 @@ def _finish(
     record = record_qualification(
         route=route,
         model_id=args.model,
+        binding=binding,
         evidence=evidence,
         expires_at=finished + timedelta(days=args.ttl_days),
         cost_record_ref=cost_record_ref,
@@ -166,11 +150,9 @@ def _finish(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    target = parser.add_mutually_exclusive_group(required=True)
-    target.add_argument("--agent", action="store_true", help="qualify the active Agent credential's provider")
-    target.add_argument("--provider", help="built-in provider id or custom-<id>")
-    parser.add_argument("--media", choices=("image", "video", "text", "audio"))
-    parser.add_argument("--model")
+    parser.add_argument("--provider", required=True, help="built-in provider id or custom-<id>")
+    parser.add_argument("--media", required=True, choices=("image", "video", "text", "audio"))
+    parser.add_argument("--model", required=True)
     parser.add_argument("--duration", type=int, default=5, help="video seconds (a duration the model supports)")
     parser.add_argument("--voice", help="voice id for an audio route")
     parser.add_argument("--ttl-days", type=int, default=30)
@@ -179,12 +161,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-    if args.provider and (not args.media or not args.model):
-        parser.error("--provider needs --media and --model")
+    args = build_parser().parse_args(argv)
     try:
-        result = asyncio.run(run_agent_canary(args) if args.agent else run_media_canary(args))
+        result = asyncio.run(run_media_canary(args))
     except Exception as exc:
         print(json.dumps({"error": type(exc).__name__, "detail": str(exc)[:500]}), file=sys.stderr)
         return 1
