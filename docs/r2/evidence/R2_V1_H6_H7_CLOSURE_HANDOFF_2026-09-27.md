@@ -177,3 +177,52 @@ Still open:
 - **Golden A/B on a restored target (V1-05/E2).** The no-provider run on a
   restored target is not done, so no set is VERIFIED.
 - **Final review.** A final independent review is needed on this HEAD.
+
+## Final review and fixes — 2026-09-27
+
+The final review of `d382f5fe` returned CHANGES_REQUIRED on F1 only
+(`R2_V1_H6_H7_FINAL_REVIEW_2026-09-27.md`). H6 was judged acceptable pending
+Golden A/B. Fixes:
+
+- `869f1351`:
+  - F1: bounded one-line separator whitespace; linear PEM pairing; masking
+    of unterminated quoted credentials. The sweep stays under 30 ms at 20k
+    characters.
+  - F3: job IDs are bound outside queued tasks too.
+- `e2463c61`:
+  - F4: global, whitespace-safe userinfo stripping, including
+    `system_setting`.
+  - F5: per-target verdict files, attested-file cross-checks, and no
+    re-verification of an attested target.
+  - F6: query parameters are kept verbatim.
+  - F7: redacted CLI errors.
+  - F8: `.env` examples document the telemetry HMAC key, OTLP and the
+    content opt-in.
+
+Accepted without change:
+
+- **F2 edges.** Only IDs bound in child tasks, and IDs of 6 characters or
+  fewer, remain; no backend path spawns child tasks.
+
+Drill evidence was regenerated on `e2463c61`:
+
+- verify `checks_passed`;
+- attest refused without passing Golden evidence;
+- the set stays `COMPLETE`;
+- 0 canaries.
+
+Verification:
+
+- The unit, `integration/lib`, `integration/server/services`,
+  `integration/server/agent_runtime` and `integration/r2/host_hardening`
+  suites: `12849 passed`. The only failure was the dirty-tree scope check.
+- H6 PostgreSQL: `17 passed`.
+- Static gates are clean.
+- The full suite was not run.
+
+Still open:
+
+1. The Golden A/B no-provider read/review/export on a restored target, with
+   attestation and measured RPO/RTO (V1-05/E2).
+2. The full affected gates on the exact candidate HEAD, as V1-05 requires.
+3. A confirmation review of these fixes.
