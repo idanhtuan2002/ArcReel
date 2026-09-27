@@ -42,5 +42,31 @@ candidate/promotion store has no production caller. `method_decision_id` stays
 an allowed attribute that is absent on every V1 path: no MethodDecision reaches
 the Host today, and none is fabricated.
 
+**Follow-up decisions from the independent review (2026-09-27).** The review is
+`docs/r2/evidence/R2_V1_H6_H7_INDEPENDENT_REVIEW_2026-09-27.md`. Each decision
+below follows sources already accepted.
+
+- **A set becomes VERIFIED only through attestation.** Automated restore
+  checks record a per-target verdict and never change the set's state. The
+  set becomes `VERIFIED` only when those checks passed and the no-provider
+  Golden A/B read/review/export evidence is attested with measured RPO/RTO.
+  This follows M7 spec §8 step 7, the recovery-closure design §7 and backlog
+  V1-05.
+- **Usage rows carry the entry `request_id`.** Inline generations are then
+  joined to their HTTP or Agent request as well as to queued tasks. This
+  follows frozen H7 ("every generation must be traceable") and the
+  persisted-join decision above.
+- **Exported span values carry no user-authored names.** Version references
+  use a digest of the resource name, and caller request IDs are reused only in
+  opaque shapes. This follows M7 spec §9.
+- **Logs mask credentials, not received failure detail; generation content is
+  opt-in.** Every rendered log line masks credentials. Received failure detail
+  (paths, provider text, tracebacks) stays in logs. Generation content
+  (prompts, model output) is logged only when the operator opts in with
+  `ARCREEL_LOG_GENERATION_CONTENT=1`. This follows ADR-0052, OWASP and the
+  OpenTelemetry GenAI conventions
+  (`docs/research/2026-09-27-r2-v1-h7-log-content-policy.md`). It supersedes
+  the M7-D plan D2 prompt/path log canary for V1.
+
 Online (zero-downtime) capture, PITR, encrypted custody and automated
 maintenance mode remain possible later profiles. They are not V1 obligations.

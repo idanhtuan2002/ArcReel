@@ -79,3 +79,52 @@ not run.
   Process-level OpenTelemetry context, including baggage, is not propagated
   into that subprocess.
 - The production Compose image tag `postgres:18-alpine` is not digest-pinned.
+
+## Independent review and fixes — 2026-09-27
+
+The independent review of `1f287029` returned CHANGES_REQUIRED
+(`R2_V1_H6_H7_INDEPENDENT_REVIEW_2026-09-27.md`). Fixes:
+
+- `12324323`: log-content policy (ADR-0052 precedent), linear redaction (I3),
+  and HMAC job references in backend logs with a static guard test (I5).
+- `ae6b568d`: `api_calls.request_id` (Alembic `b8d4f0e2a300`, I6), a digest
+  in `candidate_id` and opaque `X-Request-ID` values only (M2), and no
+  OpenTelemetry private globals in production (M4).
+- `237be5b0`: verify no longer changes set state (I1); Artifact Manifest,
+  `current_version` and release checks plus Golden attestation (I4);
+  passwords off argv (I2); sequence fence and mid-capture tests (M1);
+  `.credentials.json` exclusion and a tighter setting-key pattern (M3);
+  configuration stored in the manifest (M6).
+- `075d84f2`: a structured CLI error for malformed Golden evidence.
+
+Drill evidence was regenerated on `075d84f2`:
+
+- verify `checks_passed`, 0 canaries;
+- attest refused without passing Golden evidence;
+- the set stays `COMPLETE`.
+
+Verification on the fix commits:
+
+- The unit, `integration/lib`, `integration/server/services` and
+  `integration/server/agent_runtime` suites passed (12818 at `ae6b568d`).
+- H6 PostgreSQL integration: `13 passed`.
+- `tests/unit/r2`, `tests/integration/r2/host_hardening` and
+  `tests/unit/scripts`: `1595 passed`.
+- Static gates are clean.
+- The only failure each time was the dirty-tree M7 scope check, which passes
+  after commit. The full suite was not run.
+
+Not changed, with reasons:
+
+- **M5.** Migration tests stay SQLite per CONTRIBUTING. PostgreSQL
+  upgrade/downgrade is covered by the CI command, and the reviewer ran it
+  manually.
+- **M6.** `BackupSetRepository`/`backup_sets` stay (unused outside tests). A
+  schema removal needs its own migration decision.
+
+Still open:
+
+- **Golden A/B on a restored target.** The no-provider read/review/export on
+  a restored target is not run, so no set is `VERIFIED` yet. This is the
+  remaining V1-05 acceptance step and overlaps E2.
+- **Fresh review.** A new independent review is needed on the fix HEAD.
