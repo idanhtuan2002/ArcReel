@@ -466,6 +466,23 @@ bounds the other readers. V1-02 still must approve version/shape, Task/attempt
 and Manifest reconciliation, missing-byte results, and complete malformed-grid
 coverage. This is bounded current-source evidence, not an approved capture rule.
 
+Candidate grid field rules for review, using the existing **unversioned** JSON
+shape and the pure probe (not `GridGeneration.from_dict()`'s legacy projection):
+
+| Raw field/state | Candidate file rule | Fixture that must decide the final rule |
+| --- | --- | --- |
+| `script_file`: required string in a persisted grid | Resolve the exact bound episode script and require its bytes; an absent target has no demonstrated grid-specific pending semantics. | Missing script with a still-present grid record. |
+| `grid_image_path`: absent/null in a newly `pending` grid | No composite binding until a path is declared; `completed` with no path is a conflict to inspect, not an automatic pending case. | New pending record versus completed record missing its path. |
+| `grid_image_path`: nonempty in any status | Bind the declared path to physical bytes; do not discard an old path solely because regeneration set `pending` or failure set `failed`. A missing old path needs an approved stale-reference disposition or a typed rejection. | Pending/failed regeneration with old composite present, then missing. |
+| `frame_chain[*].image_path`: absent/null or nonempty | No path is required for every frame merely because `split_at` exists; each nonempty declared path needs an explicit binding/disposition even when `split_at` is null. | Skipped scene after split and stale frame path after composite replacement. |
+| `reference_images[*].path`: list present, null or absent | Every listed path is a declared input reference; preserve null/absent list states and reject unsupported item shape. Empty string and missing target semantics still need review. | Missing reference image, empty path, and unknown field in an unversioned record. |
+
+`inspect_grid_references()` currently accepts legacy `splitting` and rejects
+unknown fields rather than guessing a future unversioned schema
+(`r2/host_hardening/grid_reference_probe.py:16-41,83-166`). These rows specify
+review cases and conservative candidate bindings; they do not approve the
+Task/attempt fence, current Manifest mapping or stale-path disposition.
+
 ### Presentation projections and provider-media staging
 
 `MaterializedPresentation.to_dict()` writes `script_file`, its subtitle and
@@ -605,6 +622,33 @@ formal file. The policy must say which references are required for an exact
 recovery claim and how to handle a pre-existing dangling record. This is a
 research inventory, not approval to trim history or reject production data
 under an unreviewed rule.
+
+The existing index has no top-level schema discriminator in the ordinary
+`VersionManager` writer (`lib/version_manager.py:384-431`); `get_versions()`
+projects one resource, adds `is_current`/`file_url`, and makes absent index and
+absent resource look alike (`:171-221`). Reuse `RESOURCE_TYPES`,
+`version_snapshot_dir()` and `is_managed_snapshot_path()` for typed bucket
+vocabulary (`lib/resource_paths.py:42-57,88-103`;
+`lib/version_manager.py:155-169`), but the latter only checks bucket, path
+segment count and extension. A disposable probe returned true for a
+`characters` snapshot named for a different resource; it does not verify the
+record's resource ID, version or bytes. Another disposable probe made
+`add_version()` persist one record when its source file was absent, with no
+snapshot bytes. Those results agree with the source contract and are not a
+reason to change the ordinary version API in this packet.
+
+Candidate V1-02 rule: classify the raw index as absent, present-empty, valid
+supported content or corrupt/unknown before any UI projection; bind **every**
+declared `versions[*].file` to a no-follow physical record, regardless of
+`current_version` or rejection status. Require a reviewed match among resource
+key, version number and file path, using existing path vocabulary without
+assuming the bucket check proves full identity. A missing declared snapshot
+would fail `BACKUP_REQUIRED_FILE_MISSING` under the draft exact-recovery
+policy; an unreferenced post-purge snapshot stays in the physical census with
+an orphan disposition. Fixtures must include an absent and empty index, wrong
+resource filename in the right bucket, missing unselected/rejected snapshot,
+selected/current divergence and post-purge orphan. The historical filename
+compatibility rule and exact identity grammar remain for review.
 
 ## Draft-design delta for review, not a schema choice
 
