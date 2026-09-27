@@ -220,7 +220,7 @@ def test_the_real_registry_seeds_only_unqualified_route_profiles() -> None:
     real_registry = Path(__file__).resolve().parents[4] / "r2" / "provider_capabilities" / "registry.json"
     document = json.loads(real_registry.read_text())
     assert document["schema_version"] == 1
-    assert len(document["profiles"]) == 11
+    assert len(document["profiles"]) == 12
     assert {entry["qualification_status"] for entry in document["profiles"]} == {"UNQUALIFIED"}
     assert {entry["idempotency_mode"] for entry in document["profiles"]} == {"NONE"}
     for entry in document["profiles"]:

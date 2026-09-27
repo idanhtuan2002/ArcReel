@@ -38,6 +38,7 @@ from lib.task_failure import encode_failure
 from lib.telemetry import clears_baggage_at_provider_boundary
 from lib.video_backends.base import ProviderResponseStage, VideoGenerationRequest
 from lib.video_frame_slots import resolve_first_frame_aspect_ratio
+from r2.host_hardening.paid_routes import PaidRoute, require_paid_route
 
 from .check import STAGES, check_response, stage_report_payload
 from .inputs import EndpointTestCredentials, EndpointTestParameters
@@ -257,7 +258,9 @@ class TrialRunManager:
 
         Raises:
             TrialRunBusyError: 该用户已有一个测试连接在跑。
+            PaidRouteUnqualifiedError: 发布部署下试跑路线没有当前资质（ADR-0091）。
         """
+        require_paid_route(PaidRoute("trial_run"), model_id=target.model)
         if user_id in self._owners.values():
             raise TrialRunBusyError(user_id)
         self.purge_expired()

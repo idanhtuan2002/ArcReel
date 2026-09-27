@@ -33,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # 判定，解析器产出的是 starlette.datastructures.UploadFile，用子类判定会全部落空。
 from starlette.datastructures import FormData, UploadFile
 
-from lib.api_errors import BadRequestError, ConflictError, NotFoundError, UnprocessableError
+from lib.api_errors import ApiError, BadRequestError, ConflictError, NotFoundError, UnprocessableError
 from lib.backend_assembly.specs import builtin_declarative_video_diagnostics
 from lib.config.registry import PROVIDER_REGISTRY, ProviderMeta, model_info_for
 from lib.config.resolver import ConfigResolver
@@ -65,6 +65,7 @@ from lib.db.repositories.custom_endpoint_repo import CustomEndpointRepository
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.i18n import Translator
 from lib.task_failure import render_failure
+from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 
 logger = logging.getLogger(__name__)
 
@@ -415,6 +416,9 @@ async def start_trial_run(
     except TrialRunBusyError as exc:
         shutil.rmtree(staging, ignore_errors=True)
         raise ConflictError("trial_run_already_running") from exc
+    except PaidRouteUnqualifiedError as exc:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise ApiError(exc.code, status_code=403, **exc.params) from exc
     except Exception:
         # manager 接手前失败（落素材、建结果目录）时临时目录还没有主人，留在盘上没人会回来删。
         shutil.rmtree(staging, ignore_errors=True)

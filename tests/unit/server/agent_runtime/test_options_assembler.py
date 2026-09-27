@@ -365,3 +365,41 @@ async def test_append_prompt_omits_user_memory_for_invalid_user_id(tmp_path: Pat
 
     assert "## 用户记忆" not in prompt
     assert "ArcReel Agent" in prompt
+
+
+class TestAgentRouteGate:
+    async def test_dev_opens_a_session_without_reading_credentials(self, monkeypatch):
+        from r2.host_hardening.paid_routes import RELEASE_MODE_ENV
+        from server.agent_runtime.options_assembler import require_agent_route_qualified
+
+        monkeypatch.setenv(RELEASE_MODE_ENV, "DEV")
+
+        def _no_db():
+            raise AssertionError("DEV 不应读取 Agent 凭证")
+
+        monkeypatch.setattr("lib.db.async_session_factory", _no_db)
+        assert await require_agent_route_qualified() is None
+
+    async def test_a_release_deployment_refuses_an_unqualified_agent_provider(self, monkeypatch, db_factory):
+        from lib.db.repositories.agent_credential_repo import AgentCredentialRepository
+        from r2.host_hardening.paid_routes import RELEASE_MODE_ENV, PaidRouteUnqualifiedError
+        from server.agent_runtime.options_assembler import require_agent_route_qualified
+
+        async with db_factory() as session:
+            repo = AgentCredentialRepository(session)
+            credential = await repo.create(
+                preset_id="anthropic-official",
+                display_name="Anthropic",
+                base_url="https://api.anthropic.com",
+                api_key="sk-ant-x",
+                model="claude-x",
+            )
+            await repo.set_active(credential.id)
+            await session.commit()
+        monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+        monkeypatch.setattr("lib.db.async_session_factory", db_factory)
+
+        with pytest.raises(PaidRouteUnqualifiedError) as raised:
+            await require_agent_route_qualified()
+
+        assert raised.value.params == {"route": "agent:anthropic-official", "model": "claude-x"}

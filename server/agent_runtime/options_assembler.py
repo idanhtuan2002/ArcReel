@@ -84,6 +84,27 @@ _PERSONA_PROMPT = """\
 - 你是用户的视频制作搭档，专业、友善、高效"""
 
 
+async def require_agent_route_qualified() -> None:
+    """发布部署下 Agent 的模型供应商也是付费路线：没有当前资质即拒绝开会话（ADR-0091）。
+
+    DEV 模式直接放行，不读凭证。
+    """
+    from r2.host_hardening.paid_routes import PaidRoute, current_release_mode, require_paid_route
+    from r2.host_hardening.provider_capabilities import ReleaseMode
+
+    mode = current_release_mode()
+    if mode is ReleaseMode.DEV:
+        return
+    from lib.db import async_session_factory
+    from lib.db.repositories.agent_credential_repo import AgentCredentialRepository
+
+    async with async_session_factory() as session:
+        credential = await AgentCredentialRepository(session).get_active()
+    provider_id = credential.preset_id if credential is not None else None
+    model_id = credential.model if credential is not None else None
+    require_paid_route(PaidRoute("agent", provider_id=provider_id), model_id=model_id, release_mode=mode)
+
+
 class OptionsAssembler:
     """把开会话时现场收集的依赖装配成 ClaudeAgentOptions。
 
@@ -281,6 +302,7 @@ class OptionsAssembler:
         ``session_id`` 以预先指定的 id 开一个全新会话（无历史可 resume），
         与 ``resume_id`` 互斥——SDK 只在 ``fork_session`` 下才允许两者并存。
         """
+        await require_agent_route_qualified()
         if not SDK_AVAILABLE:
             raise RuntimeError("claude_agent_sdk is not installed")
         if resume_id is not None and session_id is not None:

@@ -93,12 +93,35 @@ PAID_ASYNC_SUBMIT_FAMILIES = (
         "grok-video-generate@host-video-v1",
         "lib.video_backends.grok:GrokVideoBackend._create_video",
     ),
+    # Built-in MiniMax video runs the declarative runtime under its own provider id.
+    PaidAsyncSubmitFamily(
+        SubmitRouteKey("minimax", "declarative-video-submit", HOST_VIDEO_ADAPTER_VERSION),
+        "minimax-declarative-video-submit@host-video-v1",
+        "lib.custom_provider.declarative_backend:DeclarativeVideoBackend._submit",
+    ),
     PaidAsyncSubmitFamily(
         SubmitRouteKey(CUSTOM_PROVIDER_FAMILY, "declarative-video-submit", HOST_VIDEO_ADAPTER_VERSION),
         "custom-*-declarative-video-submit@host-video-v1",
         "lib.custom_provider.declarative_backend:DeclarativeVideoBackend._submit",
     ),
 )
+
+
+#: Built-in video provider ids (backend spec registry) -> the provider id their backend submits as.
+#: Every built-in ``(provider, "video")`` spec must appear here; a new one fails the inventory test.
+BUILTIN_VIDEO_SUBMIT_PROVIDER: dict[str, str] = {
+    "agnes": "agnes",
+    "ark": "ark",
+    "ark-agent-plan": "ark",
+    "dashscope": "dashscope",
+    "gemini-aistudio": "gemini",
+    "gemini-vertex": "gemini",
+    "grok": "grok",
+    "kling": "kling",
+    "minimax": "minimax",
+    "openai": "openai",
+    "vidu": "vidu",
+}
 
 
 def _normalized_provider_id(provider_id: str) -> str:
@@ -174,6 +197,7 @@ def submit_route_inventory_problems() -> list[str]:
 
 
 __all__ = [
+    "BUILTIN_VIDEO_SUBMIT_PROVIDER",
     "CUSTOM_PROVIDER_FAMILY",
     "HOST_VIDEO_ADAPTER_VERSION",
     "PAID_ASYNC_SUBMIT_FAMILIES",

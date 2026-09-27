@@ -215,3 +215,31 @@ class TestAssembleCustomEndToEnd:
         resolver = ConfigResolver(db_factory)
         result = await assemble_backend(provider_id=pid, media_type="text", model_id="gpt-5", resolver=resolver)
         assert isinstance(result, CustomTextBackend)
+
+
+class TestReleaseModeGate:
+    async def test_a_release_deployment_refuses_an_unqualified_route_before_building(self, db_factory, monkeypatch):
+        """发布部署下没有资质的付费路线在构造 backend 之前被拒，一个供应商请求都不会发出。"""
+        from r2.host_hardening.paid_routes import RELEASE_MODE_ENV, PaidRouteUnqualifiedError
+
+        monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+        await _seed_provider_config(db_factory, "ark", api_key="ark-secret")
+        with captured_backend_construction() as built, pytest.raises(PaidRouteUnqualifiedError) as raised:
+            await assemble_backend(
+                provider_id="ark", media_type="image", model_id="doubao-x", resolver=ConfigResolver(db_factory)
+            )
+
+        assert raised.value.params == {"route": "media:ark:image", "model": "doubao-x"}
+        assert built == []
+
+    async def test_dev_builds_the_same_route(self, db_factory, monkeypatch):
+        from r2.host_hardening.paid_routes import RELEASE_MODE_ENV
+
+        monkeypatch.setenv(RELEASE_MODE_ENV, "DEV")
+        await _seed_provider_config(db_factory, "ark", api_key="ark-secret")
+        with captured_backend_construction() as built:
+            await assemble_backend(
+                provider_id="ark", media_type="image", model_id="doubao-x", resolver=ConfigResolver(db_factory)
+            )
+
+        assert [entry["backend"] for entry in built] == ["ark"]

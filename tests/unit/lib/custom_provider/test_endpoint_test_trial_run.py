@@ -496,3 +496,22 @@ class TestRetention:
 
     def test_provider_falls_back_to_the_host_of_the_base_url(self):
         assert provider_from_base_url("https://relay.test/v1") == "relay.test"
+
+
+class TestReleaseModeGate:
+    async def test_a_release_deployment_refuses_a_trial_run_before_dispatch(
+        self, trial_runs: TrialRunManager, db_factory: async_sessionmaker, monkeypatch
+    ):
+        """试跑是付费调用：发布部署下没有资质即拒绝，不占名额、不落账、不发请求。"""
+        from r2.host_hardening.paid_routes import RELEASE_MODE_ENV, PaidRouteUnqualifiedError
+
+        monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+        with capture_http() as router:
+            create = router.post("https://relay.test/v1/video/create")
+            with pytest.raises(PaidRouteUnqualifiedError):
+                await trial_runs.start(_target(), PARAMETERS)
+
+        assert create.call_count == 0
+        assert trial_runs.get("missing") is None
+        async with db_factory() as session:
+            assert (await session.execute(select(ApiCall))).scalars().all() == []

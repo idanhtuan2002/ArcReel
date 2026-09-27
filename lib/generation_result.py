@@ -163,6 +163,8 @@ _TASK_FAILURE_ACTIONS: dict[str, GenerationAction] = {
     "provider_unsupported_media": GenerationAction.CONFIGURE_PROVIDER,
     # 上游按确定性 4xx 拒了这个请求：原样重发只会被同样拒绝，还要再付一次。
     "provider_rejected": GenerationAction.FIX_INPUT,
+    # 发布部署下路线没有资质：换一条已有资质的路线或先完成资质验证，重试同一路线必然再被拒。
+    "paid_route_unqualified": GenerationAction.CONFIGURE_PROVIDER,
     "declarative_template_render_failed": GenerationAction.CONFIGURE_PROVIDER,
     "declarative_response_extract_failed": GenerationAction.CONFIGURE_PROVIDER,
     # 供应商已出片、只是没取回来：重发同一请求会再建一个付费任务，正确的一步是接续取件。

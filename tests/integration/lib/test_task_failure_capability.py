@@ -807,3 +807,15 @@ def test_bound_reason_degrades_when_params_json_load_hits_recursion_limit(monkey
     monkeypatch.setattr(task_failure.json, "loads", _boom)
 
     assert bound_reason(stored, 2000) == stored[:2000]
+
+
+def test_a_refused_paid_route_is_stored_structured_and_renders_per_locale():
+    """发布部署拒绝的付费路线落结构化失败原因，三语各自渲染。"""
+    from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError, media_route
+
+    stored = _encode_task_failure_message(PaidRouteUnqualifiedError(media_route("openai", "video"), "sora-2"))
+    assert stored == '[paid_route_unqualified] {"model": "sora-2", "route": "media:openai:video"}'
+
+    for locale in ("zh", "en", "vi"):
+        expected = MESSAGES[locale]["paid_route_unqualified"].format(route="media:openai:video", model="sora-2")
+        assert render_failure(stored, _translator(locale)) == expected

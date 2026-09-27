@@ -95,12 +95,16 @@ NARRATION_DELIVERY_FAILURE_CODES: frozenset[str] = frozenset(
     }
 )
 
+# Release-mode refusal of a paid route that has no current qualification (ADR-0091).
+PAID_ROUTE_FAILURE_CODES: frozenset[str] = frozenset({"paid_route_unqualified"})
+
 # Stable failure code -> i18n errors key. The code is agent-facing and persisted
 # in the DB; the key resolves to zh/en/vi templates rendered at read time.
 FAILURE_CODE_KEYS: dict[str, str] = {
     **{code: code for code in CAPABILITY_FAILURE_CODES},
     **{code: code for code in REFERENCE_PROJECTION_FAILURE_CODES},
     **{code: code for code in NARRATION_DELIVERY_FAILURE_CODES},
+    **{code: code for code in PAID_ROUTE_FAILURE_CODES},
     "provider_unsupported_media": "task_fail_provider_unsupported_media",
     # 上游确定性 4xx 拒绝。params 里的 provider_reason 是脱敏截断后的上游原文，刻意不进
     # 译文模板：它不该被翻译，读侧按独立字段原样展示。

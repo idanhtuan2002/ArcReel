@@ -33,6 +33,8 @@ from r2.contracts.host_hardening import (
     ProviderObservationKind,
     ProviderRouteSnapshot,
 )
+from r2.host_hardening.paid_routes import current_release_mode
+from r2.host_hardening.provider_capabilities import ReleaseMode
 from r2.host_hardening.route_inventory import HOST_VIDEO_ADAPTER_VERSION, require_submit_route
 
 if TYPE_CHECKING:
@@ -141,12 +143,17 @@ async def submit_video_attempt[T](
     submitted_base_url: str,
     submit: Callable[[], Awaitable[ProviderSubmitReceipt[T]]],
 ) -> T:
+    release_mode = current_release_mode()
     if request.task_id is None:
+        # 非 worker 提交（直生 / 宫格 / 端点试跑）没有执行尝试可绑，但发布部署下同样只放行
+        # 有资质的路线：闸门先于任何供应商请求。
+        if release_mode is not ReleaseMode.DEV:
+            require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION, release_mode=release_mode)
         return (await submit()).value
     if request.attempt_submitter is None:
         raise RuntimeError("M7_SUBMIT_ROUTE_UNBOUND: worker video request requires an attempt submitter")
 
-    capability = require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION)
+    capability = require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION, release_mode=release_mode)
     route = ProviderRouteSnapshot(
         provider_id=provider_id,
         provider_account_ref="default",

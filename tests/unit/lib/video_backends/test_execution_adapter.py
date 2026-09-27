@@ -151,3 +151,25 @@ async def test_worker_submit_emits_an_attempt_span_joining_task_execution_and_us
     assert attributes["provider.id"] == "dashscope"
     assert attributes["attempt.state"] == "ACCEPTED"
     assert "dashscope.example" not in str(attributes)
+
+
+async def test_a_release_deployment_gates_a_direct_submit_before_the_network(tmp_path: Path, monkeypatch) -> None:
+    """非 worker 提交没有执行尝试可绑，但发布部署下同样先过路线闸门，不发任何供应商请求。"""
+    from r2.host_hardening.paid_routes import RELEASE_MODE_ENV
+    from r2.host_hardening.provider_capabilities import ProviderCapabilityUnqualifiedError
+
+    monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+    network = AsyncMock(return_value=accepted_submit_receipt("job-1", provider_job_id="job-1"))
+
+    with pytest.raises(ProviderCapabilityUnqualifiedError):
+        await submit_video_attempt(
+            _request(tmp_path),
+            provider_id="dashscope",
+            provider_model_id="wan2.7-i2v",
+            backend_model_id="wan2.7-i2v",
+            endpoint_id="video-synthesis",
+            submitted_base_url="https://dashscope.example",
+            submit=network,
+        )
+
+    network.assert_not_awaited()

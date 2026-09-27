@@ -68,6 +68,7 @@ from lib.script_editor import ScriptEditError
 from lib.task_failure import encode_failure
 from lib.telemetry import correlation_span
 from lib.video_backends.base import ArtifactDownloadError, ProviderRejectedError, VideoCapabilityError
+from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 
 # Default provider used when a task payload does not specify one.
 DEFAULT_PROVIDER = "gemini-aistudio"
@@ -132,7 +133,8 @@ def _encode_task_failure_message(exc: Exception) -> str:
         | ReferenceProjectionBlockedError
         | NarratedVideoDurationBlockedError
         | ReferenceExecutionIdentityError
-        | DeclarativeRuntimeError,
+        | DeclarativeRuntimeError
+        | PaidRouteUnqualifiedError,
     ):
         # 结构化执行拒绝没有通用兜底 code 可退，退回 str(exc)（即 code 本身）——
         # 非结构化文本在读侧原样透传，不会丢失原因。

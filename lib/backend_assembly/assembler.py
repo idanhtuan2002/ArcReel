@@ -13,6 +13,7 @@ from lib.backend_assembly.loaded_config import LoadedConfig
 from lib.backend_assembly.specs import get_provider_spec
 from lib.config.registry import PROVIDER_REGISTRY
 from lib.custom_provider import is_custom_provider
+from r2.host_hardening.paid_routes import media_route, require_paid_route
 
 if TYPE_CHECKING:
     from lib.config.resolver import ConfigResolver
@@ -41,7 +42,12 @@ async def assemble_backend(
     resolver: ConfigResolver,
     rate_limiter: Any | None = None,
 ) -> Any:
-    """统一构造入口。按 provider_id 是否自定义分流；未登记的内置 provider × media fail-loud。"""
+    """统一构造入口。按 provider_id 是否自定义分流；未登记的内置 provider × media fail-loud。
+
+    发布部署（``ARCREEL_RELEASE_MODE=PRODUCTION_CANDIDATE``）下，没有当前资质的付费路线在构造
+    backend 之前即被拒绝，不会发出任何供应商请求（ADR-0091）。
+    """
+    require_paid_route(media_route(provider_id, media_type), model_id=model_id)
     if is_custom_provider(provider_id):
         from lib.custom_provider.loader import load_custom_backend
 
