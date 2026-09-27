@@ -665,3 +665,37 @@ E1 shape).**
 flexibility asked for and keeps the V1 policy unchanged. It reuses the
 existing budget reservation, the M7 attempt layer and E1's report shape. The
 cost is one small paid call per new route.
+
+## Corrections (2026-09-28)
+
+The document audit is `2026-09-28-r2-v1-decision-audit.md`. These corrections
+override the addenda above where they conflict.
+
+- **Severity grading (Addendum 2).**
+  - **Medium:**
+    - the download token accepted as a session token;
+    - the outbound destination, byte-cap and redirect-body gaps;
+    - the anonymous `/files` read of non-media files, which is outside
+      ADR-0071's "static media" scope;
+    - the authenticated plaintext credentials endpoint.
+  - **Low for a single operator:** the cancel/retry scope gaps and the
+    snapshot-path validation.
+  - "High" was overstated. ADR-0071 records a single-admin threat model.
+- **No E1 schema change for U3 (Addendum 2).** A U3 report inventories the
+  whole upstream range, with `DEFERRED` for the commits that are not
+  selected. The real gap stays S1: prove that each `UNCHANGED` or `ADAPTED`
+  commit is present in the host range.
+- **F1 is two-level (Addendum 3).**
+  - Adapter-level offline qualification ships with the release. It covers
+    the frozen §7 profile (restart, cancel, timeout/ambiguity, redaction) and
+    yields at most `OFFLINE_VERIFIED`.
+  - A route-level live canary at runtime adds the exact-version
+    submit/poll/result/cost evidence and promotes the route to `QUALIFIED`
+    with an expiry.
+- **F2 conflicts with the V1 non-promise of "provider-agnostic" claims**
+  (readiness research §4, strategy §4).
+- **"No automatic retry on ambiguous outcome" is already decided** in
+  ADR-0078. The synchronous timeout retries are a conformance gap against it.
+- **Registry.** F1's runtime qualifications must live inside the single
+  CapabilityRegistry (R2-OPEN-004). The V1 tag records the routes qualified
+  at tagging time.
