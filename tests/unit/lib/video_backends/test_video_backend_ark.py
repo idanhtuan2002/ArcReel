@@ -866,9 +866,12 @@ class TestArkResumeReplaysSubmittedBaseUrl:
                 patch("lib.video_backends.ark.create_ark_client", return_value=replay) as factory,
                 bounded_poll_clock(),
             ):
-                await backend.resume_video("cgt-old", request)
+                result = await backend.resume_video("cgt-old", request)
         finally:
             patcher.stop()
+
+        # 轮询打到提交域名的 client 上，并取回了那个任务的成片
+        assert result.video_path.read_bytes() == b"fake-mp4-data"
 
         factory.assert_called_once_with(api_key="ark-key", base_url="https://old.example.com/api/v3")
         replay.content_generation.tasks.get.assert_called_with(task_id="cgt-old")
