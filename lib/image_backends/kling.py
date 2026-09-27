@@ -29,8 +29,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import httpx
-
+from lib.artifact_download_guard import artifact_http_client
 from lib.image_backends.base import (
     ImageCapability,
     ImageCapabilityError,
@@ -176,7 +175,7 @@ class KlingImageBackend(KlingBackendBase):
     async def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
         payload = self._build_payload(request)
         logger.info("调用 Kling 图像 API payload=%s", self._safe_log_view(payload))
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             task_id = await self._submit_task(client, _IMAGE_ENDPOINT, payload)
             bind_provider_job_id(task_id)
             logger.info("Kling 图像任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)

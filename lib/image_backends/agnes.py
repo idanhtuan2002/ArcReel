@@ -12,9 +12,8 @@ import base64
 import logging
 from pathlib import Path
 
-import httpx
-
 from lib.agnes_shared import agnes_base_url, agnes_headers, resolve_agnes_api_key
+from lib.artifact_download_guard import artifact_http_client
 from lib.aspect_size import IMAGE_TIER_SHORT_EDGE, aspect_size, resolution_to_short_edge
 from lib.image_backends.base import (
     ImageCapability,
@@ -140,7 +139,7 @@ class AgnesImageBackend:
             self._model,
             format_kwargs_for_log(_safe_body_for_log(payload)),
         )
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             resp = await submit_post(
                 lambda: client.post(
                     f"{self._base_url}{_IMAGE_ENDPOINT}",

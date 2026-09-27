@@ -28,6 +28,7 @@ from pathlib import Path
 
 import httpx
 
+from lib.artifact_download_guard import artifact_http_client
 from lib.db.base import utc_now
 from lib.kling_backend_base import KlingBackendBase
 from lib.kling_shared import (
@@ -446,7 +447,7 @@ class KlingVideoBackend(KlingBackendBase, ProviderJobIdPersistenceMixin):
         subpath, payload = self._build_payload(request)
         generate_audio = self._effective_audio(request, subpath=subpath)
         logger.info("调用 Kling 视频 API payload=%s", self._safe_log_view(subpath, payload))
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             task_id = await self._submit_task(client, f"videos/{subpath}", payload, request)
             bind_provider_job_id(task_id)
             logger.info("Kling 视频任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)
@@ -471,7 +472,7 @@ class KlingVideoBackend(KlingBackendBase, ProviderJobIdPersistenceMixin):
         """
         subpath, task_id, persisted_audio = _decode_job_id(job_id)
         generate_audio = persisted_audio if persisted_audio is not None else False
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             return await self._poll_and_build(client, subpath, task_id, request, generate_audio=generate_audio)
 
     # ── M7-C exact-route attempt poll ───────────────────────────────────
@@ -495,7 +496,7 @@ class KlingVideoBackend(KlingBackendBase, ProviderJobIdPersistenceMixin):
             )
         subpath = endpoint_id.split(".", 1)[-1]
 
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             try:
                 payload = await self._poll_query(
                     client,

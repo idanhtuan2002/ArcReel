@@ -24,6 +24,7 @@ from typing import Literal
 
 import httpx
 
+from lib.artifact_download_guard import artifact_http_client
 from lib.dashscope_shared import (
     dashscope_failure_reason,
     dashscope_headers,
@@ -496,7 +497,7 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
             self._model,
             format_kwargs_for_log(safe_body_for_log(payload)),
         )
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             task_id = await self._create_task(client, payload, request)
             bind_provider_job_id(task_id)
             logger.info("DashScope 视频任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)
@@ -509,7 +510,7 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
 
     async def resume_video(self, job_id: str, request: VideoGenerationRequest) -> VideoGenerationResult:
         """接续已 submit 的 DashScope task：仅 poll + 下载（ADR 0007）。"""
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             return await self._poll_and_build(client, job_id, request, is_resume=True)
 
     # ── request building ────────────────────────────────────────────────

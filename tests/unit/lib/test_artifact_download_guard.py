@@ -195,3 +195,23 @@ class TestCappedBody:
         assert buffered.content == b"e" * 50
         assert buffered.headers["Retry-After"] == "7"
         assert str(buffered.request.url) == "https://cdn.example/a.mp4"
+
+
+def test_provider_backends_build_no_unguarded_http_client():
+    """内置与自定义供应商的直连 HTTP 一律经 artifact_http_client；新增直建 httpx.AsyncClient 即判红。"""
+    lib_root = Path(__file__).resolve().parents[3] / "lib"
+    scanned = [
+        *lib_root.glob("image_backends/*.py"),
+        *lib_root.glob("video_backends/*.py"),
+        *lib_root.glob("audio_backends/*.py"),
+        *lib_root.glob("custom_provider/**/*.py"),
+        *lib_root.glob("*_shared.py"),
+        lib_root / "kling_backend_base.py",
+    ]
+    exempt = {lib_root / "httpx_shared.py"}
+    offenders = [
+        str(path.relative_to(lib_root))
+        for path in scanned
+        if path not in exempt and "httpx.AsyncClient(" in path.read_text(encoding="utf-8")
+    ]
+    assert offenders == []

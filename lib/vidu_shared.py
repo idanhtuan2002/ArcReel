@@ -21,6 +21,7 @@ from pathlib import Path
 
 import httpx
 
+from lib.artifact_download_guard import artifact_http_client
 from lib.data_uri import image_to_data_uri as _image_to_data_uri
 from lib.http_status_errors import raise_for_status_redacted
 from lib.logging_utils import redact_provider_text
@@ -61,9 +62,9 @@ def create_vidu_client(
     base_url: str | None = None,
     timeout: float = 60.0,
 ) -> httpx.AsyncClient:
-    """创建带 Authorization 头的 httpx.AsyncClient。"""
+    """创建带 Authorization 头、经出站目的地校验的 httpx.AsyncClient。"""
     token = resolve_vidu_api_key(api_key)
-    return httpx.AsyncClient(
+    return artifact_http_client(
         base_url=base_url or VIDU_BASE_URL,
         headers={
             "Authorization": f"Token {token}",

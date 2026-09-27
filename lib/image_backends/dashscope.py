@@ -10,8 +10,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import httpx
-
+from lib.artifact_download_guard import artifact_http_client
 from lib.aspect_size import IMAGE_TIER_SHORT_EDGE, aspect_size, resolution_to_short_edge
 from lib.dashscope_shared import (
     dashscope_headers,
@@ -164,7 +163,7 @@ class DashScopeImageBackend:
             self._model,
             format_kwargs_for_log(safe_body_for_log(payload)),
         )
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             # 同步图像生成是非幂等的「建图 + 计费」POST：submit_post 把歧义传输错误（请求可能已送达
             # 但响应在途丢失）转 AmbiguousSubmitError 终态失败，避免自动重试重复计费；>=400 落 body
             # 日志 + 抛 HTTPStatusError（保留 status_code 供咽喉层识别 413 降档），交 should_retry_submit

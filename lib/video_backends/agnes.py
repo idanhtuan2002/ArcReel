@@ -31,6 +31,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from lib.agnes_shared import agnes_base_url, agnes_headers, agnes_host, resolve_agnes_api_key
+from lib.artifact_download_guard import artifact_http_client
 from lib.aspect_size import VIDEO_TIER_SHORT_EDGE, aspect_size, resolution_to_short_edge
 from lib.db.repositories.usage_repo import MAX_BILLED_DURATION_SECONDS
 from lib.logging_utils import format_kwargs_for_log
@@ -298,7 +299,7 @@ class AgnesVideoBackend(ProviderJobIdPersistenceMixin):
             self._model,
             format_kwargs_for_log(_safe_body_for_log(payload)),
         )
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             task_id = await self._create_task(client, payload, request)
             bind_provider_job_id(task_id)
             logger.info("Agnes 视频任务已创建: job_ref=%s model=%s", job_ref_for_log(task_id), self._model)
@@ -307,7 +308,7 @@ class AgnesVideoBackend(ProviderJobIdPersistenceMixin):
 
     async def resume_video(self, job_id: str, request: VideoGenerationRequest) -> VideoGenerationResult:
         """接续已 submit 的 Agnes task：仅轮询 + 下载，不重新提交（ADR 0007）。"""
-        async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+        async with artifact_http_client(timeout=self._http_timeout) as client:
             return await self._poll_and_build(client, job_id, request, is_resume=True)
 
     # ── request building ────────────────────────────────────────────────
