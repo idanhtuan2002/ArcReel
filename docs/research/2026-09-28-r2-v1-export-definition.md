@@ -72,82 +72,153 @@ and which digest proves it?
    - the stored `final/<project>.mp4` hashes to the Gate D digest, read from
      disk and not through an HTTP route;
    - re-composing from the restored masters reproduces the same bytes.
-9. **External reference.** OpenMontage and Remotion, the vendored render
-   donor, treat the rendered output file as the deliverable. There is no
-   separate packaging step.
+9. **Host owner of the finished video** (upstream compose-video skill,
+   `agent_runtime_profile/.claude/skills/compose-video/`; upstream fix
+   `99d1d036`).
+   - It concatenates an episode's clips into one finished video (成片) and
+     always writes it to `output/`.
+   - It records no version, manifest entry or digest.
+   - Scripts of other shapes use the Jianying draft export instead.
+10. **M3 already registers the final as an R2 artifact**
+    (`r2/m3/golden_a.py::_register_final`).
+    - The key is `ArtifactKey.episode_video(ep, "FINAL-GOLDEN-A")`, with
+      method `COMPOSITE`.
+    - `direct_dependencies` point at each shot master's fingerprint, and
+      `R2ArtifactBridge.evaluate_currency` invalidates the final when a
+      shot master changes.
+    - Its `approved_master` is `None`: the final is never approved.
+    - Its path is `final/final.mp4`, not an allowed root entry.
+11. **The Gate C route cannot accept the composed final today**
+    (`server/routers/gates.py:60-75`, `r2/m3/render_plan.py:42`).
+    - `FinalCutRenderedAssetRequest.tool` and `RenderedCutAsset.tool` are
+      `Literal["remotion"]`.
+    - `GoldenAComposer` produces a `GoldenACompositeAsset` whose `tool` is
+      ffmpeg.
+    - The request already carries `method` (`COMPOSITE` exists) and
+      `source_master_refs`.
+    - An approved Gate C candidate is committed through `VersionManager`
+      into `versions/`, which is an allowed root entry. The current copy
+      goes to `r2_m3_current/`, which is not.
+    - `FinalCutReceipt` binds `artifact_key`, `selected_candidate_id` and
+      `content_fingerprint`. `ApprovedMasterMetadata.host_version_ref`
+      names the committed version file.
+12. **Glossary.** CONTEXT.md, Human Gate C:
+    "人对确切 selected master/export candidate 作出的最终剪辑批准" (a human's
+    final-cut approval of the exact selected master/export candidate).
+    _Avoid_: "render 成功、最新版本、自动 QA 分数" (a successful render, the
+    latest version, an automated QA score).
+13. **Deferred in P1.** P1 spec §8
+    (`docs/superpowers/specs/2026-09-22-r2-p1-gate-receipt-surface-design.md`):
+    "If a later, distinct export/packaging step … needs its own separate
+    digest, Gate D's binding will need revisiting then".
+14. **External donor: OpenMontage at pinned commit `08e2151f`** (local clone
+    `content-os-r1-8/work/OpenMontage`).
+    - In `pipeline_defs/animated-explainer.yaml`, the `compose` stage yields
+      `render_report` and `final_review`; its output must pass ffprobe.
+    - The `publish` stage has `human_approval_default: true`. Its
+      `tools/publishers/export_bundle.py` byte-copies the final render to
+      `video/output.mp4`, with metadata, chapters and a thumbnail.
+    - Nothing is hashed, so the donor has no digest binding. R2 must be
+      stricter here.
+
+
 
 ## Inferences
 
-- In ADR-0089, "export" means that the operator obtains the exact playable
-  file that Gate D approved, so it can be published outside ArcReel. That is
-  a byte-exact file handed out under the host's authority, not an editable
-  archive.
-- **Owner gap.** The composed final is the object Gate D approves, but no
-  host authority owns it today. Decision 5 says it belongs to an existing
-  owner.
-- **Binding gap.** Gate D's digest is not bound to anything.
-- **Why the ZIP falls short.** The existing project ZIP is a project archive
-  and backup-style export. Today it would leave out the Golden final and
-  masters (fact 5).
+- **What "export" means.** In ADR-0089, "export" means that the operator
+  obtains the exact playable file approved at the gates, so it can be
+  published outside ArcReel. It is a byte-exact copy of the final render,
+  which matches the donor model (fact 14). It is not an editable archive.
+- **What Gate C should approve.** In the glossary and the ADR, Gate C is the
+  approval of the *final cut*: the composed export candidate. Per-shot
+  approvals in the drill are master selection, a different act.
+  - A human approving a final cut must be approving the composed video.
+  - The R2 COMPOSITE artifact of fact 10 is the natural object to approve.
+    It already carries dependency lineage, so ADR decision 3 ("a material
+    revision invalidates the affected prior approval") comes from the
+    existing currency mechanism.
+- **Where the export lands.** `output/` is the host's existing slot for the
+  finished video (facts 4 and 9). Writing the export copy there reuses an
+  owner, satisfying decision 5. It also makes the export part of the project
+  ZIP and marks the project `completed`.
+- **The two gaps from the first pass are real.**
+  - The final has no approval owner (facts 5, 10 and 11).
+  - Gate D's digest is unbound (fact 6).
+  - P1 already expected the Gate D binding to be revisited (fact 13).
 
 ## Options
 
 **O1. Keep the inference as it stands.**
 
-- **Definition:** export is any composed final whose sha256 equals the Gate D
-  `deliverable_digest`.
-- **Cost:** none.
-- **Weakness:** it leaves the owner and binding gaps unnamed. V1-07 could
-  pass on a file that the host neither owns nor can hand out.
+- Export is any composed final whose sha256 equals the Gate D digest.
+- Cost: none.
+- **Rejected.** It leaves the approved object unowned and the digest unbound.
+  It contradicts decision 5 and the glossary's Gate C, and V1-07 could pass
+  on a file the host neither owns nor can hand out.
 
-**O2. Export is the host-owned final, handed out byte-exact (recommended).**
+**O2a. Gate C approves the composed final; export is its byte-exact copy
+(recommended).**
 
-- **Definition:** a V1 export is the composed final deliverable stored under
-  host authority. The natural slot is `output/`, which the host already
-  reserves (fact 4).
-  - Gate C binds that exact file.
-  - Gate D's `deliverable_digest` equals the digest bound by Gate C.
-  - The operator gets it through an existing host download route
-    (`GET /files/{project}/output/<file>`), byte-identical.
-- **Export digest:** the sha256 of the bytes served by the host, which must
-  equal the Gate D digest.
-- **V1-05:** closes on the evidence already gathered.
-  - The drill proves the approved final survives restore byte-exact and is
-    reproducible from the restored masters.
-  - It proves this for an unowned file path, and says so as a limit.
-- **V1-07:** carries the product gaps, as "observed product gaps" (per the
-  backlog):
-  1. compose the final into host ownership;
-  2. bind Gate C and Gate D to it;
-  3. download it through the host route.
-- **Why it fits:** it matches ADR-0089 decisions 1, 4 and 5, reuses existing
-  surfaces, and adds no new export mechanism.
+- **Final cut.** The final is composed with the existing deterministic
+  `GoldenAComposer` and registered as the COMPOSITE R2 artifact (fact 10).
+  Gate C approves it as the export candidate through the existing route.
+  Contract change: accept the ffmpeg composite `tool` for `COMPOSITE`
+  (fact 11).
+- **Storage.** The approved final is committed to `versions/` like any
+  master.
+- **Export.** The export is a byte-exact copy of the approved final version
+  in `output/`, the host's finished-video slot. The operator downloads it
+  through the existing `GET /files/{project}/output/<file>` route or the
+  project ZIP.
+- **Export digest.** The sha256 of the bytes served by the host. It must
+  equal the digest of the approved final version.
+- **Gate D.** `deliverable_digest` is checked on the server against the
+  current Gate C–approved final, closing the unbound-digest gap. If a shot
+  master changes, currency marks the final stale, so the Gate C and Gate D
+  approvals must be renewed.
+- **Shot approvals.** These remain master selection, which is production
+  input. They are not the Final Cut gate.
+
+**O2b. Gate C stays per shot; Gate D binds a derived final.**
+
+- The final is a deterministic derivative in `output/`. Gate D checks that it
+  was composed from the current approved shot masters.
+- **Weaker than O2a.**
+  - No human Gate C approval covers the composed cut, which is the thing
+    the glossary says Gate C approves.
+  - Transitions, ordering and timing become unreviewed.
 
 **O3. Export is the existing packaging surfaces.**
 
-- **Definition:** export is the project ZIP (`scope=current`), the Jianying
-  draft or the presentation bundle.
-- **Weakness:** these are editable or archive formats, not the "playable
-  deliverable" of ADR-0089 decision 1. The ZIP currently leaves out the R2
-  directories.
-- **Role:** useful as secondary evidence, but they cannot carry the Gate D
-  digest.
-
-## Unknowns
-
-- **How the final should be composed.** A host composition step could reuse
-  `r2/m3/composition.py`. Alternatively, the M3 host integration could stage
-  the final as its own artifact. This is a V1-07 design choice.
-- **Which gate binds the final.** Should Gate C bind the whole final as one
-  artifact (per ADR "exact selected master/export candidate") or only the
-  shot masters, with the final derived from them? The receipts suggest the
-  final should be bound, but this needs a V1-07 design check.
+- The project ZIP, the Jianying draft or the presentation bundle.
+- **Rejected as the deliverable.** These are editable or archive formats,
+  not the playable deliverable of decision 1.
+- **Kept as secondary surfaces.** Under O2a the project ZIP includes
+  `output/` and so carries the export too.
 
 ## Recommendation
 
-O2. Record it as a follow-up decision, in ADR-0090's follow-up section or as
-a backlog note, so V1-07 does not redefine it.
+**O2a**, recorded as a follow-up decision to ADR-0090, so that V1-07
+implements it and does not redefine it.
 
-- **V1-05:** accepted under O2, with the unowned-path limit disclosed.
-- **V1-07:** owns the three gaps: host-owned final, Gate C/D binding, and
-  download through the host route.
+**V1-05.** V1-05 closes on current evidence under O2a, with this limit
+disclosed. The drill proves three things:
+
+1. the Gate D–approved bytes survive restore byte-exact;
+2. they are reproducible from the restored masters;
+3. the backup captures and restores every file that export reads.
+
+The drill does not prove that the final is host-owned, Gate C–approved or
+downloadable. Those are product gaps, not recovery gaps.
+
+**V1-07** (repair observed product gaps). Its first packet is:
+
+1. accept the COMPOSITE final at Gate C;
+2. write the export copy to `output/`;
+3. check the Gate D digest on the server;
+4. test the download through the host route on a restore-derived target.
+
+**Why V1-05 need not wait.** V1-05's purpose is recovery diagnosability.
+Every file O2a's export reads (versions, manifest, masters) is already
+proven restored and verified. So implementing O2a does not change V1-05's
+recovery claim.
