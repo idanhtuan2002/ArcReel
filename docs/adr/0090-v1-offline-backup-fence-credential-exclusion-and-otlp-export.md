@@ -28,7 +28,7 @@ as secret-free.
 through the OpenTelemetry OTLP/HTTP exporter only when the standard
 `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) is set.
 When it is unset, no exporter is installed and correlation relies on the durable
-IDs in logs. The source-side H7 allowlist remains the redaction authority;
+IDs persisted in the database. The source-side H7 allowlist remains the redaction authority;
 collector-side redaction is only defence in depth.
 
 **Durable correlation columns.** Following the

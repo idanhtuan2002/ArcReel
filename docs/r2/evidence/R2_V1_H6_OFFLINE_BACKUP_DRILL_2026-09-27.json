@@ -1,0 +1,96 @@
+{
+  "evidence": "R2 V1 H6 offline whole-deployment backup drill",
+  "date": "2026-09-27",
+  "head": "4c68f449f4f47c32985499b588180bf7c4c73244",
+  "decisions": "docs/adr/0090-v1-offline-backup-fence-credential-exclusion-and-otlp-export.md",
+  "runbook": "docs/r2/runbooks/m7-backup-restore.md",
+  "environment": {
+    "target": "disposable docker postgres:18 container on 127.0.0.1:55432 (not a deployment database)",
+    "server_version": "18.6 (Debian 18.6-1.pgdg13+2)",
+    "client": "pg_dump (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)",
+    "media_probe": "real ffprobe"
+  },
+  "negative_fence_check": {
+    "scenario": "one task queued at capture time",
+    "exit_code": 2,
+    "stderr": "{\"error\": \"OFFLINE_FENCE_VIOLATED\", \"detail\": \"before capture: 1 task(s) are queued, running or cancelling\"}",
+    "set_state": "REJECTED"
+  },
+  "create": {
+    "exit_code": 0,
+    "output": {
+      "state": "COMPLETE",
+      "backup_set_id": "bs-drill-20260927",
+      "manifest_digest": "sha256:5c02786d6c9773301d9fad06c3815105813572f574000c3cc79ba0cf15513eab",
+      "recovery_point": "2026-09-27T04:55:21.806047+00:00",
+      "file_count": 7,
+      "table_count": 81,
+      "sanitized_tables": [
+        "agent_anthropic_credentials",
+        "custom_provider",
+        "provider_config",
+        "provider_credential",
+        "system_setting"
+      ],
+      "excluded_data_entries": [
+        ".arcreel.db",
+        ".arcreel.db-journal",
+        ".arcreel.db-shm",
+        ".arcreel.db-wal",
+        ".system_config.json",
+        ".system_config.json.bak",
+        "logs"
+      ]
+    }
+  },
+  "source_destroyed_before_restore": true,
+  "restore": {
+    "exit_code": 0,
+    "output": {
+      "backup_set_id": "bs-drill-20260927",
+      "restored_file_count": 7,
+      "elapsed_seconds": 0.775,
+      "credentials_to_reenter": [
+        "agent_anthropic_credentials",
+        "custom_provider",
+        "provider_config",
+        "provider_credential",
+        "system_setting"
+      ]
+    }
+  },
+  "verify": {
+    "exit_code": 0,
+    "verdict": {
+      "backup_set_id": "bs-drill-20260927",
+      "manifest_digest": "sha256:5c02786d6c9773301d9fad06c3815105813572f574000c3cc79ba0cf15513eab",
+      "state": "VERIFIED",
+      "reason_codes": [],
+      "checked_table_count": 81,
+      "checked_file_count": 7,
+      "checked_reference_count": 4,
+      "probed_media_count": 2,
+      "verified_at": "2026-09-27T04:55:24.136949Z",
+      "measured_rpo_seconds": 0,
+      "measured_rto_seconds": 2
+    }
+  },
+  "ledger_state": {
+    "backup_set_id": "bs-drill-20260927",
+    "manifest_digest": "sha256:5c02786d6c9773301d9fad06c3815105813572f574000c3cc79ba0cf15513eab",
+    "state": "VERIFIED",
+    "updated_at": "2026-09-27T04:55:24.136949+00:00",
+    "verdict_digest": "sha256:d7b6e51609cd4d1afd413a47d2e806ef95dad01a93219dbfcebc710245538f39"
+  },
+  "secret_canary": {
+    "files_in_backup_set_containing_canary": 0,
+    "files_in_restored_roots_containing_canary": 0,
+    "credential_values_left_in_restored_db": 0
+  },
+  "coverage_limits": [
+    "Seeded disposable data (one project, one global asset, one video and one image version); not the Golden A/B fixture corpus.",
+    "No-provider Golden A/B review/export and browser checks on the restored target belong to E2 and were not run.",
+    "RPO/RTO are wall-clock values of this drill on a tiny dataset; they do not predict production timings.",
+    "Offline fence write-counter check relies on PostgreSQL cumulative statistics flush semantics."
+  ]
+}

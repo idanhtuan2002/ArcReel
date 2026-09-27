@@ -1,6 +1,10 @@
 # R2 V1 P0 — M7-D H6 recovery closure design
 
-Status: **DRAFT FOR SPONSOR REVIEW**. This document refines H6 implementation
+Status: **DRAFT FOR SPONSOR REVIEW — superseded for V1 by ADR-0090.** The V1
+implementation uses the offline fence and credential exclusion decided in
+[ADR-0090](../../adr/0090-v1-offline-backup-fence-credential-exclusion-and-otlp-export.md)
+(`r2/host_hardening/deployment_backup.py`, runbook `docs/r2/runbooks/m7-backup-restore.md`).
+The online lifecycle fence and encrypted custody below remain a possible later profile. This document refines H6 implementation
 within accepted ADR-0078; it is not M7-D acceptance, an implementation plan,
 or authorization to operate a live backup or restore.
 
