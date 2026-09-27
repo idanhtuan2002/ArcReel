@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a pinned M7-E upstream report without modifying either repository."""
+"""Verify a pinned upstream-compatibility report without modifying either repository."""
 
 from __future__ import annotations
 
