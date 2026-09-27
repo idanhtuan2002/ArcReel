@@ -27,7 +27,9 @@ from lib.video_backends.base import (
     VideoCapabilityError,
     VideoGenerationRequest,
     VideoGenerationResult,
+    is_retryable_http_status,
     poll_with_retry,
+    should_retry_poll,
     with_artifact_retry,
 )
 from lib.video_backends.execution_adapter import accepted_submit_receipt, submit_video_attempt
@@ -152,7 +154,8 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
             # 重复扣费场景。直接抛错让 worker finally 标 failed，比静默继续 poll 安全。
             raise RuntimeError("Gemini 提交成功但未返回 operation.name，无法持久化 provider_job_id")
         await self._persist_provider_job_id(request, op_name, provider=PROVIDER_GEMINI)
-        return await self._poll_until_done(operation, request)
+        done_operation = await self._poll_until_done(operation, request)
+        return await self._collect_video(done_operation, request)
 
     async def resume_video(self, job_id: str, request: VideoGenerationRequest) -> VideoGenerationResult:
         """接续已 submit 的 Gemini operation：用 name 重建 GenerateVideosOperation 走 poll + 下载。
@@ -161,20 +164,20 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
         Pydantic v2 ``model_validate`` 接收 dict 构造（pyright 对 Pydantic 多继承的
         字段推断不全，用 model_validate 绕开）。
 
-        NOT_FOUND 既可能在初次 ``operations.get`` 抛，也可能在 ``_poll_until_done`` 内
-        mid-poll 抛（远端 GC 了 LRO）。两处都需要归类为 ResumeExpiredError 让 worker
-        finally 走 ``[resume_expired]``——下面的 try/except 把整段包住。
+        过期判定只覆盖按 job_id 查询 operation 的阶段：远端 GC 了 LRO 时，初次
+        ``operations.get`` 与 mid-poll 的查询都会收到 NOT_FOUND，归类为 ResumeExpiredError
+        让 worker finally 走 ``[resume_expired]``。operation 完成之后的取件失败（产物 URL 404 等）
+        说明远端任务已成功、只是成片没取到，按取件失败原样上抛，不归过期。
         """
         op = self._types.GenerateVideosOperation.model_validate({"name": job_id, "done": False})
         try:
             refreshed = await self._client.aio.operations.get(op)
-            return await self._poll_until_done(refreshed, request)
-        except ResumeExpiredError:
-            raise
+            done_operation = await self._poll_until_done(refreshed, request)
         except Exception as exc:
             if _is_gemini_not_found(exc):
                 raise ResumeExpiredError(job_id=job_id, provider=PROVIDER_GEMINI) from exc
             raise
+        return await self._collect_video(done_operation, request)
 
     def _validate_duration_constraints(self, request: VideoGenerationRequest) -> None:
         """参考图 / 受约束分辨率两条路径的时长约束，违反即拒绝。
@@ -306,8 +309,8 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
         logger.info("视频生成已提交, job_ref=%s", job_ref_for_log(op_name))
         return operation
 
-    async def _poll_until_done(self, operation: Any, request: VideoGenerationRequest) -> VideoGenerationResult:
-        """轮询任务状态直到完成，瞬态错误仅重试当次轮询请求。"""
+    async def _poll_until_done(self, operation: Any, request: VideoGenerationRequest) -> Any:
+        """轮询任务状态直到完成并返回完成态 operation，瞬态错误仅重试当次轮询请求。"""
         op_name = getattr(operation, "name", "unknown")
         logger.info("开始轮询 job_ref=%s ...", job_ref_for_log(op_name))
 
@@ -319,14 +322,18 @@ class GeminiVideoBackend(ProviderJobIdPersistenceMixin):
                 is_failed=lambda op: None,  # Gemini 在轮询完成后检查失败
                 max_wait=request.poll_timeout_seconds,
                 label="Gemini",
+                retry_if=_should_retry_gemini_poll,
                 on_progress=lambda op, elapsed: logger.info(
                     "视频生成中... 已等待 %.0f 秒 (job_ref=%s)", elapsed, job_ref_for_log(op_name)
                 ),
             )
 
         logger.info("视频生成完成 (job_ref=%s)", job_ref_for_log(op_name))
+        return operation
 
-        # 检查结果
+    async def _collect_video(self, operation: Any, request: VideoGenerationRequest) -> VideoGenerationResult:
+        """校验完成态 operation 的产出，取件落盘并组装结果。"""
+        op_name = getattr(operation, "name", "unknown")
         if not operation.response or not operation.response.generated_videos:
             error_detail = getattr(operation, "error", None)
             metadata = getattr(operation, "metadata", None)
@@ -420,22 +427,27 @@ def _format_durations(durations: list[int]) -> str:
     return ", ".join(f"{d}s" for d in sorted(durations))
 
 
+def _should_retry_gemini_poll(exc: Exception) -> bool:
+    """Gemini 轮询重试谓词：SDK ``APIError`` 按 HTTP 状态码判定，其余异常按幂等轮询口径。
+
+    ``str(APIError)`` 带整份响应体，operation 名里的数字串可能含 "500" / "429"，按子串兜底会把
+    404 当成瞬态错误重试到预算耗尽，续跑便认不出 operation 已被回收。
+    """
+    from google.genai import errors as genai_errors
+
+    if isinstance(exc, genai_errors.APIError):
+        return is_retryable_http_status(exc.code)
+    return should_retry_poll(exc)
+
+
 def _is_gemini_not_found(exc: BaseException) -> bool:
     """识别 Gemini operations.get 「operation 不存在 / 已过期」响应。
 
-    INVALID_ARGUMENT 不归过期：Gemini 用它表达入参不合法（如非法 operation 格式），
-    与 NOT_FOUND（资源不存在）语义不同；归过期会把客户端 bug 当成幽灵任务静默吞掉。
+    只认 SDK ``APIError`` 携带的 HTTP 状态码 404：异常文本里的 "not found" / "expired"
+    可能来自与 operation 存续无关的环节（传输层报错、上游失败原因），按子串判定会把它们
+    误归过期。INVALID_ARGUMENT（400）同样不归过期：Gemini 用它表达入参不合法（如非法
+    operation 格式），归过期会把客户端 bug 当成幽灵任务静默吞掉。
     """
-    try:
-        from google.genai import errors as _genai_errors
-    except ImportError:
-        _genai_errors = None
+    from google.genai import errors as genai_errors
 
-    if _genai_errors is not None:
-        not_found_cls = getattr(_genai_errors, "ClientError", None) or getattr(_genai_errors, "APIError", None)
-        if not_found_cls is not None and isinstance(exc, not_found_cls):
-            code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-            if code in (404, "404", "NOT_FOUND"):
-                return True
-    msg = str(exc).lower()
-    return "not found" in msg or "expired" in msg
+    return isinstance(exc, genai_errors.APIError) and exc.code == 404
