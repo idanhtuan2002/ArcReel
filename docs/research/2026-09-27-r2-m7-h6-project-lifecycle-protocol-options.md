@@ -26,9 +26,12 @@ predicate on the committed new row version
 ([PostgreSQL transaction isolation](https://www.postgresql.org/docs/18/transaction-iso.html)).
 Those database properties support the candidate below only when *every*
 relevant writer participates and holds the same transaction through its
-domain-row admission. SQLite tests cannot establish the PostgreSQL race
-ordering; a real PostgreSQL two-connection test is required. The test must
-also confirm the effective isolation level, since the engine does not set one
+domain-row admission. A
+[scratch PostgreSQL 18.6 two-connection probe](../r2/evidence/R2_V1_H6_LIFECYCLE_PG18_PROBE_2026-09-27.md)
+confirmed the row-ordering primitive under `read committed`; it did not run
+the repo's repositories or lifecycle schema. SQLite tests cannot establish
+the production race ordering; repository-level PostgreSQL tests must also
+confirm the effective isolation level, since the engine does not set one
 explicitly (`lib/db/engine.py:43-60`).
 
 ## Candidate A: durable lifecycle row with transactional admission
@@ -48,8 +51,9 @@ Task/attempt/backup row write:
 
 1. Execute a single-row conditional `UPDATE lifecycle SET version = version+1`
    for the exact identity with `state = LIVE`, returning the resulting version.
-   Zero rows means typed refusal, never an unguarded retry against the same
-   project name. An expected version or command identity can be included where
+   Zero rows must be converted by the adapter into a typed refusal, never a
+   silent zero-row success or unguarded retry against the same project name.
+   An expected version or command identity can be included where
    replay semantics require it.
 2. Insert the domain row and its command receipt in that transaction, bound
    to the returned lifecycle ID/version or to an immutable admission receipt.
@@ -105,7 +109,7 @@ unresolved. These are candidate constraints, not current route behavior.
 
 ## Required race and crash evidence before selection
 
-- Real PostgreSQL, two connections: Task commit wins before delete intent;
+- Repository-integrated PostgreSQL, two connections: Task commit wins before delete intent;
   deletion sees and refuses it. Reverse order: admission waits, rechecks
   `state = LIVE`, and refuses without a Task row or replay receipt.
 - Repeat those orders for attempt planning and backup `PREPARING` admission.
@@ -120,8 +124,10 @@ unresolved. These are candidate constraints, not current route behavior.
   retired name with a new directory; mismatched deployment/name normalization;
   duplicate command ID; and a writer that omits the lifecycle update must
   each have a typed result.
-- Validate on PostgreSQL. SQLite unit tests may exercise pure state/error
-  mapping, but their locking behavior is not a concurrency acceptance gate.
+- Validate the actual repository and migration on PostgreSQL. The scratch
+  probe above is evidence for the database primitive only; SQLite unit tests
+  may exercise pure state/error mapping but are not a concurrency acceptance
+  gate.
 
 ## Open contract gates
 
