@@ -144,7 +144,7 @@ async def _seed_source(url: str, data_root: Path) -> None:
             "INSERT INTO system_setting (key, value, updated_at) VALUES "
             "('anthropic_api_key', $1, $2), ('video_generate_audio', 'true', $2), "
             "('anthropic_base_url', 'https://a:set-pass-1@one.invalid and https://b:set-pass-2@two.invalid "
-            "contact admin@example.invalid', $2)",
+            "contact admin@example.invalid https://q.invalid/p?x=a@b', $2)",
             SECRET_CANARY,
             now,
         )
@@ -340,7 +340,7 @@ async def test_round_trip_restores_a_verified_deployment_without_credentials(
         assert await conn.fetchval("SELECT value FROM provider_config WHERE key = 'image_rpm'") == "12"
         assert await conn.fetchval("SELECT value FROM system_setting WHERE key = 'video_generate_audio'") == "true"
         assert await conn.fetchval("SELECT value FROM system_setting WHERE key = 'anthropic_base_url'") == (
-            "https://one.invalid and https://two.invalid contact admin@example.invalid"
+            "https://one.invalid and https://two.invalid contact admin@example.invalid https://q.invalid/p?x=a@b"
         )
         assert await conn.fetchval("SELECT api_key FROM provider_credential") is None
     finally:
@@ -693,14 +693,22 @@ async def test_an_attested_target_cannot_be_reverified_and_attested_files_are_ta
 
     with pytest.raises(UnsafeBackupPath):
         await _verify(RESTORE_TARGET)
+    with pytest.raises(UnsafeBackupPath):
+        await _verify(RESTORE_TARGET.upper())
+    with pytest.raises(AttestationRejected):
+        attest_deployment_restore(
+            backup_dir=backup_dir, golden_evidence=_golden(backup_dir), measured_rpo_seconds=0, measured_rto_seconds=1
+        )
     await _verify("drill-target-2")
     assert (backup_dir / "verdicts" / "drill-target-2.json").is_file()
 
     verdict_file = backup_dir / "verdicts" / f"{RESTORE_TARGET}.json"
-    verdict = json.loads(verdict_file.read_text(encoding="utf-8"))
+    original = verdict_file.read_text(encoding="utf-8")
+    verdict = json.loads(original)
     verdict["checked_file_count"] += 1
-    verdict_file.write_text(json.dumps(verdict), encoding="utf-8")
-    with pytest.raises(BackupIntegrityError):
-        await restore_deployment_backup(
-            backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: tmp_path / "again"}
-        )
+    for tampered in (json.dumps(verdict), "{not json"):
+        verdict_file.write_text(tampered, encoding="utf-8")
+        with pytest.raises(BackupIntegrityError):
+            await restore_deployment_backup(
+                backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: tmp_path / "again"}
+            )

@@ -7,7 +7,7 @@ configuration. Stop the application and worker before ``create``.
 
     create   capture a backup set under the offline fence
     restore  restore a set into an empty database and empty roots
-    verify   run the automated checks on a restored target (verdict.json)
+    verify   run the automated checks on a restored target (verdicts/<id>.json)
     attest   mark the set VERIFIED from a passing verdict plus Golden evidence
 """
 

@@ -447,3 +447,23 @@ def test_a_quoted_credential_cut_before_its_closing_quote_is_still_masked():
     assert "abcdef123456" not in redact_diagnostic_text('{"token": "abcdef123456')
     assert "abcdef123456" not in redact_diagnostic_text("api_key='abcdef123456")
     assert redact_diagnostic_text('{"note": "hello"}') == '{"note": "hello"}'
+
+
+@pytest.mark.parametrize(
+    ("text", "secret"),
+    [
+        ("password" + " " * 20 + "= hunter2hunter2", "hunter2hunter2"),
+        ("password:\n  yamlsecret1", "yamlsecret1"),
+        ("password =\nnextline1", "nextline1"),
+        ("password=\r\ncrlfsecret1", "crlfsecret1"),
+        ('"password":\njsonnl1', "jsonnl1"),
+        ('"password"\n: "jsonnl2"', "jsonnl2"),
+        ('password="line1\nsecondline2"', "secondline2"),
+    ],
+    ids=["long-blank", "yaml", "eq-newline", "crlf", "json-newline", "quoted-key-newline", "multiline-value"],
+)
+def test_credentials_separated_by_blank_runs_or_line_breaks_are_masked(text, secret):
+    from lib.logging_utils import redact_diagnostic_text, redact_provider_text
+
+    assert secret not in redact_diagnostic_text(text)
+    assert secret not in redact_provider_text(text)

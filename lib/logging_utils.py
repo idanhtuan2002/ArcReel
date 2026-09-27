@@ -34,10 +34,12 @@ _SEPARATED_SENSITIVE_KEY_PATTERN = (
 _CAMEL_SENSITIVE_KEY_PATTERN = r"(?:apiKey|privateKey|signingKey|[A-Za-z][A-Za-z0-9]*(?:ApiKey|PrivateKey|SigningKey|SecretAccessKey|Secret|Token))"
 _SENSITIVE_KEY_RE = re.compile(_SEPARATED_SENSITIVE_KEY_PATTERN, re.IGNORECASE)
 _CAMEL_SENSITIVE_KEY_RE = re.compile(_CAMEL_SENSITIVE_KEY_PATTERN)
-# Separator whitespace stays on one line and is bounded: an unbounded ``\s*`` next
-# to another whitespace quantifier, or ``^\s*`` across newline runs, backtracks
-# quadratically on long blank runs.
+# Line-anchored header patterns keep their leading whitespace on one line and
+# bounded: ``^\s*`` across newline runs backtracks quadratically.
 _SEP = r"[ \t]{0,16}"
+# Key/value separators may span blank runs and line breaks (YAML ``key:\n  value``);
+# possessive ``\s*+`` never gives whitespace back, so long runs stay linear.
+_KV_SEP = r"\s*+"
 _COOKIE_LINE_RE = re.compile(rf"(?im)^({_SEP}(?:set-)?cookie{_SEP}:{_SEP}).*$")
 _AUTH_LINE_RE = re.compile(rf"(?im)^({_SEP}(?:proxy-)?authorization{_SEP}:{_SEP}).*$")
 _INLINE_AUTH_RE = re.compile(
@@ -51,13 +53,14 @@ _BEARER_RE = re.compile(r"(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]+")
 _TEXT_KEY = r"(?<![A-Za-z0-9_.-])(?P<key>[A-Za-z0-9_.-]+)"
 # Each pattern ends where the value begins; the value is measured only for a
 # sensitive key, so non-sensitive pairs cost only their key and separator.
-_DOUBLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_SEP}['\"]?{_SEP}[=:]{_SEP}\"")
-# A quoted value ends at its closing quote, or at the end of the line when the
-# text was cut before the quote closed; either way the value is masked.
-_DOUBLE_QUOTED_VALUE_RE = re.compile(r'(?:\\.|[^"\\\n])*')
-_SINGLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_SEP}['\"]?{_SEP}[=:]{_SEP}'")
-_SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\\n])*")
-_INLINE_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_SEP}[=:]{_SEP}(?=[^\s,;&'\"])")
+_DOUBLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_KV_SEP}['\"]?{_KV_SEP}[=:]{_KV_SEP}\"")
+# A quoted value ends at its closing quote, or at the end of the text when it was
+# cut before the quote closed; either way the whole value, line breaks included,
+# is masked.
+_DOUBLE_QUOTED_VALUE_RE = re.compile(r'(?:\\.|[^"\\])*')
+_SINGLE_QUOTED_SECRET_RE = re.compile(rf"{_TEXT_KEY}{_KV_SEP}['\"]?{_KV_SEP}[=:]{_KV_SEP}'")
+_SINGLE_QUOTED_VALUE_RE = re.compile(r"(?:\\.|[^'\\])*")
+_INLINE_SECRET_RE = re.compile(rf"{_TEXT_KEY}['\"]?{_KV_SEP}[=:]{_KV_SEP}(?=[^\s,;&'\"])")
 _INLINE_VALUE_RE = re.compile(r"[^\s,;&]+")
 _SIGNED_QUERY_RE = re.compile(
     r"(?i)([?&](?:x-amz-signature|x-goog-signature|signature|sig|access_token|auth_token|token|api_key|key|password)=)([^&#\s]*)"

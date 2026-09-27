@@ -37,8 +37,10 @@ A backup set is one directory:
   `max_tokens` keep their values.
 - **URL credentials stripped.** Every `user:password@` userinfo is removed
   from the `base_url` columns and from `provider_config` and `system_setting`
-  values. Userinfo must be percent-encoded, as RFC 3986 requires: a raw `/`
-  or whitespace inside it is not recognised as userinfo.
+  values. Userinfo must be percent-encoded, as RFC 3986 requires: a raw `/`,
+  `?`, `#` or whitespace inside it is not recognised as userinfo. An `@` in a
+  query or fragment is left alone. A raw `@` inside a password is only partly
+  stripped, and `verify` then reports it as `SECRET_RESIDUE`.
 - **Secret files excluded.** At the top of the `data` root, the capture
   excludes `.system_config.json`, `.system_config.json.bak`, the legacy
   `.arcreel.db*` SQLite files and `logs/`.
@@ -182,7 +184,9 @@ uv run python -m scripts.r2.deployment_backup attest \
 - the recorded verdict did not pass for this manifest;
 - the evidence belongs to another set, or to a different restore target than
   the verdict;
-- fewer than two distinct products of this set passed read/review/export.
+- fewer than two distinct products of this set passed read/review/export;
+- the set is already `VERIFIED`. A set is attested once; restore a new
+  target and attest a new set if needed.
 
 When it succeeds, it writes `attestation.json` and moves the set to
 `VERIFIED`.

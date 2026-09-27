@@ -40,6 +40,7 @@ from typing import Any
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 import asyncpg
+from pydantic import ValidationError
 
 from lib.artifact_manifest import MANIFEST_FILENAME as ARTIFACT_MANIFEST_FILENAME
 from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifestAdapter
@@ -97,10 +98,11 @@ _SECRET_SETTING_KEY_PATTERN = (
 
 # table -> column -> SQL expression replacing that column in the captured rows.
 # URLs keep scheme, host and path; every ``user:password@`` userinfo is removed.
-# Userinfo never spans whitespace or ``/`` (RFC 3986 requires both to be
-# percent-encoded inside it), so prose after a URL is left alone.
-_STRIP_USERINFO = "regexp_replace({column}, '://[^/@\\s]*@', '://', 'g')"
-_HAS_USERINFO = "{column} ~ '://[^/@\\s]*@'"
+# Userinfo never spans whitespace or ``/``, ``?``, ``#`` (RFC 3986 ends the
+# authority there and requires them percent-encoded inside it), so prose after
+# a URL and ``@`` in a query or fragment are left alone.
+_STRIP_USERINFO = "regexp_replace({column}, '://[^/?#@\\s]*@', '://', 'g')"
+_HAS_USERINFO = "{column} ~ '://[^/?#@\\s]*@'"
 
 SANITIZED_TABLE_POLICY: Mapping[str, Mapping[str, str]] = {
     "provider_credential": {
@@ -622,7 +624,10 @@ def _verdict_path(backup_dir: Path, restore_target_id: str) -> Path:
 def _file_digest_of(path: Path, model: type[DeploymentBackupVerdict] | type[GoldenRestoreEvidence]) -> str | None:
     if not path.is_file():
         return None
-    return _digest(model.model_validate_json(path.read_text(encoding="utf-8")))
+    try:
+        return _digest(model.model_validate_json(path.read_text(encoding="utf-8")))
+    except ValidationError as exc:
+        raise BackupIntegrityError(f"{path.name} is not a valid record") from exc
 
 
 def _verify_attestation_record(backup_dir: Path, manifest: DeploymentBackupManifest, state: Mapping[str, Any]) -> None:
@@ -631,7 +636,10 @@ def _verify_attestation_record(backup_dir: Path, manifest: DeploymentBackupManif
     path = backup_dir / ATTESTATION_FILENAME
     if not path.is_file():
         raise BackupIntegrityError("state is VERIFIED but the set has no attestation")
-    attestation = DeploymentBackupAttestation.model_validate_json(path.read_text(encoding="utf-8"))
+    try:
+        attestation = DeploymentBackupAttestation.model_validate_json(path.read_text(encoding="utf-8"))
+    except ValidationError as exc:
+        raise BackupIntegrityError("attestation.json is not a valid record") from exc
     recorded = "sha256:" + canonical_json_digest(attestation.model_dump(mode="json"))
     if recorded != state.get("attestation_digest") or attestation.manifest_digest != manifest_digest(manifest):
         raise BackupIntegrityError("the attestation does not match the VERIFIED state")
@@ -889,7 +897,7 @@ async def verify_restored_deployment(
         attested = DeploymentBackupAttestation.model_validate_json(
             (backup_dir / ATTESTATION_FILENAME).read_text(encoding="utf-8")
         )
-        if attested.restore_target_id == restore_target_id:
+        if attested.restore_target_id.casefold() == restore_target_id.casefold():
             raise UnsafeBackupPath("this restore target is already attested; verify a new target under a new id")
     reasons: list[str] = []
     if target_release_git_sha != manifest.release_git_sha:
@@ -970,6 +978,11 @@ def attest_deployment_restore(
     ``AttestationRejected`` and leaves the set's state unchanged.
     """
     manifest = load_restorable_manifest(backup_dir)
+    if read_state(backup_dir).get("state") == BackupSetState.VERIFIED.value:
+        # Attesting writes three files before the state; overwriting an existing
+        # attestation could leave them mismatched after a crash, so a set is
+        # attested once.
+        raise AttestationRejected("this set is already VERIFIED")
     digest = manifest_digest(manifest)
     verdict_path = _verdict_path(backup_dir, golden_evidence.restore_target_id)
     if not verdict_path.is_file():
