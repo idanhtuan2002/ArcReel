@@ -136,37 +136,71 @@ records.
 - **Qualification is renewed.** Changing an adapter version during an upgrade
   requires routes to be qualified again.
 
-## Implementation notes (2026-09-28)
+## Amendment (2026-09-28, after the independent V1-06 review)
 
-These notes refine how V1-06 carried out the decision. The decision itself
-is unchanged.
+The independent review (`docs/r2/evidence/R2_V1_06_INDEPENDENT_REVIEW_2026-09-28.md`)
+found that earlier "implementation notes" changed parts of this decision while claiming to
+leave it unchanged. The sponsor delegated these choices to research, and they are recorded
+here as amendments.
 
-- **One qualification check, at backend construction.**
-  - Qualification is enforced where the route is built (`assemble_backend`),
-    at Agent session start and at trial-run start.
-  - The async video submit seam checks only that the submit route is bound in
-    the inventory with a fresh profile. This also covers submits made without
-    a task. Enforcing the static registry status there too would refuse
-    routes that the runtime qualification already covers.
-- **Adapter level by route class.**
-  - Async video families carry static profiles. Their route qualifies only
-    when every profile of the submit family is at least `OFFLINE_VERIFIED`
-    and a runtime canary is recorded. All shipped profiles are still
-    `UNQUALIFIED`, so no video route qualifies until offline adapter evidence
-    is recorded through the provider verifier.
-  - Synchronous image, text and audio routes have no static profile. Their
-    adapter level is the generic invariants, which the test suite proves for
-    every adapter: no resend after an ambiguous outcome, the destination
-    guard, and budget before submit.
-- **Where runtime qualifications live.** They are files under the data root
-  in `.route_qualifications/`: one records file plus an evidence file per
-  canary, each digest-bound. A backup set therefore carries them. A record
-  stops counting when it expires, when its route class's adapter version
-  changes, or when its evidence no longer matches its digest. Canaries run
-  through `scripts/r2/qualify_route.py`.
-- **Trial runs.** Trial runs are a setup tool. They cannot be qualified and
-  stay refused in a release deployment; custom providers qualify through their
-  `custom_media` route instead.
-- **Agent budget.** The embedded Agent's spend is recorded after the fact, so
-  it is not reserved per call. The Agent route is still qualification-gated.
-  A per-session reservation remains open.
+1. **Qualification binds to the provider configuration.** A route qualification covers one
+   provider, route, model and configuration binding. The binding is a digest of the
+   provider's current base URL and credentials, so no credential is stored. Custom
+   providers are qualified one provider at a time. A new key, a new base URL, or a restore
+   into a deployment with other credentials needs a new canary. This makes "exact provider,
+   endpoint, model and account route" concrete.
+2. **Where the gate runs.** Qualification is checked at backend construction, and again on
+   every backend fetch from the generation cache in a release deployment. It is also
+   checked at Agent session start and trial-run start. The async video submit seam checks
+   only that the submit route is bound in the inventory and its profile is fresh; this
+   covers direct submits too.
+3. **Adapter level for synchronous routes (amended).** The frozen R2_05 §7 profile (status
+   and poll, restart resume, cancellation) describes async jobs. For synchronous image,
+   text and audio calls, the adapter level is the set of invariants the suite enforces on
+   every adapter's source and behaviour:
+   - a scan requires every provider retry decorator to name a reviewed predicate;
+   - a scan forbids unguarded HTTP clients and URL fetches in provider code;
+   - the predicate is tested against real SDK exception shapes;
+   - the gate and budget have behaviour tests;
+   - SDK-internal retries are disabled for OpenAI, Ark and xAI.
+
+   Async video keeps the static offline profile. All shipped video profiles are
+   `UNQUALIFIED`, so every video route stays disabled in a release deployment until
+   offline adapter evidence is recorded.
+4. **Storage and read path (amended).**
+   - **Where records live.** The capability registry has two stores. The static adapter
+     profiles are in `r2/provider_capabilities/registry.json`. The runtime route records
+     are under the data root in `.route_qualifications/`, each with a digest-bound evidence
+     file.
+   - **How gates read them.** Gates read both stores through one function,
+     `r2.host_hardening.route_qualifications.is_route_qualified`. There is no separate
+     authority.
+   - **Writes.** Evidence is written atomically, record updates take a cross-process lock,
+     and a malformed records file fails closed.
+5. **Unqualifiable routes (amended).** Two routes are refused in `PRODUCTION_CANDIDATE`
+   and cannot be qualified.
+   - **Agent:** its spend is recorded after the fact, so it has no budget-before-submit
+     under invariant 1. A per-session reservation design would lift this and is open work.
+   - **Trial runs:** they are a setup tool.
+6. **Canary surface.** Canaries run through the CLI `scripts/r2/qualify_route.py`. An API
+   and UI entry point is deferred to V1-07.
+7. **Budget details.**
+   - **Hold expiry.** Unclaimed holds expire after a 10-minute claim window.
+   - **Zero-cost calls.** A zero-cost failed call reconciles in its reservation's currency.
+   - **Unestimated calls.** Token-priced text reserves a 0.01 floor, so overspend is
+     bounded only by concurrency.
+8. **Gate-log evidence.** Only the leading `#` header of a runner log counts. A skip counts
+   only if the run config declared it up front (`allowed_skips`); every other skip is a
+   required skip and fails.
+
+Known limits:
+
+- **Adapter versions** in `ROUTE_ADAPTER_VERSIONS` are bumped by hand; no test ties an
+  adapter change to a bump.
+- **Gateway 5xx.** A 5xx from a gateway or relay (502, 504, 524) may be ambiguous, but it is
+  still resent, a policy inherited from `should_retry_submit`.
+- **Unkeyed digests.** Evidence digests are unkeyed and runner logs are
+  operator-attested, so a hand-written log is indistinguishable from a runner log (T1
+  trust model).
+- **SDK transports** (OpenAI, google-genai, Ark and xAI requests) are not
+  destination-guarded; only direct HTTP and URL downloads are.

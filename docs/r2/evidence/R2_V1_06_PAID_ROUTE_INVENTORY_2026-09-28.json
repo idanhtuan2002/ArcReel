@@ -1,0 +1,411 @@
+{
+ "schema_version": 1,
+ "generated_from": "r2.host_hardening.paid_routes.paid_route_inventory() and route_inventory.PAID_ASYNC_SUBMIT_FAMILIES",
+ "note": "custom_media entries stand for every custom provider of that media type; a qualification is per custom provider id.",
+ "dev_mode": "DEV (default) keeps every route usable; dispositions apply to ARCREEL_RELEASE_MODE=PRODUCTION_CANDIDATE.",
+ "routes": [
+  {
+   "route_ref": "agent",
+   "kind": "agent",
+   "provider_id": null,
+   "media_type": null,
+   "adapter_version": "agent-sdk-v1",
+   "release_disposition": "REFUSED_IN_RELEASE: spend recorded after the fact, no budget-before-submit (ADR-0091 invariant 1)"
+  },
+  {
+   "route_ref": "custom_media:audio",
+   "kind": "custom_media",
+   "provider_id": null,
+   "media_type": "audio",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "custom_media:image",
+   "kind": "custom_media",
+   "provider_id": null,
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "custom_media:text",
+   "kind": "custom_media",
+   "provider_id": null,
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "custom_media:video",
+   "kind": "custom_media",
+   "provider_id": null,
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:agnes:image",
+   "kind": "media",
+   "provider_id": "agnes",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:agnes:text",
+   "kind": "media",
+   "provider_id": "agnes",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:agnes:video",
+   "kind": "media",
+   "provider_id": "agnes",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:ark:image",
+   "kind": "media",
+   "provider_id": "ark",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:ark:text",
+   "kind": "media",
+   "provider_id": "ark",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:ark:video",
+   "kind": "media",
+   "provider_id": "ark",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:ark-agent-plan:image",
+   "kind": "media",
+   "provider_id": "ark-agent-plan",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:ark-agent-plan:text",
+   "kind": "media",
+   "provider_id": "ark-agent-plan",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:ark-agent-plan:video",
+   "kind": "media",
+   "provider_id": "ark-agent-plan",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:dashscope:audio",
+   "kind": "media",
+   "provider_id": "dashscope",
+   "media_type": "audio",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:dashscope:image",
+   "kind": "media",
+   "provider_id": "dashscope",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:dashscope:text",
+   "kind": "media",
+   "provider_id": "dashscope",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:dashscope:video",
+   "kind": "media",
+   "provider_id": "dashscope",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:gemini-aistudio:image",
+   "kind": "media",
+   "provider_id": "gemini-aistudio",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:gemini-aistudio:text",
+   "kind": "media",
+   "provider_id": "gemini-aistudio",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:gemini-aistudio:video",
+   "kind": "media",
+   "provider_id": "gemini-aistudio",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:gemini-vertex:image",
+   "kind": "media",
+   "provider_id": "gemini-vertex",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:gemini-vertex:text",
+   "kind": "media",
+   "provider_id": "gemini-vertex",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:gemini-vertex:video",
+   "kind": "media",
+   "provider_id": "gemini-vertex",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:grok:image",
+   "kind": "media",
+   "provider_id": "grok",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:grok:text",
+   "kind": "media",
+   "provider_id": "grok",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:grok:video",
+   "kind": "media",
+   "provider_id": "grok",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:kling:image",
+   "kind": "media",
+   "provider_id": "kling",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:kling:video",
+   "kind": "media",
+   "provider_id": "kling",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:minimax:image",
+   "kind": "media",
+   "provider_id": "minimax",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:minimax:text",
+   "kind": "media",
+   "provider_id": "minimax",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:minimax:video",
+   "kind": "media",
+   "provider_id": "minimax",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:openai:image",
+   "kind": "media",
+   "provider_id": "openai",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:openai:text",
+   "kind": "media",
+   "provider_id": "openai",
+   "media_type": "text",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:openai:video",
+   "kind": "media",
+   "provider_id": "openai",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "media:vidu:image",
+   "kind": "media",
+   "provider_id": "vidu",
+   "media_type": "image",
+   "adapter_version": "host-media-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary (scripts/r2/qualify_route.py) per exact provider, model and configuration binding"
+  },
+  {
+   "route_ref": "media:vidu:video",
+   "kind": "media",
+   "provider_id": "vidu",
+   "media_type": "video",
+   "adapter_version": "host-video-v1",
+   "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
+  },
+  {
+   "route_ref": "trial_run",
+   "kind": "trial_run",
+   "provider_id": null,
+   "media_type": null,
+   "adapter_version": "declarative-trial-v1",
+   "release_disposition": "REFUSED_IN_RELEASE: setup tool, not qualifiable"
+  }
+ ],
+ "async_video_submit_families": [
+  {
+   "provider_id": "gemini",
+   "endpoint_id": "generate_videos",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "gemini-generate-videos@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "dashscope",
+   "endpoint_id": "video-synthesis",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "dashscope-video-synthesis@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "ark",
+   "endpoint_id": "content-generation-tasks",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "ark-content-generation-tasks@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "agnes",
+   "endpoint_id": "videos.create",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "agnes-videos-create@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "vidu",
+   "endpoint_id": "video-create",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "vidu-video-create@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "kling",
+   "endpoint_id": "videos.text2video",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "kling-videos-text2video@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "kling",
+   "endpoint_id": "videos.image2video",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "kling-videos-image2video@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "kling",
+   "endpoint_id": "videos.multi-image2video",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "kling-videos-multi-image2video@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "openai",
+   "endpoint_id": "videos.create",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "openai-videos-create@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "grok",
+   "endpoint_id": "video.generate",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "grok-video-generate@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "minimax",
+   "endpoint_id": "declarative-video-submit",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "minimax-declarative-video-submit@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  },
+  {
+   "provider_id": "custom-*",
+   "endpoint_id": "declarative-video-submit",
+   "adapter_version": "host-video-v1",
+   "profile_ref": "custom-*-declarative-video-submit@host-video-v1",
+   "static_status": "UNQUALIFIED"
+  }
+ ],
+ "builtin_video_submit_provider": {
+  "agnes": "agnes",
+  "ark": "ark",
+  "ark-agent-plan": "ark",
+  "dashscope": "dashscope",
+  "gemini-aistudio": "gemini",
+  "gemini-vertex": "gemini",
+  "grok": "grok",
+  "kling": "kling",
+  "minimax": "minimax",
+  "openai": "openai",
+  "vidu": "vidu"
+ }
+}

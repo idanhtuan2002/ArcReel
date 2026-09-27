@@ -1,5 +1,7 @@
 # R2 V1-06 — upstream backport (U3), packets P1 and P2 (2026-09-28)
 
+> **Corrected after the independent review (F10).** The dispositions below match `R2_V1_06_UPSTREAM_INVENTORY_2026-09-28.json`, where the E1 verifier proved them against the host range: 4 UNCHANGED (equal stable patch-id) and 12 ADAPTED (named by a cherry-pick or `Upstream:` marker). `3ff6127f` is ADAPTED only in part: its guard, Gemini-resume and base-URL-pinning parts are taken, and its settings and dead-code parts are deferred.
+
 **Decision:** ADR-0091 (U3).
 
 **Plan:** `docs/superpowers/plans/2026-09-28-r2-v1-06-paid-routes-e1.md`.
@@ -18,21 +20,21 @@ upstream commit in an `Upstream:` trailer.
 
 | Upstream | Disposition | Host commit(s) | V1 defect confirmed on this lineage |
 |---|---|---|---|
-| `108d1680` | UNCHANGED (pick) | `180ff5bb` | A download token (`purpose: download`) was accepted as a session token: probe returned 200, now 401. |
-| `c1cf1c62` | UNCHANGED (pick) | `ae3e8229` | Anonymous `GET /files/{p}/project.json` and `/files/{p}/source/*` returned 200 with content; now 404. |
-| `9317ae46` | UNCHANGED (pick; test conflict resolved) | `ae990d31` | Task cancel looked tasks up by id without `_scope_query`. |
-| `5839ef3b` | UNCHANGED (pick) + test adaptation | `d353a80f`, `843910a2` | Retry-download lookup had no scope. The test was adapted to V1's `payload.api_call_id` link. |
-| `31c5e985` | UNCHANGED (pick) | `d6c7f22e` | Bulk cancel returns early when no queued tasks are in scope. |
-| `e6e60d0c` | UNCHANGED (pick; import paths mapped) | `109241e2` | Project-name validation on project-addressed routes. |
-| `6a3e6cd8` | UNCHANGED (pick) | `10b104e3` | The source ledger followed symlinks. |
-| `eec3c21e` | UNCHANGED (pick; import paths mapped) | `6bf80309` | Version snapshot paths were not resolved or validated. |
+| `108d1680` | UNCHANGED (pick; equal stable patch-id) | `180ff5bb` | A download token (`purpose: download`) was accepted as a session token: probe returned 200, now 401. |
+| `c1cf1c62` | ADAPTED (clean pick, but the patch-id differs against this lineage; proven by its cherry-pick marker) | `ae3e8229` | Anonymous `GET /files/{p}/project.json` and `/files/{p}/source/*` returned 200 with content; now 404. |
+| `9317ae46` | ADAPTED (pick with a test conflict resolved; marker) | `ae990d31` | Task cancel looked tasks up by id without `_scope_query`. |
+| `5839ef3b` | UNCHANGED (pick; equal patch-id) + a separate test adaptation | `d353a80f`, `843910a2` | Retry-download lookup had no scope. The test was adapted to V1's `payload.api_call_id` link. |
+| `31c5e985` | UNCHANGED (pick; equal patch-id) | `d6c7f22e` | Bulk cancel returns early when no queued tasks are in scope. |
+| `e6e60d0c` | ADAPTED (pick with import paths mapped; marker) | `109241e2` | Project-name validation on project-addressed routes. |
+| `6a3e6cd8` | UNCHANGED (pick; equal patch-id) | `10b104e3` | The source ledger followed symlinks. |
+| `eec3c21e` | ADAPTED (pick with import paths mapped; marker) | `6bf80309` | Version snapshot paths were not resolved or validated. |
 | `d3d0c454` | ADAPTED | `daf5755a` | `GET /custom-providers/{id}/credentials` returned the key in plaintext; removed. The Agent import now copies the key on the server. The dependent base-URL normalization is not taken: its migration would fork Alembic. |
 | `2c4ca6d6` | ADAPTED | `5ed579b9` | Provider artifact downloads had no destination guard and no byte cap. |
 | `8faf1450` | ADAPTED | `420b3d89` | Anthropic discovery skipped the destination guard. A cross-origin 307/308 forwarded the request body. |
 | `3ff6127f` (guard part) | ADAPTED | `cef142d5` | Built-in direct-HTTP submits and polls were unguarded. A source-scan test now pins this. |
 | `3ff6127f` (Gemini resume part) | ADAPTED | `2907dcec` | An artifact 404 after a finished paid Gemini job was classified as expired. Proven: 6 tests fail on the old code. |
 | `3ff6127f` (base-URL pinning part) | ADAPTED | `8c0591fa` | Kling, Ark and OpenAI resumed at the current base URL, not the submitted one. Proven: 3 tests fail on the old code. |
-| `39fe7611` | UNCHANGED (pick) | `25e12509` | Veo with no resolution set was priced at 1080p; the provider renders 720p. |
+| `39fe7611` | ADAPTED (clean pick, patch-id differs; marker) | `25e12509` | Veo with no resolution set was priced at 1080p; the provider renders 720p. |
 | `0f8a4e1f` | ADAPTED | `d2b09b64` | The storyboard cost estimate substituted the 1080p fallback that execution does not send. |
 | `7e994e5f` | ADAPTED | `d893941a` | Episode-scope generation re-enqueued a selected manual upload, a paid regeneration. Proven: 2 tests fail on the old code. |
 | `29c778f0` | ADAPTED | `02ec75b2` | The current-scope export shipped the full history of products, grids and end frames, and left character-derivative records dangling. Proven: the test fails on the old code. |
