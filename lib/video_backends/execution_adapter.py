@@ -143,17 +143,16 @@ async def submit_video_attempt[T](
     submitted_base_url: str,
     submit: Callable[[], Awaitable[ProviderSubmitReceipt[T]]],
 ) -> T:
-    release_mode = current_release_mode()
+    # 路线资质由 backend 装配处的发布闸门判定（含适配器层离线验证与运行期 canary，ADR-0091）；
+    # 提交缝只要求这条提交路线已登记且其能力声明未过期，发布模式下非 worker 提交同样过这一关。
     if request.task_id is None:
-        # 非 worker 提交（直生 / 宫格 / 端点试跑）没有执行尝试可绑，但发布部署下同样只放行
-        # 有资质的路线：闸门先于任何供应商请求。
-        if release_mode is not ReleaseMode.DEV:
-            require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION, release_mode=release_mode)
+        if current_release_mode() is not ReleaseMode.DEV:
+            require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION)
         return (await submit()).value
     if request.attempt_submitter is None:
         raise RuntimeError("M7_SUBMIT_ROUTE_UNBOUND: worker video request requires an attempt submitter")
 
-    capability = require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION, release_mode=release_mode)
+    capability = require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION)
     route = ProviderRouteSnapshot(
         provider_id=provider_id,
         provider_account_ref="default",

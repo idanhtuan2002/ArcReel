@@ -17,7 +17,9 @@ consulted without this module owning their storage.
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Literal
 
@@ -91,10 +93,28 @@ def set_qualification_lookup(lookup: QualificationLookup | None) -> None:
     _qualification_lookup = lookup or _no_qualifications
 
 
+_canary: ContextVar[tuple[PaidRoute, str | None] | None] = ContextVar("paid_route_canary", default=None)
+
+
+@contextmanager
+def qualification_canary(route: PaidRoute, model_id: str | None) -> Generator[None]:
+    """Let exactly this route and model through the gate while its qualification canary runs.
+
+    The canary is the one paid call an unqualified route may make, started by the operator.
+    """
+    token = _canary.set((route, model_id))
+    try:
+        yield
+    finally:
+        _canary.reset(token)
+
+
 def require_paid_route(route: PaidRoute, *, model_id: str | None, release_mode: ReleaseMode | None = None) -> None:
     """Refuse ``route`` in a release deployment unless it is currently qualified."""
     mode = release_mode if release_mode is not None else current_release_mode()
     if mode is ReleaseMode.DEV:
+        return
+    if _canary.get() == (route, model_id):
         return
     if not _qualification_lookup(route, model_id):
         raise PaidRouteUnqualifiedError(route, model_id)
@@ -130,6 +150,7 @@ __all__ = [
     "current_release_mode",
     "media_route",
     "paid_route_inventory",
+    "qualification_canary",
     "require_paid_route",
     "set_qualification_lookup",
 ]

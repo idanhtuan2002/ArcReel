@@ -193,6 +193,16 @@ def _load_entries(registry_path: Path) -> dict[str, ProviderCapabilityRegistryEn
     return entries
 
 
+def capability_qualification_status(
+    ref: str, *, now: datetime, registry_path: Path = DEFAULT_REGISTRY_PATH
+) -> ProviderQualificationStatus | None:
+    """The registry's qualification status for ``ref``; ``None`` when the entry is absent or its evidence expired."""
+    entry = _load_entries(registry_path).get(ref)
+    if entry is None or (entry.evidence_expires_at is not None and entry.evidence_expires_at <= now):
+        return None
+    return entry.qualification_status
+
+
 def load_capability_profile(ref: str, *, registry_path: Path = DEFAULT_REGISTRY_PATH) -> ProviderCapabilityProfile:
     """Structural + semantic fail-closed load of one exact capability profile,
     with no qualification or release-mode gating (see ``require_enabled_capability``
@@ -246,6 +256,7 @@ __all__ = [
     "ProviderCapabilityRegistryEntry",
     "ProviderCapabilityUnqualifiedError",
     "ReleaseMode",
+    "capability_qualification_status",
     "compute_entry_digest",
     "load_capability_profile",
     "require_enabled_capability",

@@ -42,6 +42,7 @@ from lib.project_migrations import cleanup_stale_backups, run_project_migrations
 from lib.request_context import accept_or_mint_request_id, bound_request_id
 from lib.source_loader.migration import migrate_project_source_encoding
 from r2.host_hardening.paid_routes import current_release_mode
+from r2.host_hardening.route_qualifications import install_runtime_qualification_lookup
 from server.auth import ensure_auth_password, get_current_user
 from server.cors_config import resolve_cors_policy
 from server.dependencies import require_project_migration_ok, require_valid_project_name
@@ -443,6 +444,7 @@ async def lifespan(app: FastAPI):
 
     # 发布模式在启动时读一次：取值非法即启动失败，而不是拖到第一次付费调用才暴露。
     logger.info("release mode: %s", current_release_mode().value)
+    install_runtime_qualification_lookup()
 
     # 启动共享 httpx 客户端（用于版本检查等外部 API 调用）
     await startup_http_client()

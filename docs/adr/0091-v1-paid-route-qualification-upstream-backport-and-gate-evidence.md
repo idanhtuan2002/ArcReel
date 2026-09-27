@@ -135,3 +135,38 @@ records.
   starts them. The agent never starts them.
 - **Qualification is renewed.** Changing an adapter version during an upgrade
   requires routes to be qualified again.
+
+## Implementation notes (2026-09-28)
+
+These notes refine how V1-06 carried out the decision. The decision itself
+is unchanged.
+
+- **One qualification check, at backend construction.**
+  - Qualification is enforced where the route is built (`assemble_backend`),
+    at Agent session start and at trial-run start.
+  - The async video submit seam checks only that the submit route is bound in
+    the inventory with a fresh profile. This also covers submits made without
+    a task. Enforcing the static registry status there too would refuse
+    routes that the runtime qualification already covers.
+- **Adapter level by route class.**
+  - Async video families carry static profiles. Their route qualifies only
+    when every profile of the submit family is at least `OFFLINE_VERIFIED`
+    and a runtime canary is recorded. All shipped profiles are still
+    `UNQUALIFIED`, so no video route qualifies until offline adapter evidence
+    is recorded through the provider verifier.
+  - Synchronous image, text and audio routes have no static profile. Their
+    adapter level is the generic invariants, which the test suite proves for
+    every adapter: no resend after an ambiguous outcome, the destination
+    guard, and budget before submit.
+- **Where runtime qualifications live.** They are files under the data root
+  in `.route_qualifications/`: one records file plus an evidence file per
+  canary, each digest-bound. A backup set therefore carries them. A record
+  stops counting when it expires, when its route class's adapter version
+  changes, or when its evidence no longer matches its digest. Canaries run
+  through `scripts/r2/qualify_route.py`.
+- **Trial runs.** Trial runs are a setup tool. They cannot be qualified and
+  stay refused in a release deployment; custom providers qualify through their
+  `custom_media` route instead.
+- **Agent budget.** The embedded Agent's spend is recorded after the fact, so
+  it is not reserved per call. The Agent route is still qualification-gated.
+  A per-session reservation remains open.
