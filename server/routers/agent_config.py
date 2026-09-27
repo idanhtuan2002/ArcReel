@@ -168,6 +168,7 @@ async def _resolve_key_source(
         raise HTTPException(status_code=422, detail=_t("agent_import_provider_no_key"))
     return provider.api_key, body.base_url or provider.base_url
 
+
 # ── Credential endpoints ───────────────────────────────────────────
 
 

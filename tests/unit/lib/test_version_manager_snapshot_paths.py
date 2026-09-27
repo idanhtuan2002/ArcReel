@@ -2,8 +2,9 @@ import json
 from pathlib import Path
 
 import pytest
-from lib.version_manager import UnmanagedSnapshotPathError, VersionManager
+
 from lib.api_errors import BadRequestError
+from lib.version_manager import UnmanagedSnapshotPathError, VersionManager
 
 _UNMANAGED_FILES = [
     "../outside/Hero_v1_20260101T000000.png",
