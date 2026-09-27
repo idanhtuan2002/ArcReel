@@ -128,3 +128,52 @@ Still open:
   a restored target is not run, so no set is `VERIFIED` yet. This is the
   remaining V1-05 acceptance step and overlaps E2.
 - **Fresh review.** A new independent review is needed on the fix HEAD.
+
+## Re-review and fixes — 2026-09-27
+
+The re-review of `8fdcfa13` returned CHANGES_REQUIRED
+(`R2_V1_H6_H7_INDEPENDENT_REREVIEW_2026-09-27.md`). Fixes:
+
+- `85a5e14f`:
+  - N1: whole-identifier key matching restores masking of `--password=`,
+    `_token=`, `self._api_key=`, `{"_secret": …}` and `2fa_token=`, and stays
+    linear.
+  - N2: provider job IDs learnt by a task are replaced by HMAC references
+    in every rendered log line.
+  - Log minors: redaction before truncation; declarative prompt keys; keyed
+    candidate digest; PEM bound.
+- `0f87a946`:
+  - Attestation binds the target and requires distinct set projects; a
+    VERIFIED state needs its attestation.
+  - Verify gaps are closed.
+  - A connection failure marks the set REJECTED, and the CLI reports errors
+    as JSON.
+  - `?password=` is handled; URL userinfo is stripped.
+
+Accepted with reason:
+
+- **Minor 9:** `reset_tracer_provider_for_tests` stays in `server/telemetry.py`.
+  CONTRIBUTING prescribes public `reset_*_for_tests` hooks in production
+  modules.
+
+Drill evidence was regenerated on `0f87a946`:
+
+- verify `checks_passed` with 6 references and 2 probed media;
+- attest refused for insufficient Golden products;
+- the set stays `COMPLETE`;
+- 0 canaries.
+
+Verification:
+
+- The unit, `integration/lib`, `integration/server/services`,
+  `integration/server/agent_runtime` and `integration/r2/host_hardening`
+  suites: `12838 passed`. The only failure was the dirty-tree scope check.
+- H6 PostgreSQL: `16 passed`.
+- Static gates are clean.
+- The full suite was not run.
+
+Still open:
+
+- **Golden A/B on a restored target (V1-05/E2).** The no-provider run on a
+  restored target is not done, so no set is VERIFIED.
+- **Final review.** A final independent review is needed on this HEAD.

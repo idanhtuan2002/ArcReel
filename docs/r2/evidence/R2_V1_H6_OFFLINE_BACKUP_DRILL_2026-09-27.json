@@ -1,7 +1,7 @@
 {
   "evidence": "R2 V1 H6 offline whole-deployment backup drill",
   "date": "2026-09-27",
-  "head": "075d84f28bb0eb68ef94f02ec7b1a9c77ea81771",
+  "head": "0f87a946b03c5d41dbea1936fb9743674afbaab8",
   "decisions": "docs/adr/0090-v1-offline-backup-fence-credential-exclusion-and-otlp-export.md",
   "runbook": "docs/r2/runbooks/m7-backup-restore.md",
   "environment": {
@@ -21,9 +21,9 @@
     "output": {
       "state": "COMPLETE",
       "backup_set_id": "bs-drill-20260927",
-      "manifest_digest": "sha256:bfe7dea33ad421011211d6c5e8bf09aadaa23496be08edf9d81f8dc2f97e5140",
-      "recovery_point": "2026-09-27T06:45:23.612847+00:00",
-      "file_count": 10,
+      "manifest_digest": "sha256:0d7258e76440665c3acf0c358dbba34633a4f5eaf437a4545c485ee72fb9390a",
+      "recovery_point": "2026-09-27T07:54:26.197529+00:00",
+      "file_count": 11,
       "table_count": 81,
       "sanitized_tables": [
         "agent_anthropic_credentials",
@@ -48,8 +48,8 @@
     "exit_code": 0,
     "output": {
       "backup_set_id": "bs-drill-20260927",
-      "restored_file_count": 10,
-      "elapsed_seconds": 0.768,
+      "restored_file_count": 11,
+      "elapsed_seconds": 0.765,
       "credentials_to_reenter": [
         "agent_anthropic_credentials",
         "custom_provider",
@@ -63,29 +63,30 @@
     "exit_code": 0,
     "verdict": {
       "backup_set_id": "bs-drill-20260927",
-      "manifest_digest": "sha256:bfe7dea33ad421011211d6c5e8bf09aadaa23496be08edf9d81f8dc2f97e5140",
-      "target_release_git_sha": "075d84f28bb0eb68ef94f02ec7b1a9c77ea81771",
+      "manifest_digest": "sha256:0d7258e76440665c3acf0c358dbba34633a4f5eaf437a4545c485ee72fb9390a",
+      "restore_target_id": "drill-target-1",
+      "target_release_git_sha": "0f87a946b03c5d41dbea1936fb9743674afbaab8",
       "checks_passed": true,
       "reason_codes": [],
       "checked_table_count": 81,
-      "checked_file_count": 10,
-      "checked_reference_count": 5,
+      "checked_file_count": 11,
+      "checked_reference_count": 6,
       "probed_media_count": 2,
-      "checked_at": "2026-09-27T06:45:25.920424Z"
+      "checked_at": "2026-09-27T07:54:28.633465Z"
     }
   },
   "attest_without_golden_evidence": {
     "exit_code": 2,
     "stderr_tail": [
-      "{\"error\": \"ATTESTATION_REJECTED\", \"detail\": \"Golden read/review/export did not pass for every product\"}"
+      "{\"error\": \"ATTESTATION_REJECTED\", \"detail\": \"Golden read/review/export did not pass for enough distinct products\"}"
     ]
   },
   "drill_rpo_seconds": 0,
   "ledger_state": {
     "backup_set_id": "bs-drill-20260927",
-    "manifest_digest": "sha256:bfe7dea33ad421011211d6c5e8bf09aadaa23496be08edf9d81f8dc2f97e5140",
+    "manifest_digest": "sha256:0d7258e76440665c3acf0c358dbba34633a4f5eaf437a4545c485ee72fb9390a",
     "state": "COMPLETE",
-    "updated_at": "2026-09-27T06:45:23.771639+00:00"
+    "updated_at": "2026-09-27T07:54:26.359918+00:00"
   },
   "secret_canary": {
     "files_in_backup_set_containing_canary": 0,
