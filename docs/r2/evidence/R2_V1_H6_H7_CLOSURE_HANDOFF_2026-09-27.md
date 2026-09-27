@@ -393,7 +393,10 @@ Evidence: `R2_V1_GOLDEN_RESTORE_DRILL_2026-09-27.json` (HEAD `b088f238`,
 drill `tests/drills/r2/golden_restore_drill.py`, research
 `docs/research/2026-09-27-r2-v1-restore-derived-golden-drill.md`).
 
-The run used a disposable PostgreSQL 18 server and no provider credentials:
+The run used a disposable PostgreSQL 18 server. No provider credentials were
+configured, and the fixture pipelines make no provider calls. The drill does
+not observe this: it does not check provider env vars or new `api_calls` rows
+(M7-D review F4).
 
 1. **Materialize.** The drill created three real Host projects through the
    HTTP API with a real JWT: `golden-a-h264`, `golden-b-western` and
@@ -406,12 +409,28 @@ The run used a disposable PostgreSQL 18 server and no provider credentials:
    passed: 156 files, 33 references, 15 media probed.
 4. **Check.** On the restored target, each project and its gate history
    were read through the API, and the approved masters and Gate C receipts
-   were resolved. The stored deliverable decodes. The final cut
+   were resolved. The stored deliverable passes an ffprobe stream probe;
+   this is not a full frame decode (review F3). The final cut
    re-composed from the restored masters hashes to the Gate D
-   `deliverable_digest` for all three products.
-5. **Attest.** `attest` succeeded and the set is **VERIFIED**. Measured
-   RPO 0 s and RTO 8 s on a single machine; the RTO spans restore, verify,
-   the Golden check and the re-export.
+   `deliverable_digest` for all three products. "Reviewed" means this
+   automated consistency check; no human reviewed anything, and the gate
+   receipts were made by the drill's own operator JWT (review F5).
+5. **Attest.** `attest` succeeded and the set is **VERIFIED**, with drill
+   timings of RPO 0 s and RTO 8 s on a single machine (review F2):
+   - **RPO is 0 by construction.** The incident was placed right after a
+     fenced capture, and the value is floored. Operational RPO equals the
+     backup interval, and V1 sets no schedule or target.
+   - **RTO is rounded up.** It spans restore, verify, the Golden check and
+     the re-export only. It excludes app start (the check uses in-process
+     ASGI without lifespan), backup retrieval, provisioning and credential
+     re-entry.
+6. **Correlation is not shown here** (review F11). The Golden products come
+   from the fixture producer and Gate C, not the generation queue. So there
+   are no tasks, `api_calls` or provider jobs to join. H7 correlation
+   evidence is the integration chain test
+   (`tests/integration/lib/test_generation_correlation_chain.py`), which
+   covers the image lane on SQLite. The video `execution_id` lane is not in
+   its end-to-end assertion.
 
 Remaining for V1-05:
 
@@ -446,3 +465,23 @@ Next:
 1. Run the independent M7-D acceptance review on `9fd43948` or its
    evidence-only successor.
 2. Research and decide the CI real-media budget before any push.
+
+## Independent M7-D acceptance review — 2026-09-27
+
+Evidence: `R2_V1_M7D_ACCEPTANCE_REVIEW_2026-09-27.md` (HEAD `836200bf`).
+
+- **Verdict:** **ACCEPTED_WITH_CONDITIONS**, with no blocker or major
+  finding.
+- **Condition 1 (F2–F5, F11): wording.** Fix the evidence wording. Done
+  above and in `R2_V1_FULL_GATE_2026-09-27.md`.
+- **Condition 2 (F12): "export".** Record the V1 meaning of "export". This
+  is pending a sponsor decision; it is not recorded yet.
+- **Other minor findings, left open:**
+  - F1: attest does not bind `export_digest` to captured file digests;
+  - F6: no committed H6 drill script;
+  - F7: log lines carry no request or task ID;
+  - F8: credential shapes missed by the redactor;
+  - F9: operator configuration is stored verbatim;
+  - F13: the runbook ordering and restored-app startup.
+- **Before push:** the CI budget, plus F10 (the CI `postgresql-client`
+  version).
