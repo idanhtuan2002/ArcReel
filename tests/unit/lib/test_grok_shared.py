@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import grpc
 import grpc.aio
 import pytest
 
-from lib.grok_shared import grok_should_retry
+from lib.grok_shared import create_grok_client, grok_should_retry
 from lib.retry import with_retry_async
 from tests.fakes import bounded_poll_clock
 
@@ -100,3 +100,19 @@ class TestGrokRetryIntegration:
         with pytest.raises(grpc.aio.AioRpcError):
             await fn()
         assert mock_fn.call_count == 1
+
+
+def test_the_client_disables_sdk_side_retries_of_paid_calls():
+    """xai_sdk 缺省对 UNAVAILABLE 自动重发；付费提交的重发只由调用方谓词决定（ADR-0078）。"""
+    captured: dict = {}
+
+    class _Client:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    with patch("xai_sdk.AsyncClient", _Client):
+        create_grok_client(api_key="xai-key")
+
+    options = dict(captured["channel_options"])
+    assert options["grpc.enable_retries"] == 0
+    assert "retryPolicy" not in options["grpc.service_config"]

@@ -80,3 +80,36 @@ def _grpc(code: grpc.StatusCode) -> AioRpcError:
 )
 def test_paid_sdk_submit_retries_only_unsent_or_provider_declared_failures(exc: Exception, expected: bool) -> None:
     assert should_retry_paid_sdk_submit(exc) is expected
+
+
+def test_every_provider_retry_decorator_names_a_reviewed_predicate() -> None:
+    """付费提交不得靠缺省的字符串/超时兜底重试：每个供应商代码里的 ``@with_retry_async`` 都要显式
+    ``retry_if=`` 一个审过的谓词。提交用 should_retry_submit / should_retry_paid_sdk_submit，轮询取件用
+    should_retry_poll（幂等 GET）。"""
+    import ast
+    from pathlib import Path
+
+    lib_root = Path(__file__).resolve().parents[4] / "lib"
+    scanned = [
+        *lib_root.glob("image_backends/*.py"),
+        *lib_root.glob("video_backends/*.py"),
+        *lib_root.glob("text_backends/*.py"),
+        *lib_root.glob("audio_backends/*.py"),
+        *lib_root.glob("custom_provider/**/*.py"),
+        lib_root / "kling_backend_base.py",
+    ]
+    reviewed = {"should_retry_submit", "should_retry_paid_sdk_submit", "should_retry_poll"}
+    # 写库而非调供应商：job id / api_call id 落库的 DB 瞬态重试
+    database_retries = {"_persist_with_retry", "_persist_api_call_id_with_retry"}
+    offenders = []
+    for path in scanned:
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.name in database_retries:
+                continue
+            for decorator in node.decorator_list:
+                if not (isinstance(decorator, ast.Call) and getattr(decorator.func, "id", None) == "with_retry_async"):
+                    continue
+                predicate = next((k.value for k in decorator.keywords if k.arg == "retry_if"), None)
+                if not (isinstance(predicate, ast.Name) and predicate.id in reviewed):
+                    offenders.append(f"{path.relative_to(lib_root)}:{node.name}")
+    assert offenders == []

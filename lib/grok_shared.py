@@ -10,6 +10,8 @@ Grok (xAI) 共享工具模块
 
 from __future__ import annotations
 
+import json
+
 from lib.retry import BASE_RETRYABLE_ERRORS, _should_retry
 
 # gRPC 瞬态状态码（等价于 HTTP 429/500/502/503/504）
@@ -47,8 +49,16 @@ def resolve_grok_api_key(api_key: str | None = None) -> str:
     return api_key.strip()
 
 
+#: 关掉 xai_sdk 缺省的 gRPC 自动重试（缺省 service config 对 UNAVAILABLE 重发至多 5 次）：连接在响应头
+#: 之前断开也报 UNAVAILABLE，请求可能已被受理并扣费。付费提交是否重发只由调用方谓词决定（ADR-0078）。
+GROK_CHANNEL_OPTIONS: list[tuple[str, object]] = [
+    ("grpc.enable_retries", 0),
+    ("grpc.service_config", json.dumps({"methodConfig": [{"name": [{}]}]})),
+]
+
+
 def create_grok_client(*, api_key: str | None = None):
-    """创建 xAI AsyncClient，统一校验和构造。"""
+    """创建 xAI AsyncClient，统一校验和构造；SDK 内置的自动重发被关闭。"""
     import xai_sdk
 
-    return xai_sdk.AsyncClient(api_key=resolve_grok_api_key(api_key))
+    return xai_sdk.AsyncClient(api_key=resolve_grok_api_key(api_key), channel_options=list(GROK_CHANNEL_OPTIONS))
