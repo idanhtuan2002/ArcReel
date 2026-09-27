@@ -17,7 +17,7 @@ from r2.host_hardening.provider_capabilities import ReleaseMode
 
 
 @pytest.fixture(autouse=True)
-def _no_installed_lookup():
+def no_installed_lookup():
     set_qualification_lookup(None)
     yield
     set_qualification_lookup(None)
