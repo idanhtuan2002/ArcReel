@@ -274,3 +274,51 @@ Open for H6/H7 acceptance (V1-05):
    read/review/export for the two Golden products on a restored target,
    then `attest` with measured RPO/RTO.
 2. **Full affected gates** on that exact candidate HEAD.
+
+## Second confirmation review and fixes — 2026-09-27
+
+The second confirmation review of `901b20a0` returned
+**APPROVED_WITH_FOLLOWUPS** (`R2_V1_H6_H7_CONFIRMATION_REVIEW_2_2026-09-27.md`).
+Its follow-ups were fixed in `c26c0fb5`:
+
+- **Token counts.** Numeric token counts and JSON structure are no longer
+  masked; numeric values under credential keys still are.
+- **Header next lines.** `Authorization`/`cookie` values on the next line
+  are masked.
+- **Unterminated quotes.** An unterminated quoted credential masks only the
+  rest of its line.
+- **Corrupt verdict.** `attest` rejects a corrupt verdict with
+  `AttestationRejected`.
+
+The timing sweep stayed linear: 22 ms at 20k characters, 216 ms at 200k.
+
+A drill re-run while fixing these was rejected by the fence ("the database
+was written while capturing"). The cause was verified: autovacuum/ANALYZE
+catalog writes move the `pg_stat_database` counters; a manual ANALYZE +
+VACUUM moved them by 579. Fixed in `c9776606`:
+
+- The fence now uses `pg_stat_user_tables` row counters.
+- It adds a relation fingerprint (relfilenode plus column definitions), so
+  TRUNCATE, rewrites and DDL are still rejected.
+- Tests cover TRUNCATE and ALTER (rejected) and ANALYZE + VACUUM
+  (accepted).
+
+Drill on `c9776606`, run 3 times: all `COMPLETE` with verify
+`checks_passed` and 0 canaries. The committed evidence is the third run.
+
+Verification:
+
+- The unit, `integration/lib`, `integration/server/services`,
+  `integration/server/agent_runtime` and `integration/r2/host_hardening`
+  suites: `12865 passed`. The only failure was the dirty-tree scope check.
+- H6 PostgreSQL: `21 passed`.
+- Static gates are clean.
+- The full suite was not run.
+
+Still open (V1-05):
+
+1. **Golden A/B.** The no-provider Golden A/B read/review/export on a
+   restored target, plus `attest`.
+2. **Full gates.** The full affected gates on the exact candidate HEAD.
+3. **Fence fix not independently reviewed.** The `c9776606` fence change
+   has not been independently reviewed.
