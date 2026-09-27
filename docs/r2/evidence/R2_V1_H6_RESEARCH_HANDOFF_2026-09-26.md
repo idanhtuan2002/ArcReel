@@ -13,6 +13,11 @@ artifact-download retry is a separate DB writer that must join that fence.
 The next bounded writer sweep additionally found a direct worker
 `running -> queued` SQL commit outside `TaskRepository` and a manual batch
 requeue method; both must be included in the task census/fence review.
+The follow-on Task matrix now groups enqueue, claim/requeue, cancellation and
+terminalization, retry, same-status checkpoint/job/payload writes, offline
+legacy import, and Alembic data migration/downgrade. This is a bounded
+positive writer list, not a release-complete allowlist; an active-row count
+alone cannot prove a stable DB dump.
 These are source-backed candidate rules, not H6 acceptance or production code.
 
 The isolated checkpoint-state test passed (1); `git diff --check` and the

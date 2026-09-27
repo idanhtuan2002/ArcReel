@@ -151,6 +151,30 @@ easy to miss if lifecycle integration reviews only `TaskRepository` methods.
 This search covers those literal Python forms in the stated paths, not dynamic
 SQL, external jobs, or all status transitions.
 
+### Bounded Task writer and capture-fence matrix
+
+The current-worktree Task writer paths below are distinct transaction seams.
+`ACTIVE_TASK_STATUSES` is `queued`, `running`, `cancelling`; a zero active-row
+count at one instant is not a writer fence. Every listed writer needs either
+participation in an approved lifecycle transaction or proof that the signed
+capture window stops it. The latter must include worker threads and operator
+scripts, not only HTTP admission.
+
+| Write family | Current source and write boundary | Capture implication |
+| --- | --- | --- |
+| New queued task, including dedupe/receipt path | `TaskRepository.enqueue()` constructs `Task(status="queued")` and commits its task/receipt transaction (`lib/db/repositories/task_repo.py:220-337`). `GenerationQueue.enqueue_task()` is the normal runtime caller (`lib/generation_queue.py:459-482`). | Admission must fail or wait while a capture fence owns the project identity; checking the route before repository commit is insufficient. |
+| Claim and local requeue | `claim_next()` commits `queued -> running` (`lib/db/repositories/task_repo.py:526-613`); worker `_requeue_single_task()` commits `running -> queued` directly; repository `requeue_running()` commits a batch (`lib/generation_worker.py:758-799`; `lib/db/repositories/task_repo.py:1220-1257`). | All states remain active, but DB row versions and worker ownership change. Include direct worker SQL and any use of the manual rescue method in the fence. |
+| Cancel, cascade and terminal settlement | `cancel_task()` commits queued cancellation or `running -> cancelling`; `finalize_cancelled()` commits the final transition and may cascade; `cancel_all_queued()` commits a project-wide update; success/failure methods commit terminal changes and dependent failures (`lib/db/repositories/task_repo.py:616-664,714-765,834-865,922-1003,1143-1168,1177-1218`). | Terminalization can change both Task and event/dependent rows while files are being finalized or removed; a fence cannot rely only on blocking new tasks. |
+| Failed download retry | The repository reopens `ApiCall` and commits `failed -> running` before worker dispatch (`lib/db/repositories/task_repo.py:665-712`; `server/routers/tasks.py:192-207`). | A previously terminal row can become active after a census unless the retry transaction participates in the lifecycle fence. |
+| Same-status execution facts | `persist_execution_checkpoint()` commits the pre-submit checkpoint with a running/no-job guard; `persist_provider_job_id()`, payload merge and provider projection also commit independently (`lib/db/repositories/task_repo.py:1030-1134`). | An unchanged `running` status or active-row count does not prove a stable backup DB image or matching staging tree. Version/fence checks must cover these row values. |
+| Offline legacy import | `migrate_sqlite_to_orm.py` inserts Task rows carrying imported statuses (`scripts/migrate_sqlite_to_orm.py:118-142`). | Exclude the importer from a live capture by a signed maintenance stop or integrate its project identities into bootstrap; ordinary runtime enqueue rules do not cover it. |
+| Schema migration and downgrade | Two Alembic downgrades directly cancel duplicate active tasks; an endpoint migration backfills provider columns without changing status (`alembic/versions/e167b56a3e79_add_resource_type_column_to_tasks_for_.py:28-64`; `alembic/versions/7f2c4d8a91b3_scope_task_dedup_by_user.py:53-81`; `alembic/versions/b3f9c07ae214_split_task_endpoint_and_base_url.py:31-58`). | A live schema migration or downgrade is outside the ordinary repository admission paths. The capture protocol must require a proven maintenance stop and compatible schema pin, not treat it as an invisible background writer. |
+
+This table is a bounded positive source inventory for the shown Python paths,
+not a complete release allowlist. It does not prove that every SQL writer,
+file finalizer, process or deployment job participates. The project/deployment
+identity and signed stop protocol remain open V1-01 gates.
+
 ## Why the other mechanisms are insufficient alone
 
 | Mechanism | Useful part | Missing proof for V1-01 |
