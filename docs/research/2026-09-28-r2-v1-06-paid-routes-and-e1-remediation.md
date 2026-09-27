@@ -211,3 +211,203 @@ policy.
   canaries authorized (R2b), and for which routes.
 - The exact UI surface for disabled capabilities. It should reuse existing
   provider settings and error surfaces; this needs checking during design.
+
+## Addendum (2026-09-28): deeper research on R2, R3 and R4
+
+The sponsor asked for R2 to be explained more clearly, and for R3 and R4 to be
+researched until the best option is found.
+
+### R2 — what "no paid route in the release" means in practice
+
+- **Two separate modes.**
+  - `DEV` keeps every route usable, as today. Development and experiments
+    are unchanged.
+  - The release deployment (`PRODUCTION_CANDIDATE`) refuses every
+    unqualified route when it is constructed.
+- **In a release deployment under R2a, the operator can still:**
+  - create projects and upload or supply source;
+  - edit scripts by hand;
+  - render deterministic local media (Remotion/ffmpeg) and compose;
+  - run Gates A–D, export, back up and restore.
+
+  This is exactly the path the two Golden products and the restore drill
+  proved.
+- **What the operator cannot do in a release deployment:**
+  - the Agent chat (every Agent provider is a paid LLM);
+  - AI image, video, text or TTS generation through any built-in or custom
+    provider;
+  - custom-provider trial runs.
+- **What stays available:** connectivity checks (`models.list`) and
+  discovery, which are not billed. They still pass the outbound destination
+  guard.
+- **Precedent.** The earlier primary-source synthesis
+  (`2026-09-25-r2-m7-h6-h8-primary-source-notes.md` §8) reached the same
+  recommendation independently. It is a provider-free V1 profile for the two
+  corpus products, and it keeps every paid path disabled until a specific
+  path is qualified.
+- **Moving to R2b later.** Any route can be enabled later without redesign.
+  The sponsor authorizes a bounded paid canary for one exact
+  provider/API/profile, the evidence is recorded and verified, and the
+  registry entry becomes `QUALIFIED`.
+  - For a synchronous route (image, text, audio), duplicate/restart and
+    ambiguous-outcome handling must be designed first, because only async
+    video has the attempt layer (fact 11).
+- **Consequence to accept:** a first V1 release whose AI generation is off by
+  default in release mode.
+
+### R3 — trust model: facts
+
+- **SLSA v1.0 build levels** (<https://slsa.dev/spec/v1.0/levels>).
+  - **L1:** provenance exists, and "may be incomplete and/or unsigned at L1".
+  - **L2:** "Build platform runs on dedicated infrastructure, not an
+    individual's workstation, and the provenance is tied to that
+    infrastructure through a digital signature".
+  - **L3:** adds isolation, and keeps the signing secret away from build
+    steps.
+- **GitHub artifact attestations.** They sign provenance bound to the
+  workflow, repository, commit and trigger. They must be verified, and they
+  "are not a guarantee that the artifact itself is secure" (cited in the
+  earlier notes §3).
+- **Git.** `git patch-id --stable` supports a content-equivalence
+  observation, not provenance. `range-diff` output is human porcelain and is
+  not machine-stable (earlier notes §3).
+- **Local environment.**
+  - No git signing key is configured (`user.signingkey` is unset).
+  - `gpg` and `ssh-keygen` exist; `cosign` does not.
+  - Fork Actions have never run (`total_count 0`), and CI enablement is
+    deferred by the sponsor.
+- **ADR-0090 precedent.** V1 already chose "no signed custody receipt". The
+  backup attestation is operator-supplied and consistency-checked.
+
+### R3 — analysis
+
+The threat that E1 finding S3 names is **self-asserted PASS**: a manifest that
+states results no process produced. In this project, a manifest written by an
+agent is a real instance of it.
+
+- A signature by the same operator on the same workstation proves only who
+  asserted and that nothing changed afterwards. By SLSA's definition it stays
+  at L1, so it does not prove that the gates ran.
+- Independent execution identity needs hosted infrastructure (L2), meaning
+  CI. That is blocked twice: fork CI is not enabled, and the CI real-media
+  budget is deferred.
+- **Paid canaries cannot move to CI without putting provider credentials into
+  CI secrets.** That is a new credential-exposure surface, which ADR-0090 and
+  the V1 strategy avoid.
+
+### R3 — options
+
+- **T1: operator attestation plus runner-generated evidence (recommended).**
+  1. A gate runner executes each gate command itself.
+  2. It commits the raw logs with their digests, exit codes, parsed test
+     counts (`N passed`, `0 failed`, `0 required skips`) and the tool
+     versions.
+  3. The verifier re-parses the committed logs instead of trusting manifest
+     fields. That closes S3's "self-assert PASS without logs or counts".
+  4. Provider qualification uses the same shape: the canary runner records
+     the request and response summary, exit status and the profile digest,
+     and the operator attests.
+  - Trust is equal to ADR-0090.
+  - What remains: an operator can still fabricate logs. This is disclosed,
+    in line with "attestation trusts the operator".
+- **T2: T1 plus git signing of evidence commits and the V1 tag.** This adds
+  tamper-evidence after the fact and an attester identity. It is still L1,
+  and it needs key custody decisions (V1-04 territory).
+  - Better placed at V1-08, where the annotated release tag is created.
+    Signing that tag is a cheap, standard step to decide there.
+- **T3: CI-executed gates with GitHub artifact attestations (L2).**
+  - Pros: gives independent execution identity.
+  - Cons: it requires enabling fork CI, resolving the deferred real-media
+    budget, and CI secrets for any provider canary.
+  - Suitable for V2 or after the CI decision, not for V1-06.
+
+**Recommendation: T1 for V1-06.** Decide tag signing (T2) at V1-08. Keep T3
+as the upgrade path once CI is enabled.
+
+### R4 — upstream: facts (upstream fetched 2026-09-28)
+
+- **Size of the upstream range.**
+  - From the merge base `6ddedc77` ("release 0.29.0") to `v0.31.0` there
+    are 213 non-merge commits: 65 fix, 60 feat, 48 chore, 17 refactor and
+    17 docs.
+  - They touch 1661 files (+98,604 / −36,798 lines).
+  - `upstream/main` is 294 commits ahead.
+- **Largest changes.**
+  - The ComfyUI backends.
+  - `fe1e15e2`, "执行器改由应用装配处注入，拆出重启自愈与续跑" (the executor is now
+    injected at app assembly; restart recovery and resumption are split
+    out). This overlaps the M7-A/C execution, restart and resume domain.
+  - The provider package move to `lib/backends/`.
+- **Overlap with V1.** 35 files overlap with this branch's changes, 27 of
+  them outside tests and docs. The overlap includes the generation worker,
+  the ledger, the task and api_call models and repos, `server/app.py`, and
+  the declarative backend.
+  - Upstream added 6 Alembic revisions; this branch added 16.
+- **Security defects confirmed present in the V1 lineage**, all fixed
+  upstream:
+  - `108d1680` (#2597): `server/auth.py::verify_token` accepts a
+    `purpose: "download"` token as a session token.
+    - Download tokens appear in URLs and live for 5 minutes, so any leaked
+      download URL grants a full session.
+  - `2c4ca6d6` (#2606): provider artifact downloads have no outbound
+    destination check (link-local and cloud-metadata addresses) and no byte
+    cap. The V1 lineage has no `artifact_download_guard`.
+  - `8faf1450` (#2621): probes and model discovery skip the destination
+    check.
+    - A cross-origin 307/308 in `request_with_scoped_credentials` also
+      forwards the request body to the redirect host.
+  - `3ff6127f` (#2699): built-in provider requests go through the
+    destination check. It also includes video-resume fixes, such as Gemini
+    no longer mislabelling a paid, finished job as expired.
+  - `d3d0c454` (#2599): `GET /custom-providers/{id}/credentials` exists in
+    the V1 lineage (`server/routers/custom_providers.py:800`). It returns
+    the provider key to the browser.
+  - `9317ae46`: `cancel_task`/`get_cancel_preview` look tasks up by id
+    without `_scope_query`.
+  - `eec3c21e` (#2600): version snapshot paths are not validated
+    (`resolve_snapshot_path` is absent).
+- **Dry-run cherry-pick onto HEAD** (`git merge-tree --write-tree`), counting
+  conflicts per commit:
+
+  | Commit | Conflicts |
+  |---|---|
+  | `108d1680` | 0 |
+  | `9317ae46` | 1 (test only) |
+  | `eec3c21e` | 5 |
+  | `8faf1450` | 7 |
+  | `d3d0c454` | 8 |
+  | `2c4ca6d6` | 17 |
+  | `3ff6127f` | 36 |
+
+  The last two depend on the upstream `lib/backends/` restructure.
+
+### R4 — options
+
+- **U1: pin V1 at the current base, with no upstream change.**
+  - Rejected: V1 would ship with seven confirmed security defects that
+    upstream has already fixed.
+- **U2: integrate v0.31.0 (or `upstream/main`) before V1.**
+  - It brings every fix, plus about 1600 files of feature work V1 does not
+    need, such as ComfyUI.
+  - It re-architects the executor that M7-A/B/C just accepted, which
+    re-opens M7 and every gate.
+  - Rejected for bounded V1 (ADR-0089).
+- **U3: pin the base and backport the security fixes (recommended).**
+  - Backport the seven fixes above, each with an E1 disposition:
+    - `CHERRY_PICK` where the diff applies (verified by `git patch-id
+      --stable` equality);
+    - `ADAPTED` where the upstream restructure prevents a clean pick.
+      These are re-implemented against V1's layout, with the upstream tests
+      ported.
+  - The E1 upstream verifier then has a real, bounded use: its inventory is
+    the seven selected commits and their dispositions.
+  - All other upstream commits are recorded as `DEFERRED` to the first
+    post-V1 upstream integration.
+  - This needs one schema change. The verifier currently demands the full
+    ordered range `old_sha..new_sha` (fact 12). A selective backport needs
+    an explicit "selected commits" inventory, and the unselected commits must
+    each carry a `DEFERRED` disposition.
+
+**Recommendation: U3.** It removes known vulnerabilities, keeps M7's accepted
+execution design, and gives E1 a concrete, reviewable use. The full upstream
+merge becomes a post-V1 packet, verified with the same tool.
