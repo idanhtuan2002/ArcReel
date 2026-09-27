@@ -445,6 +445,7 @@ class DeploymentBackupVerdict(R2ContractModel):
 
     backup_set_id: NonEmptyStr
     manifest_digest: NonEmptyStr
+    restore_target_id: NonEmptyStr
     target_release_git_sha: NonEmptyStr
     checks_passed: bool
     reason_codes: tuple[NonEmptyStr, ...]
@@ -472,6 +473,7 @@ class GoldenRestoreEvidence(R2ContractModel):
 
     backup_set_id: NonEmptyStr
     manifest_digest: NonEmptyStr
+    restore_target_id: NonEmptyStr
     passed: bool
     products: tuple[GoldenProductResult, ...]
 
@@ -483,6 +485,7 @@ class DeploymentBackupAttestation(R2ContractModel):
 
     backup_set_id: NonEmptyStr
     manifest_digest: NonEmptyStr
+    restore_target_id: NonEmptyStr
     verdict_digest: NonEmptyStr
     golden_evidence_digest: NonEmptyStr
     measured_rpo_seconds: int = Field(ge=0)

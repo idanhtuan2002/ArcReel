@@ -23,6 +23,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from lib.logging_utils import redact_provider_text
 from r2.contracts.host_hardening import GoldenRestoreEvidence
 from r2.host_hardening.deployment_backup import (
     DeploymentBackupError,
@@ -78,6 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--target-root", action="append", required=True)
     verify.add_argument("--target-database-url-env", required=True)
     verify.add_argument("--target-release-git-sha", required=True, help="release running on the restored target")
+    verify.add_argument("--restore-target-id", required=True, help="operator label of this restored target")
 
     attest = sub.add_parser("attest")
     attest.add_argument("--backup-dir", required=True, type=Path)
@@ -132,6 +134,7 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
             backup_dir=args.backup_dir.resolve(),
             target_database_url=_env_url(args.target_database_url_env),
             target_roots=_roots(args.target_root),
+            restore_target_id=args.restore_target_id,
             target_release_git_sha=args.target_release_git_sha,
         )
         return verdict.model_dump(mode="json")
@@ -157,6 +160,10 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps({"error": "INVALID_INPUT", "detail": f"{exc.error_count()} validation error(s)"}),
             file=sys.stderr,
         )
+        return 2
+    except Exception as exc:
+        detail = redact_provider_text(f"{type(exc).__name__}: {exc}")[:500]
+        print(json.dumps({"error": "UNEXPECTED", "detail": detail}), file=sys.stderr)
         return 2
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if args.command == "verify" and not result.get("checks_passed"):

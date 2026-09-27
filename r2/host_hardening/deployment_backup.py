@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
-from urllib.parse import unquote, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 import asyncpg
 
@@ -94,27 +94,35 @@ _SECRET_SETTING_KEY_PATTERN = (
 )
 
 # table -> column -> SQL expression replacing that column in the captured rows.
+# URLs keep scheme, host and path; ``user:password@`` userinfo is removed.
+_STRIP_USERINFO = "regexp_replace({column}, '://[^/@]*@', '://')"
+_HAS_USERINFO = "{column} ~ '://[^/@]*@'"
+
 SANITIZED_TABLE_POLICY: Mapping[str, Mapping[str, str]] = {
     "provider_credential": {
         "api_key": "NULL",
         "access_key": "NULL",
         "secret_key": "NULL",
         "credentials_path": "NULL",
+        "base_url": _STRIP_USERINFO.format(column="base_url"),
     },
-    "agent_anthropic_credentials": {"api_key": "''"},
-    "custom_provider": {"api_key": "''"},
-    "provider_config": {"value": "CASE WHEN is_secret THEN '' ELSE value END"},
+    "agent_anthropic_credentials": {"api_key": "''", "base_url": _STRIP_USERINFO.format(column="base_url")},
+    "custom_provider": {"api_key": "''", "base_url": _STRIP_USERINFO.format(column="base_url")},
+    "provider_config": {
+        "value": f"CASE WHEN is_secret THEN '' ELSE {_STRIP_USERINFO.format(column='value')} END",
+    },
     "system_setting": {"value": f"CASE WHEN key ~* '{_SECRET_SETTING_KEY_PATTERN}' THEN '' ELSE value END"},
 }
 
 # Post-restore proof that no credential value survived, per sanitized column.
 _SECRET_RESIDUE_PREDICATES: Mapping[str, Mapping[str, str]] = {
     "provider_credential": {
-        column: f"{column} IS NOT NULL" for column in SANITIZED_TABLE_POLICY["provider_credential"]
+        **{column: f"{column} IS NOT NULL" for column in ("api_key", "access_key", "secret_key", "credentials_path")},
+        "base_url": _HAS_USERINFO.format(column="base_url"),
     },
-    "agent_anthropic_credentials": {"api_key": "api_key <> ''"},
-    "custom_provider": {"api_key": "api_key <> ''"},
-    "provider_config": {"value": "is_secret AND value <> ''"},
+    "agent_anthropic_credentials": {"api_key": "api_key <> ''", "base_url": _HAS_USERINFO.format(column="base_url")},
+    "custom_provider": {"api_key": "api_key <> ''", "base_url": _HAS_USERINFO.format(column="base_url")},
+    "provider_config": {"value": f"(is_secret AND value <> '') OR {_HAS_USERINFO.format(column='value')}"},
     "system_setting": {"value": f"key ~* '{_SECRET_SETTING_KEY_PATTERN}' AND value <> ''"},
 }
 
@@ -193,16 +201,22 @@ def libpq_command_target(database_url: str) -> tuple[str, dict[str, str]]:
     the password travels in the child's ``PGPASSWORD`` instead.
     """
     parts = urlsplit(libpq_url(database_url))
-    password = parts.password
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query_password = next((value for name, value in query if name == "password"), None)
+    if query_password is not None:
+        parts = parts._replace(query=urlencode([(name, value) for name, value in query if name != "password"]))
+    password = unquote(parts.password) if parts.password is not None else query_password
     if password is None:
         return urlunsplit(parts), {}
+    if parts.password is None:
+        return urlunsplit(parts), {"PGPASSWORD": password}
     host = parts.hostname or ""
     if ":" in host:
         host = f"[{host}]"
     netloc = host if parts.port is None else f"{host}:{parts.port}"
     if parts.username:
         netloc = f"{parts.username}@{netloc}"
-    return urlunsplit(parts._replace(netloc=netloc)), {"PGPASSWORD": unquote(password)}
+    return urlunsplit(parts._replace(netloc=netloc)), {"PGPASSWORD": password}
 
 
 def _paths_alias(a: Path, b: Path) -> bool:
@@ -444,7 +458,13 @@ async def create_deployment_backup(
         raise UnsafeBackupPath("backup_dir is not empty")
     await asyncio.to_thread(_open_backup_dir, backup_dir, backup_set_id, clock())
 
-    conn = await asyncpg.connect(libpq_url(database_url))
+    try:
+        conn = await asyncpg.connect(libpq_url(database_url))
+    except Exception:
+        _write_state(
+            backup_dir, BackupSetState.REJECTED, now=clock(), backup_set_id=backup_set_id, reason="DATABASE_UNAVAILABLE"
+        )
+        raise
     try:
         before = await _fence_snapshot(conn, roots)
         _assert_quiescent(before, phase="before capture")
@@ -568,8 +588,21 @@ def load_restorable_manifest(backup_dir: Path) -> DeploymentBackupManifest:
     manifest = read_manifest(backup_dir)
     if manifest_digest(manifest) != state.get("manifest_digest"):
         raise BackupIntegrityError("manifest does not match the digest recorded in state.json")
+    if state.get("state") == BackupSetState.VERIFIED.value:
+        _verify_attestation_record(backup_dir, manifest, state)
     _verify_backup_payload(manifest, backup_dir)
     return manifest
+
+
+def _verify_attestation_record(backup_dir: Path, manifest: DeploymentBackupManifest, state: Mapping[str, Any]) -> None:
+    """A VERIFIED state must be backed by the attestation it names, for this manifest."""
+    path = backup_dir / ATTESTATION_FILENAME
+    if not path.is_file():
+        raise BackupIntegrityError("state is VERIFIED but the set has no attestation")
+    attestation = DeploymentBackupAttestation.model_validate_json(path.read_text(encoding="utf-8"))
+    recorded = "sha256:" + canonical_json_digest(attestation.model_dump(mode="json"))
+    if recorded != state.get("attestation_digest") or attestation.manifest_digest != manifest_digest(manifest):
+        raise BackupIntegrityError("the attestation does not match the VERIFIED state")
 
 
 def _verify_backup_payload(manifest: DeploymentBackupManifest, backup_dir: Path) -> None:
@@ -714,14 +747,13 @@ def _project_references(data_root: Path) -> tuple[int, list[str], list[Path]]:
     selected_media: list[Path] = []
     for project_dir in sorted(p for p in data_root.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))):
         project_json = project_dir / "project.json"
-        if not project_json.is_file():
-            continue
-        checked += 1
-        try:
-            if not isinstance(json.loads(project_json.read_text(encoding="utf-8")), dict):
+        if project_json.is_file():
+            checked += 1
+            try:
+                if not isinstance(json.loads(project_json.read_text(encoding="utf-8")), dict):
+                    reasons.append(f"PROJECT_JSON_INVALID:{project_dir.name}")
+            except ValueError:
                 reasons.append(f"PROJECT_JSON_INVALID:{project_dir.name}")
-        except ValueError:
-            reasons.append(f"PROJECT_JSON_INVALID:{project_dir.name}")
         artifact_checked, artifact_reasons = _artifact_manifest_references(project_dir)
         checked += artifact_checked
         reasons.extend(artifact_reasons)
@@ -742,9 +774,13 @@ def _project_references(data_root: Path) -> tuple[int, list[str], list[Path]]:
                 label = f"{project_dir.name}:{resource_type}/{resource_id}"
                 current = resource.get("current_version")
                 records = [record for record in resource.get("versions") or () if isinstance(record, dict)]
-                if current and not any(record.get("version") == current for record in records):
+                current_records = [record for record in records if record.get("version") == current]
+                if current and not current_records:
                     checked += 1
                     reasons.append(f"CURRENT_VERSION_MISSING:{label}/v{current}")
+                elif current and not any(record.get("file") for record in current_records):
+                    checked += 1
+                    reasons.append(f"CURRENT_VERSION_FILE_MISSING:{label}/v{current}")
                 for record in records:
                     ref = record.get("file")
                     if not ref:
@@ -800,6 +836,7 @@ async def verify_restored_deployment(
     backup_dir: Path,
     target_database_url: str,
     target_roots: Mapping[str, Path],
+    restore_target_id: str,
     target_release_git_sha: str,
     media_probe: MediaProbe = ffprobe_media,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
@@ -847,6 +884,7 @@ async def verify_restored_deployment(
     verdict = DeploymentBackupVerdict(
         backup_set_id=manifest.backup_set_id,
         manifest_digest=manifest_digest(manifest),
+        restore_target_id=restore_target_id,
         target_release_git_sha=target_release_git_sha,
         checks_passed=not reasons,
         reason_codes=tuple(reasons),
@@ -858,6 +896,14 @@ async def verify_restored_deployment(
     )
     _write_json(backup_dir / VERDICT_FILENAME, verdict.model_dump(mode="json"))
     return verdict
+
+
+def _captured_projects(manifest: DeploymentBackupManifest) -> set[str]:
+    return {
+        entry.path.split("/", 1)[0]
+        for entry in manifest.files
+        if entry.root == DATA_ROOT and entry.path.count("/") == 1 and entry.path.endswith("/project.json")
+    }
 
 
 def _digest(model: DeploymentBackupVerdict | GoldenRestoreEvidence) -> str:
@@ -889,16 +935,24 @@ def attest_deployment_restore(
         raise AttestationRejected("the recorded restore verdict did not pass for this manifest")
     if golden_evidence.backup_set_id != manifest.backup_set_id or golden_evidence.manifest_digest != digest:
         raise AttestationRejected("Golden evidence belongs to another backup set")
+    if golden_evidence.restore_target_id != verdict.restore_target_id:
+        raise AttestationRejected("Golden evidence and the restore verdict describe different targets")
+    product_names = [product.project_name for product in golden_evidence.products]
     if (
         not golden_evidence.passed
-        or len(golden_evidence.products) < MIN_GOLDEN_PRODUCTS
+        or len(set(product_names)) < MIN_GOLDEN_PRODUCTS
+        or len(set(product_names)) != len(product_names)
         or not all(product.reviewed for product in golden_evidence.products)
     ):
-        raise AttestationRejected("Golden read/review/export did not pass for every product")
+        raise AttestationRejected("Golden read/review/export did not pass for enough distinct products")
+    unknown = sorted(set(product_names) - _captured_projects(manifest))
+    if unknown:
+        raise AttestationRejected(f"Golden products are not projects of this set: {unknown}")
 
     attestation = DeploymentBackupAttestation(
         backup_set_id=manifest.backup_set_id,
         manifest_digest=digest,
+        restore_target_id=verdict.restore_target_id,
         verdict_digest=_digest(verdict),
         golden_evidence_digest=_digest(golden_evidence),
         measured_rpo_seconds=measured_rpo_seconds,

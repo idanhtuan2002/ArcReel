@@ -122,7 +122,8 @@ async def _seed_source(url: str, data_root: Path) -> None:
         )
         provider_id = await conn.fetchval(
             "INSERT INTO custom_provider (display_name, discovery_format, base_url, api_key, created_at, updated_at) "
-            "VALUES ('Custom', 'openai', 'https://custom.invalid/v1', $1, $2, $2) RETURNING id",
+            "VALUES ('Custom', 'openai', 'https://proxyuser:proxy-pass-7e21@custom.invalid/v1', $1, $2, $2) "
+            "RETURNING id",
             SECRET_CANARY,
             now,
         )
@@ -164,6 +165,8 @@ async def _seed_source(url: str, data_root: Path) -> None:
     Image.new("RGB", (8, 8), "red").save(project / "characters" / "Hero.png")
     Image.new("RGB", (8, 8), "red").save(project / "versions" / "characters" / "Hero_v1.png")
     (project / "project.json").write_text(json.dumps({"title": "Demo"}), encoding="utf-8")
+    (data_root / "demo2").mkdir()
+    (data_root / "demo2" / "project.json").write_text(json.dumps({"title": "Demo 2"}), encoding="utf-8")
     (project / "scripts").mkdir()
     (project / "scripts" / "episode_1.json").write_text("{}", encoding="utf-8")
     ProjectArtifactManifestAdapter(project).put_entry(
@@ -194,17 +197,26 @@ async def _always_playable(_path: Path) -> bool:
     return True
 
 
-def _golden(backup_dir: Path, *, products: int = 2, passed: bool = True) -> GoldenRestoreEvidence:
+RESTORE_TARGET = "drill-target-1"
+
+
+def _golden(
+    backup_dir: Path,
+    *,
+    names: tuple[str, ...] = ("demo", "demo2"),
+    passed: bool = True,
+    target: str = RESTORE_TARGET,
+) -> GoldenRestoreEvidence:
     from r2.host_hardening.deployment_backup import read_manifest
 
     manifest = read_manifest(backup_dir)
     return GoldenRestoreEvidence(
         backup_set_id=manifest.backup_set_id,
         manifest_digest=manifest_digest(manifest),
+        restore_target_id=target,
         passed=passed,
         products=tuple(
-            GoldenProductResult(project_name=f"golden-{index}", reviewed=True, export_digest="sha256:" + "e" * 64)
-            for index in range(products)
+            GoldenProductResult(project_name=name, reviewed=True, export_digest="sha256:" + "e" * 64) for name in names
         ),
     )
 
@@ -283,6 +295,7 @@ async def test_round_trip_restores_a_verified_deployment_without_credentials(
     assert not any(path.startswith("logs/") for path in captured)
     assert {t.table for t in manifest.sanitized_tables} >= {"provider_credential", "custom_provider"}
     assert SECRET_CANARY.encode() not in _bytes_under(backup_dir)
+    assert b"proxy-pass-7e21" not in _bytes_under(backup_dir)
 
     target_root = tmp_path / "restored-data"
     started = datetime.now(UTC)
@@ -293,6 +306,7 @@ async def test_round_trip_restores_a_verified_deployment_without_credentials(
         backup_dir=backup_dir,
         target_database_url=target_url,
         target_roots={DATA_ROOT: target_root},
+        restore_target_id=RESTORE_TARGET,
         target_release_git_sha=IDENTITY.release_git_sha,
         media_probe=_always_playable,
     )
@@ -316,6 +330,7 @@ async def test_round_trip_restores_a_verified_deployment_without_credentials(
     try:
         assert await conn.fetchval("SELECT request_id FROM tasks WHERE task_id = 'T-done'") == "req-seed-0001"
         assert await conn.fetchval("SELECT api_key FROM custom_provider") == ""
+        assert await conn.fetchval("SELECT base_url FROM custom_provider") == "https://custom.invalid/v1"
         assert await conn.fetchval("SELECT count(*) FROM custom_provider_model") == 1
         assert await conn.fetchval("SELECT value FROM provider_config WHERE key = 'image_rpm'") == "12"
         assert await conn.fetchval("SELECT value FROM system_setting WHERE key = 'video_generate_audio'") == "true"
@@ -416,6 +431,7 @@ async def test_failed_verification_does_not_poison_the_set(
         backup_dir=backup_dir,
         target_database_url=target_url,
         target_roots={DATA_ROOT: target_root},
+        restore_target_id=RESTORE_TARGET,
         target_release_git_sha="f" * 40,
         media_probe=_always_playable,
     )
@@ -451,6 +467,7 @@ async def test_verification_resolves_selected_versions_and_artifact_manifests(
         backup_dir=backup_dir,
         target_database_url=target_url,
         target_roots={DATA_ROOT: target_root},
+        restore_target_id=RESTORE_TARGET,
         target_release_git_sha=IDENTITY.release_git_sha,
         media_probe=_always_playable,
     )
@@ -471,12 +488,16 @@ async def test_attestation_requires_matching_passing_golden_evidence(
         backup_dir=backup_dir,
         target_database_url=target_url,
         target_roots={DATA_ROOT: target_root},
+        restore_target_id=RESTORE_TARGET,
         target_release_git_sha=IDENTITY.release_git_sha,
         media_probe=_always_playable,
     )
 
     for evidence in (
-        _golden(backup_dir, products=1),
+        _golden(backup_dir, names=("demo",)),
+        _golden(backup_dir, names=("demo", "demo")),
+        _golden(backup_dir, names=("demo", "not-a-project")),
+        _golden(backup_dir, target="some-other-target"),
         _golden(backup_dir, passed=False),
         _golden(backup_dir).model_copy(update={"manifest_digest": "sha256:" + "0" * 64}),
     ):
@@ -585,3 +606,57 @@ async def test_credential_files_are_never_captured_in_any_root(source: tuple[str
     assert ("claude_data", "projects/session.jsonl") in captured
     assert not any(path.endswith(".credentials.json") for _, path in captured)
     assert SECRET_CANARY.encode() not in _bytes_under(tmp_path / "backup-set")
+
+
+async def test_a_verified_state_without_its_attestation_is_not_restorable(
+    source: tuple[str, Path], target_url: str, tmp_path: Path
+) -> None:
+    backup_dir, _ = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-6")
+    state = json.loads((backup_dir / "state.json").read_text(encoding="utf-8"))
+    state["state"] = BackupSetState.VERIFIED.value
+    (backup_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
+
+    with pytest.raises(BackupIntegrityError):
+        await restore_deployment_backup(
+            backup_dir=backup_dir, target_database_url=target_url, target_roots={DATA_ROOT: tmp_path / "again"}
+        )
+
+
+async def test_verification_flags_a_current_record_without_a_file_and_projects_without_metadata(
+    source: tuple[str, Path], target_url: str, tmp_path: Path
+) -> None:
+    backup_dir, target_root = await _backup_restore_verify(source, target_url, tmp_path, backup_set_id="bs-7")
+    versions_file = target_root / "demo" / "versions" / "versions.json"
+    history = json.loads(versions_file.read_text(encoding="utf-8"))
+    del history["characters"]["Hero"]["versions"][0]["file"]
+    versions_file.write_text(json.dumps(history), encoding="utf-8")
+    (target_root / "demo" / "project.json").unlink()
+
+    verdict = await verify_restored_deployment(
+        backup_dir=backup_dir,
+        target_database_url=target_url,
+        target_roots={DATA_ROOT: target_root},
+        restore_target_id=RESTORE_TARGET,
+        target_release_git_sha=IDENTITY.release_git_sha,
+        media_probe=_always_playable,
+    )
+
+    assert "CURRENT_VERSION_FILE_MISSING:demo:characters/Hero/v1" in verdict.reason_codes
+
+
+async def test_an_unreachable_database_rejects_the_set(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    backup_dir = tmp_path / "backup-set"
+
+    with pytest.raises(ConnectionRefusedError):
+        await create_deployment_backup(
+            backup_set_id="bs-down",
+            database_url="postgresql://nobody:x@127.0.0.1:9/none",
+            roots={DATA_ROOT: data_root},
+            backup_dir=backup_dir,
+            identity=IDENTITY,
+        )
+
+    assert read_state(backup_dir) | {"reason": "DATABASE_UNAVAILABLE"} == read_state(backup_dir)
+    assert read_state(backup_dir)["state"] == BackupSetState.REJECTED.value

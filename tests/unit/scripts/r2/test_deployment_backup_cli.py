@@ -72,3 +72,17 @@ def test_malformed_golden_evidence_is_a_structured_error(tmp_path: Path, capsys)
 
     assert code == 2
     assert "INVALID_INPUT" in capsys.readouterr().err
+
+
+def test_libpq_command_target_moves_every_password_form_off_argv() -> None:
+    from r2.host_hardening.deployment_backup import libpq_command_target
+
+    assert libpq_command_target("postgresql+asyncpg://u:p%40ss@h:5432/db") == (
+        "postgresql://u@h:5432/db",
+        {"PGPASSWORD": "p@ss"},
+    )
+    assert libpq_command_target("postgresql://u@h/db?password=q%26s&sslmode=require") == (
+        "postgresql://u@h/db?sslmode=require",
+        {"PGPASSWORD": "q&s"},
+    )
+    assert libpq_command_target("postgresql://u@h/db") == ("postgresql://u@h/db", {})

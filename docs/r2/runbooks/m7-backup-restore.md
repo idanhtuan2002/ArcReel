@@ -28,10 +28,15 @@ A backup set is one directory:
 
 - **Credential columns blanked.** Blanked columns are
   `provider_credential.api_key/access_key/secret_key/credentials_path`,
-  `agent_anthropic_credentials.api_key` and `custom_provider.api_key`. Blanked
-  values are `provider_config.value` for `is_secret` rows and
-  `system_setting.value` for keys matching
-  `api_key|apikey|secret|token|password|credential`.
+  `agent_anthropic_credentials.api_key` and `custom_provider.api_key`.
+- **Credential values blanked.** Values are blanked for `provider_config`
+  rows marked `is_secret`. They are also blanked for `system_setting` keys
+  whose final segment is a credential word: `api_key`, `secret`,
+  `access_key`, `private_key`, `password`, `credential(s)`, `token`,
+  `access_token`, `auth_token` or `refresh_token`. Counters such as
+  `max_tokens` keep their values.
+- **URL credentials stripped.** `user:password@` userinfo is removed from the
+  `base_url` columns and from `provider_config` values.
 - **Secret files excluded.** At the top of the `data` root, the capture
   excludes `.system_config.json`, `.system_config.json.bak`, the legacy
   `.arcreel.db*` SQLite files and `logs/`.
@@ -119,7 +124,8 @@ uv run python -m scripts.r2.deployment_backup verify \
   --backup-dir /backups/bs-… \
   --target-root data=/srv/arcreel-restore/projects \
   --target-database-url-env ARCREEL_RESTORE_TARGET_URL \
-  --target-release-git-sha "$(git rev-parse HEAD)"
+  --target-release-git-sha "$(git rev-parse HEAD)" \
+  --restore-target-id drill-2026-09-27-a
 ```
 
 Verification checks the following:
@@ -148,9 +154,13 @@ the no-provider Golden A/B read, review and export for both V1 products. Record
 the results as `GoldenRestoreEvidence` JSON, with this shape:
 
 - `backup_set_id` and `manifest_digest` of this set;
+- `restore_target_id`, the same label that was given to `verify`;
 - `passed`;
 - one product entry per product, each with `project_name`, `reviewed` and
   `export_digest`.
+
+Product names must be distinct projects captured in this set, and at least
+two are required.
 
 Then attest:
 
@@ -165,8 +175,9 @@ uv run python -m scripts.r2.deployment_backup attest \
 `attest` refuses in any of these cases, and the set stays `COMPLETE`:
 
 - the recorded verdict did not pass for this manifest;
-- the evidence belongs to another set;
-- fewer than two products passed read/review/export.
+- the evidence belongs to another set, or to a different restore target than
+  the verdict;
+- fewer than two distinct products of this set passed read/review/export.
 
 When it succeeds, it writes `attestation.json` and moves the set to
 `VERIFIED`.
@@ -197,6 +208,11 @@ digest in the deployment before relying on restores across upgrades.
   no PITR.
 - **Credentials re-entered by the operator.** Credentials are re-entered after
   restore; there is no encrypted credential custody.
+- **Attestation trusts the operator.** It records operator-supplied evidence
+  and checks its consistency with the set and the recorded verdict; it does
+  not sign anything. Its integrity rests on access control over the
+  backup-set directory. A `VERIFIED` state without its matching
+  `attestation.json` is refused at restore.
 - **Golden run is not built in.** `attest` records Golden A/B evidence
   produced on the restored target; the tool does not run the Golden flow
   itself. The browser/operator workflow checks remain the E2 packet.
