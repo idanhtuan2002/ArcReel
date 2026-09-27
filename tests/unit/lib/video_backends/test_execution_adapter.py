@@ -24,13 +24,13 @@ class _RecordingSubmitter:
         if self.replay:
             return SimpleNamespace(
                 execution_id="execution-1",
-                snapshot=SimpleNamespace(execution_id="execution-1"),
+                snapshot=SimpleNamespace(execution_id="execution-1", state=SimpleNamespace(value="ACCEPTED")),
                 value=None,
             )
         receipt = await kwargs["submit"](SimpleNamespace(execution_id="execution-1"))
         return SimpleNamespace(
             execution_id="execution-1",
-            snapshot=SimpleNamespace(execution_id="execution-1"),
+            snapshot=SimpleNamespace(execution_id="execution-1", state=SimpleNamespace(value="ACCEPTED")),
             value=receipt.value,
         )
 
@@ -124,3 +124,30 @@ async def test_exact_replay_requires_resume_without_network_resubmit(tmp_path: P
         )
 
     network.assert_not_awaited()
+
+
+async def test_worker_submit_emits_an_attempt_span_joining_task_execution_and_usage(tmp_path: Path) -> None:
+    from server.telemetry import configure_test_tracer
+
+    exporter = configure_test_tracer()
+    request = _request(tmp_path, task_id="task-1", api_call_id=7, attempt_submitter=_RecordingSubmitter())
+    network = AsyncMock(return_value=accepted_submit_receipt("job-1", provider_job_id="job-1"))
+
+    await submit_video_attempt(
+        request,
+        provider_id="dashscope",
+        provider_model_id="wan2.7-i2v",
+        backend_model_id="wan2.7-i2v",
+        endpoint_id="video-synthesis",
+        submitted_base_url="https://dashscope.example",
+        submit=network,
+    )
+
+    (span,) = [s for s in exporter.get_finished_spans() if s.name == "execution.attempt_submitted"]
+    attributes = dict(span.attributes or {})
+    assert attributes["task_id"] == "task-1"
+    assert attributes["execution_id"] == "execution-1"
+    assert attributes["usage_entry_id"] == "7"
+    assert attributes["provider.id"] == "dashscope"
+    assert attributes["attempt.state"] == "ACCEPTED"
+    assert "dashscope.example" not in str(attributes)

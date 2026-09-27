@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from lib.db.base import utc_now
+from lib.telemetry import record_correlation_span
 from r2.contracts.common import JSONValue
 from r2.contracts.execution import ProviderRequest
 from r2.contracts.fingerprints import canonical_json_bytes
@@ -177,6 +178,14 @@ async def submit_video_attempt[T](
         submit=submit_observation,
     )
     request.execution_id = result.execution_id
+    record_correlation_span(
+        "execution.attempt_submitted",
+        provider_id=provider_id,
+        attempt_state=result.snapshot.state.value,
+        task_id=request.task_id,
+        execution_id=result.execution_id,
+        usage_entry_id=None if request.api_call_id is None else str(request.api_call_id),
+    )
     if result.value is None:
         raise AttemptReplayRequiresResume(result.snapshot.execution_id)
     return result.value

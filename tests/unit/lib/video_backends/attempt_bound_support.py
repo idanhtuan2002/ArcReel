@@ -12,6 +12,6 @@ class RecordingAttemptSubmitter:
         receipt = await kwargs["submit"](SimpleNamespace(execution_id="execution-1"))
         return SimpleNamespace(
             execution_id="execution-1",
-            snapshot=SimpleNamespace(execution_id="execution-1"),
+            snapshot=SimpleNamespace(execution_id="execution-1", state=SimpleNamespace(value="ACCEPTED")),
             value=receipt.value,
         )

@@ -220,3 +220,36 @@ class TestPassthrough:
         encoded = encode_failure("resume_unsupported_detail", detail="weird {placeholder} text")
         rendered = render_failure(encoded, _translator("en"))
         assert "weird {placeholder} text" in rendered
+
+
+def test_failure_log_label_names_only_the_code() -> None:
+    from lib.task_failure import encode_failure, failure_log_label
+
+    assert failure_log_label(encode_failure("script_edit_error")) == "[script_edit_error]"
+    assert failure_log_label("raw upstream text with sk-secret") == "unstructured"
+
+
+def test_exception_format_keeps_frames_and_types_but_drops_messages() -> None:
+    from lib.task_failure import format_exception_without_messages
+
+    inner_message = "-".join(("inner", "secret", "canary"))
+    outer_message = "-".join(("outer", "secret", "canary"))
+
+    def _inner() -> None:
+        raise ValueError(inner_message)
+
+    def _outer() -> None:
+        try:
+            _inner()
+        except ValueError as cause:
+            raise RuntimeError(outer_message) from cause
+
+    with pytest.raises(RuntimeError) as raised:
+        _outer()
+    text = format_exception_without_messages(raised.value)
+
+    assert "builtins.RuntimeError" in text
+    assert "builtins.ValueError" in text
+    assert "_inner" in text
+    assert inner_message not in text
+    assert outer_message not in text

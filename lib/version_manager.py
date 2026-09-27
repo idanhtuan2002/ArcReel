@@ -24,7 +24,7 @@ from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifest
 from lib.asset_types import resolve_asset_key
 from lib.formal_write import formal_write_transaction
 from lib.json_io import atomic_write_bytes, atomic_write_json
-from lib.request_context import task_attribution
+from lib.request_context import current_task_id, task_attribution
 from lib.resource_paths import RESOURCE_TYPES as _RESOURCE_TYPES
 from lib.resource_paths import (
     resource_extension,
@@ -34,6 +34,7 @@ from lib.resource_paths import (
     version_snapshot_relative_path,
 )
 from lib.schema_guards import is_bool
+from lib.telemetry import record_correlation_span
 
 _LOCKS_GUARD = threading.Lock()
 _LOCKS_BY_VERSIONS_FILE: dict[str, threading.RLock] = {}
@@ -115,6 +116,19 @@ def _create_rollback_backup(current_file: Path) -> Path:
         _report_cleanup_failures(_unlink_paths(candidate), active_failure=failure)
         raise
     return candidate
+
+
+def _record_version_span(resource_type: str, resource_id: str, version: int, *, selected: bool) -> None:
+    """Join a durably recorded version (the V1 candidate) to the executing task.
+
+    ``master_version`` is present only when this version became the selected one.
+    """
+    record_correlation_span(
+        "version.recorded",
+        task_id=current_task_id(),
+        candidate_id=f"{resource_type}/{resource_id}/v{version}",
+        master_version=str(version) if selected else None,
+    )
 
 
 class VersionManager:
@@ -430,6 +444,7 @@ class VersionManager:
             resource_data["current_version"] = new_version
 
             self._save_versions(data)
+            _record_version_span(resource_type, resource_id, new_version, selected=True)
             return new_version
 
     def commit_staged_version(
@@ -511,6 +526,7 @@ class VersionManager:
                 if on_commit is not None:
                     on_commit()
                 activation_succeeded = True
+                _record_version_span(resource_type, resource_id, new_version, selected=True)
                 return new_version
             except BaseException as failure:
                 rollback_errors: list[OSError] = []
@@ -657,6 +673,8 @@ class VersionManager:
                 if on_commit is not None:
                     on_commit()
                 activation_succeeded = True
+                for (committed_type, committed_id), committed_version in result.items():
+                    _record_version_span(committed_type, committed_id, committed_version, selected=True)
                 return result
             except BaseException as failure:
                 rollback_errors: list[OSError] = []
@@ -836,6 +854,7 @@ class VersionManager:
 
             if not should_select:
                 _report_cleanup_failures(_unlink_paths(staged_file), active_failure=None)
+                _record_version_span(resource_type, resource_id, version, selected=False)
                 return PaidVersionCommit(version=version, selected=False)
 
             current_backup: Path | None = None
@@ -851,6 +870,7 @@ class VersionManager:
                 if on_select is not None:
                     on_select()
                 selection_succeeded = True
+                _record_version_span(resource_type, resource_id, version, selected=True)
                 return PaidVersionCommit(version=version, selected=True)
             except BaseException as failure:
                 selection_rollback_errors: list[OSError] = []

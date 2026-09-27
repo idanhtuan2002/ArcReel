@@ -34,6 +34,7 @@ from lib.db.base import DEFAULT_USER_ID
 from lib.db.repositories.usage_repo import SettlementInput, UsageRepository
 from lib.providers import PROVIDER_GEMINI, CallType
 from lib.request_context import current_task_id
+from lib.telemetry import record_correlation_span
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,12 @@ class Ledger:
             provider=provider,
             user_id=user_id,
             segment_id=segment_id,
+        )
+        record_correlation_span(
+            "usage.recorded",
+            provider_id=provider,
+            task_id=current_task_id(),
+            usage_entry_id=str(call_id),
         )
         call = LedgerCall(call_id, call_type=call_type, service_tier=service_tier)
         try:

@@ -23,6 +23,7 @@ from lib.http_status_errors import provider_rejected_error, redacted_status_erro
 from lib.http_status_errors import raise_for_status_redacted as raise_for_status_redacted
 from lib.logging_utils import redact_diagnostic_text, sanitize_diagnostic_payload
 from lib.retry import BASE_RETRYABLE_ERRORS, AsyncClock, SystemClock, _should_retry, with_retry_async
+from lib.telemetry import public_job_ref, record_correlation_span
 
 if TYPE_CHECKING:
     from r2.host_hardening.host_submit import AttemptSubmitter
@@ -83,6 +84,12 @@ async def persist_provider_job_id(
     """
     try:
         await _persist_with_retry(task_id, job_id, endpoint, base_url)
+        record_correlation_span(
+            "provider.job_accepted",
+            provider_id=provider,
+            task_id=task_id,
+            provider_job_ref=public_job_ref(job_id),
+        )
         logger.info("provider_job_id 已持久化 task_id=%s provider=%s", task_id, provider)
     except Exception as exc:
         logger.error(
