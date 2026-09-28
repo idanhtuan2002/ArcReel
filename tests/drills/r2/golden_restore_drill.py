@@ -8,10 +8,12 @@ It proves the restore path with the Golden products, per
    through the HTTP API with a real login JWT. It renders the Golden A
    (H.264 factual) and both Golden B profile siblings with the existing
    no-provider fixture pipelines and Remotion. It drives Gates A, B
-   (Golden B), C (per shot) and D through the real gate routes.
+   (Golden B), C (per shot master, then the composed final, whose byte copy lands in
+   ``output/``) and D through the real gate routes.
 2. ``check`` (restored deployment): reads each project and its gate history
    through the API, confirms the Gate C approved masters and receipts
-   survived, decodes the stored deliverable, and re-exports the final cut
+   survived, downloads the approved final through the host's token route, decodes the stored
+   deliverable, and re-exports the final cut
    from the restored masters. That re-export must hash to the Gate D
    ``deliverable_digest``. It then writes ``GoldenRestoreEvidence``.
 3. ``run`` (orchestrator): drives the whole drill against a disposable
@@ -47,6 +49,7 @@ GOLDEN_B_PROJECTS = {"WESTERN_GENERIC": "golden-b-western", "CN_SHORT_DRAMA_SHUA
 PUBLISH_PLATFORM = "drill"
 PUBLISH_VISIBILITY = "private"
 FINAL_DIRNAME = "final"
+FINAL_TARGET_REF = "FINAL"
 
 
 def _sha256_file(path: Path) -> str:
@@ -152,6 +155,43 @@ def _compose_final(project_dir: Path, shot_ids: list[str], output: Path) -> dict
     }
 
 
+async def _approve_final(client, project: str, *, project_dir: Path, shot_ids: list[str], basis) -> dict[str, Any]:
+    """Compose the final from the approved shot masters and approve it at Gate C (ADR-0090, O2a).
+
+    Gate C writes the export copy to ``output/``; its digest is what Gate D binds.
+    """
+    from r2.m3.composition import GoldenAComposer
+    from r2.m3.host_integration import GoldenAHostIntegration
+
+    production_root = project_dir / "production"
+    host = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1)
+    asset = GoldenAComposer().compose(host, shot_ids, output_path=production_root / FINAL_DIRNAME / f"{project}.mp4")
+    approved = await _post(
+        client,
+        f"/projects/{project}/gates/final-cut",
+        {
+            "resource_type": "videos",
+            "episode": 1,
+            "target_ref": FINAL_TARGET_REF,
+            "content_fingerprint": hashlib.sha256(json.dumps(list(asset.source_master_refs)).encode()).hexdigest(),
+            "content_basis": basis.model_dump(mode="json"),
+            "direct_dependencies": [],
+            "contract_version": 1,
+            "contract_schema_version": "1",
+            "produced": _produced_body(asset, production_root),
+            "approval_record": f"APR-{project}-{FINAL_TARGET_REF}",
+        },
+    )
+    export = approved["export"]
+    return {
+        "shot_ids": shot_ids,
+        "final_relative_path": export["relative_path"],
+        "final_sha256": export["sha256"].removeprefix("sha256:"),
+        "duration_seconds": asset.duration_seconds,
+        "source_master_refs": list(asset.source_master_refs),
+    }
+
+
 async def _greenlight_and_publish(client, project: str, *, source_digest: str, deliverable_digest: str) -> None:
     await _post(
         client, f"/projects/{project}/gates/greenlight", {"source_digest": source_digest, "action": "GREENLIGHT"}
@@ -211,7 +251,13 @@ async def _materialize_golden_a(client, data_root: Path) -> dict[str, Any]:
         )
         shot_ids.append(item.shot.id)
 
-    final = _compose_final(project_dir, shot_ids, project_dir / FINAL_DIRNAME / f"{GOLDEN_A_PROJECT}.mp4")
+    final = await _approve_final(
+        client,
+        GOLDEN_A_PROJECT,
+        project_dir=project_dir,
+        shot_ids=shot_ids,
+        basis=prepared[0].shot.content_basis,
+    )
     await _greenlight_and_publish(
         client,
         GOLDEN_A_PROJECT,
@@ -301,7 +347,7 @@ async def _materialize_golden_b(client, data_root: Path, profile_key: str) -> di
         )
         shot_ids.append(shot.id)
 
-    final = _compose_final(project_dir, shot_ids, project_dir / FINAL_DIRNAME / f"{project}.mp4")
+    final = await _approve_final(client, project, project_dir=project_dir, shot_ids=shot_ids, basis=_basis())
     await _greenlight_and_publish(
         client,
         project,
@@ -326,6 +372,20 @@ async def materialize(data_root: Path, out_path: Path) -> None:
     await asyncio.to_thread(
         _write_json, out_path, {"products": products, "materialize_seconds": round(time.monotonic() - started, 1)}
     )
+
+
+async def _download_digest(client, project: str, digest: str) -> str | None:
+    """Download the approved final through the host's token route and hash what it served."""
+    token_response = await client.post(f"/api/v1/projects/{project}/export/deliverable/token")
+    if token_response.status_code != 200:
+        return None
+    token = token_response.json()["download_token"]
+    response = await client.get(
+        f"/api/v1/projects/{project}/export/deliverable", params={"download_token": token, "digest": digest}
+    )
+    if response.status_code != 200:
+        return None
+    return "sha256:" + hashlib.sha256(response.content).hexdigest()
 
 
 async def _final_cut_receipt_count(project: str) -> int:
@@ -376,7 +436,8 @@ async def check(
                 metadata = host.snapshot(shot_id)
                 if metadata.approved_master is None or not host.current_file_for(shot_id).is_file():
                     problems.append(f"MASTER_UNRESOLVED:{shot_id}")
-            if await _final_cut_receipt_count(project) < len(product["shot_ids"]):
+            # One Gate C receipt per shot master plus one for the composed final.
+            if await _final_cut_receipt_count(project) < len(product["shot_ids"]) + 1:
                 problems.append("GATE_C_RECEIPTS_MISSING")
 
             stored_final = project_dir / product["final_relative_path"]
@@ -384,6 +445,9 @@ async def check(
                 problems.append("STORED_DELIVERABLE_MISMATCH")
             if stored_final.is_file() and not _decodes(stored_final):
                 problems.append("STORED_DELIVERABLE_UNPLAYABLE")
+
+            if await _download_digest(client, project, deliverable_digest) != deliverable_digest:
+                problems.append("HOST_DOWNLOAD_MISMATCH")
 
             await asyncio.to_thread(export_root.mkdir, parents=True, exist_ok=True)
             reexport = _compose_final(project_dir, product["shot_ids"], export_root / f"{project}.mp4")
