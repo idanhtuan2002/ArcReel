@@ -10,11 +10,13 @@ import os
 import time
 from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Callable
 from dataclasses import dataclass, field, replace
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, ClassVar, Optional
 from uuid import uuid4
 
 from lib.agent_memory_paths import project_memory_dir
+from lib.budget_guard import reconcile_agent_connection, reserve_agent_connection
 from lib.db.base import DEFAULT_USER_ID
 from lib.i18n import DEFAULT_LOCALE
 from lib.logging_config import resolve_log_dir
@@ -224,6 +226,8 @@ class ManagedSession:
     # session's process has already booked, so each result books only its increase.
     booked_cost_usd: float = 0.0
     booked_tokens: tuple[int, int, int] = (0, 0, 0)
+    # Release mode: the budget reservation this session's CLI process runs under (ADR-0093).
+    budget_reservation_ref: str | None = None
     interrupt_requested: bool = False
     last_activity: float | None = None  # updated on every send/receive
     _cleanup_task: asyncio.Task | None = None  # current cleanup timer (idle TTL or terminal delay)
@@ -455,6 +459,7 @@ class SessionManager:
         locale: str = DEFAULT_LOCALE,
         stderr: Callable[[str], None] | None = None,
         session_id: str | None = None,
+        max_budget_usd: float | None = None,
     ) -> Any:
         """委派给 ``OptionsAssembler.build``——SessionManager 不再直接构建 options 与
         hook，仅调用装配器；凭证注入、prompt 装配、hook 工厂均由装配器持有。"""
@@ -465,6 +470,7 @@ class SessionManager:
             locale=locale,
             stderr=stderr,
             session_id=session_id,
+            max_budget_usd=max_budget_usd,
         )
 
     def _build_session_store(self):
@@ -588,15 +594,19 @@ class SessionManager:
         # 停止并清空，既完整保留启动故障证据，也不让长会话 stderr 占用内存。
         startup_stderr = _StartupStderrCollector()
 
+        budget: tuple[str, Decimal] | None = None
         try:
+            budget = await reserve_agent_connection(async_session_factory)
             options = await self._build_options(
                 project_name,
                 resume_id=None,
                 can_use_tool=await self._build_can_use_tool_callback(temp_id, managed_ref),
                 locale=locale,
                 stderr=startup_stderr,
+                max_budget_usd=float(budget[1]) if budget is not None else None,
             )
         except Exception as exc:
+            await self._release_budget(budget)
             sdk_stderr = startup_stderr.render()
             startup_stderr.stop()
             raise _make_agent_startup_error(
@@ -619,6 +629,7 @@ class SessionManager:
             project_name=project_name,
             assistant_model=assistant_model,
         )
+        managed.budget_reservation_ref = budget[0] if budget is not None else None
         if user_entry is not None:
             managed.pending_initial_user_entry = {"entry": user_entry, "client_key": client_key}
         managed.entry_pipeline = self._build_entry_pipeline(managed)
@@ -634,6 +645,7 @@ class SessionManager:
                 exc, project_name=project_name, session_id=None, sdk_stderr=sdk_stderr
             )
             self.sessions.pop(temp_id, None)
+            await self._settle_budget(managed)
             startup_stderr.stop()
             raise startup_error from exc
         # Register done callback BEFORE spawning processor to avoid a race
@@ -687,6 +699,7 @@ class SessionManager:
             # 消息，提前清掉会让回放认不出自己是副本，从而二次写入事件日志。走到
             # 这里已无回放可言，残留的登记也就不是认领失败，直接清空不记账。
             managed.pending_user_echoes.clear()
+            await self._settle_budget(managed)
             startup_stderr.stop()
 
         # 登记待回放的用户消息标识：SDK 会回放刚发送消息的副本，写入点凭此
@@ -800,6 +813,8 @@ class SessionManager:
             while True:
                 msg_dict = await managed._inbox.get()
                 if isinstance(msg_dict, _ActorExitNotice):
+                    # Every result of the process is booked by now (the inbox is ordered).
+                    await self._settle_budget(managed)
                     if msg_dict.error is not None:
                         if managed.resolved_sdk_id is not None:
                             await self._mark_session_terminal(managed, "error", "session actor failed")
@@ -807,6 +822,7 @@ class SessionManager:
                             managed.status = "error"
                     return msg_dict.error
                 if msg_dict is None:
+                    await self._settle_budget(managed)
                     return None
                 depth = managed._inbox.qsize()
                 if not managed._inbox_warned and depth >= _INBOX_BACKLOG_WARN_THRESHOLD:
@@ -920,7 +936,9 @@ class SessionManager:
             # 见 send_new_session 同名注释：只在启动阶段无损收集，成功后释放。
             startup_stderr = _StartupStderrCollector()
 
+            budget: tuple[str, Decimal] | None = None
             try:
+                budget = await reserve_agent_connection(async_session_factory)
                 options = await self._build_options(
                     meta.project_name,
                     meta.id if resumable else None,  # SessionMeta.id 就是 sdk_session_id
@@ -928,8 +946,10 @@ class SessionManager:
                     locale=locale,
                     stderr=startup_stderr,
                     session_id=None if resumable else meta.id,
+                    max_budget_usd=float(budget[1]) if budget is not None else None,
                 )
             except Exception as exc:
+                await self._release_budget(budget)
                 sdk_stderr = startup_stderr.render()
                 startup_stderr.stop()
                 raise _make_agent_startup_error(
@@ -956,6 +976,7 @@ class SessionManager:
                 assistant_model=assistant_model,
                 resolved_sdk_id=meta.id,  # 标记为已注册，防止重复创建 DB 记录
             )
+            managed.budget_reservation_ref = budget[0] if budget is not None else None
             managed.sdk_id_event.set()  # 已有会话不需要等待 sdk_id
             managed.entry_pipeline = self._build_entry_pipeline(managed)
             managed_ref[0] = managed
@@ -973,6 +994,7 @@ class SessionManager:
                     sdk_stderr=sdk_stderr,
                 )
                 self.sessions.pop(session_id, None)
+                await self._settle_budget(managed)
                 raise startup_error from exc
             finally:
                 startup_stderr.stop()
@@ -1219,7 +1241,15 @@ class SessionManager:
             logger.exception("记录 assistant usage 失败 session_id=%s", managed.session_id)
         await self.meta_store.update_status(managed.session_id, final_status)
         managed.interrupt_requested = False
-        if final_status != "running":
+        if result_msg.get("subtype") == "error_max_budget_usd":
+            # The process's cost ledger has reached its cap and would stop every later turn: close
+            # it now, settle its reservation, and let the next message open a new connection
+            # with a new reservation (ADR-0093).
+            logger.info("agent budget cap reached, closing the connection session_id=%s", managed.session_id)
+            if managed._cleanup_task is not None and not managed._cleanup_task.done():
+                managed._cleanup_task.cancel()
+            managed._cleanup_task = asyncio.create_task(self._evict_at_budget_cap(managed))
+        elif final_status != "running":
             self._schedule_cleanup(managed.session_id)
 
     async def _record_assistant_usage(
@@ -1320,6 +1350,11 @@ class SessionManager:
             managed._cleanup_task = None
             await self._evict_one(managed)
 
+    async def _evict_at_budget_cap(self, managed: ManagedSession) -> None:
+        # Clear our own reference first so _evict_one's cleanup-task cancel doesn't self-cancel.
+        managed._cleanup_task = None
+        await self._evict_one(managed)
+
     async def close_session(self, session_id: str, *, reason: str = "session closed") -> None:
         """Public close entry — gracefully tears down the actor and removes the session."""
         managed = self.sessions.get(session_id)
@@ -1388,9 +1423,27 @@ class SessionManager:
                     with contextlib.suppress(BaseException):
                         await self.meta_store.update_status(managed.resolved_sdk_id, managed.status)
         finally:
+            with contextlib.suppress(Exception):
+                await self._settle_budget(managed)
             self.sessions.pop(session_id, None)
             self._connect_locks.pop(session_id, None)
             self._disconnecting.discard(session_id)
+
+    async def _settle_budget(self, managed: ManagedSession) -> None:
+        """Reconcile the session's Agent budget reservation to what its process booked; idempotent."""
+        ref = managed.budget_reservation_ref
+        if ref is None:
+            return
+        managed.budget_reservation_ref = None
+        await reconcile_agent_connection(
+            async_session_factory, reservation_ref=ref, actual_usd=Decimal(str(managed.booked_cost_usd))
+        )
+
+    @staticmethod
+    async def _release_budget(budget: tuple[str, Decimal] | None) -> None:
+        """Return an unused reservation when the session never started its process."""
+        if budget is not None:
+            await reconcile_agent_connection(async_session_factory, reservation_ref=budget[0], actual_usd=Decimal(0))
 
     async def _get_cleanup_delay(self) -> int:
         """返回会话清理延迟秒数，默认 300（5 分钟）。"""

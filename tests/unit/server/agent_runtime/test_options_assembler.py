@@ -149,6 +149,21 @@ async def test_build_injects_short_lived_arcreel_api_credentials(
     assert payload["exp"] - payload["iat"] == 900
 
 
+async def test_a_capped_build_sets_the_cli_budget_and_disables_cli_retries(tmp_path: Path) -> None:
+    async def fake_loader():
+        return {"ANTHROPIC_API_KEY": "sk"}
+
+    assembler = _make_assembler(tmp_path, provider_env_loader=fake_loader)
+
+    capped = await assembler.build("demo", max_budget_usd=1.5)
+    uncapped = await assembler.build("demo")
+
+    assert capped.max_budget_usd == 1.5
+    assert capped.env["CLAUDE_CODE_MAX_RETRIES"] == "0"
+    assert uncapped.max_budget_usd is None
+    assert "CLAUDE_CODE_MAX_RETRIES" not in uncapped.env
+
+
 @pytest.mark.asyncio
 async def test_build_adds_keep_alive_hook_with_can_use_tool(tmp_path: Path) -> None:
     """can_use_tool 存在时，keep-alive hook 排在 file access hook 之前。"""
@@ -403,3 +418,62 @@ class TestAgentRouteGate:
             await require_agent_route_qualified()
 
         assert raised.value.params == {"route": "agent:anthropic-official", "model": "claude-x"}
+
+    async def _active_credential(self, db_factory, **fields):
+        from lib.db.repositories.agent_credential_repo import AgentCredentialRepository
+
+        values = {
+            "preset_id": "anthropic-official",
+            "display_name": "Anthropic",
+            "base_url": "https://api.anthropic.com",
+            "api_key": "sk-ant-x",
+            "model": "claude-sonnet-4-6",
+        }
+        values.update(fields)
+        async with db_factory() as session:
+            repo = AgentCredentialRepository(session)
+            credential = await repo.create(**values)
+            await repo.set_active(credential.id)
+            await session.commit()
+        return credential
+
+    async def test_a_qualified_anthropic_route_opens_a_release_session(self, monkeypatch, db_factory, tmp_path):
+        from datetime import UTC, datetime, timedelta
+
+        from r2.host_hardening.paid_routes import RELEASE_MODE_ENV, PaidRoute
+        from r2.host_hardening.route_qualifications import install_runtime_qualification_lookup, record_qualification
+        from server.agent_runtime.options_assembler import agent_route_binding, require_agent_route_qualified
+
+        credential = await self._active_credential(db_factory)
+        now = datetime.now(UTC)
+        record_qualification(
+            route=PaidRoute("agent", provider_id="anthropic-official"),
+            model_id="claude-sonnet-4-6",
+            binding=agent_route_binding(credential),
+            evidence={"result": "PASS"},
+            expires_at=now + timedelta(days=30),
+            cost_record_ref="api_call:1",
+            recorded_by="operator",
+            now=now,
+            root=tmp_path,
+        )
+        from r2.host_hardening.paid_routes import set_qualification_lookup
+
+        install_runtime_qualification_lookup(root=tmp_path)
+        monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+        monkeypatch.setattr("lib.db.async_session_factory", db_factory)
+        try:
+            assert await require_agent_route_qualified() is None
+        finally:
+            set_qualification_lookup(None)
+
+    async def test_a_non_claude_model_override_is_refused_even_on_the_anthropic_preset(self, monkeypatch, db_factory):
+        from r2.host_hardening.paid_routes import RELEASE_MODE_ENV, PaidRouteUnqualifiedError
+        from server.agent_runtime.options_assembler import require_agent_route_qualified
+
+        await self._active_credential(db_factory, subagent_model="glm-5.1")
+        monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+        monkeypatch.setattr("lib.db.async_session_factory", db_factory)
+
+        with pytest.raises(PaidRouteUnqualifiedError):
+            await require_agent_route_qualified()

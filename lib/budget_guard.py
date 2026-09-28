@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -162,15 +163,97 @@ async def reconcile_call(session_factory, *, call_id: int) -> None:
         logger.exception("budget reconciliation failed for %s; reservation left claimed for review", ref)
 
 
+AGENT_SESSION_BUDGET_ENV = "ARCREEL_AGENT_SESSION_BUDGET_USD"
+DEFAULT_AGENT_SESSION_BUDGET = Decimal("1.00")
+AGENT_CURRENCY = "USD"
+
+
+class AgentBudgetConfigError(ValueError):
+    """``ARCREEL_AGENT_SESSION_BUDGET_USD`` is not a positive amount."""
+
+
+def agent_session_budget() -> Decimal:
+    """The per-connection Agent reservation in USD (ADR-0093)."""
+    raw = (os.environ.get(AGENT_SESSION_BUDGET_ENV) or "").strip()
+    if not raw:
+        return DEFAULT_AGENT_SESSION_BUDGET
+    try:
+        amount = Decimal(raw)
+    except ArithmeticError as exc:
+        raise AgentBudgetConfigError(f"{AGENT_SESSION_BUDGET_ENV}={raw!r} is not a number") from exc
+    if not amount.is_finite() or amount <= 0:
+        raise AgentBudgetConfigError(f"{AGENT_SESSION_BUDGET_ENV}={raw!r} must be a positive amount")
+    return amount.quantize(_MONEY_QUANTUM)
+
+
+async def reserve_agent_connection(
+    session_factory, *, amount: Decimal | None = None, purpose: str = "agent_session"
+) -> tuple[str, Decimal] | None:
+    """Reserve and claim the budget for one Agent CLI process before it starts; ``None`` in DEV.
+
+    The returned amount is the process's ``max_budget_usd`` hard cap (ADR-0093).
+    """
+    if current_release_mode() is ReleaseMode.DEV:
+        return None
+    amount = agent_session_budget() if amount is None else amount
+    ref = f"{purpose}:{uuid.uuid4().hex}"
+    scope_ref = budget_scope_ref(AGENT_CURRENCY)
+    now = datetime.now(UTC)
+    async with session_factory() as session:
+        scope_exists = await BudgetReservationRepository(session).get_scope(scope_ref) is not None
+    if not scope_exists:
+        raise BudgetScopeMissingError(scope_ref)
+    async with session_factory() as session:
+        try:
+            await BudgetReservationRepository(session).reserve(
+                budget_scope_ref=scope_ref,
+                reservation_ref=ref,
+                execution_decision_ref=ref,
+                requested_amount=amount,
+                expires_at=now + CLAIM_WINDOW,
+                provenance_json={"call_type": "agent", "purpose": purpose},
+                now=now,
+                currency=AGENT_CURRENCY,
+            )
+        except BudgetDeniedError as exc:
+            raise BudgetExceededError(scope_ref, amount, str(exc)) from exc
+    async with session_factory() as session:
+        await BudgetReservationRepository(session).claim_or_revalidate(
+            reservation_ref=ref, execution_decision_ref=ref, now=now
+        )
+    return ref, amount
+
+
+async def reconcile_agent_connection(session_factory, *, reservation_ref: str, actual_usd: Decimal) -> None:
+    """Commit an Agent process's booked spend against its reservation; failures are logged, not raised."""
+    try:
+        async with session_factory() as session:
+            await BudgetReservationRepository(session).reconcile(
+                reservation_ref=reservation_ref,
+                execution_decision_ref=reservation_ref,
+                cost_record_ref=reservation_ref,
+                actual_cost=max(actual_usd, Decimal(0)).quantize(_MONEY_QUANTUM),
+                evidence_currency=AGENT_CURRENCY,
+                now=datetime.now(UTC),
+            )
+    except Exception:
+        logger.exception("agent budget reconciliation failed for %s; reservation left claimed", reservation_ref)
+
+
 __all__ = [
+    "AGENT_SESSION_BUDGET_ENV",
     "BUDGET_SCOPE_ENV",
     "CLAIM_WINDOW",
     "DEFAULT_BUDGET_SCOPE_PREFIX",
     "MIN_RESERVATION",
+    "AgentBudgetConfigError",
     "BudgetExceededError",
     "BudgetScopeMissingError",
+    "agent_session_budget",
     "budget_scope_ref",
     "call_reference",
+    "reconcile_agent_connection",
     "reconcile_call",
+    "reserve_agent_connection",
     "reserve_for_call",
 ]

@@ -1146,6 +1146,31 @@ class TestAgentBackfillChannel:
         rows = await acct.fetch_rows()
         assert [row["cost_amount"] for row in rows] == [pytest.approx(0.5), pytest.approx(0.2)]
 
+    async def test_the_session_budget_settles_once_to_what_the_process_booked(
+        self, manager: SessionManager, acct: _AccountingDb, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from decimal import Decimal
+
+        from server.agent_runtime import session_manager as session_manager_module
+
+        settled: list[tuple[str, Decimal]] = []
+
+        async def fake_reconcile(_factory, *, reservation_ref: str, actual_usd: Decimal) -> None:
+            settled.append((reservation_ref, actual_usd))
+
+        monkeypatch.setattr(session_manager_module, "reconcile_agent_connection", fake_reconcile)
+        managed = _managed_session()
+        managed.budget_reservation_ref = "agent_session:abc"
+        await manager._record_assistant_usage(
+            managed, {"model": "claude-sonnet-4", "usage": dict(_AGENT_USAGE), "total_cost_usd": 0.4}, "completed"
+        )
+
+        await manager._settle_budget(managed)
+        await manager._settle_budget(managed)
+
+        assert settled == [("agent_session:abc", Decimal("0.4"))]
+        assert managed.budget_reservation_ref is None
+
     async def test_non_completed_turn_records_failed_but_keeps_reported_cost(
         self, manager: SessionManager, acct: _AccountingDb
     ) -> None:

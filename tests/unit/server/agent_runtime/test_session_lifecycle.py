@@ -203,6 +203,27 @@ class TestCleanup:
         finally:
             await mgr.close_session("s1")
 
+    async def test_a_turn_stopped_at_the_budget_cap_closes_the_connection(self, tmp_path):
+        """ADR-0093: the process's ledger stays at its cap, so the connection closes at once."""
+        mgr = _make_manager(tmp_path)
+        managed, _ = _make_managed("s1", status="running")
+        await _start(managed)
+        mgr.sessions["s1"] = managed
+
+        result_msg = {"type": "result", "subtype": "error_max_budget_usd", "is_error": True}
+
+        with (
+            patch.object(mgr, "_schedule_cleanup") as mock_schedule,
+            patch.object(mgr.meta_store, "update_status", new_callable=AsyncMock),
+        ):
+            await mgr._finalize_turn(managed, result_msg)
+            eviction = managed._cleanup_task
+            assert eviction is not None
+            await eviction
+
+        mock_schedule.assert_not_called()
+        assert "s1" not in mgr.sessions
+
     async def test_cleanup_task_cancelled_on_new_schedule(self, tmp_path):
         """error 状态的 cleanup task 在重新调度时应被取消。"""
         mgr = _make_manager(tmp_path)

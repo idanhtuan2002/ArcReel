@@ -26,8 +26,12 @@ sponsor delegated the choice.
 2. **The process starts** with `max_budget_usd` equal to the reservation.
 3. **When the managed session ends**, the reservation reconciles to the increases booked from the
    process's cumulative totals, which may slightly exceed it.
-4. **A resumed process** whose CLI restored its earlier cost stops early, which is the safe
-   direction.
+4. **A resumed process may stop early.** The CLI can restore a conversation's earlier cost on
+   resume. The cap compares against that restored ledger, so a long conversation reaches the cap
+   sooner. This is the safe direction: continue in a new conversation, or raise the setting.
+5. **At the cap, the connection closes.** When a turn ends with `error_max_budget_usd`, the host
+   closes the connection at once and settles it. The next message opens a new connection with a
+   new reservation.
 
 **No resend after an ambiguous outcome.** In release mode the CLI runs with
 `CLAUDE_CODE_MAX_RETRIES=0`.

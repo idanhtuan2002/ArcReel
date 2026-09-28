@@ -9,12 +9,18 @@ until the expiry. A failure records nothing.
 
     uv run python -m scripts.r2.qualify_route --provider openai --media image --model gpt-image-2
     uv run python -m scripts.r2.qualify_route --provider custom-7 --media text --model relay-chat
+    uv run python -m scripts.r2.qualify_route --provider anthropic-official --media agent --model claude-sonnet-4-6
 
 The qualification is bound to the model the backend actually calls and to the provider's
 configuration, by digest (ADR-0091 amendment item 1): a new key, base URL or endpoint needs a new
 canary. A route whose adapter level does not hold is refused before any paid call: today that is
-every video route, whose shipped adapter profiles are UNQUALIFIED. The Agent route and trial runs
-cannot be qualified; in a release deployment they stay refused.
+every video route, whose shipped adapter profiles are UNQUALIFIED. Trial runs cannot be qualified.
+
+The Agent canary (``--media agent``, ADR-0093) qualifies the active Agent credential. Only the
+``anthropic-official`` preset with Claude models can qualify. It runs one tiny query under a cap of
+``AGENT_CANARY_CAP_USD`` and passes only if the CLI stops it with ``error_max_budget_usd`` and
+reports a cost: that proves the per-connection budget cap is enforced on the live route. Its
+``--model`` must equal the credential's model (empty for the CLI default).
 """
 
 from __future__ import annotations
@@ -26,13 +32,15 @@ import hashlib
 import json
 import sys
 import tempfile
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from lib.backend_assembly import assemble_backend
 from lib.backend_assembly.assembler import paid_route_binding
-from lib.budget_guard import call_reference
+from lib.budget_guard import call_reference, reconcile_agent_connection, reserve_agent_connection
 from lib.config.resolver import ConfigResolver
 from lib.db import async_session_factory
 from lib.ledger import Ledger
@@ -165,11 +173,106 @@ def _finish(
     return {"qualified": record.route_ref, "model": record.model_id, "expires_at": record.expires_at}
 
 
+AGENT_CANARY_CAP_USD = 0.0001
+AGENT_CANARY_RESERVATION = Decimal("0.10")
+AgentQuery = Callable[[dict[str, str], float, Path], Awaitable[dict[str, Any]]]
+
+
+async def _agent_query(env: dict[str, str], cap: float, workdir: Path) -> dict[str, Any]:
+    """One headless Agent query without tools; returns the CLI's result message fields."""
+    from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+
+    options = ClaudeAgentOptions(
+        cwd=str(workdir), env=env, max_budget_usd=cap, max_turns=1, allowed_tools=[], setting_sources=[]
+    )
+    result: dict[str, Any] = {}
+    async for message in query(prompt="Reply with the single word OK.", options=options):
+        if isinstance(message, ResultMessage):
+            result = {
+                "subtype": message.subtype,
+                "total_cost_usd": message.total_cost_usd,
+                "usage": message.usage,
+                "model_usage": sorted((getattr(message, "model_usage", None) or {}).keys()),
+            }
+    return result
+
+
+async def run_agent_canary(
+    args: argparse.Namespace, *, session_factory=async_session_factory, agent_query: AgentQuery = _agent_query
+) -> dict[str, Any]:
+    """Qualify the active Agent route: the CLI must enforce a tiny budget cap and report the cost."""
+    from lib.db.repositories.agent_credential_repo import AgentCredentialRepository
+    from r2.host_hardening.route_qualifications import agent_route_priced
+    from server.agent_runtime.options_assembler import agent_route_binding, load_provider_env_overrides
+
+    async with session_factory() as session:
+        credential = await AgentCredentialRepository(session).get_active()
+    if credential is None:
+        raise CanaryRefusedError("no active Agent credential; configure one first")
+    route = PaidRoute("agent", provider_id=credential.preset_id)
+    model = credential.model or ""
+    if credential.preset_id != args.provider or model != args.model:
+        raise CanaryRefusedError(
+            f"the active Agent credential is {credential.preset_id!r} with model {model!r}; qualify exactly that"
+        )
+    models = [
+        m
+        for m in (
+            model,
+            credential.haiku_model,
+            credential.sonnet_model,
+            credential.opus_model,
+            credential.subagent_model,
+        )
+        if m
+    ]
+    if not agent_route_priced(credential.preset_id, model) or not all(
+        agent_route_priced(credential.preset_id, m) for m in models
+    ):
+        raise CanaryRefusedError(
+            f"{route.ref} with models {models or ['<CLI default>']} is not priced by the CLI; "
+            "only anthropic-official with Claude models can qualify (ADR-0093); no paid call was made"
+        )
+    binding = agent_route_binding(credential)
+    reserved = await reserve_agent_connection(session_factory, amount=AGENT_CANARY_RESERVATION, purpose="agent_canary")
+    env = await load_provider_env_overrides()
+    env["CLAUDE_CODE_MAX_RETRIES"] = "0"
+    started = datetime.now(UTC)
+    cost = Decimal(0)
+    try:
+        with tempfile.TemporaryDirectory(prefix="arcreel-agent-canary-") as tmp:
+            result = await agent_query(env, AGENT_CANARY_CAP_USD, Path(tmp))
+        reported = result.get("total_cost_usd")
+        cost = Decimal(str(reported)) if isinstance(reported, int | float) else Decimal(0)
+        await Ledger(session_factory=session_factory).backfill(
+            project_name=CANARY_PROJECT,
+            call_type="text",
+            model=model or "claude-cli-default",
+            provider="anthropic",
+            prompt="agent route canary",
+            user_id="default",
+            status="success" if result.get("subtype") == "error_max_budget_usd" else "failed",
+            cost_amount=float(cost),
+            currency="USD",
+        )
+        if result.get("subtype") != "error_max_budget_usd" or cost <= 0:
+            raise CanaryFailedError(
+                f"the CLI did not stop at the ${AGENT_CANARY_CAP_USD} cap with a reported cost: "
+                f"subtype={result.get('subtype')!r} total_cost_usd={reported!r}"
+            )
+    finally:
+        if reserved is not None:
+            await reconcile_agent_connection(session_factory, reservation_ref=reserved[0], actual_usd=cost)
+    output = {"subtype": result["subtype"], "total_cost_usd": float(cost), "model_usage": result.get("model_usage")}
+    cost_record_ref = reserved[0] if reserved is not None else None
+    return _finish(route, args, binding=binding, started=started, output=output, cost_record_ref=cost_record_ref)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--provider", required=True, help="built-in provider id or custom-<id>")
-    parser.add_argument("--media", required=True, choices=("image", "video", "text", "audio"))
-    parser.add_argument("--model", required=True)
+    parser.add_argument("--media", required=True, choices=("image", "video", "text", "audio", "agent"))
+    parser.add_argument("--model", required=True, help="model id; for --media agent, '' means the CLI default")
     parser.add_argument("--duration", type=int, default=5, help="video seconds (a duration the model supports)")
     parser.add_argument("--voice", help="voice id for an audio route")
     parser.add_argument("--ttl-days", type=int, default=30)
@@ -180,7 +283,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        result = asyncio.run(run_media_canary(args))
+        canary = run_agent_canary if args.media == "agent" else run_media_canary
+        result = asyncio.run(canary(args))
     except Exception as exc:
         print(json.dumps({"error": type(exc).__name__, "detail": str(exc)[:500]}), file=sys.stderr)
         return 1
