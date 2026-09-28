@@ -1,0 +1,28 @@
+{
+  "packet": "R2 V1-07 O2a export",
+  "decision_date": "2026-09-28",
+  "decision_authority": "sponsor, explicit conversation instruction",
+  "decision": "SPONSOR_ACCEPTED_WITH_GATE_EXCEPTIONS",
+  "scope": "O2a export implementation only; no broader V1 or production release acceptance",
+  "code_commit": "fcc09a0aab79da4ffff158253978d7e8af77a24e",
+  "handoff_commit": "ec91b872ade1f6cf92c3c4340b7f898ca5bc78bb",
+  "worktree_at_decision": "clean",
+  "gate_evidence": {
+    "affected_tests": "60 passed, 2 warnings",
+    "ruff": "passed",
+    "basedpyright": "0 errors, 0 warnings",
+    "lint_imports": "20 kept, 0 broken",
+    "deptry": "no dependency issues",
+    "test_audit": "0 violations",
+    "full_backend_suite": {
+      "status": "NOT_PASSED_INTERRUPTED",
+      "observed": "15001 passed, 44 skipped, 133 warnings at KeyboardInterrupt after 41m51s on clean code commit",
+      "sponsor_instruction": "Do not run the full backend suite again"
+    },
+    "independent_final_review": {
+      "status": "NOT_COMPLETED",
+      "sponsor_instruction": "Stop the independent review"
+    }
+  },
+  "acceptance_basis": "Sponsor explicitly accepted the packet and waived completion of the full backend suite and independent final review after seeing their incomplete status. This record does not assert either gate passed."
+}
