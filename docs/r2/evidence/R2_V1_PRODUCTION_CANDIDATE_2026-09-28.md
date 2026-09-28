@@ -98,6 +98,6 @@ The first run, at `abf5ec1d` in `docs/r2/evidence/v1-release-gates-2026-09-28/`,
 - **Audio.** All V1 corpus finals are silent, by explicit MUTE decision. Narration needs a qualified TTS route.
 - **Gate B enforcement.** Gate B before production is checked by the dossier and the drill, not enforced at runtime (ADR-0092).
 - **Operations not proven.** SSE resync is proven for the project event stream only. The failed-provider-regeneration path needs a provider.
-- **Copy review.** The new UI copy (zh/en/vi) awaits the sponsor's proofreading.
+- **Copy review.** The sponsor approved the nine new UI strings (zh/en/vi) on 2026-09-28. They keep the gate terms "Final Cut" and "gate API" in English, which follows the sponsor's preference for short, clear English or Vietnamese terms.
 - **Reviews.** No independent review covers the V1-07/V1-08 commits; the main agent's review found no correctness defect.
 - **Not pushed.** Fork CI has never run.
