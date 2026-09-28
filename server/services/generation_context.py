@@ -26,15 +26,13 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from lib.audio_backends.base import VoiceOption
 from lib.backend_assembly import assemble_backend
-from lib.backend_assembly.assembler import paid_route_binding
+from lib.backend_assembly.assembler import require_built_backend_qualified
 from lib.config.resolver import ConfigResolver, VideoCapability, VoiceConsistency, get_provider_fallback
 from lib.custom_provider.backends import CustomVideoBackend
 from lib.db.base import DEFAULT_USER_ID
 from lib.gemini_shared import get_shared_rate_limiter
 from lib.media_generator import MediaGenerator
 from lib.project_manager import get_project_manager
-from r2.host_hardening.paid_routes import current_release_mode, media_route, require_paid_route
-from r2.host_hardening.provider_capabilities import ReleaseMode
 
 if TYPE_CHECKING:
     from lib.config.resolver import ProviderModel
@@ -101,10 +99,6 @@ async def _get_or_create_backend(
 ) -> Any:
     """组 key + 提供 factory closure，缓存纪律统一委托 :class:`_BackendCache`。"""
     effective_model = provider_settings.get("model") or default_model or None
-    # 发布部署下每次取用都重过路线闸门：缓存命中不能绕开资质过期、撤销或供应商配置变更（ADR-0091）。
-    if current_release_mode() is not ReleaseMode.DEV:
-        binding = await paid_route_binding(provider_id=provider_name, media_type=media_type, resolver=resolver)
-        require_paid_route(media_route(provider_name, media_type), model_id=effective_model, binding=binding)
 
     async def _factory() -> Any:
         return await assemble_backend(
@@ -115,7 +109,12 @@ async def _get_or_create_backend(
             rate_limiter=rate_limiter,
         )
 
-    return await _backend_cache.get_or_create((media_type, provider_name, effective_model), _factory)
+    backend = await _backend_cache.get_or_create((media_type, provider_name, effective_model), _factory)
+    # 发布部署下每次取用都按实际模型重过路线闸门：缓存命中不能绕开资质过期、撤销或供应商配置变更（ADR-0091）。
+    await require_built_backend_qualified(
+        backend, provider_id=provider_name, media_type=media_type, model_id=effective_model, resolver=resolver
+    )
+    return backend
 
 
 async def _get_or_create_video_backend(

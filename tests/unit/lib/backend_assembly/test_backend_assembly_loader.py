@@ -218,8 +218,10 @@ class TestAssembleCustomEndToEnd:
 
 
 class TestReleaseModeGate:
-    async def test_a_release_deployment_refuses_an_unqualified_route_before_building(self, db_factory, monkeypatch):
-        """发布部署下没有资质的付费路线在构造 backend 之前被拒，一个供应商请求都不会发出。"""
+    async def test_a_release_deployment_refuses_an_unqualified_route_before_handing_it_out(
+        self, db_factory, monkeypatch
+    ):
+        """发布部署下没有资质的付费路线在交出 backend 之前被拒：构造只在本地建客户端，一个供应商请求都不会发出。"""
         from r2.host_hardening.paid_routes import RELEASE_MODE_ENV, PaidRouteUnqualifiedError
 
         monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
@@ -230,7 +232,7 @@ class TestReleaseModeGate:
             )
 
         assert raised.value.params == {"route": "media:ark:image", "model": "doubao-x"}
-        assert built == []
+        assert [entry["backend"] for entry in built] == ["ark"]
 
     async def test_dev_builds_the_same_route(self, db_factory, monkeypatch):
         from r2.host_hardening.paid_routes import RELEASE_MODE_ENV

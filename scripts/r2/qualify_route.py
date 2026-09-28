@@ -89,7 +89,9 @@ async def _generate(backend: Any, media: str, workdir: Path, args: argparse.Name
 async def run_media_canary(args: argparse.Namespace, *, session_factory=async_session_factory) -> dict[str, Any]:
     route = media_route(args.provider, args.media)
     resolver = ConfigResolver(session_factory)
-    binding = await paid_route_binding(provider_id=args.provider, media_type=args.media, resolver=resolver)
+    binding = await paid_route_binding(
+        provider_id=args.provider, media_type=args.media, resolver=resolver, model_id=args.model
+    )
     started = datetime.now(UTC)
     with tempfile.TemporaryDirectory(prefix="arcreel-canary-") as tmp, qualification_canary(route, args.model):
         backend = await assemble_backend(
@@ -98,6 +100,11 @@ async def run_media_canary(args: argparse.Namespace, *, session_factory=async_se
             model_id=args.model,
             resolver=resolver,
         )
+        actual_model = getattr(backend, "model", None)
+        if actual_model is not None and actual_model != args.model:
+            raise CanaryFailedError(
+                f"the provider resolves {args.model!r} to {actual_model!r}; qualify an enabled model"
+            )
         ledger = Ledger(session_factory=session_factory)
         async with ledger.record(
             project_name=CANARY_PROJECT,
