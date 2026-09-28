@@ -222,6 +222,20 @@ def test_deselected_xfailed_and_todo_tests_count_as_skips() -> None:
     assert (parsed["passed"], parsed["skipped"]) == (100, 10)
 
 
+def test_node_test_runner_summaries_are_counted_across_runs() -> None:
+    parsed = parse_gate_log(
+        "# command: node --test a b\n# exit_code: 0\n"
+        "# tests 1\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n"
+        "# tests 7\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n"
+    )
+    assert (parsed["passed"], parsed["failed"], parsed["skipped"]) == (7, 0, 1)
+
+
+def test_a_failed_or_cancelled_node_test_fails_the_log() -> None:
+    parsed = parse_gate_log("# command: node --test\n# exit_code: 0\n# pass 3\n# fail 0\n# cancelled 1\n")
+    assert parsed["failed"] == 1
+
+
 def test_gate_output_cannot_restate_the_runner_header(tmp_path: Path) -> None:
     """只有日志顶部的 header 块算数：输出里再写一行 exit_code 0 不能盖过运行器记下的失败。"""
     report, host, upstream = upstream_report(tmp_path)

@@ -168,6 +168,8 @@ _LOG_HEADER_RE = re.compile(r"# (command|exit_code|tool_versions): (.*)")
 _PASSED_RE = re.compile(r"\b(\d+) passed\b")
 _FAILED_RE = re.compile(r"\b(\d+) (failed|errors?)\b")
 _NOT_RUN_RE = re.compile(r"\b(\d+) (skipped|deselected|xfailed|todo)\b")
+# The Node test runner's summary lines (TAP ``# pass 7``, spec reporter ``ℹ pass 7``).
+_NODE_SUMMARY_RE = re.compile(r"^[#ℹ] (pass|fail|cancelled|skipped|todo) (\d+)$", re.MULTILINE)
 
 
 def parse_gate_log(text: str) -> dict[str, Any]:
@@ -175,9 +177,11 @@ def parse_gate_log(text: str) -> dict[str, Any]:
 
     Only the header block at the top of the log counts, so gate output cannot restate the
     command or exit code. Counts come from pytest and vitest summary lines (``N passed``,
-    ``N failed``, ``N error(s)``); the largest figure of each kind is taken, so a per-file line
-    cannot hide the run total. ``skipped`` counts every selected test that did not run to a
-    pass: pytest's skipped, deselected and xfailed, and vitest's skipped and todo.
+    ``N failed``, ``N error(s)``) and the Node test runner's summary (``# pass N``, ``# fail N``);
+    the largest figure of each kind is taken, so a per-file line cannot hide the run total, and a
+    log holding several runs adds them up per runner. ``skipped`` counts every selected test that
+    did not run to a pass: pytest's skipped, deselected and xfailed, vitest's skipped and todo, and
+    Node's skipped and todo; a cancelled Node test counts as failed.
     """
     header: dict[str, str] = {}
     for line in text.splitlines():
@@ -187,12 +191,19 @@ def parse_gate_log(text: str) -> dict[str, Any]:
         header.setdefault(match.group(1), match.group(2))
     exit_code = header.get("exit_code")
     not_run = _NOT_RUN_RE.findall(text)
+    node: dict[str, int] = {}
+    for kind, count in _NODE_SUMMARY_RE.findall(text):
+        node[kind] = node.get(kind, 0) + int(count)
     return {
         "command": header.get("command", ""),
         "exit_code": int(exit_code) if exit_code is not None and exit_code.lstrip("-").isdigit() else None,
-        "passed": max((int(n) for n in _PASSED_RE.findall(text)), default=0),
-        "failed": max((int(n) for n, _kind in _FAILED_RE.findall(text)), default=0),
-        "skipped": sum(
+        "passed": max((int(n) for n in _PASSED_RE.findall(text)), default=0) + node.get("pass", 0),
+        "failed": max((int(n) for n, _kind in _FAILED_RE.findall(text)), default=0)
+        + node.get("fail", 0)
+        + node.get("cancelled", 0),
+        "skipped": node.get("skipped", 0)
+        + node.get("todo", 0)
+        + sum(
             max((int(n) for n, found in not_run if found == kind), default=0) for kind in {kind for _n, kind in not_run}
         ),
     }
