@@ -66,6 +66,16 @@ of scope.
    per-project stage checkpoints. `get_completed_stages` and `get_next_stage` derive progress.
    There is no separate run entity; resume reads the checkpoints.
 
+10. **Queue admission today** (read-only inventory, `lib/generation_worker.py::_claim_tasks` and
+    `lib/db/repositories/task_repo.py::claim_next`).
+    - **Claim order.** Tasks are claimed in one global FIFO over `tasks.status = 'queued'`, ordered
+      by `queued_at`.
+    - **Filters.** The claim is filtered by per-provider × media pool capacity (`*_max_workers`,
+      the `pool_full_providers` blacklist) and by dependency success (`dependency_task_id`).
+    - **What it lacks.** No filter or limit exists per project or portfolio, and no pause state
+      exists. Tasks are only queued, running, succeeded, failed, cancelling or cancelled.
+    - **`worker_lease`** is a worker-liveness lease, not a resource allotment.
+
 ## Options for `PipelineRun`
 
 | Option | Shape | Assessment |
@@ -78,9 +88,16 @@ of scope.
 
 - **Recommendation for the first design review: P1.** It is the only option consistent with every
   accepted architecture constraint, and the donor shows it is sufficient for resume and progress.
-- **What to prove first.** The open part is the portfolio resource limit. The first V2 spike should
-  show whether the existing queue admission and `worker_lease` can enforce a cross-project ceiling
-  and a portfolio pause without a new state holder. Only a proven failure justifies P2.
+- **What to prove first.** The open part is the portfolio resource limit. Fact 10 suggests P1
+  suffices, with two more `claim_next` filters over existing owners:
+  - **a project pause:** a flag held by the project owner (the project record). It is not a new
+    run authority;
+  - **a per-project or portfolio running ceiling:** computed from `tasks` (count of running tasks
+    per project). This is a projection, not stored state.
+
+  Cancel already exists per task and in bulk. This is still an inference: the spike must prove
+  that the filters keep FIFO fairness, do not starve dependencies, and survive restart. Only a
+  proven failure justifies P2.
 - **The sponsor's wishes, in dependency order:**
   1. **V1.x:** the Agent per-session budget reservation. It unlocks story and script writing with
      the host Agent in release mode, is independent of V2 and closes a V1 open item.
@@ -90,8 +107,8 @@ of scope.
 
 ## Unknowns
 
-- **Resource ceilings.** Whether `worker_lease` and the queue can express a portfolio-level
-  ceiling and a pause without new state.
+- **Resource ceilings.** Whether the two `claim_next` filters (fact 10) keep fairness and survive
+  restart. `worker_lease` cannot express them (liveness only).
 - **M8's prerequisite check.** Whether M8-A0 accepts the V1 dossier as its "accepted M7"
   prerequisite, or needs a mapping record.
 - **Durable Factual Authority.** Whether an accepted durable Factual Authority service exists for
