@@ -1,6 +1,6 @@
 {
   "evidence": "R2 V1-07 operator browser workflow over the restore-derived Golden environment (M7-E E2)",
-  "head": "4e6e2461cbf78ce3dde2408c93473f255383719b",
+  "head": "092aeb958baa070ffa1c73677c534d63613eb5a8",
   "environment": {
     "restored_from": "docs/r2/evidence/R2_V1_07_GOLDEN_RESTORE_DRILL_2026-09-28.json (drill head 38955951, backup set bs-golden-drill, restore target golden-drill-target-1)",
     "database": "disposable postgres:16, database golden_drill_target",
@@ -8,7 +8,7 @@
     "provider_credentials": "none configured; no provider called"
   },
   "command": "ARCREEL_E2E_DATA_DIR=<work>/restored-data ARCREEL_E2E_DATABASE_URL=postgresql+asyncpg://…/golden_drill_target uv run python -m pytest tests/e2e/test_m7_production_candidate_workflow.py",
-  "outcome": "1 passed",
+  "outcome": "1 passed (61.5 s)",
   "result": {
     "products": {
       "golden-a-h264": {
@@ -28,7 +28,11 @@
     "publish_approval_recorded": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
     "foreign_token_status": 403,
     "unknown_digest_status": 404,
-    "restart_reopen_digest": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e"
+    "restart_reopen_digest": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
+    "sse_resync": {
+      "page": "/app/projects/golden-a-h264",
+      "title_after_outage": "Golden A: how H.264 works (resync 1790573670) (resync 1790573751)"
+    }
   },
   "downloads_match_gate_d": {
     "golden-a-h264": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
@@ -38,8 +42,9 @@
   "coverage_limits": [
     "Production (shots and the composed final) was made by the no-provider fixture pipelines in the drill, not by browser-driven generation; browser generate/regenerate needs a provider.",
     "'Failed regeneration keeps the master' is proven as a refused Gate C re-approval (sha mismatch) that leaves the approved final and its digest unchanged, not as a failed provider task.",
-    "Reconnect is proven by a server restart and page reopen; SSE cursor replay/resync is not exercised by this test.",
     "Foreign scope is proven with a download token for another project; this is a single-operator deployment, so no second user exists.",
-    "The run mutates the disposable restored environment (one Publish Approval per run, one refused Gate C file)."
+    "The run mutates the disposable restored environment (one Publish Approval per run, one refused Gate C file).",
+    "SSE resync is proven for the project event stream (snapshot fingerprint after a server restart with the browser offline); the execution-events and assistant streams are not exercised in the browser.",
+    "The restored environment was reused across three runs; each run appends one Publish Approval and extends the Golden A title."
   ]
 }
