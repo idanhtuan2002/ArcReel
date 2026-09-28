@@ -49,6 +49,7 @@ from server.dependencies import require_project_migration_ok, require_valid_proj
 from server.error_handlers import register_error_handlers
 from server.remote_mcp import remote_mcp_host
 from server.routers import (
+    admission,
     agent_config,
     agent_memory,
     api_keys,
@@ -674,6 +675,7 @@ app.include_router(
     execution_events.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["执行事件流"]
 )
 app.include_router(tasks.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["任务队列"])
+app.include_router(admission.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["任务队列"])
 app.include_router(providers.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["供应商管理"])
 app.include_router(system_config.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["系统配置"])
 app.include_router(system.router, prefix="/api/v1", dependencies=[Depends(get_current_user)], tags=["系统"])

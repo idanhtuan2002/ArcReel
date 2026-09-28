@@ -2572,6 +2572,20 @@ class API {
     });
   }
 
+  /** ADR-0094 portfolio admission: paused projects and the per-project running ceiling. */
+  static async getAdmission(
+    options: { signal?: AbortSignal } = {}
+  ): Promise<{ paused: string[]; max_running_per_project: number }> {
+    return this.request("/admission", { signal: options.signal });
+  }
+
+  static async setProjectPaused(projectName: string, paused: boolean): Promise<{ project: string; paused: boolean }> {
+    return this.request(`/projects/${encodeURIComponent(projectName)}/admission`, {
+      method: "PUT",
+      body: JSON.stringify({ paused }),
+    });
+  }
+
   /** ADR-0092 Gate B for a factual product: lock (or revoke) the exact source and script revision. */
   static async scriptLock(
     projectName: string,

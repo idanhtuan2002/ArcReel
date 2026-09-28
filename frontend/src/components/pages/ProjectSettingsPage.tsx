@@ -26,6 +26,7 @@ import { SpeechRateField, isValidSpeechRate } from "@/components/shared/SpeechRa
 import { ACCENT_BTN_CLS, ACCENT_BUTTON_STYLE, GHOST_BTN_LG_CLS, radioCardClass } from "@/components/ui/darkroom-tokens";
 import { AgentMemoryCabinet } from "@/components/agent/AgentMemoryCabinet";
 import { GateApprovalPanel } from "@/components/shared/GateApprovalPanel";
+import { ProjectAdmissionToggle } from "@/components/shared/ProjectAdmissionToggle";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useWarnUnsaved } from "@/hooks/useWarnUnsaved";
 import { normalizeRoute, type GenerationRoute } from "@/utils/generation-mode";
@@ -722,6 +723,14 @@ export function ProjectSettingsPage() {
             description={t("gate_section_description")}
           >
             <GateApprovalPanel projectName={projectName} />
+          </SectionCard>
+
+          <SectionCard
+            kicker="Generation Queue"
+            title={t("admission_section_title")}
+            description={t("admission_section_description")}
+          >
+            <ProjectAdmissionToggle projectName={projectName} />
           </SectionCard>
 
           {/* Style picker (independent save flow, mutually exclusive template / custom) */}

@@ -130,6 +130,17 @@ For the no-provider factual product (the Golden A bundle), `scripts/r2/v1_operat
 
 A file written into `output/` by another tool under the same name also makes the final non-exportable, until you re-approve it at Gate C.
 
+## 4a. Portfolio admission (V2, ADR-0094)
+
+- **Pause a project** so the worker stops claiming its queued generation tasks. Running tasks
+  finish, and queued ones wait. Use Project settings → Generation queue → "Pause this project",
+  or `PUT /api/v1/projects/{p}/admission` with `{"paused": true}`. Resume the same way with
+  `false`. Cancelling work stays the task cancel API.
+- **Cap running tasks per project** in each media lane, so one project cannot take the whole
+  pool: `PUT /api/v1/admission` with `{"max_running_per_project": 2}`. `0` removes the cap.
+  `GET /api/v1/admission` shows both settings.
+- **When it takes effect.** Both apply at the worker's next claim cycle, and a restart keeps them.
+
 ## 5. Backup, restore and recovery
 
 - **Procedure:** follow `docs/r2/runbooks/m7-backup-restore.md`. The steps are:
