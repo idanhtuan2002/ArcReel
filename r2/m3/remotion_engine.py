@@ -129,9 +129,13 @@ def _cut_to_remotion_json(cut: RenderCut, *, staged_source_relpath: str | None) 
     return payload
 
 
+class RemotionRenderError(RuntimeError):
+    """``remotion render`` failed; the message carries the tail of its output."""
+
+
 def _run_render(remotion_project: Path, output_path: Path, props: dict[str, object]) -> float:
     start = time.perf_counter()
-    subprocess.run(
+    result = subprocess.run(
         [
             "npx",
             "remotion",
@@ -142,10 +146,14 @@ def _run_render(remotion_project: Path, output_path: Path, props: dict[str, obje
             f"--props={json.dumps(props, separators=(',', ':'))}",
         ],
         cwd=remotion_project,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0:
+        # The render's own output is the only diagnosis (bundler, Chrome, disk); keep its tail.
+        tail = "\n".join((result.stderr or result.stdout or "").strip().splitlines()[-20:])
+        raise RemotionRenderError(f"remotion render exited {result.returncode} for {output_path.name}:\n{tail}")
     return time.perf_counter() - start
 
 
@@ -230,4 +238,4 @@ def render_cut(
     )
 
 
-__all__ = ["DEFAULT_REMOTION_PROJECT", "render_cut"]
+__all__ = ["DEFAULT_REMOTION_PROJECT", "RemotionRenderError", "render_cut"]
