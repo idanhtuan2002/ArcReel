@@ -167,7 +167,7 @@ TEST_GATES = frozenset({"i18n", "frontend", "website", "h1_h8", "golden_a", "gol
 _LOG_HEADER_RE = re.compile(r"# (command|exit_code|tool_versions): (.*)")
 _PASSED_RE = re.compile(r"\b(\d+) passed\b")
 _FAILED_RE = re.compile(r"\b(\d+) (failed|errors?)\b")
-_SKIPPED_RE = re.compile(r"\b(\d+) skipped\b")
+_NOT_RUN_RE = re.compile(r"\b(\d+) (skipped|deselected|xfailed|todo)\b")
 
 
 def parse_gate_log(text: str) -> dict[str, Any]:
@@ -175,8 +175,9 @@ def parse_gate_log(text: str) -> dict[str, Any]:
 
     Only the header block at the top of the log counts, so gate output cannot restate the
     command or exit code. Counts come from pytest and vitest summary lines (``N passed``,
-    ``N failed``, ``N error(s)``, ``N skipped``); the largest figure of each kind is taken, so a
-    per-file line cannot hide the run total.
+    ``N failed``, ``N error(s)``); the largest figure of each kind is taken, so a per-file line
+    cannot hide the run total. ``skipped`` counts every selected test that did not run to a
+    pass: pytest's skipped, deselected and xfailed, and vitest's skipped and todo.
     """
     header: dict[str, str] = {}
     for line in text.splitlines():
@@ -185,12 +186,15 @@ def parse_gate_log(text: str) -> dict[str, Any]:
             break
         header.setdefault(match.group(1), match.group(2))
     exit_code = header.get("exit_code")
+    not_run = _NOT_RUN_RE.findall(text)
     return {
         "command": header.get("command", ""),
         "exit_code": int(exit_code) if exit_code is not None and exit_code.lstrip("-").isdigit() else None,
         "passed": max((int(n) for n in _PASSED_RE.findall(text)), default=0),
         "failed": max((int(n) for n, _kind in _FAILED_RE.findall(text)), default=0),
-        "skipped": max((int(n) for n in _SKIPPED_RE.findall(text)), default=0),
+        "skipped": sum(
+            max((int(n) for n, found in not_run if found == kind), default=0) for kind in {kind for _n, kind in not_run}
+        ),
     }
 
 

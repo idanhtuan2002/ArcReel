@@ -213,6 +213,15 @@ def test_the_log_parser_takes_the_run_totals() -> None:
     assert parsed == {"command": "pytest -q", "exit_code": 0, "passed": 14552, "failed": 0, "skipped": 44}
 
 
+def test_deselected_xfailed_and_todo_tests_count_as_skips() -> None:
+    parsed = parse_gate_log(
+        "# command: pytest -q\n# exit_code: 0\n"
+        "100 passed, 2 skipped, 3 deselected, 1 xfailed in 9.00s\n"
+        "Tests  40 passed | 4 todo (44)\n"
+    )
+    assert (parsed["passed"], parsed["skipped"]) == (100, 10)
+
+
 def test_gate_output_cannot_restate_the_runner_header(tmp_path: Path) -> None:
     """只有日志顶部的 header 块算数：输出里再写一行 exit_code 0 不能盖过运行器记下的失败。"""
     report, host, upstream = upstream_report(tmp_path)
