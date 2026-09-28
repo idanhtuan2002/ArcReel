@@ -1,0 +1,32 @@
+# command: env -u DATABASE_URL uv run python -m pytest -q -rs -p no:cacheprovider tests/integration/r2/m3 tests/integration/r2/m4
+# exit_code: 0
+# tool_versions: python 3.13.14; git 2.53.0
+...........................................................              [100%]
+=============================== warnings summary ===============================
+tests/integration/r2/m3/test_golden_a_composition.py::test_composer_requires_approved_masters
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+308.65s call     tests/integration/r2/m3/test_golden_a_composition.py::test_ffmpeg_composes_real_approved_masters_into_final_mp4
+307.62s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_lineage_reaches_claim_evidence_and_source
+307.45s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_single_run_produces_real_60_90s_final_and_three_methods
+307.40s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_claim2_change_selectively_invalidates_expected_shots_and_final
+306.36s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_evidence_files_capture_cost_provenance_lineage_and_restart
+301.67s call     tests/integration/r2/m3/test_golden_a_real_media_closure.py::test_h264_factual_product_renders_real_media_with_three_distinct_methods
+191.34s call     tests/integration/r2/m3/test_host_integration.py::test_real_host_b_c_d_master_semantics_and_restart
+104.62s call     tests/integration/r2/m3/test_local_production.py::test_deterministic_output_is_byte_stable_for_the_same_display_text
+99.02s call     tests/integration/r2/m3/test_local_production.py::test_different_display_text_changes_the_rendered_output
+95.66s call     tests/integration/r2/m3/test_host_integration.py::test_manifest_metadata_keeps_factual_basis_and_dependencies
+95.44s call     tests/integration/r2/m3/test_local_production.py::test_reuse_production_preserves_source_and_emits_valid_mp4
+21.92s call     tests/integration/r2/m3/test_remotion_engine.py::test_identical_props_render_byte_identical_output
+15.49s call     tests/integration/r2/m3/test_remotion_engine.py::test_video_passthrough_renders_the_real_bound_source_not_a_solid_color
+14.56s call     tests/integration/r2/m3/test_remotion_engine.py::test_text_card_renders_real_visible_text_not_a_solid_color
+2.01s setup    tests/integration/r2/m3/test_golden_a_composition.py::test_composer_requires_approved_masters
+0.96s call     tests/integration/r2/m4/test_persistence_restart.py::test_c04_reservation_survives_an_engine_close_and_reopen
+0.96s call     tests/integration/r2/m4/test_persistence_restart.py::test_m4_paid_submission_claims_the_real_reservation_and_it_persists
+0.94s call     tests/integration/r2/m3/test_remotion_engine.py::test_video_passthrough_with_a_missing_source_raises_before_any_subprocess_call
+
+(7 durations < 0.005s hidden.  Use -vv to show these durations.)
+59 passed, 1 warning in 2483.95s (0:41:23)

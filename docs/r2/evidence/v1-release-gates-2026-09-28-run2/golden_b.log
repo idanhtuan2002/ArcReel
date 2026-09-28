@@ -1,0 +1,28 @@
+# command: env -u DATABASE_URL uv run python -m pytest -q -rs -p no:cacheprovider tests/integration/r2/test_m6_dual_profile_acceptance.py
+# exit_code: 0
+# tool_versions: python 3.13.14; git 2.53.0
+..........                                                               [100%]
+=============================== warnings summary ===============================
+tests/integration/r2/test_m6_dual_profile_acceptance.py::test_two_dual_profile_slices_share_one_canon_parent_with_isolated_evidence
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+846.58s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_readmitting_an_already_locked_screenplay_is_rejected
+846.10s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_reused_decision_id_with_a_different_command_is_rejected
+845.87s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_stale_map_approval_after_supersession_is_rejected
+845.01s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_waiver_laundering_after_a_semantic_change_is_rejected
+843.87s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_cross_profile_report_reuse_is_rejected_and_siblings_are_unaffected
+843.58s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_two_dual_profile_slices_share_one_canon_parent_with_isolated_evidence
+1.97s setup    tests/integration/r2/test_m6_dual_profile_acceptance.py::test_two_dual_profile_slices_share_one_canon_parent_with_isolated_evidence
+0.09s setup    tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_stale_map_approval_after_supersession_is_rejected
+0.09s setup    tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_branch_cannot_silently_change_its_canon_parent
+0.09s setup    tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_reused_decision_id_with_a_different_command_is_rejected
+0.09s setup    tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_waiver_laundering_after_a_semantic_change_is_rejected
+0.09s setup    tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_readmitting_an_already_locked_screenplay_is_rejected
+0.08s setup    tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_cross_profile_report_reuse_is_rejected_and_siblings_are_unaffected
+0.01s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_branch_cannot_silently_change_its_canon_parent
+
+(11 durations < 0.005s hidden.  Use -vv to show these durations.)
+10 passed, 1 warning in 5073.84s (1:24:33)

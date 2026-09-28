@@ -1,0 +1,6 @@
+# command: bash -c 'uv run ruff check . && uv run ruff format --check . && uv run python scripts/audit_tests.py --check'
+# exit_code: 0
+# tool_versions: python 3.13.14; git 2.53.0
+All checks passed!
+1566 files already formatted
+闸门通过：0 处违规

@@ -1,0 +1,7 @@
+# command: uv run deptry lib server alembic scripts tests r2
+# exit_code: 0
+# tool_versions: python 3.13.14; git 2.53.0
+Assuming the corresponding module name of package 'mutmut' is 'mutmut'. Install the package or configure a package_module_name_map entry to override this behaviour.
+Scanning 1562 files...
+
+[1m[32mSuccess! No dependency issues found.[m

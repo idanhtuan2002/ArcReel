@@ -1,0 +1,144 @@
+# command: bash -c 'node --test .claude/skills/translate-docs/scripts/translation-lock.test.mjs website/scripts/*.test.mjs && cd website && pnpm install --frozen-lockfile && pnpm check'
+# exit_code: 0
+# tool_versions: python 3.13.14; git 2.53.0
+TAP version 13
+# Subtest: status reports every untranslated documentation source
+ok 1 - status reports every untranslated documentation source
+  ---
+  duration_ms: 122.914077
+  type: 'test'
+  ...
+# Subtest: record writes LF-normalized source hashes to the flat lockfile
+ok 2 - record writes LF-normalized source hashes to the flat lockfile
+  ---
+  duration_ms: 224.078622
+  type: 'test'
+  ...
+# Subtest: status reports translations whose sources were deleted
+ok 3 - status reports translations whose sources were deleted
+  ---
+  duration_ms: 240.417944
+  type: 'test'
+  ...
+# Subtest: status reports unregistered document translations but ignores locale assets
+ok 4 - status reports unregistered document translations but ignores locale assets
+  ---
+  duration_ms: 111.010897
+  type: 'test'
+  ...
+# Subtest: status reports a translation as stale when its lock entry was removed
+ok 5 - status reports a translation as stale when its lock entry was removed
+  ---
+  duration_ms: 218.491888
+  type: 'test'
+  ...
+# Subtest: status reports a translated source whose recorded content changed
+ok 6 - status reports a translated source whose recorded content changed
+  ---
+  duration_ms: 217.407271
+  type: 'test'
+  ...
+# Subtest: status reports CONTRIBUTING.md stale when only its synced copy changed
+ok 7 - status reports CONTRIBUTING.md stale when only its synced copy changed
+  ---
+  duration_ms: 220.172424
+  type: 'test'
+  ...
+# Subtest: record refuses to hide a missing translation
+ok 8 - record refuses to hide a missing translation
+  ---
+  duration_ms: 106.47558
+  type: 'test'
+  ...
+# Subtest: record refuses to hide an orphan translation that still exists
+ok 9 - record refuses to hide an orphan translation that still exists
+  ---
+  duration_ms: 226.621017
+  type: 'test'
+  ...
+# Subtest: record refuses to hide an unregistered document translation
+ok 10 - record refuses to hide an unregistered document translation
+  ---
+  duration_ms: 108.193662
+  type: 'test'
+  ...
+# Subtest: walkMarkdownFiles recurses, keeps only .md/.mdx, and sorts POSIX-relative paths
+ok 11 - walkMarkdownFiles recurses, keeps only .md/.mdx, and sorts POSIX-relative paths
+  ---
+  duration_ms: 7.237762
+  type: 'test'
+  ...
+# Subtest: walkMarkdownFiles returns an empty list for a missing directory
+ok 12 - walkMarkdownFiles returns an empty list for a missing directory
+  ---
+  duration_ms: 0.408059
+  type: 'test'
+  ...
+# Subtest: CLI derives coverage tiers from page frontmatter and reports explicit none
+ok 13 - CLI derives coverage tiers from page frontmatter and reports explicit none
+  ---
+  duration_ms: 111.705339
+  type: 'test'
+  ...
+# Subtest: CLI fails loud on an invalid update-docs value, including retired values
+ok 14 - CLI fails loud on an invalid update-docs value, including retired values
+  ---
+  duration_ms: 109.937025
+  type: 'test'
+  ...
+# Subtest: CLI fails loud when a published page has no update-docs declaration
+ok 15 - CLI fails loud when a published page has no update-docs declaration
+  ---
+  duration_ms: 108.460604
+  type: 'test'
+  ...
+# Subtest: CLI reports pages missing from and stale in the responsibilities table
+ok 16 - CLI reports pages missing from and stale in the responsibilities table
+  ---
+  duration_ms: 108.286261
+  type: 'test'
+  ...
+# Subtest: CLI ignores table-like responsibility rows inside fenced examples
+ok 17 - CLI ignores table-like responsibility rows inside fenced examples
+  ---
+  duration_ms: 105.840824
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1951.097718
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: core-js@3.50.0.                                     │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 948ms using pnpm v10.33.2
+
+> arcreel-website@0.0.0 check /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/website
+> pnpm typecheck && pnpm lint && pnpm format:check
+
+
+> arcreel-website@0.0.0 typecheck /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/website
+> tsc
+
+
+> arcreel-website@0.0.0 lint /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/website
+> eslint .
+
+
+> arcreel-website@0.0.0 format:check /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/website
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!
