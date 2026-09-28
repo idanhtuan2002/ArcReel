@@ -656,7 +656,7 @@ def orchestrate(admin_url: str, work_dir: Path, evidence_path: Path) -> None:
     )
     state = json.loads((backup_dir / "state.json").read_text(encoding="utf-8"))
     evidence = {
-        "evidence": "R2 V1 restore-derived Golden A/B drill (V1-05)",
+        "evidence": "R2 V1 restore-derived Golden A/B drill (V1-05 recovery, V1-07 O2a export)",
         "head": head,
         "research": "docs/research/2026-09-27-r2-v1-restore-derived-golden-drill.md",
         "environment": {
@@ -681,9 +681,9 @@ def orchestrate(admin_url: str, work_dir: Path, evidence_path: Path) -> None:
         "coverage_limits": [
             "Golden products are the existing fixture corpora (M3 H.264 factual; M6 ledger-reveal, both profiles), "
             "rendered locally with Remotion; no paid provider route is exercised.",
-            "Export is the V1 definition from the P1 gate design: the final cut re-composed on the restored target "
-            "from restored approved masters must hash to the Gate D deliverable_digest; there is no separate "
-            "packaging mechanism.",
+            "Export is ADR-0090 O2a: Gate C approves the composed COMPOSITE final, its byte copy in output/ is "
+            "downloaded on the restored target through the host's download-token route and must hash to the Gate D "
+            "deliverable_digest; re-composing from the restored masters must reproduce the same bytes.",
             "Browser/operator workflow checks remain the E2 / V1-07 packet.",
             "RPO/RTO are single-machine drill timings (RTO spans restore, verify, the Golden check and re-export).",
         ],
