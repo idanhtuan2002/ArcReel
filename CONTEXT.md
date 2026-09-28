@@ -621,6 +621,7 @@ _Avoid_: Agent 推荐、项目已创建、自动评分通过。
 
 **Human Gate B — Narrative Lock**：
 人对确切 source 与 script revision 作出的叙事锁定，允许该修订进入制作；后续实质修改会使批准失效。
+剧情产品以 screenplay admission 承载；事实类产品以 script lock（绑定 `source_digest` 与 `script_digest` 的追加式决定，ADR-0092）承载。
 _Avoid_: 草稿完成、confidence 阈值、Agent 自批。
 
 **Human Gate C — Final Cut**：
