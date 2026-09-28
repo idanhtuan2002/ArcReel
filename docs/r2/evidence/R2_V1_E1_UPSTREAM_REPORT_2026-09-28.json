@@ -1,0 +1,1898 @@
+{
+  "report": {
+    "schema_version": 1,
+    "host_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+    "evidence_sha": "138b0c8004edec12b9199d3602212bc69cfafa6c",
+    "upstream_url": "https://github.com/ArcReel/ArcReel.git",
+    "old_sha": "6ddedc775e7fe5f398b10081ab741985f7dceda7",
+    "new_sha": "317a7d0da81e69b42c0210b28fcf6da9a68af08b",
+    "merge_base_sha": "6ddedc775e7fe5f398b10081ab741985f7dceda7",
+    "source_tree_sha": "9f0295bc2ffe0d74d9751954807501bde9100d15",
+    "integration_method": "CHERRY_PICK",
+    "dependency_files": [
+      {
+        "path": "pyproject.toml",
+        "sha256": "sha256:51694271f53d51ccc43237f77226331c0db4d8236c81056e00d2dce63c56703a"
+      },
+      {
+        "path": "uv.lock",
+        "sha256": "sha256:a7eed9ae2f362c51b302b022169ee933b47291254de1fc75bfb0d86f5f544657"
+      },
+      {
+        "path": "frontend/package.json",
+        "sha256": "sha256:b0afc42d537fa4a88e7545b56c0a8e010a8b5914833aae7b3a9bd13c37a700e1"
+      },
+      {
+        "path": "frontend/pnpm-lock.yaml",
+        "sha256": "sha256:46911ee012f9456dd5f47f2bb94f8051450638b3f376b8a93bcdcd5aea62a59e"
+      },
+      {
+        "path": "website/package.json",
+        "sha256": "sha256:ee509b074fd46122c0fd5b6bb88bfb1ea39662b9e7de294e20baa505930bea8c"
+      }
+    ],
+    "change_inventory": [
+      {
+        "commit_sha": "5350d64ca90ba8cda7d10af5e51f74258426f68f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2a5c6fbbd06c0fbb7e51717c89008faf915050dd",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "11f77f8f43a4ce21e59674cfe5b1e3bc8e9922cb",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "67ec8ed0c49c25bc45be523505ac0cf7e43eb0ce",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6717f0b73b24074fa2920b48cf1d0bf9e026cdab",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5f58c528cdfcc2bac5ddc3887fea7958a42c589c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2e32e6e7862573b2df86f9542d23abb095bc238f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f2800d1a9adab49197cafeb5a076fcd01eade7b7",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2e8ce137cd091382b4ae1b35ef6b49eb5bb75c62",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "b49a12e31130faa8964af6f521384b34d013a6ed",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "57070c9a23ffa3e4e08385068d5786136a0c9e69",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f24136ff809e27b57017878e27cb6219142a7847",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "833c390d5e9999509719a85d8536f1e30c0c7538",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "43e48c6e412575f9c7c62776b7f0a1b4538c3cb8",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "8f336e81ce0ad0b979f088603816c1f3ddfaf8e0",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e55b1893ee5edf0a4928aa5dee78cf3fd54728eb",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "eef3374231b96d01d032b3f5cd77a1df4ed61529",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "75e5898c460616a25d24dee674a4e036dfc2eab7",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d094d9c3f72dd6ac266ccdf70464f819c332eb3e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5b8780266cda8734dcf14613e8eb37789ead4920",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "ed62ff9f123ceefdc4f4c879fb89a1cde1e7a7b0",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c79e24c0fc36356b6db2f87c5c9296c87030d8ce",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "91f7db1ec53ea4f9b8b2a2348d82277e72a10b1c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d80bed1a6eaaa3344dacee318b61c6a7ef3581f9",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d1951f76313d9e8e20e46a8926127dd3653e6b92",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5e4c52d04d4725fb7cfee75cdac16759fe744d42",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "b9163ec3f634b58ba0e78ec9986a59d6bedfc5c6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "369b47626a35ffb65c64fae26d372bab94e70233",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c74e1629c93ddfaa4f4a9367469df8bb8d338a0a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "433b7ce423ae7de200336a39b54a41680102add6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "91b506810f01f37661f52c10a1c7d4d31eee6c8f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6ccff0706d4cef9acae5456a95e1d792c79e9ec1",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1c6d8f6f4c84c58024b5691d16e8e00d47fcd91d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "3f5e182539ec399353df818a86df235fa80579d6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "92191e48da8fb813a17cce3199db69f9e82ca0d4",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9009f2ed50273b7632e31b32c6a0c5de9b86e479",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7c52e32ef0eb3e1c0d87ab1d62a5d8cade4e6bde",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "87da8e22150c322fb5530ff08ec72659f1e03391",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2761e6913211d77bbc61800e411437977e33a95a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "ca6a81e0fa963662fa5b924e1b21aa56cb96f71c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c09ee1f87a97259a8891677ba4021f30b39cb212",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "594b69ee68a41b030868fbd1f129960a965ff8f7",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "18409749594b44fe2193f118c60d5af8bc1cc3fe",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "680093c78862153a6ae2697ec3111e1ed6a794b8",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5df895b38ba24e1e8392b2da3558f470b4acfcd5",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6d77347505fc195d06f0c18039212a6e91c441f8",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "567b32e004b0fe7d9e7623042bb76d113e126639",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c4d608fca385752573de23fcdddb9659c2f43e8a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6ed993d5433de0c93d8e10e2912e21e3d96d5d45",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "134c65440b5d5bdc993e4a605410f438eb827dfa",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2624c01994a6f2f5298552d1f636be3ec7baf488",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "139eaadf1a2da9a50a22cea228c414868bf30c05",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7fb395c0c5b2724880ce222799f8fc614404f6f8",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "95fad0c5524423a047b65ead6218149a0ace8138",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7bc03669b2224638638819bf4ce0f524baa3c01d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "747cc4025542f81ed3def0b6269135aa11b26b53",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5ed46caa471a760b35cff98f96fe64696acc5442",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "452efc0f6b551d4512fc126f526ccea6bb77c803",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1057a96dd176c930f8f005921a72ae9ff79bad2e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "93f14642506f13a6ee78c4b7c6d54ce3dfa8ad7c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c8fff6dd7d1118431e6d7ebb4e89e047b2afb444",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "81c3a0e1526b2fd06ca2fae1de7452fc04cfcb9c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "79f697026ccf981c44f3650c29fbf8faa1e4463d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "db52eb44348a8d69b04887c04be0a8b9eab1418f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "38bceb8a864e082620641461f6b59aeaa22052c4",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "88fd58b5e7a25350c7bf61920456e65d331900aa",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6e851c74ec04fbbeac0c912d7ee9f75e15ca3029",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6d0201f9767af7a4f721777cbb6b4b3a0b9eca33",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f2c3e90dddbc3f00bda25612d3bb831c254c6308",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4c19a8e600a71446bf53c5cc047b888c65327d6d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9318b9a7792a05fe46fd5413a18beb3357e2aa25",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "dd4908012560cec74a424ec0c7a1f234133b588d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e88abfdfba424ba83839076ebc8d5f675d3bbbfe",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "abc2178854dd24fc7e0a878ff4163a5e89b7b5d5",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "076b2f9766b38f50e741d20c42aef640bf403582",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f53fcf3bfa9b80244881cfa3cf71debbbb7e358d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "306c2712e7226d335287273ab0295624b3d23f3b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4ba6f47ef94b810e23142bd48b14d3d84d66cfb5",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e9e926ba919e9fdbe140451d4eee3055e6d9cc2e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2bb1458a1706217191307ad391e8dc0550fd3b7d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5088643857474f2acce5c67c1e77b77969f2e2cd",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "8d2c8717430e0dc9e2ed53c19023b2fde6250c0a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "aaa05720584d9a652a55d6ee340f983e3de21c7a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "ce1628a749249682d8fdd06f04defae6a6c844ec",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "927d1125e46e9e6af6a2f0cd2f6ecaf1cedd1d6e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "98a58597accaaefd5dab3c03d8a5b78e6d2a92cf",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "3d35d2e4dd2502632afcb8e915b664d9650b77b0",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "81474f2ff367cf32d6c6755cbe9c5c6da710720b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "de99b22581bcacd01bed0919b0071b794a3a0d89",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "a2833d28b08e6479a45348d4535b1795f4763ec1",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "cfe4df02dfa1af055976f44de8fe9e358d178d59",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "359572e4d289f582402e8622f5b66605612c78d6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d20a6600f966ba2a745881aeab9151781ab4176d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "af1af381a7d243476f73dc3e1769025657e2680f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7250ddcce73b49856a68fa4aa11525095db03b36",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1e670a2bf5077c3234f2ad5f9b88f4b432afbb17",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9f41273443dd51576a345481c3c363a0e107f4c1",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "740e79293f09a0f1efc2cd03c70b3579220f92fb",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c5b1e2d74fa6ebb5dbe846240b203fd4123b507b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "da22e7d858d23173cf19801874b6ac1f1cac1dc7",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "71f7b7ca4563b56cb595bd35e3357a8b71030757",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "032eb33d85912e6a7cda624314e195c0583aa2d6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "3437ed4f838aa554b5ffe11c8f716ae79696fac1",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2251b1758e9b0a907cd67ab27e6bfd2798fa10fd",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e9e28f6043bc339c409ea265a6da7315673b2614",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f02de5bb5b76bf47c7081d3180bec2e3563414c8",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5cce55ecfb0535c7d08ed5657269c042b5a1a262",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e4d193d8c2787fed17d078d39226c2d11f6c8fed",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "3cda5eefbf11e203b910f11c66f2e2433a9be930",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5fb5856234f7a1dd092f589c04cef883bff13784",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "327a4cf81bfd6c4bcbb1de6b5e1ece8c8fb4bcf3",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "abbc529e23dd55776cf7c317ed33601097fad29d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d0351e7984a5233d1be47fafeea5b919d3607fe8",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6a3e6cd8a774419c1e64ad6eac4b95e4194980a3",
+        "disposition": "UNCHANGED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9317ae4690d3a54b96149f90e4d251d5adba9ce1",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "31c5e985c3709c7ac4d51904ea73e567017c5796",
+        "disposition": "UNCHANGED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "97f0b92a0a640499de32e7bae2b1214661b25dea",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "bec23208def300bdfe835d6532759efbea126076",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e2f4ea91444ecc6a92e87c1b44cae3b9715f79b6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "8e7cbc00abfa32330ddf2b2727c8d21e48f0d7db",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4c0118f8d72ae70051c7bd0b56c11c54ae4a39e6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "a026fc4a2cbb316789e6e8285ef1e94947469e2f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5839ef3bfb65a13a0f01fb697dad68509d3a02be",
+        "disposition": "UNCHANGED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "699675495451a757d69b6f9fbf57d4967925acd5",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "09eac8845c02181a8259ad06bbb897ddd9f06c73",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7a9a33b46a0b2ed229185c8b7b06dbd8a482f964",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "b70ac3c8e1b286ff0d32095b7eb281d3666fb6c1",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e95077bf09b4aa4cf0d3e259cb236abd58a325ce",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "0c6432bb522bdc9fe1eb04e338271e9d02079978",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d162e6c8da218bbcd7037ff7d059cc4f4bc6d59a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "31618e1e052c91a2ef029a8b7f58981ed07ac84f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "56cb567d563b41762014f2270d93b5239b549742",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6c0bb0c03eed9aef472e6428ddaad06e35306ed0",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1cf11b02c73b31302565829346473bd72fc14ea6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1012fe079e2b332c69ee4f9440c7188db9dcea8d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "98ee8ffb95ec95df54dd7195ad661f6ef3dd34a0",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "b74c2c1cc34b796352ea90eb238e0f5d0d21ee3c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "8a12edff38bc19cb777e4063d9b065e05c43458f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "200674feb06a9954a49a05181912bc0b06dcc16e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d027b2e663d2aea9e4298cc699af6c2b92bb6479",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5b45272e30c9ffe14179d16facef34b99ce9086b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e03491eea7613e85b85358a136cd339f05b0ef63",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1ec7bd8428a65b922245dd1cbbd259a76a138f37",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "fe4bd3a1a84b0281d171a28bf151f166595d5dca",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "fc3126b9279b6a958fdeaa01fb80ad2a2f4cff13",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9116977e0b405da2acd1e3a26b2927506a2e34ec",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "ac3080784ff0635c59168b2cda08ff7bbe2bb683",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "62a55eabb1060d92937f47f7085d036f3b538377",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "a1ba44db80cd39c16517275852a10648b3835792",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c8cac44fd711e0c02cfb06ab5a01f3b0390bf278",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d15192b3f991a51e517e7d5cb986014adf8bca9d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f488f7f71ee8dbe841a3d3ed7ccbbcfc9ddf3d38",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "87388eca3f8f9c4d712657e7d4a0a99af20e3272",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "51d91d956f6be52db6132e9a7a0a15c44966c93b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "fa760c5669d9c70d642f4b0ba714e54cf684b467",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "48f99a95ea448b78bb9cc5debbddda1f872c0cb7",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d010b0ee4b6353705796790f996fcb90ebc8fd31",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2658986ae0f5212bd52abf511230b6e64d8abff2",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2a7d6f50078313df2dde1454bf767d43c42f7810",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "a6127658017976f456688dffc53eb665548b86da",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "8c9a7d5039cc4ff5325136324386dd21e13a3081",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "10c39a3cd2b598ba69514cf1f0eb292f531ff3c6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "3a90cf05bd8d08df52969ca890b843942be34b62",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2904aefa0120ced35f7924172bfc67b059258475",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "07c32c439b2560befc3cd5e697694e4e6bed308e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e00e28b87ed5d0682de614d6988eee193d614682",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1a9437108335761a9649021f7269e266a9a1d988",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c1cf1c625656bd5278c1f9a67e62fc4836405027",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4cd0bf47dc7f6ff034fc4ef0bf7f96d4bf697339",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d11cfbcc06defc7fdc34effd15c213a7647578d3",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "108d168037d843bcd09f64ee49652959085fae93",
+        "disposition": "UNCHANGED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2c4ca6d60673af19840c6995896d37d381fb248d",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "eec3c21efc772acaec11890f772910221a29ef9e",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "a1616ba610e495185d3c4d0c14847587ea32c390",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f952f2cbfa2fd273de2ea45953e534a591c6bb71",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d3d0c454bf1f228122adc48db7b23f4220dbf065",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2cfbd60e9eca4c399d42185080e1347ef6f8b479",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5fa907de664d8e6b16caa4b63786dcfee6e4b828",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9d89cc84d8e955fb5a52517a45e2a0025926ea78",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "a9265769835e95c40b8ed7e2d71259c4651ab1a9",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1cf17bfaa447ac0d929e11e1789ee1619d373bb1",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1d95ec654d9c7a3d14cdd4040aef92329beae47b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "fe1e15e2fcc4b3726154cce7e320741e1a991b8a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "60ae4cca0126173efee2f6dfc61be64c74dc9b09",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "96a6031050218e8a7f15b12fb30de9191e490b7c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "42b08c676ee798b0a668e55e9b65f863db09ca66",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "8faf1450d55c2ee42caf92f99d57ed596294d067",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "db8eb9499b985fa0d38edadd09f78b0fda1c9a97",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "a300b7866bef1662862fbdcbe28d7b655ee0f028",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "beb51d020cab51215876db3fb28d376c0a83efb2",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "62456ef1bbf885f54453cc7f11eb9b4a05abc205",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "301c8a38eb7c95cdb5b3019c6ed7aa4ff73e03ef",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "38b4903c1ddebede5ce6145f4ac6b4d25aece01c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6c508d9a745d12588f2a615b5cbe9969657c5331",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "df30f0a128b40d6870e8a3cce8e3aa412c70bfe7",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f959e4d0a76352b39176eab013843250620e288c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4e4d855bc37b441286d8224e1ad077e19c8dd3f2",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5c2e35e594dc9897422bedc3fa18053ccebc5861",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c345412e8fb8df744e60fe1ca63c121594e74ac5",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f486143b4a137f89e97756154e9d833bb3f41b03",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "a44cba36ac18fdb7a0a2f80d17a5fa793c7fe846",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "efcc951525125595f9eeb831a7536b7970fe2983",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "afacc4b678116bd5218cd58d6ed64a009cda1f01",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4ab7e2c02b67d6a3a8f356b68fada0545f40feb2",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7c04d92abfc0c279dcf148afc3fb6da053774cb1",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5684732f43c719fa9b921472ad1cf83b3f67e882",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "cc3d562ef7dbf731b5e3b5259ce1bd605e48ce83",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "be77ffeeb4fd42ea48d3e2d0913ff527575adf1e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9c9c0f2a9ce47a66530be9cb317c2b567db25f98",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c33d404949b535c40311521e267980008500c4c6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "aab959abea34b1c3b0642c711891ce732c6c9acd",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "494189999ab1c96bc9d130e75c04eafb9d783e95",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1f396602ff2e3e5a352f8e5f0405a72373e33f1b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "907e260d0fff83991a5b3eb013566b233292d3d4",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "569fd0e1e539b25c17653a8d351a562f2a0118c4",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "b078b777b98996d7cfe02d4036d272debb8ef295",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "23feb7251c4918ff4e7f3010ec94129625533db4",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "3507e5940a95d9e4f782caadda6d4d8b8f84a70c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "758878d1a179586bed452a1c553386222082937f",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7ceb0a4750c9fbabb9e5bf73cede7976f9132daf",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "ae90169c3300b32cd3b200484e1b55c27e155852",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "bc2035aeb9ba7b408fda78dba31f257d7b42b418",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "76637b183712297f13d6dc5c3fa3bc9d5276ab36",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "607cb65374d00a7b591d2704b4a48fe03b88ae49",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "990ad5fceefe1e3403534647bc4b1ed5cdf1eea2",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6676f109dd7e2efc7fdc204fa102841f4b51cce5",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "88d5ba0c56aaf4f1f0afef8cc513a931f820ae0e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4e40af722c49093f038db10385375c8b0a26620e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9aa1e2c63ff9d0b81fe84b9fead4fd947a3f58a6",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "203e545378a06e3d4a51d0226bf98d2ccb99caed",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4cd1d985b60dbebc48e5075c220b64a9c03e92b9",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1c26f7f6d031e1231af7ed14e97a9199848c1b22",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "3ff6127ff13ce700fe35f6287e7dc54c6c80575f",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "ab714d9821dd4f2819466d21977ecf141f194286",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c971f5ec53bc471c8d8a8113e6a98f7cf6413449",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "3a416bab1c16535cc09ba1e24c4256feaac0035b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e95f37dbd3de6d39ed0f8a992135604c988f2219",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "300fa5afd984702d29562abdfa18fa8315bf9383",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "47d0bc3d7b4c0c42fe372c81baa16c8fd60e8841",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "bd15aac9dbceca115418a76d784b7af238296a9d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "10f640c391912c0cd168aabdefbc36ffac9c8512",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "0f177cafd71b6f1c0caae8dade5984b28310d9c2",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d9cb7143ca36f3922694faff0ef422b00fd9d491",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5765850f1f76739f39350b7a000e6f6e758a53dd",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "30ed522502a19a8763377c0240fe148b3901e32d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "c004a7f07f42115e64fe6471420853ddf005fe24",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d908fb8497625bb3dd5717358230ce91ff2895af",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1fe8d2f69df0feeb21e21329024cc5b737754c82",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "088e32d5248a85cf4af41d03b104f1e568482c35",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "0f8a4e1fa8881b44c3c9f332e618b34410a70b8e",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "70e1db9280d223a342981daef578aca2f9a700e3",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d42226d5c4fd6f8fef4d9dd312171cc0227220a8",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "e6e60d0caff7a502d452a4b7219e264fff6a4a1b",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "f89df442d5434530fd3a2d7be4248486747b46f4",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "66bd44aca215f658cc1d5e3bdf5c3b4f0f8db19c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "82d57d182c5ef54b01cc9ae0f6f9418b7218c96a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "59b7e138e6f1a729573dc559079d903155563120",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "81e905125fcdd30ee923dfbaf7de0019cf217926",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "53e80d59205800572d544799324863fb54fa384e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7f3dfa14cc116cc071cdc5cb0fef9fa92697fe1d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "986ad3312ea41a0a5d758b0e6f70f5a70a4fc63a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "d92a4dbff972e77ca2a6a615389f42f0d468fe94",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6a1c3bd7cfff46e0701021f2163be9650a59729a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "531f1b8195d2c4b02fd1e17082e8c51b48b55205",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9eaf3378a8d50fdf0f09dc0122f3717eabbe8ba2",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "b1ffa1d0a350cf51412cadbb0c9b520edfb862cc",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "714f4aff7cc7014df5db539dddf65b754c8e25ad",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "4e83cbdd8381c5e8993dead5a0370983b001a067",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2964330aad829d2d9f73dd147e9751a00914dc4a",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "cc1fa742ceae3a466c056520c33d628f1549a364",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5948f8a37fc3d6a911ce249cbe75ad81a8393787",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "03c7688172e152cdc55f125466a878891571c93c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "90ad8c86f8efbde5927000848596352459186d5d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "44cc47c200368a268cb36f1635e4ac613450d381",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "8734ff2eaef5615b5376c7cf1790446cbc39b3cb",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "25a4eed496c4621d453d41fc6f67166f7c1001f5",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "87d8f5ca22c786391a4aa7b8fb7cc7ca2bdb8135",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "33cc5c94b52de7a323eb3b7853f7ecca189d4870",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1bd385d1ca2cf477d4e5a3586370e9ff425c9b60",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "9a435c65b43b05486092aec6ff04a91790ae7e16",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "fcc38031196c2b6bac2eb1e288c126369cbeb978",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "2806b635936b55c4672b1e834434392c9a27b03d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "b68213cc084b40661ce824da1ad6e304612a966c",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "0d9d30fc35550e50d7c98a076766b1a99252af6e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "42a51730b0259620278c90b6cd5c8c7a99494e69",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "7e994e5f6b67b3ae1c1c6c6d40a24159c3932941",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "1f786f02704893d04eb4d8ce42e01c758b74885e",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "39fe7611e4f176937024c124213b5b72d7eabcc0",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "5a6152a65b01b5bb8a37e46a7d7f2cd886f10058",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "6189a96053c07a627ed726848980c8aa4f582621",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "29c778f0b914f5714426e2476317da1c541c5e4c",
+        "disposition": "ADAPTED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "39fd2ead87f211ed46c022c70f1fccc097ecd861",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "87f9a3fbe3da59b06c92f8ba844fb500931cc31d",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      },
+      {
+        "commit_sha": "317a7d0da81e69b42c0210b28fcf6da9a68af08b",
+        "disposition": "DEFERRED",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5"
+      }
+    ],
+    "rollback_target_sha": "20a030d84522e20643bb7dc6ebb685408b1fa42b",
+    "gates": {
+      "browser": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "dependencies": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "frontend": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "golden_a": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "golden_b": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "h1_h8": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "i18n": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "imports": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "migration": {
+        "status": "FAIL",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "static": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "type": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      },
+      "website": {
+        "status": "PASS",
+        "evidence_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+        "evidence_path": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json",
+        "evidence_digest": "sha256:68d95ec9bd62be5a4015bb2bd7e066823efc3326551da51cf7af0a194f6e3ef5",
+        "required_skips": 0
+      }
+    }
+  },
+  "verifier": {
+    "command": "uv run python scripts/r2/verify_upstream_candidate.py --report <this report> --host-repo . --upstream-repo <local mirror>",
+    "run_at_head": "138b0c8004edec12b9199d3602212bc69cfafa6c",
+    "output": {
+      "reason": "migration gate lacks fresh complete PASS evidence",
+      "verdict": "INCOMPATIBLE"
+    }
+  },
+  "upstream_repo_note": "a local mirror of this repository's fetched `upstream` remote with origin set to the upstream URL; commit ids are content addresses, so the pinned old/new SHAs and tree identify the same objects",
+  "sponsor_exception": "R2_V1_RELEASE_SPONSOR_DECISION_2026-09-28.json"
+}

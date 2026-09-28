@@ -1,0 +1,31 @@
+# command: DATABASE_URL=<disposable postgres:16 db> TMPDIR=<on-disk dir without 'arcreel'> PATH=<pg16 client shims mounting TMPDIR>:$PATH uv run python -m pytest -q -rs -p no:cacheprovider tests/integration/r2/host_hardening/test_deployment_backup.py
+# host_sha: d5c4e6b09c53e82392da7416848b199b18b02df6
+# purpose: recheck of the only file that failed in the run-2 migration gate (see R2_V1_RELEASE_SPONSOR_DECISION_2026-09-28.json)
+.......................                                                  [100%]
+============================= slowest 25 durations =============================
+3.93s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_failed_verification_does_not_poison_the_set
+2.21s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_an_attested_target_cannot_be_reverified_and_attested_files_are_tamper_checked
+2.16s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_verification_resolves_selected_versions_and_artifact_manifests
+2.15s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_round_trip_restores_a_verified_deployment_without_credentials
+2.13s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_attestation_requires_matching_passing_golden_evidence
+2.12s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_verification_flags_a_current_record_without_a_file_and_projects_without_metadata
+2.11s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_attesting_with_a_corrupt_verdict_is_rejected
+2.06s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_a_manifest_of_an_older_schema_version_is_not_restorable
+2.05s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_an_unreadable_state_ledger_is_reported_as_an_integrity_error
+2.04s call     tests/integration/r2/host_hardening/test_deployment_backup.py::test_a_verified_state_without_its_attestation_is_not_restorable
+1.83s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_round_trip_restores_a_verified_deployment_without_credentials
+1.50s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_autovacuum_style_maintenance_during_capture_is_not_a_write
+1.49s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_capture_refuses_while_another_client_is_connected
+1.49s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_capture_detects_changes_made_while_capturing[row-the database was written]
+1.41s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_attestation_requires_matching_passing_golden_evidence
+1.41s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_a_verified_state_without_its_attestation_is_not_restorable
+1.38s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_a_manifest_of_an_older_schema_version_is_not_restorable
+1.37s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_failed_verification_does_not_poison_the_set
+1.37s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_an_unreadable_state_ledger_is_reported_as_an_integrity_error
+1.37s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_capture_detects_changes_made_while_capturing[file-data-root files changed]
+1.37s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_verification_resolves_selected_versions_and_artifact_manifests
+1.36s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_attesting_with_a_corrupt_verdict_is_rejected
+1.36s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_verification_flags_a_current_record_without_a_file_and_projects_without_metadata
+1.36s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_an_attested_target_cannot_be_reverified_and_attested_files_are_tamper_checked
+1.35s setup    tests/integration/r2/host_hardening/test_deployment_backup.py::test_restore_refuses_an_altered_set_and_a_non_empty_target
+23 passed in 61.09s (0:01:01)

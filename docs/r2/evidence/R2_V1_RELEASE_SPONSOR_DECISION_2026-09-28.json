@@ -1,0 +1,34 @@
+{
+  "decision": "SPONSOR_ACCEPTED_RELEASE_GATES_WITH_EXCEPTION",
+  "decision_date": "2026-09-28",
+  "decision_authority": "sponsor, explicit conversation instruction: run only tests/integration/r2/host_hardening/test_deployment_backup.py on PG16 to confirm the fix, do not rerun everything, then treat all 12 gates as meeting the requirement",
+  "candidate_sha": "d5c4e6b09c53e82392da7416848b199b18b02df6",
+  "gate_run": "docs/r2/evidence/v1-release-gates-2026-09-28-run2/manifest.json (evidence commit 138b0c80)",
+  "gates_passed_by_runner": [
+    "h1_h8",
+    "static",
+    "type",
+    "imports",
+    "dependencies",
+    "i18n",
+    "frontend",
+    "website",
+    "golden_a",
+    "golden_b",
+    "browser"
+  ],
+  "gate_accepted_by_exception": {
+    "gate": "migration",
+    "runner_result": "FAIL: alembic round trip exit 0; dialect suite 19 failed, 1052 passed",
+    "cause": "every failure is in tests/integration/r2/host_hardening/test_deployment_backup.py: the session's pg_dump/pg_restore PG16 client shims run in a container that mounted only /tmp, while this run set TMPDIR to an on-disk directory, so pg_dump could not open its output file ('could not open output file ... No such file or directory'). A test-tooling fault, not product code.",
+    "fix": "the shims mount $TMPDIR (session tooling, outside the repository)",
+    "recheck": "docs/r2/evidence/v1-release-gates-2026-09-28-run2-migration-recheck.log: 23 passed on disposable postgres:16 at d5c4e6b0 (a first recheck failed test_database_password_never_reaches_tool_argv only because the chosen TMPDIR path contained the test password string 'arcreel'; rerun with a neutral TMPDIR)",
+    "not_rerun": "the full migration gate and the other 11 gates were not rerun, by the sponsor's instruction"
+  },
+  "e1_verifier_output": {
+    "verdict": "INCOMPATIBLE",
+    "reason": "migration gate lacks fresh complete PASS evidence"
+  },
+  "acceptance_basis": "The sponsor accepts the 12 release gates as met with this exception. The runner-written manifest and the E1 verifier are left exactly as produced; this record does not claim the verifier returned COMPATIBLE.",
+  "first_run": "docs/r2/evidence/v1-release-gates-2026-09-28 (abf5ec1d, failed; README there)"
+}
