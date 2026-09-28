@@ -180,6 +180,8 @@ async def _approve_final(client, project: str, *, project_dir: Path, shot_ids: l
             "contract_schema_version": "1",
             "produced": _produced_body(asset, production_root),
             "approval_record": f"APR-{project}-{FINAL_TARGET_REF}",
+            # The no-provider fixture pipelines render no narration; Gate C verifies the track is silent.
+            "audio_decision": "MUTE",
         },
     )
     export = approved["export"]
@@ -192,10 +194,13 @@ async def _approve_final(client, project: str, *, project_dir: Path, shot_ids: l
     }
 
 
-async def _greenlight_and_publish(client, project: str, *, source_digest: str, deliverable_digest: str) -> None:
+async def _greenlight(client, project: str, *, source_digest: str) -> None:
     await _post(
         client, f"/projects/{project}/gates/greenlight", {"source_digest": source_digest, "action": "GREENLIGHT"}
     )
+
+
+async def _publish(client, project: str, *, deliverable_digest: str) -> None:
     await _post(
         client,
         f"/projects/{project}/gates/publish-approval",
@@ -229,6 +234,15 @@ async def _materialize_golden_a(client, data_root: Path) -> dict[str, Any]:
         "/projects",
         {"name": GOLDEN_A_PROJECT, "title": "Golden A: how H.264 works", "generation_mode": "storyboard"},
     )
+    source_digest = "sha256:" + _sha256_file(fixture)
+    await _greenlight(client, GOLDEN_A_PROJECT, source_digest=source_digest)
+    # Gate B for the factual product (ADR-0092): lock the exact source and script revision before production.
+    script_digest = "sha256:" + hashlib.sha256(bundle.script.model_dump_json().encode()).hexdigest()
+    await _post(
+        client,
+        f"/projects/{GOLDEN_A_PROJECT}/gates/script-lock",
+        {"source_digest": source_digest, "script_digest": script_digest, "action": "LOCK"},
+    )
     project_dir = data_root / GOLDEN_A_PROJECT
     production_root = project_dir / "production"
     producer = GoldenALocalProducer()
@@ -258,12 +272,7 @@ async def _materialize_golden_a(client, data_root: Path) -> dict[str, Any]:
         shot_ids=shot_ids,
         basis=prepared[0].shot.content_basis,
     )
-    await _greenlight_and_publish(
-        client,
-        GOLDEN_A_PROJECT,
-        source_digest="sha256:" + _sha256_file(fixture),
-        deliverable_digest="sha256:" + final["final_sha256"],
-    )
+    await _publish(client, GOLDEN_A_PROJECT, deliverable_digest="sha256:" + final["final_sha256"])
     return {"project_name": GOLDEN_A_PROJECT, "kind": "GOLDEN_A", **final}
 
 
@@ -300,6 +309,7 @@ async def _materialize_golden_b(client, data_root: Path, profile_key: str) -> di
     setup = await build_screenplay_admission_command(
         profile_ref, canon=canon, uow_factory=uow_factory, user_id=DEFAULT_USER_ID, project_name=project
     )
+    await _greenlight(client, project, source_digest="sha256:" + canon.canon_ref.content_hash.removeprefix("sha256:"))
     lock = await _post(client, f"/projects/{project}/gates/narrative-lock", setup.admit.model_dump(mode="json"))
     admitted = setup.admit.admitted_screenplay
     screenplay_ref = ArtifactVersionRef(
@@ -348,12 +358,7 @@ async def _materialize_golden_b(client, data_root: Path, profile_key: str) -> di
         shot_ids.append(shot.id)
 
     final = await _approve_final(client, project, project_dir=project_dir, shot_ids=shot_ids, basis=_basis())
-    await _greenlight_and_publish(
-        client,
-        project,
-        source_digest="sha256:" + canon.canon_ref.content_hash.removeprefix("sha256:"),
-        deliverable_digest="sha256:" + final["final_sha256"],
-    )
+    await _publish(client, project, deliverable_digest="sha256:" + final["final_sha256"])
     return {
         "project_name": project,
         "kind": f"GOLDEN_B_{profile_key}",
@@ -386,6 +391,24 @@ async def _download_digest(client, project: str, digest: str) -> str | None:
     if response.status_code != 200:
         return None
     return "sha256:" + hashlib.sha256(response.content).hexdigest()
+
+
+async def _final_audio_decision(project: str) -> str | None:
+    from sqlalchemy import select
+
+    from lib.artifact_manifest import ArtifactKey
+    from lib.db import async_session_factory
+    from lib.db.models.gates import FinalCutReceiptModel
+
+    final_key = ArtifactKey.episode_video(1, FINAL_TARGET_REF).encode()
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(FinalCutReceiptModel.audio_decision)
+            .where(FinalCutReceiptModel.project_name == project, FinalCutReceiptModel.artifact_key == final_key)
+            .order_by(FinalCutReceiptModel.sequence.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
 
 async def _final_cut_receipt_count(project: str) -> int:
@@ -428,6 +451,13 @@ async def check(
                 problems.append("GATE_A_MISSING")
             if not published:
                 problems.append("GATE_D_MISSING")
+            script_locks = history.get("script_lock", [])
+            if product["kind"] == "GOLDEN_A" and (not script_locks or script_locks[-1].get("action") != "LOCK"):
+                problems.append("GATE_B_MISSING")
+            if product["kind"] != "GOLDEN_A" and not product.get("narrative_lock_decision_id"):
+                problems.append("GATE_B_MISSING")
+            if await _final_audio_decision(project) not in ("AUDIO", "MUTE"):
+                problems.append("AUDIO_DECISION_MISSING")
             deliverable_digest = published[-1]["deliverable_digest"] if published else ""
 
             project_dir = data_root / project
