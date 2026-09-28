@@ -4,7 +4,7 @@ Runs only when pointed at a restored target: the golden restore drill's restored
 database (``tests/drills/r2/golden_restore_drill.py run``). The environment is disposable; the test
 records a Gate D decision and a refused Gate C request in it.
 
-    uv sync --group browser && (cd frontend && pnpm build)
+    uv sync && (cd frontend && pnpm build)
     ARCREEL_E2E_DATA_DIR=<work>/restored-data \\
     ARCREEL_E2E_DATABASE_URL=postgresql+asyncpg://…/golden_drill_target \\
     [ARCREEL_E2E_EVIDENCE=<dir>] uv run python -m pytest tests/e2e/test_m7_production_candidate_workflow.py
@@ -42,7 +42,7 @@ import pytest
 if TYPE_CHECKING:
     from playwright.sync_api import Locator, Page
 
-sync_api = pytest.importorskip("playwright.sync_api", reason="uv sync --group browser")
+sync_api = pytest.importorskip("playwright.sync_api", reason="uv sync (dev group)")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIST = REPO_ROOT / "frontend" / "dist" / "index.html"

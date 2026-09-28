@@ -52,11 +52,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-# 浏览器 E2E（tests/e2e 的 V1 操作员工作流），不进 dev：按需 `uv sync --group browser` 装入。
-# 用例通过 channel="chrome" 驱动系统 Chrome，无需 `playwright install` 下载浏览器。
-browser = [
-    "playwright==1.63.0",
-]
 dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
@@ -73,6 +68,9 @@ dev = [
     "respx>=0.22.0",
     "deptry>=0.24.0",
     "hypothesis>=6.167.1",
+    # 浏览器 E2E（tests/e2e 的 V1 操作员工作流）通过 channel="chrome" 驱动系统 Chrome，
+    # 无需 `playwright install`；放在 dev 组以便 basedpyright 在默认环境解析其类型。
+    "playwright==1.63.0",
 ]
 # 变异测试工具，不进 dev：只在按批次跑 mutmut 时 `uv sync --group mutation` 装入。
 # 独立成组是为了让版本 pin 进 uv.lock、被 dependabot 看到；流程见 docs/testing/mutmut-runbook.md。
@@ -459,7 +457,7 @@ DEP004 = [
     "pytest_asyncio", # pytest 的 asyncio 插件，测试内直接用 @pytest_asyncio.fixture（本规则按模块名匹配）
     "respx",          # httpx 的测试替身
     "hypothesis",     # 属性测试库，R2-M4 capability matcher 性质测试直接 import
-    "playwright",     # 浏览器 E2E（browser 组），tests/e2e 直接 import；未安装时用例 importorskip
+    "playwright",     # 浏览器 E2E，tests/e2e 直接 import
 ]
 
 [tool.ruff]

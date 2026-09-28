@@ -235,14 +235,12 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-browser = [
-    { name = "playwright" },
-]
 dev = [
     { name = "basedpyright" },
     { name = "deptry" },
     { name = "hypothesis" },
     { name = "import-linter" },
+    { name = "playwright" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -303,12 +301,12 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-browser = [{ name = "playwright", specifier = "==1.63.0" }]
 dev = [
     { name = "basedpyright", specifier = ">=1.39.4" },
     { name = "deptry", specifier = ">=0.24.0" },
     { name = "hypothesis", specifier = ">=6.167.1" },
     { name = "import-linter", specifier = ">=2.13" },
+    { name = "playwright", specifier = "==1.63.0" },
     { name = "pre-commit", specifier = ">=4.0.0" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-asyncio", specifier = ">=1.3.0" },
