@@ -220,6 +220,10 @@ class ManagedSession:
     initial_user_entry_error: Exception | None = None
     last_user_prompt: str = ""
     assistant_model: str = ""
+    # The CLI reports cost and usage cumulatively for its process; these hold what this
+    # session's process has already booked, so each result books only its increase.
+    booked_cost_usd: float = 0.0
+    booked_tokens: tuple[int, int, int] = (0, 0, 0)
     interrupt_requested: bool = False
     last_activity: float | None = None  # updated on every send/receive
     _cleanup_task: asyncio.Task | None = None  # current cleanup timer (idle TTL or terminal delay)
@@ -1228,6 +1232,25 @@ class SessionManager:
         total_cost_usd = extract_assistant_cost(result_msg)
         if input_tokens is None and output_tokens is None and total_cost_usd is None:
             return
+        # ``total_cost_usd`` and ``usage`` are totals for the CLI process, which serves every turn
+        # of this session: book the increase since the previous result. A smaller total means a
+        # new process whose counters started again, so the whole total is new.
+        cumulative = (input_tokens or 0, output_tokens or 0, usage_tokens or 0)
+        if any(now < before for now, before in zip(cumulative, managed.booked_tokens, strict=True)):
+            managed.booked_tokens = (0, 0, 0)
+        delta_tokens = tuple(now - before for now, before in zip(cumulative, managed.booked_tokens, strict=True))
+        managed.booked_tokens = cumulative
+        if total_cost_usd is not None:
+            if total_cost_usd < managed.booked_cost_usd:
+                managed.booked_cost_usd = 0.0
+            cost_delta: float | None = total_cost_usd - managed.booked_cost_usd
+            managed.booked_cost_usd = total_cost_usd
+        else:
+            cost_delta = None
+        input_tokens = delta_tokens[0] if input_tokens is not None else None
+        output_tokens = delta_tokens[1] if output_tokens is not None else None
+        usage_tokens = delta_tokens[2] if usage_tokens is not None else None
+        total_cost_usd = cost_delta
 
         # 事后补录：一次调用写入终态行（省掉调用方管理的 pending 中间态）。
         await self.ledger.backfill(
