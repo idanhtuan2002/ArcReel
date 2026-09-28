@@ -227,6 +227,11 @@ class _FakeQueue:
     async def list_orphan_tasks_on_start(self):
         return self._orphans
 
+    async def project_admission(self):
+        from lib.project_admission import ProjectAdmission
+
+        return ProjectAdmission()
+
     async def claim_next_task(self, media_type, **_kwargs):
         return None
 

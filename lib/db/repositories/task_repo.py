@@ -532,8 +532,15 @@ class TaskRepository(BaseRepository):
         *,
         pool_full_providers: frozenset[str] | None = None,
         exclude_task_ids: frozenset[str] | None = None,
+        paused_projects: frozenset[str] | None = None,
+        project_running_ceiling: int | None = None,
     ) -> dict[str, Any] | None:
         """领取下一个 queued 任务。
+
+        Portfolio admission (ADR-0094): tasks of a project in ``paused_projects`` are not claimed,
+        and a project that already has ``project_running_ceiling`` running tasks in this lane is
+        skipped. The running count is read from ``tasks`` itself, so it survives restarts; a
+        skipped project does not block later-queued tasks of other projects.
 
         ``pool_full_providers`` 为本 cycle 已知池满的 provider_id 集合（黑名单语义）：
         - ``None`` / 空集合 —— 不做 provider 过滤
@@ -563,6 +570,18 @@ class TaskRepository(BaseRepository):
         if exclude_task_ids:
             task_filter = "AND tasks.task_id NOT IN :excluded_task_ids"
             params["excluded_task_ids"] = tuple(exclude_task_ids)
+        admission_filter = ""
+        if paused_projects:
+            admission_filter += " AND tasks.project_name NOT IN :paused_projects"
+            params["paused_projects"] = tuple(paused_projects)
+        if project_running_ceiling is not None and project_running_ceiling > 0:
+            admission_filter += (
+                " AND (SELECT COUNT(*) FROM tasks AS running_task"
+                " WHERE running_task.project_name = tasks.project_name"
+                " AND running_task.media_type = tasks.media_type"
+                " AND running_task.status = 'running') < :project_running_ceiling"
+            )
+            params["project_running_ceiling"] = project_running_ceiling
 
         # Use raw SQL for the dependency join (clearer than ORM for self-join)
         raw_stmt = text(f"""
@@ -574,6 +593,7 @@ class TaskRepository(BaseRepository):
               AND tasks.media_type = :media_type
               {provider_filter}
               {task_filter}
+              {admission_filter}
               AND (
                 tasks.dependency_task_id IS NULL
                 OR dependency.status = 'succeeded'
@@ -585,6 +605,8 @@ class TaskRepository(BaseRepository):
             raw_stmt = raw_stmt.bindparams(sa_bindparam("providers", expanding=True))
         if "excluded_task_ids" in params:
             raw_stmt = raw_stmt.bindparams(sa_bindparam("excluded_task_ids", expanding=True))
+        if "paused_projects" in params:
+            raw_stmt = raw_stmt.bindparams(sa_bindparam("paused_projects", expanding=True))
 
         result = await self.session.execute(raw_stmt, params)
         row = result.first()

@@ -31,6 +31,7 @@ from lib.generation_batch import (
     validate_blocked_items,
 )
 from lib.logging_utils import redact_provider_text
+from lib.project_admission import ProjectAdmission, load_project_admission
 from lib.project_migration_guard import assert_project_migration_ok
 from lib.request_context import current_request_id
 from lib.task_terminal_events import TERMINAL_TASK_STATUSES, emit_task_terminal_events
@@ -657,16 +658,24 @@ class GenerationQueue:
         *,
         pool_full_providers: frozenset[str] | None = None,
         exclude_task_ids: frozenset[str] | None = None,
+        admission: ProjectAdmission | None = None,
     ) -> dict[str, Any] | None:
         async with self._task_repo() as repo:
             task = await repo.claim_next(
                 media_type,
                 pool_full_providers=pool_full_providers,
                 exclude_task_ids=exclude_task_ids,
+                paused_projects=admission.paused if admission is not None else None,
+                project_running_ceiling=admission.ceiling if admission is not None else None,
             )
         if task:
             logger.debug("任务被领取 task_id=%s", task["task_id"])
         return task
+
+    async def project_admission(self) -> ProjectAdmission:
+        """The current portfolio admission controls (ADR-0094), read once per claim cycle."""
+        async with self._session_factory() as session:
+            return await load_project_admission(session)
 
     async def requeue_running_tasks(self, *, limit: int = 1000) -> int:
         async with self._task_repo() as repo:

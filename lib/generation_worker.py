@@ -672,6 +672,7 @@ class GenerationWorker:
         worker 二次 ``_extract_provider`` 派生 provider 再校验容量。
         """
         claimed_any = False
+        admission = await self.queue.project_admission()
 
         for media_type in self._lanes:
             attempted_current_state_tasks: set[str] = set()
@@ -683,11 +684,13 @@ class GenerationWorker:
                         media_type=media_type,
                         pool_full_providers=pool_full,
                         exclude_task_ids=frozenset(attempted_current_state_tasks),
+                        admission=admission,
                     )
                 else:
                     task = await self.queue.claim_next_task(
                         media_type=media_type,
                         pool_full_providers=pool_full,
+                        admission=admission,
                     )
                 if not task:
                     break
