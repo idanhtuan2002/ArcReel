@@ -17,7 +17,10 @@ downloads it through the download-token route and checks its bytes against the G
 - Publish Approval is filled from the listed final and recorded;
 - a download token for another project and an unknown digest are refused, and so is an
   unauthenticated gate read;
-- after a server restart, the reopened page lists the same final and serves the same bytes.
+- the workspace's event stream survives a server restart while the browser is offline: a title
+  changed during the outage appears after reconnecting, through the stream's snapshot, without a
+  page reload;
+- after the restart, the reopened settings page lists the same final and serves the same bytes.
 """
 
 from __future__ import annotations
@@ -285,8 +288,23 @@ def test_the_operator_reviews_downloads_approves_and_reopens_restored_golden_pro
         assert unknown.status == 404
         assert httpx.get(f"{server.base_url}/api/v1/projects/{project}/gates").status_code == 401
 
+    # Reconnect and resync: the workspace's project event stream is cut by a server restart while
+    # the browser is offline, the title changes during the outage, and after reconnecting the
+    # stream's snapshot (new fingerprint) must refresh the open page without a reload.
+    page.goto(f"/app/projects/{project}")
+    with _api(server, token) as client:
+        old_title = client.get(f"/projects/{project}").raise_for_status().json()["project"]["title"]
+    page.get_by_text(old_title).first.wait_for(timeout=60_000)
+    new_title = f"{old_title} (resync {int(time.time())})"
+    page.context.set_offline(True)
     server.stop()
     server.start()
+    with _api(server, token) as client:
+        client.patch(f"/projects/{project}", json={"title": new_title}).raise_for_status()
+    page.context.set_offline(False)
+    page.get_by_text(new_title).first.wait_for(timeout=90_000)
+    resynced_url = page.url
+
     row = _open_settings(page, project)
     assert _listed_digest(row) == digest
     reopened = _download(page, row, evidence_dir / f"{project}-after-restart.mp4")
@@ -298,4 +316,5 @@ def test_the_operator_reviews_downloads_approves_and_reopens_restored_golden_pro
     record["foreign_token_status"] = 403
     record["unknown_digest_status"] = 404
     record["restart_reopen_digest"] = _sha256(reopened)
+    record["sse_resync"] = {"page": resynced_url.removeprefix(server.base_url), "title_after_outage": new_title}
     (evidence_dir / "e2e-result.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
