@@ -59,7 +59,7 @@ ROUTE_ADAPTER_VERSIONS: dict[str, str] = {
     "media:image": "host-media-v1",
     "media:text": "host-media-v1",
     "media:audio": "host-media-v1",
-    "agent": "agent-sdk-v1",
+    "agent": "agent-sdk-v2",
     "trial_run": "declarative-trial-v1",
 }
 
@@ -96,9 +96,26 @@ def qualifications_dir(root: Path | None = None) -> Path:
     return (root or app_data_dir()) / QUALIFICATIONS_DIRNAME
 
 
-#: Route classes that cannot be qualified: the Agent's spend is recorded after the fact, so it has
-#: no budget-before-submit (ADR-0091 invariant 1), and trial runs are a setup tool.
-UNQUALIFIABLE_ROUTE_KINDS = frozenset({"agent", "trial_run"})
+#: Route classes that cannot be qualified: trial runs are a setup tool (ADR-0091 amendment item 5).
+UNQUALIFIABLE_ROUTE_KINDS = frozenset({"trial_run"})
+
+#: The only Agent preset whose models the Claude CLI prices from its own table (ADR-0093).
+CLI_PRICED_AGENT_PRESET = "anthropic-official"
+
+
+def agent_route_priced(provider_id: str | None, model_id: str | None) -> bool:
+    """Whether the Agent's budget cap can be trusted: the CLI's own price table covers the model.
+
+    Another model is priced as "unknown" by the CLI, so its cost, and the ``max_budget_usd`` cap
+    that compares against it, are unreliable (ADR-0093).
+    """
+    return provider_id == CLI_PRICED_AGENT_PRESET and (not model_id or model_id.startswith("claude-"))
+
+
+def _qualifiable(route: PaidRoute, model_id: str | None) -> bool:
+    if route.kind in UNQUALIFIABLE_ROUTE_KINDS:
+        return False
+    return route.kind != "agent" or agent_route_priced(route.provider_id, model_id)
 
 
 def load_qualifications(root: Path | None = None) -> list[RouteQualification]:
@@ -161,8 +178,8 @@ def record_qualification(
     root: Path | None = None,
 ) -> RouteQualification:
     """Write the canary evidence and replace any earlier record for the same route and model."""
-    if route.kind in UNQUALIFIABLE_ROUTE_KINDS:
-        raise ValueError(f"route class {route.kind!r} cannot be qualified")
+    if not _qualifiable(route, model_id):
+        raise ValueError(f"route {route.ref!r} with model {model_id!r} cannot be qualified")
     directory = qualifications_dir(root)
     evidence_dir = directory / _EVIDENCE_DIR
     evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -220,7 +237,7 @@ def is_route_qualified(
     root: Path | None = None,
 ) -> bool:
     """The single registry read for release gates: static adapter level plus runtime route record."""
-    if route.kind in UNQUALIFIABLE_ROUTE_KINDS or binding is None:
+    if not _qualifiable(route, model_id) or binding is None:
         return False
     if not adapter_level_holds(route, now):
         return False
@@ -247,12 +264,14 @@ def install_runtime_qualification_lookup(root: Path | None = None) -> None:
 
 
 __all__ = [
+    "CLI_PRICED_AGENT_PRESET",
     "QUALIFICATIONS_DIRNAME",
     "ROUTE_ADAPTER_VERSIONS",
     "UNQUALIFIABLE_ROUTE_KINDS",
     "RouteQualification",
     "adapter_level_holds",
     "adapter_version_for",
+    "agent_route_priced",
     "install_runtime_qualification_lookup",
     "is_route_qualified",
     "load_qualifications",

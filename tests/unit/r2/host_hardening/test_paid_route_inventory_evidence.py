@@ -9,7 +9,7 @@ from r2.host_hardening.paid_routes import paid_route_inventory
 from r2.host_hardening.route_inventory import BUILTIN_VIDEO_SUBMIT_PROVIDER, PAID_ASYNC_SUBMIT_FAMILIES
 from r2.host_hardening.route_qualifications import UNQUALIFIABLE_ROUTE_KINDS, adapter_version_for
 
-EVIDENCE = Path(__file__).resolve().parents[4] / "docs/r2/evidence/R2_V1_06_PAID_ROUTE_INVENTORY_2026-09-28.json"
+EVIDENCE = Path(__file__).resolve().parents[4] / "docs/r2/evidence/R2_V1X_PAID_ROUTE_INVENTORY_2026-09-29.json"
 
 
 def _evidence() -> dict[str, object]:
@@ -29,6 +29,9 @@ def test_every_source_route_is_recorded_with_its_adapter_version_and_nothing_els
         disposition = str(row["release_disposition"])
         if route.kind in UNQUALIFIABLE_ROUTE_KINDS:
             assert disposition.startswith("REFUSED_IN_RELEASE")
+        elif route.kind == "agent":
+            assert disposition.startswith("REFUSED_UNTIL_QUALIFIED")
+            assert "ADR-0093" in disposition
         elif route.media_type == "video":
             assert disposition.startswith("DISABLED_IN_RELEASE")
         else:

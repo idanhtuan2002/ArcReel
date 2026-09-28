@@ -235,3 +235,39 @@ async def test_an_unclaimed_hold_expires_after_the_claim_window(db_factory: asyn
             budget_scope_ref=budget_scope_ref("USD"), now=now + CLAIM_WINDOW
         )
     assert [r.reservation_ref for r in expired] == ["api_call:999"]
+
+
+async def test_an_agent_connection_reserves_its_cap_and_commits_what_it_booked(
+    db_factory, release_mode: None, monkeypatch
+) -> None:
+    from lib.budget_guard import AGENT_SESSION_BUDGET_ENV, reconcile_agent_connection, reserve_agent_connection
+
+    monkeypatch.setenv(AGENT_SESSION_BUDGET_ENV, "2.50")
+    await _create_scope(db_factory, "10")
+
+    reserved = await reserve_agent_connection(db_factory)
+
+    assert reserved is not None
+    ref, cap = reserved
+    assert cap == Decimal("2.50")
+    await reconcile_agent_connection(db_factory, reservation_ref=ref, actual_usd=Decimal("2.75"))
+    scope = await _scope(db_factory)
+    assert scope is not None
+    assert (scope.reserved_total, scope.committed_total) == (Decimal(0), Decimal("2.75"))
+
+
+async def test_an_agent_connection_is_refused_without_room(db_factory, release_mode: None) -> None:
+    from lib.budget_guard import reserve_agent_connection
+
+    await _create_scope(db_factory, "0.50")
+
+    with pytest.raises(BudgetExceededError):
+        await reserve_agent_connection(db_factory)
+
+
+async def test_an_agent_connection_takes_no_reservation_in_dev(db_factory, monkeypatch) -> None:
+    from lib.budget_guard import reserve_agent_connection
+
+    monkeypatch.setenv(RELEASE_MODE_ENV, "DEV")
+
+    assert await reserve_agent_connection(db_factory) is None

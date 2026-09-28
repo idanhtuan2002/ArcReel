@@ -6,6 +6,7 @@ import argparse
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import select
@@ -18,7 +19,13 @@ from lib.db.models.api_call import ApiCall
 from lib.db.repositories.budget_reservation_repo import BudgetReservationRepository
 from lib.image_backends import registry as image_registry
 from lib.image_backends.base import ImageGenerationResult
-from r2.host_hardening.paid_routes import RELEASE_MODE_ENV, PaidRouteUnqualifiedError, media_route, require_paid_route
+from r2.host_hardening.paid_routes import (
+    RELEASE_MODE_ENV,
+    PaidRoute,
+    PaidRouteUnqualifiedError,
+    media_route,
+    require_paid_route,
+)
 from r2.host_hardening.route_qualifications import is_route_qualified, load_qualifications
 from scripts.r2 import qualify_route
 
@@ -132,3 +139,106 @@ async def test_a_new_api_key_needs_a_new_canary(db_factory, release_deployment: 
     assert not is_route_qualified(
         media_route("ark", "image"), "doubao-x", binding, now=datetime.now(UTC), root=release_deployment
     )
+
+
+async def _agent_credential(db_factory, **fields) -> None:
+    from lib.db.repositories.agent_credential_repo import AgentCredentialRepository
+
+    values = {
+        "preset_id": "anthropic-official",
+        "display_name": "Anthropic",
+        "base_url": "https://api.anthropic.com",
+        "api_key": "sk-ant-canary",
+        "model": "claude-sonnet-4-6",
+    }
+    values.update(fields)
+    async with db_factory() as session:
+        repo = AgentCredentialRepository(session)
+        credential = await repo.create(**values)
+        await repo.set_active(credential.id)
+        await session.commit()
+
+
+@pytest.fixture
+async def agent_release(db_factory, release_deployment: Path, monkeypatch):
+    monkeypatch.setattr("lib.db.async_session_factory", db_factory)
+    async with db_factory() as session:
+        await BudgetReservationRepository(session).create_scope(
+            budget_scope_ref=budget_scope_ref("USD"),
+            currency="USD",
+            authorized_limit=Decimal("5"),
+            now=datetime.now(UTC),
+        )
+    return release_deployment
+
+
+def _agent_args(**overrides) -> argparse.Namespace:
+    return _args(**{"provider": "anthropic-official", "media": "agent", "model": "claude-sonnet-4-6", **overrides})
+
+
+async def _usd_scope(db_factory):
+    async with db_factory() as session:
+        return await BudgetReservationRepository(session).get_scope(budget_scope_ref("USD"))
+
+
+async def test_the_agent_canary_qualifies_a_route_whose_cap_the_cli_enforces(db_factory, agent_release: Path) -> None:
+    from server.agent_runtime.options_assembler import agent_route_binding
+
+    await _agent_credential(db_factory)
+    seen: dict[str, Any] = {}
+
+    async def capped_query(env, cap, workdir):
+        seen.update(env=env, cap=cap)
+        return {"subtype": "error_max_budget_usd", "total_cost_usd": 0.0031, "usage": {}, "model_usage": []}
+
+    result = await qualify_route.run_agent_canary(_agent_args(), session_factory=db_factory, agent_query=capped_query)
+
+    assert result["qualified"] == "agent:anthropic-official"
+    assert seen["cap"] == qualify_route.AGENT_CANARY_CAP_USD
+    assert seen["env"]["CLAUDE_CODE_MAX_RETRIES"] == "0"
+    from lib.db.repositories.agent_credential_repo import AgentCredentialRepository
+
+    async with db_factory() as session:
+        credential = await AgentCredentialRepository(session).get_active()
+    route = PaidRoute("agent", provider_id="anthropic-official")
+    assert is_route_qualified(
+        route, "claude-sonnet-4-6", agent_route_binding(credential), now=datetime.now(UTC), root=agent_release
+    )
+    scope = await _usd_scope(db_factory)
+    assert (scope.reserved_total, scope.committed_total) == (Decimal(0), Decimal("0.003100"))
+
+
+async def test_the_agent_canary_fails_when_the_cli_does_not_stop_at_the_cap(db_factory, agent_release: Path) -> None:
+    await _agent_credential(db_factory)
+
+    async def uncapped_query(env, cap, workdir):
+        return {"subtype": "success", "total_cost_usd": 0.02, "usage": {}, "model_usage": []}
+
+    with pytest.raises(qualify_route.CanaryFailedError):
+        await qualify_route.run_agent_canary(_agent_args(), session_factory=db_factory, agent_query=uncapped_query)
+
+    assert load_qualifications(agent_release) == []
+    scope = await _usd_scope(db_factory)
+    assert (scope.reserved_total, scope.committed_total) == (Decimal(0), Decimal("0.020000"))
+
+
+@pytest.mark.parametrize(
+    ("fields", "args"),
+    [
+        ({"preset_id": "deepseek", "model": "deepseek-v4-pro"}, {"provider": "deepseek", "model": "deepseek-v4-pro"}),
+        ({"sonnet_model": "glm-5.1"}, {}),
+    ],
+)
+async def test_an_agent_route_the_cli_cannot_price_is_refused_before_any_call(
+    db_factory, agent_release: Path, fields, args
+) -> None:
+    await _agent_credential(db_factory, **fields)
+
+    async def must_not_run(env, cap, workdir):
+        raise AssertionError("no paid call may be made")
+
+    with pytest.raises(qualify_route.CanaryRefusedError):
+        await qualify_route.run_agent_canary(_agent_args(**args), session_factory=db_factory, agent_query=must_not_run)
+
+    scope = await _usd_scope(db_factory)
+    assert scope.reserved_total == Decimal(0)

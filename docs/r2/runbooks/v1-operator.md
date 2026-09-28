@@ -19,7 +19,7 @@ V1 turns a selected source into a finished short video with four human gates:
 **Disabled or manual in V1** (strategy §4; do not describe them as available):
 
 - **Video generation through a paid provider in a release deployment.** Every async video adapter profile is `UNQUALIFIED`, so every video route is refused, and a video canary is refused before it spends anything.
-- **The built-in Agent and custom-provider trial runs in a release deployment.** The Agent's spend is only recorded after the fact, so it has no budget-before-submit.
+- **The built-in Agent in a release deployment, except on the Anthropic route.** Only the `anthropic-official` preset with Claude models can be qualified. It runs with a per-connection budget reservation and a hard cap (ADR-0093); other Agent presets are refused. Custom-provider trial runs are refused.
 - **Publication.** V1 never uploads. After Gate D the operator publishes the downloaded file by hand.
 - **Other deferred capabilities:**
   - trend research and autonomous discovery;
@@ -80,6 +80,18 @@ In `PRODUCTION_CANDIDATE`, a paid image, text or audio call runs only when two c
    - **Where it is stored:** under `<data root>/.route_qualifications/`, with a digest-bound evidence file.
    - **A failed canary** records nothing.
    - **A stale `.lock`** in that directory (older than 5 minutes) is cleared automatically.
+
+**The Agent (ADR-0093).**
+
+1. Set the active Agent credential to the `anthropic-official` preset, with a Claude model or no model.
+2. Create a USD budget scope.
+3. Run the Agent canary. It makes one tiny call that the CLI must stop at its cap:
+
+   ```bash
+   uv run python -m scripts.r2.qualify_route --provider anthropic-official --media agent --model claude-sonnet-4-6
+   ```
+
+Each Agent connection then reserves `ARCREEL_AGENT_SESSION_BUDGET_USD` (default 1.00 USD) and cannot spend more than that; the overshoot is at most the calls already in flight. When the cap is reached, the turn ends with a budget message, the connection closes, and the next message opens a new connection with a new reservation. The CLI may restore a conversation's earlier cost on resume, so a long conversation reaches the cap sooner; continue in a new conversation or raise the setting.
 
 **If a paid call is refused:**
 

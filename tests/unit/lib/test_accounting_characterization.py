@@ -1114,6 +1114,63 @@ class TestAgentBackfillChannel:
             ),
         )
 
+    async def test_later_turns_of_one_process_book_only_the_increase(
+        self, manager: SessionManager, acct: _AccountingDb
+    ) -> None:
+        managed = _managed_session()
+        first = {"model": "claude-sonnet-4", "usage": dict(_AGENT_USAGE), "total_cost_usd": 0.1}
+        # The CLI reports totals for its process: the second turn's figures include the first.
+        doubled = {key: value * 2 for key, value in _AGENT_USAGE.items()}
+        second = {"model": "claude-sonnet-4", "usage": doubled, "total_cost_usd": 0.25}
+
+        await manager._record_assistant_usage(managed, first, "completed")
+        await manager._record_assistant_usage(managed, second, "completed")
+
+        rows = await acct.fetch_rows()
+        assert [row["cost_amount"] for row in rows] == [pytest.approx(0.1), pytest.approx(0.15)]
+        assert [(row["input_tokens"], row["output_tokens"]) for row in rows] == [
+            (1_000_000, 200_000),
+            (1_000_000, 200_000),
+        ]
+
+    async def test_a_new_process_books_its_whole_total(self, manager: SessionManager, acct: _AccountingDb) -> None:
+        managed = _managed_session()
+        await manager._record_assistant_usage(
+            managed, {"model": "claude-sonnet-4", "usage": dict(_AGENT_USAGE), "total_cost_usd": 0.5}, "completed"
+        )
+        # A restarted process reports smaller totals: they are all new spend.
+        await manager._record_assistant_usage(
+            managed, {"model": "claude-sonnet-4", "usage": dict(_AGENT_USAGE), "total_cost_usd": 0.2}, "completed"
+        )
+
+        rows = await acct.fetch_rows()
+        assert [row["cost_amount"] for row in rows] == [pytest.approx(0.5), pytest.approx(0.2)]
+
+    async def test_the_session_budget_settles_once_to_what_the_process_booked(
+        self, manager: SessionManager, acct: _AccountingDb, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from decimal import Decimal
+
+        from server.agent_runtime import session_manager as session_manager_module
+
+        settled: list[tuple[str, Decimal]] = []
+
+        async def fake_reconcile(_factory, *, reservation_ref: str, actual_usd: Decimal) -> None:
+            settled.append((reservation_ref, actual_usd))
+
+        monkeypatch.setattr(session_manager_module, "reconcile_agent_connection", fake_reconcile)
+        managed = _managed_session()
+        managed.budget_reservation_ref = "agent_session:abc"
+        await manager._record_assistant_usage(
+            managed, {"model": "claude-sonnet-4", "usage": dict(_AGENT_USAGE), "total_cost_usd": 0.4}, "completed"
+        )
+
+        await manager._settle_budget(managed)
+        await manager._settle_budget(managed)
+
+        assert settled == [("agent_session:abc", Decimal("0.4"))]
+        assert managed.budget_reservation_ref is None
+
     async def test_non_completed_turn_records_failed_but_keeps_reported_cost(
         self, manager: SessionManager, acct: _AccountingDb
     ) -> None:

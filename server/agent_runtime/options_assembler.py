@@ -84,13 +84,41 @@ _PERSONA_PROMPT = """\
 - 你是用户的视频制作搭档，专业、友善、高效"""
 
 
-async def require_agent_route_qualified() -> None:
-    """发布部署下 Agent 的模型供应商也是付费路线：没有当前资质即拒绝开会话（ADR-0091）。
+def agent_route_binding(credential: Any) -> str:
+    """Digest of the Agent configuration a qualification covers: preset, base URL, key and every model."""
+    from r2.host_hardening.paid_routes import route_binding
 
-    DEV 模式直接放行，不读凭证。
+    return route_binding(
+        preset_id=credential.preset_id,
+        base_url=credential.base_url,
+        api_key=credential.api_key,
+        model=credential.model,
+        haiku_model=credential.haiku_model,
+        sonnet_model=credential.sonnet_model,
+        opus_model=credential.opus_model,
+        subagent_model=credential.subagent_model,
+    )
+
+
+def _agent_models(credential: Any) -> list[str]:
+    fields = ("model", "haiku_model", "sonnet_model", "opus_model", "subagent_model")
+    return [value for value in (getattr(credential, name) for name in fields) if value]
+
+
+async def require_agent_route_qualified() -> None:
+    """发布部署下 Agent 的模型供应商也是付费路线：没有当前资质即拒绝开会话（ADR-0091、ADR-0093）。
+
+    只有 CLI 自带价目表能计价的路线（``anthropic-official`` 且所有模型为 ``claude-*``）可以取得资质，
+    预算硬上限依赖这份计价；资质绑定预设、base URL、密钥与全部模型。DEV 模式直接放行，不读凭证。
     """
-    from r2.host_hardening.paid_routes import PaidRoute, current_release_mode, require_paid_route
+    from r2.host_hardening.paid_routes import (
+        PaidRoute,
+        PaidRouteUnqualifiedError,
+        current_release_mode,
+        require_paid_route,
+    )
     from r2.host_hardening.provider_capabilities import ReleaseMode
+    from r2.host_hardening.route_qualifications import agent_route_priced
 
     mode = current_release_mode()
     if mode is ReleaseMode.DEV:
@@ -102,7 +130,11 @@ async def require_agent_route_qualified() -> None:
         credential = await AgentCredentialRepository(session).get_active()
     provider_id = credential.preset_id if credential is not None else None
     model_id = credential.model if credential is not None else None
-    require_paid_route(PaidRoute("agent", provider_id=provider_id), model_id=model_id, release_mode=mode)
+    route = PaidRoute("agent", provider_id=provider_id)
+    priced = credential is not None and agent_route_priced(provider_id, model_id)
+    if not priced or not all(agent_route_priced(provider_id, model) for model in _agent_models(credential)):
+        raise PaidRouteUnqualifiedError(route, model_id)
+    require_paid_route(route, model_id=model_id, binding=agent_route_binding(credential), release_mode=mode)
 
 
 class OptionsAssembler:
@@ -292,8 +324,13 @@ class OptionsAssembler:
         locale: str = DEFAULT_LOCALE,
         stderr: Callable[[str], None] | None = None,
         session_id: str | None = None,
+        max_budget_usd: float | None = None,
     ) -> Any:
         """Build ClaudeAgentOptions for a session.
+
+        ``max_budget_usd`` is the process's hard spend cap in a release deployment (ADR-0093): the
+        CLI stops when its cumulative cost reaches it, and CLI-internal API retries are disabled so
+        an ambiguous outcome is never resent (ADR-0078).
 
         ``stderr`` 在 SDK 子进程退出非 0 时是唯一拿到真实错误的途径
         （``ProcessError.stderr`` 在 SDK 内部被写死为占位符）；上层应在
@@ -365,6 +402,8 @@ class OptionsAssembler:
                 ),
             }
         )
+        if max_budget_usd is not None:
+            provider_env["CLAUDE_CODE_MAX_RETRIES"] = "0"
         sandbox_typed = policy.build_sandbox_settings(project_cwd, user_id=self._user_id_provider())
 
         # Windows 回退：sandbox 关闭时 Bash 系列被剥离出 allowed_tools，
@@ -392,6 +431,7 @@ class OptionsAssembler:
             settings=json.dumps({"autoMemoryDirectory": str(project_memory_dir(project_cwd))}),
             allowed_tools=allowed_tools,
             max_turns=self._max_turns_provider(),
+            max_budget_usd=max_budget_usd,
             system_prompt=SystemPromptPreset(
                 type="preset",
                 preset="claude_code",

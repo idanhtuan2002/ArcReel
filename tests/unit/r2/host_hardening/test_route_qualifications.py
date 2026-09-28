@@ -119,11 +119,29 @@ def test_an_async_video_route_also_needs_its_adapter_verified_offline(tmp_path: 
     assert not _qualified(route, tmp_path)
 
 
-@pytest.mark.parametrize("route", [PaidRoute("agent", provider_id="anthropic-official"), PaidRoute("trial_run")])
-def test_the_agent_and_trial_runs_cannot_be_qualified(tmp_path: Path, route: PaidRoute) -> None:
+def test_trial_runs_cannot_be_qualified(tmp_path: Path) -> None:
+    route = PaidRoute("trial_run")
     with pytest.raises(ValueError, match="cannot be qualified"):
         _record(tmp_path, route)
     assert not _qualified(route, tmp_path)
+
+
+@pytest.mark.parametrize("model", ["claude-sonnet-4-6", ""])
+def test_the_agent_on_the_cli_priced_route_can_be_qualified(tmp_path: Path, model: str) -> None:
+    route = PaidRoute("agent", provider_id="anthropic-official")
+    _record(tmp_path, route, model)
+    assert _qualified(route, tmp_path, model=model)
+
+
+@pytest.mark.parametrize(
+    ("provider_id", "model"),
+    [("deepseek", "deepseek-v4-pro"), ("anthropic-official", "gpt-5.5"), ("arcreel", "claude-sonnet-4-6")],
+)
+def test_an_agent_route_the_cli_cannot_price_cannot_be_qualified(tmp_path: Path, provider_id: str, model: str) -> None:
+    route = PaidRoute("agent", provider_id=provider_id)
+    with pytest.raises(ValueError, match="cannot be qualified"):
+        _record(tmp_path, route, model)
+    assert not _qualified(route, tmp_path, model=model)
 
 
 def test_the_installed_lookup_opens_the_release_gate(tmp_path: Path) -> None:
