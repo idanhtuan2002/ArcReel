@@ -1,0 +1,31 @@
+{
+  "decision": "SPONSOR_STARTS_V2",
+  "decision_date": "2026-09-29",
+  "decision_authority": "sponsor, explicit conversation instruction: skip the operator journal and move to the next step (V2), after 'toi cam thay v1 da on, chung ta co nen sang v2 luon khong' and agreement to finish cycle 1 first",
+  "v2_start_gate": {
+    "1_v1_release_gate_and_tag": {
+      "state": "MET",
+      "evidence": "tag r2-v1.0.0 (54240210); R2_V1_PRODUCTION_CANDIDATE_2026-09-28.md; migration gate by sponsor exception R2_V1_RELEASE_SPONSOR_DECISION_2026-09-28.json"
+    },
+    "2_baseline_restored_and_verified": {
+      "state": "MET",
+      "evidence": "operator cycle 1 backup bs-20260928T190438Z restored into a clean database and data root, checks_passed true (R2_V1_OPERATOR_CYCLE_1_RECORD_2026-09-29.md); the V2 staging restore (strategy item 12) follows as V2-00"
+    },
+    "3_one_stable_operator_release_cycle": {
+      "state": "MET_BY_OBJECTIVE_EVIDENCE",
+      "evidence": "R2_V1_OPERATOR_CYCLE_1_RECORD_2026-09-29.md; operator narrative journal waived by the sponsor"
+    },
+    "4_evidence_backed_gap": {
+      "state": "MET",
+      "gap": "autonomous opportunity research and story/script writing in release mode: V1 has no M9 authority and refuses the host Agent in PRODUCTION_CANDIDATE (ADR-0091); no-provider production is limited to the Golden A fixture director",
+      "evidence": "sponsor request 2026-09-29; cycle 1 record findings 8-9; ADR-0091 amendment item 5"
+    }
+  },
+  "limits": "The strategy's 'observed stable operator release cycle' is one cycle, compiled from logs; no production deployment or publication occurred. V2 starts from the V1 tag lineage; V1 keeps a maintenance line.",
+  "next": [
+    "V2-00: branch r2-v2/main from r2-v1.0.0 lineage, keep r2-v1/maintenance, restore the cycle-1 baseline into isolated V2 staging and verify",
+    "V1.x: Agent per-session budget reservation (unlocks the host Agent in release mode)",
+    "V2-01: PipelineRun decision (research recommends a host runtime projection) with a queue-admission spike",
+    "M8: re-run A0 prerequisite check against the V1 candidate; then M9 opportunity research"
+  ]
+}

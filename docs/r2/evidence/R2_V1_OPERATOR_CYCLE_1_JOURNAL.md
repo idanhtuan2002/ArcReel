@@ -1,5 +1,7 @@
 # R2 V1 operator cycle 1 — journal
 
+> The sponsor waived this narrative journal on 2026-09-29. The objective record is `R2_V1_OPERATOR_CYCLE_1_RECORD_2026-09-29.md`.
+
 This is the operator's record of the first real V1 release cycle, the V2 start gate
 condition 3 ("one stable operator release cycle has been observed", strategy §7).
 
