@@ -159,6 +159,14 @@ def _login(page: Page) -> str:
     page.fill("#login-password", PASSWORD)
     page.click("button[type=submit]")
     page.wait_for_url("**/app/**", timeout=30_000)
+    # The first-use tour opens on a fresh deployment and steers every navigation back to its
+    # own route; the operator skips it, which the server records.
+    skip = page.get_by_role("button", name="Skip")
+    try:
+        skip.wait_for(timeout=15_000)
+        skip.click()
+    except sync_api.TimeoutError:
+        pass
     token = page.evaluate("window.localStorage.getItem('arcreel_auth_token')")
     assert isinstance(token, str)
     assert token
