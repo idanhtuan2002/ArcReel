@@ -51,7 +51,7 @@ Then run from the tagged source:
 ```bash
 uv sync
 (cd frontend && pnpm install --frozen-lockfile && pnpm build)
-uv run python -m server.app          # migrates the database on startup
+uv run uvicorn server.app:app --host 127.0.0.1 --port 1241   # migrates the database on startup
 ```
 
 - The PostgreSQL major version must match the `pg_dump`/`pg_restore` client used for backups (`m7-backup-restore.md`).
@@ -91,6 +91,13 @@ In `PRODUCTION_CANDIDATE`, a paid image, text or audio call runs only when two c
 
 1. **Gate A:** in Project settings, "V1 Human Gates" → Greenlight, enter the source digest and approve.
 2. **Gate B (drama):** admit the screenplay through `POST /api/v1/projects/{p}/gates/narrative-lock`.
+For the no-provider factual product (the Golden A bundle), `scripts/r2/v1_operator.py` does steps 3 and 4 under your own login:
+
+- `digests` prints the digests for Gates A and B;
+- `produce` renders the shots into `production/`;
+- `approve-shots` records Gate C for each shot, after you review the files;
+- `approve-final --audio MUTE|AUDIO` composes the final and records its Gate C.
+
 3. **Gate C for each shot:** render the shot, then approve its master through `POST /api/v1/projects/{p}/gates/final-cut`.
    - Send the file path under `production/` and its sha256; the server re-hashes the file and refuses a mismatch.
    - Re-using an `approval_record` for the same request replays safely.
