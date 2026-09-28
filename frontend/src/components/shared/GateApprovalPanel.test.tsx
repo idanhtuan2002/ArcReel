@@ -65,7 +65,7 @@ describe("GateApprovalPanel", () => {
     render(<GateApprovalPanel projectName="demo" />);
     await waitFor(() => expect(screen.getAllByText("尚未作出决策")[0]).toBeInTheDocument());
 
-    fireEvent.change(screen.getByPlaceholderText("源内容摘要"), { target: { value: "sha256:a" } });
+    fireEvent.change(screen.getAllByPlaceholderText("源内容摘要")[0], { target: { value: "sha256:a" } });
     fireEvent.click(screen.getAllByText("批准")[0]);
 
     await waitFor(() => {
@@ -84,7 +84,7 @@ describe("GateApprovalPanel", () => {
     render(<GateApprovalPanel projectName="demo" />);
     await waitFor(() => expect(screen.getAllByText("尚未作出决策")[0]).toBeInTheDocument());
 
-    fireEvent.change(screen.getByPlaceholderText("源内容摘要"), { target: { value: "sha256:a" } });
+    fireEvent.change(screen.getAllByPlaceholderText("源内容摘要")[0], { target: { value: "sha256:a" } });
     fireEvent.click(screen.getAllByText("批准")[0]);
 
     await waitFor(() => {
@@ -134,5 +134,34 @@ describe("GateApprovalPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("暂无已批准且有效的成片；Final Cut 通过 gate API 批准。")).toBeInTheDocument();
     });
+  });
+
+  it("locks a factual script with its exact source and script digests", async () => {
+    vi.spyOn(API, "getGateHistory").mockResolvedValue({ greenlight: [], publish_approval: [], script_lock: [] });
+    const lockSpy = vi.spyOn(API, "scriptLock").mockResolvedValueOnce({
+      decision_id: "d-2",
+      action: "LOCK",
+      sequence: 1,
+      created_at: "2026-09-28T00:00:00Z",
+      authorization: { authenticated_principal: "operator-1", authorized_at: "2026-09-28T00:00:00Z" },
+      source_digest: "sha256:s",
+      script_digest: "sha256:c",
+    });
+
+    render(<GateApprovalPanel projectName="demo" />);
+    await waitFor(() => expect(screen.getAllByText("尚未作出决策")[0]).toBeInTheDocument());
+
+    fireEvent.change(screen.getAllByPlaceholderText("源内容摘要")[1], { target: { value: "sha256:s" } });
+    fireEvent.change(screen.getByPlaceholderText("脚本摘要"), { target: { value: "sha256:c" } });
+    fireEvent.click(screen.getByText("锁定脚本"));
+
+    await waitFor(() => {
+      expect(lockSpy).toHaveBeenCalledWith("demo", {
+        source_digest: "sha256:s",
+        script_digest: "sha256:c",
+        action: "LOCK",
+      });
+    });
+    await waitFor(() => expect(useAppStore.getState().toast?.text).toBe("脚本已锁定。"));
   });
 });

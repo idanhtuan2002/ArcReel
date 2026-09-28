@@ -22,9 +22,9 @@ interface GateApprovalPanelProps {
  * ADR-0089's four mandatory V1 Human Gates. Greenlight (A) and Publish
  * Approval (D) get a real one-click approve action here, backed by
  * server/routers/gates.py's new, small append-only tables. Narrative Lock
- * (B) and Final Cut (C) are approved through the gate API: each requires a
- * full domain command (a screenplay admission / a rendered candidate) with no
- * simplified "pending items to review" surface yet. Final Cut lists the current
+ * (B) is a one-click script lock for factual products (ADR-0092); a drama
+ * screenplay is admitted through the gate API. Final Cut (C) is approved through
+ * the gate API with a rendered candidate command. Final Cut lists the current
  * approved finals (ADR-0090 O2a): each downloads through the download-token
  * route and can fill Publish Approval's digest.
  */
@@ -37,7 +37,9 @@ export function GateApprovalPanel({ projectName }: GateApprovalPanelProps) {
   const [deliverableDigest, setDeliverableDigest] = useState("");
   const [platform, setPlatform] = useState("");
   const [visibility, setVisibility] = useState("");
-  const [busyAction, setBusyAction] = useState<"greenlight" | "publish" | null>(null);
+  const [busyAction, setBusyAction] = useState<"greenlight" | "script" | "publish" | null>(null);
+  const [lockSourceDigest, setLockSourceDigest] = useState("");
+  const [scriptDigest, setScriptDigest] = useState("");
   const [deliverables, setDeliverables] = useState<ApprovedDeliverable[]>([]);
 
   async function loadHistory() {
@@ -95,6 +97,26 @@ export function GateApprovalPanel({ projectName }: GateApprovalPanelProps) {
     }
   }
 
+  async function handleScriptLock() {
+    if (!lockSourceDigest.trim() || !scriptDigest.trim()) return;
+    setBusyAction("script");
+    try {
+      await API.scriptLock(projectName, {
+        source_digest: lockSourceDigest.trim(),
+        script_digest: scriptDigest.trim(),
+        action: "LOCK",
+      });
+      pushToast(t("gate_script_lock_success"), "success");
+      setLockSourceDigest("");
+      setScriptDigest("");
+      await loadHistory();
+    } catch (err) {
+      pushToast(t("gate_action_failed", { message: errMsg(err) }), "error");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function handlePublishApproval() {
     if (!deliverableDigest.trim() || !platform.trim() || !visibility.trim()) return;
     setBusyAction("publish");
@@ -123,6 +145,7 @@ export function GateApprovalPanel({ projectName }: GateApprovalPanelProps) {
   }
 
   const latestGreenlight = latest(history?.greenlight);
+  const latestScriptLock = latest(history?.script_lock);
   const latestPublish = latest(history?.publish_approval);
 
   return (
@@ -153,7 +176,36 @@ export function GateApprovalPanel({ projectName }: GateApprovalPanelProps) {
 
       <div className="flex flex-col gap-2 rounded-[8px] border border-hairline-soft p-3">
         <div className="font-semibold">{t("gate_narrative_lock_label")}</div>
-        <div className="text-[12px] text-text-3">{t("gate_managed_via_api_hint")}</div>
+        <div className="text-[12px] text-text-3">{t("gate_narrative_lock_hint")}</div>
+        <div className="text-[12px] text-text-3">
+          {latestScriptLock
+            ? t("gate_status_history_count", { count: history?.script_lock?.length ?? 0 })
+            : t("gate_status_not_yet_decided")}
+        </div>
+        <input
+          className="rounded-[6px] border border-hairline bg-transparent px-2 py-1 text-[12px]"
+          placeholder={t("gate_source_digest_label")}
+          aria-label={t("gate_source_digest_label")}
+          value={lockSourceDigest}
+          onChange={(e) => setLockSourceDigest(e.target.value)}
+          disabled={busyAction !== null}
+        />
+        <input
+          className="rounded-[6px] border border-hairline bg-transparent px-2 py-1 text-[12px]"
+          placeholder={t("gate_script_digest_label")}
+          aria-label={t("gate_script_digest_label")}
+          value={scriptDigest}
+          onChange={(e) => setScriptDigest(e.target.value)}
+          disabled={busyAction !== null}
+        />
+        <button
+          type="button"
+          className="self-start rounded-[6px] border border-hairline px-3 py-1 text-[12px] disabled:opacity-50"
+          onClick={() => void handleScriptLock()}
+          disabled={busyAction !== null || !lockSourceDigest.trim() || !scriptDigest.trim()}
+        >
+          {t("gate_script_lock_button")}
+        </button>
       </div>
 
       <div className="flex flex-col gap-2 rounded-[8px] border border-hairline-soft p-3">

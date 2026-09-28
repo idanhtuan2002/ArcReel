@@ -381,12 +381,15 @@ export interface GateDecision {
   authorization: { authenticated_principal: string; authorized_at: string };
   source_digest?: string;
   deliverable_digest?: string;
+  script_digest?: string;
   platform?: string;
   visibility?: string;
 }
 
 export interface GateHistory {
   greenlight: GateDecision[];
+  /** ADR-0092 Gate B for factual products: script-lock decisions. */
+  script_lock?: GateDecision[];
   publish_approval: GateDecision[];
 }
 
@@ -2564,6 +2567,17 @@ class API {
     payload: { source_digest: string; action: "GREENLIGHT" | "REVOKE" }
   ): Promise<GateDecision> {
     return this.request(`/projects/${encodeURIComponent(projectName)}/gates/greenlight`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** ADR-0092 Gate B for a factual product: lock (or revoke) the exact source and script revision. */
+  static async scriptLock(
+    projectName: string,
+    payload: { source_digest: string; script_digest: string; action: "LOCK" | "REVOKE" }
+  ): Promise<GateDecision> {
+    return this.request(`/projects/${encodeURIComponent(projectName)}/gates/script-lock`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
