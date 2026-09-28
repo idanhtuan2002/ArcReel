@@ -143,12 +143,23 @@ found that earlier "implementation notes" changed parts of this decision while c
 leave it unchanged. The sponsor delegated these choices to research, and they are recorded
 here as amendments.
 
-1. **Qualification binds to the provider configuration.** A route qualification covers one
-   provider, route, model and configuration binding. The binding is a digest of the
-   provider's current base URL and credentials, so no credential is stored. Custom
-   providers are qualified one provider at a time. A new key, a new base URL, or a restore
-   into a deployment with other credentials needs a new canary. This makes "exact provider,
-   endpoint, model and account route" concrete.
+1. **Qualification binds to the provider configuration and the called model.** A route
+   qualification covers one provider, route, model and configuration binding. The binding
+   is a digest, so no credential is stored:
+   - **built-in providers:** the provider configuration without rate and concurrency tuning
+     keys (`*_rpm`, `*_max_workers`, `request_gap`), which includes the base URL and
+     credentials;
+   - **custom providers:** the base URL, credentials and discovery format, the model's
+     endpoint, and the definition of a user-defined endpoint.
+
+   The gate checks the model the built backend actually calls, not the requested one, so a
+   custom provider's fallback to its default model is gated on that model, and a canary
+   whose backend resolves another model is refused. Custom providers are qualified one
+   provider at a time. A new key, base URL or endpoint, or a restore into a deployment with
+   other credentials, needs a new canary. Where an SDK falls back to an environment-variable key
+   (`OPENAI_API_KEY`, `GOOGLE_API_KEY`) because the database holds none, that key is outside
+   the binding.
+
 2. **Where the gate runs.** Qualification is checked at backend construction, and again on
    every backend fetch from the generation cache in a release deployment. It is also
    checked at Agent session start and trial-run start. The async video submit seam checks
@@ -176,7 +187,8 @@ here as amendments.
      `r2.host_hardening.route_qualifications.is_route_qualified`. There is no separate
      authority.
    - **Writes.** Evidence is written atomically, record updates take a cross-process lock,
-     and a malformed records file fails closed.
+     and a malformed records file fails closed. A lock older than 300 seconds is treated as
+     left by a killed writer and cleared.
 5. **Unqualifiable routes (amended).** Two routes are refused in `PRODUCTION_CANDIDATE`
    and cannot be qualified.
    - **Agent:** its spend is recorded after the fact, so it has no budget-before-submit
@@ -189,9 +201,10 @@ here as amendments.
    - **Zero-cost calls.** A zero-cost failed call reconciles in its reservation's currency.
    - **Unestimated calls.** Token-priced text reserves a 0.01 floor, so overspend is
      bounded only by concurrency.
-8. **Gate-log evidence.** Only the leading `#` header of a runner log counts. A skip counts
-   only if the run config declared it up front (`allowed_skips`); every other skip is a
-   required skip and fails.
+8. **Gate-log evidence.** Only the leading `#` header of a runner log counts. Skipped,
+   deselected, xfailed and (vitest) todo tests all count as skips. A skip counts only if the
+   run config declared it up front (`allowed_skips`); every other skip is a required skip and
+   fails.
 
 Known limits:
 
@@ -202,5 +215,10 @@ Known limits:
 - **Unkeyed digests.** Evidence digests are unkeyed and runner logs are
   operator-attested, so a hand-written log is indistinguishable from a runner log (T1
   trust model).
+- **Structured-output re-asks.** Instructor (`max_retries=2`) sends up to two further
+  text requests after a completed response fails schema validation. The earlier outcome is
+  known, so this is not a resend after ambiguity; API errors are not retried, and usage is
+  summed across attempts into the ledgered call. The 0.01 reservation floor does not scale
+  with re-asks.
 - **SDK transports** (OpenAI, google-genai, Ark and xAI requests) are not
   destination-guarded; only direct HTTP and URL downloads are.
