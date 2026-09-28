@@ -15,6 +15,7 @@ a path-escape attempt before touching disk.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -121,6 +122,8 @@ async def test_greenlight_round_trips_through_the_real_repository(
 async def test_publish_approval_round_trips_through_the_real_repository(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
 ) -> None:
+    # A REVOKE is recorded without a deliverable check; APPROVE_PUBLISH binding is covered in
+    # test_gates_export.py.
     async with _authed_client(monkeypatch, session_factory, tmp_path) as client:
         response = await client.post(
             f"/api/v1/projects/{PROJECT}/gates/publish-approval",
@@ -128,7 +131,7 @@ async def test_publish_approval_round_trips_through_the_real_repository(
                 "deliverable_digest": "sha256:" + "b" * 64,
                 "platform": "youtube",
                 "visibility": "unlisted",
-                "action": "APPROVE_PUBLISH",
+                "action": "REVOKE",
             },
         )
     assert response.status_code == 200
@@ -148,7 +151,8 @@ async def test_final_cut_stages_and_approves_a_real_file(
     production_dir = project_dir / "production"
     production_dir.mkdir(parents=True)
     rendered_file = production_dir / "SH01.mp4"
-    rendered_file.write_bytes(b"not a real video, just proving the route stages+approves a real file")
+    rendered_bytes = b"not a real video, just proving the route stages+approves a real file"
+    rendered_file.write_bytes(rendered_bytes)
 
     app = _make_app(monkeypatch, session_factory, project_root, authed=True)
 
@@ -164,7 +168,7 @@ async def test_final_cut_stages_and_approves_a_real_file(
         "produced": {
             "method": "DETERMINISTIC",
             "relative_path": "SH01.mp4",
-            "sha256": "sha256:" + "d" * 64,
+            "sha256": "sha256:" + hashlib.sha256(rendered_bytes).hexdigest(),
             "duration_seconds": 15.0,
             "execution_fingerprint": "sha256:" + "e" * 64,
             "tool": "remotion",

@@ -18,18 +18,27 @@ before anything touches disk.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import BinaryIO, Literal
+from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field, field_validator
 
 from lib.async_thread import run_noninterruptible_sync
 from lib.db import async_session_factory
 from lib.db.adaptation_uow import adaptation_uow_factory
-from lib.db.repositories.gates import FinalCutReceiptRepository, GreenlightRepository, PublishApprovalRepository
+from lib.db.repositories.gates import (
+    FinalCutReceiptRepository,
+    GateSequenceConflictError,
+    GreenlightRepository,
+    PublishApprovalRepository,
+)
 from lib.project_manager import get_project_manager
 from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.session_authority import SessionAuthenticatedShowrunnerAuthority
@@ -37,12 +46,25 @@ from r2.contracts.adaptation import ScreenplayAdmissionCommand
 from r2.contracts.content_basis import ContentBasis
 from r2.contracts.enums import ProductionMethod
 from r2.contracts.gates import FinalCutReceipt, GateAuthorization, GreenlightDecision, PublishApprovalDecision
-from r2.m3.host_integration import GoldenAHostIntegration
+from r2.m3.deliverables import (
+    COMPOSITE_CONTRACT_TYPE,
+    SourceMasterMismatchError,
+    composite_dependencies,
+    current_deliverables,
+    exportable_deliverable,
+    normalize_sha256,
+    sha256_file,
+    verified_export_snapshot,
+    write_export_copy,
+)
+from r2.m3.host_integration import GoldenAHostIntegration, StagedOperationConflictError, validate_m3_target_ref
 from r2.m3.render_plan import RenderedCutAsset
 from r2.production.artifact_metadata import DependencySnapshot
-from server.auth import CurrentUser
+from server.auth import DOWNLOAD_TOKEN_EXPIRY_SECONDS, CurrentUser, create_download_token, verify_download_token
 
 router = APIRouter()
+# Token-authenticated like the project ZIP export (ADR-0071): registered without the session dependency.
+self_auth_router = APIRouter()
 
 
 class GreenlightRequest(BaseModel):
@@ -68,7 +90,7 @@ class FinalCutRenderedAssetRequest(BaseModel):
     sha256: str
     duration_seconds: float
     execution_fingerprint: str
-    tool: Literal["remotion"]
+    tool: Literal["remotion", "ffmpeg"]
     tool_version: str
     wall_time_seconds: float
     external_provider_cost: Decimal
@@ -76,7 +98,7 @@ class FinalCutRenderedAssetRequest(BaseModel):
 
 
 class FinalCutApprovalRequest(BaseModel):
-    resource_type: str
+    resource_type: Literal["videos"]
     episode: int
     target_ref: str
     content_fingerprint: str
@@ -85,12 +107,31 @@ class FinalCutApprovalRequest(BaseModel):
     contract_version: int
     contract_schema_version: str
     produced: FinalCutRenderedAssetRequest
-    approval_record: str
+    approval_record: str = Field(min_length=1)
+
+    @field_validator("target_ref")
+    @classmethod
+    def validate_target_ref(cls, value: str) -> str:
+        return validate_m3_target_ref(value)
 
 
 def _authorization(user: CurrentUser) -> GateAuthorization:
     return GateAuthorization(
         authenticated_principal=user.sub, authority_role="HUMAN_OPERATOR", authorized_at=datetime.now(UTC)
+    )
+
+
+class PostApprovalExportError(RuntimeError):
+    """The selected master is durable, while its export copy still needs reconciliation."""
+
+
+def _gate_c_retry_error(approval_record: str) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail={
+            "code": "GATE_C_RETRY_SAME_APPROVAL_RECORD",
+            "approval_record": approval_record,
+        },
     )
 
 
@@ -140,6 +181,9 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         )
     if not candidate_path.is_file():
         raise HTTPException(status_code=404, detail=f"no rendered file at {req.produced.relative_path!r}")
+    actual_sha256 = await run_noninterruptible_sync(lambda: sha256_file(candidate_path))
+    if actual_sha256 != normalize_sha256(req.produced.sha256):
+        raise HTTPException(status_code=400, detail="produced.sha256 does not match the rendered file")
 
     produced = RenderedCutAsset(
         target_ref=req.target_ref,
@@ -156,25 +200,56 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
     )
 
     host = GoldenAHostIntegration(project_dir, resource_type=req.resource_type, episode=req.episode)
+    operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"gate-c/{user.id}/{project_name}/{req.episode}/{req.target_ref}/{req.approval_record}",
+        )
+    )
+    request_digest = hashlib.sha256(req.model_dump_json().encode()).hexdigest()
+    composite = req.produced.method is ProductionMethod.COMPOSITE
+    if composite and req.direct_dependencies:
+        raise HTTPException(
+            status_code=400,
+            detail="a COMPOSITE final's dependencies are derived from its source masters; send none",
+        )
 
     def _stage_and_approve():
+        dependencies = (
+            composite_dependencies(host, req.produced.source_master_refs) if composite else req.direct_dependencies
+        )
         registered = host.stage_candidate(
             target_ref=req.target_ref,
             content_fingerprint=req.content_fingerprint,
             produced=produced,
             content_basis=req.content_basis,
-            direct_dependencies=req.direct_dependencies,
+            direct_dependencies=dependencies,
             contract_version=req.contract_version,
             contract_schema_version=req.contract_schema_version,
+            contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
+            operation_id=operation_id,
+            request_digest=request_digest,
         )
-        return host.approve(
+        approved = host.approve(
             registered,
             approval_record=req.approval_record,
             selected_by=user.sub,
             selected_at=datetime.now(UTC),
         )
+        try:
+            export = write_export_copy(host, req.target_ref) if composite else None
+        except Exception as exc:
+            raise PostApprovalExportError("approved final requires export reconciliation") from exc
+        return approved, export
 
-    approved_master = await run_noninterruptible_sync(_stage_and_approve)
+    try:
+        approved_master, export = await run_noninterruptible_sync(_stage_and_approve)
+    except SourceMasterMismatchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except StagedOperationConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except PostApprovalExportError as exc:
+        raise _gate_c_retry_error(req.approval_record) from exc
 
     receipt = FinalCutReceipt(
         user_id=user.id,
@@ -187,15 +262,48 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         selected_at=approved_master.selected_at,
         sequence=1,  # ignored by append(); the repository assigns the real, race-safe value
     )
-    async with async_session_factory() as session:
-        await FinalCutReceiptRepository(session).append(receipt)
-        await session.commit()
+    receipt_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"gate-c-receipt/{operation_id}"))
+    try:
+        async with async_session_factory() as session:
+            repository = FinalCutReceiptRepository(session)
+            stored_receipt = await repository.get_by_id(receipt_id)
+            if stored_receipt is None:
+                await repository.append(receipt, receipt_id=receipt_id)
+                await session.commit()
+                stored_receipt = await repository.get_by_id(receipt_id)
+            if stored_receipt is None:
+                raise RuntimeError("committed Final Cut receipt is not visible")
+    except GateSequenceConflictError:
+        async with async_session_factory() as session:
+            stored_receipt = await FinalCutReceiptRepository(session).get_by_id(receipt_id)
+        if stored_receipt is None:
+            raise _gate_c_retry_error(req.approval_record) from None
+    except Exception as exc:
+        raise _gate_c_retry_error(req.approval_record) from exc
+    if stored_receipt.model_dump(exclude={"sequence"}) != receipt.model_dump(exclude={"sequence"}):
+        raise HTTPException(status_code=409, detail="approval_record is already bound to a different receipt")
 
-    return {"approved_master": approved_master.model_dump(mode="json"), "receipt": receipt.model_dump(mode="json")}
+    result: dict[str, object] = {
+        "approved_master": approved_master.model_dump(mode="json"),
+        "receipt": stored_receipt.model_dump(mode="json"),
+    }
+    if export is not None:
+        result["export"] = {"relative_path": export.relative_path, "sha256": "sha256:" + export.sha256}
+    return result
 
 
 @router.post("/projects/{project_name}/gates/publish-approval")
 async def publish_approval(project_name: str, req: PublishApprovalRequest, user: CurrentUser) -> dict[str, object]:
+    if req.action == "APPROVE_PUBLISH":
+        project_dir = get_project_manager().get_project_path(project_name)
+        deliverable = await run_noninterruptible_sync(
+            lambda: exportable_deliverable(project_dir, req.deliverable_digest)
+        )
+        if deliverable is None:
+            raise HTTPException(
+                status_code=409,
+                detail="deliverable_digest is not the digest of a current Gate C-approved final and its export copy",
+            )
     decision = PublishApprovalDecision(
         decision_id=str(uuid.uuid4()),
         user_id=user.id,
@@ -238,4 +346,68 @@ async def gate_history(project_name: str, user: CurrentUser) -> dict[str, object
     }
 
 
-__all__ = ["router"]
+def _deliverable_view(project_dir) -> list[dict[str, object]]:
+    return [
+        {
+            "episode": d.episode,
+            "target_ref": d.target_ref,
+            "sha256": "sha256:" + d.approved_sha256,
+        }
+        for d in current_deliverables(project_dir)
+        if d.exportable and d.approved_sha256 is not None
+    ]
+
+
+@router.post("/projects/{project_name}/export/deliverable/token")
+async def create_deliverable_token(project_name: str, user: CurrentUser) -> dict[str, object]:
+    """Issue a short-lived download token and list the project's approved finals."""
+    project_dir = get_project_manager().get_project_path(project_name)
+    deliverables = await run_noninterruptible_sync(lambda: _deliverable_view(project_dir))
+    return {
+        "download_token": create_download_token(user.sub, project_name),
+        "expires_in": DOWNLOAD_TOKEN_EXPIRY_SECONDS,
+        "deliverables": deliverables,
+    }
+
+
+@self_auth_router.get("/projects/{project_name}/export/deliverable")
+async def download_deliverable(
+    project_name: str, download_token: str = Query(...), digest: str = Query(...)
+) -> StreamingResponse:
+    """Serve the export copy of the current approved final whose bytes hash to ``digest``."""
+    import jwt as pyjwt
+
+    try:
+        verify_download_token(download_token, project_name)
+    except pyjwt.ExpiredSignatureError as exc:
+        raise HTTPException(status_code=401, detail="download token expired") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="download token does not match the project") from exc
+    except pyjwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="download token invalid") from exc
+
+    project_dir = get_project_manager().get_project_path(project_name)
+    result = await run_noninterruptible_sync(lambda: verified_export_snapshot(project_dir, digest))
+    if result is None:
+        raise HTTPException(status_code=404, detail="no current approved deliverable has this digest")
+    deliverable, snapshot = result
+    filename = f"ep{deliverable.episode}-{deliverable.target_ref}.mp4"
+    return StreamingResponse(
+        _snapshot_chunks(snapshot),
+        media_type="video/mp4",
+        headers={
+            "X-Content-SHA256": "sha256:" + str(deliverable.approved_sha256),
+            "Content-Disposition": f"attachment; filename*=utf-8''{quote(filename)}",
+        },
+    )
+
+
+def _snapshot_chunks(snapshot: BinaryIO) -> Iterator[bytes]:
+    try:
+        while chunk := snapshot.read(1024 * 1024):
+            yield chunk
+    finally:
+        snapshot.close()
+
+
+__all__ = ["router", "self_auth_router"]

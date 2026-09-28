@@ -46,7 +46,7 @@ class RenderedCutAsset:
     sha256: str
     duration_seconds: float
     execution_fingerprint: str
-    tool: Literal["remotion"]
+    tool: Literal["remotion", "ffmpeg"]
     tool_version: str
     wall_time_seconds: float
     external_provider_cost: Decimal

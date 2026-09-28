@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,6 +83,29 @@ class RegisteredGoldenACandidate:
     host_version_ref: str
 
 
+def validate_m3_target_ref(target_ref: str) -> str:
+    if (
+        not target_ref
+        or target_ref in {".", ".."}
+        or any(char in target_ref for char in ("/", "\\", ":", "\x00"))
+        or any(ord(char) < 32 for char in target_ref)
+    ):
+        raise ValueError("target_ref must be one safe filename component")
+    return target_ref
+
+
+def safe_project_subdir(project_dir: Path, name: str) -> Path:
+    root = Path(project_dir).resolve()
+    path = Path(project_dir) / name
+    if path.is_symlink() or path.resolve().parent != root:
+        raise ValueError(f"{name} must be a directory inside the project")
+    return path
+
+
+class StagedOperationConflictError(ValueError):
+    """An approval record is being reused for a different candidate or an older approval."""
+
+
 class GoldenAHostIntegration:
     def __init__(
         self,
@@ -93,19 +118,29 @@ class GoldenAHostIntegration:
         self.project_dir.mkdir(parents=True, exist_ok=True)
         if resource_type not in VersionManager.RESOURCE_TYPES:
             raise ValueError(f"unsupported VersionManager resource type: {resource_type}")
+        versions_dir = safe_project_subdir(self.project_dir, "versions")
+        safe_project_subdir(versions_dir, resource_type)
+        if (versions_dir / "versions.json").is_symlink():
+            raise ValueError("version metadata must stay inside the project")
         self.resource_type = resource_type
         self.episode = episode
         self.versions = VersionManager(self.project_dir)
         self.manifest = ProjectArtifactManifestAdapter(self.project_dir)
 
     def artifact_key_for(self, target_ref: str) -> str:
+        validate_m3_target_ref(target_ref)
         return ArtifactKey.episode_video(
             self.episode,
             target_ref,
         ).encode()
 
     def current_file_for(self, target_ref: str) -> Path:
-        return self.project_dir / "r2_m3_current" / f"{target_ref}.mp4"
+        validate_m3_target_ref(target_ref)
+        directory = safe_project_subdir(self.project_dir, "r2_m3_current")
+        path = directory / f"{target_ref}.mp4"
+        if path.is_symlink() or path.resolve().parent != directory.resolve():
+            raise ValueError("current file must stay inside the project")
+        return path
 
     def _native_currency(
         self,
@@ -142,6 +177,7 @@ class GoldenAHostIntegration:
         direct_dependencies: Sequence[DependencySnapshot],
         contract_version: int,
         contract_schema_version: str,
+        contract_type: str = "ShotSpec",
     ) -> R2ArtifactMetadata:
         approved = None
         key = self.artifact_key_for(target_ref)
@@ -152,7 +188,7 @@ class GoldenAHostIntegration:
         return R2ArtifactMetadata(
             metadata_schema_version=_metadata_schema_version(),
             contract_ref=R2ContractRef(
-                contract_type="ShotSpec",
+                contract_type=contract_type,
                 id=target_ref,
                 version=contract_version,
                 schema_version=contract_schema_version,
@@ -199,43 +235,84 @@ class GoldenAHostIntegration:
         direct_dependencies: Sequence[DependencySnapshot],
         contract_version: int,
         contract_schema_version: str,
+        contract_type: str = "ShotSpec",
+        operation_id: str | None = None,
+        request_digest: str | None = None,
     ) -> RegisteredGoldenACandidate:
         if produced.target_ref != target_ref:
             raise ValueError("produced asset target does not match candidate target")
+        if (operation_id is None) != (request_digest is None):
+            raise ValueError("operation_id and request_digest must be supplied together")
 
-        metadata = self._metadata(
-            target_ref=target_ref,
-            content_fingerprint=content_fingerprint,
-            content_basis=content_basis,
-            direct_dependencies=direct_dependencies,
-            contract_version=contract_version,
-            contract_schema_version=contract_schema_version,
-        )
         artifact_key = self.artifact_key_for(target_ref)
-        self._ensure_manifest_entry(
-            artifact_key=artifact_key,
-            metadata=metadata,
-            target_ref=target_ref,
-        )
+        replay_version = None
+        if operation_id is not None:
+            versions = self.versions.get_versions(self.resource_type, target_ref)
+            existing = next((item for item in versions["versions"] if item.get("execution_id") == operation_id), None)
+            if existing is not None:
+                replay_version = int(existing["version"])
+                if existing.get("request_digest") != request_digest:
+                    raise StagedOperationConflictError("approval_record is already bound to a different request")
+                current = self.snapshot(target_ref).approved_master
+                if current is not None and int(current.host_version_ref) > replay_version:
+                    raise StagedOperationConflictError("approval_record belongs to a superseded final cut")
 
-        staged_dir = self.project_dir / "r2_m3_staged"
-        staged_dir.mkdir(parents=True, exist_ok=True)
-        staged = staged_dir / (f"{target_ref}-{produced.execution_fingerprint[:12]}.mp4")
-        shutil.copy2(produced.path, staged)
+        if replay_version is None:
+            metadata = self._metadata(
+                target_ref=target_ref,
+                content_fingerprint=content_fingerprint,
+                content_basis=content_basis,
+                direct_dependencies=direct_dependencies,
+                contract_version=contract_version,
+                contract_schema_version=contract_schema_version,
+                contract_type=contract_type,
+            )
+            self._ensure_manifest_entry(
+                artifact_key=artifact_key,
+                metadata=metadata,
+                target_ref=target_ref,
+            )
 
-        commit = self.versions.commit_staged_paid_version(
-            self.resource_type,
-            target_ref,
-            "Golden A local candidate",
-            staged_file=staged,
-            current_file=self.current_file_for(target_ref),
-            select_current=False,
-            method=produced.method.value,
-            execution_fingerprint=produced.execution_fingerprint,
-            external_provider_cost=str(produced.external_provider_cost),
-        )
+            staged_dir = safe_project_subdir(self.project_dir, "r2_m3_staged")
+            staged_dir.mkdir(parents=True, exist_ok=True)
+            fd, staged_name = tempfile.mkstemp(dir=staged_dir, prefix=f".{target_ref}-", suffix=".mp4")
+            os.close(fd)
+            staged = Path(staged_name)
+            try:
+                shutil.copy2(produced.path, staged)
+                with staged.open("rb") as handle:
+                    staged_sha256 = hashlib.file_digest(handle, "sha256").hexdigest()
+                if staged_sha256 != produced.sha256.removeprefix("sha256:").lower():
+                    raise ValueError("staged candidate does not match produced.sha256")
+            except BaseException:
+                staged.unlink(missing_ok=True)
+                raise
+
+            commit = self.versions.commit_staged_paid_version(
+                self.resource_type,
+                target_ref,
+                "Golden A local candidate",
+                staged_file=staged,
+                current_file=self.current_file_for(target_ref),
+                select_current=False,
+                method=produced.method.value,
+                execution_fingerprint=produced.execution_fingerprint,
+                external_provider_cost=str(produced.external_provider_cost),
+                output_sha256=staged_sha256,
+                execution_id=operation_id,
+                request_digest=request_digest,
+            )
+            replay_version = commit.version
+            if operation_id is not None:
+                record = next(
+                    item
+                    for item in self.versions.get_versions(self.resource_type, target_ref)["versions"]
+                    if item["version"] == replay_version
+                )
+                if record.get("request_digest") != request_digest or record.get("output_sha256") != staged_sha256:
+                    raise StagedOperationConflictError("approval_record raced with a different candidate")
         candidate = GenerationCandidate(
-            id=f"CAND-{target_ref}-V{commit.version}",
+            id=f"CAND-{target_ref}-V{replay_version}",
             target_ref=target_ref,
             content_fingerprint=content_fingerprint,
             execution_fingerprint=produced.execution_fingerprint,
@@ -247,7 +324,7 @@ class GoldenAHostIntegration:
         return RegisteredGoldenACandidate(
             artifact_key=artifact_key,
             candidate=candidate,
-            host_version_ref=str(commit.version),
+            host_version_ref=str(replay_version),
         )
 
     def approve(

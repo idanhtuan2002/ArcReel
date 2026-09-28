@@ -180,7 +180,7 @@ class FinalCutReceiptRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def append(self, receipt: FinalCutReceipt) -> None:
+    async def append(self, receipt: FinalCutReceipt, *, receipt_id: str | None = None) -> None:
         try:
             async with self.session.begin_nested():
                 next_sequence = await self._next_sequence(
@@ -188,7 +188,7 @@ class FinalCutReceiptRepository:
                 )
                 self.session.add(
                     FinalCutReceiptModel(
-                        final_cut_receipt_id=str(uuid.uuid4()),
+                        final_cut_receipt_id=receipt_id or str(uuid.uuid4()),
                         user_id=receipt.user_id,
                         project_name=receipt.project_name,
                         artifact_key=receipt.artifact_key,
@@ -230,20 +230,25 @@ class FinalCutReceiptRepository:
                 .order_by(FinalCutReceiptModel.sequence)
             )
         ).scalars()
-        return [
-            FinalCutReceipt(
-                user_id=row.user_id,
-                project_name=row.project_name,
-                artifact_key=row.artifact_key,
-                selected_candidate_id=row.selected_candidate_id,
-                content_fingerprint=row.content_fingerprint,
-                approval_record=row.approval_record,
-                selected_by=row.selected_by,
-                selected_at=_stored_aware(row.selected_at),
-                sequence=row.sequence,
-            )
-            for row in rows
-        ]
+        return [self._to_receipt(row) for row in rows]
+
+    async def get_by_id(self, receipt_id: str) -> FinalCutReceipt | None:
+        row = await self.session.get(FinalCutReceiptModel, receipt_id)
+        return self._to_receipt(row) if row is not None else None
+
+    @staticmethod
+    def _to_receipt(row: FinalCutReceiptModel) -> FinalCutReceipt:
+        return FinalCutReceipt(
+            user_id=row.user_id,
+            project_name=row.project_name,
+            artifact_key=row.artifact_key,
+            selected_candidate_id=row.selected_candidate_id,
+            content_fingerprint=row.content_fingerprint,
+            approval_record=row.approval_record,
+            selected_by=row.selected_by,
+            selected_at=_stored_aware(row.selected_at),
+            sequence=row.sequence,
+        )
 
 
 __all__ = [
