@@ -1,0 +1,17 @@
+{
+  "h1_h8": {
+    "command": "env -u DATABASE_URL -u ARCREEL_E2E_DATA_DIR -u ARCREEL_E2E_DATABASE_URL uv run python -m pytest -n 4 --dist loadfile -q -rs -p no:cacheprovider",
+    "allowed_skips": 45
+  },
+  "migration": "bash -c 'export DATABASE_URL=\"$GATE_PG_URL\" && uv run alembic upgrade head && uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic upgrade head && uv run python -m pytest -q -rs -p no:cacheprovider -m \"uses_db and not sqlite_only\" -n 4 --dist loadfile'",
+  "static": "bash -c 'uv run ruff check . && uv run ruff format --check . && uv run python scripts/audit_tests.py --check'",
+  "type": "uv run basedpyright --warnings",
+  "imports": "uv run lint-imports",
+  "dependencies": "uv run deptry lib server alembic scripts tests r2",
+  "i18n": "env -u DATABASE_URL uv run python -m pytest -q -rs -p no:cacheprovider tests/unit/lib/i18n/test_i18n_consistency.py",
+  "frontend": "bash -c 'cd frontend && pnpm install --frozen-lockfile && pnpm check && pnpm build'",
+  "website": "bash -c 'node --test .claude/skills/translate-docs/scripts/translation-lock.test.mjs website/scripts/*.test.mjs && cd website && pnpm install --frozen-lockfile && pnpm check'",
+  "golden_a": "env -u DATABASE_URL uv run python -m pytest -q -rs -p no:cacheprovider tests/integration/r2/m3 tests/integration/r2/m4",
+  "golden_b": "env -u DATABASE_URL uv run python -m pytest -q -rs -p no:cacheprovider tests/integration/r2/test_m6_dual_profile_acceptance.py",
+  "browser": "bash -c 'ARCREEL_E2E_DATA_DIR=\"$GATE_E2E_DATA_DIR\" ARCREEL_E2E_DATABASE_URL=\"$GATE_E2E_DATABASE_URL\" uv run python -m pytest -q -rs -p no:cacheprovider tests/e2e/test_m7_production_candidate_workflow.py'"
+}
