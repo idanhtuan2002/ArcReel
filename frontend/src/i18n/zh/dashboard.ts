@@ -2053,4 +2053,9 @@ export default {
   'gate_action_failed': 'Gate 操作失败：{{message}}',
   'gate_managed_via_api_hint': '直接通过 gate API 完成批准；此处尚未构建待审核列表。',
   'gate_loading': '正在加载 gate 历史…',
+  'gate_deliverables_empty': '暂无已批准且有效的成片；Final Cut 通过 gate API 批准。',
+  'gate_deliverable_row': '第 {{episode}} 集 · {{target}}',
+  'gate_deliverable_download': '下载',
+  'gate_deliverable_use_for_publish': '用于发布审批',
+  'gate_deliverable_download_failed': '下载成片失败：{{message}}',
 } satisfies Record<keyof typeof enDashboard, string>;

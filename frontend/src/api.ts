@@ -390,6 +390,13 @@ export interface GateHistory {
   publish_approval: GateDecision[];
 }
 
+/** ADR-0090 O2a: a current Gate C-approved final whose byte copy is ready to download. */
+export interface ApprovedDeliverable {
+  episode: number;
+  target_ref: string;
+  sha256: string;
+}
+
 /** 分镜/视频单元媒体上传的统一响应。 */
 export interface ShotUploadResult {
   success: boolean;
@@ -2576,6 +2583,21 @@ class API {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  }
+
+  /** ADR-0090 O2a: list the exportable approved finals and issue a short-lived download token. */
+  static async requestDeliverableToken(
+    projectName: string,
+    options: { signal?: AbortSignal } = {}
+  ): Promise<{ download_token: string; expires_in: number; deliverables: ApprovedDeliverable[] }> {
+    return this.request(`/projects/${encodeURIComponent(projectName)}/export/deliverable/token`, {
+      method: "POST",
+      signal: options.signal,
+    });
+  }
+
+  static getDeliverableDownloadUrl(projectName: string, downloadToken: string, digest: string): string {
+    return `${API_BASE}/projects/${encodeURIComponent(projectName)}/export/deliverable?download_token=${encodeURIComponent(downloadToken)}&digest=${encodeURIComponent(digest)}`;
   }
 
   /** Greenlight (A) and Publish Approval (D) full decision history for a project. */

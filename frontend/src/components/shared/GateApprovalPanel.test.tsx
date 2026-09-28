@@ -8,6 +8,11 @@ describe("GateApprovalPanel", () => {
   beforeEach(() => {
     useAppStore.setState(useAppStore.getInitialState(), true);
     vi.restoreAllMocks();
+    vi.spyOn(API, "requestDeliverableToken").mockResolvedValue({
+      download_token: "tok",
+      expires_in: 300,
+      deliverables: [],
+    });
   });
 
   it("loads gate history and shows recorded decisions", async () => {
@@ -84,6 +89,50 @@ describe("GateApprovalPanel", () => {
 
     await waitFor(() => {
       expect(useAppStore.getState().toast?.text).toContain("Gate 操作失败");
+    });
+  });
+
+  it("lists approved finals, downloads one with a fresh token and fills the Gate D digest", async () => {
+    const digest = "sha256:" + "a".repeat(64);
+    vi.spyOn(API, "getGateHistory").mockResolvedValue({ greenlight: [], publish_approval: [] });
+    const tokenSpy = vi
+      .spyOn(API, "requestDeliverableToken")
+      .mockResolvedValueOnce({
+        download_token: "tok-list",
+        expires_in: 300,
+        deliverables: [{ episode: 1, target_ref: "FINAL", sha256: digest }],
+      })
+      .mockResolvedValueOnce({
+        download_token: "tok-download",
+        expires_in: 300,
+        deliverables: [{ episode: 1, target_ref: "FINAL", sha256: digest }],
+      });
+    const clicks: string[] = [];
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicks.push(this.href);
+    });
+
+    render(<GateApprovalPanel projectName="demo" />);
+    await waitFor(() => expect(screen.getByText("第 1 集 · FINAL")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("下载"));
+    await waitFor(() => expect(clicks).toHaveLength(1));
+    expect(clicks[0]).toContain("/projects/demo/export/deliverable?download_token=tok-download");
+    expect(clicks[0]).toContain(`digest=${encodeURIComponent(digest)}`);
+    expect(tokenSpy).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByText("用于发布审批"));
+    expect(screen.getByPlaceholderText("交付物摘要")).toHaveValue(digest);
+    clickSpy.mockRestore();
+  });
+
+  it("shows the empty state when no final is approved", async () => {
+    vi.spyOn(API, "getGateHistory").mockResolvedValue({ greenlight: [], publish_approval: [] });
+
+    render(<GateApprovalPanel projectName="demo" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("暂无已批准且有效的成片；Final Cut 通过 gate API 批准。")).toBeInTheDocument();
     });
   });
 });

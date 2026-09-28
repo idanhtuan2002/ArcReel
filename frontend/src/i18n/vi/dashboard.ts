@@ -2052,4 +2052,9 @@ export default {
   'gate_action_failed': 'Thao tác gate thất bại: {{message}}',
   'gate_managed_via_api_hint': 'Được phê duyệt trực tiếp qua API gate; danh sách chờ duyệt chưa được xây ở đây.',
   'gate_loading': 'Đang tải lịch sử gate...',
+  'gate_deliverables_empty': 'Chưa có bản dựng cuối đã duyệt còn hiệu lực; Final Cut được duyệt qua API gate.',
+  'gate_deliverable_row': 'Tập {{episode}} · {{target}}',
+  'gate_deliverable_download': 'Tải xuống',
+  'gate_deliverable_use_for_publish': 'Dùng cho Duyệt công bố',
+  'gate_deliverable_download_failed': 'Không tải được bản dựng cuối: {{message}}',
 } satisfies Record<keyof typeof enDashboard, string>;

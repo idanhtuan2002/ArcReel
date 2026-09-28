@@ -2054,4 +2054,9 @@ export default {
   'gate_action_failed': 'Gate action failed: {{message}}',
   'gate_managed_via_api_hint': 'Approved through the gate API directly; a review list is not built here yet.',
   'gate_loading': 'Loading gate history...',
+  'gate_deliverables_empty': 'No current approved final yet; Final Cut is approved through the gate API.',
+  'gate_deliverable_row': 'Episode {{episode}} · {{target}}',
+  'gate_deliverable_download': 'Download',
+  'gate_deliverable_use_for_publish': 'Use for Publish Approval',
+  'gate_deliverable_download_failed': 'Could not download the final: {{message}}',
 };
