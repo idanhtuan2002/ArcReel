@@ -1,0 +1,15 @@
+# command: env -u DATABASE_URL uv run python -m pytest -q -rs -p no:cacheprovider tests/unit/lib/i18n/test_i18n_consistency.py
+# exit_code: 0
+# tool_versions: python 3.13.14; git 2.53.0
+..................                                                       [100%]
+=============================== warnings summary ===============================
+tests/unit/lib/i18n/test_i18n_consistency.py::test_all_locales_have_same_keys
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+0.85s setup    tests/unit/lib/i18n/test_i18n_consistency.py::test_all_locales_have_same_keys
+
+(24 durations < 0.005s hidden.  Use -vv to show these durations.)
+18 passed, 1 warning in 0.97s

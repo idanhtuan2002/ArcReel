@@ -1,0 +1,1794 @@
+# command: env -u DATABASE_URL -u ARCREEL_E2E_DATA_DIR -u ARCREEL_E2E_DATABASE_URL uv run python -m pytest -n 4 --dist loadfile -q -rs -p no:cacheprovider
+# exit_code: 1
+# tool_versions: python 3.13.14; git 2.53.0
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  0%]
+........................................................................ [  0%]
+........................................................................ [  1%]
+........................................................................ [  1%]
+........................................................................ [  2%]
+........................................................................ [  2%]
+........................................................................ [  3%]
+........................................................................ [  3%]
+........................................................................ [  4%]
+........................................................................ [  4%]
+........................................................................ [  5%]
+........................................................................ [  5%]
+........................................................................ [  6%]
+........................................................................ [  6%]
+........................................................................ [  7%]
+........................................................................ [  7%]
+........................................................................ [  8%]
+........................................................................ [  8%]
+........................................................................ [  9%]
+........................................................................ [  9%]
+........................................................................ [ 10%]
+........................................................................ [ 10%]
+........................................................................ [ 10%]
+........................................................................ [ 11%]
+........................................................................ [ 11%]
+........................................................................ [ 12%]
+........................................................................ [ 12%]
+........................................................................ [ 13%]
+........................................................................ [ 13%]
+........................................................................ [ 14%]
+........................................................................ [ 14%]
+........................................................................ [ 15%]
+........................................................................ [ 15%]
+........................................................................ [ 16%]
+........................................................................ [ 16%]
+........................................................................ [ 17%]
+........................................................................ [ 17%]
+........................................................................ [ 18%]
+........................................................................ [ 18%]
+........................................................................ [ 19%]
+........................................................................ [ 19%]
+........................................................................ [ 20%]
+........................................................................ [ 20%]
+........................................................................ [ 21%]
+........................................................................ [ 21%]
+........................................................................ [ 21%]
+........................................................................ [ 22%]
+........................................................................ [ 22%]
+........................................................................ [ 23%]
+........................................................................ [ 23%]
+........................................................................ [ 24%]
+........................................................................ [ 24%]
+........................................................................ [ 25%]
+........................................................................ [ 25%]
+........................................................................ [ 26%]
+........................................................................ [ 26%]
+........................................................................ [ 27%]
+........................................................................ [ 27%]
+........................................................................ [ 28%]
+........................................................................ [ 28%]
+........................................................................ [ 29%]
+........................................................................ [ 29%]
+........................................................................ [ 30%]
+........................................................................ [ 30%]
+........................................................................ [ 31%]
+........................................................................ [ 31%]
+........................................................................ [ 32%]
+........................................................................ [ 32%]
+........................................................................ [ 32%]
+........................................................................ [ 33%]
+........................................................................ [ 33%]
+..................................................................s..... [ 34%]
+........................................................................ [ 34%]
+........................................................................ [ 35%]
+........................................................................ [ 35%]
+........................................................................ [ 36%]
+........................................................................ [ 36%]
+........................................................................ [ 37%]
+........................................................................ [ 37%]
+........................................................................ [ 38%]
+........................................................................ [ 38%]
+........................................................................ [ 39%]
+........................................................................ [ 39%]
+........................................................................ [ 40%]
+........................................................................ [ 40%]
+........................................................................ [ 41%]
+........................................................................ [ 41%]
+........................................................................ [ 42%]
+........................................................................ [ 42%]
+........................................................................ [ 43%]
+........................................................................ [ 43%]
+........................................................................ [ 43%]
+........................................................................ [ 44%]
+........................................................................ [ 44%]
+........................................................................ [ 45%]
+........................................................................ [ 45%]
+........................................................................ [ 46%]
+........................................................................ [ 46%]
+........................................................................ [ 47%]
+........................................................................ [ 47%]
+........................................................................ [ 48%]
+........................................................................ [ 48%]
+........................................................................ [ 49%]
+........................................................................ [ 49%]
+........................................................................ [ 50%]
+........................................................................ [ 50%]
+........................................................................ [ 51%]
+........................................................................ [ 51%]
+........................................................................ [ 52%]
+........................................................................ [ 52%]
+........................................................................ [ 53%]
+........................................................................ [ 53%]
+........................................................................ [ 54%]
+........................................................................ [ 54%]
+........................................................................ [ 54%]
+..................................................................F..... [ 55%]
+........................................................................ [ 55%]
+.....................s..............................s................... [ 56%]
+........................................................................ [ 56%]
+........................................................................ [ 57%]
+........................................................................ [ 57%]
+........................................................................ [ 58%]
+........................................................................ [ 58%]
+........................................................................ [ 59%]
+........................................................................ [ 59%]
+........................................................................ [ 60%]
+........................................................................ [ 60%]
+........................................................................ [ 61%]
+........................................................................ [ 61%]
+........................................................................ [ 62%]
+........................................................................ [ 62%]
+........................................................................ [ 63%]
+........................................................................ [ 63%]
+........................................................................ [ 64%]
+........................................................................ [ 64%]
+........................................................................ [ 65%]
+........................................................................ [ 65%]
+........................................................................ [ 65%]
+..............................sss..sssssssss.sssss.ss.sss............... [ 66%]
+........................................................................ [ 66%]
+........................................................................ [ 67%]
+........................................................................ [ 67%]
+........................................................................ [ 68%]
+.............................................s...s...................... [ 68%]
+........................................................................ [ 69%]
+........................................................................ [ 69%]
+........................................................................ [ 70%]
+........................................................................ [ 70%]
+..s..................................................................... [ 71%]
+........................................................................ [ 71%]
+........................................................................ [ 72%]
+........................................................................ [ 72%]
+........................................................................ [ 73%]
+........................................................................ [ 73%]
+........................................................................ [ 74%]
+........................................................................ [ 74%]
+........................................................................ [ 75%]
+........................................................................ [ 75%]
+..............................................s......................... [ 76%]
+.......................................s................................ [ 76%]
+........................................................................ [ 76%]
+........................................................................ [ 77%]
+........................................................................ [ 77%]
+........................................................................ [ 78%]
+........................................................................ [ 78%]
+........................................................................ [ 79%]
+........................................................................ [ 79%]
+........................................................................ [ 80%]
+........................................................................ [ 80%]
+..............s......................................................... [ 81%]
+........................................................................ [ 81%]
+........................................................................ [ 82%]
+........................................................................ [ 82%]
+........................................................................ [ 83%]
+........................................................................ [ 83%]
+........................................................................ [ 84%]
+........................................................................ [ 84%]
+........................................................................ [ 85%]
+........................................................................ [ 85%]
+........................................................................ [ 86%]
+........................................................................ [ 86%]
+........................................................................ [ 87%]
+........................................................................ [ 87%]
+........................................................................ [ 87%]
+........................................................................ [ 88%]
+........................................................................ [ 88%]
+........................................................................ [ 89%]
+........................................................................ [ 89%]
+........................................................................ [ 90%]
+........................................................................ [ 90%]
+..............................................................s......... [ 91%]
+........................................................................ [ 91%]
+........................................................................ [ 92%]
+........................................................................ [ 92%]
+........................s............................................... [ 93%]
+........................................................................ [ 93%]
+........................................................................ [ 94%]
+........................................................................ [ 94%]
+........................................................................ [ 95%]
+........................................................................ [ 95%]
+........................................................................ [ 96%]
+......................................s................................. [ 96%]
+..........................................F.FFF.FF.FFsFsss.............. [ 97%]
+........................................................F............... [ 97%]
+........................................................................ [ 97%]
+........................................................................ [ 98%]
+.............................................................s.......... [ 98%]
+.........................s.sss...F...................................... [ 99%]
+....................................s.F..........F....................F. [ 99%]
+s.............                                                           [100%]
+=================================== FAILURES ===================================
+____________ TestTrialRuns.test_a_second_concurrent_run_is_refused _____________
+[gw1] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+self = <tests.unit.server.routers.test_endpoint_tests_api.TestTrialRuns object at 0x74b0e13e3ce0>
+client = <starlette.testclient.TestClient object at 0x74b0dd54a690>
+trial_runs = <lib.custom_provider.endpoint_test.trial_run.TrialRunManager object at 0x74b0dc6a7070>
+
+    def test_a_second_concurrent_run_is_refused(self, client: TestClient, trial_runs: TrialRunManager):
+        with capture_http() as router:
+            _hold_submit(router)
+            payload = {
+                "definition": custom_endpoint_definition(),
+                "parameters": PARAMETERS,
+                "credentials": INLINE_CREDENTIALS,
+            }
+            first = _post(client, "trial-runs", payload)
+            second = _post(client, "trial-runs", payload)
+    
+            assert first.status_code == 201
+            assert second.status_code == 409
+    
+            run_id = first.json()["id"]
+            cancelled = client.post(f"/api/v1/custom-endpoints/trial-runs/{run_id}/cancel")
+            assert cancelled.status_code == 204
+            # 取消后名额让出，同一份定义可以再发一次。
+            third = _post(client, "trial-runs", payload)
+            assert third.status_code == 201
+            # 这一笔也要在离开 http 替身之前停掉，否则它会挂在闸口上直到事件循环消亡。
+            third_id = third.json()["id"]
+>           assert client.post(f"/api/v1/custom-endpoints/trial-runs/{third_id}/cancel").status_code == 204
+E           AssertionError: assert 404 == 204
+E            +  where 404 = <Response [404 Not Found]>.status_code
+E            +    where <Response [404 Not Found]> = post('/api/v1/custom-endpoints/trial-runs/d0d131bd522b4561b1870ce47969a7cf/cancel')
+E            +      where post = <starlette.testclient.TestClient object at 0x74b0dd54a690>.post
+
+tests/unit/server/routers/test_endpoint_tests_api.py:374: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-28 13:38:27 [INFO] httpx: HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs "HTTP/1.1 201 Created"
+2026-09-28 13:38:27 [INFO] httpx: HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs "HTTP/1.1 409 Conflict"
+2026-09-28 13:38:27 [INFO] httpx: HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs/7cde4be4083246b7bce82d6724d60696/cancel "HTTP/1.1 204 No Content"
+2026-09-28 13:38:27 [INFO] httpx: HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs "HTTP/1.1 201 Created"
+2026-09-28 13:38:27 [INFO] httpx: HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs/d0d131bd522b4561b1870ce47969a7cf/cancel "HTTP/1.1 404 Not Found"
+------------------------------ Captured log call -------------------------------
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs "HTTP/1.1 201 Created"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs "HTTP/1.1 409 Conflict"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs/7cde4be4083246b7bce82d6724d60696/cancel "HTTP/1.1 204 No Content"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs "HTTP/1.1 201 Created"
+INFO     httpx:_client.py:1025 HTTP Request: POST http://testserver/api/v1/custom-endpoints/trial-runs/d0d131bd522b4561b1870ce47969a7cf/cancel "HTTP/1.1 404 Not Found"
+__ test_two_dual_profile_slices_share_one_canon_parent_with_isolated_evidence __
+[gw2] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+session_factory = async_sessionmaker(class_='AsyncSession', bind=<sqlalchemy.ext.asyncio.engine.AsyncEngine object at 0x72eca1a85d10>, autoflush=True, expire_on_commit=False)
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw2/test_two_dual_profile_slices_s0')
+
+    @pytest.mark.timeout(
+        1500
+    )  # real per-shot Remotion renders: measured ~400s/slice x 2 slices (~800s); see pyproject.toml note
+    async def test_two_dual_profile_slices_share_one_canon_parent_with_isolated_evidence(
+        session_factory: Factory, tmp_path
+    ) -> None:
+        canon = build_golden_b_canon()
+        uow_factory = adaptation_uow_factory(session_factory)
+    
+>       western = await run_profile_slice(
+            _western_ref(),
+            canon=canon,
+            uow_factory=uow_factory,
+            user_id=USER,
+            project_name=PROJECT,
+            work_dir=tmp_path / "western",
+        )
+
+tests/integration/r2/test_m6_dual_profile_acceptance.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/fixtures/r2/m6_dual_profile_corpus.py:514: in run_profile_slice
+    produced = local_producer.produce(prepared, work_dir=work_dir / "produced", display_text=display_text)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:185: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw2/test_two_dual_profile_slices_s0/western/produced/w-scene-1-TAKE-1.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw2/test_two_dual_profile_slices_s0/western/produced/w-scene-1-TAKE-1.mp4', '--props={"cuts":[{"id":"w-scene-1-TAKE-1","in_seconds":0.0,"out_seconds":15.0,"type":"text_card","text":"INT. OLD WAREHOUSE - NIGHT\\nHero crouches beside a crate.\\nHero listens for footsteps outside."}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+_________ test_single_run_produces_real_60_90s_final_and_three_methods _________
+[gw3] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_single_run_produces_real_0')
+
+    @_RUN_TIMEOUT
+    def test_single_run_produces_real_60_90s_final_and_three_methods(tmp_path):
+>       result = GoldenARunner().run(tmp_path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_golden_a_end_to_end.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/golden_a.py:295: in run
+    produced = producer.produce(
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_single_run_produces_real_0/production/SH01/SH01.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_single_run_produces_real_0/production/SH01/SH01.mp4', '--props={"cuts":[{"id":"SH01","in_seconds":0.0,"out_seconds":22.0,"source":"_r2_runtime_staging/c1aed63d796c47cc99631c3241edd93e/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+_ test_mutation_cross_profile_report_reuse_is_rejected_and_siblings_are_unaffected _
+[gw2] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+session_factory = async_sessionmaker(class_='AsyncSession', bind=<sqlalchemy.ext.asyncio.engine.AsyncEngine object at 0x72ec76b23bd0>, autoflush=True, expire_on_commit=False)
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw2/test_mutation_cross_profile_re0')
+
+    @pytest.mark.timeout(
+        1500
+    )  # real per-shot Remotion renders via _build_pair: measured ~800s/pair; see pyproject.toml note
+    async def test_mutation_cross_profile_report_reuse_is_rejected_and_siblings_are_unaffected(
+        session_factory: Factory, tmp_path
+    ) -> None:
+        """Owning boundary: AdaptationAuthorityService.admit_screenplay_for_direction's
+        dependency-report checks (report.artifact_hash / report.profile_ref) — a report
+        minted for one profile's branch can never admit a screenplay proposed under the
+        sibling profile's branch."""
+>       canon, uow_factory, western, shuangwen = await _build_pair(session_factory, tmp_path)
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/test_m6_dual_profile_acceptance.py:263: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/integration/r2/test_m6_dual_profile_acceptance.py:226: in _build_pair
+    western = await run_profile_slice(
+tests/fixtures/r2/m6_dual_profile_corpus.py:514: in run_profile_slice
+    produced = local_producer.produce(prepared, work_dir=work_dir / "produced", display_text=display_text)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:185: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw2/test_mutation_cross_profile_re0/western/produced/w-scene-1-TAKE-1.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw2/test_mutation_cross_profile_re0/western/produced/w-scene-1-TAKE-1.mp4', '--props={"cuts":[{"id":"w-scene-1-TAKE-1","in_seconds":0.0,"out_seconds":15.0,"type":"text_card","text":"INT. OLD WAREHOUSE - NIGHT\\nHero crouches beside a crate.\\nHero listens for footsteps outside."}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+________________ test_lineage_reaches_claim_evidence_and_source ________________
+[gw3] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_lineage_reaches_claim_evi0')
+
+    @_RUN_TIMEOUT
+    def test_lineage_reaches_claim_evidence_and_source(tmp_path):
+>       result = GoldenARunner().run(tmp_path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_golden_a_end_to_end.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/golden_a.py:295: in run
+    produced = producer.produce(
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_lineage_reaches_claim_evi0/production/SH01/SH01.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_lineage_reaches_claim_evi0/production/SH01/SH01.mp4', '--props={"cuts":[{"id":"SH01","in_seconds":0.0,"out_seconds":22.0,"source":"_r2_runtime_staging/0de54bb644804f58a6b59a08207e78c1/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+____ test_video_passthrough_renders_the_real_bound_source_not_a_solid_color ____
+[gw1] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_video_passthrough_renders0')
+
+    def test_video_passthrough_renders_the_real_bound_source_not_a_solid_color(tmp_path: Path) -> None:
+        source = Path("r2/m3/fixtures/assets/reused_terminal_frame.svg").resolve()
+        cut = RenderCut(cut_id="c1", in_seconds=0.0, out_seconds=2.0, kind="video_passthrough", source_path=source)
+>       asset = render_cut(cut, output_path=tmp_path / "out.mp4")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_remotion_engine.py:57: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_video_passthrough_renders0/out.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_video_passthrough_renders0/out.mp4', '--props={"cuts":[{"id":"c1","in_seconds":0.0,"out_seconds":2.0,"source":"_r2_runtime_staging/5d857ed988bb41078079e2c3af20e452/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+__________ test_reuse_production_preserves_source_and_emits_valid_mp4 __________
+[gw0] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_reuse_production_preserve0')
+
+    @pytest.mark.timeout(300)  # one real ~22s-shot Remotion render; see pyproject.toml note
+    def test_reuse_production_preserves_source_and_emits_valid_mp4(tmp_path: Path) -> None:
+        source = Path("r2/m3/fixtures/assets/reused_terminal_frame.svg")
+        before = hashlib.sha256(source.read_bytes()).hexdigest()
+        sh01 = prepared(str(source))[0]
+>       asset = GoldenALocalProducer().produce(sh01, work_dir=tmp_path)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_local_production.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_reuse_production_preserve0/SH01.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_reuse_production_preserve0/SH01.mp4', '--props={"cuts":[{"id":"SH01","in_seconds":0.0,"out_seconds":22.0,"source":"_r2_runtime_staging/8447ed6fc7cd49898bbe616a502ef6c9/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+______ test_deterministic_output_is_byte_stable_for_the_same_display_text ______
+[gw0] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_deterministic_output_is_b0')
+
+    @pytest.mark.timeout(500)  # two real ~25s-shot Remotion renders; see pyproject.toml note
+    def test_deterministic_output_is_byte_stable_for_the_same_display_text(tmp_path: Path) -> None:
+        sh02 = prepared("r2/m3/fixtures/assets/reused_terminal_frame.svg")[1]
+        producer = GoldenALocalProducer()
+        claim_text = "git commit records the current index contents as a new commit."
+>       a = producer.produce(sh02, work_dir=tmp_path / "a", display_text=claim_text)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_local_production.py:85: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:185: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_deterministic_output_is_b0/a/SH02.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_deterministic_output_is_b0/a/SH02.mp4', '--props={"cuts":[{"id":"SH02","in_seconds":0.0,"out_seconds":12.0,"type":"text_card","text":"git commit records the current index contents as a new commit."}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+______________ test_identical_props_render_byte_identical_output _______________
+[gw1] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_identical_props_render_by0')
+
+    def test_identical_props_render_byte_identical_output(tmp_path: Path) -> None:
+        cut = RenderCut(cut_id="c1", in_seconds=0.0, out_seconds=1.0, kind="text_card", text="determinism check")
+>       a = render_cut(cut, output_path=tmp_path / "a.mp4")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_remotion_engine.py:70: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/remotion_engine.py:185: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_identical_props_render_by0/a.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_identical_props_render_by0/a.mp4', '--props={"cuts":[{"id":"c1","in_seconds":0.0,"out_seconds":1.0,"type":"text_card","text":"determinism check"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+_____ test_claim2_change_selectively_invalidates_expected_shots_and_final ______
+[gw3] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_claim2_change_selectively0')
+
+    @_RUN_TIMEOUT
+    def test_claim2_change_selectively_invalidates_expected_shots_and_final(tmp_path):
+>       result = GoldenARunner().run(tmp_path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_golden_a_end_to_end.py:75: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/golden_a.py:295: in run
+    produced = producer.produce(
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_claim2_change_selectively0/production/SH01/SH01.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw3/test_claim2_change_selectively0/production/SH01/SH01.mp4', '--props={"cuts":[{"id":"SH01","in_seconds":0.0,"out_seconds":22.0,"source":"_r2_runtime_staging/50f41ad45e30488cac5b9b1027577874/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+___________ test_different_display_text_changes_the_rendered_output ____________
+[gw0] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_different_display_text_ch0')
+
+    @pytest.mark.timeout(500)  # two real ~25s-shot Remotion renders; see pyproject.toml note
+    def test_different_display_text_changes_the_rendered_output(tmp_path: Path) -> None:
+        sh02 = prepared("r2/m3/fixtures/assets/reused_terminal_frame.svg")[1]
+        producer = GoldenALocalProducer()
+>       a = producer.produce(sh02, work_dir=tmp_path / "a", display_text="the first claim statement")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_local_production.py:96: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:185: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_different_display_text_ch0/a/SH02.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_different_display_text_ch0/a/SH02.mp4', '--props={"cuts":[{"id":"SH02","in_seconds":0.0,"out_seconds":12.0,"type":"text_card","text":"the first claim statement"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+__________ test_ffmpeg_composes_real_approved_masters_into_final_mp4 ___________
+[gw1] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_ffmpeg_composes_real_appr0')
+
+    @pytest.mark.timeout(900)  # 4 real ~22-25s-shot Remotion renders + a compose; see pyproject.toml note
+    def test_ffmpeg_composes_real_approved_masters_into_final_mp4(tmp_path):
+>       host = approved_host(tmp_path)
+               ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_golden_a_composition.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/integration/r2/m3/test_golden_a_composition.py:55: in approved_host
+    produced = producer.produce(
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_ffmpeg_composes_real_appr0/produced/SH01/SH01.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_ffmpeg_composes_real_appr0/produced/SH01/SH01.mp4', '--props={"cuts":[{"id":"SH01","in_seconds":0.0,"out_seconds":22.0,"source":"_r2_runtime_staging/e3d2291c74d14c9e8db3e4bb886b6587/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+______________ test_real_host_b_c_d_master_semantics_and_restart _______________
+[gw0] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_real_host_b_c_d_master_se0')
+
+    @pytest.mark.timeout(500)  # two real ~22s-shot Remotion renders; see pyproject.toml note
+    def test_real_host_b_c_d_master_semantics_and_restart(tmp_path):
+        prepared, host, dep, fingerprint, resource_type = setup_sh01(tmp_path)
+        producer = GoldenALocalProducer()
+    
+>       produced_b = producer.produce(
+            prepared,
+            work_dir=tmp_path / "b",
+        )
+
+tests/integration/r2/m3/test_host_integration.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_real_host_b_c_d_master_se0/b/SH01.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_real_host_b_c_d_master_se0/b/SH01.mp4', '--props={"cuts":[{"id":"SH01","in_seconds":0.0,"out_seconds":22.0,"source":"_r2_runtime_staging/dcf1e6525d634471a0d87f88dc5921c6/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+_________ test_manifest_metadata_keeps_factual_basis_and_dependencies __________
+[gw0] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_manifest_metadata_keeps_f0')
+
+    @pytest.mark.timeout(300)  # one real ~22s-shot Remotion render; see pyproject.toml note
+    def test_manifest_metadata_keeps_factual_basis_and_dependencies(tmp_path):
+        prepared, host, dep, fingerprint, _ = setup_sh01(tmp_path)
+>       produced = GoldenALocalProducer().produce(
+            prepared,
+            work_dir=tmp_path / "asset",
+        )
+
+tests/integration/r2/m3/test_host_integration.py:157: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_manifest_metadata_keeps_f0/asset/SH01.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw0/test_manifest_metadata_keeps_f0/asset/SH01.mp4', '--props={"cuts":[{"id":"SH01","in_seconds":0.0,"out_seconds":22.0,"source":"_r2_runtime_staging/5157fd3ca6984526925cedbe7f2aca2e/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+___ test_h264_factual_product_renders_real_media_with_three_distinct_methods ___
+[gw1] linux -- Python 3.13.14 /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/bin/python3
+
+tmp_path = PosixPath('/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_h264_factual_product_rend0')
+
+    @pytest.mark.timeout(600)  # 3 real ~22-25s-shot Remotion renders + a compose; see pyproject.toml note
+    def test_h264_factual_product_renders_real_media_with_three_distinct_methods(tmp_path: Path) -> None:
+>       host, produced_by_shot = _produced_host(tmp_path)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/integration/r2/m3/test_golden_a_real_media_closure.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/integration/r2/m3/test_golden_a_real_media_closure.py:61: in _produced_host
+    produced = producer.produce(
+r2/m3/local_production.py:48: in produce
+    return render_cut(cut, output_path=output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:180: in render_cut
+    wall = _run_render(remotion_project, output_path, props)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r2/m3/remotion_engine.py:134: in _run_render
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_h264_factual_product_rend0/produced/SH01/SH01.mp4', ...],)
+kwargs = {'cwd': PosixPath('/home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/vendor/openmontage/remotion-composer'), 'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['npx', 'remotion', 'render', 'src/index.tsx', 'Explainer', '/tmp/pytest-of-anhtuan/pytest-496/popen-gw1/test_h264_factual_product_rend0/produced/SH01/SH01.mp4', '--props={"cuts":[{"id":"SH01","in_seconds":0.0,"out_seconds":22.0,"source":"_r2_runtime_staging/9f5e0ef0ac3a4ff1a3f88d812ccd80ad/reused_terminal_frame.svg"}],"overlays":[],"captions":[],"audio":{}}']' returned non-zero exit status 1.
+
+../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/subprocess.py:577: CalledProcessError
+=============================== warnings summary ===============================
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+.venv/lib/python3.13/site-packages/fastapi/testclient.py:1
+  /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/unit/lib/video_backends/test_wan_family_consistency.py: 1 warning
+tests/integration/lib/config/test_config_resolver.py: 1 warning
+tests/integration/server/agent_runtime/sdk_tools/test_patch_tools.py: 1 warning
+tests/unit/server/agent_runtime/test_agent_access_policy.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_collapse_image_backend_buckets.py: 15 warnings
+tests/integration/lib/db/migrations/test_alembic_execution_attempts.py: 14 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_provider_max_workers.py: 8 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py: 8 warnings
+tests/integration/lib/db/migrations/test_alembic_atomic_master_promotion.py: 6 warnings
+tests/integration/lib/db/migrations/test_alembic_gate_receipt_tables.py: 6 warnings
+tests/integration/lib/db/migrations/test_alembic_task_endpoint_base_url_split.py: 5 warnings
+tests/integration/lib/db/migrations/test_alembic_asset_derivatives_table.py: 4 warnings
+tests/integration/lib/db/migrations/test_alembic_split_default_image_backend.py: 4 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_provider_capability_overrides.py: 3 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_submitted_base_url.py: 3 warnings
+tests/integration/lib/db/migrations/test_alembic_adaptation.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_adaptation_authority.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_adaptation_profiles.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_api_call_request_id.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_budget_reservations.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_canon_authority.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_correlation_columns.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_provider_endpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_custom_endpoint_table.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_generation_batches.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_gate_script_lock.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_compilation.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_decision_authority.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_lifecycle_evidence.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_handoff_admission.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_narrative_plan.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_resource_type_dedupe_downgrade.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_execution_checkpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_screenplay_admission.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_tasks_provider_endpoint.py: 2 warnings
+tests/integration/lib/db/migrations/test_alembic_drop_task_events_downgrade.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_last_provider_response.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_split_minimax_video_endpoints.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_supported_durations_backfill.py: 1 warning
+tests/integration/lib/db/migrations/test_alembic_task_dedup_user_scope.py: 1 warning
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+tests/integration/server/test_remote_mcp.py::test_remote_mcp_accepts_source_upload_sized_requests
+tests/unit/server/test_auth_kill_switch.py::TestLoginRouteKillSwitch::test_disabled_login_succeeds_with_any_password
+tests/unit/server/test_app_startup_migration.py::test_startup_migrates_projects_and_reaps_stale_backups
+  /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/.venv/lib/python3.13/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+    warnings.warn(
+
+tests/integration/test_mutmut_fork_isolation.py::test_forked_child_running_atexit_handlers_keeps_shared_test_db_dir
+  /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/tests/integration/test_mutmut_fork_isolation.py:49: DeprecationWarning: This process (pid=2522202) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+tests/integration/lib/db/migrations/test_alembic_generation_batches.py::test_upgrade_adds_batches_without_changing_existing_tasks
+  /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/tests/integration/lib/db/migrations/test_alembic_generation_batches.py:46: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    indexes = {index["name"] for index in sa.inspect(conn).get_indexes("tasks")}
+
+tests/integration/lib/db/test_db_engine_fork.py::test_forked_child_can_query_module_level_engine_after_parent_used_pool
+  /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage/tests/integration/lib/db/test_db_engine_fork.py:22: DeprecationWarning: This process (pid=2522205) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+892.46s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_stale_map_approval_after_supersession_is_rejected
+861.39s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_readmitting_an_already_locked_screenplay_is_rejected
+836.00s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_waiver_laundering_after_a_semantic_change_is_rejected
+832.99s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_reused_decision_id_with_a_different_command_is_rejected
+318.42s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_evidence_files_capture_cost_provenance_lineage_and_restart
+38.17s call     tests/integration/r2/m3/test_local_production.py::test_reuse_production_preserves_source_and_emits_valid_mp4
+35.83s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_two_dual_profile_slices_share_one_canon_parent_with_isolated_evidence
+19.78s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_claim2_change_selectively_invalidates_expected_shots_and_final
+18.63s call     tests/integration/r2/m3/test_remotion_engine.py::test_text_card_renders_real_visible_text_not_a_solid_color
+7.88s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_single_run_produces_real_60_90s_final_and_three_methods
+7.34s call     tests/integration/r2/m3/test_remotion_engine.py::test_identical_props_render_byte_identical_output
+7.29s call     tests/integration/r2/m3/test_remotion_engine.py::test_video_passthrough_renders_the_real_bound_source_not_a_solid_color
+7.27s call     tests/integration/r2/m3/test_local_production.py::test_different_display_text_changes_the_rendered_output
+7.15s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_lineage_reaches_claim_evidence_and_source
+7.06s call     tests/integration/r2/m3/test_local_production.py::test_deterministic_output_is_byte_stable_for_the_same_display_text
+6.94s call     tests/integration/r2/m3/test_host_integration.py::test_manifest_metadata_keeps_factual_basis_and_dependencies
+6.93s call     tests/integration/r2/m3/test_golden_a_real_media_closure.py::test_h264_factual_product_renders_real_media_with_three_distinct_methods
+6.89s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_cross_profile_report_reuse_is_rejected_and_siblings_are_unaffected
+6.85s call     tests/integration/r2/m3/test_host_integration.py::test_real_host_b_c_d_master_semantics_and_restart
+6.70s call     tests/integration/r2/m3/test_golden_a_composition.py::test_ffmpeg_composes_real_approved_masters_into_final_mp4
+5.04s call     tests/integration/test_mutmut_fork_isolation.py::test_mutmut_session_uses_private_basetemp_outside_shared_root
+3.63s call     tests/integration/r2/host_hardening/test_h5_process_crash_recovery.py::test_sigkill_mid_submitting_is_recovered_to_needs_operator
+2.99s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_full_chain_downgrade_only_drops_intentional_indexes
+2.95s call     tests/integration/lib/test_media_generator_module.py::TestReferenceCompressionSeam::test_backend_receives_compressed_copy_source_untouched
+2.94s call     tests/unit/lib/test_image_compression_batch.py::test_compress_batch_nine_images_memory_ok
+=========================== short test summary info ============================
+SKIPPED [1] tests/integration/lib/test_script_generator_incremental.py:518: drama 的脚本规划没有草稿模型，两侧消费的都是磁盘原文
+SKIPPED [2] tests/integration/lib/db/repositories/test_execution_attempt_repository.py:103: concurrency races need real row-level locking (PostgreSQL only)
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:281: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:353: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:375: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:391: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:405: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:434: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:466: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:489: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:540: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [5] tests/integration/r2/host_hardening/test_deployment_backup.py:565: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:606: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:629: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:643: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:683: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:727: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:754: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:775: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/host_hardening/test_deployment_backup.py:790: requires DATABASE_URL pointing at a disposable PostgreSQL server
+SKIPPED [1] tests/integration/r2/narrative_lifecycle/test_handoff_admission.py:534: this race needs two real connections and row-level locking (PostgreSQL only)
+SKIPPED [1] tests/integration/r2/narrative_lifecycle/test_handoff_admission.py:611: this race needs two real connections and row-level locking (PostgreSQL only)
+SKIPPED [1] tests/integration/r2/adaptation/test_screenplay_admission.py:991: concurrency races need real row-level locking (PostgreSQL only)
+SKIPPED [1] tests/integration/lib/db/repositories/test_narrative_lifecycle.py:192: the SQLite test engine runs with foreign keys disabled
+SKIPPED [1] tests/integration/lib/db/repositories/test_narrative_lifecycle.py:564: the SQLite test engine runs with foreign keys disabled
+SKIPPED [1] tests/integration/lib/db/repositories/test_host_hardening_promotion.py:38: concurrency races need real row-level locking (PostgreSQL only)
+SKIPPED [1] tests/integration/lib/db/repositories/test_task_command_idempotency.py:32: concurrency races need real row-level locking (PostgreSQL only)
+SKIPPED [1] tests/integration/lib/db/repositories/test_adaptation.py:206: the SQLite test engine runs with foreign keys disabled
+SKIPPED [1] tests/integration/server/services/test_realize_pending_cancels.py:106: concurrency races need real row-level locking (PostgreSQL only)
+SKIPPED [4] tests/integration/r2/narrative_lifecycle/test_lifecycle_concurrency.py:57: concurrency races need real row-level locking (PostgreSQL only)
+SKIPPED [1] tests/integration/test_mutmut_fork_isolation.py:99: _scproxy 只在 macOS 存在
+SKIPPED [2] tests/integration/r2/adaptation/test_adaptation_concurrency.py:48: concurrency races need real row-level locking (PostgreSQL only)
+SKIPPED [2] tests/integration/r2/adaptation/test_m6_postgres_concurrency.py:64: concurrency races need real row-level locking (PostgreSQL only)
+SKIPPED [1] tests/e2e/test_m7_production_candidate_workflow.py:210: ARCREEL_E2E_DATA_DIR is not set; point it at a restore-derived target
+SKIPPED [1] tests/integration/r2/test_m5c_architecture_boundaries_db.py:26: isolation level is a PostgreSQL-only precondition (spec §7.2)
+15 failed, 15002 passed, 45 skipped, 135 warnings in 3574.20s (0:59:34)

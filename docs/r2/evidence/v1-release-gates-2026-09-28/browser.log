@@ -1,0 +1,15 @@
+# command: bash -c 'ARCREEL_E2E_DATA_DIR="$GATE_E2E_DATA_DIR" ARCREEL_E2E_DATABASE_URL="$GATE_E2E_DATABASE_URL" uv run python -m pytest -q -rs -p no:cacheprovider tests/e2e/test_m7_production_candidate_workflow.py'
+# exit_code: 0
+# tool_versions: python 3.13.14; git 2.53.0
+.                                                                        [100%]
+=============================== warnings summary ===============================
+tests/e2e/test_m7_production_candidate_workflow.py::test_the_operator_reviews_downloads_approves_and_reopens_restored_golden_products
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+41.93s call     tests/e2e/test_m7_production_candidate_workflow.py::test_the_operator_reviews_downloads_approves_and_reopens_restored_golden_products
+5.14s setup    tests/e2e/test_m7_production_candidate_workflow.py::test_the_operator_reviews_downloads_approves_and_reopens_restored_golden_products
+0.33s teardown tests/e2e/test_m7_production_candidate_workflow.py::test_the_operator_reviews_downloads_approves_and_reopens_restored_golden_products
+1 passed, 1 warning in 47.52s

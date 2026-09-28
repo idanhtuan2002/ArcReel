@@ -1,0 +1,4 @@
+# command: uv run basedpyright --warnings
+# exit_code: 0
+# tool_versions: python 3.13.14; git 2.53.0
+0 errors, 0 warnings, 0 notes
