@@ -136,3 +136,21 @@ def test_the_installed_lookup_opens_the_release_gate(tmp_path: Path) -> None:
     assert require_paid_route(route, model_id="m1", binding=BINDING, release_mode=gate) is None
     with pytest.raises(PaidRouteUnqualifiedError):
         require_paid_route(route, model_id="m1", binding="sha256:other", release_mode=gate)
+
+
+def test_a_stale_lock_from_a_killed_writer_is_cleared(tmp_path: Path) -> None:
+    import os
+    import time
+
+    route = media_route("openai", "image")
+    directory = qualifications_dir(tmp_path)
+    directory.mkdir(parents=True)
+    lock = directory / ".lock"
+    lock.write_text("")
+    old = time.time() - 3600
+    os.utime(lock, (old, old))
+
+    _record(tmp_path, route)
+
+    assert _qualified(route, tmp_path)
+    assert not lock.exists()

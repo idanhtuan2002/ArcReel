@@ -47,6 +47,8 @@ from r2.host_hardening.route_inventory import (
 logger = logging.getLogger(__name__)
 
 QUALIFICATIONS_DIRNAME = ".route_qualifications"
+#: Age after which a records lock is treated as left behind by a killed writer.
+STALE_LOCK_SECONDS = 300
 _RECORDS_FILE = "qualifications.json"
 _EVIDENCE_DIR = "evidence"
 
@@ -122,6 +124,16 @@ def _exclusive(directory: Path, *, timeout: float = 30.0) -> Generator[None]:
             fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             break
         except FileExistsError:
+            # A writer killed inside the (millisecond-long) critical section leaves the lock behind;
+            # one older than STALE_LOCK_SECONDS cannot belong to a live writer and is cleared.
+            try:
+                age = time.time() - lock.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            if age > STALE_LOCK_SECONDS:
+                logger.warning("clearing a stale route qualification lock (%.0f s old): %s", age, lock)
+                lock.unlink(missing_ok=True)
+                continue
             if time.monotonic() >= deadline:
                 raise TimeoutError(f"route qualification store is locked: {lock}") from None
             time.sleep(0.05)
