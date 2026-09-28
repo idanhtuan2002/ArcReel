@@ -192,7 +192,7 @@ def record_qualification(
     return record
 
 
-def _adapter_level_holds(route: PaidRoute, now: datetime) -> bool:
+def adapter_level_holds(route: PaidRoute, now: datetime) -> bool:
     """Async video routes also need their shipped adapter profile verified offline."""
     if route.media_type != "video":
         return True
@@ -222,7 +222,7 @@ def is_route_qualified(
     """The single registry read for release gates: static adapter level plus runtime route record."""
     if route.kind in UNQUALIFIABLE_ROUTE_KINDS or binding is None:
         return False
-    if not _adapter_level_holds(route, now):
+    if not adapter_level_holds(route, now):
         return False
     directory = qualifications_dir(root)
     for record in load_qualifications(root):
@@ -251,6 +251,7 @@ __all__ = [
     "ROUTE_ADAPTER_VERSIONS",
     "UNQUALIFIABLE_ROUTE_KINDS",
     "RouteQualification",
+    "adapter_level_holds",
     "adapter_version_for",
     "install_runtime_qualification_lookup",
     "is_route_qualified",

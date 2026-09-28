@@ -8,11 +8,13 @@ success the evidence is written under the data root and the route becomes qualif
 until the expiry. A failure records nothing.
 
     uv run python -m scripts.r2.qualify_route --provider openai --media image --model gpt-image-2
-    uv run python -m scripts.r2.qualify_route --provider custom-7 --media video --model relay-video --duration 5
+    uv run python -m scripts.r2.qualify_route --provider custom-7 --media text --model relay-chat
 
-The qualification is bound to the provider's current configuration (base URL and credentials, by
-digest): changing either needs a new canary. The Agent route and trial runs cannot be qualified;
-in a release deployment they stay refused.
+The qualification is bound to the model the backend actually calls and to the provider's
+configuration, by digest (ADR-0091 amendment item 1): a new key, base URL or endpoint needs a new
+canary. A route whose adapter level does not hold is refused before any paid call: today that is
+every video route, whose shipped adapter profiles are UNQUALIFIED. The Agent route and trial runs
+cannot be qualified; in a release deployment they stay refused.
 """
 
 from __future__ import annotations
@@ -35,7 +37,7 @@ from lib.config.resolver import ConfigResolver
 from lib.db import async_session_factory
 from lib.ledger import Ledger
 from r2.host_hardening.paid_routes import PaidRoute, media_route, qualification_canary
-from r2.host_hardening.route_qualifications import adapter_version_for, record_qualification
+from r2.host_hardening.route_qualifications import adapter_level_holds, adapter_version_for, record_qualification
 
 CANARY_PROJECT = "__route_qualification__"
 _PROMPT = "A single red apple on a plain white table."
@@ -43,6 +45,10 @@ _PROMPT = "A single red apple on a plain white table."
 
 class CanaryFailedError(RuntimeError):
     """The canary call ran but did not produce a usable result."""
+
+
+class CanaryRefusedError(RuntimeError):
+    """The route cannot become qualified, so no paid canary call is made."""
 
 
 def _file_summary(path: Path) -> dict[str, Any]:
@@ -88,6 +94,10 @@ async def _generate(backend: Any, media: str, workdir: Path, args: argparse.Name
 
 async def run_media_canary(args: argparse.Namespace, *, session_factory=async_session_factory) -> dict[str, Any]:
     route = media_route(args.provider, args.media)
+    if not adapter_level_holds(route, datetime.now(UTC)):
+        raise CanaryRefusedError(
+            f"{route.ref} has no offline-verified adapter profile, so a canary cannot qualify it; no paid call was made"
+        )
     resolver = ConfigResolver(session_factory)
     binding = await paid_route_binding(
         provider_id=args.provider, media_type=args.media, resolver=resolver, model_id=args.model

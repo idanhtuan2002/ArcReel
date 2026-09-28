@@ -101,6 +101,23 @@ async def test_a_canary_without_usable_output_records_nothing(
     assert load_qualifications(release_deployment) == []
 
 
+async def test_a_video_canary_is_refused_before_any_paid_call(
+    db_factory, release_deployment: Path, monkeypatch
+) -> None:
+    from lib.video_backends import registry as video_registry
+
+    built: list[str] = []
+    monkeypatch.setitem(video_registry._BACKEND_FACTORIES, "ark", lambda **kw: built.append("ark"))
+
+    with pytest.raises(qualify_route.CanaryRefusedError):
+        await qualify_route.run_media_canary(_args(media="video", model="seedance-x"), session_factory=db_factory)
+
+    assert built == []
+    async with db_factory() as session:
+        assert (await session.execute(select(ApiCall))).first() is None
+    assert load_qualifications(release_deployment) == []
+
+
 async def test_a_new_api_key_needs_a_new_canary(db_factory, release_deployment: Path, monkeypatch) -> None:
     """资质绑定到供应商当下的配置：换了凭证即不再有效，旧 canary 不能带到新账户上。"""
     monkeypatch.setitem(image_registry._BACKEND_FACTORIES, "ark", lambda **kw: _FakeImageBackend(**kw))
