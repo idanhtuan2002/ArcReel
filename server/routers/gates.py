@@ -38,6 +38,7 @@ from lib.db.repositories.gates import (
     GateSequenceConflictError,
     GreenlightRepository,
     PublishApprovalRepository,
+    ScriptLockRepository,
 )
 from lib.project_manager import get_project_manager
 from r2.adaptation.authority import AdaptationAuthorityService
@@ -45,10 +46,17 @@ from r2.adaptation.session_authority import SessionAuthenticatedShowrunnerAuthor
 from r2.contracts.adaptation import ScreenplayAdmissionCommand
 from r2.contracts.content_basis import ContentBasis
 from r2.contracts.enums import ProductionMethod
-from r2.contracts.gates import FinalCutReceipt, GateAuthorization, GreenlightDecision, PublishApprovalDecision
+from r2.contracts.gates import (
+    FinalCutReceipt,
+    GateAuthorization,
+    GreenlightDecision,
+    PublishApprovalDecision,
+    ScriptLockDecision,
+)
 from r2.m3.deliverables import (
     COMPOSITE_CONTRACT_TYPE,
     SourceMasterMismatchError,
+    audio_decision_holds,
     composite_dependencies,
     current_deliverables,
     exportable_deliverable,
@@ -70,6 +78,12 @@ self_auth_router = APIRouter()
 class GreenlightRequest(BaseModel):
     source_digest: str
     action: Literal["GREENLIGHT", "REVOKE"]
+
+
+class ScriptLockRequest(BaseModel):
+    source_digest: str = Field(min_length=1)
+    script_digest: str = Field(min_length=1)
+    action: Literal["LOCK", "REVOKE"]
 
 
 class PublishApprovalRequest(BaseModel):
@@ -108,6 +122,8 @@ class FinalCutApprovalRequest(BaseModel):
     contract_schema_version: str
     produced: FinalCutRenderedAssetRequest
     approval_record: str = Field(min_length=1)
+    # Required for a COMPOSITE final and verified against its bytes (ADR-0092); shots send none.
+    audio_decision: Literal["AUDIO", "MUTE"] | None = None
 
     @field_validator("target_ref")
     @classmethod
@@ -170,6 +186,27 @@ async def narrative_lock(
     return receipt.model_dump(mode="json")
 
 
+@router.post("/projects/{project_name}/gates/script-lock")
+async def script_lock(project_name: str, req: ScriptLockRequest, user: CurrentUser) -> dict[str, object]:
+    """Gate B for a factual product (ADR-0092): lock the exact source and script revision."""
+    decision = ScriptLockDecision(
+        decision_id=str(uuid.uuid4()),
+        user_id=user.id,
+        project_name=project_name,
+        source_digest=req.source_digest,
+        script_digest=req.script_digest,
+        action=req.action,
+        authorization=_authorization(user),
+        sequence=1,  # ignored by append(); the repository assigns the real, race-safe value
+        created_at=datetime.now(UTC),
+    )
+    async with async_session_factory() as session:
+        await ScriptLockRepository(session).append(decision)
+        await session.commit()
+        history = await ScriptLockRepository(session).list_for_project(user_id=user.id, project_name=project_name)
+    return history[-1].model_dump(mode="json")
+
+
 @router.post("/projects/{project_name}/gates/final-cut")
 async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, user: CurrentUser) -> dict[str, object]:
     project_dir = get_project_manager().get_project_path(project_name)
@@ -206,13 +243,33 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             f"gate-c/{user.id}/{project_name}/{req.episode}/{req.target_ref}/{req.approval_record}",
         )
     )
-    request_digest = hashlib.sha256(req.model_dump_json().encode()).hexdigest()
+    # A request without an audio decision digests as it did before the field existed, so an
+    # approval_record retry from before ADR-0092 still replays.
+    request_digest = hashlib.sha256(
+        req.model_dump_json(exclude={"audio_decision"} if req.audio_decision is None else None).encode()
+    ).hexdigest()
     composite = req.produced.method is ProductionMethod.COMPOSITE
     if composite and req.direct_dependencies:
         raise HTTPException(
             status_code=400,
             detail="a COMPOSITE final's dependencies are derived from its source masters; send none",
         )
+    if composite != (req.audio_decision is not None):
+        raise HTTPException(
+            status_code=400,
+            detail="a COMPOSITE final needs audio_decision (AUDIO or MUTE); a shot approval sends none",
+        )
+    if composite:
+        decision = req.audio_decision or ""
+        try:
+            holds = await run_noninterruptible_sync(lambda: audio_decision_holds(decision, candidate_path))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not holds:
+            raise HTTPException(
+                status_code=400,
+                detail=f"audio_decision {decision} does not match the final's audio track",
+            )
 
     def _stage_and_approve():
         dependencies = (
@@ -261,6 +318,7 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         selected_by=user.sub,
         selected_at=approved_master.selected_at,
         sequence=1,  # ignored by append(); the repository assigns the real, race-safe value
+        audio_decision=req.audio_decision,
     )
     receipt_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"gate-c-receipt/{operation_id}"))
     try:
@@ -340,8 +398,12 @@ async def gate_history(project_name: str, user: CurrentUser) -> dict[str, object
         publish_history = await PublishApprovalRepository(session).list_for_project(
             user_id=user.id, project_name=project_name
         )
+        script_lock_history = await ScriptLockRepository(session).list_for_project(
+            user_id=user.id, project_name=project_name
+        )
     return {
         "greenlight": [d.model_dump(mode="json") for d in greenlight_history],
+        "script_lock": [d.model_dump(mode="json") for d in script_lock_history],
         "publish_approval": [d.model_dump(mode="json") for d in publish_history],
     }
 

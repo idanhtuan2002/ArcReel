@@ -62,6 +62,34 @@ class GreenlightDecisionModel(UserOwnedMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class ScriptLockDecisionModel(UserOwnedMixin, Base):
+    """Gate B for a factual product (ADR-0092). Same shape/rationale as ``GreenlightDecisionModel``."""
+
+    __tablename__ = "gate_script_lock_decisions"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "decision_id", name="pk_gate_script_lock_decisions"),
+        UniqueConstraint("user_id", "project_name", "sequence", name="uq_gate_script_lock_decisions_sequence"),
+        CheckConstraint("sequence >= 1", name="ck_gate_script_lock_decisions_sequence"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        server_default=DEFAULT_USER_ID,
+        primary_key=True,
+    )
+    project_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    decision_id: Mapped[str] = mapped_column(_ID, primary_key=True)
+
+    source_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+    script_digest: Mapped[str] = mapped_column(_ID, nullable=False)
+    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    authorization_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class PublishApprovalDecisionModel(UserOwnedMixin, Base):
     """Gate D. Same shape/rationale as ``GreenlightDecisionModel``."""
 
@@ -120,10 +148,12 @@ class FinalCutReceiptModel(Base):
     selected_by: Mapped[str] = mapped_column(_ID, nullable=False)
     selected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    audio_decision: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 __all__ = [
     "FinalCutReceiptModel",
     "GreenlightDecisionModel",
     "PublishApprovalDecisionModel",
+    "ScriptLockDecisionModel",
 ]

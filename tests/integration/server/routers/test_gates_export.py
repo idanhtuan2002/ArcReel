@@ -4,6 +4,9 @@ copy lands in ``output/``, Gate D binds that digest, and the single-file downloa
 from __future__ import annotations
 
 import hashlib
+import subprocess
+import tempfile
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -61,6 +64,23 @@ async def gate_export_client(monkeypatch: pytest.MonkeyPatch, session_factory: F
         yield http
 
 
+@cache
+def _media(tag: bytes, *, tone: bool = False) -> bytes:
+    """A real one-second MP4 whose bytes are unique per ``tag``: silent, or with an audible tone."""
+    audio_in = ["-f", "lavfi", "-i", "sine=frequency=440:duration=1"] if tone else []
+    audio_out = ["-c:a", "aac", "-shortest"] if tone else []
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "media.mp4"
+        subprocess.run(
+            [
+                *("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=64x36:d=1", *audio_in),
+                *("-metadata", f"comment={tag.hex()}", "-c:v", "libx264", "-pix_fmt", "yuv420p", *audio_out, str(out)),
+            ],
+            check=True,
+        )
+        return out.read_bytes()
+
+
 def _body(target_ref: str, data: bytes, **produced: object) -> dict[str, object]:
     fields: dict[str, object] = {
         "method": "DETERMINISTIC",
@@ -101,6 +121,7 @@ async def _approve_final(
 ):
     (project_dir / "production" / "FINAL.mp4").write_bytes(data)
     body = _body("FINAL", data, method="COMPOSITE", tool="ffmpeg", tool_version="ffmpeg 7", source_master_refs=sources)
+    body["audio_decision"] = "MUTE"
     body.update(extra)
     return await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=body)
 
@@ -123,7 +144,7 @@ async def test_an_approved_composite_final_is_exported_bound_at_gate_d_and_downl
     gate_export_client: AsyncClient, project_dir: Path
 ) -> None:
     sources = [await _approve_shot(gate_export_client, project_dir, s, s.encode() * 64) for s in ("SH01", "SH02")]
-    final = b"composed final cut bytes" * 32
+    final = _media(b"composed final cut bytes" * 32)
 
     approved = await _approve_final(gate_export_client, project_dir, final, sources)
 
@@ -186,7 +207,9 @@ async def test_a_composite_final_takes_its_dependencies_from_its_masters_not_the
     sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")]
     forged = [{"ref": "artifact:SH01", "version": "1", "fingerprint": "f" * 64}]
 
-    response = await _approve_final(gate_export_client, project_dir, b"final", sources, direct_dependencies=forged)
+    response = await _approve_final(
+        gate_export_client, project_dir, _media(b"final"), sources, direct_dependencies=forged
+    )
 
     assert response.status_code == 400
 
@@ -197,7 +220,7 @@ async def test_a_composite_final_must_name_current_approved_masters(
 ) -> None:
     await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")
 
-    response = await _approve_final(gate_export_client, project_dir, b"final", [source])
+    response = await _approve_final(gate_export_client, project_dir, _media(b"final"), [source])
 
     assert response.status_code == 409
     assert not (project_dir / "output").exists()
@@ -209,7 +232,7 @@ async def test_a_tampered_shot_master_cannot_authorize_a_composite_final(
     source = await _approve_shot(gate_export_client, project_dir, "SH01", b"approved shot")
     (project_dir / "r2_m3_current" / "SH01.mp4").write_bytes(b"unapproved shot")
 
-    response = await _approve_final(gate_export_client, project_dir, b"final", [source])
+    response = await _approve_final(gate_export_client, project_dir, _media(b"final"), [source])
 
     assert response.status_code == 409
     assert not (project_dir / "output").exists()
@@ -219,7 +242,7 @@ async def test_a_reapproved_shot_master_makes_the_final_stale_so_it_cannot_be_pu
     gate_export_client: AsyncClient, project_dir: Path
 ) -> None:
     sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one v1")]
-    final = b"final from v1"
+    final = _media(b"final from v1")
     assert (await _approve_final(gate_export_client, project_dir, final, sources)).status_code == 200
 
     await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one v2")
@@ -235,7 +258,7 @@ async def test_a_tampered_export_copy_is_neither_publishable_nor_served(
     gate_export_client: AsyncClient, project_dir: Path
 ) -> None:
     sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")]
-    final = b"approved final"
+    final = _media(b"approved final")
     assert (await _approve_final(gate_export_client, project_dir, final, sources)).status_code == 200
 
     (project_dir / "output" / "ep1-FINAL.mp4").write_bytes(b"swapped by another tool")
@@ -249,7 +272,7 @@ async def test_the_download_needs_a_valid_token_for_this_project(
     gate_export_client: AsyncClient, project_dir: Path
 ) -> None:
     sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")]
-    final = b"approved final"
+    final = _media(b"approved final")
     assert (await _approve_final(gate_export_client, project_dir, final, sources)).status_code == 200
 
     assert (await _download(gate_export_client, _sha(final), token="not-a-token")).status_code == 401
@@ -275,11 +298,11 @@ async def test_retry_after_export_failure_reuses_the_approved_version_and_receip
         return original(host, target_ref)
 
     monkeypatch.setattr(gates, "write_export_copy", fail_once)
-    first = await _approve_final(gate_export_client, project_dir, b"final", sources)
+    first = await _approve_final(gate_export_client, project_dir, _media(b"final"), sources)
     assert first.status_code == 503
     assert first.json()["detail"]["code"] == "GATE_C_RETRY_SAME_APPROVAL_RECORD"
 
-    second = await _approve_final(gate_export_client, project_dir, b"final", sources)
+    second = await _approve_final(gate_export_client, project_dir, _media(b"final"), sources)
     assert second.status_code == 200, second.text
     assert len(VersionManager(project_dir).get_versions("videos", "FINAL")["versions"]) == 1
     async with session_factory() as session:
@@ -309,14 +332,14 @@ async def test_retry_after_receipt_failure_and_duplicate_success_are_idempotent(
     engine = session_factory.kw["bind"]
     event.listen(engine.sync_engine, "before_cursor_execute", fail_once)
     try:
-        first = await _approve_final(gate_export_client, project_dir, b"final", sources)
+        first = await _approve_final(gate_export_client, project_dir, _media(b"final"), sources)
         assert first.status_code == 503
         assert first.json()["detail"]["code"] == "GATE_C_RETRY_SAME_APPROVAL_RECORD"
     finally:
         event.remove(engine.sync_engine, "before_cursor_execute", fail_once)
 
-    second = await _approve_final(gate_export_client, project_dir, b"final", sources)
-    third = await _approve_final(gate_export_client, project_dir, b"final", sources)
+    second = await _approve_final(gate_export_client, project_dir, _media(b"final"), sources)
+    third = await _approve_final(gate_export_client, project_dir, _media(b"final"), sources)
     assert second.status_code == 200, second.text
     assert third.status_code == 200, third.text
     assert len(VersionManager(project_dir).get_versions("videos", "FINAL")["versions"]) == 1
@@ -333,10 +356,59 @@ async def test_reusing_approval_record_for_changed_final_is_rejected(
     gate_export_client: AsyncClient, project_dir: Path
 ) -> None:
     sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")]
-    assert (await _approve_final(gate_export_client, project_dir, b"final v1", sources)).status_code == 200
-    previous_record = _body("FINAL", b"final v1")["approval_record"]
+    assert (await _approve_final(gate_export_client, project_dir, _media(b"final v1"), sources)).status_code == 200
+    previous_record = _body("FINAL", _media(b"final v1"))["approval_record"]
     response = await _approve_final(
-        gate_export_client, project_dir, b"final v2", sources, approval_record=previous_record
+        gate_export_client, project_dir, _media(b"final v2"), sources, approval_record=previous_record
     )
     assert response.status_code == 409
     assert len(VersionManager(project_dir).get_versions("videos", "FINAL")["versions"]) == 1
+
+
+async def test_a_composite_final_needs_an_audio_decision_that_matches_its_track(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
+) -> None:
+    sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")]
+    silent, toned = _media(b"silent final"), _media(b"toned final", tone=True)
+
+    missing = await _approve_final(gate_export_client, project_dir, silent, sources, audio_decision=None)
+    muted_but_audible = await _approve_final(gate_export_client, project_dir, toned, sources, audio_decision="MUTE")
+    audible_but_silent = await _approve_final(gate_export_client, project_dir, silent, sources, audio_decision="AUDIO")
+    not_media = await _approve_final(gate_export_client, project_dir, b"not a video", sources)
+    approved = await _approve_final(gate_export_client, project_dir, toned, sources, audio_decision="AUDIO")
+
+    assert [r.status_code for r in (missing, muted_but_audible, audible_but_silent, not_media)] == [400] * 4
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["receipt"]["audio_decision"] == "AUDIO"
+    async with session_factory() as session:
+        [receipt] = await FinalCutReceiptRepository(session).list_for_artifact(
+            user_id=USER.id, project_name=PROJECT, artifact_key=ArtifactKey.episode_video(1, "FINAL").encode()
+        )
+    assert receipt.audio_decision == "AUDIO"
+
+
+async def test_a_shot_approval_carries_no_audio_decision(gate_export_client: AsyncClient, project_dir: Path) -> None:
+    (project_dir / "production" / "SH01.mp4").write_bytes(b"shot")
+    body = _body("SH01", b"shot")
+    body["audio_decision"] = "MUTE"
+
+    response = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=body)
+
+    assert response.status_code == 400
+
+
+async def test_a_factual_script_lock_is_recorded_in_the_gate_history(gate_export_client: AsyncClient) -> None:
+    body = {"source_digest": "sha256:" + "a" * 64, "script_digest": "sha256:" + "b" * 64, "action": "LOCK"}
+
+    locked = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/script-lock", json=body)
+    revoked = await gate_export_client.post(
+        f"/api/v1/projects/{PROJECT}/gates/script-lock", json={**body, "action": "REVOKE"}
+    )
+    history = (await gate_export_client.get(f"/api/v1/projects/{PROJECT}/gates")).json()["script_lock"]
+
+    assert (locked.status_code, revoked.status_code) == (200, 200)
+    assert [(d["action"], d["sequence"], d["script_digest"]) for d in history] == [
+        ("LOCK", 1, body["script_digest"]),
+        ("REVOKE", 2, body["script_digest"]),
+    ]
+    assert history[0]["authorization"]["authenticated_principal"] == USER.sub

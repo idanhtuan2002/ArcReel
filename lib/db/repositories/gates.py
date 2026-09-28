@@ -13,13 +13,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Literal, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.db.models.gates import FinalCutReceiptModel, GreenlightDecisionModel, PublishApprovalDecisionModel
-from r2.contracts.gates import FinalCutReceipt, GreenlightDecision, PublishApprovalDecision
+from lib.db.models.gates import (
+    FinalCutReceiptModel,
+    GreenlightDecisionModel,
+    PublishApprovalDecisionModel,
+    ScriptLockDecisionModel,
+)
+from r2.contracts.gates import FinalCutReceipt, GreenlightDecision, PublishApprovalDecision, ScriptLockDecision
 
 
 def _is_unique_violation(exc: IntegrityError) -> bool:
@@ -97,6 +103,75 @@ class GreenlightRepository:
                     "user_id": row.user_id,
                     "project_name": row.project_name,
                     "source_digest": row.source_digest,
+                    "action": row.action,
+                    "authorization": row.authorization_json,
+                    "sequence": row.sequence,
+                    "created_at": _stored_aware(row.created_at),
+                }
+            )
+            for row in rows
+        ]
+
+
+class ScriptLockRepository:
+    """Gate B for a factual product (ADR-0092); same append pattern as ``GreenlightRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def append(self, decision: ScriptLockDecision) -> None:
+        try:
+            async with self.session.begin_nested():
+                next_sequence = await self._next_sequence(user_id=decision.user_id, project_name=decision.project_name)
+                self.session.add(
+                    ScriptLockDecisionModel(
+                        user_id=decision.user_id,
+                        project_name=decision.project_name,
+                        decision_id=decision.decision_id,
+                        source_digest=decision.source_digest,
+                        script_digest=decision.script_digest,
+                        action=decision.action,
+                        sequence=next_sequence,
+                        authorization_json=decision.authorization.model_dump(mode="json"),
+                        created_at=decision.created_at,
+                    )
+                )
+                await self.session.flush()
+        except IntegrityError as exc:
+            if not _is_unique_violation(exc):
+                raise
+            raise GateSequenceConflictError(
+                f"a script-lock decision for {decision.project_name!r} raced on sequence assignment"
+            ) from exc
+
+    async def _next_sequence(self, *, user_id: str, project_name: str) -> int:
+        current_max = await self.session.scalar(
+            select(func.max(ScriptLockDecisionModel.sequence)).where(
+                ScriptLockDecisionModel.user_id == user_id,
+                ScriptLockDecisionModel.project_name == project_name,
+            )
+        )
+        return 1 if current_max is None else current_max + 1
+
+    async def list_for_project(self, *, user_id: str, project_name: str) -> list[ScriptLockDecision]:
+        rows = (
+            await self.session.execute(
+                select(ScriptLockDecisionModel)
+                .where(
+                    ScriptLockDecisionModel.user_id == user_id,
+                    ScriptLockDecisionModel.project_name == project_name,
+                )
+                .order_by(ScriptLockDecisionModel.sequence)
+            )
+        ).scalars()
+        return [
+            ScriptLockDecision.model_validate(
+                {
+                    "decision_id": row.decision_id,
+                    "user_id": row.user_id,
+                    "project_name": row.project_name,
+                    "source_digest": row.source_digest,
+                    "script_digest": row.script_digest,
                     "action": row.action,
                     "authorization": row.authorization_json,
                     "sequence": row.sequence,
@@ -198,6 +273,7 @@ class FinalCutReceiptRepository:
                         selected_by=receipt.selected_by,
                         selected_at=receipt.selected_at,
                         sequence=next_sequence,
+                        audio_decision=receipt.audio_decision,
                     )
                 )
                 await self.session.flush()
@@ -232,6 +308,17 @@ class FinalCutReceiptRepository:
         ).scalars()
         return [self._to_receipt(row) for row in rows]
 
+    async def list_for_project(self, *, user_id: str, project_name: str) -> list[FinalCutReceipt]:
+        """Every Final Cut receipt of the project, in approval order."""
+        rows = (
+            await self.session.execute(
+                select(FinalCutReceiptModel)
+                .where(FinalCutReceiptModel.user_id == user_id, FinalCutReceiptModel.project_name == project_name)
+                .order_by(FinalCutReceiptModel.selected_at, FinalCutReceiptModel.sequence)
+            )
+        ).scalars()
+        return [self._to_receipt(row) for row in rows]
+
     async def get_by_id(self, receipt_id: str) -> FinalCutReceipt | None:
         row = await self.session.get(FinalCutReceiptModel, receipt_id)
         return self._to_receipt(row) if row is not None else None
@@ -248,6 +335,7 @@ class FinalCutReceiptRepository:
             selected_by=row.selected_by,
             selected_at=_stored_aware(row.selected_at),
             sequence=row.sequence,
+            audio_decision=cast(Literal["AUDIO", "MUTE"] | None, row.audio_decision),
         )
 
 
@@ -256,4 +344,5 @@ __all__ = [
     "GateSequenceConflictError",
     "GreenlightRepository",
     "PublishApprovalRepository",
+    "ScriptLockRepository",
 ]

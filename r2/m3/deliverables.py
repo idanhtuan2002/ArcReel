@@ -14,6 +14,7 @@ import hashlib
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -36,6 +37,8 @@ from r2.production.dependency_resolver import UnresolvedDependencyError
 from .host_integration import GoldenAHostIntegration, safe_project_subdir, validate_m3_target_ref
 
 COMPOSITE_CONTRACT_TYPE = "GoldenAComposite"
+#: An audio track whose peak is at or below this level counts as silent (ADR-0092).
+SILENCE_PEAK_DB = -60.0
 MASTER_REF_PREFIX = "master:"
 EXPORT_DIRNAME = "output"
 
@@ -110,6 +113,67 @@ def composite_dependencies(host: GoldenAHostIntegration, source_master_refs: Seq
             raise SourceMasterMismatchError(f"{source!r} is not the current approved master of {shot_ref}")
         dependencies.append(snapshot)
     return dependencies
+
+
+_MAX_VOLUME_RE = re.compile(r"max_volume:\s*(-?inf|-?\d+(?:\.\d+)?) dB")
+
+
+def audio_peak_db(path: Path) -> float | None:
+    """Peak level of the file's first audio stream in dB, or ``None`` when it has no audio stream.
+
+    Raises ``ValueError`` when the file is not readable media.
+    """
+    probe = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "a",
+            "-show_entries",
+            "stream=index",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if probe.returncode != 0:
+        raise ValueError(f"{path.name} is not a readable media file")
+    if not probe.stdout.strip():
+        return None
+    measured = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(path),
+            "-map",
+            "0:a:0",
+            "-af",
+            "volumedetect",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    match = _MAX_VOLUME_RE.search(measured.stderr) if measured.returncode == 0 else None
+    if match is None:
+        raise ValueError(f"ffmpeg reported no audio level for {path.name}")
+    return float(match.group(1))
+
+
+def audio_decision_holds(decision: str, path: Path) -> bool:
+    """``MUTE``: no audio stream or a peak at or below ``SILENCE_PEAK_DB``; ``AUDIO``: a louder stream."""
+    peak = audio_peak_db(path)
+    silent = peak is None or peak <= SILENCE_PEAK_DB
+    return silent if decision == "MUTE" else not silent
 
 
 def export_relative_path(episode: int, target_ref: str) -> str:
@@ -309,10 +373,13 @@ def verified_export_snapshot(project_dir: Path, digest: str) -> tuple[Deliverabl
 __all__ = [
     "COMPOSITE_CONTRACT_TYPE",
     "MASTER_REF_PREFIX",
+    "SILENCE_PEAK_DB",
     "ApprovedMasterResolver",
     "Deliverable",
     "ExportCopy",
     "SourceMasterMismatchError",
+    "audio_decision_holds",
+    "audio_peak_db",
     "composite_dependencies",
     "current_deliverables",
     "export_relative_path",

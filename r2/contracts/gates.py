@@ -36,6 +36,22 @@ class GreenlightDecision(R2ContractModel):
     created_at: AwareDatetime
 
 
+class ScriptLockDecision(R2ContractModel):
+    """Gate B for a factual product (ADR-0092): a human lock on the exact source and script
+    revision. Drama products are locked by screenplay admission instead."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    decision_id: NonEmptyStr
+    user_id: NonEmptyStr
+    project_name: NonEmptyStr
+    source_digest: NonEmptyStr
+    script_digest: NonEmptyStr
+    action: Literal["LOCK", "REVOKE"]
+    authorization: GateAuthorization
+    sequence: int = Field(ge=1)
+    created_at: AwareDatetime
+
+
 class PublishApprovalDecision(R2ContractModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     decision_id: NonEmptyStr
@@ -66,6 +82,8 @@ class FinalCutReceipt(R2ContractModel):
     selected_by: NonEmptyStr
     selected_at: AwareDatetime
     sequence: int = Field(ge=1)
+    # The composed final's verified audio decision (ADR-0092); shot receipts carry none.
+    audio_decision: Literal["AUDIO", "MUTE"] | None = None
 
 
 __all__ = [
@@ -73,4 +91,5 @@ __all__ = [
     "GateAuthorization",
     "GreenlightDecision",
     "PublishApprovalDecision",
+    "ScriptLockDecision",
 ]
