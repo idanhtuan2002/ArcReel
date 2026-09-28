@@ -1,0 +1,45 @@
+{
+  "evidence": "R2 V1-07 operator browser workflow over the restore-derived Golden environment (M7-E E2)",
+  "head": "4e6e2461cbf78ce3dde2408c93473f255383719b",
+  "environment": {
+    "restored_from": "docs/r2/evidence/R2_V1_07_GOLDEN_RESTORE_DRILL_2026-09-28.json (drill head 38955951, backup set bs-golden-drill, restore target golden-drill-target-1)",
+    "database": "disposable postgres:16, database golden_drill_target",
+    "browser": "system Google Chrome 153.0.8010.36 via Playwright 1.63.0 (channel=chrome, headless)",
+    "provider_credentials": "none configured; no provider called"
+  },
+  "command": "ARCREEL_E2E_DATA_DIR=<work>/restored-data ARCREEL_E2E_DATABASE_URL=postgresql+asyncpg://…/golden_drill_target uv run python -m pytest tests/e2e/test_m7_production_candidate_workflow.py",
+  "outcome": "1 passed",
+  "result": {
+    "products": {
+      "golden-a-h264": {
+        "digest": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
+        "bytes": 8406737
+      },
+      "golden-b-western": {
+        "digest": "sha256:4ca9250f9de63ac28e5cd617db61b185cdca2a10e26ed6f69e46a9fdfc4fcfc7",
+        "bytes": 6653279
+      },
+      "golden-b-shuangwen": {
+        "digest": "sha256:ed6bd13ea626aab41eaacf57ad8f7bac9e9b3fdf4ad20c6d464fb4b19a4ae563",
+        "bytes": 6282244
+      }
+    },
+    "refused_gate_c_status": 400,
+    "publish_approval_recorded": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
+    "foreign_token_status": 403,
+    "unknown_digest_status": 404,
+    "restart_reopen_digest": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e"
+  },
+  "downloads_match_gate_d": {
+    "golden-a-h264": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
+    "golden-b-western": "sha256:4ca9250f9de63ac28e5cd617db61b185cdca2a10e26ed6f69e46a9fdfc4fcfc7",
+    "golden-b-shuangwen": "sha256:ed6bd13ea626aab41eaacf57ad8f7bac9e9b3fdf4ad20c6d464fb4b19a4ae563"
+  },
+  "coverage_limits": [
+    "Production (shots and the composed final) was made by the no-provider fixture pipelines in the drill, not by browser-driven generation; browser generate/regenerate needs a provider.",
+    "'Failed regeneration keeps the master' is proven as a refused Gate C re-approval (sha mismatch) that leaves the approved final and its digest unchanged, not as a failed provider task.",
+    "Reconnect is proven by a server restart and page reopen; SSE cursor replay/resync is not exercised by this test.",
+    "Foreign scope is proven with a download token for another project; this is a single-operator deployment, so no second user exists.",
+    "The run mutates the disposable restored environment (one Publish Approval per run, one refused Gate C file)."
+  ]
+}

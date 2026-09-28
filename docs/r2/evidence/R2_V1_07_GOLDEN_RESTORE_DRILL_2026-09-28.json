@@ -1,0 +1,202 @@
+{
+  "evidence": "R2 V1 restore-derived Golden A/B drill (V1-05 recovery, V1-07 O2a export)",
+  "head": "389559518648a9cc4516bbf6288be266b558abc5",
+  "research": "docs/research/2026-09-27-r2-v1-restore-derived-golden-drill.md",
+  "environment": {
+    "database": "disposable PostgreSQL server (not a deployment database)",
+    "provider_credentials": "none configured; sanitized tables restored blank"
+  },
+  "materialized": {
+    "products": [
+      {
+        "project_name": "golden-a-h264",
+        "kind": "GOLDEN_A",
+        "shot_ids": [
+          "SH01",
+          "SH02",
+          "SH03"
+        ],
+        "final_relative_path": "output/ep1-FINAL.mp4",
+        "final_sha256": "cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
+        "duration_seconds": 75.157333,
+        "source_master_refs": [
+          "SH01:CAND-SH01-V1:1",
+          "SH02:CAND-SH02-V1:1",
+          "SH03:CAND-SH03-V1:1"
+        ]
+      },
+      {
+        "project_name": "golden-b-western",
+        "kind": "GOLDEN_B_WESTERN_GENERIC",
+        "narrative_lock_decision_id": "d-admit-golden-b-western_generic",
+        "shot_ids": [
+          "w-scene-1-TAKE-1",
+          "w-scene-2-TAKE-1",
+          "w-scene-3-TAKE-1",
+          "w-scene-4-TAKE-1",
+          "w-scene-5-TAKE-1",
+          "w-scene-6-TAKE-1"
+        ],
+        "final_relative_path": "output/ep1-FINAL.mp4",
+        "final_sha256": "4ca9250f9de63ac28e5cd617db61b185cdca2a10e26ed6f69e46a9fdfc4fcfc7",
+        "duration_seconds": 96.256,
+        "source_master_refs": [
+          "w-scene-1-TAKE-1:CAND-w-scene-1-TAKE-1-V1:1",
+          "w-scene-2-TAKE-1:CAND-w-scene-2-TAKE-1-V1:1",
+          "w-scene-3-TAKE-1:CAND-w-scene-3-TAKE-1-V1:1",
+          "w-scene-4-TAKE-1:CAND-w-scene-4-TAKE-1-V1:1",
+          "w-scene-5-TAKE-1:CAND-w-scene-5-TAKE-1-V1:1",
+          "w-scene-6-TAKE-1:CAND-w-scene-6-TAKE-1-V1:1"
+        ]
+      },
+      {
+        "project_name": "golden-b-shuangwen",
+        "kind": "GOLDEN_B_CN_SHORT_DRAMA_SHUANGWEN",
+        "narrative_lock_decision_id": "d-admit-golden-b-cn_short_drama_shuangwen",
+        "shot_ids": [
+          "s-scene-1-TAKE-1",
+          "s-scene-2-TAKE-1",
+          "s-scene-3-TAKE-1",
+          "s-scene-4-TAKE-1",
+          "s-scene-5-TAKE-1",
+          "s-scene-6-TAKE-1"
+        ],
+        "final_relative_path": "output/ep1-FINAL.mp4",
+        "final_sha256": "ed6bd13ea626aab41eaacf57ad8f7bac9e9b3fdf4ad20c6d464fb4b19a4ae563",
+        "duration_seconds": 96.256,
+        "source_master_refs": [
+          "s-scene-1-TAKE-1:CAND-s-scene-1-TAKE-1-V1:1",
+          "s-scene-2-TAKE-1:CAND-s-scene-2-TAKE-1-V1:1",
+          "s-scene-3-TAKE-1:CAND-s-scene-3-TAKE-1-V1:1",
+          "s-scene-4-TAKE-1:CAND-s-scene-4-TAKE-1-V1:1",
+          "s-scene-5-TAKE-1:CAND-s-scene-5-TAKE-1-V1:1",
+          "s-scene-6-TAKE-1:CAND-s-scene-6-TAKE-1-V1:1"
+        ]
+      }
+    ],
+    "materialize_seconds": 1028.4
+  },
+  "backup_create": {
+    "state": "COMPLETE",
+    "backup_set_id": "bs-golden-drill",
+    "manifest_digest": "sha256:402be1d2c7edf5938ccacf49e8eceb602a877676ac4f444c1fbd8233c8c6fa4b",
+    "recovery_point": "2026-09-28T05:27:36.184851+00:00",
+    "file_count": 165,
+    "table_count": 81,
+    "sanitized_tables": [
+      "agent_anthropic_credentials",
+      "custom_provider",
+      "provider_config",
+      "provider_credential",
+      "system_setting"
+    ],
+    "excluded_data_entries": [
+      ".arcreel.db",
+      ".arcreel.db-journal",
+      ".arcreel.db-shm",
+      ".arcreel.db-wal",
+      ".system_config.json",
+      ".system_config.json.bak",
+      "logs"
+    ]
+  },
+  "source_destroyed_before_restore": true,
+  "restore": {
+    "backup_set_id": "bs-golden-drill",
+    "restored_file_count": 165,
+    "elapsed_seconds": 2.015,
+    "credentials_to_reenter": [
+      "agent_anthropic_credentials",
+      "custom_provider",
+      "provider_config",
+      "provider_credential",
+      "system_setting"
+    ]
+  },
+  "verify": {
+    "backup_set_id": "bs-golden-drill",
+    "manifest_digest": "sha256:402be1d2c7edf5938ccacf49e8eceb602a877676ac4f444c1fbd8233c8c6fa4b",
+    "restore_target_id": "golden-drill-target-1",
+    "target_release_git_sha": "389559518648a9cc4516bbf6288be266b558abc5",
+    "checks_passed": true,
+    "reason_codes": [],
+    "checked_table_count": 81,
+    "checked_file_count": 165,
+    "checked_reference_count": 39,
+    "probed_media_count": 18,
+    "checked_at": "2026-09-28T05:27:41.662849Z"
+  },
+  "golden_evidence": {
+    "backup_set_id": "bs-golden-drill",
+    "manifest_digest": "sha256:402be1d2c7edf5938ccacf49e8eceb602a877676ac4f444c1fbd8233c8c6fa4b",
+    "restore_target_id": "golden-drill-target-1",
+    "passed": true,
+    "products": [
+      {
+        "project_name": "golden-a-h264",
+        "reviewed": true,
+        "export_digest": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e"
+      },
+      {
+        "project_name": "golden-b-western",
+        "reviewed": true,
+        "export_digest": "sha256:4ca9250f9de63ac28e5cd617db61b185cdca2a10e26ed6f69e46a9fdfc4fcfc7"
+      },
+      {
+        "project_name": "golden-b-shuangwen",
+        "reviewed": true,
+        "export_digest": "sha256:ed6bd13ea626aab41eaacf57ad8f7bac9e9b3fdf4ad20c6d464fb4b19a4ae563"
+      }
+    ]
+  },
+  "golden_check_details": [
+    {
+      "project_name": "golden-a-h264",
+      "deliverable_digest": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
+      "reexport_digest": "sha256:cc7672f90936eb8435a51f9fb8cec13cc50002b8373146bf1e193dff63788b5e",
+      "problems": []
+    },
+    {
+      "project_name": "golden-b-western",
+      "deliverable_digest": "sha256:4ca9250f9de63ac28e5cd617db61b185cdca2a10e26ed6f69e46a9fdfc4fcfc7",
+      "reexport_digest": "sha256:4ca9250f9de63ac28e5cd617db61b185cdca2a10e26ed6f69e46a9fdfc4fcfc7",
+      "problems": []
+    },
+    {
+      "project_name": "golden-b-shuangwen",
+      "deliverable_digest": "sha256:ed6bd13ea626aab41eaacf57ad8f7bac9e9b3fdf4ad20c6d464fb4b19a4ae563",
+      "reexport_digest": "sha256:ed6bd13ea626aab41eaacf57ad8f7bac9e9b3fdf4ad20c6d464fb4b19a4ae563",
+      "problems": []
+    }
+  ],
+  "attest": {
+    "exit_code": 0,
+    "stdout": {
+      "state": "VERIFIED",
+      "backup_set_id": "bs-golden-drill",
+      "manifest_digest": "sha256:402be1d2c7edf5938ccacf49e8eceb602a877676ac4f444c1fbd8233c8c6fa4b",
+      "restore_target_id": "golden-drill-target-1",
+      "verdict_digest": "sha256:ba686f2d6ab1594431cc685a7cbdc66238488117b143185dda3a58732f31d2a2",
+      "golden_evidence_digest": "sha256:5b14217124f441bcfc746a1d05f6f8b5124b89db0288979c26c71da5d4e0eafa",
+      "measured_rpo_seconds": 1,
+      "measured_rto_seconds": 10,
+      "verified_at": "2026-09-28T05:27:47.096682Z"
+    },
+    "stderr_tail": []
+  },
+  "measured_rpo_seconds": 1,
+  "measured_rto_seconds": 10,
+  "ledger_state": {
+    "attestation_digest": "sha256:947a08a496cdef7d7d7e64424e74a32f2d93be6bbc4e9e5d93160b6088088461",
+    "backup_set_id": "bs-golden-drill",
+    "manifest_digest": "sha256:402be1d2c7edf5938ccacf49e8eceb602a877676ac4f444c1fbd8233c8c6fa4b",
+    "state": "VERIFIED",
+    "updated_at": "2026-09-28T05:27:47.096682+00:00"
+  },
+  "coverage_limits": [
+    "Golden products are the existing fixture corpora (M3 H.264 factual; M6 ledger-reveal, both profiles), rendered locally with Remotion; no paid provider route is exercised.",
+    "Export is ADR-0090 O2a: Gate C approves the composed COMPOSITE final, its byte copy in output/ is downloaded on the restored target through the host's download-token route and must hash to the Gate D deliverable_digest; re-composing from the restored masters must reproduce the same bytes.",
+    "Browser/operator workflow checks remain the E2 / V1-07 packet.",
+    "RPO/RTO are single-machine drill timings (RTO spans restore, verify, the Golden check and re-export)."
+  ]
+}
