@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
+import { timeCases } from "./timingRunner";
 
 import { CANVAS_NODE_TYPES } from "@/features/canvas/domain/canvasNodes";
 import { useCanvasStore, type CanvasEdge, type CanvasNode } from "@/stores/canvasStore";
@@ -221,23 +222,28 @@ function apply(op: Op): void {
   }
 }
 
+function replay(fixture: (typeof fixtures.cases)[number]): unknown[] {
+  useCanvasStore.getState().setCanvasData([], []);
+  portTypes = new Map();
+  known = new Set();
+  counter = 0;
+  const observations: unknown[] = [];
+  for (const op of fixture.ops) {
+    apply(op);
+    renameCreatedIds();
+    observations.push(observe(op.op));
+  }
+  return observations;
+}
+
+const timingOut = process.env.PARITY_TIMING_OUT;
+
 describe("M8-B group parity: donor side", () => {
-  it("replays every fixture case and writes observations", () => {
+  it("replays every fixture case and writes observations", async () => {
     const results: Record<string, unknown[]> = {};
-    for (const fixture of fixtures.cases) {
-      useCanvasStore.getState().setCanvasData([], []);
-      portTypes = new Map();
-      known = new Set();
-      counter = 0;
-      const observations: unknown[] = [];
-      for (const op of fixture.ops) {
-        apply(op);
-        renameCreatedIds();
-        observations.push(observe(op.op));
-      }
-      results[fixture.id] = observations;
-    }
+    for (const fixture of fixtures.cases) results[fixture.id] = replay(fixture);
     if (outPath) writeFileSync(outPath, `${JSON.stringify({ fixture_set: fixtures.fixture_set, results }, null, 2)}\n`);
+    if (timingOut) writeFileSync(timingOut, `${JSON.stringify(await timeCases(fixtures.cases, replay), null, 2)}\n`);
 
     expect(Object.keys(results)).toHaveLength(fixtures.cases.length);
   });

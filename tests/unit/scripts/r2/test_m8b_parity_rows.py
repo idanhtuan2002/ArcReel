@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from r2.contracts.advanced_creative import ParityDisposition
-from scripts.r2.m8b_parity_rows import HarnessRun, build_rows, compare_behavior
+from scripts.r2.m8b_parity_rows import (
+    HarnessRun,
+    TimingRun,
+    build_rows,
+    compare_behavior,
+    failure_safety,
+    measure_behavior,
+)
 
 FIXTURES = {
     "cases": [
-        {"id": "same", "behaviors": ["A"]},
+        {"id": "same", "behaviors": ["A"], "evidences": ["failure_safety"]},
         {"id": "fixed", "behaviors": ["B"]},
         {"id": "drift", "behaviors": ["C"]},
     ]
@@ -75,3 +82,48 @@ def test_rows_merge_measured_dimensions_and_record_intentional_differences() -> 
     assert rows[1].performance is ParityDisposition.UNVERIFIED
     assert rows[1].intentional_difference == "donor defect"
     assert rows[1].donor_test_refs == ("t-b",)
+
+
+def _timing(port_ms: float, port_bytes: int = 100) -> TimingRun:
+    donor = {"median_ms": 1.0, "p95_ms": 1.2, "reps": 25, "observation_bytes": 100}
+    port = {"median_ms": port_ms, "p95_ms": port_ms, "reps": 25, "observation_bytes": port_bytes}
+    return TimingRun(name="graph", donor={"same": donor}, port={"same": port})
+
+
+def test_failure_safety_needs_a_tagged_failure_path_case() -> None:
+    assert failure_safety("A", [_run()], ParityDisposition.PARITY) is ParityDisposition.PARITY
+    assert failure_safety("B", [_run()], ParityDisposition.IMPROVED) is ParityDisposition.UNVERIFIED
+
+
+def test_performance_and_resources_compare_both_sides_timings() -> None:
+    assert measure_behavior("A", [_run()], {"graph": _timing(1.4)}) == (
+        ParityDisposition.PARITY,
+        ParityDisposition.PARITY,
+        ["timing:graph:same"],
+    )
+    assert measure_behavior("A", [_run()], {"graph": _timing(0.5)})[0] is ParityDisposition.IMPROVED
+    assert measure_behavior("A", [_run()], {"graph": _timing(1.6)})[0] is ParityDisposition.UNVERIFIED
+    assert measure_behavior("A", [_run()], {"graph": _timing(1.0, port_bytes=174)})[1] is ParityDisposition.PARITY
+    assert measure_behavior("A", [_run()], {"graph": _timing(1.0, port_bytes=175)})[1] is ParityDisposition.UNVERIFIED
+
+
+def test_an_untimed_case_is_unverified() -> None:
+    assert measure_behavior("A", [_run()], {})[:2] == (ParityDisposition.UNVERIFIED, ParityDisposition.UNVERIFIED)
+    assert measure_behavior("Z", [_run()], {"graph": _timing(1.0)})[:2] == (
+        ParityDisposition.UNVERIFIED,
+        ParityDisposition.UNVERIFIED,
+    )
+
+
+def test_rows_take_measured_dimensions_from_timings_and_failure_tags() -> None:
+    baseline = {"behaviors": [{"behavior_id": "A", "donor_tests": []}]}
+
+    [row] = build_rows(baseline, [_run()], CORRECTIONS, {}, {"graph": _timing(1.0)})
+
+    assert (row.observability, row.failure_safety, row.performance, row.resources) == (
+        ParityDisposition.PARITY,
+        ParityDisposition.PARITY,
+        ParityDisposition.PARITY,
+        ParityDisposition.PARITY,
+    )
+    assert row.evidence_refs == ("fixture:graph:same", "timing:graph:same")

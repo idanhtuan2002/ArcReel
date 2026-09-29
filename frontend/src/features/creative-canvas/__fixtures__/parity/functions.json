@@ -92,6 +92,9 @@
             }
           ]
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -400,6 +403,9 @@
             }
           ]
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -590,6 +596,9 @@
             ""
           ]
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -1182,6 +1191,67 @@
               "n1",
               "n2"
             ]
+          ]
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "layout-and-selection-edge-inputs",
+      "behaviors": [
+        "G11",
+        "G08"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "calls": [
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [],
+            []
+          ]
+        },
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [
+              {
+                "id": "a",
+                "type": "note"
+              }
+            ],
+            [
+              {
+                "id": "e",
+                "source": "a",
+                "target": "missing"
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "collectBatchDeletableIds",
+          "args": [
+            [],
+            [
+              "missing"
+            ]
+          ]
+        },
+        {
+          "fn": "collectDuplicableIds",
+          "args": [
+            [
+              {
+                "id": "a",
+                "type": "note"
+              }
+            ],
+            []
           ]
         }
       ]

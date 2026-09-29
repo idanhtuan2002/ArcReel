@@ -27,6 +27,7 @@ import { checkPayloadLimits, classifySaveError, decideSaveAction } from "@/featu
 import { deriveSaveState, useSaveStatusStore } from "@/stores/save-status-store";
 
 import { type RecoveryImpl, type ScenarioCase, runScenario } from "./recoveryRunner";
+import { timeCases } from "./timingRunner";
 
 const fixturesPath = process.env.PARITY_FIXTURES;
 const outPath = process.env.PARITY_OUT;
@@ -140,6 +141,11 @@ describe("M8-B save and recovery parity: donor side", () => {
     const results: Record<string, unknown[]> = {};
     for (const fixture of fixtures.cases) results[fixture.id] = await runScenario(DONOR, fixture);
     if (outPath) writeFileSync(outPath, `${JSON.stringify({ fixture_set: fixtures.fixture_set, results }, null, 2)}\n`);
+    const timingOut = process.env.PARITY_TIMING_OUT;
+    if (timingOut) {
+      const timing = await timeCases(fixtures.cases, (fixture) => runScenario(DONOR, fixture));
+      writeFileSync(timingOut, `${JSON.stringify(timing, null, 2)}\n`);
+    }
 
     expect(Object.keys(results)).toHaveLength(fixtures.cases.length);
   });

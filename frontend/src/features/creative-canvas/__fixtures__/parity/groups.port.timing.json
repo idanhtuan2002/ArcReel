@@ -1,0 +1,80 @@
+{
+  "group-two-nodes-and-undo": {
+    "reps": 25,
+    "median_ms": 0.0301,
+    "p95_ms": 0.1652,
+    "observation_bytes": 2894
+  },
+  "group-needs-two-top-level-members": {
+    "reps": 25,
+    "median_ms": 0.0303,
+    "p95_ms": 0.0483,
+    "observation_bytes": 2721
+  },
+  "ungroup-restores-absolute-positions": {
+    "reps": 25,
+    "median_ms": 0.0302,
+    "p95_ms": 0.0534,
+    "observation_bytes": 4367
+  },
+  "fit-grows-and-pushes-inward": {
+    "reps": 25,
+    "median_ms": 0.0199,
+    "p95_ms": 0.0328,
+    "observation_bytes": 2511
+  },
+  "arrange-modes": {
+    "reps": 25,
+    "median_ms": 0.0359,
+    "p95_ms": 0.0398,
+    "observation_bytes": 4079
+  },
+  "storyboard-merge-and-edges": {
+    "reps": 25,
+    "median_ms": 0.0737,
+    "p95_ms": 0.1776,
+    "observation_bytes": 10880
+  },
+  "storyboard-add-members": {
+    "reps": 25,
+    "median_ms": 0.0395,
+    "p95_ms": 0.0767,
+    "observation_bytes": 4807
+  },
+  "duplicate-sibling": {
+    "reps": 25,
+    "median_ms": 0.0112,
+    "p95_ms": 0.0339,
+    "observation_bytes": 2206
+  },
+  "duplicate-group-with-members": {
+    "reps": 25,
+    "median_ms": 0.0254,
+    "p95_ms": 0.027,
+    "observation_bytes": 6617
+  },
+  "storyboard-reload-keeps-reanchored-edges": {
+    "reps": 25,
+    "median_ms": 0.0315,
+    "p95_ms": 0.0346,
+    "observation_bytes": 3660
+  },
+  "group-missing-targets": {
+    "reps": 25,
+    "median_ms": 0.0098,
+    "p95_ms": 0.0106,
+    "observation_bytes": 2702
+  },
+  "storyboard-invalid-edits": {
+    "reps": 25,
+    "median_ms": 0.0355,
+    "p95_ms": 0.0375,
+    "observation_bytes": 7431
+  },
+  "duplicate-missing": {
+    "reps": 25,
+    "median_ms": 0.0077,
+    "p95_ms": 0.0081,
+    "observation_bytes": 1817
+  }
+}

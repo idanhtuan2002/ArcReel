@@ -715,6 +715,31 @@
           true
         ]
       }
+    ],
+    "layout-and-selection-edge-inputs": [
+      {
+        "value": {
+          "positions": {},
+          "changedCount": 0
+        }
+      },
+      {
+        "value": {
+          "positions": {
+            "a": {
+              "x": 0,
+              "y": 0
+            }
+          },
+          "changedCount": 0
+        }
+      },
+      {
+        "value": []
+      },
+      {
+        "value": []
+      }
     ]
   }
 }

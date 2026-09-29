@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerStorageReclaimer, safeLocalStorageSet } from "../recovery/storageQuota";
 
 import { type RecoveryImpl, type ScenarioCase, runScenario } from "../../../../../tools/parity/dramaclaw/recoveryRunner";
+import { timingOut, writeTiming } from "./timing";
 import fixtures from "../__fixtures__/parity/recovery.json";
 import { holdCanvasAutosave, isCanvasAutosaveHeld, subscribeCanvasAutosaveRelease } from "../recovery/autosaveHold";
 import type { CanvasNode } from "../domain/types";
@@ -86,5 +87,9 @@ describe("save and recovery parity scenarios on the port", () => {
     await expect(`${JSON.stringify({ fixture_set: fixtures.fixture_set, results }, null, 2)}\n`).toMatchFileSnapshot(
       "../__fixtures__/parity/recovery.port.json",
     );
+  });
+
+  it.runIf(Boolean(timingOut))("records the timing of every case for the parity report", async () => {
+    await expect(writeTiming(cases, (fixture) => runScenario(PORT, fixture))).resolves.toBeUndefined();
   });
 });

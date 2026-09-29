@@ -3,7 +3,9 @@
   "cases": [
     {
       "id": "group-two-nodes-and-undo",
-      "behaviors": ["G07"],
+      "behaviors": [
+        "G07"
+      ],
       "ops": [
         {
           "op": "load",
@@ -35,7 +37,12 @@
         },
         {
           "op": "group",
-          "ids": ["b", "a", "a", " "]
+          "ids": [
+            "b",
+            "a",
+            "a",
+            " "
+          ]
         },
         {
           "op": "undo"
@@ -47,7 +54,9 @@
     },
     {
       "id": "group-needs-two-top-level-members",
-      "behaviors": ["G07"],
+      "behaviors": [
+        "G07"
+      ],
       "ops": [
         {
           "op": "load",
@@ -78,22 +87,36 @@
         },
         {
           "op": "group",
-          "ids": ["a"]
+          "ids": [
+            "a"
+          ]
         },
         {
           "op": "group",
-          "ids": ["g", "a"]
+          "ids": [
+            "g",
+            "a"
+          ]
         },
         {
           "op": "group",
-          "ids": ["g", "a", "b"],
+          "ids": [
+            "g",
+            "a",
+            "b"
+          ],
           "extraPadding": 20
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
       "id": "ungroup-restores-absolute-positions",
-      "behaviors": ["G07"],
+      "behaviors": [
+        "G07"
+      ],
       "ops": [
         {
           "op": "load",
@@ -154,7 +177,9 @@
     },
     {
       "id": "fit-grows-and-pushes-inward",
-      "behaviors": ["G07"],
+      "behaviors": [
+        "G07"
+      ],
       "ops": [
         {
           "op": "load",
@@ -204,7 +229,9 @@
     },
     {
       "id": "arrange-modes",
-      "behaviors": ["G07"],
+      "behaviors": [
+        "G07"
+      ],
       "ops": [
         {
           "op": "load",
@@ -265,7 +292,9 @@
     },
     {
       "id": "storyboard-merge-and-edges",
-      "behaviors": ["G09"],
+      "behaviors": [
+        "G09"
+      ],
       "ops": [
         {
           "op": "load",
@@ -315,7 +344,11 @@
         },
         {
           "op": "merge",
-          "ids": ["s1", "s2", "s3"]
+          "ids": [
+            "s1",
+            "s2",
+            "s3"
+          ]
         },
         {
           "op": "sbConfig",
@@ -353,7 +386,9 @@
     },
     {
       "id": "storyboard-add-members",
-      "behaviors": ["G09"],
+      "behaviors": [
+        "G09"
+      ],
       "ops": [
         {
           "op": "load",
@@ -375,17 +410,26 @@
         },
         {
           "op": "merge",
-          "ids": ["s1", "s2"]
+          "ids": [
+            "s1",
+            "s2"
+          ]
         },
         {
           "op": "sbAdd",
           "id": "n1",
-          "frames": ["asset-1", " ", "asset-2"]
+          "frames": [
+            "asset-1",
+            " ",
+            "asset-2"
+          ]
         },
         {
           "op": "sbAdd",
           "id": "s1",
-          "frames": ["asset-3"]
+          "frames": [
+            "asset-3"
+          ]
         },
         {
           "op": "sbConfig",
@@ -398,7 +442,9 @@
     },
     {
       "id": "duplicate-sibling",
-      "behaviors": ["G10"],
+      "behaviors": [
+        "G10"
+      ],
       "ops": [
         {
           "op": "load",
@@ -439,7 +485,10 @@
     },
     {
       "id": "duplicate-group-with-members",
-      "behaviors": ["G10", "G08"],
+      "behaviors": [
+        "G10",
+        "G08"
+      ],
       "ops": [
         {
           "op": "load",
@@ -488,21 +537,31 @@
         },
         {
           "op": "dupSiblings",
-          "ids": ["g", "a", "b"]
+          "ids": [
+            "g",
+            "a",
+            "b"
+          ]
         },
         {
           "op": "dupSiblings",
-          "ids": ["x"]
+          "ids": [
+            "x"
+          ]
         },
         {
           "op": "dupSiblings",
-          "ids": ["missing"]
+          "ids": [
+            "missing"
+          ]
         }
       ]
     },
     {
       "id": "storyboard-reload-keeps-reanchored-edges",
-      "behaviors": ["G09"],
+      "behaviors": [
+        "G09"
+      ],
       "ops": [
         {
           "op": "load",
@@ -536,7 +595,10 @@
         },
         {
           "op": "merge",
-          "ids": ["s1", "s2"]
+          "ids": [
+            "s1",
+            "s2"
+          ]
         },
         {
           "op": "reload"
@@ -544,6 +606,188 @@
         {
           "op": "ungroup",
           "id": "n1"
+        }
+      ]
+    },
+    {
+      "id": "group-missing-targets",
+      "behaviors": [
+        "G07"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "b",
+              "type": "note",
+              "x": 400,
+              "y": 0
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "group",
+          "ids": [
+            "missing"
+          ]
+        },
+        {
+          "op": "group",
+          "ids": []
+        },
+        {
+          "op": "ungroup",
+          "id": "missing"
+        },
+        {
+          "op": "fit",
+          "id": "missing"
+        },
+        {
+          "op": "arrange",
+          "id": "missing",
+          "mode": "grid"
+        }
+      ]
+    },
+    {
+      "id": "storyboard-invalid-edits",
+      "behaviors": [
+        "G09"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "s1",
+              "type": "frame",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "s2",
+              "type": "frame",
+              "x": 400,
+              "y": 0
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "merge",
+          "ids": [
+            "s1"
+          ]
+        },
+        {
+          "op": "merge",
+          "ids": [
+            "s1",
+            "s2"
+          ]
+        },
+        {
+          "op": "sbReorder",
+          "id": "n1",
+          "from": 0,
+          "to": 9
+        },
+        {
+          "op": "sbReorder",
+          "id": "n1",
+          "from": -1,
+          "to": 0
+        },
+        {
+          "op": "sbAdd",
+          "id": "n1",
+          "frames": [
+            ""
+          ]
+        },
+        {
+          "op": "sbAdd",
+          "id": "missing",
+          "frames": [
+            "x.png"
+          ]
+        },
+        {
+          "op": "sbConfig",
+          "id": "missing",
+          "config": {
+            "cols": 2
+          }
+        },
+        {
+          "op": "sbConvert",
+          "id": "missing"
+        },
+        {
+          "op": "sbReorder",
+          "id": "missing",
+          "from": 0,
+          "to": 1
+        }
+      ]
+    },
+    {
+      "id": "duplicate-missing",
+      "behaviors": [
+        "G10",
+        "G08"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "b",
+              "type": "note",
+              "x": 400,
+              "y": 0
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "dupSibling",
+          "id": "missing",
+          "index": 0
+        },
+        {
+          "op": "dupSiblings",
+          "ids": []
+        },
+        {
+          "op": "dupSiblings",
+          "ids": [
+            "missing"
+          ]
         }
       ]
     }

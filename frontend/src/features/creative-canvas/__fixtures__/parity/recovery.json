@@ -99,6 +99,9 @@
           "op": "request",
           "tag": "late"
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -136,6 +139,9 @@
           "op": "resolve",
           "value": true
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -189,6 +195,9 @@
           "op": "resolve",
           "value": true
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -302,6 +311,9 @@
             "pendingClearIntent": false
           }
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -341,6 +353,9 @@
           "edges": 200000,
           "size": 5242880
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -395,6 +410,9 @@
           "op": "advance",
           "ms": 90000
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -436,6 +454,9 @@
           "project": "p",
           "canvas": "bad"
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -474,6 +495,9 @@
           "op": "read",
           "canvas": "huge"
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -514,6 +538,9 @@
           "op": "read",
           "canvas": "future"
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -543,6 +570,9 @@
           "project": "p",
           "canvas": "c"
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -639,6 +669,9 @@
             "a"
           ]
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -675,6 +708,9 @@
           "status": 400,
           "detail": "Bad"
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -743,6 +779,9 @@
           "op": "derive",
           "scope": "canvas.a"
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -787,6 +826,9 @@
           "key": "b",
           "size": 90
         }
+      ],
+      "evidences": [
+        "failure_safety"
       ]
     },
     {
@@ -812,6 +854,60 @@
           "op": "set",
           "key": "new",
           "size": 50
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "coalesce-after-failure",
+      "behaviors": [
+        "S01",
+        "S02",
+        "S03",
+        "S06"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "kind": "session",
+      "ops": [
+        {
+          "op": "request",
+          "tag": "a"
+        },
+        {
+          "op": "request",
+          "tag": "b"
+        },
+        {
+          "op": "resolve",
+          "value": false
+        },
+        {
+          "op": "request",
+          "tag": "c"
+        },
+        {
+          "op": "request",
+          "tag": "d"
+        },
+        {
+          "op": "resolve",
+          "value": "throw"
+        },
+        {
+          "op": "request",
+          "tag": "e"
+        },
+        {
+          "op": "resolve",
+          "value": true
+        },
+        {
+          "op": "unsavedBeyond",
+          "version": 5
         }
       ]
     }

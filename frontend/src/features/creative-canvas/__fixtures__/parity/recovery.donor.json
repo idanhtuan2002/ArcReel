@@ -1079,6 +1079,193 @@
         "stored": false,
         "keys": 1
       }
+    ],
+    "coalesce-after-failure": [
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1
+        ],
+        "events": [
+          "b:false",
+          "a:false"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          3
+        ],
+        "runVersions": [
+          1,
+          3
+        ],
+        "events": [
+          "b:false",
+          "a:false"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 4,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          3
+        ],
+        "runVersions": [
+          1,
+          3
+        ],
+        "events": [
+          "b:false",
+          "a:false"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 4,
+        "savedVersion": 0,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          3
+        ],
+        "events": [
+          "b:false",
+          "a:false",
+          "d:false",
+          "c:false"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 5,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          5
+        ],
+        "runVersions": [
+          1,
+          3,
+          5
+        ],
+        "events": [
+          "b:false",
+          "a:false",
+          "d:false",
+          "c:false"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 5,
+        "savedVersion": 5,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          3,
+          5
+        ],
+        "events": [
+          "b:false",
+          "a:false",
+          "d:false",
+          "c:false",
+          "e:true"
+        ]
+      },
+      {
+        "op": "unsavedBeyond",
+        "value": false,
+        "contentVersion": 5,
+        "savedVersion": 5,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          3,
+          5
+        ],
+        "events": [
+          "b:false",
+          "a:false",
+          "d:false",
+          "c:false",
+          "e:true"
+        ]
+      }
     ]
   }
 }

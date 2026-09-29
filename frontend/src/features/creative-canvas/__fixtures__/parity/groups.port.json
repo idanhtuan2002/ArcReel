@@ -3772,6 +3772,988 @@
         "selected": null,
         "edits": 1
       }
+    ],
+    "group-missing-targets": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "group",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "group",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "ungroup",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "fit",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "arrange",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      }
+    ],
+    "storyboard-invalid-edits": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "merge",
+        "nodes": [
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "merge",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": 1152,
+            "styleHeight": 361,
+            "hidden": false,
+            "selected": true,
+            "dragHandle": ".storyboard-group-drag-handle",
+            "storyboard": {
+              "storyboardGroup": true,
+              "storyboardAspect": "16:9",
+              "storyboardCols": 2,
+              "storyboardShowIndex": false,
+              "storyboardBaseWidth": 320,
+              "storyboardBaseHeight": 200
+            }
+          },
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 12,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 376,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "n1",
+        "edits": 1
+      },
+      {
+        "op": "sbReorder",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": 1152,
+            "styleHeight": 361,
+            "hidden": false,
+            "selected": true,
+            "dragHandle": ".storyboard-group-drag-handle",
+            "storyboard": {
+              "storyboardGroup": true,
+              "storyboardAspect": "16:9",
+              "storyboardCols": 2,
+              "storyboardShowIndex": false,
+              "storyboardBaseWidth": 320,
+              "storyboardBaseHeight": 200
+            }
+          },
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 12,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 376,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "n1",
+        "edits": 1
+      },
+      {
+        "op": "sbReorder",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": 1152,
+            "styleHeight": 361,
+            "hidden": false,
+            "selected": true,
+            "dragHandle": ".storyboard-group-drag-handle",
+            "storyboard": {
+              "storyboardGroup": true,
+              "storyboardAspect": "16:9",
+              "storyboardCols": 2,
+              "storyboardShowIndex": false,
+              "storyboardBaseWidth": 320,
+              "storyboardBaseHeight": 200
+            }
+          },
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 12,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 376,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "n1",
+        "edits": 1
+      },
+      {
+        "op": "sbAdd",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": 1152,
+            "styleHeight": 361,
+            "hidden": false,
+            "selected": true,
+            "dragHandle": ".storyboard-group-drag-handle",
+            "storyboard": {
+              "storyboardGroup": true,
+              "storyboardAspect": "16:9",
+              "storyboardCols": 2,
+              "storyboardShowIndex": false,
+              "storyboardBaseWidth": 320,
+              "storyboardBaseHeight": 200
+            }
+          },
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 12,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 376,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "n1",
+        "edits": 1
+      },
+      {
+        "op": "sbAdd",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": 1152,
+            "styleHeight": 361,
+            "hidden": false,
+            "selected": true,
+            "dragHandle": ".storyboard-group-drag-handle",
+            "storyboard": {
+              "storyboardGroup": true,
+              "storyboardAspect": "16:9",
+              "storyboardCols": 2,
+              "storyboardShowIndex": false,
+              "storyboardBaseWidth": 320,
+              "storyboardBaseHeight": 200
+            }
+          },
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 12,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 376,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "n1",
+        "edits": 1
+      },
+      {
+        "op": "sbConfig",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": 1152,
+            "styleHeight": 361,
+            "hidden": false,
+            "selected": true,
+            "dragHandle": ".storyboard-group-drag-handle",
+            "storyboard": {
+              "storyboardGroup": true,
+              "storyboardAspect": "16:9",
+              "storyboardCols": 2,
+              "storyboardShowIndex": false,
+              "storyboardBaseWidth": 320,
+              "storyboardBaseHeight": 200
+            }
+          },
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 12,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 376,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "n1",
+        "edits": 1
+      },
+      {
+        "op": "sbConvert",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": 1152,
+            "styleHeight": 361,
+            "hidden": false,
+            "selected": true,
+            "dragHandle": ".storyboard-group-drag-handle",
+            "storyboard": {
+              "storyboardGroup": true,
+              "storyboardAspect": "16:9",
+              "storyboardCols": 2,
+              "storyboardShowIndex": false,
+              "storyboardBaseWidth": 320,
+              "storyboardBaseHeight": 200
+            }
+          },
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 12,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 376,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "n1",
+        "edits": 1
+      },
+      {
+        "op": "sbReorder",
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": 1152,
+            "styleHeight": 361,
+            "hidden": false,
+            "selected": true,
+            "dragHandle": ".storyboard-group-drag-handle",
+            "storyboard": {
+              "storyboardGroup": true,
+              "storyboardAspect": "16:9",
+              "storyboardCols": 2,
+              "storyboardShowIndex": false,
+              "storyboardBaseWidth": 320,
+              "storyboardBaseHeight": 200
+            }
+          },
+          {
+            "id": "s1",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 12,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "s2",
+            "type": "frame",
+            "parentId": "n1",
+            "x": 376,
+            "y": 34,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": true,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "n1",
+        "edits": 1
+      }
+    ],
+    "duplicate-missing": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "dupSibling",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "dupSiblings",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      },
+      {
+        "op": "dupSiblings",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 400,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "styleWidth": null,
+            "styleHeight": null,
+            "hidden": false,
+            "selected": false,
+            "dragHandle": null,
+            "storyboard": {}
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0
+      }
     ]
   }
 }

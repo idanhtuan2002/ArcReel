@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
+import { timeCases } from "./timingRunner";
 
 import { computeAutoLayout } from "@/features/canvas/application/autoLayout";
 import {
@@ -114,22 +115,27 @@ const fixtures = fixturesPath
   ? (JSON.parse(readFileSync(fixturesPath, "utf-8")) as { fixture_set: string; cases: FunctionCase[] })
   : { fixture_set: "none", cases: [] };
 
-describe("M8-B pure-function parity: donor side", () => {
-  it("calls every fixture function and writes results", () => {
-    const results: Record<string, unknown[]> = {};
-    for (const fixture of fixtures.cases) {
-      results[fixture.id] = fixture.calls.map((call) => {
-        const fn = FUNCTIONS[call.fn];
-        if (!fn) return { error: `unknown function ${call.fn}` };
-        try {
-          const value = fn(...(decode(call.args) as unknown[]));
-          return { value: value === undefined ? { $undefined: true } : value };
-        } catch (error) {
-          return { error: error instanceof Error ? error.message : String(error) };
-        }
-      });
+function replay(fixture: FunctionCase): unknown[] {
+  return fixture.calls.map((call) => {
+    const fn = FUNCTIONS[call.fn];
+    if (!fn) return { error: `unknown function ${call.fn}` };
+    try {
+      const value = fn(...(decode(call.args) as unknown[]));
+      return { value: value === undefined ? { $undefined: true } : value };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
     }
+  });
+}
+
+const timingOut = process.env.PARITY_TIMING_OUT;
+
+describe("M8-B pure-function parity: donor side", () => {
+  it("calls every fixture function and writes results", async () => {
+    const results: Record<string, unknown[]> = {};
+    for (const fixture of fixtures.cases) results[fixture.id] = replay(fixture);
     if (outPath) writeFileSync(outPath, `${JSON.stringify({ fixture_set: fixtures.fixture_set, results }, null, 2)}\n`);
+    if (timingOut) writeFileSync(timingOut, `${JSON.stringify(await timeCases(fixtures.cases, replay), null, 2)}\n`);
 
     expect(Object.keys(results)).toHaveLength(fixtures.cases.length);
   });

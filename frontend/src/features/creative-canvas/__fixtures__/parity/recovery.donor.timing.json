@@ -1,0 +1,116 @@
+{
+  "single-flight-and-coalesce": {
+    "reps": 25,
+    "median_ms": 0.0105,
+    "p95_ms": 0.0122,
+    "observation_bytes": 1081
+  },
+  "waiter-released-only-by-covering-save": {
+    "reps": 25,
+    "median_ms": 0.0097,
+    "p95_ms": 0.0128,
+    "observation_bytes": 930
+  },
+  "dispose-releases-waiters": {
+    "reps": 25,
+    "median_ms": 0.0075,
+    "p95_ms": 0.0103,
+    "observation_bytes": 783
+  },
+  "failure-stops-pump": {
+    "reps": 25,
+    "median_ms": 0.0183,
+    "p95_ms": 0.02,
+    "observation_bytes": 1148
+  },
+  "request-as-previous-lands": {
+    "reps": 25,
+    "median_ms": 0.007,
+    "p95_ms": 0.0083,
+    "observation_bytes": 610
+  },
+  "canvas-switch-isolation": {
+    "reps": 25,
+    "median_ms": 0.0084,
+    "p95_ms": 0.0093,
+    "observation_bytes": 799
+  },
+  "save-decisions": {
+    "reps": 25,
+    "median_ms": 0.0014,
+    "p95_ms": 0.0024,
+    "observation_bytes": 495
+  },
+  "payload-limits": {
+    "reps": 25,
+    "median_ms": 0.0009,
+    "p95_ms": 0.0009,
+    "observation_bytes": 157
+  },
+  "autosave-hold": {
+    "reps": 25,
+    "median_ms": 0.0378,
+    "p95_ms": 0.0468,
+    "observation_bytes": 575
+  },
+  "draft-round-trip-and-scope": {
+    "reps": 25,
+    "median_ms": 0.0818,
+    "p95_ms": 0.1007,
+    "observation_bytes": 308
+  },
+  "draft-shedding": {
+    "reps": 25,
+    "median_ms": 28.935,
+    "p95_ms": 29.671,
+    "observation_bytes": 478
+  },
+  "draft-pruning": {
+    "reps": 25,
+    "median_ms": 0.1329,
+    "p95_ms": 0.1414,
+    "observation_bytes": 344
+  },
+  "draft-user-isolation": {
+    "reps": 25,
+    "median_ms": 0.0504,
+    "p95_ms": 0.0684,
+    "observation_bytes": 390
+  },
+  "hydrate-decisions": {
+    "reps": 25,
+    "median_ms": 0.2889,
+    "p95_ms": 0.3475,
+    "observation_bytes": 69
+  },
+  "save-failure-classification": {
+    "reps": 25,
+    "median_ms": 0.0019,
+    "p95_ms": 0.0022,
+    "observation_bytes": 52
+  },
+  "save-status": {
+    "reps": 25,
+    "median_ms": 0.009,
+    "p95_ms": 0.0112,
+    "observation_bytes": 511
+  },
+  "quota-safe-write": {
+    "reps": 25,
+    "median_ms": 0.0965,
+    "p95_ms": 0.1214,
+    "observation_bytes": 221
+  },
+  "quota-legacy-error-name": {
+    "reps": 25,
+    "median_ms": 0.0466,
+    "p95_ms": 0.0487,
+    "observation_bytes": 97
+  },
+  "coalesce-after-failure": {
+    "reps": 25,
+    "median_ms": 0.0195,
+    "p95_ms": 0.0212,
+    "observation_bytes": 1544
+  }
+}

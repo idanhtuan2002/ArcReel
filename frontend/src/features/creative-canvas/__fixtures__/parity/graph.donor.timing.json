@@ -1,0 +1,98 @@
+{
+  "normalize-drops-dangling-edges": {
+    "reps": 25,
+    "median_ms": 0.0714,
+    "p95_ms": 0.1446,
+    "observation_bytes": 308
+  },
+  "normalize-detaches-missing-parent": {
+    "reps": 25,
+    "median_ms": 0.0612,
+    "p95_ms": 0.0649,
+    "observation_bytes": 228
+  },
+  "normalize-orders-parents-first": {
+    "reps": 25,
+    "median_ms": 0.0616,
+    "p95_ms": 0.0691,
+    "observation_bytes": 233
+  },
+  "delete-group-with-descendants": {
+    "reps": 25,
+    "median_ms": 0.1572,
+    "p95_ms": 0.1672,
+    "observation_bytes": 1366
+  },
+  "delete-edge": {
+    "reps": 25,
+    "median_ms": 0.1388,
+    "p95_ms": 0.1653,
+    "observation_bytes": 1170
+  },
+  "delete-to-empty": {
+    "reps": 25,
+    "median_ms": 0.189,
+    "p95_ms": 0.1944,
+    "observation_bytes": 1061
+  },
+  "clear-and-acknowledge": {
+    "reps": 25,
+    "median_ms": 0.1544,
+    "p95_ms": 0.172,
+    "observation_bytes": 727
+  },
+  "selection-resolved-on-undo": {
+    "reps": 25,
+    "median_ms": 0.1757,
+    "p95_ms": 0.1859,
+    "observation_bytes": 776
+  },
+  "history-bounded-60-adds": {
+    "reps": 25,
+    "median_ms": 4.196,
+    "p95_ms": 4.5305,
+    "observation_bytes": 5041
+  },
+  "history-measure-drag-resize": {
+    "reps": 25,
+    "median_ms": 0.3039,
+    "p95_ms": 0.3093,
+    "observation_bytes": 1719
+  },
+  "connect-once": {
+    "reps": 25,
+    "median_ms": 0.1897,
+    "p95_ms": 0.3443,
+    "observation_bytes": 1171
+  },
+  "restore-history-bounded": {
+    "reps": 25,
+    "median_ms": 0.3594,
+    "p95_ms": 0.4073,
+    "observation_bytes": 531
+  },
+  "hydrate-draft": {
+    "reps": 25,
+    "median_ms": 0.0575,
+    "p95_ms": 0.0771,
+    "observation_bytes": 182
+  },
+  "delete-unknown-and-empty": {
+    "reps": 25,
+    "median_ms": 0.0896,
+    "p95_ms": 0.0946,
+    "observation_bytes": 1545
+  },
+  "undo-redo-on-empty-history": {
+    "reps": 25,
+    "median_ms": 0.1632,
+    "p95_ms": 0.1677,
+    "observation_bytes": 1992
+  },
+  "select-missing-node": {
+    "reps": 25,
+    "median_ms": 0.1554,
+    "p95_ms": 0.1926,
+    "observation_bytes": 1093
+  }
+}

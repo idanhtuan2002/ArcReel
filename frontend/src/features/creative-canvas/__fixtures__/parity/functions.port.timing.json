@@ -1,0 +1,50 @@
+{
+  "storyboard-aspect-and-cols": {
+    "reps": 25,
+    "median_ms": 0.0046,
+    "p95_ms": 0.0052,
+    "observation_bytes": 213
+  },
+  "storyboard-cells-and-grid": {
+    "reps": 25,
+    "median_ms": 0.0169,
+    "p95_ms": 0.0264,
+    "observation_bytes": 1817
+  },
+  "bookmarks": {
+    "reps": 25,
+    "median_ms": 0.0307,
+    "p95_ms": 0.043,
+    "observation_bytes": 479
+  },
+  "group-selection": {
+    "reps": 25,
+    "median_ms": 0.055,
+    "p95_ms": 0.0911,
+    "observation_bytes": 122
+  },
+  "group-colors": {
+    "reps": 25,
+    "median_ms": 0.0025,
+    "p95_ms": 0.0045,
+    "observation_bytes": 420
+  },
+  "auto-layout": {
+    "reps": 25,
+    "median_ms": 0.4631,
+    "p95_ms": 0.507,
+    "observation_bytes": 938
+  },
+  "lod-tier": {
+    "reps": 25,
+    "median_ms": 0.0088,
+    "p95_ms": 0.0098,
+    "observation_bytes": 319
+  },
+  "layout-and-selection-edge-inputs": {
+    "reps": 25,
+    "median_ms": 0.0226,
+    "p95_ms": 0.0243,
+    "observation_bytes": 132
+  }
+}

@@ -4,6 +4,9 @@
 #   tools/parity/dramaclaw/run.sh <harness> <out-dir>
 #
 # <harness> is a file name under tools/parity/dramaclaw/ (for example graph.parity.test.ts).
+# With PARITY_TIMING=1, both sides also time every fixture case with the shared timing runner
+# (tools/parity/dramaclaw/timingRunner.ts) and write <name>.donor.timing.json and
+# <name>.port.timing.json to <out-dir>. Run timings on an otherwise idle machine.
 # The donor checkout (DONOR_DIR, default ~/.cache/r2-donors/dramaclaw-full) must be at the
 # pinned commit with frontend dependencies installed. The harness is copied into the donor's
 # frontend/src/__parity__/ and removed afterwards; no donor file is modified.
@@ -25,8 +28,10 @@ cp "$ROOT/tools/parity/dramaclaw/$HARNESS" "$DONOR_DIR/frontend/src/__parity__/$
 cp "$ROOT"/tools/parity/dramaclaw/*Runner.ts "$DONOR_DIR/frontend/src/__parity__/" 2>/dev/null || true
 trap 'rm -rf "$DONOR_DIR/frontend/src/__parity__"' EXIT
 
+DONOR_TIMING=""
+[ "${PARITY_TIMING:-0}" = "1" ] && DONOR_TIMING="$OUT/${NAME}.donor.timing.json"
 (cd "$DONOR_DIR/frontend" && PARITY_FIXTURES="$FIXTURES" PARITY_OUT="$OUT/${NAME}.donor.json" \
-  npx vitest run "src/__parity__/$HARNESS")
+  PARITY_TIMING_OUT="$DONOR_TIMING" npx vitest run "src/__parity__/$HARNESS")
 # The port side records its observations as a file snapshot next to the fixtures; the second,
 # non-updating run must reproduce it byte for byte (determinism).
 PORT_SNAPSHOT="$ROOT/frontend/src/features/creative-canvas/__fixtures__/parity/${NAME}.port.json"
@@ -34,4 +39,8 @@ PORT_SNAPSHOT="$ROOT/frontend/src/features/creative-canvas/__fixtures__/parity/$
 cp "$PORT_SNAPSHOT" "$OUT/${NAME}.port.json"
 (cd "$ROOT/frontend" && npx vitest run "src/features/creative-canvas/__parity__/${NAME}.parity.test.ts")
 cp "$PORT_SNAPSHOT" "$OUT/${NAME}.port.rerun.json"
+if [ "${PARITY_TIMING:-0}" = "1" ]; then
+  (cd "$ROOT/frontend" && PARITY_TIMING_OUT="$OUT/${NAME}.port.timing.json" \
+    npx vitest run "src/features/creative-canvas/__parity__/${NAME}.parity.test.ts" -t "records the timing")
+fi
 echo "wrote $OUT/${NAME}.donor.json, $OUT/${NAME}.port.json and $OUT/${NAME}.port.rerun.json"
