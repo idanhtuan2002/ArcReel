@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_6_2026-09-29.json"
+  ],
+  "reason": "The M8-A round 2 review (dc13cc93..f606ac06) accepted V2-02c. It found that the master authority backfill decided on a head outside the row lock and could overwrite a concurrent Gate C approval. The fix belongs to M7, which owns the backfill: V2-02d (40337fe3). M8-A is re-based onto it.",
+  "m7_prerequisite_changes": {
+    "executor_base": "the commit that adds this seventh amendment",
+    "intermediate_commits": "As amendment 6, plus V2-02d (40337fe3), which changes only scripts/r2/backfill_master_authority.py, its test and its evidence.",
+    "packets_added": [
+      {
+        "packet": "V2-02c M7 promotion lock order",
+        "evidence": "docs/r2/evidence/R2_V2_02C_M7_LOCK_ORDER_2026-09-29.md",
+        "head": "34bd4346",
+        "status": "ACCEPTED_BY_M8_A_ROUND_2_REVIEW"
+      },
+      {
+        "packet": "V2-02d serialized backfill",
+        "evidence": "docs/r2/evidence/R2_V2_02D_BACKFILL_SERIALIZATION_2026-09-29.md",
+        "head": "40337fe3",
+        "status": "REVIEW_BUNDLED_WITH_M8_A_ROUND_3",
+        "acceptance_rule": "M8-A is not accepted unless its round 3 independent review, whose range starts at dc13cc93, also accepts V2-02d."
+      }
+    ]
+  },
+  "packet_overrides": {
+    "M8-A": {
+      "rebase": "The M8-A commits on 50b82db6 are re-applied onto this executor base. The baseline is re-frozen with base_head = this commit."
+    }
+  },
+  "created_at": "2026-09-29"
+}
