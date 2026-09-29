@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "M8_A_ACCEPTED",
+  "packet": "M8-A exploration revisions and preview-bound ARTIFACT_SLOT promotion (ADR-0097)",
+  "accepted_candidate_head": "215d18e06ecb08a805d3663b7d415015124ccdbf",
+  "accepted_candidate_parent": "b72df36ba145befbcc18a42dd920cc518462b40f",
+  "tested_code_head": "b72df36ba145befbcc18a42dd920cc518462b40f",
+  "executor_base": "bddb42a432c4c699690ef43c456ef05d87e69a5a",
+  "alembic_head": "8a8c4a0e0001",
+  "acceptance_scope": "M8-A and V2-02c (34bd4346), per amendment 12; V2-02d is on its own V2 track",
+  "m8_a_evidence_sha256": {
+    "docs/r2/evidence/R2_M8_A_EXPLORATION_PROMOTION.json": "046294dcc8b108eaa2d6406fbe4e72ca13c7647526e177fd267b2088529dd1cf",
+    "docs/r2/evidence/schemas/R2_M8_A_EXPLORATION_PROMOTION.schema.json": "610ebcf1a5f466004f01888bdcfd25047f55bcf7eafd2d21df476481388c97d2",
+    "docs/r2/evidence/R2_M8_A_CODEX_REVIEW_2026-09-29.md": "e8130b75060f90d6119b4158baefa86773f0921702766834369bb41311b58afa"
+  },
+  "reviewer": "codex",
+  "review_jobs": [
+    "task-mumkmd5v-iab8rb",
+    "task-mumm3dov-92e1fw",
+    "task-mumnabnb-j68cdt",
+    "task-mumo1kt0-hhvlo9",
+    "task-mumoru3q-bfv13h",
+    "task-mumpluj0-nmpspe",
+    "task-mumqsk50-yxozkk"
+  ],
+  "accepting_review_job": "task-mumqsk50-yxozkk",
+  "reviewer_verdict": {
+    "status": "M8_A_ACCEPTED",
+    "reviewed_head": "215d18e06ecb08a805d3663b7d415015124ccdbf",
+    "accepts_v2_02c": true,
+    "blocking_findings": [],
+    "nonblocking_findings": [
+      "Concurrent M8 promotion tests do not force a complete M8 interleaving; disclosed at docs/r2/evidence/R2_M8_A_EXPLORATION_PROMOTION.json:375."
+    ],
+    "material_unknowns": []
+  },
+  "reviewed_at": "2026-09-29",
+  "required_skips": [],
+  "material_unknowns": [],
+  "nonblocking_findings": [
+    "Concurrent M8 promotion tests do not force a complete M8 interleaving (disclosed in the evidence coverage_limits)."
+  ],
+  "recorded_by": "authoring agent, transcribing the independent reviewer's verdict (same procedure as R2_M7_IMPLEMENTATION_ACCEPTANCE.json); the candidate evidence keeps status M8_A_CANDIDATE"
+}
