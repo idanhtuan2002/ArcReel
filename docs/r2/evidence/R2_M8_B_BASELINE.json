@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "base_head": "37b633dda7a4b5c5a42e871da161b058bf9d6fff",
+  "base_head": "d8d74299b6413e5ad561ebaabc88bebb1efcee27",
   "accepted_m7_candidate_head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
   "branch": "impl/r2-m8b-creative-canvas",
   "alembic_heads": [
@@ -318,12 +318,14 @@
     "docs/r2/evidence/R2_M8_B_CANVAS_PARITY.json",
     "docs/r2/evidence/R2_M8_B_BASELINE.json",
     "docs/r2/evidence/schemas/R2_M8_B_CANVAS_PARITY_EVIDENCE.schema.json",
-    "docs/superpowers/plans/2026-09-29-r2-m8b-creative-canvas-executable.md"
+    "docs/superpowers/plans/2026-09-29-r2-m8b-creative-canvas-executable.md",
+    ".github/dependabot.yml",
+    "tests/unit/r2/advanced_creative/test_m8b_canonical_digest_fixture.py"
   ],
   "graph": {
     "project": "r2-m8b",
     "generation": "not indexed for this worktree",
     "coverage": "frontend paths are new; seams verified by source hash"
   },
-  "created_at": "2026-09-29T00:00:00Z"
+  "created_at": "2026-09-30T00:00:00Z"
 }
