@@ -248,3 +248,66 @@ exportable (fail-closed). This is the unchanged M2 ordering.
 - The PG16 unit, Gate and backfill suites: 40 passed.
 - The broad SQLite suites: 1253 passed, 2 skipped.
 - Static gates: clean.
+
+---
+
+# Codex review 4 (job `task-mumcpvlk-d4qj5e`, reviewed HEAD `6697e065`), verbatim
+
+## 1. HEAD reviewed
+
+`6697e06536e4084c04465b43f1953019793202c6` on `fix/r2-v2-02b-serialize-gate-c`; worktree clean. I reviewed `814a7244..6697e065` and the whole packet `cca1eeaf..6697e065`.
+
+## 2. Verdict
+
+**CHANGES_REQUIRED.** The reported semantic-state race is fixed, but a Gate D, listing, or download request can still pass its DB-head check before B commits and consume A after B becomes the committed head. The affected reader paths do not check the head again.
+
+## 3. Per-finding table
+
+| Prior finding | Status | File:line and test evidence |
+|---|---|---|
+| Phase 2 pairs A’s approved master with B’s semantic state | **FIXED** | [gates.py:362](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:362) passes B’s state into approval; [approval_service.py:75](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/production/approval_service.py:75) checks it, and [approval_service.py:97](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/production/approval_service.py:97) combines it with B’s master for the single manifest replacement at [artifact_bridge.py:133](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/production/artifact_bridge.py:133). The write-recording test is [test_gates_master_authority.py:276](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:276); unit checks are [test_approval_service.py:199](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/unit/r2/production/test_approval_service.py:199). Tests did not run in this review. |
+| Failed or in-flight staging changes A’s dependencies | **FIXED** | [host_integration.py:279](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/host_integration.py:279) preserves an existing approved state during staging. The failed-promotion case is exercised by [test_gates_master_authority.py:250](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:250), inspected but not run here. |
+| Superseded approval overwrites the newer export; projection precedes DB commit | **FIXED** for those orderings | Phase 1 commits before phase 2 at [gates.py:414](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:414); phase 2 checks and holds the head lock through projection and export at [master_authority.py:115](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/services/master_authority.py:115). Forced supersession is tested at [test_gates_master_authority.py:180](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:180). No phase-1 commit-failure test was run here. |
+| Crash leaves a committed head unprojected | **PARTIALLY_FIXED** | The split remains at [gates.py:417](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:417) and [gates.py:422](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:422). Retry is documented at [v1-operator.md:165](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/docs/r2/runbooks/v1-operator.md:165) and exercised after an injected projection refusal at [test_gates_master_authority.py:152](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:152). Recovery still needs a retry or re-approval; the reader race below limits the fail-closed claim. |
+| Timed overlap test does not force the critical interleaving | **PARTIALLY_FIXED** | [test_gates_master_authority.py:191](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:191) forces approval supersession; [test_gates_master_authority.py:219](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:219) still relies on sleep. Neither forces the reader interval below. |
+
+## 4. New findings table
+
+| Severity | File:line | Scenario | Confidence |
+|---|---|---|---|
+| **High** | [gates.py:482](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:482), [gates.py:414](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:414), [gates.py:483](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:483), [gates.py:503](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:503) | **Code-derived interleaving:** Gate D verifies A, then pauses. B’s phase 1 commits its DB head; phase 2 has not yet changed A’s manifest, current file, or export because staging uses `select_current=False` at [host_integration.py:301](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/host_integration.py:301). Gate D resumes, finds A exportable from those agreeing files, and records approval for A while B is the DB head. Listing and download have the same separate check/read sequence at [gates.py:553](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:553) and [gates.py:581](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:581). | High on ordering; interleaving not fault-injected. |
+
+I found no separate V1 Gate C/D/O2a regression by inspection. In the version promoter, the current file changes before the manifest callback ([version_manager.py:1326](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/lib/version_manager.py:1326), [version_manager.py:1329](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/lib/version_manager.py:1329)); a reader in that interval encounters a digest mismatch under [deliverables.py:229](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/deliverables.py:229). The later export replacement is atomic and checked against the approved digest at [deliverables.py:185](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/deliverables.py:185). Existing O2a tests cover successful publish/download and stale or tampered exports at [test_gates_export.py:138](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_export.py:138) and [test_gates_export.py:236](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_export.py:236); this review did not execute them.
+
+## 5. Commands run
+
+Read-only `git status`, `git rev-parse`, `git log`, both requested `git diff` ranges, targeted `nl`/`rg`, and code-graph status/coverage attempts. I attempted:
+
+```bash
+TMPDIR=/tmp timeout 90s .venv/bin/python -m pytest -q -p no:cacheprovider tests/integration/server/routers/test_gates_master_authority.py tests/integration/server/routers/test_gates_export.py tests/unit/r2/production/test_approval_service.py
+```
+
+Pytest failed **before collection** with `FileNotFoundError: No usable temporary directory found`. No test passed in this review.
+
+## 6. Coverage limits
+
+Graph status and coverage calls were approval-blocked; structural conclusions use direct source inspection. The new interleaving, a phase-1 commit failure, crash recovery, and PostgreSQL concurrency behavior were not executed. Test references above describe inspected test code or earlier evidence, not fresh passing results.
+
+## 7. JSON
+
+```json
+{"schema_version":1,"status":"V2_02B_NOT_ACCEPTED","reviewed_head":"6697e06536e4084c04465b43f1953019793202c6","reviewer":"codex","reviewed_at":"2026-09-29T07:26:18Z","required_skips":["Targeted pytest failed before collection: no usable temporary directory in the read-only sandbox"],"material_unknowns":["DB-head-check to deliverable-read interleaving was established by source inspection but not fault-injected","Phase-1 commit failure and crash recovery were not executed","PostgreSQL concurrency behavior was not executed","Code-graph status and coverage were approval-blocked"]}
+```
+
+## Resolution — `2792a08d`
+
+| Finding | Fix | Test |
+|---|---|---|
+| High: a reader passes the head check, then reads the previous head's files after a new head commits | `verify_masters` returns the verified heads `(key, version, candidate)`. `_stable_read` runs publish approval, listing and download reads between two checks, and refuses with 409 `master_moving` if they differ; a download snapshot is closed first. A Gate D decision is recorded only after both checks agree | `test_a_head_committed_while_gate_d_reads_refuses_the_decision` lands a complete, consistent Gate C of the source shot during the Gate D read. It fails with the comparison disabled (verified) |
+
+**Verification at `2792a08d`:**
+
+- `test_gates_master_authority.py`: 10 passed ×2 on PG16.
+- The PG16 unit, Gate and backfill suites: 40 passed.
+- The broad SQLite suites: 1254 passed, 2 skipped.
+- Static gates: clean.
