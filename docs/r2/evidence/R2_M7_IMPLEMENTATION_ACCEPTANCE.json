@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "status": "M7_IMPLEMENTATION_ACCEPTED",
+  "lineage": "r2-v1.0.0..r2-v2/main (V1-07, V1-08, V1.x Agent budget, V2-01 admission); option B1 of docs/research/2026-09-29-r2-v2-m8-rebase.md",
+  "accepted_candidate_head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
+  "accepted_candidate_parent": "6746ce57a72d74ab9196da7db3bc3fd1a79d6fb4",
+  "alembic_head": "c9e1f4a2b701",
+  "m7_evidence_sha256": {
+    "docs/r2/evidence/R2_V1_PRODUCTION_CANDIDATE_2026-09-28.md": "14dee8814c29f3533dd6ce50113fa20550f5252fb6ecf79edf8bde32f0c38d4c",
+    "docs/r2/evidence/R2_V1_RELEASE_SPONSOR_DECISION_2026-09-28.json": "3eb51b4b0ed533c16b6a03a7076c97e11f70bf30b3cc20ba75ed47d6feb17d37",
+    "docs/r2/evidence/R2_V2_START_DECISION_2026-09-29.json": "00d61294a5eae096fd27b4d6d8d5c35bf993e26f64eca4fca14fe5fdca06e6e7",
+    "docs/r2/evidence/R2_V2_CODEX_REVIEW_2026-09-29.md": "543a909a59f37160dd8135f4ad9ef829d16d254ae2089051d07e61af9fddc3a2",
+    "docs/r2/evidence/R2_V2_CODEX_CONFIRMATION_REVIEW_2026-09-29.md": "95107a59f003b81c0f86570d008a6f2cda13af495b7a5443d77127edc24f2fb3"
+  },
+  "reviewer": "codex",
+  "review_jobs": [
+    "task-mum0cgan-iolyho",
+    "task-mum16oi9-cmfuu1",
+    "task-mum1vybd-ybq28r",
+    "fd8f58bb third review",
+    "task-mum2gy9m-62p42u"
+  ],
+  "review_outcome": "The final review (task-mum2gy9m-62p42u) found every earlier finding FIXED, with no regression and no new defect. Its only NOT_ACCEPTED reasons were two test-execution skips: the reviewer sandbox cannot open sockets, and its SQLite schema setup timed out.",
+  "test_execution": {
+    "executed_by": "sponsor (human operator), not the authoring agent",
+    "head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
+    "runs": [
+      {
+        "command": "TMPDIR=/home/anhtuan/.cache/pytmp uv run python -m pytest -n 4 --dist loadfile -q -p no:randomly tests/unit/server/agent_runtime tests/unit/lib/test_accounting_characterization.py tests/integration/lib/test_budget_guard.py tests/unit/r2/host_hardening tests/integration/scripts/r2/test_qualify_route.py",
+        "database": "SQLite",
+        "result": "1086 passed",
+        "exit_status": 0
+      },
+      {
+        "command": "TMPDIR=/home/anhtuan/.cache/pytmp DATABASE_URL=postgresql+asyncpg://…@127.0.0.1:55445/arcreel_v201 uv run python -m pytest -q tests/integration/lib/test_budget_guard.py tests/integration/lib/db/repositories/test_task_repo_admission.py",
+        "database": "PostgreSQL 16",
+        "result": "19 passed",
+        "exit_status": 0
+      }
+    ]
+  },
+  "reviewed_at": "2026-09-29T02:46:51Z",
+  "accepted_at": "2026-09-29",
+  "required_skips": [],
+  "material_unknowns": [],
+  "accepted_limits": [
+    "ADR-0093: a CLI config race with another session's graceful exit in the same project can undercount by at most one connection's spend",
+    "ADR-0093: the orphan hold sweep assumes one host process",
+    "ADR-0093: the CLI restore rule is verified against the bundled CLI source (Xha, Giy, Tot), not by a live paid resume",
+    "ADR-0092: the script lock records operator-named digests; the release dossier verifies them",
+    "Release gates: the sponsor accepted the migration-gate exception (R2_V1_RELEASE_SPONSOR_DECISION_2026-09-28.json)"
+  ]
+}
