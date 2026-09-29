@@ -37,6 +37,10 @@ These follow from the spec; none is a new architecture choice.
 
   Each adapter writes canonical JSON outputs. `scripts/r2/m8b_parity_rows.py` compares them and emits the `BehaviorParityRow`s of a `DonorParityReport`. `scripts/r2/verify_donor_parity.py` (from M8-A) recomputes its surface digest and verdict. Donor tests run unmodified.
 
+- **D5 — M8-A error bodies.** The M8-A API returns `{"detail": <localized message>}`; its stable keys are i18n keys and are not in the body. The canvas classifies a save failure by status (409 conflict, 404 not found, 422 invalid, network/408/429/5xx retry) and shows `detail` as is. On autosave, a 409 is a moved head: every save uses a fresh command id, so a reused command cannot occur. No M8-A change is needed.
+- **D6 — Browser storage.** The recovery modules use the browser `localStorage` through the ported quota-safe wrapper, as the donor does, with the clock injected (`now`). Tests use jsdom's storage, and the parity harness uses a budgeted fake storage.
+- **D7 — Module-private donor code.** When a selected donor behavior lives in a module-private function (the hydrate decision in `useCanvasSync.ts`), the donor harness copies that function's exact source, with the helpers it calls, into a scratch module and runs it. The donor file is in the selected surface with its hash.
+
 ## Selected donor surface
 
 | Area | Donor paths | Donor tests (run unmodified) |
@@ -46,7 +50,7 @@ These follow from the spec; none is a new architecture choice.
 | History (bounded undo/redo, `MAX_HISTORY_STEPS = 50`) | `canvasStore.ts` history functions | `canvas-store-undo-history` |
 | Viewport bookmarks | `features/canvas/domain/viewportBookmarks.ts`, `application/bookmarkActions.ts` | `viewport-bookmarks-domain`, `canvas-store-viewport-bookmarks` |
 | Save coordination, save decision, payload caps, clear intent | `features/freezone/canvasSaveCoordinator.ts`, `canvasSyncCore.ts` (the pure save decision, payload limits and error classification), `canvasAutosaveHold.ts`, `stores/save-status-store.ts` | `canvasSaveCoordinator`, `canvasSyncCore`, `canvas-autosave-hold`, `save-status-store` |
-| Draft recovery, payload caps, pruning, shedding | `features/freezone/canvasDraftStorage.ts`, `lib/localStorageQuota.ts` | `canvas-draft-storage`, `local-storage-quota`, `canvas-store-draft-hydrate` |
+| Draft recovery, payload caps, pruning, shedding, hydrate decision | `features/freezone/canvasDraftStorage.ts`, `lib/localStorageQuota.ts`, `features/freezone/useCanvasSync.ts` (the hydrate decision only, D7) | `canvas-draft-storage`, `local-storage-quota`, `canvas-store-draft-hydrate` |
 | React Flow interaction | `features/canvas/Canvas.tsx` (interaction and LOD only), `application/canvasLod.ts` | the LOD behaviour, measured by the benchmark |
 
 **Excluded** (spec §2 and D1): generation, task and resume logic; asset library and upload; Director World 3D and 360; audio and voice generation; export and compose; billing and credits; companion; auto-commit and push; the donor project shell and routing; donor i18n content.

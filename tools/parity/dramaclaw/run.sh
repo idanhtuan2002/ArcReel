@@ -21,6 +21,8 @@ FIXTURES="$ROOT/frontend/src/features/creative-canvas/__fixtures__/parity/${NAME
 [ -z "$(git -C "$DONOR_DIR" status --porcelain --untracked-files=no)" ] || { echo "donor checkout is modified" >&2; exit 2; }
 mkdir -p "$OUT" "$DONOR_DIR/frontend/src/__parity__"
 cp "$ROOT/tools/parity/dramaclaw/$HARNESS" "$DONOR_DIR/frontend/src/__parity__/$HARNESS"
+# Shared scenario runners are copied too; they import nothing from either codebase.
+cp "$ROOT"/tools/parity/dramaclaw/*Runner.ts "$DONOR_DIR/frontend/src/__parity__/" 2>/dev/null || true
 trap 'rm -rf "$DONOR_DIR/frontend/src/__parity__"' EXIT
 
 (cd "$DONOR_DIR/frontend" && PARITY_FIXTURES="$FIXTURES" PARITY_OUT="$OUT/${NAME}.donor.json" \

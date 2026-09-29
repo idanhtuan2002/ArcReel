@@ -1,0 +1,819 @@
+{
+  "fixture_set": "recovery-v1",
+  "cases": [
+    {
+      "id": "single-flight-and-coalesce",
+      "behaviors": [
+        "S01",
+        "S02",
+        "S03"
+      ],
+      "kind": "session",
+      "ops": [
+        {
+          "op": "request",
+          "tag": "a"
+        },
+        {
+          "op": "request",
+          "tag": "b"
+        },
+        {
+          "op": "request",
+          "tag": "c"
+        },
+        {
+          "op": "unsavedBeyond",
+          "version": 1
+        },
+        {
+          "op": "resolve",
+          "value": true
+        },
+        {
+          "op": "resolve",
+          "value": true
+        },
+        {
+          "op": "unsavedBeyond",
+          "version": 3
+        }
+      ]
+    },
+    {
+      "id": "waiter-released-only-by-covering-save",
+      "behaviors": [
+        "S03"
+      ],
+      "kind": "session",
+      "ops": [
+        {
+          "op": "request",
+          "tag": "a"
+        },
+        {
+          "op": "request",
+          "tag": "b"
+        },
+        {
+          "op": "resolve",
+          "value": true
+        },
+        {
+          "op": "request",
+          "tag": "c"
+        },
+        {
+          "op": "resolve",
+          "value": true
+        },
+        {
+          "op": "resolve",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "dispose-releases-waiters",
+      "behaviors": [
+        "S04"
+      ],
+      "kind": "session",
+      "ops": [
+        {
+          "op": "request",
+          "tag": "a"
+        },
+        {
+          "op": "request",
+          "tag": "b"
+        },
+        {
+          "op": "dispose"
+        },
+        {
+          "op": "resolve",
+          "value": true
+        },
+        {
+          "op": "request",
+          "tag": "late"
+        }
+      ]
+    },
+    {
+      "id": "failure-stops-pump",
+      "behaviors": [
+        "S05"
+      ],
+      "kind": "session",
+      "ops": [
+        {
+          "op": "request",
+          "tag": "a"
+        },
+        {
+          "op": "request",
+          "tag": "b"
+        },
+        {
+          "op": "resolve",
+          "value": false
+        },
+        {
+          "op": "request",
+          "tag": "c"
+        },
+        {
+          "op": "resolve",
+          "value": "throw"
+        },
+        {
+          "op": "request",
+          "tag": "d"
+        },
+        {
+          "op": "resolve",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "request-as-previous-lands",
+      "behaviors": [
+        "S06"
+      ],
+      "kind": "session",
+      "ops": [
+        {
+          "op": "request",
+          "tag": "a"
+        },
+        {
+          "op": "resolve",
+          "value": true
+        },
+        {
+          "op": "request",
+          "tag": "b"
+        },
+        {
+          "op": "resolve",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "canvas-switch-isolation",
+      "behaviors": [
+        "S07"
+      ],
+      "kind": "session",
+      "ops": [
+        {
+          "op": "request",
+          "tag": "old"
+        },
+        {
+          "op": "switch"
+        },
+        {
+          "op": "request",
+          "tag": "new"
+        },
+        {
+          "op": "resolve",
+          "value": true
+        },
+        {
+          "op": "resolve",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "save-decisions",
+      "behaviors": [
+        "S08"
+      ],
+      "kind": "decision",
+      "ops": [
+        {
+          "op": "decide",
+          "snapshot": {
+            "hydrated": false,
+            "switching": false,
+            "nodeCount": 1,
+            "edgeCount": 0,
+            "lastRemoteNodeCount": 1,
+            "userEditsSinceHydrate": 0,
+            "lastMutationSource": null,
+            "pendingClearIntent": false
+          }
+        },
+        {
+          "op": "decide",
+          "snapshot": {
+            "hydrated": true,
+            "switching": true,
+            "nodeCount": 1,
+            "edgeCount": 0,
+            "lastRemoteNodeCount": 1,
+            "userEditsSinceHydrate": 0,
+            "lastMutationSource": null,
+            "pendingClearIntent": false
+          }
+        },
+        {
+          "op": "decide",
+          "snapshot": {
+            "hydrated": true,
+            "switching": false,
+            "nodeCount": 0,
+            "edgeCount": 0,
+            "lastRemoteNodeCount": 4,
+            "userEditsSinceHydrate": 2,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": false
+          }
+        },
+        {
+          "op": "decide",
+          "snapshot": {
+            "hydrated": true,
+            "switching": false,
+            "nodeCount": 0,
+            "edgeCount": 0,
+            "lastRemoteNodeCount": 4,
+            "userEditsSinceHydrate": 2,
+            "lastMutationSource": "delete_to_empty",
+            "pendingClearIntent": false
+          }
+        },
+        {
+          "op": "decide",
+          "snapshot": {
+            "hydrated": true,
+            "switching": false,
+            "nodeCount": 0,
+            "edgeCount": 0,
+            "lastRemoteNodeCount": 4,
+            "userEditsSinceHydrate": 2,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": true
+          }
+        },
+        {
+          "op": "decide",
+          "snapshot": {
+            "hydrated": true,
+            "switching": false,
+            "nodeCount": 0,
+            "edgeCount": 0,
+            "lastRemoteNodeCount": 4,
+            "userEditsSinceHydrate": 2,
+            "lastMutationSource": "manual_clear",
+            "pendingClearIntent": false
+          }
+        },
+        {
+          "op": "decide",
+          "snapshot": {
+            "hydrated": true,
+            "switching": false,
+            "nodeCount": 0,
+            "edgeCount": 0,
+            "lastRemoteNodeCount": 0,
+            "userEditsSinceHydrate": 0,
+            "lastMutationSource": null,
+            "pendingClearIntent": false
+          }
+        },
+        {
+          "op": "decide",
+          "snapshot": {
+            "hydrated": true,
+            "switching": false,
+            "nodeCount": 3,
+            "edgeCount": 2,
+            "lastRemoteNodeCount": 1,
+            "userEditsSinceHydrate": 5,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "payload-limits",
+      "behaviors": [
+        "S09"
+      ],
+      "kind": "decision",
+      "ops": [
+        {
+          "op": "limits",
+          "nodes": 10,
+          "edges": 10,
+          "size": 100
+        },
+        {
+          "op": "limits",
+          "nodes": 50001,
+          "edges": 200001,
+          "size": 99999999
+        },
+        {
+          "op": "limits",
+          "nodes": 50000,
+          "edges": 200001,
+          "size": null
+        },
+        {
+          "op": "limits",
+          "nodes": 50000,
+          "edges": 200000,
+          "size": 5242881
+        },
+        {
+          "op": "limits",
+          "nodes": 50000,
+          "edges": 200000,
+          "size": 5242880
+        }
+      ]
+    },
+    {
+      "id": "autosave-hold",
+      "behaviors": [
+        "S11"
+      ],
+      "kind": "hold",
+      "ops": [
+        {
+          "op": "hold",
+          "project": "a",
+          "token": "t1"
+        },
+        {
+          "op": "hold",
+          "project": "a",
+          "token": "t2"
+        },
+        {
+          "op": "hold",
+          "project": "b",
+          "token": "t3",
+          "maxMs": 100
+        },
+        {
+          "op": "release",
+          "token": "t1"
+        },
+        {
+          "op": "release",
+          "token": "t1"
+        },
+        {
+          "op": "advance",
+          "ms": 99
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "release",
+          "token": "t2"
+        },
+        {
+          "op": "hold",
+          "project": "a",
+          "token": "t4"
+        },
+        {
+          "op": "advance",
+          "ms": 90000
+        }
+      ]
+    },
+    {
+      "id": "draft-round-trip-and-scope",
+      "behaviors": [
+        "R01"
+      ],
+      "kind": "draft",
+      "ops": [
+        {
+          "op": "write",
+          "project": "p",
+          "canvas": "c",
+          "baseRevision": 4,
+          "nodes": 3
+        },
+        {
+          "op": "read",
+          "project": "p",
+          "canvas": "c"
+        },
+        {
+          "op": "read",
+          "project": "p",
+          "canvas": "other"
+        },
+        {
+          "op": "read",
+          "project": "q",
+          "canvas": "c"
+        },
+        {
+          "op": "corrupt",
+          "project": "p",
+          "canvas": "bad"
+        },
+        {
+          "op": "read",
+          "project": "p",
+          "canvas": "bad"
+        }
+      ]
+    },
+    {
+      "id": "draft-shedding",
+      "behaviors": [
+        "R02"
+      ],
+      "kind": "draft",
+      "ops": [
+        {
+          "op": "write",
+          "canvas": "heavy",
+          "contentFraction": 0.3,
+          "historyFraction": 1.0
+        },
+        {
+          "op": "read",
+          "canvas": "heavy"
+        },
+        {
+          "op": "write",
+          "canvas": "fits",
+          "contentFraction": 0.2,
+          "historyFraction": 0.2
+        },
+        {
+          "op": "read",
+          "canvas": "fits"
+        },
+        {
+          "op": "write",
+          "canvas": "huge",
+          "contentFraction": 1.01
+        },
+        {
+          "op": "read",
+          "canvas": "huge"
+        }
+      ]
+    },
+    {
+      "id": "draft-pruning",
+      "behaviors": [
+        "R03"
+      ],
+      "kind": "draft",
+      "ops": [
+        {
+          "op": "write",
+          "canvas": "old",
+          "updatedAt": 1
+        },
+        {
+          "op": "write",
+          "canvas": "fresh",
+          "updatedAt": 604800000
+        },
+        {
+          "op": "write",
+          "canvas": "future",
+          "updatedAt": 999999999999
+        },
+        {
+          "op": "prune",
+          "now": 691200002
+        },
+        {
+          "op": "read",
+          "canvas": "old"
+        },
+        {
+          "op": "read",
+          "canvas": "fresh"
+        },
+        {
+          "op": "read",
+          "canvas": "future"
+        }
+      ]
+    },
+    {
+      "id": "draft-user-isolation",
+      "behaviors": [
+        "R06"
+      ],
+      "kind": "draft",
+      "ops": [
+        {
+          "op": "write",
+          "user": "alice",
+          "project": "p",
+          "canvas": "c",
+          "baseRevision": 7,
+          "nodes": 2
+        },
+        {
+          "op": "read",
+          "user": "alice",
+          "project": "p",
+          "canvas": "c"
+        },
+        {
+          "op": "read",
+          "user": "bob",
+          "project": "p",
+          "canvas": "c"
+        }
+      ]
+    },
+    {
+      "id": "hydrate-decisions",
+      "behaviors": [
+        "R07",
+        "R05"
+      ],
+      "kind": "hydrate",
+      "ops": [
+        {
+          "draft": null,
+          "remoteRevision": 3,
+          "remoteLabels": [
+            "a"
+          ]
+        },
+        {
+          "draft": {
+            "baseRevision": 2,
+            "labels": [
+              "a"
+            ]
+          },
+          "remoteRevision": 3,
+          "remoteLabels": [
+            "a"
+          ]
+        },
+        {
+          "draft": {
+            "baseRevision": 2,
+            "labels": [
+              "a"
+            ],
+            "metadata": {
+              "k": 1
+            }
+          },
+          "remoteRevision": 3,
+          "remoteLabels": [
+            "a"
+          ],
+          "remoteMetadata": {
+            "k": 1,
+            "other": 2
+          }
+        },
+        {
+          "draft": {
+            "baseRevision": 3,
+            "labels": [
+              "local edit"
+            ]
+          },
+          "remoteRevision": 3,
+          "remoteLabels": [
+            "a"
+          ]
+        },
+        {
+          "draft": {
+            "baseRevision": 2,
+            "labels": [
+              "local edit"
+            ]
+          },
+          "remoteRevision": 3,
+          "remoteLabels": [
+            "a"
+          ]
+        },
+        {
+          "draft": {
+            "baseRevision": null,
+            "labels": [
+              "local edit"
+            ]
+          },
+          "remoteRevision": 3,
+          "remoteLabels": [
+            "a"
+          ]
+        },
+        {
+          "draft": {
+            "baseRevision": 3,
+            "labels": [
+              "local edit"
+            ]
+          },
+          "remoteRevision": null,
+          "remoteLabels": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "save-failure-classification",
+      "behaviors": [
+        "S10"
+      ],
+      "kind": "decision",
+      "ops": [
+        {
+          "op": "classify",
+          "status": 409,
+          "detail": "The candidate changed"
+        },
+        {
+          "op": "classify",
+          "status": 404,
+          "detail": "Not found"
+        },
+        {
+          "op": "classify",
+          "status": 422
+        },
+        {
+          "op": "classify",
+          "status": 503
+        },
+        {
+          "op": "classify",
+          "status": null
+        },
+        {
+          "op": "classify",
+          "status": 400,
+          "detail": "Bad"
+        }
+      ]
+    },
+    {
+      "id": "save-status",
+      "behaviors": [
+        "S12"
+      ],
+      "kind": "status",
+      "ops": [
+        {
+          "op": "derive",
+          "scope": "canvas"
+        },
+        {
+          "op": "set",
+          "scope": "canvas.a",
+          "status": "saving"
+        },
+        {
+          "op": "derive",
+          "scope": "canvas"
+        },
+        {
+          "op": "set",
+          "scope": "canvas.a",
+          "status": "saved"
+        },
+        {
+          "op": "advance",
+          "ms": 1000
+        },
+        {
+          "op": "set",
+          "scope": "canvas.b",
+          "status": "error",
+          "error": "boom"
+        },
+        {
+          "op": "derive",
+          "scope": "canvas"
+        },
+        {
+          "op": "set",
+          "scope": "canvas.a",
+          "status": "saving"
+        },
+        {
+          "op": "derive",
+          "scope": "canvas.a"
+        },
+        {
+          "op": "set",
+          "scope": "canvas.b",
+          "status": "saved"
+        },
+        {
+          "op": "derive",
+          "scope": "canvas"
+        },
+        {
+          "op": "set",
+          "scope": "canvas.a",
+          "status": "idle"
+        },
+        {
+          "op": "derive",
+          "scope": "canvas.a"
+        }
+      ]
+    },
+    {
+      "id": "quota-safe-write",
+      "behaviors": [
+        "R04"
+      ],
+      "kind": "quota",
+      "ops": [
+        {
+          "op": "seed",
+          "key": "junk:1",
+          "size": 40,
+          "budget": 100
+        },
+        {
+          "op": "seed",
+          "key": "keep",
+          "size": 20
+        },
+        {
+          "op": "set",
+          "key": "a",
+          "size": 30
+        },
+        {
+          "op": "reclaimer",
+          "prefix": "junk:"
+        },
+        {
+          "op": "set",
+          "key": "a",
+          "size": 30
+        },
+        {
+          "op": "set",
+          "key": "a",
+          "size": 70
+        },
+        {
+          "op": "set",
+          "key": "b",
+          "size": 90
+        }
+      ]
+    },
+    {
+      "id": "quota-legacy-error-name",
+      "behaviors": [
+        "R04"
+      ],
+      "kind": "quota",
+      "ops": [
+        {
+          "op": "seed",
+          "key": "old",
+          "size": 80,
+          "budget": 100,
+          "errorName": "NS_ERROR_DOM_QUOTA_REACHED"
+        },
+        {
+          "op": "set",
+          "key": "old",
+          "size": 90
+        },
+        {
+          "op": "set",
+          "key": "new",
+          "size": 50
+        }
+      ]
+    }
+  ]
+}

@@ -13,6 +13,20 @@
       "from_step": 2,
       "behavior": "G09",
       "description": "A storyboard group keeps its re-anchored outside edges across a save and reload. The donor's load normalization drops every edge touching a group node (groups have no handles), so a reloaded storyboard loses those connections and ungrouping cannot restore them. The port keeps and restores them."
+    },
+    {
+      "harness": "recovery",
+      "case": "draft-user-isolation",
+      "from_step": 2,
+      "behavior": "R06",
+      "description": "Drafts are isolated per user (spec \u00a77: keyed by user, project, candidate and server revision). The donor keys drafts by project and canvas only, so a second user of the same project and canvas in the same browser reads the first user's draft. The port returns none."
+    },
+    {
+      "harness": "recovery",
+      "case": "save-failure-classification",
+      "from_step": 1,
+      "behavior": "S10",
+      "description": "Save failures are classified by the M8-A exploration API. The donor recognizes only its own backend codes, so an unknown candidate (404), a rejected body (422), a transient server failure (503) and a network failure all become one generic error. The port distinguishes not_found, invalid and retryable outcomes; a 409 conflict is handled the same way by both."
     }
   ]
 }

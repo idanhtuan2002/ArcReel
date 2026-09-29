@@ -286,6 +286,10 @@
         {
           "path": "frontend/src/lib/localStorageQuota.ts",
           "sha256": "8e8b9f44469af6ecadcf507c577213d965a28029de3f149a8d88fc8bedb9be9f"
+        },
+        {
+          "path": "frontend/src/features/freezone/useCanvasSync.ts",
+          "sha256": "c556f6571c1239ba8e7e7f5a144fea3721b171694106a870027ffa8cac6d8004"
         }
       ]
     }

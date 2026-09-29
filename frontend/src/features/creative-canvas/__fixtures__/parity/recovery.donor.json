@@ -1,0 +1,1084 @@
+{
+  "fixture_set": "recovery-v1",
+  "results": {
+    "single-flight-and-coalesce": [
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "unsavedBeyond",
+        "value": true,
+        "contentVersion": 3,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 1,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          3
+        ],
+        "runVersions": [
+          1,
+          3
+        ],
+        "events": [
+          "a:true"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 3,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          3
+        ],
+        "events": [
+          "a:true",
+          "c:true",
+          "b:true"
+        ]
+      },
+      {
+        "op": "unsavedBeyond",
+        "value": false,
+        "contentVersion": 3,
+        "savedVersion": 3,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          3
+        ],
+        "events": [
+          "a:true",
+          "c:true",
+          "b:true"
+        ]
+      }
+    ],
+    "waiter-released-only-by-covering-save": [
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 1,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          2
+        ],
+        "runVersions": [
+          1,
+          2
+        ],
+        "events": [
+          "a:true"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 1,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          2
+        ],
+        "runVersions": [
+          1,
+          2
+        ],
+        "events": [
+          "a:true"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 2,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          3
+        ],
+        "runVersions": [
+          1,
+          2,
+          3
+        ],
+        "events": [
+          "a:true",
+          "b:true"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 3,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          2,
+          3
+        ],
+        "events": [
+          "a:true",
+          "b:true",
+          "c:true"
+        ]
+      }
+    ],
+    "dispose-releases-waiters": [
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "dispose",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          true
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": [
+          "b:false",
+          "a:false"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": false,
+        "disposed": [
+          true
+        ],
+        "pending": [],
+        "runVersions": [
+          1
+        ],
+        "events": [
+          "b:false",
+          "a:false"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": false,
+        "disposed": [
+          true
+        ],
+        "pending": [],
+        "runVersions": [
+          1
+        ],
+        "events": [
+          "b:false",
+          "a:false",
+          "late:false"
+        ]
+      }
+    ],
+    "failure-stops-pump": [
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 0,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1
+        ],
+        "events": [
+          "b:false",
+          "a:false"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          3
+        ],
+        "runVersions": [
+          1,
+          3
+        ],
+        "events": [
+          "b:false",
+          "a:false"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 3,
+        "savedVersion": 0,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          3
+        ],
+        "events": [
+          "b:false",
+          "a:false",
+          "c:false"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 4,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          4
+        ],
+        "runVersions": [
+          1,
+          3,
+          4
+        ],
+        "events": [
+          "b:false",
+          "a:false",
+          "c:false"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 4,
+        "savedVersion": 4,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          3,
+          4
+        ],
+        "events": [
+          "b:false",
+          "a:false",
+          "c:false",
+          "d:true"
+        ]
+      }
+    ],
+    "request-as-previous-lands": [
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 1,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1
+        ],
+        "events": [
+          "a:true"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 1,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          2
+        ],
+        "runVersions": [
+          1,
+          2
+        ],
+        "events": [
+          "a:true"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 2,
+        "savedVersion": 2,
+        "saving": false,
+        "disposed": [
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          2
+        ],
+        "events": [
+          "a:true",
+          "b:true"
+        ]
+      }
+    ],
+    "canvas-switch-isolation": [
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": []
+      },
+      {
+        "op": "switch",
+        "value": null,
+        "contentVersion": 0,
+        "savedVersion": 0,
+        "saving": false,
+        "disposed": [
+          true,
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1
+        ],
+        "events": [
+          "old:false"
+        ]
+      },
+      {
+        "op": "request",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          true,
+          false
+        ],
+        "pending": [
+          1,
+          1
+        ],
+        "runVersions": [
+          1,
+          1
+        ],
+        "events": [
+          "old:false"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 0,
+        "saving": true,
+        "disposed": [
+          true,
+          false
+        ],
+        "pending": [
+          1
+        ],
+        "runVersions": [
+          1,
+          1
+        ],
+        "events": [
+          "old:false"
+        ]
+      },
+      {
+        "op": "resolve",
+        "value": null,
+        "contentVersion": 1,
+        "savedVersion": 1,
+        "saving": false,
+        "disposed": [
+          true,
+          false
+        ],
+        "pending": [],
+        "runVersions": [
+          1,
+          1
+        ],
+        "events": [
+          "old:false",
+          "new:true"
+        ]
+      }
+    ],
+    "save-decisions": [
+      {
+        "kind": "skip",
+        "reason": "not_hydrated"
+      },
+      {
+        "kind": "skip",
+        "reason": "switching"
+      },
+      {
+        "kind": "block",
+        "reason": "dangerous_empty",
+        "lastRemoteNodeCount": 4
+      },
+      {
+        "kind": "send",
+        "saveSource": "manual_clear",
+        "allowEmptyOverwrite": true
+      },
+      {
+        "kind": "send",
+        "saveSource": "manual_clear",
+        "allowEmptyOverwrite": true
+      },
+      {
+        "kind": "send",
+        "saveSource": "manual_clear",
+        "allowEmptyOverwrite": true
+      },
+      {
+        "kind": "send",
+        "saveSource": "autosave",
+        "allowEmptyOverwrite": false
+      },
+      {
+        "kind": "send",
+        "saveSource": "autosave",
+        "allowEmptyOverwrite": false
+      }
+    ],
+    "payload-limits": [
+      null,
+      {
+        "field": "nodes",
+        "actual": 50001,
+        "limit": 50000
+      },
+      {
+        "field": "edges",
+        "actual": 200001,
+        "limit": 200000
+      },
+      {
+        "field": "body",
+        "actual": 5242881,
+        "limit": 5242880
+      },
+      null
+    ],
+    "autosave-hold": [
+      {
+        "op": "hold",
+        "heldA": true,
+        "heldB": false,
+        "events": []
+      },
+      {
+        "op": "hold",
+        "heldA": true,
+        "heldB": false,
+        "events": []
+      },
+      {
+        "op": "hold",
+        "heldA": true,
+        "heldB": true,
+        "events": []
+      },
+      {
+        "op": "release",
+        "heldA": true,
+        "heldB": true,
+        "events": []
+      },
+      {
+        "op": "release",
+        "heldA": true,
+        "heldB": true,
+        "events": []
+      },
+      {
+        "op": "advance",
+        "heldA": true,
+        "heldB": true,
+        "events": []
+      },
+      {
+        "op": "advance",
+        "heldA": true,
+        "heldB": false,
+        "events": [
+          "b"
+        ]
+      },
+      {
+        "op": "release",
+        "heldA": false,
+        "heldB": false,
+        "events": [
+          "b",
+          "a"
+        ]
+      },
+      {
+        "op": "hold",
+        "heldA": true,
+        "heldB": false,
+        "events": [
+          "b",
+          "a"
+        ]
+      },
+      {
+        "op": "advance",
+        "heldA": false,
+        "heldB": false,
+        "events": [
+          "b",
+          "a",
+          "a"
+        ]
+      }
+    ],
+    "draft-round-trip-and-scope": [
+      {
+        "op": "write",
+        "stored": true
+      },
+      {
+        "op": "read",
+        "draft": {
+          "baseRevision": 4,
+          "nodes": 3,
+          "history": null,
+          "mutation": {
+            "userEditsSinceHydrate": 1,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": false
+          },
+          "updatedAt": 10
+        }
+      },
+      {
+        "op": "read",
+        "draft": null
+      },
+      {
+        "op": "read",
+        "draft": null
+      },
+      {
+        "op": "corrupt"
+      },
+      {
+        "op": "read",
+        "draft": null
+      }
+    ],
+    "draft-shedding": [
+      {
+        "op": "write",
+        "stored": true
+      },
+      {
+        "op": "read",
+        "draft": {
+          "baseRevision": 1,
+          "nodes": 1,
+          "history": null,
+          "mutation": {
+            "userEditsSinceHydrate": 1,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": false
+          },
+          "updatedAt": 10
+        }
+      },
+      {
+        "op": "write",
+        "stored": true
+      },
+      {
+        "op": "read",
+        "draft": {
+          "baseRevision": 1,
+          "nodes": 1,
+          "history": "kept",
+          "mutation": {
+            "userEditsSinceHydrate": 1,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": false
+          },
+          "updatedAt": 10
+        }
+      },
+      {
+        "op": "write",
+        "stored": false
+      },
+      {
+        "op": "read",
+        "draft": null
+      }
+    ],
+    "draft-pruning": [
+      {
+        "op": "write",
+        "stored": true
+      },
+      {
+        "op": "write",
+        "stored": true
+      },
+      {
+        "op": "write",
+        "stored": true
+      },
+      {
+        "op": "prune"
+      },
+      {
+        "op": "read",
+        "draft": null
+      },
+      {
+        "op": "read",
+        "draft": {
+          "baseRevision": 1,
+          "nodes": 1,
+          "history": null,
+          "mutation": {
+            "userEditsSinceHydrate": 1,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": false
+          },
+          "updatedAt": 604800000
+        }
+      },
+      {
+        "op": "read",
+        "draft": null
+      }
+    ],
+    "draft-user-isolation": [
+      {
+        "op": "write",
+        "stored": true
+      },
+      {
+        "op": "read",
+        "draft": {
+          "baseRevision": 7,
+          "nodes": 2,
+          "history": null,
+          "mutation": {
+            "userEditsSinceHydrate": 1,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": false
+          },
+          "updatedAt": 10
+        }
+      },
+      {
+        "op": "read",
+        "draft": {
+          "baseRevision": 7,
+          "nodes": 2,
+          "history": null,
+          "mutation": {
+            "userEditsSinceHydrate": 1,
+            "lastMutationSource": "user_edit",
+            "pendingClearIntent": false
+          },
+          "updatedAt": 10
+        }
+      }
+    ],
+    "hydrate-decisions": [
+      "remote",
+      "remote",
+      "remote",
+      "draft",
+      "conflict",
+      "conflict",
+      "conflict"
+    ],
+    "save-failure-classification": [
+      "conflict",
+      "error",
+      "error",
+      "error",
+      "error",
+      "error"
+    ],
+    "save-status": [
+      {
+        "op": "derive",
+        "state": {
+          "status": "idle",
+          "lastSavedAt": null
+        }
+      },
+      {
+        "op": "set"
+      },
+      {
+        "op": "derive",
+        "state": {
+          "status": "saving",
+          "lastSavedAt": null
+        }
+      },
+      {
+        "op": "set"
+      },
+      {
+        "op": "advance"
+      },
+      {
+        "op": "set"
+      },
+      {
+        "op": "derive",
+        "state": {
+          "status": "error",
+          "lastSavedAt": 1790640090100,
+          "error": "boom"
+        }
+      },
+      {
+        "op": "set"
+      },
+      {
+        "op": "derive",
+        "state": {
+          "status": "saving",
+          "lastSavedAt": 1790640090100
+        }
+      },
+      {
+        "op": "set"
+      },
+      {
+        "op": "derive",
+        "state": {
+          "status": "saving",
+          "lastSavedAt": 1790640091100
+        }
+      },
+      {
+        "op": "set"
+      },
+      {
+        "op": "derive",
+        "state": {
+          "status": "idle",
+          "lastSavedAt": null
+        }
+      }
+    ],
+    "quota-safe-write": [
+      {
+        "op": "seed",
+        "keys": 1
+      },
+      {
+        "op": "seed",
+        "keys": 2
+      },
+      {
+        "op": "set",
+        "stored": false,
+        "keys": 2
+      },
+      {
+        "op": "reclaimer",
+        "keys": 2
+      },
+      {
+        "op": "set",
+        "stored": true,
+        "keys": 2
+      },
+      {
+        "op": "set",
+        "stored": true,
+        "keys": 2
+      },
+      {
+        "op": "set",
+        "stored": false,
+        "keys": 2
+      }
+    ],
+    "quota-legacy-error-name": [
+      {
+        "op": "seed",
+        "keys": 1
+      },
+      {
+        "op": "set",
+        "stored": true,
+        "keys": 1
+      },
+      {
+        "op": "set",
+        "stored": false,
+        "keys": 1
+      }
+    ]
+  }
+}

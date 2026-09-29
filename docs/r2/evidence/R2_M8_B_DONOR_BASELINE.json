@@ -73,9 +73,13 @@
     {
       "path": "frontend/src/lib/localStorageQuota.ts",
       "sha256": "sha256:8e8b9f44469af6ecadcf507c577213d965a28029de3f149a8d88fc8bedb9be9f"
+    },
+    {
+      "path": "frontend/src/features/freezone/useCanvasSync.ts",
+      "sha256": "sha256:c556f6571c1239ba8e7e7f5a144fea3721b171694106a870027ffa8cac6d8004"
     }
   ],
-  "reachable_surface_digest": "sha256:eee7cac8054663d3888a8e395e2f28925166c8cfaab8ceb2103b2ee823fd79d5",
+  "reachable_surface_digest": "sha256:02302340dac4180870799ff74140b64d889b930faa1ee716b30d47bb04fe1ab9",
   "donor_tests": [
     "src/__tests__/features/freezone/canvasSaveCoordinator.test.ts",
     "src/__tests__/features/freezone/canvasSyncCore.test.ts",
@@ -479,7 +483,8 @@
       "behavior_id": "R05",
       "description": "draft hydrate restores nodes, edges, history and mutation state",
       "donor_refs": [
-        "canvasStore.hydrateCanvasDraft"
+        "canvasStore.hydrateCanvasDraft",
+        "useCanvasSync.decideHydrateDraft (module-private; its exact source is extracted and run by the harness)"
       ],
       "donor_tests": [
         "canvas-store-draft-hydrate"
@@ -499,14 +504,15 @@
     },
     {
       "behavior_id": "R07",
-      "description": "a conflicting server revision never overwrites local or server content automatically (spec \u00a77)",
+      "description": "the hydrate decision: no draft or an already-saved draft loads the server content; a draft edited from the current server revision is restored; any other draft is a conflict kept as a snapshot and never applied automatically",
       "donor_refs": [
-        "canvasSyncCore.classifySaveError"
+        "canvasSyncCore.classifySaveError",
+        "useCanvasSync.decideHydrateDraft (module-private; its exact source is extracted and run by the harness)"
       ],
       "donor_tests": [
         "canvasSyncCore"
       ],
-      "planned_disposition": "IMPROVED"
+      "planned_disposition": "PARITY"
     },
     {
       "behavior_id": "U01",
@@ -519,7 +525,7 @@
       "planned_disposition": "PARITY"
     }
   ],
-  "behavior_inventory_digest": "sha256:ef2cf31e44bfd28b726cf4b4b11a614ace539f819060b6fcfa0b028dab22068f",
+  "behavior_inventory_digest": "sha256:a5912d39a2e1ca8bed5b9dcf8c82eb0f7f1ddba57a3438ab3dbfad66dae2ee5c",
   "excluded": [
     "generation, task, resume and credit logic (useNodeGenerationTaskState, resumeGeneration, generationTaskArbitration)",
     "asset library, upload, cross-project paste and asset migration",
