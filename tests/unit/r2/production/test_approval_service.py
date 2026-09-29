@@ -196,3 +196,38 @@ def test_same_candidate_and_host_version_is_idempotent():
     assert second.changed is False
     assert second.approved_master == first.approved_master
     assert len(host.promotions) == calls_after_first
+
+
+def test_a_semantic_state_is_written_with_its_approved_master_in_one_update():
+    host = Host(metadata(content_fingerprint="a" * 64))
+    new_state = metadata(content_fingerprint="c" * 64, direct_dependencies=[])
+
+    result = service(host).promote(
+        artifact_key="video:SH1",
+        candidate=candidate(),
+        host_version_ref="2",
+        approval_record="approval:1",
+        selected_by="showrunner:1",
+        selected_at=selected_at(),
+        semantic_state=new_state,
+    )
+
+    ((_, _, written),) = host.promotions
+    assert written.content_fingerprint == "c" * 64
+    assert written.approved_master == result.approved_master
+
+
+def test_a_candidate_is_checked_against_the_semantic_state_it_will_have():
+    host = Host(metadata(content_fingerprint="a" * 64))
+
+    with pytest.raises(ValueError, match="content_fingerprint"):
+        service(host).promote(
+            artifact_key="video:SH1",
+            candidate=candidate(),
+            host_version_ref="2",
+            approval_record="approval:1",
+            selected_by="showrunner:1",
+            selected_at=selected_at(),
+            semantic_state=metadata(content_fingerprint="b" * 64),
+        )
+    assert host.promotions == []

@@ -34,9 +34,10 @@ delegated the choice.
       artifact that already has an approved master. The checks run against the state the
       candidate would have. So a stage whose promotion fails, or is still in flight, cannot
       make the old master look current against new dependencies.
-   2. **Phase 2** runs only while the promoted candidate is still the head. It writes that
-      candidate's semantic state to the manifest. It then projects the manifest master through
-      `ProductionApprovalService` and writes the composite export copy.
+   2. **Phase 2** runs only while the promoted candidate is still the head. It projects the
+      manifest master through `ProductionApprovalService`, and writes the candidate's semantic
+      state and its approved master in one manifest update. No reader sees one without the other.
+      It then writes the composite export copy.
 
    **Failures:**
    - An approval superseded before phase 2 gets 409 `master_superseded` and writes nothing, so

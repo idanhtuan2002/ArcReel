@@ -65,8 +65,19 @@ class ProductionApprovalService:
         approval_record: str,
         selected_by: str,
         selected_at: datetime,
+        semantic_state: R2ArtifactMetadata | None = None,
     ) -> PromotionResult:
-        metadata = self.check(artifact_key=artifact_key, candidate=candidate, host_version_ref=host_version_ref)
+        """Select ``candidate`` as the approved master.
+
+        With ``semantic_state``, the candidate's semantic state and its approved master are written
+        together in one manifest update, so no reader sees one without the other.
+        """
+        metadata = self.check(
+            artifact_key=artifact_key,
+            candidate=candidate,
+            host_version_ref=host_version_ref,
+            semantic_state=semantic_state,
+        )
 
         existing = metadata.approved_master
         if (

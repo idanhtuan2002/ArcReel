@@ -271,3 +271,34 @@ async def test_a_final_whose_promotion_fails_after_staging_leaves_the_old_final_
 
     # The failed stage did not make the old final look current against the new shot master.
     assert (await _publish(gate_export_client, _sha(old_final))).status_code == 409
+
+
+async def test_no_manifest_write_pairs_the_old_master_with_the_new_semantic_state(
+    gate_export_client: AsyncClient, project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from lib.artifact_manifest import ProjectArtifactManifestAdapter
+
+    sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one v1")]
+    first = await _approve_final(gate_export_client, project_dir, _media(b"final one"), sources)
+    assert first.status_code == 200
+    old_master = first.json()["approved_master"]["selected_candidate_id"]
+    sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one v2")]
+    written: list[dict] = []
+    real_replace = ProjectArtifactManifestAdapter.replace_entries_if_matches_atomically
+
+    def record(self, *, expected, replacements):
+        written.extend(entry.r2 for entry in replacements.values() if entry.r2 is not None)
+        return real_replace(self, expected=expected, replacements=replacements)
+
+    monkeypatch.setattr(ProjectArtifactManifestAdapter, "replace_entries_if_matches_atomically", record)
+    new_final = _media(b"final two")
+    second = await _approve_final(gate_export_client, project_dir, new_final, sources)
+
+    assert second.status_code == 200, second.text
+    new_fingerprint = _body("FINAL", new_final)["content_fingerprint"]
+    assert written
+    for metadata in written:
+        approved = metadata.get("approved_master") or {}
+        assert not (
+            approved.get("selected_candidate_id") == old_master and metadata["content_fingerprint"] == new_fingerprint
+        ), metadata

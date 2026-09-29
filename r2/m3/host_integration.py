@@ -245,7 +245,8 @@ class GoldenAHostIntegration:
         With ``keep_approved_semantic_state``, an artifact that already has an approved master keeps
         its semantic state (fingerprint and dependencies) until the new candidate is promoted, so a
         stage whose promotion never lands cannot make the old master look current against new
-        dependencies. The promoting caller then writes the state through ``restore_semantic_state``.
+        dependencies. The promoting caller then passes the state to ``approve``, which writes it with
+        the new approved master in one manifest update.
         """
         if produced.target_ref != target_ref:
             raise ValueError("produced asset target does not match candidate target")
@@ -359,36 +360,6 @@ class GoldenAHostIntegration:
             raise KeyError(f"{target_ref} has no host version {host_version_ref}")
         return record
 
-    def restore_semantic_state(
-        self,
-        *,
-        target_ref: str,
-        content_fingerprint: str,
-        content_basis: ContentBasis,
-        direct_dependencies: Sequence[DependencySnapshot],
-        contract_version: int,
-        contract_schema_version: str,
-        contract_type: str = "ShotSpec",
-    ) -> None:
-        """Make the manifest's semantic state the given candidate's again, keeping its approved master.
-
-        A later stage of the same artifact overwrites this state; the projection of a promoted
-        candidate restores it first, so a stage whose promotion was rolled back cannot refuse it.
-        """
-        self._ensure_manifest_entry(
-            artifact_key=self.artifact_key_for(target_ref),
-            metadata=self._metadata(
-                target_ref=target_ref,
-                content_fingerprint=content_fingerprint,
-                content_basis=content_basis,
-                direct_dependencies=direct_dependencies,
-                contract_version=contract_version,
-                contract_schema_version=contract_schema_version,
-                contract_type=contract_type,
-            ),
-            target_ref=target_ref,
-        )
-
     def semantic_state_for(
         self,
         *,
@@ -400,7 +371,7 @@ class GoldenAHostIntegration:
         contract_schema_version: str,
         contract_type: str = "ShotSpec",
     ) -> R2ArtifactMetadata:
-        """The metadata ``restore_semantic_state`` would write for these arguments."""
+        """The metadata a candidate with these arguments carries once it is approved."""
         return self._metadata(
             target_ref=target_ref,
             content_fingerprint=content_fingerprint,
@@ -433,6 +404,7 @@ class GoldenAHostIntegration:
         approval_record: str,
         selected_by: str,
         selected_at,
+        semantic_state: R2ArtifactMetadata | None = None,
     ) -> ApprovedMasterMetadata:
         service = ProductionApprovalService(
             self._port(
@@ -447,6 +419,7 @@ class GoldenAHostIntegration:
             approval_record=approval_record,
             selected_by=selected_by,
             selected_at=selected_at,
+            semantic_state=semantic_state,
         )
         return result.approved_master
 

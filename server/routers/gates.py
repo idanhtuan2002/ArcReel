@@ -360,21 +360,13 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         )
 
     def _project_and_export(registered):
-        # The promoted candidate defines the artifact's semantic state from here on.
-        host.restore_semantic_state(
-            target_ref=req.target_ref,
-            content_fingerprint=req.content_fingerprint,
-            content_basis=req.content_basis,
-            direct_dependencies=staged_dependencies,
-            contract_version=req.contract_version,
-            contract_schema_version=req.contract_schema_version,
-            contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
-        )
+        # The candidate's semantic state and its approved master land in one manifest update.
         approved = host.approve(
             registered,
             approval_record=req.approval_record,
             selected_by=user.sub,
             selected_at=datetime.now(UTC),
+            semantic_state=_semantic_state(),
         )
         try:
             export = write_export_copy(host, req.target_ref) if composite else None
