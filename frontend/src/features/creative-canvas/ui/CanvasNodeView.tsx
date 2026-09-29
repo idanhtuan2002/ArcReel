@@ -91,13 +91,13 @@ function CommitField({
     if (event.key === "Enter" && !multiline) (event.target as HTMLElement).blur();
   };
   const className =
-    "nodrag nowheel w-full resize-none rounded-md border border-hairline-soft bg-bg/60 px-2 py-1 text-sm text-text placeholder:text-text-4 focus:border-accent focus:outline-none";
+    "nodrag nowheel w-full resize-none rounded-md border border-hairline-soft bg-bg/60 px-2 py-1 text-sm text-text placeholder:text-text-4 cc-field";
   return multiline ? (
     <textarea
       aria-label={label}
       name={field}
       autoComplete="off"
-      className={`${className} min-h-24`}
+      className={`${className} cc-field-multi`}
       value={shown}
       onChange={(event) => change(event.target.value)}
       onBlur={commit}
@@ -128,7 +128,7 @@ function MediaStill({ path, alt }: { path: string; alt: string }) {
       loading="lazy"
       decoding="async"
       draggable={false}
-      className="aspect-video h-auto w-full rounded-md bg-surface-2 object-cover"
+      className="cc-media aspect-video w-full rounded-md object-cover"
     />
   );
 }
@@ -169,8 +169,8 @@ function ClipMedia({ nodeId, node, title }: { nodeId: string; node: NodeProps["d
       onClick={() => setPlaying(true)}
       aria-label={`${t("creative_canvas_play_clip")}: ${title}`}
     >
-      {still ? <MediaStill path={still} alt="" /> : <span className="block aspect-video w-full rounded-md bg-surface-2" />}
-      <span className="absolute inset-0 grid place-items-center text-2xl text-text/80 group-hover:text-text" aria-hidden>
+      {still ? <MediaStill path={still} alt="" /> : <span className="cc-media block aspect-video w-full rounded-md" />}
+      <span className="cc-play absolute inset-0 grid place-items-center text-2xl" aria-hidden>
         ▶
       </span>
     </button>
@@ -217,9 +217,9 @@ function CanvasNodeViewImpl({ id, type, data, selected }: NodeProps) {
       <div
         className={`canvas-group relative h-full w-full rounded-xl border border-dashed ${
           selected ? "border-accent" : "border-hairline-strong"
-        } ${storyboard ? "bg-warm-tint-faint" : "bg-surface-2/20"}`}
+        } ${storyboard ? "bg-warm-tint-faint" : "cc-group-plain"}`}
       >
-        <div className={`${storyboard ? "storyboard-handle cursor-grab" : ""} flex items-center gap-2 px-3 py-2`}>
+        <div className={`${storyboard ? "storyboard-handle" : ""} flex items-center gap-2 px-3 py-2`}>
           <span className={`font-mono text-[10px] tracking-[0.18em] ${storyboard ? "text-warm" : "text-text-3"}`}>{kicker}</span>
           <span className="truncate text-xs text-text-2">{title}</span>
         </div>
@@ -233,7 +233,7 @@ function CanvasNodeViewImpl({ id, type, data, selected }: NodeProps) {
   return (
     <div
       className={`canvas-node flex h-full w-full flex-col gap-2 rounded-xl border bg-bg-grad-a p-3 ${
-        selected ? "border-accent shadow-glow" : "border-hairline"
+        selected ? "border-accent cc-node-selected" : "border-hairline"
       }`}
     >
       <Handle type="target" position={Position.Left} className="canvas-handle" />

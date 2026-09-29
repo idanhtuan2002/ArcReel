@@ -129,7 +129,7 @@ export function StoryboardFilmstrip({ onShowShot }: StoryboardFilmstripProps) {
                 }}
                 className="filmstrip-frame group relative w-28 shrink-0 cursor-pointer rounded-sm outline-none"
               >
-                <span className="block aspect-video overflow-hidden rounded-sm bg-surface-2 ring-1 ring-hairline group-aria-selected:ring-2 group-aria-selected:ring-warm group-focus-visible:ring-2 group-focus-visible:ring-accent">
+                <span className="cc-frame-thumb block aspect-video overflow-hidden rounded-sm">
                   {path ? (
                     <img
                       src={API.getFileUrl(project, path)}

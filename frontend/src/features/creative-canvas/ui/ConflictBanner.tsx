@@ -12,7 +12,7 @@ export function ConflictBanner({ onUseMine, onDiscardMine }: ConflictBannerProps
   // Discarding deletes the kept-aside work for good, so it takes a second, confirming click.
   const [confirming, setConfirming] = useState(false);
   return (
-    <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-warm-ring bg-warm-soft px-4 py-2 text-sm">
+    <div role="alert" className="flex flex-wrap items-center gap-3 cc-conflict border-b border-warm-ring px-4 py-2 text-sm">
       <span className="font-mono text-[10px] tracking-[0.18em] text-warm">CONFLICT</span>
       <p className="min-w-0 flex-1 text-text-2">
         <span className="font-medium text-text">{t("creative_canvas_conflict_title")}</span>{" "}
@@ -21,7 +21,7 @@ export function ConflictBanner({ onUseMine, onDiscardMine }: ConflictBannerProps
       <button
         type="button"
         onClick={onUseMine}
-        className="rounded-md bg-warm px-3 py-1 text-xs font-medium text-bg hover:bg-warm-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warm"
+        className="cc-btn-warm rounded-md px-3 py-1 text-xs font-medium"
       >
         {t("creative_canvas_conflict_use_mine")}
       </button>

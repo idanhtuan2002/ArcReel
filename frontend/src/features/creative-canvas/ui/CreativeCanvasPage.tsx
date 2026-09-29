@@ -75,7 +75,7 @@ function SaveChip({ scope }: { scope: string }) {
   }[state.status];
   return (
     <p role="status" className={`font-mono text-[11px] ${tone}`} title={state.error}>
-      <span aria-hidden className="mr-1.5 inline-block size-1.5 rounded-full bg-current align-middle" />
+      <span aria-hidden className="cc-dot mr-1.5 inline-block rounded-full align-middle" />
       {text}
       {state.status === "error" && state.error ? <span className="sr-only">: {state.error}</span> : null}
     </p>
@@ -98,9 +98,9 @@ function ToolButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-text-2 hover:bg-surface-2 hover:text-text disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-text-2 cc-tool hover:text-text disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
     >
-      <Icon aria-hidden className="size-3.5" />
+      <Icon aria-hidden className="cc-icon" />
       {label}
     </button>
   );
@@ -221,20 +221,19 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
-      {/* The right padding keeps the workspace's floating assistant button clear of the save controls. */}
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline py-2.5 pl-4 pr-16">
+      <header className="cc-header flex flex-wrap items-center border-b border-hairline py-2.5">
         <Link
           href={`/${WORKSPACE_ROUTE_EPISODES}/${episode}`}
           className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-text-3 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
-          <ArrowLeft aria-hidden className="size-3.5" />
+          <ArrowLeft aria-hidden className="cc-icon" />
           {t("creative_canvas_back")}
         </Link>
         <div className="min-w-0">
           <p className="font-mono text-[10px] tracking-[0.18em] text-text-3">
             EPISODE {String(episode).padStart(2, "0")} · CANVAS
           </p>
-          <h1 className="truncate font-editorial text-xl leading-tight text-text">
+          <h1 className="truncate cc-title font-editorial leading-tight text-text">
             {title || t("creative_canvas_graph_label", { episode })}
           </h1>
         </div>
@@ -244,9 +243,9 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
             type="button"
             onClick={() => void persistence.saveNow()}
             disabled={phase !== "ready" || hasConflict}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-bg hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="cc-btn-accent inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <Save aria-hidden className="size-3.5" />
+            <Save aria-hidden className="cc-icon" />
             {t("creative_canvas_save")}
           </button>
         </div>
