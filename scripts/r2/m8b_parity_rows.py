@@ -230,6 +230,10 @@ def _pair(raw: str) -> HarnessRun:
     )
 
 
+def _list(value: object) -> list[object]:
+    return value if isinstance(value, list) else []
+
+
 def _sha256(path: str) -> str:
     return "sha256:" + hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -250,7 +254,9 @@ def build_report(
             "donor": {
                 "repository_url": donor.get("repository_url"),
                 "commit_sha": donor.get("commit"),
-                "selected_paths": baseline.get("selected_paths"),
+                "selected_paths": [
+                    item["path"] if isinstance(item, dict) else item for item in _list(baseline.get("selected_paths"))
+                ],
                 "reachable_surface_digest": baseline.get("reachable_surface_digest"),
                 "runtime_identity": baseline.get("runtime_identity"),
                 "behavior_inventory_digest": baseline.get("behavior_inventory_digest"),

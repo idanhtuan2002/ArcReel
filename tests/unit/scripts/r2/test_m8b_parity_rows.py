@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from r2.contracts.advanced_creative import ParityDisposition
+from pathlib import Path
+
+from r2.contracts.advanced_creative import ParityDisposition, ParityVerdict
 from scripts.r2.m8b_parity_rows import (
     HarnessRun,
     TimingRun,
+    build_report,
     build_rows,
     compare_behavior,
     failure_safety,
@@ -127,3 +130,27 @@ def test_rows_take_measured_dimensions_from_timings_and_failure_tags() -> None:
         ParityDisposition.PARITY,
     )
     assert row.evidence_refs == ("fixture:graph:same", "timing:graph:same")
+
+
+def test_the_report_carries_the_donor_surface_and_recomputes_the_verdict(tmp_path: Path) -> None:
+    fixture = tmp_path / "graph.json"
+    fixture.write_text("{}", encoding="utf-8")
+    digest = "sha256:" + "0" * 64
+    baseline = {
+        "donor": {"repository_url": "https://example.test/donor", "commit": "abc"},
+        "selected_paths": [{"path": "src/a.ts", "sha256": "x"}],
+        "reachable_surface_digest": digest,
+        "runtime_identity": "node",
+        "behavior_inventory_digest": digest,
+        "donor_test_inventory_digest": digest,
+        "behaviors": [{"behavior_id": "A", "donor_tests": []}],
+    }
+    rows = build_rows(baseline, [_run()], CORRECTIONS, {}, {"graph": _timing(1.0)})
+
+    report = build_report(baseline, rows, [str(fixture)], "head-1", "reviewer", [{"cmd": "x", "exit": 0}])
+
+    assert report.donor.selected_paths == ("src/a.ts",)
+    assert report.integrated_head == "head-1"
+    assert report.verdict is ParityVerdict.PASS
+    blocked = build_report(baseline, build_rows(baseline, [_run()], CORRECTIONS, {}), [str(fixture)], "h", "r", [])
+    assert blocked.verdict is ParityVerdict.BLOCKED
