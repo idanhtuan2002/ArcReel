@@ -79,3 +79,73 @@ The fixes are `e8a89567` on `r2-v1/maintenance`, merged into `r2-v2/main` as `5e
 - **At `e8a89567` (maintenance):** 1084 passed in the affected SQLite scope (agent runtime unit tests, accounting, budget guard, canary, host_hardening). The budget guard and canary suites passed on PG16: 22 passed.
 - **At `5e5e95cc` (V2):** 1089 passed and 1 skipped (the PostgreSQL-only test) on SQLite. On PG16 (`arcreel_v201`, head `c9e1f4a2b701`), 19 passed, including the concurrent-admission test.
 - **Static gates:** ruff, basedpyright (0/0), lint-imports (20 kept), deptry and audit_tests are clean.
+
+---
+
+# Second confirmation review (job `task-mum1vybd-ybq28r`, thread `01a0eaf7-dd40-7d73-855f-894258bf4f60`)
+
+Reviewed HEAD `9408e042`. The reviewer output is saved verbatim.
+
+---
+
+## 1. HEAD reviewed
+
+`9408e042ca2cfa5a2b5a82b381138d7e79081680` on `r2-v2/main`. The worktree was clean. I reviewed `git diff 94445e28..9408e042` without editing files or spawning subagents.
+
+## 2. Verdict
+
+**CHANGES_REQUIRED.** The settlement retry and restore baseline changes address the prior failures at code level. Cancellation during `actor.start()` still leaves the real actor task running after the manager removes the session and settles its budget.
+
+## 3. Per-finding status
+
+| Previous finding | Status | Evidence and original-failure test |
+|---|---|---|
+| Resume books restored spend twice; restart, another session, and non-restored undercount | **FIXED**, subject to the documented config race | [cli_restored_totals.py:36](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/cli_restored_totals.py:36) resolves the config path; [line 60](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/cli_restored_totals.py:60) checks `lastSessionId`; [session_manager.py:1460](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_manager.py:1460) sets the baseline. The bundled CLI’s `Xha`, `Giy`, and `Tot` match the checked restore rule and production path. A fresh manager can read persisted config after restart. [Tests](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/tests/unit/lib/test_accounting_characterization.py:1221) exercise restored and non-restored totals, including a new total above the old cost; [config tests](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/tests/unit/server/agent_runtime/test_cli_restored_totals.py:17) cover path and lookup cases. No actual CLI restart was run. The race disclosed in [ADR-0093:58](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/docs/adr/0093-v1x-agent-per-connection-budget-in-release-mode.md:58) remains. |
+| Canary setup leaves a hold | **FIXED** | [qualify_route.py:238](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/scripts/r2/qualify_route.py:238) loads credentials before reservation. The prior review identifies a direct failure test; this path was unchanged in the reviewed diff. |
+| Final settlement loses its retry handle | **FIXED**, with a startup failure gap below | [session_manager.py:1451](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_manager.py:1451) hands an unreconciled hold to [the patrol retry](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_manager.py:1490). [budget_guard.py:251](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/lib/budget_guard.py:251) sweeps claimed `agent_session:` holds at their reserved amount and excludes canary holds by prefix. [Eviction retry test](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/tests/unit/lib/test_accounting_characterization.py:1266) and [orphan sweep test](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/tests/integration/lib/test_budget_guard.py:276) exercise the original failures. |
+| Gate C checks only the first audio stream | **FIXED** | [deliverables.py:146](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/r2/m3/deliverables.py:146) measures each stream and returns the loudest peak. The prior review identifies a direct multistream test; this path was unchanged. |
+| Concurrent claims exceed the project ceiling | **FIXED at code level** | [task_repo.py:623](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/lib/db/repositories/task_repo.py:623) locks PostgreSQL claims and [line 639](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/lib/db/repositories/task_repo.py:639) rechecks the ceiling. The prior review identifies a PostgreSQL concurrency test; I could not run it here. |
+| Cancellation during `actor.start()` | **PARTIALLY_FIXED** | Both manager paths now catch cancellation and attempt settlement: [new session](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_manager.py:652), [resume](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_manager.py:1008). Their [tests](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/tests/unit/server/agent_runtime/test_agent_startup_error.py:296) use a fake actor with no owned task. The real [SessionActor.start()](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_actor.py:65) leaves its task alive on caller cancellation. |
+| Script-lock digests unchecked | **PARTIALLY_FIXED** | [script_lock_problem](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/tests/drills/r2/golden_restore_drill.py:419) compares the recorded digests with the drill’s expected digests; [its test](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/tests/unit/r2/host_hardening/test_golden_restore_drill_gate_b.py:18) exercises mismatches. The route still records supplied values after format validation at [gates.py:192](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/routers/gates.py:192). [ADR-0092](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/docs/adr/0092-v1-factual-script-lock-and-verified-audio-decision.md:18) does not clearly disclose that the server does not verify those values against source and script bytes. |
+
+## 4. New findings
+
+| Severity | File:line | Scenario | Confidence |
+|---|---|---|---|
+| **Major** | [session_actor.py:65](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_actor.py:65), [session_manager.py:654](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_manager.py:654), [line 1010](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_manager.py:1010) | Cancelling either connect caller while the SDK client is starting removes the manager entry and settles the reservation, but does not cancel the actor’s separately created task. That task can continue starting a CLI process without a managed budget. | **Confirmed:** a read-only asyncio probe of the real `SessionActor` printed `actor_task_exists=True actor_task_done=False` after cancelling `start()`; the probe then cancelled its task for cleanup. |
+| **Moderate** | [session_manager.py:1582](/home/anhtuan/content-production-os/.worktrees/r2-v2-main/server/agent_runtime/session_manager.py:1582) | If the one startup orphan sweep fails, it logs the error and never retries the sweep. Claimed holds inherited from a previous process can remain indefinitely. | **High:** direct control-flow inspection; no injected-failure test run. |
+
+## 5. Commands run with results
+
+- `git rev-parse HEAD`, `git status --short --branch`, `git diff 94445e28..9408e042`, and `git diff --check 94445e28..9408e042`: expected HEAD, clean worktree, nonempty diff, and no whitespace errors.
+- Read-only extraction of `Xha`, `Giy`, and `Tot` from the bundled CLI: confirmed the restore condition and path selection described above.
+- Requested `TMPDIR=/tmp .venv/bin/python -m pytest -q -p no:cacheprovider ...`: **exit 1 before collection**. Python reported `FileNotFoundError: No usable temporary directory found` for `/tmp`, `/var/tmp`, `/usr/tmp`, and the worktree. No tests ran.
+- Read-only `SessionActor` cancellation probe: completed and showed the actor task still pending.
+
+## 6. Coverage limits
+
+The graph project listing succeeded, but `index_status` and `search_graph` returned “MCP tool call requires approval, but approval policy is never”; conclusions rely on direct source reads. I did not execute pytest, a real SDK restart, a PostgreSQL concurrency test, or a restore drill. The config race and the single-host assumption remain the limits stated in ADR-0093.
+
+## 7. JSON verdict
+
+```json
+{"schema_version":1,"status":"M7_IMPLEMENTATION_NOT_ACCEPTED","accepted_candidate_head":"9408e042ca2cfa5a2b5a82b381138d7e79081680","reviewer":"codex","reviewed_at":"2026-09-29T02:23:50Z","required_skips":["Targeted pytest could not start: no usable temporary directory in the read-only environment"],"material_unknowns":["Actual bundled CLI restart and config-race behavior were not reproduced","PostgreSQL concurrent admission was not run","Codebase-memory graph verification was approval-blocked"]}
+```
+
+---
+
+## Resolution of the second review (main agent, 2026-09-29)
+
+The fix is `cb8f8eff` on `r2-v1/maintenance`, merged into `r2-v2/main` as `b94b7893`.
+
+| Finding | Fix | Test |
+|---|---|---|
+| Major: a cancelled start leaves the actor task running | When the caller is cancelled, `SessionActor.start()` cancels its own task and awaits it before re-raising. | `test_cancelling_start_cancels_the_actor_task` (fails without the fix) |
+| Moderate: a failed orphan sweep is never retried | The sweep settles only holds created before this host process started (`created_before`), so a retry cannot touch live holds. The patrol retries it until it succeeds, and a failed reconciliation fails the sweep. | `test_a_failed_orphan_sweep_is_retried_by_the_patrol_until_it_succeeds`; `test_orphaned_agent_holds_are_committed_at_their_reserved_amount` now includes a hold created after startup, which the sweep leaves in place |
+| Script lock (partial) | ADR-0092 states that the server checks only the digest format and does not recompute the digests. The release dossier verifies them. | covered by `test_golden_restore_drill_gate_b.py` |
+
+**Verification at `b94b7893` (V2):**
+
+- **SQLite:** 1077 passed (agent runtime, accounting, budget guard, host_hardening).
+- **PG16** (`arcreel_v201`): 19 passed (budget guard, concurrent admission).
+- **Static gates:** basedpyright 0/0, lint-imports and audit_tests clean.
