@@ -14,6 +14,7 @@ from sqlalchemy import bindparam as sa_bindparam
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from lib.api_errors import ConflictError
 from lib.content_digest import canonical_json_digest
@@ -585,7 +586,7 @@ class TaskRepository(BaseRepository):
 
         # Use raw SQL for the dependency join (clearer than ORM for self-join)
         raw_stmt = text(f"""
-            SELECT tasks.task_id
+            SELECT tasks.task_id, tasks.project_name
             FROM tasks
             LEFT JOIN tasks AS dependency
               ON dependency.task_id = tasks.dependency_task_id
@@ -614,12 +615,32 @@ class TaskRepository(BaseRepository):
             return None
 
         target_task_id = row[0]
+        claim = update(Task).where(Task.task_id == target_task_id, Task.status == "queued")
+        if project_running_ceiling is not None and project_running_ceiling > 0:
+            # Two claimers can both see room in the SELECT above. Serialize claims per project and
+            # lane (PostgreSQL; SQLite already serializes writers) and re-check the running count in
+            # the UPDATE itself, so the ceiling holds under concurrency.
+            if self.session.bind.dialect.name == "postgresql":
+                await self.session.execute(
+                    text("SELECT pg_advisory_xact_lock(hashtextextended(:admission_key, 0))"),
+                    {"admission_key": f"project-admission:{row[1]}:{media_type}"},
+                )
+            running_task = aliased(Task)
+            running_count = (
+                select(func.count())
+                .select_from(running_task)
+                .where(
+                    running_task.project_name == row[1],
+                    running_task.media_type == media_type,
+                    running_task.status == "running",
+                )
+                .scalar_subquery()
+            )
+            claim = claim.where(running_count < project_running_ceiling)
 
         # Update to running atomically; check rowcount to guard against concurrent claims
         update_result = await self.session.execute(
-            update(Task)
-            .where(Task.task_id == target_task_id, Task.status == "queued")
-            .values(
+            claim.values(
                 status="running",
                 started_at=now,
                 updated_at=now,

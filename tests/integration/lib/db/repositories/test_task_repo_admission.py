@@ -92,3 +92,52 @@ class TestAdmissionSettings:
 
         assert admission.paused == frozenset({"b"})
         assert admission.ceiling == 3
+
+
+class TestConcurrentAdmission:
+    async def test_a_claim_of_another_task_waits_for_an_uncommitted_claim_of_the_same_project(self, session_factory):
+        """Claimer A has set its task running but not committed yet; claimer B skips A's task (as a
+        full provider pool would) and must not see room under the ceiling for a second one."""
+        import asyncio
+
+        import pytest
+
+        async with session_factory() as session:
+            if session.bind.dialect.name != "postgresql":
+                pytest.skip("concurrent read-committed claims need PostgreSQL")
+            repo = TaskRepository(session)
+            first = await _enqueue(repo, "busy", "E1S01")
+            await _enqueue(repo, "busy", "E1S02")
+            await session.commit()
+
+        release_a = asyncio.Event()
+        a_updated = asyncio.Event()
+
+        async def claim_a():
+            async with session_factory() as session_a:
+                real_commit = session_a.commit
+
+                async def held_commit():
+                    a_updated.set()
+                    await release_a.wait()
+                    await real_commit()
+
+                session_a.commit = held_commit
+                return await TaskRepository(session_a).claim_next("image", project_running_ceiling=1)
+
+        async def claim_b():
+            async with session_factory() as session_b:
+                return await TaskRepository(session_b).claim_next(
+                    "image", project_running_ceiling=1, exclude_task_ids=frozenset({first})
+                )
+
+        a = asyncio.create_task(claim_a())
+        await asyncio.wait_for(a_updated.wait(), timeout=10)
+        b = asyncio.create_task(claim_b())
+        await asyncio.sleep(0.5)
+        release_a.set()
+        claimed_a = await asyncio.wait_for(a, timeout=10)
+        claimed_b = await asyncio.wait_for(b, timeout=10)
+
+        assert claimed_a is not None
+        assert claimed_b is None
