@@ -636,7 +636,7 @@ def nearest_rank(values: list[float], percentile: float) -> float:
 
 
 def _summary(values: list[float]) -> dict[str, float | int]:
-    return {"n": len(values), "p50": round(nearest_rank(values, 50), 2), "p95": round(nearest_rank(values, 95), 2)}
+    return {"n": len(values), "p50": round(nearest_rank(values, 50), 3), "p95": round(nearest_rank(values, 95), 3)}
 
 
 def _gzip_kb(path: Path) -> float:
@@ -837,8 +837,8 @@ def test_canvas_meets_the_frozen_benchmark_protocol(preview_url: str, browser: B
                 "strict_only_failures": strict_only,
                 "idle_frame_ms": {
                     **_summary(idle),
-                    "p99": round(nearest_rank(idle, 99), 2),
-                    "max": round(max(idle), 2),
+                    "p99": round(nearest_rank(idle, 99), 3),
+                    "max": round(max(idle), 3),
                     "share_above_16_7": round(sum(value > 16.7 for value in idle) / len(idle), 4),
                 },
                 "machine": _machine(),
