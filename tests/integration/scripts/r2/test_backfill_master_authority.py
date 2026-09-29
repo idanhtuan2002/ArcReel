@@ -12,6 +12,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.artifact_manifest import ArtifactKey
 from lib.db.models.host_hardening import (
     CandidateObjectModel,
     MasterAuthorityModel,
@@ -19,8 +20,9 @@ from lib.db.models.host_hardening import (
     ProjectEventModel,
     PromotionReceiptModel,
 )
-from lib.db.repositories.host_hardening import CandidateObjectRepository
+from lib.db.repositories.host_hardening import CandidateObjectRepository, MasterAuthorityRepository
 from r2.host_hardening.master_authority import MasterDivergedError, m7_candidate_id
+from r2.m3.host_integration import GoldenAHostIntegration
 from scripts.r2 import backfill_master_authority as backfill
 from server.auth import get_current_user
 from server.error_handlers import register_error_handlers
@@ -132,3 +134,65 @@ async def test_a_divergent_head_is_reported_and_exits_2(
     summary = json.loads(capsys.readouterr().out)
     assert status == 2
     assert summary[PROJECT]["diverged"] == [sh01]
+
+
+async def test_a_gate_c_approval_between_the_head_check_and_the_promotion_is_not_overwritten(
+    legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with session_factory() as probe:
+        if probe.get_bind().dialect.name != "postgresql":
+            pytest.skip("row locks between sessions need PostgreSQL")
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    records = composition.projected_master_records(project_dir)
+    sh01, sh02 = sorted(records)
+    sh02_target = str(ArtifactKey.decode(sh02).components[1])
+    late_file, late_digest = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).staged_version(
+        sh02_target, records[sh02].host_version_ref
+    )
+    root = await asyncio.to_thread(project_dir.resolve)
+
+    async def approve_late() -> None:
+        async with composition.serialized_artifact(
+            session_factory, user_id=USER.id, project_name=PROJECT, artifact_key=sh01
+        ) as session:
+            await composition.master_authority_unit(session, defer_commit=True).promote_staged(
+                user_id=USER.id,
+                project_name=PROJECT,
+                project_dir=root,
+                artifact_key=sh01,
+                generation_candidate_id="CAND-late",
+                version_file=late_file,
+                expected_content_digest=late_digest,
+                approval_record="APR-late",
+                command_id="late",
+            )
+
+    late: list[asyncio.Task[None]] = []
+    original_unit = composition.master_authority_unit
+
+    def unit_with_a_late_approval(session: AsyncSession, **kwargs: bool):
+        unit = original_unit(session, **kwargs)
+        promote = unit.promote_staged
+
+        async def promote_after_a_late_approval(**fields: object):
+            if fields["artifact_key"] == sh01 and not late:
+                late.append(asyncio.create_task(approve_late()))
+                # Without the row lock the late approval commits here; with it, it waits.
+                await asyncio.wait([asyncio.shield(late[0])], timeout=1.5)
+            return await promote(**fields)
+
+        unit.promote_staged = promote_after_a_late_approval
+        return unit
+
+    monkeypatch.setattr(backfill, "master_authority_unit", unit_with_a_late_approval)
+    summary = await backfill.backfill_project(user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
+    await asyncio.wait_for(late[0], timeout=10.0)
+
+    async with session_factory() as session:
+        head = await MasterAuthorityRepository(session).get_current(
+            user_id=USER.id, project_name=PROJECT, artifact_key=sh01
+        )
+    assert summary["promoted"] == [sh01, sh02]
+    assert head is not None
+    assert (head.master_version, head.candidate_id) == (2, m7_candidate_id(sh01, "CAND-late"))
