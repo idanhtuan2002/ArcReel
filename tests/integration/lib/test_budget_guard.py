@@ -271,3 +271,21 @@ async def test_an_agent_connection_takes_no_reservation_in_dev(db_factory, monke
     monkeypatch.setenv(RELEASE_MODE_ENV, "DEV")
 
     assert await reserve_agent_connection(db_factory) is None
+
+
+async def test_orphaned_agent_holds_are_committed_at_their_reserved_amount(db_factory, release_mode: None) -> None:
+    from lib.budget_guard import reserve_agent_connection, settle_orphaned_agent_connections
+
+    await _create_scope(db_factory, "10")
+    orphan = await reserve_agent_connection(db_factory)
+    canary = await reserve_agent_connection(db_factory, amount=Decimal("0.10"), purpose="agent_canary")
+    assert orphan is not None
+    assert canary is not None
+
+    settled = await settle_orphaned_agent_connections(db_factory)
+
+    assert settled == (orphan[0],)
+    scope = await _scope(db_factory)
+    assert scope is not None
+    assert (scope.reserved_total, scope.committed_total) == (Decimal("0.10"), Decimal("1.00"))
+    assert await settle_orphaned_agent_connections(db_factory) == ()

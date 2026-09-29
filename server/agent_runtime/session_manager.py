@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import time
-from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Callable
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from pathlib import Path
@@ -16,13 +16,18 @@ from typing import Any, ClassVar, Optional
 from uuid import uuid4
 
 from lib.agent_memory_paths import project_memory_dir
-from lib.budget_guard import reconcile_agent_connection, reserve_agent_connection
+from lib.budget_guard import (
+    reconcile_agent_connection,
+    reserve_agent_connection,
+    settle_orphaned_agent_connections,
+)
 from lib.db.base import DEFAULT_USER_ID
 from lib.i18n import DEFAULT_LOCALE
 from lib.logging_config import resolve_log_dir
 from lib.logging_utils import redact_diagnostic_text
 from lib.path_safety import PathTraversalError, safe_join
 from server.agent_runtime.agent_access_policy import AgentAccessPolicy
+from server.agent_runtime.cli_restored_totals import restored_totals
 from server.agent_runtime.entry_pipeline import SessionEntryPipeline
 from server.agent_runtime.event_log import (
     REPLAYED_USER_ECHO_ENTRY_UUID_KEY,
@@ -374,11 +379,9 @@ class SessionManager:
         # 优雅 send_disconnect 的等待上限；超时后各调用点再走无界的 cancel 兜底。
         self._session_actor_shutdown_timeout: float = 15.0
         self._connect_locks: dict[str, asyncio.Lock] = {}
-        # Per project: the session whose CLI process exited gracefully last, with its final
-        # cumulative cost and usage. The CLI restores exactly that session's totals when it is
-        # resumed (it saves them as the project's lastSessionId on exit), so a resume of it
-        # starts booking from these totals instead of counting them again.
-        self._last_graceful_exit: dict[str, tuple[str, float, tuple[int, int, int]]] = {}
+        # Agent reservations whose session is gone but whose reconciliation failed, with the
+        # spend to commit. The patrol retries them.
+        self._unsettled_budgets: dict[str, Decimal] = {}
         # 实例不变量缓存：避免每次构建 access policy 都重做 path resolve。
         self._project_root_resolved = self.project_root.resolve()
         # agent_runtime_profile 实际位置：``ARCREEL_PROFILE_DIR`` env 覆盖 >
@@ -648,14 +651,17 @@ class SessionManager:
 
         try:
             await actor.start()
-        except Exception as exc:
+        except BaseException as exc:
+            self.sessions.pop(temp_id, None)
+            await self._settle_budget(managed)
+            self._keep_unsettled(managed)
             sdk_stderr = startup_stderr.render()
+            startup_stderr.stop()
+            if not isinstance(exc, Exception):
+                raise
             startup_error = _make_agent_startup_error(
                 exc, project_name=project_name, session_id=None, sdk_stderr=sdk_stderr
             )
-            self.sessions.pop(temp_id, None)
-            await self._settle_budget(managed)
-            startup_stderr.stop()
             raise startup_error from exc
         # Register done callback BEFORE spawning processor to avoid a race
         # where the actor task completes before add_done_callback is attached，
@@ -709,6 +715,7 @@ class SessionManager:
             # 这里已无回放可言，残留的登记也就不是认领失败，直接清空不记账。
             managed.pending_user_echoes.clear()
             await self._settle_budget(managed)
+            self._keep_unsettled(managed)
             startup_stderr.stop()
 
         # 登记待回放的用户消息标识：SDK 会回放刚发送消息的副本，写入点凭此
@@ -824,8 +831,6 @@ class SessionManager:
                 if isinstance(msg_dict, _ActorExitNotice):
                     # Every result of the process is booked by now (the inbox is ordered).
                     await self._settle_budget(managed)
-                    if msg_dict.error is None:
-                        self._note_graceful_exit(managed)
                     if msg_dict.error is not None:
                         if managed.resolved_sdk_id is not None:
                             await self._mark_session_terminal(managed, "error", "session actor failed")
@@ -991,7 +996,9 @@ class SessionManager:
             )
             managed.budget_reservation_ref = budget[0] if budget is not None else None
             if resumable:
-                self._restore_booking_baseline(managed, project_name=meta.project_name, sdk_session_id=meta.id)
+                # The CLI process sees the host environment overlaid with the options' env.
+                cli_env = {**os.environ, **(getattr(options, "env", None) or {})}
+                self._restore_booking_baseline(managed, sdk_session_id=meta.id, env=cli_env)
             managed.sdk_id_event.set()  # 已有会话不需要等待 sdk_id
             managed.entry_pipeline = self._build_entry_pipeline(managed)
             managed_ref[0] = managed
@@ -1000,7 +1007,12 @@ class SessionManager:
 
             try:
                 await actor.start()
-            except Exception as exc:
+            except BaseException as exc:
+                self.sessions.pop(session_id, None)
+                await self._settle_budget(managed)
+                self._keep_unsettled(managed)
+                if not isinstance(exc, Exception):
+                    raise
                 sdk_stderr = startup_stderr.render()
                 startup_error = _make_agent_startup_error(
                     exc,
@@ -1008,8 +1020,6 @@ class SessionManager:
                     session_id=session_id,
                     sdk_stderr=sdk_stderr,
                 )
-                self.sessions.pop(session_id, None)
-                await self._settle_budget(managed)
                 raise startup_error from exc
             finally:
                 startup_stderr.stop()
@@ -1441,26 +1451,19 @@ class SessionManager:
         finally:
             with contextlib.suppress(Exception):
                 await self._settle_budget(managed)
+            self._keep_unsettled(managed)
             self.sessions.pop(session_id, None)
             self._connect_locks.pop(session_id, None)
             self._disconnecting.discard(session_id)
 
-    def _note_graceful_exit(self, managed: ManagedSession) -> None:
-        """Remember the project's last gracefully exited session and its final CLI totals."""
-        if managed.resolved_sdk_id is not None:
-            self._last_graceful_exit[managed.project_name] = (
-                managed.resolved_sdk_id,
-                managed.booked_cost_usd,
-                managed.booked_tokens,
-            )
-
-    def _restore_booking_baseline(self, managed: ManagedSession, *, project_name: str, sdk_session_id: str) -> None:
+    @staticmethod
+    def _restore_booking_baseline(managed: ManagedSession, *, sdk_session_id: str, env: Mapping[str, str]) -> None:
         """Start booking a resumed process from the totals the CLI restores into it, if it restores any."""
-        restored = self._last_graceful_exit.get(project_name)
-        if restored is not None and restored[0] == sdk_session_id:
-            managed.booked_cost_usd = restored[1]
-            managed.booked_tokens = restored[2]
-            managed.connection_cost_baseline_usd = restored[1]
+        restored = restored_totals(sdk_session_id, env)
+        if restored is not None:
+            managed.booked_cost_usd = restored.cost_usd
+            managed.booked_tokens = restored.tokens
+            managed.connection_cost_baseline_usd = restored.cost_usd
 
     async def _settle_budget(self, managed: ManagedSession) -> None:
         """Reconcile the session's Agent budget reservation to what this connection spent; idempotent.
@@ -1474,6 +1477,20 @@ class SessionManager:
         spent = Decimal(str(managed.booked_cost_usd)) - Decimal(str(managed.connection_cost_baseline_usd))
         if await reconcile_agent_connection(async_session_factory, reservation_ref=ref, actual_usd=spent):
             managed.budget_reservation_ref = None
+
+    def _keep_unsettled(self, managed: ManagedSession) -> None:
+        """Hand a still-unreconciled reservation to the patrol before its session is dropped."""
+        ref = managed.budget_reservation_ref
+        if ref is not None:
+            self._unsettled_budgets[ref] = Decimal(str(managed.booked_cost_usd)) - Decimal(
+                str(managed.connection_cost_baseline_usd)
+            )
+            managed.budget_reservation_ref = None
+
+    async def _retry_unsettled_budgets(self) -> None:
+        for ref, spent in list(self._unsettled_budgets.items()):
+            if await reconcile_agent_connection(async_session_factory, reservation_ref=ref, actual_usd=spent):
+                self._unsettled_budgets.pop(ref, None)
 
     @staticmethod
     async def _release_budget(budget: tuple[str, Decimal] | None) -> None:
@@ -1541,7 +1558,8 @@ class SessionManager:
     _PATROL_INTERVAL = 300  # 5 分钟
 
     async def _patrol_once(self) -> None:
-        """单次巡检：清理所有超时的非 running 会话。"""
+        """单次巡检：重试未核销的 Agent 预算，并清理所有超时的非 running 会话。"""
+        await self._retry_unsettled_budgets()
         cleanup_delay = await self._get_cleanup_delay()
         now = time.monotonic()
         for sid, managed in list(self.sessions.items()):
@@ -1563,6 +1581,10 @@ class SessionManager:
 
     async def _patrol_loop(self) -> None:
         """后台定期巡检循环。"""
+        try:
+            await settle_orphaned_agent_connections(async_session_factory)
+        except Exception:
+            logger.warning("orphaned agent budget sweep failed", exc_info=True)
         while True:
             await asyncio.sleep(self._PATROL_INTERVAL)
             try:
@@ -1869,9 +1891,9 @@ class SessionManager:
                 await patrol
 
         sessions = list(self.sessions.values())
-        if not sessions:
-            return
-        await asyncio.gather(
-            *[self._evict_one(s) for s in sessions],
-            return_exceptions=True,
-        )
+        if sessions:
+            await asyncio.gather(
+                *[self._evict_one(s) for s in sessions],
+                return_exceptions=True,
+            )
+        await self._retry_unsettled_budgets()

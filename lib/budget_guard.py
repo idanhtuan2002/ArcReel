@@ -33,6 +33,7 @@ from sqlalchemy import select
 from lib.budget_reservation import BudgetDeniedError, BudgetReservationState
 from lib.cost_calculator import cost_calculator
 from lib.db.models.api_call import ApiCall
+from lib.db.models.budget_reservation import BudgetReservationModel
 from lib.db.repositories.budget_reservation_repo import BudgetReservationRepository
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.pricing.strategies import PricingParams
@@ -166,6 +167,7 @@ async def reconcile_call(session_factory, *, call_id: int) -> None:
 AGENT_SESSION_BUDGET_ENV = "ARCREEL_AGENT_SESSION_BUDGET_USD"
 DEFAULT_AGENT_SESSION_BUDGET = Decimal("1.00")
 AGENT_CURRENCY = "USD"
+AGENT_SESSION_PURPOSE = "agent_session"
 
 
 class AgentBudgetConfigError(ValueError):
@@ -187,7 +189,7 @@ def agent_session_budget() -> Decimal:
 
 
 async def reserve_agent_connection(
-    session_factory, *, amount: Decimal | None = None, purpose: str = "agent_session"
+    session_factory, *, amount: Decimal | None = None, purpose: str = AGENT_SESSION_PURPOSE
 ) -> tuple[str, Decimal] | None:
     """Reserve and claim the budget for one Agent CLI process before it starts; ``None`` in DEV.
 
@@ -246,8 +248,39 @@ async def reconcile_agent_connection(session_factory, *, reservation_ref: str, a
     return True
 
 
+async def settle_orphaned_agent_connections(session_factory) -> tuple[str, ...]:
+    """Reconcile every claimed Agent session hold at its full amount; call before any session starts.
+
+    A claimed hold never expires. At host startup no Agent process is alive, so a claimed
+    ``agent_session`` hold belongs to a process that ended without settling (a crash, or a
+    reconciliation that failed until the host stopped). Its booked spend is not known here; the
+    reserved amount is the process's hard cap, so committing it never under-counts beyond the
+    overshoot the cap allows. Route canaries use another purpose and are not touched.
+    """
+    if current_release_mode() is ReleaseMode.DEV:
+        return ()
+    async with session_factory() as session:
+        rows = (
+            await session.execute(
+                select(BudgetReservationModel.reservation_ref, BudgetReservationModel.reserved_amount).where(
+                    BudgetReservationModel.reservation_ref.startswith(f"{AGENT_SESSION_PURPOSE}:"),
+                    BudgetReservationModel.state == BudgetReservationState.CLAIMED.value,
+                    BudgetReservationModel.reconciled_at.is_(None),
+                )
+            )
+        ).all()
+    settled = []
+    for ref, amount in rows:
+        if await reconcile_agent_connection(session_factory, reservation_ref=ref, actual_usd=Decimal(amount)):
+            settled.append(ref)
+    if settled:
+        logger.warning("settled %d orphaned agent budget holds at their reserved amount", len(settled))
+    return tuple(settled)
+
+
 __all__ = [
     "AGENT_SESSION_BUDGET_ENV",
+    "AGENT_SESSION_PURPOSE",
     "BUDGET_SCOPE_ENV",
     "CLAIM_WINDOW",
     "DEFAULT_BUDGET_SCOPE_PREFIX",
@@ -262,4 +295,5 @@ __all__ = [
     "reconcile_call",
     "reserve_agent_connection",
     "reserve_for_call",
+    "settle_orphaned_agent_connections",
 ]

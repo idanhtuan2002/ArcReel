@@ -21,8 +21,10 @@ aware(finished_at) 相减，duration_ms 按真实步进（单次 start→finish 
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
 
@@ -1172,11 +1174,31 @@ class TestAgentBackfillChannel:
         assert settled == [("agent_session:abc", Decimal("0.4"))]
         assert managed.budget_reservation_ref is None
 
-    async def test_a_resumed_process_books_only_spend_beyond_the_restored_totals(
-        self, manager: SessionManager, acct: _AccountingDb, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from decimal import Decimal
+    @staticmethod
+    def _cli_config(tmp_path: Path, *, last_session_id: str, last_cost: float) -> dict[str, str]:
+        """A CLI global config that records ``last_session_id`` as a project's last graceful exit."""
+        config = {
+            "projects": {
+                "/projects/demo": {
+                    "lastSessionId": last_session_id,
+                    "lastCost": last_cost,
+                    "lastModelUsage": {
+                        "claude-sonnet-4": {
+                            "inputTokens": 400_000,
+                            "outputTokens": 200_000,
+                            "cacheReadInputTokens": 500_000,
+                            "cacheCreationInputTokens": 100_000,
+                        }
+                    },
+                }
+            }
+        }
+        (tmp_path / ".claude.json").write_text(json.dumps(config), encoding="utf-8")
+        return {"CLAUDE_CONFIG_DIR": str(tmp_path)}
 
+    async def _book_resumed_turn(
+        self, manager: SessionManager, monkeypatch: pytest.MonkeyPatch, env: dict[str, str], total_cost: float
+    ) -> list[Decimal]:
         from server.agent_runtime import session_manager as session_manager_module
 
         settled: list[Decimal] = []
@@ -1186,32 +1208,45 @@ class TestAgentBackfillChannel:
             return True
 
         monkeypatch.setattr(session_manager_module, "reconcile_agent_connection", fake_reconcile)
-        first = _managed_session()
-        first.resolved_sdk_id = "sdk-1"
-        await manager._record_assistant_usage(
-            first, {"model": "claude-sonnet-4", "usage": dict(_AGENT_USAGE), "total_cost_usd": 0.4}, "completed"
-        )
-        manager._note_graceful_exit(first)
-
-        # The resumed CLI restores $0.40 and reports $0.45 after $0.05 of new spend.
         resumed = _managed_session()
         resumed.budget_reservation_ref = "agent_session:r"
-        manager._restore_booking_baseline(resumed, project_name="demo", sdk_session_id="sdk-1")
+        manager._restore_booking_baseline(resumed, sdk_session_id="sdk-1", env=env)
         grown = {key: value + 1_000 for key, value in _AGENT_USAGE.items()}
         await manager._record_assistant_usage(
-            resumed, {"model": "claude-sonnet-4", "usage": grown, "total_cost_usd": 0.45}, "completed"
+            resumed, {"model": "claude-sonnet-4", "usage": grown, "total_cost_usd": total_cost}, "completed"
         )
         await manager._settle_budget(resumed)
+        return settled
+
+    async def test_a_resumed_process_books_only_spend_beyond_the_restored_totals(
+        self, manager: SessionManager, acct: _AccountingDb, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        env = self._cli_config(tmp_path, last_session_id="sdk-1", last_cost=0.4)
+
+        # The CLI restores $0.40 and reports $0.45 after $0.05 of new spend.
+        settled = await self._book_resumed_turn(manager, monkeypatch, env, 0.45)
 
         rows = await acct.fetch_rows()
-        assert [row["cost_amount"] for row in rows] == [pytest.approx(0.4), pytest.approx(0.05)]
+        assert [row["cost_amount"] for row in rows] == [pytest.approx(0.05)]
+        assert rows[0]["usage_tokens"] == 4_000
         assert settled == [Decimal("0.05")]
+
+    async def test_a_resume_the_cli_does_not_restore_books_its_whole_total(
+        self, manager: SessionManager, acct: _AccountingDb, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # Another session exited last, so the CLI starts this one from zero; its first total is new
+        # spend even though it exceeds this session's earlier cost.
+        env = self._cli_config(tmp_path, last_session_id="sdk-other", last_cost=0.4)
+
+        settled = await self._book_resumed_turn(manager, monkeypatch, env, 0.45)
+
+        rows = await acct.fetch_rows()
+        assert [row["cost_amount"] for row in rows] == [pytest.approx(0.45)]
+        assert settled == [Decimal("0.45")]
 
     async def test_a_failed_settlement_keeps_its_reference_for_a_retry(
         self, manager: SessionManager, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from decimal import Decimal
-
         from server.agent_runtime import session_manager as session_manager_module
 
         outcomes = [False, True]
@@ -1227,6 +1262,33 @@ class TestAgentBackfillChannel:
         assert managed.budget_reservation_ref == "agent_session:x"
         await manager._settle_budget(managed)
         assert managed.budget_reservation_ref is None
+
+    async def test_an_evicted_session_whose_settlement_failed_is_retried_by_the_patrol(
+        self, manager: SessionManager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from server.agent_runtime import session_manager as session_manager_module
+
+        outcomes = [False, True]
+        attempts: list[tuple[str, Decimal]] = []
+
+        async def flaky_reconcile(_factory, *, reservation_ref: str, actual_usd: Decimal) -> bool:
+            attempts.append((reservation_ref, actual_usd))
+            return outcomes.pop(0)
+
+        monkeypatch.setattr(session_manager_module, "reconcile_agent_connection", flaky_reconcile)
+        managed = _managed_session()
+        managed.budget_reservation_ref = "agent_session:e"
+        await manager._record_assistant_usage(
+            managed, {"model": "claude-sonnet-4", "usage": dict(_AGENT_USAGE), "total_cost_usd": 0.3}, "completed"
+        )
+        manager.sessions["s1"] = managed
+
+        await manager._evict_one(managed)
+        assert "s1" not in manager.sessions
+        await manager._patrol_once()
+        await manager._patrol_once()
+
+        assert attempts == [("agent_session:e", Decimal("0.3"))] * 2
 
     async def test_non_completed_turn_records_failed_but_keeps_reported_cost(
         self, manager: SessionManager, acct: _AccountingDb
