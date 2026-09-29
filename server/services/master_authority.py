@@ -7,13 +7,15 @@ head stays the one authority and the file manifest stays its guarded projection.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import ValidationError
 from sqlalchemy import update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError, NoResultFound
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.artifact_manifest import ArtifactKind, ProjectArtifactManifestAdapter
 from lib.db.models.host_hardening import MasterAuthorityModel
@@ -34,15 +36,59 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def master_authority_unit(session: AsyncSession) -> MasterAuthorityUnit:
-    """A promotion unit whose single commit is ``session``'s."""
+async def _deferred_commit() -> None:
+    """The enclosing transaction commits; the promotion stages its rows only."""
+
+
+def master_authority_unit(session: AsyncSession, *, defer_commit: bool = False) -> MasterAuthorityUnit:
+    """A promotion unit on ``session``; it commits the session unless ``defer_commit``."""
     return MasterAuthorityUnit(
         candidates=CandidateObjectRepository(session),
         authorities=MasterAuthorityRepository(session),
         receipts=PromotionReceiptRepository(session),
-        commit=session.commit,
+        commit=_deferred_commit if defer_commit else session.commit,
         clock=_utc_now,
     )
+
+
+_ROW_CREATE_ATTEMPTS = 5
+
+
+@asynccontextmanager
+async def serialized_artifact(
+    session_factory: async_sessionmaker[AsyncSession], *, user_id: str, project_name: str, artifact_key: str
+) -> AsyncGenerator[AsyncSession]:
+    """One transaction that holds the artifact's authority row write lock until it commits.
+
+    The row is created first if absent. The transaction then rewrites it unchanged, which takes
+    the row lock on PostgreSQL and the database write lock on SQLite, across processes. Everything
+    one Gate C does to the artifact (stage, check, promote, project) runs inside, so no other
+    approval can interleave. An error rolls the promotion back with the rest.
+    """
+    for attempt in range(_ROW_CREATE_ATTEMPTS):
+        try:
+            async with session_factory() as session:
+                await MasterAuthorityRepository(session).get_current_version(
+                    user_id=user_id, project_name=project_name, artifact_key=artifact_key
+                )
+                await session.commit()
+            break
+        except (IntegrityError, NoResultFound):
+            # A concurrent approval is creating the same row; it is visible once that commits.
+            if attempt == _ROW_CREATE_ATTEMPTS - 1:
+                raise
+            await asyncio.sleep(0.05 * (attempt + 1))
+    async with session_factory() as session, session.begin():
+        await session.execute(
+            update(MasterAuthorityModel)
+            .where(
+                MasterAuthorityModel.user_id == user_id,
+                MasterAuthorityModel.project_name == project_name,
+                MasterAuthorityModel.artifact_key == artifact_key,
+            )
+            .values(current_version=MasterAuthorityModel.current_version)
+        )
+        yield session
 
 
 class MasterSupersededError(RuntimeError):
@@ -131,5 +177,6 @@ __all__ = [
     "project_if_current",
     "projected_master_records",
     "projected_masters",
+    "serialized_artifact",
     "verify_masters",
 ]
