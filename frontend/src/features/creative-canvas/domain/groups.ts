@@ -548,7 +548,7 @@ export function mergeStoryboardGroup(
   };
 }
 
-function membersInReadingOrder(
+export function membersInReadingOrder(
   nodes: readonly CanvasNode[],
   groupId: string,
 ): CanvasNode[] {
