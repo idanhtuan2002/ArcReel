@@ -181,6 +181,35 @@ class ExplorationRepository:
         )
         await self.session.flush()
 
+    async def record_command(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        actor_scope: str,
+        operation: str,
+        command_id: str,
+        command_digest: str,
+        result_kind: str,
+        result_ref: str,
+        result_digest: str,
+        created_at: datetime,
+    ) -> None:
+        await self.stage_command_receipt(
+            user_id=user_id,
+            project_name=project_name,
+            receipt=CommandReceipt(
+                actor_scope=actor_scope,
+                operation=operation,
+                command_id=command_id,
+                command_digest=command_digest,
+                result_kind=result_kind,
+                result_ref=result_ref,
+                result_digest=result_digest,
+                created_at=created_at,
+            ),
+        )
+
     # --- candidate heads and revisions -------------------------------------------------
 
     async def get_head(
@@ -389,20 +418,18 @@ class ExplorationRepository:
         await self.session.flush()
         return preview_digest
 
-    async def get_preview_for_update(
-        self, *, user_id: str, project_name: str, preview_id: str
+    async def get_preview(
+        self, *, user_id: str, project_name: str, preview_id: str, for_update: bool = False
     ) -> tuple[PromotionPreview, str] | None:
-        row = (
-            await self.session.execute(
-                select(M8PromotionPreviewModel)
-                .where(
-                    M8PromotionPreviewModel.user_id == user_id,
-                    M8PromotionPreviewModel.project_name == project_name,
-                    M8PromotionPreviewModel.preview_id == preview_id,
-                )
-                .with_for_update()
-            )
-        ).scalar_one_or_none()
+        """The scoped preview and its digest; ``for_update`` locks its row."""
+        statement = select(M8PromotionPreviewModel).where(
+            M8PromotionPreviewModel.user_id == user_id,
+            M8PromotionPreviewModel.project_name == project_name,
+            M8PromotionPreviewModel.preview_id == preview_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = (await self.session.execute(statement)).scalar_one_or_none()
         return None if row is None else (_preview_from_row(row), row.preview_digest)
 
     async def stage_authorization(self, *, user_id: str, authorization: PromotionAuthorization) -> str:
