@@ -547,3 +547,37 @@ async def test_interrupt_failure_still_wakes_waiter():
     finally:
         # actor 已 crash；cancel 清理
         await actor.cancel_and_wait()
+
+
+class _HangingConnect:
+    """A client whose connect never finishes until the actor task is cancelled."""
+
+    def __init__(self) -> None:
+        self.entered = asyncio.Event()
+        self.exited = False
+
+    async def __aenter__(self):
+        self.entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            self.exited = True
+
+    async def __aexit__(self, *_exc):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_cancelling_start_cancels_the_actor_task():
+    client = _HangingConnect()
+    actor = SessionActor(client_factory=lambda: client, on_message=lambda msg: None)
+
+    starting = asyncio.create_task(actor.start())
+    await client.entered.wait()
+    starting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await starting
+
+    assert actor._task is not None
+    assert actor._task.done()
+    assert client.exited

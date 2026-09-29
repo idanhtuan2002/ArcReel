@@ -10,6 +10,7 @@ import os
 import time
 from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, ClassVar, Optional
@@ -382,6 +383,9 @@ class SessionManager:
         # Agent reservations whose session is gone but whose reconciliation failed, with the
         # spend to commit. The patrol retries them.
         self._unsettled_budgets: dict[str, Decimal] = {}
+        # Holds of earlier host runs are swept once; the patrol retries until a sweep succeeds.
+        self._started_at = datetime.now(UTC)
+        self._orphaned_budgets_settled = False
         # 实例不变量缓存：避免每次构建 access policy 都重做 path resolve。
         self._project_root_resolved = self.project_root.resolve()
         # agent_runtime_profile 实际位置：``ARCREEL_PROFILE_DIR`` env 覆盖 >
@@ -1487,6 +1491,16 @@ class SessionManager:
             )
             managed.budget_reservation_ref = None
 
+    async def _settle_orphaned_budgets(self) -> None:
+        if self._orphaned_budgets_settled:
+            return
+        try:
+            await settle_orphaned_agent_connections(async_session_factory, created_before=self._started_at)
+        except Exception:
+            logger.warning("orphaned agent budget sweep failed; the patrol retries it", exc_info=True)
+            return
+        self._orphaned_budgets_settled = True
+
     async def _retry_unsettled_budgets(self) -> None:
         for ref, spent in list(self._unsettled_budgets.items()):
             if await reconcile_agent_connection(async_session_factory, reservation_ref=ref, actual_usd=spent):
@@ -1559,6 +1573,7 @@ class SessionManager:
 
     async def _patrol_once(self) -> None:
         """单次巡检：重试未核销的 Agent 预算，并清理所有超时的非 running 会话。"""
+        await self._settle_orphaned_budgets()
         await self._retry_unsettled_budgets()
         cleanup_delay = await self._get_cleanup_delay()
         now = time.monotonic()
@@ -1581,10 +1596,7 @@ class SessionManager:
 
     async def _patrol_loop(self) -> None:
         """后台定期巡检循环。"""
-        try:
-            await settle_orphaned_agent_connections(async_session_factory)
-        except Exception:
-            logger.warning("orphaned agent budget sweep failed", exc_info=True)
+        await self._settle_orphaned_budgets()
         while True:
             await asyncio.sleep(self._PATROL_INTERVAL)
             try:

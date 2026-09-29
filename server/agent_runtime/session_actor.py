@@ -72,6 +72,10 @@ class SessionActor:
                 {started_task, self._task},
                 return_when=asyncio.FIRST_COMPLETED,
             )
+        except BaseException:
+            # 调用方被取消：actor task 不得脱离管理继续建连，先取消并等其退出。
+            await self.cancel_and_wait()
+            raise
         finally:
             if not started_task.done():
                 started_task.cancel()
