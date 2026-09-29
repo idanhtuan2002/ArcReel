@@ -31,7 +31,7 @@ import type { EditorContentMode } from "@/utils/script-shape";
 import { canvasCandidateId } from "../api/explorationClient";
 import { digitToBookmarkIndex } from "../domain/bookmarks";
 import { isGroupNode } from "../domain/geometry";
-import { addNode, redo, selectNode, undo } from "../domain/graph";
+import { addNode, redo, undo } from "../domain/graph";
 import { groupNodes, mergeStoryboardGroup, ungroupNode, type GroupDeps } from "../domain/groups";
 import { useCanvasStore } from "../state/canvasStore";
 import { canvasSaveScope, useSaveState } from "../state/saveStatusStore";
@@ -40,6 +40,7 @@ import { CanvasBoard } from "./CanvasBoard";
 import { CanvasProjectContext } from "./canvasContext";
 import { ConflictBanner } from "./ConflictBanner";
 import { createTextNode, episodeShots, importEpisodeShots, type TextNodeType } from "./nodeFactory";
+import { selectOnly } from "./selection";
 import { StoryboardFilmstrip } from "./StoryboardFilmstrip";
 
 interface CreativeCanvasPageProps {
@@ -157,7 +158,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
   const addText = (type: TextNodeType) => {
     const center = viewCenter();
     const node = createTextNode(newId(), type, { x: center.x - 220, y: center.y - 160 });
-    edit((graph) => selectNode(addNode(graph, node), node.id));
+    edit((graph) => selectOnly(addNode(graph, node), node.id));
   };
 
   const selection = selectedIds ? selectedIds.split(",") : [];
@@ -176,7 +177,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
 
   const onShowShot = useCallback(
     (groupId: string) => {
-      edit((graph) => selectNode(graph, groupId));
+      edit((graph) => selectOnly(graph, groupId));
       void flow.fitView({ nodes: [{ id: groupId }], duration: 200, maxZoom: 1 });
       requestAnimationFrame(() =>
         document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(groupId)}"]`)?.focus(),
@@ -220,7 +221,8 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline px-4 py-2.5">
+      {/* The right padding keeps the workspace's floating assistant button clear of the save controls. */}
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline py-2.5 pl-4 pr-16">
         <Link
           href={`/${WORKSPACE_ROUTE_EPISODES}/${episode}`}
           className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-text-3 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"

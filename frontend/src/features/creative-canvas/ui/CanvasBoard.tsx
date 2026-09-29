@@ -22,10 +22,11 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 
-import { addEdge, applyNodeChanges, deleteEdge } from "../domain/graph";
+import { addEdge, deleteEdge } from "../domain/graph";
 import type { NodeChange } from "../domain/types";
 import { useCanvasStore } from "../state/canvasStore";
 import { CanvasNodeView } from "./CanvasNodeView";
+import { applyFlowNodeChanges } from "./selection";
 
 const NODE_TYPES: NodeTypes = {
   beat: CanvasNodeView,
@@ -37,6 +38,7 @@ const NODE_TYPES: NodeTypes = {
 };
 
 const DELETE_KEYS = ["Backspace", "Delete"];
+const MULTI_SELECT_KEYS = ["Shift", "Meta", "Control"];
 const PRO_OPTIONS = { hideAttribution: true };
 
 /** The React Flow node changes the domain understands; React Flow's own add/replace are not used. */
@@ -77,7 +79,7 @@ export function CanvasBoard({ label, newId }: CanvasBoardProps) {
   const onNodesChange = useCallback(
     (changes: FlowNodeChange[]) => {
       const mapped = toDomainChanges(changes);
-      if (mapped.length > 0) edit((graph) => applyNodeChanges(graph, mapped));
+      if (mapped.length > 0) edit((graph) => applyFlowNodeChanges(graph, mapped));
     },
     [edit],
   );
@@ -150,6 +152,7 @@ export function CanvasBoard({ label, newId }: CanvasBoardProps) {
         nodesFocusable
         edgesFocusable
         deleteKeyCode={DELETE_KEYS}
+        multiSelectionKeyCode={MULTI_SELECT_KEYS}
         minZoom={0.05}
         maxZoom={2}
         colorMode="dark"
