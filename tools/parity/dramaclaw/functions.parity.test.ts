@@ -9,7 +9,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { CANVAS_NODE_TYPES, type CanvasNode } from "@/features/canvas/domain/canvasNodes";
+import { computeAutoLayout } from "@/features/canvas/application/autoLayout";
+import { CANVAS_NODE_TYPES, type CanvasEdge, type CanvasNode } from "@/features/canvas/domain/canvasNodes";
 import { GROUP_COLOR_PRESETS, groupColorBackground, groupColorBorder } from "@/features/canvas/domain/groupColors";
 import { collectBatchDeletableIds } from "@/features/canvas/domain/groupSelectionDelete";
 import { collectDuplicableIds } from "@/features/canvas/domain/groupSelectionDuplicate";
@@ -51,12 +52,17 @@ function decode(value: unknown): unknown {
 }
 
 function nodes(value: unknown): CanvasNode[] {
-  return (value as { id: string; type: string; parentId?: string }[]).map((item) => ({
+  return (
+    value as { id: string; type: string; parentId?: string; x?: number; y?: number; w?: number; h?: number; mw?: number; mh?: number }[]
+  ).map((item) => ({
     id: item.id,
     type: TO_DONOR[item.type],
-    position: { x: 0, y: 0 },
+    position: { x: item.x ?? 0, y: item.y ?? 0 },
     data: {},
     ...(item.parentId ? { parentId: item.parentId } : {}),
+    ...(item.w !== undefined ? { width: item.w } : {}),
+    ...(item.h !== undefined ? { height: item.h } : {}),
+    ...(item.mw !== undefined ? { measured: { width: item.mw, height: item.mh } } : {}),
   })) as unknown as CanvasNode[];
 }
 
@@ -77,6 +83,7 @@ const FUNCTIONS: Record<string, (...args: any[]) => unknown> = {
   projectToMinimap: (point, viewBox, size) => projectToMinimap(point, viewBox, size),
   collectBatchDeletableIds: (items, selected) => collectBatchDeletableIds(nodes(items), selected),
   collectDuplicableIds: (items, selected) => collectDuplicableIds(nodes(items), selected),
+  computeAutoLayout: (items, edges) => computeAutoLayout(nodes(items), edges as CanvasEdge[]),
   groupColorPresets: () => GROUP_COLOR_PRESETS.map(({ key, value }) => ({ key, value })),
   groupColorBackground: (color) => groupColorBackground(color),
   groupColorBorder: (color) => groupColorBorder(color),

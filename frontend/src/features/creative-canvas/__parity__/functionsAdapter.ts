@@ -32,7 +32,8 @@ import {
   resolveStoryboardCols,
   storyboardSlotRect,
 } from "../domain/storyboardLayout";
-import type { CanvasNode } from "../domain/types";
+import { computeAutoLayout } from "../domain/layout";
+import type { CanvasEdge, CanvasNode } from "../domain/types";
 
 export interface FunctionCall {
   fn: string;
@@ -61,13 +62,26 @@ export function decode(value: unknown): unknown {
 /** Fixture nodes carry only id, type and parentId; the functions read nothing else. */
 function nodes(value: unknown): CanvasNode[] {
   return (
-    value as { id: string; type: CanvasNode["type"]; parentId?: string }[]
+    value as {
+      id: string;
+      type: CanvasNode["type"];
+      parentId?: string;
+      x?: number;
+      y?: number;
+      w?: number;
+      h?: number;
+      mw?: number;
+      mh?: number;
+    }[]
   ).map((item) => ({
     id: item.id,
     type: item.type,
-    position: { x: 0, y: 0 },
+    position: { x: item.x ?? 0, y: item.y ?? 0 },
     data: {},
     ...(item.parentId ? { parentId: item.parentId } : {}),
+    ...(item.w !== undefined ? { width: item.w } : {}),
+    ...(item.h !== undefined ? { height: item.h } : {}),
+    ...(item.mw !== undefined ? { measured: { width: item.mw, height: item.mh } } : {}),
   }));
 }
 
@@ -112,6 +126,7 @@ const FUNCTIONS: Record<string, (args: Args) => unknown> = {
     collectBatchDeletableIds(nodes(items), selected as string[]),
   collectDuplicableIds: ([items, selected]) =>
     collectDuplicableIds(nodes(items), selected as string[]),
+  computeAutoLayout: ([items, edges]) => computeAutoLayout(nodes(items), edges as CanvasEdge[]),
   groupColorPresets: () =>
     GROUP_COLOR_PRESETS.map(({ key, value }) => ({ key, value })),
   groupColorBackground: ([color]) =>
