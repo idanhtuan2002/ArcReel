@@ -158,3 +158,72 @@ No current-HEAD test pass is claimed. PostgreSQL lock cancellation, pool saturat
 - **SQLite:** 1248 passed, 2 skipped (PostgreSQL-only).
 - **PG16:** 60 passed (`arcreel_v201`).
 - **Static gates:** ruff, basedpyright 0/0, lint-imports, deptry and audit_tests are clean.
+
+---
+
+# Second confirmation review (job `task-mum9ckw2-g3oxpk`, reviewed HEAD `928a3b51`) — ACCEPTED
+
+A dispatched job with an empty request (`task-mum9btcu-w362dc`) returned no review and is
+disregarded. The reviewer output is saved verbatim below.
+
+## 1. HEAD reviewed
+
+`928a3b51262a6a5afa9b46f37b8dd9bacf2cda01` on `feat/r2-v2-02-master-authority`. The worktree was clean before and after the review.
+
+## 2. Verdict
+
+**ACCEPTED** by source inspection, with the test and runtime limits in section 6. No current-HEAD test pass is claimed.
+
+## 3. Per-finding status
+
+| Original finding | Status | Evidence | Test exercising the fix |
+|---|---|---|---|
+| Advisory-lock pool starvation | **FIXED** | The advisory-lock session is gone. Promotion uses a session and commits before a separate projection session begins: [gates.py:364](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/routers/gates.py:364), [gates.py:379](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/routers/gates.py:379). Projection holds one transaction: [master_authority.py:69](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:69). | No dedicated pool-saturation test found. |
+| Lock leak on cancellation | **FIXED** for the reported session-level advisory-lock leak | The replacement lock is acquired by an `UPDATE` inside a transaction: [master_authority.py:69](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:69). The file worker is awaited through cancellation until it finishes: [async_thread.py:43](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/lib/async_thread.py:43), [async_thread.py:68](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/lib/async_thread.py:68). | [test_a_projection_holds_the_artifact_until_it_commits](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/tests/integration/r2/host_hardening/test_master_authority_unit.py:209) exercises normal PostgreSQL lock release; no cancellation-specific test found. |
+| SQLite cross-process ordering | **FIXED** in the reviewed route, subject to runtime verification | Projection issues the `UPDATE`, then reads the head and refuses a superseded candidate before file work: [master_authority.py:69](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:69), [master_authority.py:79](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:79). The route calls it after promotion: [gates.py:364](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/routers/gates.py:364), [gates.py:379](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/routers/gates.py:379). | [test_a_superseded_promotion_is_not_projected](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/tests/integration/r2/host_hardening/test_master_authority_unit.py:181) and [test_overlapping_gate_c_approvals_of_one_artifact_end_consistent](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/tests/integration/server/routers/test_gates_master_authority.py:166) cover the decision and in-process overlap. No cross-process test found. |
+| Partial ADR/backfill scope | **FIXED** as an explicit episode-video scope | ADR-0096 now limits the contract to episode videos: [ADR-0096:46](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/docs/adr/0096-v2-the-m7-master-head-is-the-sole-master-authority.md:46). Gate C accepts `videos`: [gates.py:132](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/routers/gates.py:132). Verification and backfill apply that scope: [master_authority.py:90](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:90), [backfill_master_authority.py:48](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/scripts/r2/backfill_master_authority.py:48). | [test_backfill_makes_a_legacy_project_verifiable_and_is_idempotent](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/tests/integration/scripts/r2/test_backfill_master_authority.py:79) covers video masters. No non-video test found. |
+
+## 4. New findings
+
+| Severity | File:line | Scenario | Confidence |
+|---|---|---|---|
+| minor | [master_authority.py:69](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:69), [gates.py:332](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/routers/gates.py:332), [deliverables.py:199](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/r2/m3/deliverables.py:199), [engine.py:69](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/lib/db/engine.py:69) | On SQLite, the transaction remains open during manifest work and a potentially long export copy. A competing writer can reach the configured 30-second busy timeout. This is a liveness limit; it does not establish an out-of-order projection. | High for the code path; no timed contention run. |
+
+The exact model expression at [master_authority.py:70](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:70) compiled to `UPDATE master_authorities SET current_version=master_authorities.current_version ...` for **both** dialects. SQLAlchemy did not elide it in that compilation check. PostgreSQL row locking and SQLite write locking are inferred from executing that statement; neither database lock was measured in this review. The first Gate C projection follows its own committed promotion, whose [get_current_version](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/lib/db/repositories/host_hardening.py:925) creates a missing authority row and whose [advance_head](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/lib/db/repositories/host_hardening.py:1008) updates it. A direct call with no head is refused before `project()`: [master_authority.py:79](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:79).
+
+I found no circular wait in the traced route: promotion writes the candidate, head version, pointer, receipt and event, then commits ([master_authority.py:183](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/r2/host_hardening/master_authority.py:183), [promotion.py:145](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/r2/host_hardening/promotion.py:145)); only afterward does that request enter projection ([gates.py:364](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/routers/gates.py:364), [gates.py:379](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/routers/gates.py:379)). This is a source-path conclusion, not a database deadlock test.
+
+Cancellation during the worker does **not**, by this code path, leave the thread running after the projection transaction exits: [run_noninterruptible_async](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/lib/async_thread.py:43) continues awaiting the worker, and [project_if_current](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:84) returns from `project()` inside the transaction. An older exact replay after a newer head is rejected by the receipt version check at [promotion.py:103](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/r2/host_hardening/promotion.py:103); an already promoted but superseded request is refused before projection at [master_authority.py:82](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/server/services/master_authority.py:82).
+
+## 5. Commands run
+
+| Command | Actual result |
+|---|---|
+| `git rev-parse HEAD`; `git status --short --branch` | Exit 0; requested full SHA, requested branch, clean worktree. |
+| `git diff --stat f6e573f0..928a3b51`; `git diff --stat 7f2f3e3b..928a3b51` | Exit 0; 7 files and 21 files respectively. Relevant diff hunks and numbered source were read. |
+| `git diff --check` on both ranges | Exit 0; no output. |
+| Targeted pytest over the three master-authority, Gate C and backfill integration files, `TMPDIR=/tmp`, 150-second bound | Exit **1 before collection**: `FileNotFoundError`, no usable temporary directory. **0 tests run.** |
+| Unit pytest with capture and plugin autoload disabled, 30-second bound | Exit **4 before collection**: `tests/conftest.py` could not create its temporary database directory. **0 tests run.** |
+| SQLAlchemy 2.0.52 compilation of the exact `MasterAuthorityModel` update for PostgreSQL and SQLite | Exit **0**; both emitted the no-op `UPDATE` SQL shown above. |
+
+The review record reports **1248 passed, 2 skipped** on SQLite and **60 passed** on PostgreSQL 16 at `6933bf40` ([review evidence](/home/anhtuan/content-production-os/.worktrees/r2-v2-02/docs/r2/evidence/R2_V2_02_CODEX_REVIEW_2026-09-29.md)). Those are prior runs, not results from this review.
+
+## 6. Coverage limits
+
+The read-only sandbox has no writable temporary directory, so I could not run tests at `928a3b51`. I did not run PostgreSQL or SQLite contention, cancellation, cross-process, or deadlock probes. The graph catalog did not contain this worktree, and graph queries were approval blocked; structural conclusions use the exact Git diffs and directly read source. SQLite writer-timeout frequency and the database engines’ runtime handling of this no-op `UPDATE` remain unmeasured here.
+
+## 7. Final JSON object
+
+{"schema_version":1,"status":"V2_02_ACCEPTED","reviewed_head":"928a3b51262a6a5afa9b46f37b8dd9bacf2cda01","reviewer":"codex","reviewed_at":"2026-09-29T05:53:34Z","required_skips":["Current-HEAD targeted pytest could not collect because the read-only sandbox has no writable temporary directory","PostgreSQL and SQLite contention, cancellation, and cross-process probes were not run"],"material_unknowns":["Runtime lock behavior of the no-op UPDATE was not independently measured on PostgreSQL or SQLite","Duration and frequency of SQLite writer timeouts during projection were not measured"]}
+
+---
+
+## Acceptance note (main agent)
+
+- **Reviewer skips.** The reviewer could not run tests (no writable temporary directory). The
+  test evidence is the main agent's runs at `6933bf40`: SQLite 1248 passed, 2 skipped; PG16 60
+  passed. `6933bf40..928a3b51` changes only this evidence file.
+- **Minor finding.** SQLite holds the database write lock during the projection and export
+  copy, up to the 30 s busy timeout. This is the known limit recorded above; production runs
+  PostgreSQL.
+- **Deferred to the V2 release gate:** the full golden restore drill and the browser e2e test.
