@@ -262,6 +262,49 @@ async def test_an_episode_without_a_readable_indexed_script_has_no_context(
     assert response.status_code == 404
 
 
+@pytest.mark.parametrize(
+    "metadata",
+    [{"title": PROJECT, "episodes": 42}, {"title": PROJECT, "episodes": [1, "x", None]}, [1, 2]],
+    ids=["episodes-not-a-list", "episode-entries-not-objects", "metadata-not-an-object"],
+)
+async def test_malformed_project_metadata_has_no_context(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, metadata: object
+) -> None:
+    projects = _project(tmp_path, [], {})
+    (tmp_path / PROJECT / "project.json").write_text(json.dumps(metadata), encoding="utf-8")
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+
+    response = await m8_client.get(f"{BASE}/context", params={"episode": 1})
+
+    assert response.status_code == 404
+
+
+async def test_a_script_symlink_leaving_the_scripts_directory_has_no_context(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    projects = _project(tmp_path, [{"episode": 1, "script_file": "episode_1.json"}], {})
+    (tmp_path / "secret.json").write_bytes(b"secret")
+    (tmp_path / PROJECT / "scripts" / "episode_1.json").symlink_to(tmp_path / "secret.json")
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+
+    response = await m8_client.get(f"{BASE}/context", params={"episode": 1})
+
+    assert response.status_code == 404
+
+
+async def test_a_padded_project_name_has_no_context(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    projects = _project(tmp_path, [{"episode": 1, "script_file": "episode_1.json"}], {"episode_1.json": b"one"})
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+
+    padded = await m8_client.get(f"/api/v1/projects/%20{PROJECT}%20/m8/exploration/context", params={"episode": 1})
+    own = await m8_client.get(f"{BASE}/context", params={"episode": 1})
+
+    assert (padded.status_code, own.status_code) == (404, 200)
+    assert padded.json() == (await m8_client.get(f"{BASE}/context", params={"episode": 9})).json()
+
+
 async def test_an_unknown_project_has_no_context(
     m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

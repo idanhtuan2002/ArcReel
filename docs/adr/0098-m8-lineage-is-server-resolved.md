@@ -28,8 +28,10 @@ sponsor delegated the choice. The evidence is in
   - `content_basis_digest` is the canonical digest of
     `{"basis_kind": "host_episode_script", "episode": N, "script_digest": "sha256:<hex>"}`,
     where the hex is the SHA-256 of the bytes of the episode's indexed
-    `script_file`. An episode without an indexed script, or with a missing script
-    file, is not found.
+    `script_file`. An episode without an indexed script, a missing script file, a
+    script path leaving the project's `scripts/` directory, malformed project
+    metadata, and a project name not already in canonical form are all not found,
+    so `lineage.project_name` is always the canonical name of the project read.
   - `approved_master_id` and `approved_master_digest` are null. No host seam names
     an episode's final master.
   - `creative_profile_id` is `arcreel.host`, `creative_profile_version` is `1`,
@@ -46,9 +48,9 @@ sponsor delegated the choice. The evidence is in
 
 ## Consequences
 
-- An edit to the episode script changes the content basis. The next Canvas save
-  carries the new lineage and so a new `payload_digest`, as spec §5 requires. The
-  client fetches the lineage when it opens the Canvas and again after a 409.
+- An edit to the episode script changes the content basis. The client reads the
+  context before every save, so the next Canvas revision carries the new lineage
+  and a new `payload_digest`, as spec §5 requires.
 - Binding an adaptation profile or an episode master later changes only the
   resolver. The route and the client stay the same. Each change is a new
   resolution version recorded in an ADR.

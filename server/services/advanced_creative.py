@@ -140,15 +140,21 @@ __all__ = ["HostSlotAuthority", "exploration_promotion", "exploration_service"]
 
 
 def _episode_script_bytes(projects: ProjectManager, project_name: str, episode: int) -> bytes:
+    """The bytes of the episode's indexed script. A project name that is not already in canonical
+    form, malformed project metadata, and a missing or escaping script are all not found."""
     try:
+        if ProjectManager.normalize_project_name(project_name) != project_name:
+            raise ExplorationNotFoundError("the project name is not canonical")
         project_dir = projects.get_project_path(project_name)
-        entry = find_episode(projects.load_project_readonly(project_name), episode)
+        episodes = projects.load_project_readonly(project_name).get("episodes")
+        entry = find_episode({"episodes": episodes}, episode) if isinstance(episodes, list) else None
         script_file = entry.get("script_file") if entry is not None else None
         if not isinstance(script_file, str) or not script_file:
             raise ExplorationNotFoundError("the episode has no indexed script")
         path = safe_join(project_dir / "scripts", ProjectManager.normalize_script_filename(script_file))
         return path.read_bytes()
-    except (OSError, ValueError, PathTraversalError) as error:
+    except (OSError, ValueError, TypeError, AttributeError, PathTraversalError) as error:
+        # Loading migrates the metadata in memory; malformed metadata surfaces as a type error there.
         raise ExplorationNotFoundError("the episode script cannot be read") from error
 
 
