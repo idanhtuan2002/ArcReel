@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_3_2026-09-29.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_4_2026-09-29.json"
+  ],
+  "reason": "M8-A found a V2-02 Gate C race (a database head without its projection). V2-02b fixes it and was accepted by an independent Codex review (R2_V2_02B_GATE_C_SERIALIZATION_2026-09-29.md, reviewed HEAD e24a19fc, V2_02B_ACCEPTED). M8-A is re-based onto it.",
+  "m7_prerequisite_changes": {
+    "executor_base": "the commit that adds this fifth amendment",
+    "intermediate_commits": "The acceptance commit b2816af4 is an ancestor of the executor base. Every commit between them changes only docs/, or belongs to an accepted packet: V2-02 (7f2f3e3b..9c25e70e) or V2-02b (cca1eeaf..1f8441af).",
+    "accepted_packets_added": [
+      {
+        "packet": "V2-02b Gate C per-artifact serialization",
+        "evidence": "docs/r2/evidence/R2_V2_02B_GATE_C_SERIALIZATION_2026-09-29.md",
+        "reviewed_head": "e24a19fc1e38b95abda0304c77fe768c21bee564",
+        "status": "V2_02B_ACCEPTED"
+      }
+    ]
+  },
+  "packet_overrides": {
+    "M8-A": {
+      "rebase": "The M8-A commits made on cca1eeaf (A0 baseline, A1 contracts, A2 persistence, ADR-0097 and amendment 4) are re-applied onto this executor base. The baseline is re-frozen with base_head = this commit, and its seam hashes are recomputed; V2-02b changed master_authority_unit and verify_masters.",
+      "lock_protocol": "Any M8 write that depends on a master head (the ARTIFACT_SLOT promotion) runs in a transaction that holds that head's row write lock (server/services/master_authority.py serialized_artifacts), and writes only if the head is unchanged. This is the V2-02b rule."
+    }
+  },
+  "created_at": "2026-09-29"
+}
