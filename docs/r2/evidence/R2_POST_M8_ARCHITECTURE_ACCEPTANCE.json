@@ -1,0 +1,44 @@
+{
+  "schema_version": "1",
+  "status": "POST_M8_ARCHITECTURE_ACCEPTED",
+  "accepted_candidate_head": "016e094689b5e59666ee879c33bdc194caa415a0",
+  "accepted_candidate_parent": "6d10319313437c1cca7861d7e538a0442f59d76f",
+  "contract_sha256": "047551f6a198bb1a310292aec389d0c3828d997e220effcf7ac2c1c2f6369ea4",
+  "reviewed_adr_sha256": "3a9192c1ba2ab3ded9fbd06bc651a042b19cfde34dddaf4c0aa191730fa013ce",
+  "accepted_adr_sha256": "53f9d9986723df587cf52fd5b34b78c0d440809d6ba057df1625d179de070aa8",
+  "research_sha256": "b32246a69e50d1ec79562d77b97e8b162b9885b0e94a6bc286da517078cd8912",
+  "reviewers": [
+    {
+      "reviewer_id": "codex-blind-reviewer-1",
+      "qualification_evidence": [
+        "traced M7 and M8 authority ownership through ADR-0079 and M8 design",
+        "reviewed append-only identity, corrections, CAS, approval custody and unknown-outcome recovery",
+        "reviewed credential, consent, retention, deletion and provider-policy boundaries",
+        "verified candidate lineage and all recorded SHA-256 values from Git objects"
+      ],
+      "conflict_declaration": "No conflict; did not author the candidate and did not receive or inspect reviewer 2 output.",
+      "rubric_version": "POST_M8_ARCHITECTURE_REVIEW_V1",
+      "reviewed_candidate_head": "016e094689b5e59666ee879c33bdc194caa415a0",
+      "verdict": "PASS",
+      "reviewed_at": "2026-09-14T09:54:32Z"
+    },
+    {
+      "reviewer_id": "codex-blind-reviewer-2",
+      "qualification_evidence": [
+        "traced M7 execution, receipt, idempotency and unknown-outcome ownership through ADR-0078",
+        "traced M8 normalization, correction, recommendation and persistence ownership through ADR-0079 and M8 design",
+        "reviewed credential custody, platform consent, retention, deletion and production non-authorization",
+        "verified candidate lineage, all recorded hashes and the status-only accepted ADR hash"
+      ],
+      "conflict_declaration": "No conflict; did not author the candidate and did not receive or inspect reviewer 1 output.",
+      "rubric_version": "POST_M8_ARCHITECTURE_REVIEW_V1",
+      "reviewed_candidate_head": "016e094689b5e59666ee879c33bdc194caa415a0",
+      "verdict": "PASS",
+      "reviewed_at": "2026-09-14T16:54:17+07:00"
+    }
+  ],
+  "rubric_version": "POST_M8_ARCHITECTURE_REVIEW_V1",
+  "reviewed_at": "2026-09-14T09:55:34Z",
+  "required_skips": [],
+  "material_unknowns": []
+}

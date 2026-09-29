@@ -1,0 +1,244 @@
+{
+  "schema_version": "1",
+  "status": "NORMATIVE_REVIEW_CONTRACT",
+  "purpose": "Fail-closed acceptance contract for ADR-0080 and later M9-M12 design work",
+  "adr_candidate_head": "72cef951324a8817c6f61ba5de219cabbfe19e23",
+  "hash_algorithm": "sha256",
+  "bound_artifacts": [
+    {
+      "path": "docs/adr/0080-post-m8-north-star-closed-loop.md",
+      "sha256": "3a9192c1ba2ab3ded9fbd06bc651a042b19cfde34dddaf4c0aa191730fa013ce"
+    },
+    {
+      "path": "docs/research/2026-09-14-r2-north-star-completion-research.md",
+      "sha256": "b32246a69e50d1ec79562d77b97e8b162b9885b0e94a6bc286da517078cd8912"
+    }
+  ],
+  "architecture_decision": {
+    "selected_option": "FOUR_SEQUENCED_HOST_INTEGRATED_MILESTONES",
+    "milestone_order": [
+      "M9_OPPORTUNITY_RESEARCH_INTELLIGENCE",
+      "M10_QUALITY_EVIDENCE_PACKAGING",
+      "M11_GOVERNED_DISTRIBUTION",
+      "M12_CLOSED_LOOP_PORTFOLIO_LEARNING"
+    ],
+    "host": "ArcReel",
+    "durable_authority_store": "PostgreSQL",
+    "one_active_implementation_and_review_packet": true,
+    "parallel_fixture_only_research_allowed": true,
+    "parallel_fixture_constraints": [
+      "no production authority",
+      "no provider API calls",
+      "no credential use",
+      "not admissible as milestone acceptance evidence"
+    ]
+  },
+  "authority_owners": {
+    "opportunity_greenlight": "Human Greenlight custodian defined by M9 design",
+    "factual_claims": "existing Factual Authority",
+    "approved_master": "existing Production Authority",
+    "quality_disposition": "Human QualityDispositionAuthority defined by M10 design",
+    "packaging_selection": "M10 Packaging Authority defined by M10 design",
+    "publish_approval": "Human PublishApprovalAuthority defined by M11 design",
+    "credential_custody": "ArcReel host",
+    "learning_lifecycle": "M8",
+    "platform_ingestion_mapping_evaluation": "M12"
+  },
+  "schema_freeze_protocol": {
+    "rule": "Each milestone freezes its own contract and evidence hashes at that milestone's design acceptance; future hashes are not required for ADR-0080 acceptance.",
+    "required_fields": [
+      "schema_version",
+      "milestone",
+      "accepted_design_head",
+      "contract_paths_and_sha256",
+      "evidence_schema_paths_and_sha256",
+      "migration_boundary",
+      "stop_codes",
+      "reviewers",
+      "rubric_version",
+      "reviewed_at",
+      "required_skips",
+      "material_unknowns"
+    ],
+    "reviewer_collection": {
+      "minimum_items": 2,
+      "reviewers_must_be_independent_of_author_and_each_other": true,
+      "blind_verdicts_required_before_reviews_are_shared": true,
+      "each_item_fields_source": "review_policy.required_reviewer_record_fields",
+      "every_item_required_verdict": "PASS"
+    },
+    "milestones": {
+      "M9": {
+        "design_target": "docs/superpowers/specs/YYYY-MM-DD-r2-m9-opportunity-research-intelligence-design.md",
+        "freeze_record_target": "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json",
+        "required_contract_domains": [
+          "SourceQuery and SourceSnapshot",
+          "lossless source normalization",
+          "OpportunityCandidate and Greenlight",
+          "Factual Authority bridge",
+          "composite-signal policy basis"
+        ]
+      },
+      "M10": {
+        "design_target": "docs/superpowers/specs/YYYY-MM-DD-r2-m10-quality-packaging-design.md",
+        "freeze_record_target": "docs/r2/evidence/R2_M10_DESIGN_ACCEPTANCE.json",
+        "required_contract_domains": [
+          "QualityProfile, QualityRun and QualityDisposition",
+          "PackagingCandidate and PACKAGING_SLOT",
+          "secure deterministic probes",
+          "export bundle",
+          "donor parity evidence"
+        ]
+      },
+      "M11": {
+        "design_target": "docs/superpowers/specs/YYYY-MM-DD-r2-m11-governed-distribution-design.md",
+        "freeze_record_target": "docs/r2/evidence/R2_M11_DESIGN_ACCEPTANCE.json",
+        "required_contract_domains": [
+          "host-owned credential custody reference",
+          "PublishApproval and Publish Gate",
+          "DistributionCommand, DeliveryAttempt and DistributionReceipt",
+          "provider session reconciliation and webhook inbox",
+          "data refresh, revocation and deletion operations"
+        ]
+      },
+      "M12": {
+        "design_target": "docs/superpowers/specs/YYYY-MM-DD-r2-m12-portfolio-learning-design.md",
+        "freeze_record_target": "docs/r2/evidence/R2_M12_DESIGN_ACCEPTANCE.json",
+        "required_contract_domains": [
+          "M8-owned pure normalization reuse",
+          "platform I/O and consent lifecycle",
+          "receipt-to-content lineage",
+          "append-only correction, withdrawal and deletion propagation",
+          "cohort, experiment and portfolio evaluation"
+        ]
+      }
+    },
+    "on_missing_or_drift": "POST_M8_SCHEMA_FREEZE_FAILED"
+  },
+  "migration_policy": {
+    "linear_only": true,
+    "one_alembic_head": true,
+    "milestone_migrations_require_predecessor_acceptance": true,
+    "rollback_restore_proof_required_before_migration_acceptance": true,
+    "production_migration_authorized": false,
+    "on_violation": "POST_M8_MIGRATION_BOUNDARY_VIOLATION"
+  },
+  "platform_policy": {
+    "revalidate_at": [
+      "adapter design acceptance",
+      "provider activation",
+      "each policy-version change detected by the adapter"
+    ],
+    "required_evidence": [
+      "first-party source URL",
+      "assessed_at",
+      "scope and account eligibility",
+      "quota or rate class",
+      "freshness and pagination semantics",
+      "retention, refresh, revocation and deletion semantics",
+      "derived-data or composite-signal permission basis",
+      "reconciliation identity and unknown-outcome procedure"
+    ],
+    "on_stale_or_missing": "POST_M8_PROVIDER_POLICY_STALE"
+  },
+  "review_policy": {
+    "minimum_independent_reviewers_per_normative_artifact": 2,
+    "reviewers_must_be_independent_of_author_and_each_other": true,
+    "blind_verdicts_required_before_reviews_are_shared": true,
+    "reviewer_qualification_criteria": [
+      "can trace M7 and M8 authority ownership",
+      "can evaluate append-only identity, idempotency, CAS and unknown-outcome recovery",
+      "can evaluate platform credential, consent, retention and deletion constraints",
+      "declares conflicts and did not author the reviewed candidate"
+    ],
+    "required_reviewer_record_fields": [
+      "reviewer_id",
+      "qualification_evidence",
+      "conflict_declaration",
+      "rubric_version",
+      "reviewed_candidate_head",
+      "verdict",
+      "reviewed_at"
+    ],
+    "rubric_version": "POST_M8_ARCHITECTURE_REVIEW_V1",
+    "required_verdict": "PASS",
+    "required_skips": [],
+    "material_unknowns": [],
+    "on_failure": "POST_M8_REVIEW_INDEPENDENCE_FAILED"
+  },
+  "adr_acceptance_record": {
+    "output_path": "docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE.json",
+    "required_fields": [
+      "schema_version",
+      "status",
+      "accepted_candidate_head",
+      "accepted_candidate_parent",
+      "contract_sha256",
+      "reviewed_adr_sha256",
+      "accepted_adr_sha256",
+      "research_sha256",
+      "reviewers",
+      "rubric_version",
+      "reviewed_at",
+      "required_skips",
+      "material_unknowns"
+    ],
+    "required_status": "POST_M8_ARCHITECTURE_ACCEPTED",
+    "acceptance_commit_policy": [
+      "accepted_candidate_head equals the exact commit reviewed by both reviewers",
+      "acceptance commit has accepted_candidate_head as its parent",
+      "acceptance commit changes only ADR-0080 status and architecture acceptance evidence",
+      "contract_sha256, reviewed_adr_sha256 and research_sha256 recompute exactly at accepted_candidate_head",
+      "accepted_adr_sha256 recomputes exactly after the status-only ADR transition in the acceptance commit",
+      "required_skips and material_unknowns are empty"
+    ]
+  },
+  "implementation_prerequisite": {
+    "m8_acceptance_path": "docs/r2/evidence/R2_M8_IMPLEMENTATION_ACCEPTANCE.json",
+    "m8_required_status": "M8_IMPLEMENTATION_ACCEPTED",
+    "rule": "Architecture acceptance permits design and implementation planning only. M9 code starts from the independently accepted M8 implementation commit; later code starts from the independently accepted predecessor milestone.",
+    "on_failure": "POST_M8_PREREQUISITE_NOT_ACCEPTED"
+  },
+  "stop_codes": {
+    "POST_M8_PREREQUISITE_NOT_ACCEPTED": "Required predecessor implementation acceptance is absent, stale or mismatched.",
+    "POST_M8_SCHEMA_FREEZE_FAILED": "The milestone schema-freeze record is missing, incomplete or has mismatched hashes.",
+    "POST_M8_BASE_SEAM_CHANGED": "An accepted M7, M8 or host authority seam is absent or materially changed.",
+    "POST_M8_SCOPE_EXPANSION_REQUIRED": "Work requires files, authority or behavior outside the accepted packet allowlist.",
+    "POST_M8_CREDENTIAL_CUSTODY_UNPROVEN": "Credential reference, scope, refresh, revocation or non-leakage proof is incomplete.",
+    "POST_M8_PROVIDER_POLICY_STALE": "First-party provider policy evidence is missing, stale or incompatible with the requested operation.",
+    "POST_M8_DATA_DELETION_UNPROVEN": "Idempotent deletion, correction, withdrawal, deadline or fail-closed propagation evidence is incomplete.",
+    "POST_M8_UNKNOWN_OUTCOME_UNRECONCILED": "A provider operation has no durable identity or cannot be reconciled after an unknown outcome.",
+    "POST_M8_REVIEW_INDEPENDENCE_FAILED": "Reviewer qualification, independence, rubric or PASS evidence is incomplete.",
+    "POST_M8_REQUIRED_EVIDENCE_MISSING": "A required fixture, test, digest, lineage field or evidence artifact is absent.",
+    "POST_M8_PACKET_ORDER_VIOLATION": "A packet treats a planned or unaccepted predecessor as available.",
+    "POST_M8_MIGRATION_BOUNDARY_VIOLATION": "Migration is nonlinear, has multiple heads, lacks restore proof or crosses milestone ownership.",
+    "POST_M8_PRODUCTION_OPERATION_NOT_AUTHORIZED": "The requested credential, provider, migration, runtime, upload or public operation is not explicitly authorized."
+  },
+  "stop_receipt": {
+    "output_path": "docs/r2/evidence/R2_POST_M8_STOP.json",
+    "required_fields": [
+      "schema_version",
+      "milestone",
+      "packet",
+      "task",
+      "stop_code",
+      "head",
+      "dirty_paths",
+      "failed_checks",
+      "evidence_refs",
+      "created_at"
+    ],
+    "commit_when_repository_is_writable": false
+  },
+  "authorization": {
+    "architecture_review": true,
+    "design_and_plan_authoring_after_acceptance": true,
+    "code_implementation": false,
+    "migration": false,
+    "credential_use": false,
+    "provider_api_calls": false,
+    "upload_or_publication": false,
+    "runtime_activation": false,
+    "production_approval": false
+  }
+}

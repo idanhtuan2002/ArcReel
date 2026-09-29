@@ -1,0 +1,153 @@
+{
+  "schema_version": "1",
+  "status": "DESIGN_READY_M7_IMPLEMENTATION_PENDING",
+  "purpose": "Non-interactive fail-closed execution contract for Claude Code",
+  "design_manifest": "docs/r2/evidence/R2_M8_DESIGN_MANIFEST_2026-09-13.json",
+  "handoff": "docs/r2/evidence/R2_M8_DESIGN_HANDOFF_2026-09-13.md",
+  "execution_policy": {
+    "first_packet": "M8-A",
+    "one_packet_at_a_time": true,
+    "ask_for_architecture_choices": false,
+    "stop_instead_of_guess": true,
+    "implementation_on_design_branch": false,
+    "production_operations_authorized": false
+  },
+  "scope_policy": {
+    "allowlist_source": "docs/superpowers/plans/2026-09-13-r2-m8a-exploration-promotion.md#exact-owned-file-map",
+    "scope_expansion_allowed": false,
+    "on_required_expansion": "M8_BASE_SEAM_CHANGED"
+  },
+  "m7_prerequisite": {
+    "final_evidence_path": "docs/r2/evidence/R2_M7_E_PRODUCTION_CANDIDATE.json",
+    "independent_acceptance_path": "docs/r2/evidence/R2_M7_IMPLEMENTATION_ACCEPTANCE.json",
+    "required_status": "PRODUCTION_CANDIDATE",
+    "required_independent_status": "M7_IMPLEMENTATION_ACCEPTED",
+    "required_alembic_head": "7b7c4a0e0001",
+    "required_checkpoint_evidence": [
+      "docs/r2/evidence/R2_M7_A_IDENTITY_IDEMPOTENCY.json",
+      "docs/r2/evidence/R2_M7_B_ATOMIC_PROMOTION.json",
+      "docs/r2/evidence/R2_M7_C_RESTART_STREAM_RECOVERY.json",
+      "docs/r2/evidence/R2_M7_D_RECOVERY_VERIFIED.json",
+      "docs/r2/evidence/R2_M7_E_PRODUCTION_CANDIDATE.json"
+    ],
+    "required_properties": [
+      "evidence files parse and their recorded hashes match",
+      "M7-E binds all independently accepted M7-A through M7-E checkpoints",
+      "independent acceptance records the M7-E candidate HEAD and has no skips or unknowns",
+      "the acceptance commit changes only its acceptance evidence and has the accepted candidate HEAD as parent",
+      "the executor worktree starts at that acceptance commit",
+      "HEAD is clean and has exactly one Alembic head",
+      "required_skips and material_unknowns are empty",
+      "all recorded verification commands have zero exit status"
+    ],
+    "independent_acceptance_required_fields": [
+      "schema_version",
+      "status",
+      "accepted_candidate_head",
+      "accepted_candidate_parent",
+      "m7_evidence_sha256",
+      "reviewer",
+      "reviewed_at",
+      "required_skips",
+      "material_unknowns"
+    ],
+    "on_failure": "M8_PREREQUISITE_NOT_ACCEPTED"
+  },
+  "required_m7_symbols": [
+    {
+      "symbol": "AtomicPromotionService.promote",
+      "contract_source": "docs/superpowers/specs/2026-09-12-r2-m7-host-production-hardening-design.md"
+    },
+    {
+      "symbol": "MasterResolver.get_exact",
+      "contract_source": "docs/superpowers/specs/2026-09-12-r2-m7-host-production-hardening-design.md"
+    },
+    {
+      "symbol": "CommandReceiptRepository.get_exact/add",
+      "contract_source": "docs/superpowers/specs/2026-09-12-r2-m7-host-production-hardening-design.md"
+    }
+  ],
+  "production_binding_policy": {
+    "require_one_atomic_authority_seam": true,
+    "contract_class_alone_is_insufficient": true,
+    "parallel_writer_allowed": false,
+    "on_absent_or_non_atomic_seam": "M8_BASE_SEAM_CHANGED"
+  },
+  "donors": [
+    {
+      "name": "DramaClaw",
+      "commit": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+      "initial_selected_paths": [
+        "frontend/src/features/canvas/application/canvasServices.ts",
+        "frontend/src/stores/canvasStore.ts",
+        "frontend/src/features/freezone/commit/promoteToAsset.ts",
+        "src/novelvideo/director_world/scene_spatial_contract.py"
+      ]
+    },
+    {
+      "name": "OpenMontage",
+      "commit": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "initial_selected_paths": [
+        "skills/pipelines/explainer/research-director.md",
+        "schemas/artifacts/research_brief.schema.json",
+        "schemas/artifacts/decision_log.schema.json",
+        "tools/video/video_compose.py",
+        "tools/analysis/composition_validator.py",
+        "tools/analysis/visual_qa.py",
+        "remotion-composer/src/Root.tsx"
+      ]
+    }
+  ],
+  "packet_inputs": {
+    "M8-A": {
+      "human_decisions_required": [],
+      "environment_required": [
+        "repository-supported disposable PostgreSQL target attested as non-production"
+      ],
+      "executor_may_continue_when": "all M7 and seam checks pass"
+    },
+    "M8-B": {
+      "human_decisions_required": [
+        "sponsor-approved production graph envelope"
+      ],
+      "on_missing": "M8_REQUIRED_EVIDENCE_MISSING"
+    },
+    "M8-C": {
+      "human_decisions_required": [],
+      "executor_may_continue_when": "M8-B is independently accepted"
+    },
+    "M8-D": {
+      "human_decisions_required": [],
+      "executor_may_continue_when": "M8-C is independently accepted"
+    },
+    "M8-E": {
+      "human_decisions_required": [
+        "qualified blind semantic reviewer assignments"
+      ],
+      "on_missing": "M8_REQUIRED_EVIDENCE_MISSING"
+    },
+    "M8-F": {
+      "human_decisions_required": [
+        "locked evaluation corpus",
+        "smallest useful effect or confidence policy",
+        "reviewer roster and conflict declarations"
+      ],
+      "on_missing": "M8_EVALUATION_NOT_PREREGISTERED"
+    }
+  },
+  "stop_receipt": {
+    "required_fields": [
+      "schema_version",
+      "packet",
+      "task",
+      "stop_code",
+      "head",
+      "dirty_paths",
+      "failed_checks",
+      "evidence_refs",
+      "created_at"
+    ],
+    "output_path": "docs/r2/evidence/R2_M8_STOP.json",
+    "commit_when_repository_is_writable": false
+  }
+}
