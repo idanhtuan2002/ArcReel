@@ -295,4 +295,6 @@ async def test_verify_masters_ignores_slots_that_have_no_file_projection(
 
     async with session_factory() as session:
         # KEY is not a manifest artifact key, so its head has no projection to compare.
-        await composition.verify_masters(session, user_id=USER, project_name=PROJECT, project_dir=tmp_path)
+        verified = await composition.verify_masters(session, user_id=USER, project_name=PROJECT, project_dir=tmp_path)
+
+    assert verified == ()
