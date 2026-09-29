@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "packet": "M8-A",
+  "task": "A0.2",
+  "stop_code": "M8_BASE_SEAM_CHANGED",
+  "head": "e455ab056f09c2f7702efa12409e4a0b96e15ca5",
+  "dirty_paths": [],
+  "failed_checks": [
+    {
+      "check": "the ARTIFACT_SLOT target has exactly one composed atomic authority seam (execution contract production_binding_policy.require_one_atomic_authority_seam; plan A0.2 'missing, duplicate or non-atomic authority')",
+      "result": "DUPLICATE_AUTHORITY_UNCOMPOSED_M7_SEAM",
+      "detail": "AtomicPromotionService (r2/host_hardening/promotion.py:58) is constructed only in tests/unit/r2/host_hardening/test_promotion.py. No server, r2 or lib module composes it, DatabaseMasterResolver, MasterAuthorityRepository or CandidateObjectRepository, and LegacyMasterProjection has no implementation. Production approval runs through ProductionApprovalService (r2/production/approval_service.py) through GoldenAHostIntegration.approve (r2/m3/host_integration.py:330) and the gate receipts (server/routers/gates.py). The P1 gate design §6 and §8 (docs/superpowers/specs/2026-09-22-r2-p1-gate-receipt-surface-design.md) name this AtomicPromotionService <-> M3/M4 candidate bridge as deferred. The earlier graph edge from GoldenAHostIntegration.approve to AtomicPromotionService.promote is a name match on 'promote', not a real call."
+    }
+  ],
+  "evidence_refs": [
+    "docs/r2/evidence/R2_M8_A_STOP_2026-09-29.json",
+    "docs/adr/0095-m8a-defers-the-production-binding-promotion-target.md",
+    "docs/research/2026-09-29-r2-m8a-master-authority-seam.md"
+  ],
+  "created_at": "2026-09-29"
+}
