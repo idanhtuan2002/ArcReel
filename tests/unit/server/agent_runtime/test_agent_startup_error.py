@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
@@ -289,3 +291,63 @@ async def test_startup_stderr_is_not_truncated(
     assert len(lines) == observed_count
     assert lines[0] == "line-0000"
     assert lines[-1] == f"line-{observed_count - 1:04d}"
+
+
+class _CancelledStartActor:
+    def __init__(self, *_, on_message=None, client_factory=None):
+        self.task = None
+
+    async def start(self):
+        raise asyncio.CancelledError
+
+    def add_done_callback(self, _cb):
+        pass
+
+
+def _fake_agent_budget(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Decimal]]:
+    settled: list[tuple[str, Decimal]] = []
+
+    async def fake_env():
+        return {"ANTHROPIC_API_KEY": "sk"}
+
+    async def fake_reserve(_factory):
+        return "agent_session:c", Decimal("1.00")
+
+    async def fake_reconcile(_factory, *, reservation_ref: str, actual_usd: Decimal) -> bool:
+        settled.append((reservation_ref, actual_usd))
+        return True
+
+    monkeypatch.setattr("server.agent_runtime.options_assembler.load_provider_env_overrides", fake_env)
+    monkeypatch.setattr("server.agent_runtime.session_manager.reserve_agent_connection", fake_reserve)
+    monkeypatch.setattr("server.agent_runtime.session_manager.reconcile_agent_connection", fake_reconcile)
+    monkeypatch.setattr("server.agent_runtime.session_manager.SessionActor", _CancelledStartActor)
+    return settled
+
+
+@pytest.mark.asyncio
+async def test_a_new_session_cancelled_while_starting_releases_its_budget(
+    seeded_session_manager: SessionManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settled = _fake_agent_budget(monkeypatch)
+
+    with pytest.raises(asyncio.CancelledError):
+        await seeded_session_manager.send_new_session("demo", "你好")
+
+    assert settled == [("agent_session:c", Decimal(0))]
+    assert seeded_session_manager.sessions == {}
+
+
+@pytest.mark.asyncio
+async def test_a_resume_cancelled_while_starting_releases_its_budget(
+    seeded_session_manager: SessionManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.factories import make_session_meta
+
+    settled = _fake_agent_budget(monkeypatch)
+    meta = make_session_meta(id="resumed-session", project_name="demo", status="idle")
+
+    with pytest.raises(asyncio.CancelledError):
+        await seeded_session_manager.get_or_connect("resumed-session", meta=meta)
+
+    assert settled == [("agent_session:c", Decimal(0))]
+    assert "resumed-session" not in seeded_session_manager.sessions

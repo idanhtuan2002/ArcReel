@@ -26,9 +26,18 @@ sponsor delegated the choice.
 2. **The process starts** with `max_budget_usd` equal to the reservation.
 3. **When the managed session ends**, the reservation reconciles to the increases booked from the
    process's cumulative totals, which may slightly exceed it.
-4. **A resumed process may stop early.** The CLI can restore a conversation's earlier cost on
-   resume. The cap compares against that restored ledger, so a long conversation reaches the cap
-   sooner. This is the safe direction: continue in a new conversation, or raise the setting.
+   - A failed reconciliation keeps the reference: the session retries it at its next settlement
+     point, and a dropped session hands it to the patrol, which retries it until it succeeds.
+   - At host startup no Agent process is alive, so every claimed `agent_session:` hold is
+     committed at its full reserved amount, the process's hard cap.
+4. **Restored totals on resume.** The CLI restores a session's final cost and usage on resume only
+   when the session is the `lastSessionId` in its global config. The host reads that file before
+   the process starts and applies the same rule:
+   - **Restored:** booking starts from the restored totals, so they are not booked again.
+   - **Not restored:** booking starts from zero.
+
+   The cap compares against the restored ledger, so a long conversation reaches the cap sooner.
+   This is the safe direction: continue in a new conversation, or raise the setting.
 5. **At the cap, the connection closes.** When a turn ends with `error_max_budget_usd`, the host
    closes the connection at once and settles it. The next message opens a new connection with a
    new reservation.
@@ -46,4 +55,11 @@ sponsor delegated the choice.
 - **Known limits:**
   - **Overshoot per stop** is bounded by in-flight calls.
   - **Spend after the last result** of a crashed process is not booked.
+  - **Config races.** A graceful exit of another session in the same project, between the host's
+    read of the CLI config and the CLI's own read, can change the restore outcome. If the CLI
+    then restores nothing, the first result's total is smaller than the baseline, and the host
+    books it from zero. The case this does not catch undercounts by at most one connection's
+    spend.
+  - **One host process.** The startup sweep assumes that one host process owns every Agent
+    session.
   - **Non-Claude presets stay refused** in release mode.

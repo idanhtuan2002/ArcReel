@@ -416,6 +416,18 @@ async def _final_audio_decision(project: str) -> str | None:
         return result.scalar_one_or_none()
 
 
+def script_lock_problem(lock: dict[str, Any], expected: dict[str, Any]) -> str | None:
+    """A factual product's latest script-lock decision must lock the product's own source and script."""
+    if lock.get("action") != "LOCK":
+        return "GATE_B_MISSING"
+    if (lock.get("source_digest"), lock.get("script_digest")) != (
+        expected.get("source_digest"),
+        expected.get("script_digest"),
+    ):
+        return "GATE_B_DIGEST_MISMATCH"
+    return None
+
+
 async def _locked_before_first_gate_c(project: str, locked_at: str) -> bool:
     """Gate B precedes production: the script lock is older than the project's first Gate C receipt."""
     from datetime import UTC
@@ -482,14 +494,9 @@ async def check(
             script_locks = history.get("script_lock", [])
             if product["kind"] == "GOLDEN_A":
                 lock = script_locks[-1] if script_locks else {}
-                expected = product.get("script_lock") or {}
-                if lock.get("action") != "LOCK":
-                    problems.append("GATE_B_MISSING")
-                elif (lock.get("source_digest"), lock.get("script_digest")) != (
-                    expected.get("source_digest"),
-                    expected.get("script_digest"),
-                ):
-                    problems.append("GATE_B_DIGEST_MISMATCH")
+                lock_problem = script_lock_problem(lock, product.get("script_lock") or {})
+                if lock_problem is not None:
+                    problems.append(lock_problem)
                 elif not await _locked_before_first_gate_c(project, lock.get("created_at", "")):
                     problems.append("GATE_B_AFTER_PRODUCTION")
             if product["kind"] != "GOLDEN_A" and not product.get("narrative_lock_decision_id"):
