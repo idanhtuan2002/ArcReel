@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_6_2026-09-29.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_7_2026-09-29.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_8_2026-09-29.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_9_2026-09-29.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_10_2026-09-29.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_11_2026-09-29.json"
+  ],
+  "reason": "Sponsor decision of 2026-09-29. Review rounds 3 to 6 of M8-A dealt only with pre-existing outcome paths of the M7 master authority backfill (scripts/r2/backfill_master_authority.py), an operator script that no M8-A code calls. Bundling its acceptance into M8-A made each backfill edge case block M8-A. The two packets are decoupled, and a stopping rule is added.",
+  "decisions": {
+    "m8_a_acceptance_scope": "The M8-A independent review accepts or rejects M8-A code, its tests and evidence, and V2-02c (34bd4346), which M8-A depends on and which rounds 2 to 6 accepted. It no longer accepts V2-02d.",
+    "v2_02d_track": "V2-02d (40337fe3, 079679fb, fef820c3, 40972905, fc8bda2d) is the executor base's backfill. Its acceptance is a separate V2 review track, recorded in docs/r2/evidence/R2_V2_02D_BACKFILL_SERIALIZATION_2026-09-29.md. It does not gate M8-A, and M8-A does not gate it.",
+    "stopping_rule": "A review finding blocks acceptance only if it is a correctness, data integrity, security or acceptance defect in the reviewed packet's scope, tied to a concrete code path. A Low or non-blocking finding is recorded in the packet's evidence (coverage_limits or known limitations) and does not open another review round. A round whose only findings are non-blocking is an acceptance."
+  },
+  "m7_prerequisite_changes": {
+    "executor_base": "the commit that adds this twelfth amendment",
+    "intermediate_commits": "As amendment 11. This amendment changes only docs/."
+  },
+  "packet_overrides": {
+    "M8-A": {
+      "rebase": "The M8-A commits on d1f9bf41 are re-applied onto this executor base. The baseline is re-frozen with base_head = this commit.",
+      "acceptance_rule": "M8-A is accepted when its independent review accepts M8-A and V2-02c under the stopping rule. The acceptance_rule entries of amendments 6 to 11 that tie M8-A to V2-02d are superseded."
+    }
+  },
+  "created_at": "2026-09-29"
+}
