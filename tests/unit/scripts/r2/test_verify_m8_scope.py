@@ -78,6 +78,16 @@ def test_accepts_changes_inside_the_scope_allowlist() -> None:
     assert evaluate(BASELINE, replace(OBSERVED, changed_paths=("r2/advanced_creative/__init__.py",))) == []
 
 
+def test_a_directory_entry_allows_every_path_below_it_only() -> None:
+    baseline = {**BASELINE, "scope_allowlist": ["frontend/src/features/creative-canvas/"]}
+
+    inside = evaluate(baseline, replace(OBSERVED, changed_paths=("frontend/src/features/creative-canvas/ui/Page.tsx",)))
+    sibling = evaluate(baseline, replace(OBSERVED, changed_paths=("frontend/src/features/creative-canvas-old/x.ts",)))
+
+    assert inside == []
+    assert _codes(sibling) == {"M8_PREREQUISITE_NOT_ACCEPTED"}
+
+
 def test_rejects_design_branch() -> None:
     problems = evaluate(BASELINE, replace(OBSERVED, branch="design/r2-m5b-narrative-context"))
 

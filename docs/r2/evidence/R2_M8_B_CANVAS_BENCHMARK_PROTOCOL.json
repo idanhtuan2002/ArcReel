@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "status": "FROZEN_BEFORE_RESULTS",
+  "sponsor_decision": {
+    "path": "docs/r2/evidence/R2_M8_B_GRAPH_ENVELOPE_SPONSOR_DECISION_2026-09-29.json",
+    "sha256": "07bdb354449c03773cf1e07d5679e393a43a9bd5a6603924e1cdf4200d1b2b38"
+  },
+  "canvas_scope": "one episode per Canvas (DramaClaw donor precedent: FreezoneCanvasScope episode/beat/asset)",
+  "ladder": [
+    {
+      "nodes": 25,
+      "edges": 37
+    },
+    {
+      "nodes": 50,
+      "edges": 75
+    },
+    {
+      "nodes": 100,
+      "edges": 150
+    },
+    {
+      "nodes": 200,
+      "edges": 300
+    },
+    {
+      "nodes": 400,
+      "edges": 600
+    }
+  ],
+  "graph_generator": "deterministic seeded generator: episode-shaped graphs (beat to frame to clip chains in storyboard groups, plus notes and asset reference nodes), seed 20260929, edges = round(1.5 x nodes)",
+  "operation_mix_percent": {
+    "pan_zoom": 35,
+    "node_drag": 20,
+    "node_text_edit": 15,
+    "add_node": 10,
+    "connect_edge": 10,
+    "group_ungroup": 5,
+    "undo_redo": 5
+  },
+  "thresholds": {
+    "continuous_interaction_frame_time_p95_ms": {
+      "up_to_200_nodes": 16.7,
+      "top_rung": 33.0,
+      "zoom_range": [
+        0.5,
+        1.0
+      ],
+      "operations": [
+        "pan",
+        "zoom",
+        "node drag"
+      ]
+    },
+    "discrete_operation_latency_p95_ms": 100,
+    "discrete_operations": [
+      "add node",
+      "connect edge",
+      "delete",
+      "group/ungroup",
+      "undo/redo",
+      "node text edit commit"
+    ],
+    "top_rung_open_to_interactive_ms": 2000,
+    "top_rung_canvas_js_heap_mb": 120,
+    "bundle": {
+      "initial_app_bundle_delta_kb_gzip": 0,
+      "lazy_canvas_chunk_max_kb_gzip": 250
+    }
+  },
+  "measurement": {
+    "continuous": "frame time from requestAnimationFrame deltas during scripted pan, zoom and node drag at zoom 0.5 and 1.0",
+    "discrete": "input event to the next painted frame after the store commit (performance.mark/measure around the handler plus rAF), per operation",
+    "open": "navigation start of the Canvas route to the first frame with all visible nodes mounted and input enabled",
+    "heap": "performance.measureUserAgentSpecificMemory where available, else CDP HeapProfiler after GC; Canvas-attributable = Canvas route minus an empty route baseline",
+    "bundle": "vite build manifest: initial chunk delta against the base commit, and the lazy Canvas chunk size, gzip"
+  },
+  "environment": {
+    "browser": "Chromium bundled with the repository Python Playwright 1.63, headless, production build (vite build + preview)",
+    "machine": "recorded in the result: CPU model, cores, RAM, GPU, OS, display refresh rate",
+    "low_end_profile": "4x CPU throttling; must meet the discrete-operation threshold at the 100-node rung"
+  },
+  "repetitions": "at least 30 per operation per rung, over 3 cold runs",
+  "statistics": "p50 and p95 over all repetitions of an operation at a rung, nearest-rank",
+  "pass_rule": "every rung and operation meets its threshold; any missing measurement is a failure",
+  "on_failure": "blocks the React Flow adapter, not the M8-A exploration authority (spec section 7)",
+  "created_at": "2026-09-29T00:00:00Z"
+}
