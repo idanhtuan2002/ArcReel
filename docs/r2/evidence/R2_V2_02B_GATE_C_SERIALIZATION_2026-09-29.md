@@ -48,7 +48,7 @@ The database head is left without its projection.
 
 # Codex review 1 (job `task-mumbkyt0-9t44fw`, reviewed HEAD `18c50eec`), verbatim
 
-**HEAD reviewed:** `18c50eece5633fced6d52e45a8d7bcebb22b625f`  
+**HEAD reviewed:** `18c50eece5633fced6d52e45a8d7bcebb22b625f`
 **Verdict:** **CHANGES_REQUIRED**
 
 | Severity | File:line | Scenario | Confidence |
@@ -387,3 +387,66 @@ its sources, sorted), so no multi-row holders form a cycle and there is no deadl
 - **Listing and download** return data verified between two checks. They do not write, so a
   head that moves after the second check makes their answer historical, not inconsistent.
 - **Crash recovery** after phase 1 is fail-closed, with a retry or re-approval.
+
+---
+
+# Codex review 6 (job `task-mumdhxhn-4u8swc`, reviewed HEAD `e24a19fc`): ACCEPTED, verbatim
+
+Earlier dispatches with an empty request (`task-mumdglcf-9d17gs`) returned no review and are
+disregarded.
+
+## 1. HEAD reviewed
+
+`e24a19fc1e38b95abda0304c77fe768c21bee564` on `fix/r2-v2-02b-serialize-gate-c`; worktree clean. I reviewed the requested fix and whole-packet diffs.
+
+## 2. Verdict
+
+**ACCEPTED.** Source inspection found no remaining material issue in the packet. This is an inspection-based verdict: the read-only sandbox prevented fresh test execution.
+
+## 3. Per-finding status
+
+| Finding | Status | Evidence |
+|---|---|---|
+| Gate D records a decision after its second check goes stale | **FIXED** | [_locked_to_heads](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:280) locks the previously read heads, re-verifies them in that transaction, and returns 409 if they moved; [the decision append](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:562) occurs before that transaction commits. [The forced test](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:341) inserts a source approval between the read and lock and asserts no decision is recorded. |
+| Composite Gate C checks source shots before locking them | **FIXED** | [Phase 1](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:422) verifies source masters after acquiring the final and source locks at [line 470](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:470). [The concurrency test](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:374) checks that a source approval waits during staging. Its PostgreSQL result is recorded in [packet evidence](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/docs/r2/evidence/R2_V2_02B_GATE_C_SERIALIZATION_2026-09-29.md:378), but I could not rerun it. |
+| Crash leaves a committed head unprojected | **PARTIALLY_FIXED** | [Phase 1 commits before phase 2 projection](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:470). Readers fail closed on divergence; the [runbook](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/docs/r2/runbooks/v1-operator.md:165) requires retry or re-approval. [The injected failure test](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:154) covers retry convergence, not automatic crash recovery. |
+| Timed overlap test | **PARTIALLY_FIXED** | [Forced supersession](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:182) and the two new forced race tests cover specific interleavings. [The general overlap test](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:213) still relies on timing. |
+
+## 4. New findings
+
+| Severity | File:line | Scenario | Confidence |
+|---|---|---|---|
+| None material | — | The multi-row locker uses sorted, distinct keys; Gate C’s phase 2 locks one row. Row creation happens before locks are held. File verification extends lock duration but did not expose an unsafe interleaving in the inspected paths. | Source inspection |
+
+## 5. Commands run
+
+`git status`, `git rev-parse HEAD`, both requested `git diff` ranges, targeted numbered source and test reads, and `git diff --check`. The fix-range whitespace check was clean; the whole-packet check reports trailing whitespace in the evidence document at line 51.
+
+I attempted `TMPDIR=/tmp timeout 120s .venv/bin/python -m pytest -q -p no:cacheprovider` on the master-authority, Gate export, and approval-service test files. Pytest stopped **before collection** with `FileNotFoundError: No usable temporary directory`; no test passed in this review.
+
+## 6. Coverage limits
+
+Codebase-memory status, search, and coverage calls were blocked by the environment’s approval policy, so structural conclusions use direct source inspection. PostgreSQL concurrency, crash recovery, and V1 regression tests were not freshly executed. The packet records earlier PostgreSQL and SQLite passes, which I treated as historical evidence rather than this review’s results.
+
+## 7. Review record
+
+```json
+{"schema_version":1,"status":"V2_02B_ACCEPTED","reviewed_head":"e24a19fc1e38b95abda0304c77fe768c21bee564","reviewer":"codex","reviewed_at":"2026-09-29T07:48:50Z","required_skips":["Targeted pytest stopped before collection: no usable temporary directory in the read-only sandbox"],"material_unknowns":["PostgreSQL concurrency and crash recovery were not freshly executed","Codebase-memory search and coverage were approval-blocked"]}
+```
+
+## Acceptance note (main agent)
+
+- **Test evidence.** The reviewer could not run tests (read-only sandbox). The test evidence is
+  the main agent's runs at `465cbc11`, and `465cbc11..e24a19fc` changes docs only:
+  - `test_gates_master_authority.py`: 12 passed on SQLite and on PG16;
+  - the PG16 Gate and master suites: 40 passed;
+  - the broad SQLite suites: 1256 passed, 2 skipped.
+- **Accepted limits:**
+  - crash recovery after phase 1 is fail-closed, with a retry or re-approval (runbook §4b);
+  - the general overlap test is a stress check; the forced-interleaving tests are the
+    deterministic guards.
+- **Why it took six rounds.** Each fix closed one interleaving of a dual-store (database and
+  file) consistency problem, instead of starting from one lock protocol. The final protocol:
+  every write that depends on master heads runs in a transaction that holds those heads' row
+  write locks (in sorted key order), and it writes only if the heads are unchanged. It is the
+  rule for further work on this authority.
