@@ -118,6 +118,19 @@ async def test_a_foreign_revision_is_indistinguishable_from_an_unknown_one(m8_cl
     assert foreign.json() == unknown.json()
 
 
+async def test_the_head_reports_the_current_revision_and_hides_foreign_candidates(m8_client: AsyncClient) -> None:
+    assert (await m8_client.post(f"{BASE}/revisions", json=_append_body())).status_code == 200
+
+    own = await m8_client.get(f"{BASE}/candidates/c-1")
+    foreign = await m8_client.get("/api/v1/projects/other/m8/exploration/candidates/c-1")
+    unknown = await m8_client.get(f"{BASE}/candidates/missing")
+
+    assert own.status_code == 200
+    assert own.json() == {"candidate_id": "c-1", "current_revision": 1, "head_version": 1}
+    assert (foreign.status_code, unknown.status_code) == (404, 404)
+    assert foreign.json() == unknown.json()
+
+
 async def test_a_genesis_reusing_a_foreign_id_is_indistinguishable_from_a_new_one(m8_client: AsyncClient) -> None:
     assert (await m8_client.post(f"{BASE}/revisions", json=_append_body())).status_code == 200
     other = "/api/v1/projects/other/m8/exploration"

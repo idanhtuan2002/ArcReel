@@ -196,6 +196,12 @@ class ExplorationService:
         await self._commit()
         return head
 
+    async def head(self, *, user_id: str, project_name: str, candidate_id: str) -> CandidateHead:
+        found = await self._store.get_head(user_id=user_id, project_name=project_name, candidate_id=candidate_id)
+        if found is None:
+            raise ExplorationNotFoundError("no such candidate in this scope")
+        return found
+
     async def get_exact(
         self, *, user_id: str, project_name: str, candidate_id: str, revision: int
     ) -> ExplorationRevision:

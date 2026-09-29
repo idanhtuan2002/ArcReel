@@ -83,6 +83,19 @@ async def append_revision(project_name: str, req: AppendRevisionRequest, user: C
     return await _run(operation)
 
 
+@router.get("/projects/{project_name}/m8/exploration/candidates/{candidate_id}")
+async def get_head(project_name: str, candidate_id: str, user: CurrentUser) -> CandidateHead:
+    """The candidate's current revision and CAS version, without any revision body."""
+
+    async def operation() -> CandidateHead:
+        async with async_session_factory() as session:
+            return await exploration_service(session).head(
+                user_id=user.id, project_name=project_name, candidate_id=candidate_id
+            )
+
+    return await _run(operation)
+
+
 @router.get("/projects/{project_name}/m8/exploration/candidates/{candidate_id}/revisions/{revision}")
 async def get_revision(project_name: str, candidate_id: str, revision: int, user: CurrentUser) -> ExplorationRevision:
     async def operation() -> ExplorationRevision:
