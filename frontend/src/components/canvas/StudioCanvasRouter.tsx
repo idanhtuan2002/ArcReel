@@ -1,6 +1,6 @@
-import { useCallback, useRef } from "react";
+import { lazy, Suspense, useCallback, useRef } from "react";
 import { errMsg, voidPromise } from "@/utils/async";
-import { Route, Switch, Redirect } from "wouter";
+import { Link, Route, Switch, Redirect } from "wouter";
 import {
   WORKSPACE_ROUTE_LOREBOOK,
   WORKSPACE_ROUTE_CLUES,
@@ -56,6 +56,9 @@ import type {
   ReferenceGenerationRequestOptions,
 } from "@/types";
 import type { EpisodeScript } from "@/types/script";
+
+// React Flow and the Canvas stay out of the initial bundle.
+const CreativeCanvasPage = lazy(() => import("@/features/creative-canvas/ui/CreativeCanvasPage"));
 
 /** 集级路由 path，与渲染该集的 `<Route>` 共用一份。 */
 const EPISODE_ROUTE_PATH = `/${WORKSPACE_ROUTE_EPISODES}/:episodeId`;
@@ -678,6 +681,22 @@ export function StudioCanvasRouter() {
         }
       </Route>
 
+      <Route path={`${EPISODE_ROUTE_PATH}/canvas`}>
+        {(params) =>
+          demoMode ? (
+            <Redirect to="/" />
+          ) : (
+            <Suspense fallback={null}>
+              <CreativeCanvasPage
+                key={`${currentProjectName}::${params.episodeId}`}
+                projectName={currentProjectName}
+                episode={parseInt(params.episodeId, 10)}
+              />
+            </Suspense>
+          )
+        }
+      </Route>
+
       <Route path={EPISODE_ROUTE_PATH}>
         {(params) => {
           const epNum = parseInt(params.episodeId, 10);
@@ -708,6 +727,16 @@ export function StudioCanvasRouter() {
 
           return (
             <div className="flex h-full flex-col">
+              {!demoMode && episode ? (
+                <div className="flex justify-end border-b border-hairline-soft px-4 py-1">
+                  <Link
+                    href={`${EPISODE_ROUTE_PATH.replace(":episodeId", String(epNum))}/canvas`}
+                    className="rounded-md px-2 py-1 font-mono text-[11px] tracking-[0.12em] text-text-3 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  >
+                    {t("creative_canvas_open")} →
+                  </Link>
+                </div>
+              ) : null}
               {/* 演示态没有真实项目事实可投影，面板不挂载。 */}
               {!demoMode && currentProjectName && (
                 <WorkflowPanel

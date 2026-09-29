@@ -1,0 +1,74 @@
+/* Darkroom skin over React Flow's base styles, plus the Canvas-only details. */
+
+.canvas-shell .react-flow {
+  --xy-background-color: var(--color-bg);
+  --xy-edge-stroke: var(--color-text-4);
+  --xy-edge-stroke-selected: var(--color-accent);
+  --xy-connectionline-stroke: var(--color-accent);
+  --xy-minimap-background-color: var(--color-bg-grad-b);
+  --xy-minimap-mask-background-color: oklch(0.148 0.009 260 / 0.7);
+  --xy-minimap-node-background-color: var(--color-surface-2);
+  --xy-controls-button-background-color: var(--color-bg-grad-a);
+  --xy-controls-button-background-color-hover: var(--color-surface-2);
+  --xy-controls-button-color: var(--color-text-2);
+  --xy-controls-button-border-color: var(--color-hairline);
+}
+
+.canvas-shell .canvas-grid {
+  color: var(--color-hairline);
+}
+
+.canvas-shell .react-flow__node:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+}
+
+.canvas-shell .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.canvas-shell .canvas-handle {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--color-hairline-strong);
+  background: var(--color-bg);
+}
+
+.canvas-shell .canvas-node {
+  transition: box-shadow 120ms ease, border-color 120ms ease;
+}
+
+/* Effects off while the view or a node is moving. */
+.canvas-shell[data-moving] .canvas-node {
+  transition: none;
+  box-shadow: none;
+}
+
+/* Sprocket holes along both edges of the storyboard strip. */
+.filmstrip::before,
+.filmstrip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-image: radial-gradient(circle at 5px 3px, var(--color-hairline) 1.6px, transparent 2px);
+  background-size: 14px 6px;
+  pointer-events: none;
+}
+
+.filmstrip::before {
+  top: 2px;
+}
+
+.filmstrip::after {
+  bottom: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-shell .canvas-node {
+    transition: none;
+  }
+}

@@ -1,0 +1,34 @@
+import { useTranslation } from "react-i18next";
+
+interface ConflictBannerProps {
+  onUseMine: () => void;
+  onDiscardMine: () => void;
+}
+
+/** Shown while local work is kept aside after another tab or device saved the Canvas. */
+export function ConflictBanner({ onUseMine, onDiscardMine }: ConflictBannerProps) {
+  const { t } = useTranslation("dashboard");
+  return (
+    <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-warm-ring bg-warm-soft px-4 py-2 text-sm">
+      <span className="font-mono text-[10px] tracking-[0.18em] text-warm">CONFLICT</span>
+      <p className="min-w-0 flex-1 text-text-2">
+        <span className="font-medium text-text">{t("creative_canvas_conflict_title")}</span>{" "}
+        {t("creative_canvas_conflict_body")}
+      </p>
+      <button
+        type="button"
+        onClick={onUseMine}
+        className="rounded-md bg-warm px-3 py-1 text-xs font-medium text-bg hover:bg-warm-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warm"
+      >
+        {t("creative_canvas_conflict_use_mine")}
+      </button>
+      <button
+        type="button"
+        onClick={onDiscardMine}
+        className="rounded-md border border-hairline-strong px-3 py-1 text-xs text-text-2 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {t("creative_canvas_conflict_discard_mine")}
+      </button>
+    </div>
+  );
+}
