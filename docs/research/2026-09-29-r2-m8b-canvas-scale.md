@@ -42,3 +42,49 @@ The donor's measured working Canvas (69 nodes) falls between Small and Typical.
 4. The **pass thresholds**: p50/p95 interaction latency (or frame time), peak memory and allowed bundle delta.
 
 The ladder's lower rungs, repetitions and the protocol file are then frozen by M8-B Task B1 before any result exists.
+
+## External references (checked 2026-09-29)
+
+| Source | Fact |
+|---|---|
+| DramaClaw donor `frontend/src/api/canvas.ts` | Canvases are scoped: `FreezoneCanvasScope = "default" \| "episode" \| "beat" \| "asset"`. A project has many canvases, one per episode, beat or asset, not one project-wide graph. |
+| React Flow docs ([performance](https://reactflow.dev/learn/advanced-use/performance)) | Guidance only (memoize, avoid depending on the `nodes` array, hide collapsed subtrees, simplify CSS). No node-count threshold or benchmark. |
+| React Flow [stress example](https://reactflow.dev/examples/nodes/stress) | The default grid is 10 × 10: 100 nodes and 90 edges. |
+| RealFlow benchmark ([repo](https://github.com/olbboy/realflow)) | 10,000 nodes, Chromium software rendering. React Flow default: 4 pan fps, 239 MB heap, 10,000 DOM nodes. React Flow with `onlyRenderVisibleElements`: 9 fps, 34 MB, 49 DOM nodes. RealFlow (spatial-hash culling): 43 fps, 18 MB. |
+| xyflow discussion [#4975](https://github.com/xyflow/xyflow/discussions/4975) | Users report slow updates at 80+ nodes when state is held outside React Flow. Local state fixed it. |
+| ComfyUI ([troubleshooting](https://docs.comfy.org/troubleshooting/overview), issues [#3913](https://github.com/comfyanonymous/ComfyUI/issues/3913), [#6513](https://github.com/Comfy-Org/ComfyUI/issues/6513)) | Reports say 100+ node workflows stress the browser renderer. The advice is to split workflows, collapse groups and turn off live previews. |
+| n8n community ([thread](https://community.n8n.io/t/performance-issues-with-large-workflow-including-many-http-nodes-need-help/167668)) | Editor lag is reported at about 50 heavy nodes. No documented node limit. |
+| tldraw ([performance docs](https://tldraw.dev/sdk-features/performance)) | `maxShapesPerPage` defaults to 4,000 (raisable to 10,000). Viewport culling is built in. `p95FrameTime` is its interaction metric. Zoom is debounced above 500 shapes. Its shapes are much lighter than media nodes. |
+| LibTV / liblib (the donor's reference) ([overview](https://www.uied.cn/114196.html)) | An infinite canvas with 5 base node types; it generates 9/25-panel storyboard grids in one step. The donor measured it at 74.6 fps and p90 14.1 ms, the same as the donor after LOD. No published node limit. |
+| web.dev [INP](https://web.dev/articles/inp) | Good ≤ 200 ms, poor > 500 ms, at the 75th percentile. |
+| web.dev [RAIL](https://web.dev/articles/rail) | Respond to input within 100 ms (handle it within 50 ms); produce each animation frame in ≤ 10 ms (16 ms is the hard limit at 60 Hz). |
+
+**What they imply:**
+
+- Media-heavy node canvases (ComfyUI, n8n, the donor) start to struggle at about 50–100 nodes unless culling and LOD are on.
+- Lightweight-shape canvases (tldraw) stay smooth into the thousands.
+- The donor already needed LOD to stay within budget at 69 nodes.
+- Scoping one Canvas to an episode, as the donor does, keeps graphs in the tens to low hundreds.
+
+## Options for the sponsor
+
+| | A: conservative | **B: recommended** | C: ambitious |
+|---|---|---|---|
+| Canvas scope | one episode | one episode (donor precedent) | one episode, or a batch |
+| Graph-size ladder (nodes) | 25 / 50 / 100 / **200** | 25 / 50 / 100 / 200 / **400** | 50 / 100 / 250 / 500 / **1000** |
+| Top rung edges | 300 | **600** | 1500 |
+| Headroom over the Large episode estimate (~180 nodes) | 1.1× | **2.2×** | 5.5× |
+| Frame time while panning, zooming or dragging, at zoom 0.5–1 | p95 ≤ 16.7 ms at every rung | p95 ≤ 16.7 ms up to 200 nodes; p95 ≤ 33 ms at the top rung | p95 ≤ 33 ms at every rung |
+| Discrete operations (add, connect, delete, group, undo/redo, edit commit) | p95 ≤ 100 ms | p95 ≤ 100 ms | p95 ≤ 200 ms |
+| Open the top-rung Canvas until interactive | ≤ 1.5 s | ≤ 2 s | ≤ 3 s |
+| Canvas-attributable JS heap at the top rung | ≤ 80 MB | ≤ 120 MB | ≤ 250 MB |
+| Bundle | Canvas lazy-loaded; initial app bundle +0; Canvas chunk ≤ 250 KB gzip | same | same |
+
+In every option:
+
+- **Reference environment:** the Playwright-pinned Chromium on a production build. The machine identity (CPU, RAM, GPU, display Hz) is recorded. A second, low-end profile runs with 4× CPU throttling and must meet the discrete-operation threshold at the 100-node rung.
+- **Operation mix:** pan/zoom 35%, node drag 20%, node text edit 15%, add node 10%, connect edge 10%, group/ungroup 5%, undo/redo 5%.
+- **Repetitions:** at least 30 per operation per rung, over 3 cold runs.
+- **Failure:** per spec §7, a failure blocks the React Flow adapter, not the M8-A exploration authority.
+
+Option B covers the largest estimated episode with about 2× headroom. It keeps the high-frequency interaction inside one 60 Hz frame at realistic sizes, and it allows 30 fps only at the stress rung, which is where the external evidence shows media-node canvases degrade.
