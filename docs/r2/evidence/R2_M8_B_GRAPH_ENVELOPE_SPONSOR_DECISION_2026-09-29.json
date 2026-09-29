@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "status": "SPONSOR_APPROVED",
+  "decision": "M8-B production graph envelope (execution contract packet_inputs.M8-B)",
+  "decided_by": "sponsor",
+  "decided_at": "2026-09-29",
+  "selected_option": "B",
+  "research": "docs/research/2026-09-29-r2-m8b-canvas-scale.md",
+  "envelope": {
+    "canvas_scope": "one episode per Canvas (DramaClaw donor precedent: FreezoneCanvasScope episode/beat/asset)",
+    "graph_size_ladder_nodes": [25, 50, 100, 200, 400],
+    "top_rung": {"nodes": 400, "edges": 600},
+    "thresholds": {
+      "continuous_interaction_frame_time_p95_ms": {"up_to_200_nodes": 16.7, "top_rung": 33.0, "zoom_range": [0.5, 1.0], "operations": ["pan", "zoom", "node drag"]},
+      "discrete_operation_latency_p95_ms": 100,
+      "discrete_operations": ["add node", "connect edge", "delete", "group/ungroup", "undo/redo", "node text edit commit"],
+      "top_rung_open_to_interactive_ms": 2000,
+      "top_rung_canvas_js_heap_mb": 120,
+      "bundle": {"initial_app_bundle_delta_kb_gzip": 0, "lazy_canvas_chunk_max_kb_gzip": 250}
+    },
+    "operation_mix_percent": {"pan_zoom": 35, "node_drag": 20, "node_text_edit": 15, "add_node": 10, "connect_edge": 10, "group_ungroup": 5, "undo_redo": 5},
+    "reference_environment": {
+      "browser": "the Playwright-pinned Chromium, production build",
+      "machine": "recorded exactly (CPU, RAM, GPU, display refresh rate)",
+      "low_end_profile": "4x CPU throttling; must meet the discrete-operation threshold at the 100-node rung"
+    },
+    "repetitions": "at least 30 per operation per rung, over 3 cold runs",
+    "on_failure": "blocks the React Flow adapter, not the M8-A exploration authority (spec section 7)"
+  },
+  "note": "M8-B Task B1 freezes the benchmark protocol file (R2_M8_B_CANVAS_BENCHMARK_PROTOCOL.json) from this envelope before any result exists."
+}
