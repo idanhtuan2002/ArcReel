@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R2 M8-A exploration and promotion evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "tested_head",
+    "tested_parent",
+    "branch",
+    "alembic_graph",
+    "baseline_digest",
+    "scope_allowlist",
+    "contract_digest",
+    "seam_digest",
+    "commands",
+    "fault_matrix",
+    "cross_scope_results",
+    "architecture_results",
+    "excluded_suites",
+    "required_skips",
+    "material_unknowns",
+    "artifacts",
+    "independent_review",
+    "created_at",
+    "coverage_limits",
+    "deviations",
+    "review_rounds"
+  ],
+  "$defs": {
+    "sha1": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "tests",
+        "result"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tests": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "result": {
+          "const": "PASS"
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "status": {
+      "const": "M8_A_CANDIDATE"
+    },
+    "tested_head": {
+      "$ref": "#/$defs/sha1"
+    },
+    "tested_parent": {
+      "$ref": "#/$defs/sha1"
+    },
+    "branch": {
+      "const": "impl/r2-m8a-exploration-promotion"
+    },
+    "alembic_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heads",
+        "revision",
+        "down_revision",
+        "round_trip"
+      ],
+      "properties": {
+        "heads": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "revision": {
+          "const": "8a8c4a0e0001"
+        },
+        "down_revision": {
+          "const": "c9e1f4a2b701"
+        },
+        "round_trip": {
+          "const": "upgrade -> downgrade c9e1f4a2b701 -> upgrade (PostgreSQL 16)"
+        }
+      }
+    },
+    "baseline_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "scope_allowlist": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "contract_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "seam_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "command",
+          "exit",
+          "passed",
+          "skipped",
+          "failed",
+          "log_sha256"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exit": {
+            "type": "integer"
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "const": 0
+          },
+          "log_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "fault_matrix": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "cross_scope_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "architecture_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "excluded_suites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "reason"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "required_skips": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "material_unknowns": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "independent_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer",
+        "status"
+      ],
+      "properties": {
+        "reviewer": {
+          "const": "codex"
+        },
+        "status": {
+          "enum": [
+            "PENDING"
+          ]
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "coverage_limits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item",
+          "planned",
+          "implemented",
+          "reason"
+        ],
+        "properties": {
+          "item": {
+            "type": "string",
+            "minLength": 1
+          },
+          "planned": {
+            "type": "string",
+            "minLength": 1
+          },
+          "implemented": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "review_rounds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "round",
+          "reviewer",
+          "reviewed_range",
+          "verdict",
+          "findings",
+          "resolution_commit"
+        ],
+        "properties": {
+          "round": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reviewer": {
+            "const": "codex"
+          },
+          "reviewed_range": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{7,40}\\.\\.[0-9a-f]{7,40}$"
+          },
+          "verdict": {
+            "enum": [
+              "CHANGES_REQUIRED"
+            ]
+          },
+          "findings": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "severity",
+                "summary",
+                "resolution"
+              ],
+              "properties": {
+                "severity": {
+                  "enum": [
+                    "High",
+                    "Medium",
+                    "Low"
+                  ]
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "resolution": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "resolution_commit": {
+            "$ref": "#/$defs/sha1"
+          }
+        }
+      }
+    }
+  }
+}

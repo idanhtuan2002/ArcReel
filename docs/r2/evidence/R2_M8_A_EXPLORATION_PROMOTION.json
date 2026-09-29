@@ -1,0 +1,755 @@
+{
+  "schema_version": 1,
+  "status": "M8_A_CANDIDATE",
+  "tested_head": "b72df36ba145befbcc18a42dd920cc518462b40f",
+  "tested_parent": "ed9996744994e2c8302745e475958eb0007c4639",
+  "branch": "impl/r2-m8a-exploration-promotion",
+  "alembic_graph": {
+    "heads": [
+      "8a8c4a0e0001"
+    ],
+    "revision": "8a8c4a0e0001",
+    "down_revision": "c9e1f4a2b701",
+    "round_trip": "upgrade -> downgrade c9e1f4a2b701 -> upgrade (PostgreSQL 16)"
+  },
+  "baseline_digest": "sha256:5e03c31fbfb92bc6e549fe2e30b2b931c5f63aa6185b89400c3d34acecaa7a5b",
+  "scope_allowlist": [
+    "alembic/versions/8a8c4a0e0001_add_exploration_authority.py",
+    "docs/adr/0097-m8a-promotes-registered-candidate-objects-into-non-manifest-slots.md",
+    "docs/r2/evidence/R2_M8_A_EXPLORATION_PROMOTION.json",
+    "docs/r2/evidence/R2_M8_BASELINE.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_4_2026-09-29.json",
+    "docs/r2/evidence/schemas/R2_M8_A_EXPLORATION_PROMOTION.schema.json",
+    "docs/r2/evidence/schemas/R2_M8_BASELINE.schema.json",
+    "lib/db/models/__init__.py",
+    "lib/db/models/advanced_creative.py",
+    "lib/db/repositories/__init__.py",
+    "lib/db/repositories/advanced_creative.py",
+    "lib/i18n/en/errors.py",
+    "lib/i18n/vi/errors.py",
+    "lib/i18n/zh/errors.py",
+    "r2/advanced_creative/__init__.py",
+    "r2/advanced_creative/digests.py",
+    "r2/advanced_creative/errors.py",
+    "r2/advanced_creative/exploration.py",
+    "r2/advanced_creative/parity.py",
+    "r2/advanced_creative/ports.py",
+    "r2/advanced_creative/promotion.py",
+    "r2/contracts/__init__.py",
+    "r2/contracts/advanced_creative.py",
+    "r2/host_hardening/master_authority.py",
+    "scripts/r2/verify_donor_parity.py",
+    "scripts/r2/verify_m8_evidence.py",
+    "scripts/r2/verify_m8_scope.py",
+    "server/app.py",
+    "server/routers/advanced_creative.py",
+    "server/services/advanced_creative.py",
+    "server/services/master_authority.py",
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+    "tests/integration/lib/db/repositories/test_advanced_creative.py",
+    "tests/integration/r2/advanced_creative/test_promotion_atomicity.py",
+    "tests/integration/r2/host_hardening/test_master_authority_unit.py",
+    "tests/integration/server/routers/test_advanced_creative_router.py",
+    "tests/unit/r2/advanced_creative/test_digests.py",
+    "tests/unit/r2/advanced_creative/test_exploration.py",
+    "tests/unit/r2/advanced_creative/test_exploration_promotion.py",
+    "tests/unit/r2/advanced_creative/test_parity.py",
+    "tests/unit/r2/contracts/test_advanced_creative.py",
+    "tests/unit/r2/test_m8_architecture_boundaries.py",
+    "tests/unit/scripts/r2/test_verify_donor_parity.py",
+    "tests/unit/scripts/r2/test_verify_m8_evidence.py",
+    "tests/unit/scripts/r2/test_verify_m8_scope.py"
+  ],
+  "contract_digest": "sha256:094437eeb37b3fdd995c42bfaa4d634dfb4c6e3464705e2191cedf8b0b18f1e7",
+  "seam_digest": "sha256:3337ec4688d34a1ee0675f8200e8b893092735e7748a377bede1b2455fabd6b0",
+  "commands": [
+    {
+      "name": "a0_a3_sqlite",
+      "command": "uv run python -m pytest -q -p no:randomly <M8 unit+integration, M7 promotion unit/repository/unit-of-work, Gate C/D master authority routes, master authority backfill> (SQLite)",
+      "exit": 0,
+      "passed": 517,
+      "skipped": 9,
+      "failed": 0,
+      "log_sha256": "e157ee2c4c053535e612fbd60fe3f6a7d463f2d34f27cc17e10371b91678845e"
+    },
+    {
+      "name": "migration_downgrade",
+      "command": "DATABASE_URL=<PG16 arcreel_m8_ev> uv run alembic downgrade c9e1f4a2b701",
+      "exit": 0,
+      "passed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "log_sha256": "abf9c8c5ad0e5bc7aa664a382f3975d251ce58d8686600ef8559c22e3ed946f7"
+    },
+    {
+      "name": "migration_upgrade",
+      "command": "DATABASE_URL=<PG16 arcreel_m8_ev> uv run alembic upgrade head",
+      "exit": 0,
+      "passed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "log_sha256": "23937ac30ad101ea4757354de7235cc03b13fbfdbcc73b851b77c6bcf3742350"
+    },
+    {
+      "name": "migration_reupgrade",
+      "command": "DATABASE_URL=<PG16 arcreel_m8_ev> uv run alembic downgrade c9e1f4a2b701 && uv run alembic upgrade head",
+      "exit": 0,
+      "passed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "log_sha256": "618353a9847faf96e0df7a33d057173d1f6fcdda88ad3cada28a88794177f3a8"
+    },
+    {
+      "name": "alembic_heads",
+      "command": "DATABASE_URL=<PG16 arcreel_m8_ev> uv run alembic heads",
+      "exit": 0,
+      "passed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "log_sha256": "090c8874980fc0137b127e59fed7f1977a2cb0f2ad203b22e88ccbb0d4a8c828"
+    },
+    {
+      "name": "a2_a3_postgres",
+      "command": "DATABASE_URL=<PG16 arcreel_m8_ev> uv run python -m pytest -q -p no:randomly --timeout 300 <M8 integration, M8 router, M8 repository, M7 promotion repository, master authority unit, Gate C/D master authority routes, master authority backfill>",
+      "exit": 0,
+      "passed": 95,
+      "skipped": 0,
+      "failed": 0,
+      "log_sha256": "d428077e230bbdb776e49a07daf77fe79dc3530960e1b3c426000b07981ef2c4"
+    },
+    {
+      "name": "architecture",
+      "command": "uv run python -m pytest -q tests/unit/r2/test_m8_architecture_boundaries.py tests/unit/r2/test_master_authority_boundaries.py",
+      "exit": 0,
+      "passed": 8,
+      "skipped": 0,
+      "failed": 0,
+      "log_sha256": "aadb8c24e65e8212c0ff1abfbf1dd586afd0c0e475543c44cff10f8e433d1e11"
+    },
+    {
+      "name": "scope_verifier",
+      "command": "uv run python scripts/r2/verify_m8_scope.py docs/r2/evidence/R2_M8_BASELINE.json --donor DramaClaw=<clone> --donor OpenMontage=<clone>",
+      "exit": 0,
+      "passed": 0,
+      "skipped": 0,
+      "failed": 0,
+      "log_sha256": "8147ed8a617a62698b8cc0b1b43cddd0e99051cef3c5844af44ab671d82f9bf5"
+    },
+    {
+      "name": "parity_verifier",
+      "command": "uv run python -m pytest -q tests/unit/scripts/r2/test_verify_donor_parity.py tests/unit/r2/advanced_creative/test_parity.py",
+      "exit": 0,
+      "passed": 25,
+      "skipped": 0,
+      "failed": 0,
+      "log_sha256": "415423db6f131587a6014ec0d071a1c40e8e1cc5cab637a33ee04f503681f9e6"
+    },
+    {
+      "name": "backend_broad",
+      "command": "uv run python -m pytest -n 4 --dist loadfile -q --ignore=<each excluded_suites path> (SQLite)",
+      "exit": 0,
+      "passed": 15265,
+      "skipped": 53,
+      "failed": 0,
+      "log_sha256": "c4bd85557bda15a0247e71ce89033eae8b67f42b0e7894c5040df418c0c7e264"
+    }
+  ],
+  "fault_matrix": [
+    {
+      "name": "exact replay returns the stored receipt before currentness checks",
+      "tests": [
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_a_previewed_format_candidate_replaces_the_slot_master_once",
+        "tests/unit/r2/advanced_creative/test_exploration_promotion.py::test_an_exact_replay_returns_the_receipt_before_any_currentness_check"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "stale bindings write nothing (expiry, preview digest, scope)",
+      "tests": [
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_a_stale_or_foreign_binding_writes_nothing"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "moved master or candidate head refuses the promotion",
+      "tests": [
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_a_moved_master_or_candidate_head_refuses_the_promotion"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "a stored payload changed under its digest is refused (review 1, finding 1)",
+      "tests": [
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_a_stored_payload_changed_under_its_digest_is_refused"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "an object registered for another slot is refused as an M8 error (review 1, finding 5)",
+      "tests": [
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_an_object_registered_for_another_slot_is_refused"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "authority failure before and after M7 staged its writes rolls every row back",
+      "tests": [
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_an_authority_failure_rolls_every_row_back",
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_a_failure_after_the_authority_staged_its_writes_rolls_every_row_back"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "a row-lock holder and an unserialized M7 promotion of one slot do not deadlock (PostgreSQL, forced interleaving; review 1, finding 2, V2-02c)",
+      "tests": [
+        "tests/integration/lib/db/repositories/test_host_hardening_promotion.py::test_a_promotion_waits_on_a_held_authority_row_before_appending_history"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "V2-02d track, not gating M8-A (amendment 12): a Gate C approval inside the backfill's check-to-promote window is not overwritten (PostgreSQL; review 2, finding 1)",
+      "tests": [
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_gate_c_approval_between_the_head_check_and_the_promotion_is_not_overwritten"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "V2-02d track, not gating M8-A (amendment 12): every backfill outcome follows the V2-02d outcome model: unverifiable versions and invalid metadata are diverged, unreadable manifests are reported, conflicts roll back, a missing ffprobe exits 3 (reviews 3 to 6)",
+      "tests": [
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_missing_version_file_is_reported_and_the_run_continues",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_rerun_reports_a_version_whose_bytes_changed_as_diverged",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_an_unmanaged_or_malformed_version_record_is_reported_and_the_run_continues",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_file_failure_during_registration_rolls_the_artifact_back_and_the_run_continues",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_an_episode_master_whose_metadata_does_not_validate_is_reported",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_an_unreadable_manifest_is_reported_and_exits_2",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_conflict_after_registration_rolls_the_candidate_back",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_missing_media_probe_fails_the_run_before_any_write",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_database_head_without_a_projection_is_reported",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_projection_removed_after_the_scan_is_not_promoted",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_project_that_vanishes_during_all_is_reported_and_the_run_continues",
+        "tests/integration/scripts/r2/test_backfill_master_authority.py::test_a_media_probe_lost_during_the_run_exits_3"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "concurrent promotions of one preview have one winner (PostgreSQL)",
+      "tests": [
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_concurrent_promotions_of_one_preview_have_one_winner"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "concurrent genesis, append and replay (PostgreSQL)",
+      "tests": [
+        "tests/integration/lib/db/repositories/test_advanced_creative.py::test_concurrent_genesis_has_one_winner",
+        "tests/integration/lib/db/repositories/test_advanced_creative.py::test_concurrent_appends_on_one_head_have_one_winner",
+        "tests/integration/lib/db/repositories/test_advanced_creative.py::test_concurrent_replays_of_one_command_write_once"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "lock order command -> head -> preview -> slot, one commit",
+      "tests": [
+        "tests/unit/r2/advanced_creative/test_exploration_promotion.py::test_locks_are_taken_in_the_adr_order_and_the_promotion_commits_once",
+        "tests/unit/r2/advanced_creative/test_exploration.py::test_a_preview_locks_the_command_then_the_head_and_binds_the_current_master"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "unavailable targets (Canvas, manifest slot, ProductionBinding) write nothing",
+      "tests": [
+        "tests/integration/r2/advanced_creative/test_promotion_atomicity.py::test_unavailable_targets_are_refused_before_any_write",
+        "tests/unit/r2/advanced_creative/test_exploration.py::test_unavailable_targets_write_nothing"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "evidence keys are scoped, match the ORM and never cascade (review 1, findings 3 and 4)",
+      "tests": [
+        "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py::test_keys_are_scoped_match_the_orm_and_never_cascade"
+      ],
+      "result": "PASS"
+    }
+  ],
+  "cross_scope_results": [
+    {
+      "name": "foreign and unknown identities are indistinguishable on read and append",
+      "tests": [
+        "tests/integration/lib/db/repositories/test_advanced_creative.py::test_a_foreign_scope_is_indistinguishable_from_an_unknown_candidate",
+        "tests/integration/server/routers/test_advanced_creative_router.py::test_a_foreign_revision_is_indistinguishable_from_an_unknown_one"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "a genesis reusing a foreign ID behaves like a new one (review 1, finding 3)",
+      "tests": [
+        "tests/integration/server/routers/test_advanced_creative_router.py::test_a_genesis_reusing_a_foreign_id_is_indistinguishable_from_a_new_one"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "the database refuses evidence bound to a preview of another scope (PostgreSQL; review 2, finding 2)",
+      "tests": [
+        "tests/integration/lib/db/repositories/test_advanced_creative.py::test_the_database_refuses_an_authorization_bound_to_a_preview_of_another_scope",
+        "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py::test_keys_are_scoped_match_the_orm_and_never_cascade"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "a request body cannot inject another user or project",
+      "tests": [
+        "tests/integration/server/routers/test_advanced_creative_router.py::test_a_body_cannot_inject_another_scope",
+        "tests/unit/r2/advanced_creative/test_exploration.py::test_an_append_outside_the_callers_scope_is_not_found",
+        "tests/unit/r2/advanced_creative/test_exploration_promotion.py::test_an_authorization_outside_the_callers_scope_is_not_found"
+      ],
+      "result": "PASS"
+    }
+  ],
+  "architecture_results": [
+    {
+      "name": "M8 domain has no persistence/server/provider/foreign-writer import",
+      "tests": [
+        "tests/unit/r2/test_m8_architecture_boundaries.py::test_the_m8_domain_carries_no_persistence_server_provider_or_foreign_writer_import"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "only promotion.py invokes the authority adapter",
+      "tests": [
+        "tests/unit/r2/test_m8_architecture_boundaries.py::test_only_the_promotion_module_invokes_the_authority_adapter"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "the M8 repository never commits",
+      "tests": [
+        "tests/unit/r2/test_m8_architecture_boundaries.py::test_the_m8_repository_never_commits"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "one router registration behind auth and the migration gate",
+      "tests": [
+        "tests/unit/r2/test_m8_architecture_boundaries.py::test_the_m8_router_is_registered_once_behind_auth_and_the_migration_gate"
+      ],
+      "result": "PASS"
+    },
+    {
+      "name": "single AtomicPromotionService construction (V2-02)",
+      "tests": [
+        "tests/unit/r2/test_master_authority_boundaries.py::test_only_the_master_authority_unit_constructs_the_promotion_service"
+      ],
+      "result": "PASS"
+    }
+  ],
+  "excluded_suites": [
+    {
+      "path": "tests/e2e",
+      "reason": "Real Remotion/ffmpeg render suite (minutes per test); sponsor instruction to limit full runs. It exercises no M8-A code. The Gate C master authority path it shares ran in a0_a3_sqlite and a2_a3_postgres."
+    },
+    {
+      "path": "tests/integration/r2/m3/test_golden_a_composition.py",
+      "reason": "Real Remotion/ffmpeg render suite (minutes per test); sponsor instruction to limit full runs. It exercises no M8-A code. The Gate C master authority path it shares ran in a0_a3_sqlite and a2_a3_postgres."
+    },
+    {
+      "path": "tests/integration/r2/m3/test_golden_a_end_to_end.py",
+      "reason": "Real Remotion/ffmpeg render suite (minutes per test); sponsor instruction to limit full runs. It exercises no M8-A code. The Gate C master authority path it shares ran in a0_a3_sqlite and a2_a3_postgres."
+    },
+    {
+      "path": "tests/integration/r2/m3/test_golden_a_real_media_closure.py",
+      "reason": "Real Remotion/ffmpeg render suite (minutes per test); sponsor instruction to limit full runs. It exercises no M8-A code. The Gate C master authority path it shares ran in a0_a3_sqlite and a2_a3_postgres."
+    },
+    {
+      "path": "tests/integration/r2/m3/test_local_production.py",
+      "reason": "Real Remotion/ffmpeg render suite (minutes per test); sponsor instruction to limit full runs. It exercises no M8-A code. The Gate C master authority path it shares ran in a0_a3_sqlite and a2_a3_postgres."
+    },
+    {
+      "path": "tests/integration/r2/test_m6_dual_profile_acceptance.py",
+      "reason": "Real Remotion/ffmpeg render suite (minutes per test); sponsor instruction to limit full runs. It exercises no M8-A code. The Gate C master authority path it shares ran in a0_a3_sqlite and a2_a3_postgres."
+    }
+  ],
+  "required_skips": [],
+  "material_unknowns": [],
+  "coverage_limits": [
+    "Amendment 12 (sponsor decision) scopes this acceptance to M8-A and V2-02c. The V2-02d backfill rows in the fault matrix record its tests, but V2-02d is accepted on its own V2 track. Non-blocking findings are recorded here and do not open a new review round.",
+    "The concurrent promotion, genesis, append and replay tests start two operations with asyncio.gather. They assert exactly one winner, but they do not force a particular lock interleaving.",
+    "The forced interleavings are proven for the slot row (V2-02c test) and for the backfill window (V2-02d test). Its lock holder runs the same no-op UPDATE as HostSlotAuthority.lock_slot, but it is not a full M8 promotion.",
+    "The historical logs are bound by sha256; the reviewer reads them but cannot rerun them in its read-only sandbox.",
+    "Graph queries were not usable for this worktree in the reviews (approval-blocked). The single caller of promote_registered rests on source search and the architecture test."
+  ],
+  "deviations": [
+    {
+      "item": "CanonicalJsonObject",
+      "planned": "spec \u00a74 models verbatim",
+      "implemented": "an as_mapping model_serializer that dumps a JSON object; Decimal becomes int, or float if exact, otherwise it raises",
+      "reason": "Canonical digests need a deterministic JSON object; the model fields are unchanged."
+    },
+    {
+      "item": "router test tier and names",
+      "planned": "tests/unit/server/routers, tests/unit/r2/advanced_creative/test_promotion.py",
+      "implemented": "tests/integration/server/routers/test_advanced_creative_router.py, tests/unit/r2/advanced_creative/test_exploration_promotion.py",
+      "reason": "audit_tests forbids a real DB in the unit tier, and the basename clashed with the host_hardening test."
+    },
+    {
+      "item": "candidate identity keys",
+      "planned": "PK candidate_id and PK (candidate_id, revision), each with a unique scope constraint",
+      "implemented": "PK (user_id, project_name, candidate_id[, revision]); preview and receipt revision FKs carry the scope",
+      "reason": "Spec: all public reads and writes scope by (user_id, project_name), and foreign and unknown IDs are indistinguishable. The global key made genesis on a foreign ID a 409 (ADR-0097 review round 1, rule 3)."
+    },
+    {
+      "item": "preview references",
+      "planned": "FK preview (by preview_id)",
+      "implemented": "unique (user_id, project_name, preview_id) on previews; authorization and receipt FKs carry the scope",
+      "reason": "Review round 2, finding 2: the database must refuse evidence bound to a preview from another scope."
+    },
+    {
+      "item": "owner foreign key",
+      "planned": "no cascade deletion from any evidence table",
+      "implemented": "users.id ON DELETE RESTRICT on all six tables, instead of the UserOwnedMixin CASCADE",
+      "reason": "It implements the plan rule; the mixin default contradicted it."
+    },
+    {
+      "item": "ARTIFACT_SLOT scope",
+      "planned": "promotion into an artifact slot",
+      "implemented": "ADR-0097: an existing registered M7 candidate object is promoted into a non-manifest slot; verify_masters is scoped to EPISODE_VIDEO keys",
+      "reason": "ADR-0095 and ADR-0096 authority boundaries (amendment 4)."
+    },
+    {
+      "item": "M7 master authority backfill",
+      "planned": "no M7 change",
+      "implemented": "V2-02d (40337fe3, amendment 7) and its follow-ups (079679fb, amendment 8; fef820c3, amendment 9; 40972905, amendment 10; fc8bda2d, amendment 11): each artifact is verified, decided and promoted in one serialized_artifact transaction",
+      "reason": "Review 2, finding 1 (race with Gate C), review 3 (missing or changed selected version), review 4 (unmanaged snapshot path), review 5 (invalid metadata, missing ffprobe) and review 6 (exhaustive sweep: unprojected heads, scan-to-lock changes, vanishing projects)."
+    },
+    {
+      "item": "M7 promotion write order",
+      "planned": "no M7 change",
+      "implemented": "V2-02c (34bd4346, amendment 6): the pointer compare-and-set runs before the head version append",
+      "reason": "Review 1, finding 2: the old order could deadlock against every row-lock holder."
+    }
+  ],
+  "review_rounds": [
+    {
+      "round": 1,
+      "reviewer": "codex",
+      "reviewed_range": "dc13cc93..21821568",
+      "verdict": "CHANGES_REQUIRED",
+      "findings": [
+        {
+          "severity": "High",
+          "summary": "the promotion trusted the stored payload digest without recomputing it",
+          "resolution": "recomputed under the locks (e87fbdf3, rebased from 1066423d)"
+        },
+        {
+          "severity": "High",
+          "summary": "M7 appended history before the row lock: deadlock against an M8 slot lock",
+          "resolution": "V2-02c on r2-v2/main (34bd4346), amendment 6, rebase"
+        },
+        {
+          "severity": "Medium",
+          "summary": "genesis on a foreign candidate ID returned 409 where an unknown ID returns 200",
+          "resolution": "scoped candidate keys (e87fbdf3, rebased from 1066423d)"
+        },
+        {
+          "severity": "Medium",
+          "summary": "evidence tables cascaded on user deletion",
+          "resolution": "users.id RESTRICT (e87fbdf3, rebased from 1066423d)"
+        },
+        {
+          "severity": "Medium",
+          "summary": "an object registered for another slot reached an unhandled M7 error",
+          "resolution": "slot check under the lock plus M7 error mapping (e87fbdf3, rebased from 1066423d)"
+        }
+      ],
+      "resolution_commit": "e87fbdf30c542429cd498822576750119cff3112"
+    },
+    {
+      "round": 2,
+      "reviewer": "codex",
+      "reviewed_range": "dc13cc93..f606ac06",
+      "verdict": "CHANGES_REQUIRED",
+      "findings": [
+        {
+          "severity": "High",
+          "summary": "the master authority backfill decided on a head outside the row lock and could overwrite a concurrent Gate C approval",
+          "resolution": "V2-02d on r2-v2/main (40337fe3), amendment 7, rebase"
+        },
+        {
+          "severity": "Medium",
+          "summary": "authorization and receipt foreign keys referenced a preview by preview_id alone",
+          "resolution": "scoped preview references (d61aa021, rebased from 32f97d46)"
+        }
+      ],
+      "resolution_commit": "d61aa021a75bf5f54d79d57333b99425fcad24d6"
+    },
+    {
+      "round": 3,
+      "reviewer": "codex",
+      "reviewed_range": "dc13cc93..07cb27f9",
+      "verdict": "CHANGES_REQUIRED",
+      "findings": [
+        {
+          "severity": "Medium",
+          "summary": "a missing selected snapshot file raised FileNotFoundError and aborted the backfill run",
+          "resolution": "V2-02d follow-up on r2-v2/main (079679fb), amendment 8, rebase"
+        },
+        {
+          "severity": "Medium",
+          "summary": "a backfill rerun reported a head as current without re-hashing the selected version",
+          "resolution": "V2-02d follow-up on r2-v2/main (079679fb), amendment 8, rebase"
+        }
+      ],
+      "resolution_commit": "22b02769162a8dda209965fe2fd77719f2bc8c90"
+    },
+    {
+      "round": 4,
+      "reviewer": "codex",
+      "reviewed_range": "dc13cc93..809e1358",
+      "verdict": "CHANGES_REQUIRED",
+      "findings": [
+        {
+          "severity": "Medium",
+          "summary": "an unmanaged snapshot path raised UnmanagedSnapshotPathError and aborted the backfill run",
+          "resolution": "second V2-02d follow-up on r2-v2/main (fef820c3): any unverifiable selected version is diverged; amendment 9, rebase"
+        }
+      ],
+      "resolution_commit": "74ef2a92c18160a2baa486c510712f2903374b91"
+    },
+    {
+      "round": 5,
+      "reviewer": "codex",
+      "reviewed_range": "dc13cc93..96a84875",
+      "verdict": "CHANGES_REQUIRED",
+      "findings": [
+        {
+          "severity": "Medium",
+          "summary": "episode-video R2 metadata that failed validation was silently omitted, so a backfill could exit 0 with an unbackfilled master",
+          "resolution": "third V2-02d follow-up (40972905): one outcome model; invalid metadata is diverged; amendment 10, rebase"
+        },
+        {
+          "severity": "Medium",
+          "summary": "a missing ffprobe reported every master as diverged instead of failing as infrastructure",
+          "resolution": "third V2-02d follow-up (40972905): exit 3 before any write"
+        }
+      ],
+      "resolution_commit": "ed9996744994e2c8302745e475958eb0007c4639"
+    },
+    {
+      "round": 6,
+      "reviewer": "codex",
+      "reviewed_range": "dc13cc93..72d1de78",
+      "verdict": "CHANGES_REQUIRED",
+      "findings": [
+        {
+          "severity": "High",
+          "summary": "R6-1: an episode-video database head without a manifest projection could exit 0",
+          "resolution": "fourth V2-02d follow-up (fc8bda2d): heads are reconciled against the projection; amendment 11, rebase"
+        },
+        {
+          "severity": "High",
+          "summary": "R6-2: a projection changed between the scan and the row lock could still be promoted",
+          "resolution": "fourth V2-02d follow-up (fc8bda2d): the manifest is read again under the lock"
+        },
+        {
+          "severity": "High",
+          "summary": "R6-3: a project vanishing during --all aborted the run",
+          "resolution": "fourth V2-02d follow-up (fc8bda2d): path lookup failures are reported unreadable per project"
+        },
+        {
+          "severity": "Low",
+          "summary": "R6-4: the skipped outcome was unreachable",
+          "resolution": "removed (fc8bda2d)"
+        },
+        {
+          "severity": "Low",
+          "summary": "R6-5: an ffprobe lost mid-run was reported as divergence",
+          "resolution": "exit 3 (fc8bda2d)"
+        },
+        {
+          "severity": "Low",
+          "summary": "R6-6: the version-0 authority lock row survives an unsuccessful artifact",
+          "resolution": "documented in the outcome model (fc8bda2d)"
+        }
+      ],
+      "resolution_commit": "b72df36ba145befbcc18a42dd920cc518462b40f"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "alembic/versions/8a8c4a0e0001_add_exploration_authority.py",
+      "sha256": "30c9430238552b3210e451d88526f6d3afb5c95bd4750c50eb9c2503e06d0b56"
+    },
+    {
+      "path": "docs/adr/0097-m8a-promotes-registered-candidate-objects-into-non-manifest-slots.md",
+      "sha256": "e6067b1267ebdfddb4cef48f143667ea174efb213088358d9078f995a90446ff"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_BASELINE.json",
+      "sha256": "5e03c31fbfb92bc6e549fe2e30b2b931c5f63aa6185b89400c3d34acecaa7a5b"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_4_2026-09-29.json",
+      "sha256": "cba0ac6bf9179dc9466a701e7035668118d0b13241adeb80b0f2988e04e29db2"
+    },
+    {
+      "path": "docs/r2/evidence/schemas/R2_M8_BASELINE.schema.json",
+      "sha256": "a2184c4b9f720fda9912a417dee286e5f796aa83ef6ce9825392850bc4cff08e"
+    },
+    {
+      "path": "lib/db/models/__init__.py",
+      "sha256": "8c52986fc0b369bc403ab36cc139b5a6e3889501d55e145b12d642bb26afe31e"
+    },
+    {
+      "path": "lib/db/models/advanced_creative.py",
+      "sha256": "d7f5b6b060b3610fec27d861f24b39c91f7f629eab2321548465465de85cb288"
+    },
+    {
+      "path": "lib/db/repositories/__init__.py",
+      "sha256": "6657d4d78d3636a0e20fdc5caeefae2f6b29f40ab0a32993ad7182e395d47c84"
+    },
+    {
+      "path": "lib/db/repositories/advanced_creative.py",
+      "sha256": "8d77c22c5b7638c27f92ea935932315003017e857e64ed53afbcd0f234812a82"
+    },
+    {
+      "path": "lib/i18n/en/errors.py",
+      "sha256": "232fb3e6fb1184e9836c2aa458d01925808af32a7b53ff9d2ccf4b1755f8fdc4"
+    },
+    {
+      "path": "lib/i18n/vi/errors.py",
+      "sha256": "79799ab5f20bd6c5e234173c6a013c89f412eb9902353c79b26e9ce04375293b"
+    },
+    {
+      "path": "lib/i18n/zh/errors.py",
+      "sha256": "d527a3fa84e9603dbd3bd8dcf1d6256507331349787241dcf379a5f4901f23bc"
+    },
+    {
+      "path": "r2/advanced_creative/__init__.py",
+      "sha256": "3b047728638b83f5de1f2ef0d382b4c231116b502643e327a6cf38286c91754a"
+    },
+    {
+      "path": "r2/advanced_creative/digests.py",
+      "sha256": "f9e4357a14ab0b55405c5231b84c96069ebb4b207171c91328e9aaaa71f573fa"
+    },
+    {
+      "path": "r2/advanced_creative/errors.py",
+      "sha256": "cd9b94977d6d72e168726e4ee104a9dcf770e1e9973510d1f8187ebe7081dee0"
+    },
+    {
+      "path": "r2/advanced_creative/exploration.py",
+      "sha256": "41d142e28f4dbbbd3c20d8ca5cf60f31d62df244b45a7c17a6fe7982dd1c97a0"
+    },
+    {
+      "path": "r2/advanced_creative/parity.py",
+      "sha256": "3ff7c9ebf257f52562210a9b8ace1b0cf7ad81ff2f169cccbc21810f55703821"
+    },
+    {
+      "path": "r2/advanced_creative/ports.py",
+      "sha256": "9b156d986128c0835ac2218f45847753ff1431ce722818974ff9ed646fce44e2"
+    },
+    {
+      "path": "r2/advanced_creative/promotion.py",
+      "sha256": "65ca790f4c01669ac3eeac195fb9083ec128c1727e047369926786fcff91a1b6"
+    },
+    {
+      "path": "r2/contracts/__init__.py",
+      "sha256": "0f8c544b159c23f8d7035d8e00a271845873559506379ec6ba6fc3f70d863162"
+    },
+    {
+      "path": "r2/contracts/advanced_creative.py",
+      "sha256": "094437eeb37b3fdd995c42bfaa4d634dfb4c6e3464705e2191cedf8b0b18f1e7"
+    },
+    {
+      "path": "r2/host_hardening/master_authority.py",
+      "sha256": "1aedbd46b5034a60e4c9357025328443b0b3815ac766e739dfa2836324107356"
+    },
+    {
+      "path": "scripts/r2/verify_donor_parity.py",
+      "sha256": "1ef3f384360cf971c0ee015d46ff8c479920084c6509e5fa012c81778ac29f7d"
+    },
+    {
+      "path": "scripts/r2/verify_m8_evidence.py",
+      "sha256": "8e2229cd61bd7d0f14644f0dc9f5fa7e0b55c22537d9764c5f2863c43d344f9a"
+    },
+    {
+      "path": "scripts/r2/verify_m8_scope.py",
+      "sha256": "e3836fc911858eb3b61dab04362039e617fcd97172fc1aa5af9e2cb450d10fd6"
+    },
+    {
+      "path": "server/app.py",
+      "sha256": "adfc8898c4079f1d0f19890e321a662ebe0c6ee2831ab24d1176a02225d1db6e"
+    },
+    {
+      "path": "server/routers/advanced_creative.py",
+      "sha256": "2a67e84b11a5013ee4e5ebe126981193dc89a881e89adc053a6d6a77f29e0021"
+    },
+    {
+      "path": "server/services/advanced_creative.py",
+      "sha256": "0d4fb39850de1911cda6b1e612983cc3242e0c1d978dd1b9304b2d82631b47f9"
+    },
+    {
+      "path": "server/services/master_authority.py",
+      "sha256": "7f9e55021561643b40bab28442893220cd7202a69c88fe0ce556c8db26e32e83"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+      "sha256": "291cae633ff90170b70898b83f7f99955ffe2103e83b6ebe6e86a85cbda70f1f"
+    },
+    {
+      "path": "tests/integration/lib/db/repositories/test_advanced_creative.py",
+      "sha256": "9308e7c4a89606f29e8b4acda41c0d1c4eb4eb679672423d6b3c0458d914c924"
+    },
+    {
+      "path": "tests/integration/r2/advanced_creative/test_promotion_atomicity.py",
+      "sha256": "b3fabba674200320944ee723474e50147d9099e37dbe6858dcc376b8b82c0b4d"
+    },
+    {
+      "path": "tests/integration/r2/host_hardening/test_master_authority_unit.py",
+      "sha256": "0908920f2447f485730546ae92c140871252a5c1b6841ed1a1c4811cf89455c7"
+    },
+    {
+      "path": "tests/integration/server/routers/test_advanced_creative_router.py",
+      "sha256": "62cd87865d3c37b41667c707220b03a6c48db7172b8db09ffeb87a00a17d24e6"
+    },
+    {
+      "path": "tests/unit/r2/advanced_creative/test_digests.py",
+      "sha256": "c8e3f82a92d07b906e64d8477c715d4b2c5c9e5bd609d2c8a5b3cf14831ad97a"
+    },
+    {
+      "path": "tests/unit/r2/advanced_creative/test_exploration.py",
+      "sha256": "a4e0e6621ee155e82d6af79740a67516645e36a5b8b9f00805c8ee074b99b646"
+    },
+    {
+      "path": "tests/unit/r2/advanced_creative/test_exploration_promotion.py",
+      "sha256": "19296aa40d2c3059632400da69b2e6e90a7ae877485ff4caab425f677716b2f3"
+    },
+    {
+      "path": "tests/unit/r2/advanced_creative/test_parity.py",
+      "sha256": "ad7d4b970e50077effd932c15eebb5255ae499b41690ebac6d6dbb963c191df3"
+    },
+    {
+      "path": "tests/unit/r2/contracts/test_advanced_creative.py",
+      "sha256": "c1520709fcde97101124dbd816fb2f434c9a724bc2c1838d8f71ecbc5b3afb1d"
+    },
+    {
+      "path": "tests/unit/r2/test_m8_architecture_boundaries.py",
+      "sha256": "1e3ceea4f497ee2026469fd4b1591a2d6b852563692c8856dcc54dad6cc3dc2f"
+    },
+    {
+      "path": "tests/unit/scripts/r2/test_verify_donor_parity.py",
+      "sha256": "d052d95e5547e4ee4c49597a80247e852dd9e410f51e1fb67814338bb3412ae6"
+    },
+    {
+      "path": "tests/unit/scripts/r2/test_verify_m8_evidence.py",
+      "sha256": "135c1b4bf6331ded123b45939f0afdfd15a496f4ab750d86679be3a2abdb37b2"
+    },
+    {
+      "path": "tests/unit/scripts/r2/test_verify_m8_scope.py",
+      "sha256": "81f10455a7597af3ee2127f0a867683368b337c4adf5e052af5a9b065c49af93"
+    }
+  ],
+  "independent_review": {
+    "reviewer": "codex",
+    "status": "PENDING"
+  },
+  "created_at": "2026-09-29T00:00:00Z"
+}
