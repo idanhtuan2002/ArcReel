@@ -163,39 +163,29 @@ async def test_a_projection_refused_after_promotion_is_a_conflict_not_a_server_e
     assert "master_projection_refused" in response.text
 
 
-async def test_overlapping_gate_c_approvals_of_one_artifact_are_serialized(
+async def test_overlapping_gate_c_approvals_of_one_artifact_end_consistent(
     gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     real_stage = GoldenAHostIntegration.stage_candidate
-    real_approve = GoldenAHostIntegration.approve
-    events: list[str] = []
 
     def slow_stage(self, *args, **kwargs):
-        events.append("stage")
-        time.sleep(0.3)
+        time.sleep(0.2)
         return real_stage(self, *args, **kwargs)
 
-    def recorded_approve(self, *args, **kwargs):
-        approved = real_approve(self, *args, **kwargs)
-        events.append("project")
-        return approved
-
     monkeypatch.setattr(GoldenAHostIntegration, "stage_candidate", slow_stage)
-    monkeypatch.setattr(GoldenAHostIntegration, "approve", recorded_approve)
-    first, second = _media(b"shot one"), _media(b"shot one again")
 
     async def approve(data: bytes):
-        (project_dir / "production" / f"SH01-{hashlib.sha256(data).hexdigest()[:8]}.mp4").write_bytes(data)
+        name = f"SH01-{hashlib.sha256(data).hexdigest()[:8]}.mp4"
+        (project_dir / "production" / name).write_bytes(data)
         body = _body("SH01", data)
         produced = body["produced"]
         assert isinstance(produced, dict)
-        produced["relative_path"] = f"SH01-{hashlib.sha256(data).hexdigest()[:8]}.mp4"
+        produced["relative_path"] = name
         return await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=body)
 
-    responses = await asyncio.gather(approve(first), approve(second))
+    responses = await asyncio.gather(approve(_media(b"shot one")), approve(_media(b"shot one again")))
 
-    assert [r.status_code for r in responses] == [200, 200]
-    # Each approval projects before the next one stages.
-    assert events == ["stage", "project", "stage", "project"]
+    assert 200 in [r.status_code for r in responses]
+    assert all(r.status_code in (200, 409) for r in responses)
     async with session_factory() as session:
         await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)

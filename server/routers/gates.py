@@ -56,7 +56,7 @@ from r2.contracts.gates import (
     PublishApprovalDecision,
     ScriptLockDecision,
 )
-from r2.host_hardening.master_authority import CandidateObjectConflictError, MasterDivergedError
+from r2.host_hardening.master_authority import CandidateObjectConflictError, MasterDivergedError, m7_candidate_id
 from r2.host_hardening.promotion import (
     CandidateArtifactMismatchError,
     PromotionExpectedVersionConflictError,
@@ -78,7 +78,12 @@ from r2.m3.host_integration import GoldenAHostIntegration, StagedOperationConfli
 from r2.m3.render_plan import RenderedCutAsset
 from r2.production.artifact_metadata import DependencySnapshot
 from server.auth import DOWNLOAD_TOKEN_EXPIRY_SECONDS, CurrentUser, create_download_token, verify_download_token
-from server.services.master_authority import artifact_master_lock, master_authority_unit, verify_masters
+from server.services.master_authority import (
+    MasterSupersededError,
+    master_authority_unit,
+    project_if_current,
+    verify_masters,
+)
 
 router = APIRouter()
 # Token-authenticated like the project ZIP export (ADR-0071): registered without the session dependency.
@@ -372,7 +377,17 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
 
         try:
-            return await run_noninterruptible_sync(lambda: _project_and_export(registered))
+            async with async_session_factory() as session:
+                return await project_if_current(
+                    session,
+                    user_id=user.id,
+                    project_name=project_name,
+                    artifact_key=registered.artifact_key,
+                    candidate_id=m7_candidate_id(registered.artifact_key, registered.candidate.id),
+                    project=lambda: run_noninterruptible_sync(lambda: _project_and_export(registered)),
+                )
+        except MasterSupersededError as exc:
+            raise HTTPException(status_code=409, detail=f"master_superseded: {exc}") from exc
         except PostApprovalExportError as exc:
             raise _gate_c_retry_error(req.approval_record) from exc
         except (KeyError, ValueError) as exc:
@@ -383,15 +398,7 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             ) from exc
 
     project_root = await run_noninterruptible_sync(project_dir.resolve)
-    # One artifact's stage, promotion and projection run under one lock, so projections cannot land
-    # out of promotion order.
-    async with artifact_master_lock(
-        async_session_factory,
-        user_id=user.id,
-        project_name=project_name,
-        artifact_key=host.artifact_key_for(req.target_ref),
-    ):
-        approved_master, export = await _stage_promote_project()
+    approved_master, export = await _stage_promote_project()
 
     receipt = FinalCutReceipt(
         user_id=user.id,

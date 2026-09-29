@@ -164,6 +164,9 @@ A file written into `output/` by another tool under the same name also makes the
   the summary. Re-approve the artifact through Gate C, which writes a new head and its projection.
 - **A failed Gate C** that fails after the database promotion converges on a retry with the
   same `approval_record`.
+- **Overlapping approvals.** Two Gate C approvals of one artifact at the same time end with the
+  newer database head projected. The superseded request gets 409 `master_superseded`, and
+  nothing further is needed.
 
 ## 5. Backup, restore and recovery
 

@@ -27,7 +27,11 @@ delegated the choice.
       `command_id` equal to the route's operation id. The promotion writes its receipt and
       the promoted event;
    3. project the file manifest through the existing `ProductionApprovalService`, which is
-      idempotent;
+      idempotent. The projection runs in a transaction that first rewrites the artifact's
+      authority row unchanged, which takes its write lock (the row on PostgreSQL, the database
+      on SQLite, across processes). It then projects only if the promoted candidate is still
+      the head. A superseded promotion is refused with 409 `master_superseded` and writes
+      nothing, so projections always follow the newest head;
    4. write the export copy, then the Gate C receipt.
 
    A failure after step 2 is retried by the same `approval_record`: every step replays.
@@ -40,7 +44,9 @@ delegated the choice.
      download.
    - The file checks already in `r2/m3/deliverables.py` stay as a second line.
 5. **Backfill.** `scripts/r2/backfill_master_authority.py` promotes every existing file master
-   that has no database head. It is operator-run, idempotent, and uses the deterministic command
+   that has no database head. Masters here are episode videos: Gate C's `resource_type` is
+   `videos` and its artifact keys are `episode_video`, so verification and backfill both cover
+   `EPISODE_VIDEO` only. It is operator-run, idempotent, and uses the deterministic command
    `backfill:<artifact_key>:<candidate_id>`.
    - It is a release step for existing deployments.
    - Offline `GoldenARunner` output stays file-only until it is backfilled.
