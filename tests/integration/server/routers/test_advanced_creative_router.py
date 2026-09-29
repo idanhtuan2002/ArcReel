@@ -216,7 +216,7 @@ def _project(root: Path, episodes: list[dict[str, object]], scripts: dict[str, b
     return ProjectManager(root)
 
 
-async def test_the_lineage_binds_the_indexed_script_of_the_episode(
+async def test_the_context_binds_the_indexed_script_and_the_session_author(
     m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     projects = _project(
@@ -226,12 +226,15 @@ async def test_the_lineage_binds_the_indexed_script_of_the_episode(
     )
     monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
 
-    first = await m8_client.get(f"{BASE}/lineage", params={"episode": 1})
-    second = await m8_client.get(f"{BASE}/lineage", params={"episode": 2})
+    first = await m8_client.get(f"{BASE}/context", params={"episode": 1})
+    second = await m8_client.get(f"{BASE}/context", params={"episode": 2})
 
     assert first.status_code == 200
-    assert first.json() == resolve_episode_lineage(PROJECT, 1, b"one").model_dump(mode="json")
-    assert second.json() == resolve_episode_lineage(PROJECT, 2, b"two").model_dump(mode="json")
+    assert first.json() == {
+        "lineage": resolve_episode_lineage(PROJECT, 1, b"one").model_dump(mode="json"),
+        "created_by": USER.id,
+    }
+    assert second.json()["lineage"] == resolve_episode_lineage(PROJECT, 2, b"two").model_dump(mode="json")
 
 
 @pytest.mark.parametrize(
@@ -244,7 +247,7 @@ async def test_the_lineage_binds_the_indexed_script_of_the_episode(
     ],
     ids=["unindexed-episode", "no-script-file", "missing-script", "script-outside-scripts"],
 )
-async def test_an_episode_without_a_readable_indexed_script_has_no_lineage(
+async def test_an_episode_without_a_readable_indexed_script_has_no_context(
     m8_client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -254,23 +257,23 @@ async def test_an_episode_without_a_readable_indexed_script_has_no_lineage(
     projects = _project(tmp_path, episodes, {"episode_1.json": b"one"})
     monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
 
-    response = await m8_client.get(f"{BASE}/lineage", params={"episode": episode})
+    response = await m8_client.get(f"{BASE}/context", params={"episode": episode})
 
     assert response.status_code == 404
 
 
-async def test_an_unknown_project_has_no_lineage(
+async def test_an_unknown_project_has_no_context(
     m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: ProjectManager(tmp_path))
 
-    response = await m8_client.get(f"{BASE}/lineage", params={"episode": 1})
+    response = await m8_client.get(f"{BASE}/context", params={"episode": 1})
 
     assert response.status_code == 404
 
 
 @pytest.mark.parametrize("query", ["", "?episode=0", "?episode=x"])
-async def test_the_lineage_episode_is_validated(m8_client: AsyncClient, query: str) -> None:
-    response = await m8_client.get(f"{BASE}/lineage{query}")
+async def test_the_context_episode_is_validated(m8_client: AsyncClient, query: str) -> None:
+    response = await m8_client.get(f"{BASE}/context{query}")
 
     assert response.status_code == 422

@@ -14,10 +14,16 @@ sponsor delegated the choice. The evidence is in
 
 ## Decision
 
-- A read-only route `GET /projects/{project_name}/m8/exploration/lineage?episode=N`
-  returns the `LineageBinding` the server resolves for the session user, the
-  project and the episode. The client sends it unchanged. The client never builds
-  lineage values itself.
+- A read-only route `GET /projects/{project_name}/m8/exploration/context?episode=N`
+  returns `{lineage, created_by}`. `lineage` is the `LineageBinding` the server
+  resolves for the session user, the project and the episode. `created_by` is the
+  session user's id, which append requires as the revision author; the client has
+  no other source for it. The client copies both unchanged and never builds them
+  itself.
+- A read-only route `GET /projects/{project_name}/m8/exploration/candidates/{candidate_id}`
+  returns the `CandidateHead` (current revision and CAS version) without any
+  revision body, so opening a candidate reads the head first and then one exact
+  revision. Without it, the client would have to page through full revision bodies.
 - Version 1 of the resolution:
   - `content_basis_digest` is the canonical digest of
     `{"basis_kind": "host_episode_script", "episode": N, "script_digest": "sha256:<hex>"}`,

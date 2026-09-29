@@ -37,6 +37,13 @@ class AppendRevisionRequest(M8ContractModel):
     command_id: str
 
 
+class ExplorationContext(M8ContractModel):
+    """What a client copies into a revision it appends: the lineage and the author identity."""
+
+    lineage: LineageBinding
+    created_by: str
+
+
 class CreatePromotionPreviewRequest(M8ContractModel):
     candidate_id: str
     revision: int
@@ -62,10 +69,15 @@ async def _run[T](operation: Callable[[], Awaitable[T]]) -> T:
         raise _api_error(error) from error
 
 
-@router.get("/projects/{project_name}/m8/exploration/lineage")
-async def get_lineage(project_name: str, user: CurrentUser, episode: int = Query(ge=1)) -> LineageBinding:
-    """The server-resolved lineage a revision for this episode binds (ADR-0098)."""
-    return await _run(lambda: episode_lineage(get_project_manager(), project_name, episode))
+@router.get("/projects/{project_name}/m8/exploration/context")
+async def get_context(project_name: str, user: CurrentUser, episode: int = Query(ge=1)) -> ExplorationContext:
+    """The server-resolved values a revision for this episode binds (ADR-0098)."""
+
+    async def operation() -> ExplorationContext:
+        lineage = await episode_lineage(get_project_manager(), project_name, episode)
+        return ExplorationContext(lineage=lineage, created_by=user.id)
+
+    return await _run(operation)
 
 
 @router.post("/projects/{project_name}/m8/exploration/revisions")

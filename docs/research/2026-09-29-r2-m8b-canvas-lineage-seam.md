@@ -65,7 +65,7 @@ these values?
 
 | Option | What | Assessment |
 |---|---|---|
-| A. Server-resolved lineage, read-only | A new `GET /projects/{p}/m8/exploration/lineage?episode=N` returns the `LineageBinding` a server resolver derives from host authority. The client sends it unchanged and computes `payload_digest` with a TypeScript port of the canonical encoder, pinned by a differential test against `digests.py`. Append is unchanged. | Additive. No accepted behaviour changes. The server stays the only source of lineage values. **Chosen.** |
+| A. Server-resolved lineage, read-only | A new `GET /projects/{p}/m8/exploration/context?episode=N` returns the `LineageBinding` a server resolver derives from host authority, and the author id append requires. The client sends it unchanged and computes `payload_digest` with a TypeScript port of the canonical encoder, pinned by a differential test against `digests.py`. Append is unchanged. | Additive. No accepted behaviour changes. The server stays the only source of lineage values. **Chosen.** |
 | B. Server stamps lineage at append | The client sends no lineage or digest. | Changes the accepted public request contract (`ExplorationRevision` is frozen and requires both). It needs the episode in the request. Rejected. |
 | C. Client-built lineage | The client fills placeholder or client-derived values. | Lineage becomes meaningless and forgeable, which contradicts spec §5. Rejected. |
 | D. A server digest helper route | The server returns `payload_digest` for a body. | One extra round trip for every autosave, plus the same resolver is still needed. Rejected; the differential test gives the same guarantee. |
