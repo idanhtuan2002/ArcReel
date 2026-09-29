@@ -21,6 +21,7 @@ from tests.integration.server.routers.test_gates_export import (
     USER,
     _approve_final,
     _approve_shot,
+    _body,
     _media,
     _publish,
     _sha,
@@ -122,3 +123,34 @@ async def test_a_diverged_master_is_refused_by_every_consuming_route(
     for response in (publish, token, composite):
         assert response.status_code == 409, response.text
         assert "master_diverged" in response.text
+
+
+async def test_a_refused_projection_check_writes_no_database_head(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(self, registered):
+        raise ValueError("candidate content_fingerprint does not match current semantic state")
+
+    monkeypatch.setattr(GoldenAHostIntegration, "check_approvable", refuse)
+    data = _media(b"shot one")
+    (project_dir / "production" / "SH01.mp4").write_bytes(data)
+    response = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=_body("SH01", data))
+
+    assert response.status_code == 409
+    assert "master_conflict" in response.text
+    assert await _count(session_factory, MasterHeadVersionModel) == 0
+
+
+async def test_a_projection_refused_after_promotion_is_a_conflict_not_a_server_error(
+    gate_export_client: AsyncClient, project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(self, *args, **kwargs):
+        raise ValueError("candidate content_fingerprint does not match current semantic state")
+
+    monkeypatch.setattr(GoldenAHostIntegration, "approve", refuse)
+    data = _media(b"shot one")
+    (project_dir / "production" / "SH01.mp4").write_bytes(data)
+    response = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=_body("SH01", data))
+
+    assert response.status_code == 409
+    assert "master_projection_refused" in response.text

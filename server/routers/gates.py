@@ -342,10 +342,16 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
     except StagedOperationConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    # The database master head is the authority (ADR-0096); the manifest master is projected after it.
-    version_file = await run_noninterruptible_sync(
-        lambda: host.version_file_for(req.target_ref, registered.host_version_ref)
-    )
+    # The database master head is the authority (ADR-0096); the manifest master is projected after it,
+    # so every check the projection makes runs first.
+    def _approvable_version_file():
+        host.check_approvable(registered)
+        return host.version_file_for(req.target_ref, registered.host_version_ref)
+
+    try:
+        version_file = await run_noninterruptible_sync(_approvable_version_file)
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
     try:
         async with async_session_factory() as session:
             await master_authority_unit(session).promote_staged(
@@ -365,6 +371,12 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         approved_master, export = await run_noninterruptible_sync(lambda: _project_and_export(registered))
     except PostApprovalExportError as exc:
         raise _gate_c_retry_error(req.approval_record) from exc
+    except (KeyError, ValueError) as exc:
+        # A concurrent change refused the projection after the database promotion. Master-consuming
+        # routes refuse the project as diverged until a new Gate C approval projects its head.
+        raise HTTPException(
+            status_code=409, detail=f"master_projection_refused: re-approve this artifact at Gate C ({exc})"
+        ) from exc
 
     receipt = FinalCutReceipt(
         user_id=user.id,

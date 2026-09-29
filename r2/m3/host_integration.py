@@ -342,6 +342,14 @@ class GoldenAHostIntegration:
             raise KeyError(f"{target_ref} has no host version {host_version_ref}")
         return VersionManager.resolve_snapshot_path(self.project_dir, self.resource_type, record["file"]).resolve()
 
+    def check_approvable(self, registered: RegisteredGoldenACandidate) -> None:
+        """Raise ``KeyError``/``ValueError`` if ``approve`` would refuse ``registered`` now."""
+        ProductionApprovalService(self._port(registered.candidate.target_ref)).check(
+            artifact_key=registered.artifact_key,
+            candidate=registered.candidate,
+            host_version_ref=registered.host_version_ref,
+        )
+
     def approve(
         self,
         registered: RegisteredGoldenACandidate,

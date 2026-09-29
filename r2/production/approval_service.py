@@ -23,16 +23,14 @@ class ProductionApprovalService:
     def __init__(self, host: ArtifactManifestPort) -> None:
         self._host = host
 
-    def promote(
+    def check(
         self,
         *,
         artifact_key: str,
         candidate: GenerationCandidate,
         host_version_ref: str,
-        approval_record: str,
-        selected_by: str,
-        selected_at: datetime,
-    ) -> PromotionResult:
+    ) -> R2ArtifactMetadata:
+        """Raise ``KeyError``/``ValueError`` if ``promote`` would refuse this candidate; return the metadata."""
         snapshot = self._host.load_artifact(artifact_key)
         if snapshot is None:
             raise KeyError(artifact_key)
@@ -51,6 +49,19 @@ class ProductionApprovalService:
             raise ValueError("candidate content_fingerprint does not match current semantic state")
         if not host_version_ref:
             raise ValueError("host_version_ref must be non-empty")
+        return metadata
+
+    def promote(
+        self,
+        *,
+        artifact_key: str,
+        candidate: GenerationCandidate,
+        host_version_ref: str,
+        approval_record: str,
+        selected_by: str,
+        selected_at: datetime,
+    ) -> PromotionResult:
+        metadata = self.check(artifact_key=artifact_key, candidate=candidate, host_version_ref=host_version_ref)
 
         existing = metadata.approved_master
         if (
