@@ -125,7 +125,7 @@ Round 6 (`dc13cc93..72d1de78`) swept the whole backfill against the model above.
 
 Non-episode manifest keys are never Gate C masters. The scanner leaves them out, so the summary has no `skipped` list (R6-4).
 
-A `diverged` or `unreadable` artifact gets no master head. `serialized_artifact` may leave its authority row at version 0, which is the lock row and is not a promoted master. `verify_masters` lists only rows above version 0 (R6-6).
+A `diverged` or `unreadable` artifact gets no master head written by the backfill; an existing head (for example one that names another candidate) is left unchanged. `serialized_artifact` may leave its authority row at version 0, which is the lock row and is not a promoted master. `verify_masters` lists only rows above version 0 (R6-6).
 
 ### Round 6 verification
 
@@ -139,3 +139,20 @@ A `diverged` or `unreadable` artifact gets no master head. `serialized_artifact`
 | Backfill tests on SQLite / PG16 (with Gate C/D master authority routes) | 17 passed, 1 skipped / 30 passed |
 | M7 unit, scripts/r2, Gate C/D/export routes and `tests/integration/server/services` on SQLite | 1177 passed, 5 skipped. `test_verify_m7_scope_git` fails only on the uncommitted tree; it was rerun after the commit. |
 | `ruff`, `basedpyright` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |
+
+## Acceptance (own V2 track, amendment 12)
+
+The independent Codex review of V2-02d (`task-mumqz1lr-oy26r0`, reviewed HEAD `68be75bf`) accepted the packet under the amendment 12 stopping rule. It found R6-1 to R6-6 FIXED, and every row of the revised outcome model matches the code. There is one non-blocking finding. N1 said the sentence "gets no master head" overstated the behavior for an artifact with an existing, different head; the sentence above is corrected accordingly.
+
+Two further items are recorded as limits, not defects:
+
+- R6-4 and R6-6 have no distinguishing test (code removal and documentation only).
+- `test_a_media_probe_lost_during_the_run_exits_3` exercises the mid-run loss only on a host where `ffprobe` is present at the start.
+
+Verdict (verbatim):
+
+```json
+{"status":"V2_02D_ACCEPTED","reviewed_head":"68be75bf943beed2a427d36ea2cd275497fb24ce","blocking_findings":[],"nonblocking_findings":["N1: evidence overstates that every diverged artifact has no master head"],"material_unknowns":["Tests and PostgreSQL concurrency behavior were not freshly executed in this read-only review."]}
+```
+
+The authoring agent ran the tests: see the per-round verification tables above and the M8-A evidence logs bound to `b72df36b`.
