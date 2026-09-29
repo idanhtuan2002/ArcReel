@@ -185,3 +185,66 @@ The graph project lookup succeeded, but subsequent graph status and search calls
 - The broad SQLite suites: 1249 passed, 2 skipped. The one failure before the fix was a stale test double signature, now fixed.
 - The PG16 master-authority, Gate and backfill suites: 40 passed.
 - Static gates: clean.
+
+---
+
+# Codex review 3 (job `task-mumcenxp-j9udvl`, reviewed HEAD `814a7244`), verbatim
+
+## 1. HEAD reviewed
+
+`814a7244b435364ab1a90d2f17af429f1b557b9` on `fix/r2-v2-02b-serialize-gate-c`; worktree clean. I reviewed `7666071b..814a7244` and the whole packet `cca1eeaf..814a7244`.
+
+## 2. Verdict
+
+**CHANGES_REQUIRED.** Staging now preserves an approved final’s semantic state, and the new test exercises the reported failure. A reader race remains during phase 2: a request can pass the master check before the new head commits, then read new dependencies paired with the old approved master before projection finishes.
+
+## 3. Per-finding table
+
+| Prior finding | Status | File:line | Test coverage yes/no |
+|---|---|---|---|
+| Export can run after an approval is superseded | **FIXED** | [gates.py:429](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:429), [master_authority.py:115](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/services/master_authority.py:115) | **Yes**, forced supersession at [test_gates_master_authority.py:180](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:180) |
+| File projection precedes database commit | **FIXED** for that ordering | [gates.py:422](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:422), [gates.py:429](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:429) | **No** phase 1 commit-failure injection; retry after a projection failure is exercised at [test_gates_master_authority.py:152](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:152) |
+| Timed overlap test does not force the critical interleaving | **PARTIALLY_FIXED** | Forced supersession at [test_gates_master_authority.py:191](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:191); timed test remains at [test_gates_master_authority.py:219](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:219) | **Yes** for supersession; **no** for the phase 2 reader window below |
+| Failed or in-flight stage can make the old final current against new dependencies | **PARTIALLY_FIXED** | Staging guard at [host_integration.py:278](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/host_integration.py:278); separate phase 2 semantic write at [gates.py:364](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:364) | **Yes** for failed staging at [test_gates_master_authority.py:250](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:250); **no** for a concurrent reader |
+| A committed head can remain unprojected after a crash | **PARTIALLY_FIXED** | Phase split at [gates.py:422](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:422), retry handling at [gates.py:440](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:440), operator recovery at [v1-operator.md:165](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/docs/r2/runbooks/v1-operator.md:165) | **Yes** for an injected failure followed by the same request at [test_gates_master_authority.py:152](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:152); **no** automatic recovery or crash test |
+
+## 4. New findings table
+
+| Severity | File:line | Scenario | Confidence |
+|---|---|---|---|
+| **High** | [gates.py:490](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:490), [gates.py:364](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:364), [gates.py:373](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:373), [deliverables.py:302](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/deliverables.py:302) | **Inferred interleaving from the cited code:** Gate D verifies old head A, then pauses. Phase 1 commits B. Phase 2 writes B’s current dependencies while the manifest still names A; before `approve` replaces A, Gate D resumes its separate deliverable read. Currency compares B’s dependencies and can report A’s unchanged export as current. Listing and download have the same separated check/read pattern at [gates.py:561](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:561) and [gates.py:589](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:589). No test forces this interleaving. | **High** on code path; runtime interleaving untested |
+
+First-ever approval has a manifest entry created during staging ([host_integration.py:268](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/host_integration.py:268)); replay recomputes `staged_dependencies` before taking the saved-version path ([gates.py:332](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:332), [host_integration.py:255](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/host_integration.py:255)). `promote` checks the restored manifest state ([approval_service.py:69](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/production/approval_service.py:69)). I found no separate defect in those paths by inspection. The new failed-stage test would fail with the guard removed: its final assertion expects 409 after the failed promotion ([test_gates_master_authority.py:268](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:268)).
+
+## 5. Commands run
+
+Read-only `git status`, `git rev-parse`, `git log`, both requested `git diff` ranges, and targeted `nl`/`rg` inspections. I attempted `TMPDIR=/tmp timeout 90s .venv/bin/python -m pytest -q -p no:cacheprovider tests/integration/server/routers/test_gates_master_authority.py`. Pytest failed before collection with `FileNotFoundError: No usable temporary directory found`.
+
+## 6. Coverage limits
+
+**No test passed in this review**; “test coverage” above means the test code exercises the path by inspection. Graph status, search, and coverage calls were blocked by the environment’s approval policy, so source and call-site inspection supplied the evidence. The offline Golden A runner also writes approved R2 metadata outside the Gate C route ([golden_a.py:300](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/golden_a.py:300), [golden_a.py:309](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/golden_a.py:309)); its run uses an `output_dir/host_project` checkout ([golden_a.py:257](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/golden_a.py:257)). I did not establish that it writes a live server project.
+
+## 7. JSON
+
+```json
+{"schema_version":1,"status":"V2_02B_NOT_ACCEPTED","reviewed_head":"814a7244b435364ab1a90d2f17af429f1b557b9a","reviewer":"codex","reviewed_at":"2026-09-29T07:18:28Z","required_skips":["Targeted pytest failed before collection: no usable temporary directory in the read-only sandbox"],"material_unknowns":["Phase 2 reader interleaving was established by source inspection but not fault-injected","Phase 1 commit failure and crash recovery were not executed","Graph status, search, and coverage were approval blocked"]}
+```
+
+## Resolution — `863541ff`
+
+| Finding | Fix | Test |
+|---|---|---|
+| High: a reader in the phase-2 window sees the new semantic state with the old approved master | `approve(..., semantic_state=)` hands the state to `ProductionApprovalService.promote`. It is checked against, then written with the approved master in the version promotion's single atomic manifest replacement. There is no separate semantic write, and `restore_semantic_state` is removed | `test_no_manifest_write_pairs_the_old_master_with_the_new_semantic_state` records every manifest write of the final. It fails at `814a7244` (verified in a detached worktree). Unit tests: `test_a_semantic_state_is_written_with_its_approved_master_in_one_update` and `test_a_candidate_is_checked_against_the_semantic_state_it_will_have` |
+| Partial: head unprojected after a crash | Fail-closed, with the documented retry or re-approval (runbook §4b). There is no automatic reconciler, because the projection needs the request's semantic arguments, which exist only in the request | retry test |
+
+**Remaining reader window, by design.** Inside the version promotion, the host version file is
+restored before the manifest update. A reader in between sees the new current file with the old
+approved master. That is a digest mismatch, which `current_deliverables` treats as not
+exportable (fail-closed). This is the unchanged M2 ordering.
+
+**Verification at `863541ff`:**
+
+- `test_gates_master_authority.py`: 9 passed ×2 on PG16.
+- The PG16 unit, Gate and backfill suites: 40 passed.
+- The broad SQLite suites: 1253 passed, 2 skipped.
+- Static gates: clean.
