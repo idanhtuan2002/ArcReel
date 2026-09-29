@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { graphFootprint } from "../../../../../tools/parity/dramaclaw/timingRunner";
+import type { CanvasGraphState } from "../domain/types";
 import { timingOut, writeTiming } from "./timing";
 import fixtures from "../__fixtures__/parity/graph.json";
 import {
   type FixtureCase,
   type GraphObservation,
+  replayGraphCase,
   runGraphCase,
 } from "./graphAdapter";
 
@@ -30,6 +33,6 @@ describe("graph parity fixtures on the port", () => {
   });
 
   it.runIf(Boolean(timingOut))("records the timing of every case for the parity report", async () => {
-    await expect(writeTiming(cases, runGraphCase)).resolves.toBeUndefined();
+    await expect(writeTiming(cases, (fixture) => replayGraphCase(fixture).state, (state) => graphFootprint(state as CanvasGraphState))).resolves.toBeUndefined();
   });
 });

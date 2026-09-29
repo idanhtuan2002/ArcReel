@@ -452,4 +452,56 @@ describe("kept-aside work and late responses", () => {
 
     expect(readDraft(SCOPE)?.nodes.map((node) => node.id)).toEqual(["a", "b"]);
   });
+
+  it("settles two kept-aside versions one after the other without losing either", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeConflictSnapshot(SCOPE, {
+      nodes: [note("a", "older")],
+      edges: [],
+      viewport: null,
+      metadata: null,
+      timestamp: new Date(0).toISOString(),
+    });
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+
+    persistence.resolveConflict("mine");
+    timers.fire(300);
+
+    expect(store().graph.nodes[0].data.label).toBe("older");
+    expect(store().conflict?.nodes[0].data.label).toBe("mine");
+    expect(readConflictSnapshot(SCOPE)?.nodes[0].data.label).toBe("mine");
+
+    persistence.close();
+    await persistence.openCanvas(PROJECT, 1);
+    expect(store().conflict?.nodes[0].data.label).toBe("mine");
+
+    persistence.resolveConflict("mine");
+    await autosave();
+
+    expect(store().conflict).toBeNull();
+    expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes[0].body.data).toMatchObject({ label: "mine" });
+  });
+
+  it("keeps a waiting draft when the Canvas closes during a stacked conflict", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeConflictSnapshot(SCOPE, {
+      nodes: [note("a", "older")],
+      edges: [],
+      viewport: null,
+      metadata: null,
+      timestamp: new Date(0).toISOString(),
+    });
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+
+    store().edit((graph) => addNode(graph, note("while-deciding")));
+    timers.fire(300);
+    persistence.close();
+
+    expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
+  });
 });
+

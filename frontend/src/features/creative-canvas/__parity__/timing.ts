@@ -12,10 +12,11 @@ export const timingOut = env.PARITY_TIMING_OUT;
 export async function writeTiming<C extends { id: string }>(
   cases: readonly C[],
   run: (fixture: C) => unknown,
+  footprint?: (result: unknown) => number,
 ): Promise<void> {
   if (!timingOut) return;
   // node:fs through a runtime specifier: the frontend TypeScript project carries no Node types.
   const specifier = "node:fs";
   const fs = (await import(/* @vite-ignore */ specifier)) as { writeFileSync(path: string, data: string): void };
-  fs.writeFileSync(timingOut, `${JSON.stringify(await timeCases(cases, run), null, 2)}\n`);
+  fs.writeFileSync(timingOut, `${JSON.stringify(await timeCases(cases, run, footprint), null, 2)}\n`);
 }

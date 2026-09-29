@@ -200,12 +200,17 @@ function apply(state: CanvasGraphState, op: FixtureOp): CanvasGraphState {
   }
 }
 
-export function runGraphCase(fixture: FixtureCase): GraphObservation[] {
+/** Replay a case; the final graph state is returned with the observations. */
+export function replayGraphCase(fixture: FixtureCase): { observations: GraphObservation[]; state: CanvasGraphState } {
   let state = createGraphState();
   const observations: GraphObservation[] = [];
   for (const op of fixture.ops) {
     state = apply(state, op);
     observations.push(observe(op.op, state));
   }
-  return observations;
+  return { observations, state };
+}
+
+export function runGraphCase(fixture: FixtureCase): GraphObservation[] {
+  return replayGraphCase(fixture).observations;
 }

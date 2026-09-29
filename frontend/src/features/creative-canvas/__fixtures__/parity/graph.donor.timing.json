@@ -1,130 +1,130 @@
 {
   "normalize-drops-dangling-edges": {
     "reps": 25,
-    "median_ms": 0.2039,
-    "p95_ms": 0.2574,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.0678,
+    "p95_ms": 0.1424,
+    "state_entries": 3,
     "storage_bytes": 0,
-    "observation_bytes": 308
+    "observation_bytes": 984
   },
   "normalize-detaches-missing-parent": {
     "reps": 25,
-    "median_ms": 0.1772,
-    "p95_ms": 0.1952,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.0611,
+    "p95_ms": 0.0657,
+    "state_entries": 2,
     "storage_bytes": 0,
-    "observation_bytes": 228
+    "observation_bytes": 876
   },
   "normalize-orders-parents-first": {
     "reps": 25,
-    "median_ms": 0.1896,
-    "p95_ms": 0.2142,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.0603,
+    "p95_ms": 0.0696,
+    "state_entries": 2,
     "storage_bytes": 0,
-    "observation_bytes": 233
+    "observation_bytes": 818
   },
   "delete-group-with-descendants": {
     "reps": 25,
-    "median_ms": 0.3357,
-    "p95_ms": 0.3736,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.1529,
+    "p95_ms": 0.1596,
+    "state_entries": 7,
     "storage_bytes": 0,
-    "observation_bytes": 1366
+    "observation_bytes": 1602
   },
   "delete-edge": {
     "reps": 25,
-    "median_ms": 0.3009,
-    "p95_ms": 0.3649,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.1369,
+    "p95_ms": 0.1602,
+    "state_entries": 5,
     "storage_bytes": 0,
-    "observation_bytes": 1170
+    "observation_bytes": 1359
   },
   "delete-to-empty": {
     "reps": 25,
-    "median_ms": 0.353,
-    "p95_ms": 0.3806,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.1851,
+    "p95_ms": 0.191,
+    "state_entries": 3,
     "storage_bytes": 0,
-    "observation_bytes": 1061
+    "observation_bytes": 1103
   },
   "clear-and-acknowledge": {
     "reps": 25,
-    "median_ms": 0.3098,
-    "p95_ms": 0.3452,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.152,
+    "p95_ms": 0.1722,
+    "state_entries": 1,
     "storage_bytes": 0,
-    "observation_bytes": 727
+    "observation_bytes": 728
   },
   "selection-resolved-on-undo": {
     "reps": 25,
-    "median_ms": 0.327,
-    "p95_ms": 0.368,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.173,
+    "p95_ms": 0.1875,
+    "state_entries": 1,
     "storage_bytes": 0,
-    "observation_bytes": 776
+    "observation_bytes": 754
   },
   "history-bounded-60-adds": {
     "reps": 25,
-    "median_ms": 4.4757,
-    "p95_ms": 4.6212,
-    "retained_heap_bytes": 0,
+    "median_ms": 4.2397,
+    "p95_ms": 4.763,
+    "state_entries": 1785,
     "storage_bytes": 0,
-    "observation_bytes": 5041
+    "observation_bytes": 359957
   },
   "history-measure-drag-resize": {
     "reps": 25,
-    "median_ms": 0.4762,
-    "p95_ms": 0.5026,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.2991,
+    "p95_ms": 0.3045,
+    "state_entries": 3,
     "storage_bytes": 0,
-    "observation_bytes": 1719
+    "observation_bytes": 1378
   },
   "connect-once": {
     "reps": 25,
-    "median_ms": 0.362,
-    "p95_ms": 0.4023,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.1862,
+    "p95_ms": 0.3399,
+    "state_entries": 8,
     "storage_bytes": 0,
-    "observation_bytes": 1171
+    "observation_bytes": 1840
   },
   "restore-history-bounded": {
     "reps": 25,
-    "median_ms": 0.5111,
-    "p95_ms": 0.5677,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.351,
+    "p95_ms": 0.3998,
+    "state_entries": 51,
     "storage_bytes": 0,
-    "observation_bytes": 531
+    "observation_bytes": 10603
   },
   "hydrate-draft": {
     "reps": 25,
-    "median_ms": 0.1757,
-    "p95_ms": 0.1916,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.0572,
+    "p95_ms": 0.081,
+    "state_entries": 1,
     "storage_bytes": 0,
-    "observation_bytes": 182
+    "observation_bytes": 707
   },
   "delete-unknown-and-empty": {
     "reps": 25,
-    "median_ms": 0.2269,
-    "p95_ms": 0.272,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.088,
+    "p95_ms": 0.0919,
+    "state_entries": 3,
     "storage_bytes": 0,
-    "observation_bytes": 1545
+    "observation_bytes": 985
   },
   "undo-redo-on-empty-history": {
     "reps": 25,
-    "median_ms": 0.3234,
-    "p95_ms": 0.3424,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.1593,
+    "p95_ms": 0.1655,
+    "state_entries": 5,
     "storage_bytes": 0,
-    "observation_bytes": 1992
+    "observation_bytes": 1451
   },
   "select-missing-node": {
     "reps": 25,
-    "median_ms": 0.3107,
-    "p95_ms": 0.3415,
-    "retained_heap_bytes": 0,
+    "median_ms": 0.1533,
+    "p95_ms": 0.1739,
+    "state_entries": 3,
     "storage_bytes": 0,
-    "observation_bytes": 1093
+    "observation_bytes": 1077
   }
 }

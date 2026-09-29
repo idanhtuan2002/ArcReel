@@ -125,7 +125,8 @@ function deps(): GroupDeps {
   };
 }
 
-export function runGroupCase(fixture: GroupCase) {
+/** Replay a case; the final graph state is returned with the observations. */
+export function replayGroupCase(fixture: GroupCase) {
   let state = createGraphState();
   const ids = deps();
   const observations: ReturnType<typeof observeGroups>[] = [];
@@ -198,5 +199,9 @@ export function runGroupCase(fixture: GroupCase) {
     }
     observations.push(observeGroups(op.op, state));
   }
-  return observations;
+  return { observations, state };
+}
+
+export function runGroupCase(fixture: GroupCase) {
+  return replayGroupCase(fixture).observations;
 }

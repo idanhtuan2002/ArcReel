@@ -40,6 +40,7 @@ import {
   writeDraft,
   type ConflictSnapshot,
   type DraftScope,
+  type StoredDraft,
 } from "../recovery/draftRecovery";
 import {
   checkPayloadLimits,
@@ -93,6 +94,22 @@ interface OpenCanvas {
   head: CandidateHead | null;
   lastRemoteNodeCount: number;
   session: CanvasSaveSession;
+  /**
+   * A conflicting draft waits in the draft slot behind an older kept-aside version. It is
+   * moved into the kept-aside slot as soon as that version is settled, before any edit can
+   * write the draft slot.
+   */
+  pendingConflictDraft: boolean;
+}
+
+function snapshotOf(draft: StoredDraft): ConflictSnapshot {
+  return {
+    nodes: draft.nodes,
+    edges: draft.edges,
+    viewport: draft.viewport,
+    metadata: draft.metadata,
+    timestamp: new Date(draft.updatedAt).toISOString(),
+  };
 }
 
 function metadataOf(bookmarks: ViewportBookmarks): Record<string, unknown> {
@@ -172,13 +189,7 @@ export class CanvasPersistence {
       } else {
         state.replace({ graph: loadGraph(state.graph, remote.nodes, remote.edges), bookmarks: remote.bookmarks });
         if (decision.kind === "conflict" && !keptAside) {
-          conflict = {
-            nodes: decision.draft.nodes,
-            edges: decision.draft.edges,
-            viewport: decision.draft.viewport,
-            metadata: decision.draft.metadata,
-            timestamp: new Date(decision.draft.updatedAt).toISOString(),
-          };
+          conflict = snapshotOf(decision.draft);
           writeConflictSnapshot(draftScope, conflict);
           clearDraft(draftScope);
         }
@@ -193,6 +204,7 @@ export class CanvasPersistence {
         context,
         head,
         lastRemoteNodeCount: remote.nodes.length,
+        pendingConflictDraft: decision.kind === "conflict" && keptAside !== null,
         session: createCanvasSaveSession({
           canvasKey: `${projectName}:${candidateId}`,
           generation,
@@ -246,8 +258,16 @@ export class CanvasPersistence {
     const conflict = this.store.getState().conflict;
     if (!open || !conflict) return;
     clearConflictSnapshot(open.draftScope);
-    this.store.getState().replace({ conflict: null });
-    if (choice === "server") writeSaveStatus(open.saveScope, "idle");
+    // The next kept-aside version, if a conflicting draft waited behind this one.
+    const waiting = open.pendingConflictDraft ? readDraft(open.draftScope) : null;
+    open.pendingConflictDraft = false;
+    const next = waiting ? snapshotOf(waiting) : null;
+    if (next) {
+      writeConflictSnapshot(open.draftScope, next);
+      clearDraft(open.draftScope);
+    }
+    this.store.getState().replace({ conflict: next });
+    if (choice === "server" && !next) writeSaveStatus(open.saveScope, "idle");
     if (choice === "mine") {
       this.store.getState().edit((graph) => commitEdit(graph, conflict.nodes, conflict.edges));
       if (conflict.metadata) this.store.getState().editBookmarks(() => bookmarksOf(conflict.metadata));
@@ -285,6 +305,8 @@ export class CanvasPersistence {
   }
 
   private writeDraftNow(open: OpenCanvas): void {
+    // The draft slot holds a conflicting draft waiting behind a kept-aside version; never overwrite it.
+    if (open.pendingConflictDraft) return;
     const { graph, bookmarks } = this.store.getState();
     writeDraft(open.draftScope, {
       baseRevision: open.head?.current_revision ?? null,
@@ -409,10 +431,36 @@ export class CanvasPersistence {
     }
   }
 
+  /** Load the server's current revision and show `conflict` as kept-aside work. */
+  private async reloadServer(open: OpenCanvas, conflict: ConflictSnapshot): Promise<void> {
+    try {
+      const head = await this.readHead(open.projectName, open.candidateId);
+      const remote = head
+        ? fromCanvasPayload(
+            (await this.deps.client.getCanvasRevision(open.projectName, open.candidateId, head.current_revision)).payload,
+          )
+        : EMPTY;
+      if (this.open !== open) return;
+      open.head = head;
+      open.lastRemoteNodeCount = remote.nodes.length;
+      const state = this.store.getState();
+      state.replace({
+        graph: loadGraph(state.graph, remote.nodes, remote.edges),
+        bookmarks: remote.bookmarks,
+        conflict,
+      });
+    } catch {
+      if (this.open === open) this.store.getState().replace({ conflict });
+    }
+  }
+
   private async keepAsideAndReload(open: OpenCanvas, message: string): Promise<false> {
-    if (readConflictSnapshot(open.draftScope)) {
-      // One slot of kept-aside work is already taken: the local work stays in the draft instead.
+    const taken = readConflictSnapshot(open.draftScope);
+    if (taken) {
+      // The kept-aside slot is taken: the local work waits in the draft behind that version.
       this.writeDraftNow(open);
+      open.pendingConflictDraft = true;
+      await this.reloadServer(open, taken);
       return this.fail(open, message);
     }
     const { graph, bookmarks } = this.store.getState();
@@ -425,25 +473,7 @@ export class CanvasPersistence {
     };
     writeConflictSnapshot(open.draftScope, conflict);
     clearDraft(open.draftScope);
-    try {
-      const head = await this.readHead(open.projectName, open.candidateId);
-      const remote = head
-        ? fromCanvasPayload(
-            (await this.deps.client.getCanvasRevision(open.projectName, open.candidateId, head.current_revision)).payload,
-          )
-        : EMPTY;
-      if (this.open !== open) return false;
-      open.head = head;
-      open.lastRemoteNodeCount = remote.nodes.length;
-      const state = this.store.getState();
-      state.replace({
-        graph: loadGraph(state.graph, remote.nodes, remote.edges),
-        bookmarks: remote.bookmarks,
-        conflict,
-      });
-    } catch {
-      if (this.open === open) this.store.getState().replace({ conflict });
-    }
+    await this.reloadServer(open, conflict);
     return this.fail(open, message);
   }
 }
