@@ -12,11 +12,12 @@ export const timingOut = env.PARITY_TIMING_OUT;
 export async function writeTiming<C extends { id: string }>(
   cases: readonly C[],
   run: (fixture: C) => unknown,
-  footprint?: (result: unknown) => number,
 ): Promise<void> {
   if (!timingOut) return;
-  // node:fs through a runtime specifier: the frontend TypeScript project carries no Node types.
-  const specifier = "node:fs";
-  const fs = (await import(/* @vite-ignore */ specifier)) as { writeFileSync(path: string, data: string): void };
-  fs.writeFileSync(timingOut, `${JSON.stringify(await timeCases(cases, run, footprint), null, 2)}\n`);
+  // node:fs and node:v8 through runtime specifiers: the frontend TypeScript project carries no Node types.
+  const [fsSpecifier, v8Specifier] = ["node:fs", "node:v8"];
+  const fs = (await import(/* @vite-ignore */ fsSpecifier)) as { writeFileSync(path: string, data: string): void };
+  const v8 = (await import(/* @vite-ignore */ v8Specifier)) as { serialize(value: unknown): { length: number } };
+  const timing = await timeCases(cases, run, (value) => v8.serialize(value).length);
+  fs.writeFileSync(timingOut, `${JSON.stringify(timing, null, 2)}\n`);
 }

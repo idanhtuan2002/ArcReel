@@ -79,6 +79,8 @@ export function CanvasBoard({ label, newId }: CanvasBoardProps) {
   const nodes = useCanvasStore((state) => state.graph.nodes) as unknown as Node[];
   const edges = useCanvasStore((state) => state.graph.edges);
   const edit = useCanvasStore((state) => state.edit);
+  // Kept-aside work waits for the user's choice: no graph interaction until then.
+  const readOnly = useCanvasStore((state) => state.conflict !== null);
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(() => new Set());
   const shellRef = useRef<HTMLDivElement>(null);
 
@@ -180,7 +182,9 @@ export function CanvasBoard({ label, newId }: CanvasBoardProps) {
         onlyRenderVisibleElements
         nodesFocusable
         edgesFocusable
-        deleteKeyCode={DELETE_KEYS}
+        deleteKeyCode={readOnly ? null : DELETE_KEYS}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
         multiSelectionKeyCode={MULTI_SELECT_KEYS}
         minZoom={0.05}
         maxZoom={2}

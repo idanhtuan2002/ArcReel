@@ -1,130 +1,130 @@
 {
   "normalize-drops-dangling-edges": {
     "reps": 25,
-    "median_ms": 0.0053,
-    "p95_ms": 0.0395,
-    "state_entries": 3,
+    "median_ms": 0.0055,
+    "p95_ms": 0.0424,
+    "resident_bytes": 276,
     "storage_bytes": 12,
-    "observation_bytes": 410
+    "observation_bytes": 289
   },
   "normalize-detaches-missing-parent": {
     "reps": 25,
-    "median_ms": 0.0046,
-    "p95_ms": 0.0054,
-    "state_entries": 2,
+    "median_ms": 0.0068,
+    "p95_ms": 0.0081,
+    "resident_bytes": 178,
     "storage_bytes": 12,
-    "observation_bytes": 302
+    "observation_bytes": 181
   },
   "normalize-orders-parents-first": {
     "reps": 25,
-    "median_ms": 0.0049,
-    "p95_ms": 0.0104,
-    "state_entries": 2,
+    "median_ms": 0.0061,
+    "p95_ms": 0.0107,
+    "resident_bytes": 193,
     "storage_bytes": 12,
-    "observation_bytes": 323
+    "observation_bytes": 202
   },
   "delete-group-with-descendants": {
     "reps": 25,
-    "median_ms": 0.016,
-    "p95_ms": 0.0615,
-    "state_entries": 7,
+    "median_ms": 0.0168,
+    "p95_ms": 0.0581,
+    "resident_bytes": 547,
     "storage_bytes": 12,
-    "observation_bytes": 768
+    "observation_bytes": 640
   },
   "delete-edge": {
     "reps": 25,
-    "median_ms": 0.0106,
+    "median_ms": 0.0115,
     "p95_ms": 0.0145,
-    "state_entries": 5,
+    "resident_bytes": 300,
     "storage_bytes": 12,
-    "observation_bytes": 559
+    "observation_bytes": 431
   },
   "delete-to-empty": {
     "reps": 25,
-    "median_ms": 0.014,
-    "p95_ms": 0.0169,
-    "state_entries": 3,
+    "median_ms": 0.0151,
+    "p95_ms": 0.0212,
+    "resident_bytes": 229,
     "storage_bytes": 12,
-    "observation_bytes": 416
+    "observation_bytes": 282
   },
   "clear-and-acknowledge": {
     "reps": 25,
-    "median_ms": 0.0083,
-    "p95_ms": 0.0137,
-    "state_entries": 1,
+    "median_ms": 0.0085,
+    "p95_ms": 0.015,
+    "resident_bytes": 146,
     "storage_bytes": 12,
-    "observation_bytes": 267
+    "observation_bytes": 139
   },
   "selection-resolved-on-undo": {
     "reps": 25,
-    "median_ms": 0.0079,
-    "p95_ms": 0.0118,
-    "state_entries": 1,
+    "median_ms": 0.0082,
+    "p95_ms": 0.0135,
+    "resident_bytes": 143,
     "storage_bytes": 12,
-    "observation_bytes": 267
+    "observation_bytes": 139
   },
   "history-bounded-60-adds": {
     "reps": 25,
-    "median_ms": 0.0806,
-    "p95_ms": 0.151,
-    "state_entries": 1785,
+    "median_ms": 0.0807,
+    "p95_ms": 0.1387,
+    "resident_bytes": 8296,
     "storage_bytes": 12,
-    "observation_bytes": 111494
+    "observation_bytes": 111364
   },
   "history-measure-drag-resize": {
     "reps": 25,
-    "median_ms": 0.0127,
-    "p95_ms": 0.0139,
-    "state_entries": 3,
+    "median_ms": 0.0125,
+    "p95_ms": 0.0138,
+    "resident_bytes": 349,
     "storage_bytes": 12,
-    "observation_bytes": 507
+    "observation_bytes": 379
   },
   "connect-once": {
     "reps": 25,
-    "median_ms": 0.0078,
-    "p95_ms": 0.0105,
-    "state_entries": 5,
+    "median_ms": 0.0077,
+    "p95_ms": 0.0129,
+    "resident_bytes": 300,
     "storage_bytes": 12,
-    "observation_bytes": 559
+    "observation_bytes": 431
   },
   "restore-history-bounded": {
     "reps": 25,
-    "median_ms": 0.092,
-    "p95_ms": 0.1189,
-    "state_entries": 51,
+    "median_ms": 0.0906,
+    "p95_ms": 0.1134,
+    "resident_bytes": 4269,
     "storage_bytes": 12,
-    "observation_bytes": 4492
+    "observation_bytes": 4364
   },
   "hydrate-draft": {
     "reps": 25,
     "median_ms": 0.0026,
-    "p95_ms": 0.006,
-    "state_entries": 1,
+    "p95_ms": 0.0092,
+    "resident_bytes": 119,
     "storage_bytes": 12,
-    "observation_bytes": 246
+    "observation_bytes": 116
   },
   "delete-unknown-and-empty": {
     "reps": 25,
-    "median_ms": 0.0065,
-    "p95_ms": 0.0068,
-    "state_entries": 3,
+    "median_ms": 0.0067,
+    "p95_ms": 0.0071,
+    "resident_bytes": 276,
     "storage_bytes": 12,
-    "observation_bytes": 411
+    "observation_bytes": 290
   },
   "undo-redo-on-empty-history": {
     "reps": 25,
-    "median_ms": 0.0088,
-    "p95_ms": 0.009,
-    "state_entries": 5,
+    "median_ms": 0.0091,
+    "p95_ms": 0.0107,
+    "resident_bytes": 257,
     "storage_bytes": 12,
-    "observation_bytes": 512
+    "observation_bytes": 384
   },
   "select-missing-node": {
     "reps": 25,
     "median_ms": 0.0069,
-    "p95_ms": 0.0086,
-    "state_entries": 3,
+    "p95_ms": 0.0071,
+    "resident_bytes": 203,
     "storage_bytes": 12,
-    "observation_bytes": 390
+    "observation_bytes": 262
   }
 }

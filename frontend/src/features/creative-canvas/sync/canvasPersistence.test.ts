@@ -369,7 +369,8 @@ describe("kept-aside work and late responses", () => {
     metadata: null,
     history: null,
     mutation: { userEditsSinceHydrate: 1, lastMutationSource: "user_edit" as const, pendingClearIntent: false },
-    updatedAt: 1,
+    // Fresh: the storage reclaimers that run on a full quota prune drafts past their TTL.
+    updatedAt: Date.now(),
   });
 
   it("offers kept-aside work again when the Canvas is reopened", async () => {
@@ -502,6 +503,67 @@ describe("kept-aside work and late responses", () => {
     persistence.close();
 
     expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
+  });
+
+  it("refuses edits while kept-aside work waits for the user", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+    const before = store().graph;
+
+    store().edit((graph) => addNode(graph, note("ignored")));
+
+    expect(store().graph).toBe(before);
+    expect(store().editSeq).toBe(0);
+  });
+
+  it("keeps a conflicting draft in its slot when the kept-aside slot cannot be written", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    const originalSetItem = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
+      if (key.startsWith("arcreel:creative-canvas:conflict:")) throw new DOMException("full", "QuotaExceededError");
+      originalSetItem.call(this, key, value);
+    });
+
+    await persistence.openCanvas(PROJECT, 1);
+    timers.fire(300);
+    persistence.close();
+
+    expect(store().conflict?.nodes[0].data.label).toBe("mine");
+    expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
+    spy.mockRestore();
+  });
+
+  it("keeps the waiting draft when it cannot move into the kept-aside slot", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeConflictSnapshot(SCOPE, {
+      nodes: [note("a", "older")],
+      edges: [],
+      viewport: null,
+      metadata: null,
+      timestamp: new Date(0).toISOString(),
+    });
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+    const originalSetItem = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
+      if (key.startsWith("arcreel:creative-canvas:conflict:")) throw new DOMException("full", "QuotaExceededError");
+      originalSetItem.call(this, key, value);
+    });
+
+    persistence.resolveConflict("mine");
+    timers.fire(300);
+    persistence.close();
+
+    expect(store().conflict?.nodes[0].data.label).toBe("mine");
+    expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
+    spy.mockRestore();
+    await persistence.openCanvas(PROJECT, 1);
+    expect(store().conflict?.nodes[0].data.label).toBe("mine");
   });
 });
 

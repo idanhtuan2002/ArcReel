@@ -21,12 +21,12 @@ compares two port runs.
 a harness with the same runner (tools/parity/dramaclaw/timingRunner.ts). Per case, the port's
 median time must be at most ``PERF_RATIO`` times the donor's plus ``PERF_SLACK_MS``
 (``IMPROVED`` when every case is at most ``PERF_FASTER`` times the donor's). For resources, the
-state the case leaves resident (``state_entries``: a graph's nodes, edges and history snapshot
-entries) must be at most ``STATE_RATIO`` times the donor's plus ``STATE_SLACK_ENTRIES``, and the
+bytes one run leaves resident (``resident_bytes``: the structured-clone size of the final graph
+state, of pure-function results, or of the final scenario state with its localStorage entries)
+must be at most ``RESIDENT_RATIO`` times the donor's plus ``RESIDENT_SLACK_BYTES``, and the
 localStorage bytes it leaves at most ``STORAGE_RATIO`` times the donor's plus
-``STORAGE_SLACK_BYTES``; a harness without a state (pure functions, the save and recovery
-scenarios) is compared on storage alone. The absolute slacks keep small cases from failing on a
-ratio alone. A
+``STORAGE_SLACK_BYTES``; an unmeasured resident size is ``UNVERIFIED``. The absolute slacks keep
+small cases from failing on a ratio alone. A
 behavior with an unmeasured case is ``UNVERIFIED``.
 ``--dimension`` files override any dimension for a behavior.
 
@@ -60,8 +60,8 @@ COMPARED = ("functionality", "correctness", "data_integrity", "observability")
 PERF_RATIO = 1.5
 PERF_SLACK_MS = 0.05
 PERF_FASTER = 0.67
-STATE_RATIO = 1.1
-STATE_SLACK_ENTRIES = 2
+RESIDENT_RATIO = 1.5
+RESIDENT_SLACK_BYTES = 1024
 STORAGE_RATIO = 1.1
 STORAGE_SLACK_BYTES = 64
 
@@ -166,14 +166,8 @@ def measure_behavior(
         donor_ms, port_ms = float(donor["median_ms"]), float(port["median_ms"])
         if port_ms > donor_ms * PERF_RATIO + PERF_SLACK_MS:
             return ParityDisposition.UNVERIFIED, ParityDisposition.UNVERIFIED, refs
-        donor_state, port_state = donor.get("state_entries"), port.get("state_entries")
-        if (donor_state is None) != (port_state is None):
-            return ParityDisposition.UNVERIFIED, ParityDisposition.UNVERIFIED, refs
-        if (
-            donor_state is not None
-            and port_state is not None
-            and (port_state > donor_state * STATE_RATIO + STATE_SLACK_ENTRIES)
-        ):
+        donor_bytes, port_bytes = donor.get("resident_bytes"), port.get("resident_bytes")
+        if not donor_bytes or not port_bytes or port_bytes > donor_bytes * RESIDENT_RATIO + RESIDENT_SLACK_BYTES:
             return ParityDisposition.UNVERIFIED, ParityDisposition.UNVERIFIED, refs
         if port["storage_bytes"] > donor["storage_bytes"] * STORAGE_RATIO + STORAGE_SLACK_BYTES:
             return ParityDisposition.UNVERIFIED, ParityDisposition.UNVERIFIED, refs

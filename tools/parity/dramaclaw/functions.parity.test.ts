@@ -6,6 +6,7 @@
  * (frontend/src/features/creative-canvas/__parity__/functionsAdapter.ts).
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { serialize } from "node:v8";
 
 import { describe, expect, it } from "vitest";
 import { timeCases } from "./timingRunner";
@@ -135,7 +136,7 @@ describe("M8-B pure-function parity: donor side", () => {
     const results: Record<string, unknown[]> = {};
     for (const fixture of fixtures.cases) results[fixture.id] = replay(fixture);
     if (outPath) writeFileSync(outPath, `${JSON.stringify({ fixture_set: fixtures.fixture_set, results }, null, 2)}\n`);
-    if (timingOut) writeFileSync(timingOut, `${JSON.stringify(await timeCases(fixtures.cases, replay), null, 2)}\n`);
+    if (timingOut) writeFileSync(timingOut, `${JSON.stringify(await timeCases(fixtures.cases, replay, (value) => serialize(value).length), null, 2)}\n`);
 
     expect(Object.keys(results)).toHaveLength(fixtures.cases.length);
   });

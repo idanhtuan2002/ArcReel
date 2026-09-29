@@ -1,154 +1,154 @@
 {
   "single-flight-and-coalesce": {
     "reps": 25,
-    "median_ms": 0.0105,
-    "p95_ms": 0.0124,
-    "state_entries": null,
+    "median_ms": 0.0176,
+    "p95_ms": 0.0366,
+    "resident_bytes": 708,
     "storage_bytes": 517,
-    "observation_bytes": 1081
+    "observation_bytes": 832
   },
   "waiter-released-only-by-covering-save": {
     "reps": 25,
-    "median_ms": 0.0097,
-    "p95_ms": 0.0123,
-    "state_entries": null,
+    "median_ms": 0.0165,
+    "p95_ms": 0.0196,
+    "resident_bytes": 704,
     "storage_bytes": 517,
-    "observation_bytes": 930
+    "observation_bytes": 827
   },
   "dispose-releases-waiters": {
     "reps": 25,
-    "median_ms": 0.0074,
-    "p95_ms": 0.0105,
-    "state_entries": null,
+    "median_ms": 0.0145,
+    "p95_ms": 0.0185,
+    "resident_bytes": 706,
     "storage_bytes": 517,
-    "observation_bytes": 783
+    "observation_bytes": 828
   },
   "failure-stops-pump": {
     "reps": 25,
-    "median_ms": 0.0183,
-    "p95_ms": 0.0197,
-    "state_entries": null,
+    "median_ms": 0.0275,
+    "p95_ms": 0.0302,
+    "resident_bytes": 715,
     "storage_bytes": 517,
-    "observation_bytes": 1148
+    "observation_bytes": 839
   },
   "request-as-previous-lands": {
     "reps": 25,
-    "median_ms": 0.007,
-    "p95_ms": 0.0073,
-    "state_entries": null,
+    "median_ms": 0.0137,
+    "p95_ms": 0.0153,
+    "resident_bytes": 694,
     "storage_bytes": 517,
-    "observation_bytes": 610
+    "observation_bytes": 816
   },
   "canvas-switch-isolation": {
     "reps": 25,
-    "median_ms": 0.0083,
-    "p95_ms": 0.0091,
-    "state_entries": null,
+    "median_ms": 0.0153,
+    "p95_ms": 0.0167,
+    "resident_bytes": 700,
     "storage_bytes": 517,
-    "observation_bytes": 799
+    "observation_bytes": 826
   },
   "save-decisions": {
     "reps": 25,
-    "median_ms": 0.0012,
-    "p95_ms": 0.0024,
-    "state_entries": null,
+    "median_ms": 0.0068,
+    "p95_ms": 0.0085,
+    "resident_bytes": 605,
     "storage_bytes": 517,
-    "observation_bytes": 495
+    "observation_bytes": 722
   },
   "payload-limits": {
     "reps": 25,
-    "median_ms": 0.0009,
-    "p95_ms": 0.0009,
-    "state_entries": null,
+    "median_ms": 0.0062,
+    "p95_ms": 0.0063,
+    "resident_bytes": 547,
     "storage_bytes": 517,
-    "observation_bytes": 157
+    "observation_bytes": 659
   },
   "autosave-hold": {
     "reps": 25,
-    "median_ms": 0.0373,
-    "p95_ms": 0.0441,
-    "state_entries": null,
+    "median_ms": 0.0475,
+    "p95_ms": 0.0544,
+    "resident_bytes": 600,
     "storage_bytes": 517,
-    "observation_bytes": 575
+    "observation_bytes": 722
   },
   "draft-round-trip-and-scope": {
     "reps": 25,
-    "median_ms": 0.0799,
-    "p95_ms": 0.1003,
-    "state_entries": null,
+    "median_ms": 0.0928,
+    "p95_ms": 0.117,
+    "resident_bytes": 921,
     "storage_bytes": 867,
-    "observation_bytes": 308
+    "observation_bytes": 1157
   },
   "draft-shedding": {
     "reps": 25,
-    "median_ms": 27.8835,
-    "p95_ms": 29.1692,
-    "state_entries": null,
+    "median_ms": 28.139,
+    "p95_ms": 29.1419,
+    "resident_bytes": 1801176,
     "storage_bytes": 1801119,
-    "observation_bytes": 478
+    "observation_bytes": 1801427
   },
   "draft-pruning": {
     "reps": 25,
-    "median_ms": 0.1334,
-    "p95_ms": 0.1532,
-    "state_entries": null,
+    "median_ms": 0.143,
+    "p95_ms": 0.1804,
+    "resident_bytes": 562,
     "storage_bytes": 512,
-    "observation_bytes": 344
+    "observation_bytes": 676
   },
   "draft-user-isolation": {
     "reps": 25,
-    "median_ms": 0.0489,
-    "p95_ms": 0.0617,
-    "state_entries": null,
+    "median_ms": 0.0568,
+    "p95_ms": 0.0866,
+    "resident_bytes": 856,
     "storage_bytes": 659,
-    "observation_bytes": 390
+    "observation_bytes": 1036
   },
   "hydrate-decisions": {
     "reps": 25,
-    "median_ms": 0.279,
-    "p95_ms": 0.3594,
-    "state_entries": null,
+    "median_ms": 0.2842,
+    "p95_ms": 0.3089,
+    "resident_bytes": 556,
     "storage_bytes": 517,
-    "observation_bytes": 69
+    "observation_bytes": 665
   },
   "save-failure-classification": {
     "reps": 25,
-    "median_ms": 0.0018,
-    "p95_ms": 0.0021,
-    "state_entries": null,
+    "median_ms": 0.0065,
+    "p95_ms": 0.0071,
+    "resident_bytes": 553,
     "storage_bytes": 517,
-    "observation_bytes": 52
+    "observation_bytes": 662
   },
   "save-status": {
     "reps": 25,
-    "median_ms": 0.0094,
-    "p95_ms": 0.0115,
-    "state_entries": null,
+    "median_ms": 0.0158,
+    "p95_ms": 0.0192,
+    "resident_bytes": 599,
     "storage_bytes": 517,
-    "observation_bytes": 511
+    "observation_bytes": 715
   },
   "quota-safe-write": {
     "reps": 25,
-    "median_ms": 0.0933,
-    "p95_ms": 0.119,
-    "state_entries": null,
+    "median_ms": 0.1097,
+    "p95_ms": 0.1362,
+    "resident_bytes": 575,
     "storage_bytes": 517,
-    "observation_bytes": 221
+    "observation_bytes": 691
   },
   "quota-legacy-error-name": {
     "reps": 25,
-    "median_ms": 0.0446,
-    "p95_ms": 0.0473,
-    "state_entries": null,
+    "median_ms": 0.0574,
+    "p95_ms": 0.0594,
+    "resident_bytes": 575,
     "storage_bytes": 517,
-    "observation_bytes": 97
+    "observation_bytes": 691
   },
   "coalesce-after-failure": {
     "reps": 25,
-    "median_ms": 0.0203,
-    "p95_ms": 0.0321,
-    "state_entries": null,
+    "median_ms": 0.0384,
+    "p95_ms": 0.0443,
+    "resident_bytes": 730,
     "storage_bytes": 517,
-    "observation_bytes": 1544
+    "observation_bytes": 856
   }
 }

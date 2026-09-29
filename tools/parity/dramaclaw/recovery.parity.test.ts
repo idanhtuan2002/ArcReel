@@ -5,6 +5,7 @@
  * observations (PARITY_OUT).
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { serialize } from "node:v8";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,7 +28,7 @@ import { checkPayloadLimits, classifySaveError, decideSaveAction } from "@/featu
 import { deriveSaveState, useSaveStatusStore } from "@/stores/save-status-store";
 
 import { type RecoveryImpl, type ScenarioCase, runScenario } from "./recoveryRunner";
-import { timeCases } from "./timingRunner";
+import { storageEntries, timeCases } from "./timingRunner";
 
 const fixturesPath = process.env.PARITY_FIXTURES;
 const outPath = process.env.PARITY_OUT;
@@ -143,7 +144,14 @@ describe("M8-B save and recovery parity: donor side", () => {
     if (outPath) writeFileSync(outPath, `${JSON.stringify({ fixture_set: fixtures.fixture_set, results }, null, 2)}\n`);
     const timingOut = process.env.PARITY_TIMING_OUT;
     if (timingOut) {
-      const timing = await timeCases(fixtures.cases, (fixture) => runScenario(DONOR, fixture));
+      const timing = await timeCases(
+        fixtures.cases,
+        async (fixture) => {
+          const observations = await runScenario(DONOR, fixture);
+          return { final: observations.at(-1) ?? null, storage: storageEntries() };
+        },
+        (value) => serialize(value).length,
+      );
       writeFileSync(timingOut, `${JSON.stringify(timing, null, 2)}\n`);
     }
 

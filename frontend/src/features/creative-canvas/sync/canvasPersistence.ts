@@ -100,6 +100,8 @@ interface OpenCanvas {
    * write the draft slot.
    */
   pendingConflictDraft: boolean;
+  /** Where the durable copy of the shown conflict lives: its own slot, or (when that write failed) the draft slot. */
+  conflictCopy: "snapshot" | "draft" | null;
 }
 
 function snapshotOf(draft: StoredDraft): ConflictSnapshot {
@@ -181,6 +183,7 @@ export class CanvasPersistence {
       // Work kept aside earlier stays reachable until the user settles it.
       const keptAside = readConflictSnapshot(draftScope);
       let conflict: ConflictSnapshot | null = keptAside;
+      let conflictCopy: OpenCanvas["conflictCopy"] = keptAside ? "snapshot" : null;
       if (decision.kind === "draft") {
         state.replace({
           graph: hydrateDraft(state.graph, decision.draft),
@@ -190,8 +193,13 @@ export class CanvasPersistence {
         state.replace({ graph: loadGraph(state.graph, remote.nodes, remote.edges), bookmarks: remote.bookmarks });
         if (decision.kind === "conflict" && !keptAside) {
           conflict = snapshotOf(decision.draft);
-          writeConflictSnapshot(draftScope, conflict);
-          clearDraft(draftScope);
+          // The draft is the only copy until the kept-aside slot holds it.
+          if (writeConflictSnapshot(draftScope, conflict)) {
+            clearDraft(draftScope);
+            conflictCopy = "snapshot";
+          } else {
+            conflictCopy = "draft";
+          }
         }
       }
       const saveScope = canvasSaveScope(projectName, candidateId);
@@ -205,6 +213,7 @@ export class CanvasPersistence {
         head,
         lastRemoteNodeCount: remote.nodes.length,
         pendingConflictDraft: decision.kind === "conflict" && keptAside !== null,
+        conflictCopy,
         session: createCanvasSaveSession({
           canvasKey: `${projectName}:${candidateId}`,
           generation,
@@ -257,20 +266,39 @@ export class CanvasPersistence {
     const open = this.open;
     const conflict = this.store.getState().conflict;
     if (!open || !conflict) return;
-    clearConflictSnapshot(open.draftScope);
+    const settledCopy = open.conflictCopy;
     // The next kept-aside version, if a conflicting draft waited behind this one.
     const waiting = open.pendingConflictDraft ? readDraft(open.draftScope) : null;
-    open.pendingConflictDraft = false;
-    const next = waiting ? snapshotOf(waiting) : null;
-    if (next) {
-      writeConflictSnapshot(open.draftScope, next);
+    let next: ConflictSnapshot | null = null;
+    let nextCopy: OpenCanvas["conflictCopy"] = null;
+    if (waiting) {
+      next = snapshotOf(waiting);
+      // Replace the settled version in its slot; if that fails, free the slot and retry once.
+      let moved = writeConflictSnapshot(open.draftScope, next);
+      if (!moved) {
+        clearConflictSnapshot(open.draftScope);
+        moved = writeConflictSnapshot(open.draftScope, next);
+      }
+      if (moved) clearDraft(open.draftScope);
+      nextCopy = moved ? "snapshot" : "draft";
+    } else if (settledCopy === "snapshot") {
+      clearConflictSnapshot(open.draftScope);
+    } else if (settledCopy === "draft" && choice === "server") {
       clearDraft(open.draftScope);
     }
-    this.store.getState().replace({ conflict: next });
-    if (choice === "server" && !next) writeSaveStatus(open.saveScope, "idle");
+    open.pendingConflictDraft = false;
+    open.conflictCopy = null;
+    // Edits are refused while a conflict is shown: settle the choice first, then show the next one.
+    this.store.getState().replace({ conflict: null });
     if (choice === "mine") {
       this.store.getState().edit((graph) => commitEdit(graph, conflict.nodes, conflict.edges));
       if (conflict.metadata) this.store.getState().editBookmarks(() => bookmarksOf(conflict.metadata));
+    }
+    if (next) {
+      open.conflictCopy = nextCopy;
+      this.store.getState().replace({ conflict: next });
+    } else if (choice === "server") {
+      writeSaveStatus(open.saveScope, "idle");
     }
   }
 
@@ -305,8 +333,9 @@ export class CanvasPersistence {
   }
 
   private writeDraftNow(open: OpenCanvas): void {
-    // The draft slot holds a conflicting draft waiting behind a kept-aside version; never overwrite it.
-    if (open.pendingConflictDraft) return;
+    // The draft slot may hold the only copy of kept-aside work: a draft waiting behind a kept-aside
+    // version, or the shown conflict itself when its own slot could not be written. Never overwrite it.
+    if (open.pendingConflictDraft || open.conflictCopy === "draft") return;
     const { graph, bookmarks } = this.store.getState();
     writeDraft(open.draftScope, {
       baseRevision: open.head?.current_revision ?? null,
@@ -460,6 +489,7 @@ export class CanvasPersistence {
       // The kept-aside slot is taken: the local work waits in the draft behind that version.
       this.writeDraftNow(open);
       open.pendingConflictDraft = true;
+      open.conflictCopy = "snapshot";
       await this.reloadServer(open, taken);
       return this.fail(open, message);
     }
@@ -471,8 +501,14 @@ export class CanvasPersistence {
       metadata: metadataOf(bookmarks),
       timestamp: this.deps.now().toISOString(),
     };
-    writeConflictSnapshot(open.draftScope, conflict);
-    clearDraft(open.draftScope);
+    if (writeConflictSnapshot(open.draftScope, conflict)) {
+      clearDraft(open.draftScope);
+      open.conflictCopy = "snapshot";
+    } else {
+      // The kept-aside slot cannot be written: the local work stays in the draft slot.
+      this.writeDraftNow(open);
+      open.conflictCopy = "draft";
+    }
     await this.reloadServer(open, conflict);
     return this.fail(open, message);
   }

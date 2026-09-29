@@ -68,6 +68,7 @@ function CommitField({
   multiline?: boolean;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const readOnly = useCanvasStore((state) => state.conflict !== null);
   // An unmount (a compact LOD tier, a deleted node) fires no blur: commit the pending draft then.
   const pending = useRef<string | null>(null);
   const change = (next: string | null) => {
@@ -97,6 +98,7 @@ function CommitField({
       aria-label={label}
       name={field}
       autoComplete="off"
+      readOnly={readOnly}
       className={`${className} cc-field-multi`}
       value={shown}
       onChange={(event) => change(event.target.value)}
@@ -108,6 +110,7 @@ function CommitField({
       aria-label={label}
       name={field}
       autoComplete="off"
+      readOnly={readOnly}
       className={`${className} font-medium`}
       value={shown}
       onChange={(event) => change(event.target.value)}

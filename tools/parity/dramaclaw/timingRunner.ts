@@ -1,15 +1,18 @@
 /**
  * Shared measurement runner of the M8-B parity harnesses (performance and resource
  * dimensions). Imports nothing: the donor side and the port side pass their own
- * case runner, so both measure the same fixture cases the same way.
+ * case runner and byte measure, so both measure the same fixture cases the same way.
  *
  * Each case is replayed WARMUP times, then REPS times. The result records:
  * - the median and p95 wall time;
- * - the size of the state the case leaves resident (`footprint`): for a graph, its
- *   nodes, edges and every history snapshot's nodes and edges; null without a
- *   footprint function. JS heap counters cannot resolve states of a few kilobytes,
- *   so the footprint counts the retained entries instead; heap at Canvas scale is
- *   measured by the browser benchmark;
+ * - the resident bytes of one run (`resident_bytes`): the size of the structured-clone
+ *   serialization (`node:v8` `serialize`, passed in as `residentBytes`) of what the run
+ *   leaves resident: the final graph state for a graph harness, the results of pure
+ *   functions, the final scenario state and localStorage entries for save and recovery.
+ *   The serialization keeps shared references once, so it counts the data a run holds,
+ *   not how often it is referenced. JS heap counters (`heapUsed` after gc) could not
+ *   resolve these kilobyte-sized states reproducibly; heap at Canvas scale is measured by
+ *   the browser benchmark;
  * - the localStorage bytes (keys and values) present after the case;
  * - the size of the case's observations, for reference.
  */
@@ -18,7 +21,7 @@ export interface CaseTiming {
   reps: number;
   median_ms: number;
   p95_ms: number;
-  state_entries: number | null;
+  resident_bytes: number;
   storage_bytes: number;
   observation_bytes: number;
 }
@@ -44,22 +47,22 @@ function storageBytes(): number {
   return total;
 }
 
-interface GraphLike {
-  nodes: readonly unknown[];
-  edges: readonly unknown[];
-  history?: { past: readonly GraphLike[]; future: readonly GraphLike[] };
-}
-
-/** Nodes, edges and every history snapshot's nodes and edges of a graph state. */
-export function graphFootprint(state: GraphLike): number {
-  const snapshots = [...(state.history?.past ?? []), ...(state.history?.future ?? [])];
-  return state.nodes.length + state.edges.length + snapshots.reduce((sum, item) => sum + item.nodes.length + item.edges.length, 0);
+/** The localStorage entries, as resident state of a save and recovery scenario. */
+export function storageEntries(): Record<string, string> {
+  const storage = (globalThis as { localStorage?: Storage }).localStorage;
+  const out: Record<string, string> = {};
+  if (!storage) return out;
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index) ?? "";
+    out[key] = storage.getItem(key) ?? "";
+  }
+  return out;
 }
 
 export async function timeCases<C extends { id: string }>(
   cases: readonly C[],
   run: (fixture: C) => unknown,
-  footprint?: (result: unknown) => number,
+  residentBytes: (value: unknown) => number,
 ): Promise<Record<string, CaseTiming>> {
   const out: Record<string, CaseTiming> = {};
   for (const fixture of cases) {
@@ -76,7 +79,7 @@ export async function timeCases<C extends { id: string }>(
       reps: REPS,
       median_ms: Number(rank(samples, 50).toFixed(4)),
       p95_ms: Number(rank(samples, 95).toFixed(4)),
-      state_entries: footprint ? footprint(last) : null,
+      resident_bytes: residentBytes(last),
       storage_bytes: storageBytes(),
       observation_bytes: JSON.stringify(last).length,
     };

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerStorageReclaimer, safeLocalStorageSet } from "../recovery/storageQuota";
 
 import { type RecoveryImpl, type ScenarioCase, runScenario } from "../../../../../tools/parity/dramaclaw/recoveryRunner";
+import { storageEntries } from "../../../../../tools/parity/dramaclaw/timingRunner";
 import { timingOut, writeTiming } from "./timing";
 import fixtures from "../__fixtures__/parity/recovery.json";
 import { holdCanvasAutosave, isCanvasAutosaveHeld, subscribeCanvasAutosaveRelease } from "../recovery/autosaveHold";
@@ -90,6 +91,9 @@ describe("save and recovery parity scenarios on the port", () => {
   });
 
   it.runIf(Boolean(timingOut))("records the timing of every case for the parity report", async () => {
-    await expect(writeTiming(cases, (fixture) => runScenario(PORT, fixture))).resolves.toBeUndefined();
+    await expect(writeTiming(cases, async (fixture) => {
+        const observations = await runScenario(PORT, fixture);
+        return { final: observations.at(-1) ?? null, storage: storageEntries() };
+      })).resolves.toBeUndefined();
   });
 });

@@ -10,9 +10,10 @@
  * appear in the current nodes, edges and selection (never in history).
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { serialize } from "node:v8";
 
 import { describe, expect, it } from "vitest";
-import { graphFootprint, timeCases } from "./timingRunner";
+import { timeCases } from "./timingRunner";
 
 import { CANVAS_NODE_TYPES } from "@/features/canvas/domain/canvasNodes";
 import { useCanvasStore, type CanvasEdge, type CanvasNode } from "@/stores/canvasStore";
@@ -248,9 +249,10 @@ describe("M8-B group parity: donor side", () => {
         fixtures.cases,
         (fixture) => {
           replay(fixture);
-          return useCanvasStore.getState();
+          const { nodes, edges, history } = useCanvasStore.getState();
+          return { nodes, edges, history };
         },
-        (state) => graphFootprint(state as Parameters<typeof graphFootprint>[0]),
+        (value) => serialize(value).length,
       );
       writeFileSync(timingOut, `${JSON.stringify(timing, null, 2)}\n`);
     }

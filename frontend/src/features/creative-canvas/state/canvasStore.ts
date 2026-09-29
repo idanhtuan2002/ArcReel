@@ -4,6 +4,8 @@
  *
  * `edit` is the only path for user interaction; it applies a pure domain
  * function, and counts as an edit for autosave when the domain tracked one.
+ * While a conflict is shown the Canvas is read-only: `edit` and
+ * `editBookmarks` change nothing.
  * `replace` swaps in content the persistence layer loaded and never triggers
  * a save.
  */
@@ -46,6 +48,8 @@ export const useCanvasStore = create<CanvasStoreState>()((set) => ({
   ...initial(),
   edit: (update) =>
     set((state) => {
+      // Kept-aside work waits for the user's choice: the Canvas is read-only until then.
+      if (state.conflict) return state;
       const graph = update(state.graph);
       if (graph === state.graph) return state;
       // Selection and in-progress drags change the graph without counting as an edit.
@@ -54,6 +58,7 @@ export const useCanvasStore = create<CanvasStoreState>()((set) => ({
     }),
   editBookmarks: (update) =>
     set((state) => {
+      if (state.conflict) return state;
       const bookmarks = update(state.bookmarks);
       return bookmarks === state.bookmarks ? state : { bookmarks, editSeq: state.editSeq + 1 };
     }),

@@ -250,31 +250,31 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
           </button>
         </div>
         <div role="toolbar" aria-label={t("creative_canvas_toolbar_label")} className="flex w-full flex-wrap items-center gap-1">
-          <ToolButton label={t("creative_canvas_add_beat")} icon={Zap} onClick={() => addText("beat")} disabled={phase !== "ready"} />
-          <ToolButton label={t("creative_canvas_add_note")} icon={StickyNote} onClick={() => addText("note")} disabled={phase !== "ready"} />
-          <ToolButton label={t("creative_canvas_import_shots")} icon={Film} onClick={onImport} disabled={phase !== "ready"} />
+          <ToolButton label={t("creative_canvas_add_beat")} icon={Zap} onClick={() => addText("beat")} disabled={phase !== "ready" || hasConflict} />
+          <ToolButton label={t("creative_canvas_add_note")} icon={StickyNote} onClick={() => addText("note")} disabled={phase !== "ready" || hasConflict} />
+          <ToolButton label={t("creative_canvas_import_shots")} icon={Film} onClick={onImport} disabled={phase !== "ready" || hasConflict} />
           <span aria-hidden className="mx-1 h-4 w-px bg-hairline" />
           <ToolButton
             label={t("creative_canvas_group")}
             icon={BoxSelect}
             onClick={() => edit((graph) => groupNodes(graph, selection, groupDeps).state)}
-            disabled={selection.length < 2}
+            disabled={selection.length < 2 || hasConflict}
           />
           <ToolButton
             label={t("creative_canvas_make_storyboard")}
             icon={Clapperboard}
             onClick={() => edit((graph) => mergeStoryboardGroup(graph, selection, groupDeps).state)}
-            disabled={selection.length < 2}
+            disabled={selection.length < 2 || hasConflict}
           />
           <ToolButton
             label={t("creative_canvas_ungroup")}
             icon={Ungroup}
             onClick={() => selectedGroup && edit((graph) => ungroupNode(graph, selectedGroup).state)}
-            disabled={!selectedGroup}
+            disabled={!selectedGroup || hasConflict}
           />
           <span aria-hidden className="mx-1 h-4 w-px bg-hairline" />
-          <ToolButton label={t("creative_canvas_undo")} icon={Undo2} onClick={() => edit((graph) => undo(graph).state)} disabled={!canUndo} />
-          <ToolButton label={t("creative_canvas_redo")} icon={Redo2} onClick={() => edit((graph) => redo(graph).state)} disabled={!canRedo} />
+          <ToolButton label={t("creative_canvas_undo")} icon={Undo2} onClick={() => edit((graph) => undo(graph).state)} disabled={!canUndo || hasConflict} />
+          <ToolButton label={t("creative_canvas_redo")} icon={Redo2} onClick={() => edit((graph) => redo(graph).state)} disabled={!canRedo || hasConflict} />
           <ToolButton label={t("creative_canvas_fit")} icon={Maximize} onClick={() => void flow.fitView({ duration: 200 })} />
           <p aria-live="polite" className="ml-2 text-xs text-text-3">
             {notice}
