@@ -1,0 +1,55 @@
+{
+  "source": "r2/advanced_creative/digests.py",
+  "values": [
+    {
+      "name": "scalars",
+      "input": "null",
+      "canonical": "null",
+      "digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "booleans",
+      "input": "[true,false]",
+      "canonical": "[true,false]",
+      "digest": "sha256:153c9dbcc7025ecd7e50ce6d83f1995233dfc636bc869098e3a8d84288fd938a"
+    },
+    {
+      "name": "integers",
+      "input": "[0,1,-1,42,9007199254740991,-9007199254740991,1152921504606847000]",
+      "canonical": "[0,1,-1,42,9007199254740991,-9007199254740991,1152921504606847000]",
+      "digest": "sha256:c8d1ccab79aa38fac1a12be432ee68821110231604302f7d15b679fd57d71b6a"
+    },
+    {
+      "name": "decimals",
+      "input": "[0.1,-0.1,1.5,123.456,0.000001,1e-7,5e-324,1e21,1.7976931348623157e308,-2.5e-10,100.0,-0.0,3.14159]",
+      "canonical": "[0.1,-0.1,1.5,123.456,0.000001,0.0000001,0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005,1000000000000000000000,179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,-0.00000000025,100,0,3.14159]",
+      "digest": "sha256:c34df297aaa677ed571176c63db9b19dc9fa6bea9e776c315b286256eb3e72c5"
+    },
+    {
+      "name": "strings",
+      "input": "[\"\", \"plain\", \"quote\\\" backslash\\\\ slash/\", \"\\n\\r\\t\\b\\f\", \"\\u0001\\u001f\\u007f\", \"é中文\", \"emoji \\ud83c\\udfac\", \"\\u2028\\u2029\"]",
+      "canonical": "[\"\",\"plain\",\"quote\\\" backslash\\\\ slash/\",\"\\n\\r\\t\\b\\f\",\"\\u0001\\u001f\",\"é中文\",\"emoji 🎬\",\"  \"]",
+      "digest": "sha256:a2a711168e11be3438f6370eec34f12131417e504dc5f39f61641427092466f6"
+    },
+    {
+      "name": "key_order",
+      "input": "{\"b\":1,\"a\":2,\"B\":3,\"_\":4,\"é\":5,\"中\":6,\"aa\":7,\"a b\":8,\"\":9}",
+      "canonical": "{\"\":9,\"B\":3,\"_\":4,\"a\":2,\"a b\":8,\"aa\":7,\"b\":1,\"é\":5,\"中\":6}",
+      "digest": "sha256:fd8ce2ddbf4a0923bfbfe1ef7781a7ca43dc2c869fed98e58635c7b6eeaed7a5"
+    },
+    {
+      "name": "nested",
+      "input": "{\"z\":[{\"y\":{\"x\":[]}},{}],\"a\":{\"c\":null,\"b\":[1.25,{\"k\":\"v\"}]}}",
+      "canonical": "{\"a\":{\"b\":[1.25,{\"k\":\"v\"}],\"c\":null},\"z\":[{\"y\":{\"x\":[]}},{}]}",
+      "digest": "sha256:3dfde6c2aad21a8f4546145e83415521b0ba86c7d7567138bb29b8c93283a40a"
+    }
+  ],
+  "payloads": [
+    {
+      "name": "canvas_revision",
+      "payload": "{\"kind\": \"CANVAS\", \"graph_schema_version\": \"1\", \"nodes\": [{\"node_id\": \"n-beat\", \"node_type\": \"beat\", \"body\": {\"position\": {\"x\": 120.5, \"y\": -48.25}, \"label\": \"Mở đầu — 開場\", \"size\": {\"w\": 440, \"h\": 320}}}, {\"node_id\": \"n-frame\", \"node_type\": \"frame\", \"body\": {\"position\": {\"x\": 0.1, \"y\": 1e-07}, \"asset_ref\": \"storyboards/ep1/shot_01.png\", \"parent\": null}}], \"edges\": [{\"edge_id\": \"e1\", \"source_node_id\": \"n-beat\", \"target_node_id\": \"n-frame\", \"edge_type\": \"flow\", \"body\": {}}], \"groups\": [{\"group_id\": \"g1\", \"members\": [\"n-frame\"], \"storyboard\": true}], \"storyboard_order\": [\"n-frame\"], \"viewport_bookmarks\": [{\"x\": -10.5, \"y\": 3, \"zoom\": 0.35}]}",
+      "lineage": "{\"project_name\": \"demo\", \"content_basis_digest\": \"sha256:1111111111111111111111111111111111111111111111111111111111111111\", \"approved_master_id\": null, \"approved_master_digest\": null, \"creative_profile_id\": \"arcreel.host\", \"creative_profile_version\": \"1\", \"policy_digest\": \"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}",
+      "digest": "sha256:bb6961fb80ba0033b3a2a02b8d2416ad800aba5cb8922cd2f416ac81795fde2c"
+    }
+  ]
+}
