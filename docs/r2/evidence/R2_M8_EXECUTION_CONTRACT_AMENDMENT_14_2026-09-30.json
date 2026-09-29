@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "M8_B_RESUMED",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_13_2026-09-29.json"
+  ],
+  "reason": "M8-B B3 stopped with M8_BASE_SEAM_CHANGED (R2_M8_B_STOP_2026-09-29.json): no seam supplied the LineageBinding or the created_by an M8 revision needs. ADR-0098 (sponsor-delegated) decided server-resolved lineage. V2-02e implemented it and is independently accepted (R2_V2_02E_M8_LINEAGE_2026-09-30.md, 1f520d0c). M8-B resumes on the new executor base.",
+  "decisions": {
+    "lineage_source": "An M8-B Canvas revision copies lineage and created_by from GET /projects/{p}/m8/exploration/context?episode=N, read before every save, and computes payload_digest with a TypeScript port of r2/advanced_creative/digests.py pinned by a shared differential fixture.",
+    "head_read": "A Canvas opens with GET /projects/{p}/m8/exploration/candidates/{id} and then one exact revision.",
+    "promotion_preview": "CanvasCandidate has no promotable artifact (ADR-0097), so M8-B builds no promotion-preview UI. The packet's promotion-preview UI test is not applicable and is recorded as such in the parity evidence."
+  },
+  "packet_overrides": {
+    "M8-B": {
+      "executor_base": "the commit that adds this fourteenth amendment",
+      "rebase": "The M8-B commits on 37b633dd are re-applied onto this executor base. The baseline is re-frozen with base_head = this commit.",
+      "scope_allowlist_additions": [
+        ".github/dependabot.yml",
+        "tests/unit/r2/advanced_creative/test_m8b_canonical_digest_fixture.py"
+      ],
+      "migrations": "none",
+      "acceptance_rule": "Unchanged: the M8-B independent review accepts M8-B under the amendment 12 stopping rule."
+    }
+  },
+  "created_at": "2026-09-30"
+}
