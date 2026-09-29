@@ -28,8 +28,10 @@ sponsor delegated the choice.
    process's cumulative totals, which may slightly exceed it.
    - A failed reconciliation keeps the reference: the session retries it at its next settlement
      point, and a dropped session hands it to the patrol, which retries it until it succeeds.
-   - At host startup no Agent process is alive, so every claimed `agent_session:` hold is
-     committed at its full reserved amount, the process's hard cap.
+   - Claimed `agent_session:` holds created before the host process started belong to an
+     earlier run, whose Agent processes are gone. The patrol commits each at its full reserved
+     amount, the process's hard cap, and retries until the sweep succeeds. Holds created in this
+     run are never swept.
 4. **Restored totals on resume.** The CLI restores a session's final cost and usage on resume only
    when the session is the `lastSessionId` in its global config. The host reads that file before
    the process starts and applies the same rule:
@@ -60,6 +62,6 @@ sponsor delegated the choice.
     then restores nothing, the first result's total is smaller than the baseline, and the host
     books it from zero. The case this does not catch undercounts by at most one connection's
     spend.
-  - **One host process.** The startup sweep assumes that one host process owns every Agent
-    session.
+  - **One host process.** The sweep assumes that one host process owns every Agent session. A
+    second, concurrently running host process would sweep the first one's live holds.
   - **Non-Claude presets stay refused** in release mode.
