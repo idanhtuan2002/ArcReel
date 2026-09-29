@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "base_head": "109d25d7b8ad8eb077bc55479ca3d630a884c774",
+  "base_head": "bb764ae986574afcf47da9baae765f7210faf1f8",
   "accepted_m7_candidate_head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
   "branch": "impl/r2-m8a-exploration-promotion",
   "alembic_heads": [
@@ -130,6 +130,10 @@
     {
       "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_9_2026-09-29.json",
       "sha256": "031835412bcda896bd5e30cd23061d6c0c025cec69630ff5a5f3898183b39c33"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_10_2026-09-29.json",
+      "sha256": "8835c721558b7ac10ea4b71924b8b9fc2b9dd0854903bdc1501f054f1a3aa6c2"
     },
     {
       "path": "docs/r2/evidence/R2_V2_02B_GATE_C_SERIALIZATION_2026-09-29.md",
