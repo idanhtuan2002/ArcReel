@@ -53,3 +53,21 @@
   ]
 }
 ```
+
+## Resolution (main agent, 2026-09-29)
+
+| Finding | Fix | Test |
+|---|---|---|
+| 1. Resumed spend booked twice | `57a1836b`: the host remembers each project's last gracefully exited session and its final CLI totals, the ones the CLI restores on resume. A resume of that session books and settles only the spend beyond them. A smaller first total means no restore and resets the baseline. | `test_a_resumed_process_books_only_spend_beyond_the_restored_totals` |
+| 2. Canary setup failure leaves a hold | `57a1836b`: the credentials are loaded before reserving | `test_a_canary_setup_failure_leaves_no_budget_hold` |
+| 3. Failed reconciliation loses the retry handle | `57a1836b`: the reference is cleared only after success, and `reconcile_agent_connection` returns a bool | `test_a_failed_settlement_keeps_its_reference_for_a_retry` |
+| 4. Audio check reads only the first stream | `57a1836b`: every audio stream is measured, and the loudest peak decides | `test_mute_is_refused_when_any_audio_track_is_audible` (real two-track MP4) |
+| 5. Ceiling exceeded under concurrent claims | `1c4e4414`: a per-project and lane advisory transaction lock on PostgreSQL, plus a re-check of the running count in the `UPDATE` | `test_a_claim_of_another_task_waits_for_an_uncommitted_claim_of_the_same_project` (PostgreSQL; fails without the guard) |
+| Minor: cancellation bypasses the startup release | `57a1836b`: both startup paths release on `BaseException` | not tested directly |
+| Minor: script-lock digests unchecked | `57a1836b`: digests must be `sha256:<64 hex>`. The restore drill checks the lock's digests against the bundle, and that the lock precedes the first Gate C receipt. The server still cannot know a factual product's source or script (ADR-0092 limit). | `test_a_script_lock_needs_well_formed_digests` |
+
+**Verification.**
+
+- **At `57a1836b` (maintenance):** 11935 passed in the affected SQLite scope. The only failure was the known dirty-tree check, which passes on the clean tree.
+- **At `1c4e4414` (V2):** 10825 passed in the affected scope, and the admission suite passed on PostgreSQL 16.
+- **Static gates:** clean.
