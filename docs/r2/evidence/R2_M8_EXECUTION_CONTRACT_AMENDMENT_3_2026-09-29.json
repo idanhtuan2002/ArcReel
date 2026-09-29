@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_2026-09-13.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2026-09-29.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2_2026-09-29.json"
+  ],
+  "reason": "The second M8-A seam stop (R2_M8_A_STOP_2_2026-09-29.json: the M7 master authority was not composed into the host) is resolved by ADR-0096 and the V2-02 packet, accepted by an independent Codex review (R2_V2_02_CODEX_REVIEW_2026-09-29.md, reviewed HEAD 928a3b51, V2_02_ACCEPTED).",
+  "m7_prerequisite_changes": {
+    "executor_base": "the commit that adds this third amendment",
+    "intermediate_commits": "The acceptance commit b2816af4 is an ancestor of the executor base. Every commit between them changes only docs/, or belongs to the accepted V2-02 packet: feat/r2-v2-02-master-authority from 7f2f3e3b to 9c25e70e, fast-forwarded into r2-v2/main.",
+    "accepted_packets": [
+      {
+        "packet": "V2-02 master authority unification",
+        "decision": "docs/adr/0096-v2-the-m7-master-head-is-the-sole-master-authority.md",
+        "candidate_evidence": "docs/r2/evidence/R2_V2_02_MASTER_AUTHORITY_CANDIDATE_2026-09-29.md",
+        "independent_review": "docs/r2/evidence/R2_V2_02_CODEX_REVIEW_2026-09-29.md",
+        "reviewed_head": "928a3b51262a6a5afa9b46f37b8dd9bacf2cda01",
+        "status": "V2_02_ACCEPTED",
+        "reviewer_skips_covered_by": "main-agent test runs at 6933bf40 (SQLite 1248 passed, 2 skipped; PG16 60 passed); 6933bf40..928a3b51 changes docs only",
+        "deferred_to_v2_release_gate": ["full golden restore drill", "browser e2e"]
+      }
+    ]
+  },
+  "packet_overrides": {
+    "M8-A": {
+      "artifact_slot_seam": "M8-A composes AtomicPromotionService through server/services/master_authority.py (master_authority_unit, project_if_current, verify_masters). A0.2 records these as the ARTIFACT_SLOT seam. M8-A's promotion must use promote_staged and project_if_current, so that the database head stays the sole authority and the manifest its projection. A second composition of AtomicPromotionService violates tests/unit/r2/test_master_authority_boundaries.py and stops with M8_BASE_SEAM_CHANGED."
+    }
+  },
+  "created_at": "2026-09-29"
+}
