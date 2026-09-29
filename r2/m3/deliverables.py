@@ -119,8 +119,9 @@ _MAX_VOLUME_RE = re.compile(r"max_volume:\s*(-?inf|-?\d+(?:\.\d+)?) dB")
 
 
 def audio_peak_db(path: Path) -> float | None:
-    """Peak level of the file's first audio stream in dB, or ``None`` when it has no audio stream.
+    """Loudest peak across all of the file's audio streams in dB, or ``None`` when it has none.
 
+    Every stream is measured, so a silent first track cannot hide an audible second one.
     Raises ``ValueError`` when the file is not readable media.
     """
     probe = subprocess.run(
@@ -142,31 +143,25 @@ def audio_peak_db(path: Path) -> float | None:
     )
     if probe.returncode != 0:
         raise ValueError(f"{path.name} is not a readable media file")
-    if not probe.stdout.strip():
+    stream_count = len([line for line in probe.stdout.splitlines() if line.strip()])
+    if stream_count == 0:
         return None
-    measured = subprocess.run(
-        [
-            "ffmpeg",
-            "-hide_banner",
-            "-nostats",
-            "-i",
-            str(path),
-            "-map",
-            "0:a:0",
-            "-af",
-            "volumedetect",
-            "-f",
-            "null",
-            "-",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    match = _MAX_VOLUME_RE.search(measured.stderr) if measured.returncode == 0 else None
-    if match is None:
-        raise ValueError(f"ffmpeg reported no audio level for {path.name}")
-    return float(match.group(1))
+    peaks: list[float] = []
+    for position in range(stream_count):
+        measured = subprocess.run(
+            [
+                *("ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-map", f"0:a:{position}"),
+                *("-af", "volumedetect", "-f", "null", "-"),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        match = _MAX_VOLUME_RE.search(measured.stderr) if measured.returncode == 0 else None
+        if match is None:
+            raise ValueError(f"ffmpeg reported no audio level for stream {position} of {path.name}")
+        peaks.append(float(match.group(1)))
+    return max(peaks)
 
 
 def audio_decision_holds(decision: str, path: Path) -> bool:

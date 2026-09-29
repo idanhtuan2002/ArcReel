@@ -224,8 +224,12 @@ async def reserve_agent_connection(
     return ref, amount
 
 
-async def reconcile_agent_connection(session_factory, *, reservation_ref: str, actual_usd: Decimal) -> None:
-    """Commit an Agent process's booked spend against its reservation; failures are logged, not raised."""
+async def reconcile_agent_connection(session_factory, *, reservation_ref: str, actual_usd: Decimal) -> bool:
+    """Commit an Agent process's spend against its reservation; ``False`` (logged) if it failed.
+
+    A failed reconciliation leaves the reservation claimed, so the caller keeps its reference and
+    retries at its next settlement point.
+    """
     try:
         async with session_factory() as session:
             await BudgetReservationRepository(session).reconcile(
@@ -238,6 +242,8 @@ async def reconcile_agent_connection(session_factory, *, reservation_ref: str, a
             )
     except Exception:
         logger.exception("agent budget reconciliation failed for %s; reservation left claimed", reservation_ref)
+        return False
+    return True
 
 
 __all__ = [

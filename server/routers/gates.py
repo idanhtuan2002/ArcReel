@@ -80,9 +80,12 @@ class GreenlightRequest(BaseModel):
     action: Literal["GREENLIGHT", "REVOKE"]
 
 
+_SHA256_DIGEST = r"^sha256:[0-9a-f]{64}$"
+
+
 class ScriptLockRequest(BaseModel):
-    source_digest: str = Field(min_length=1)
-    script_digest: str = Field(min_length=1)
+    source_digest: str = Field(pattern=_SHA256_DIGEST)
+    script_digest: str = Field(pattern=_SHA256_DIGEST)
     action: Literal["LOCK", "REVOKE"]
 
 

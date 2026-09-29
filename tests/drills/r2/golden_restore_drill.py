@@ -273,7 +273,12 @@ async def _materialize_golden_a(client, data_root: Path) -> dict[str, Any]:
         basis=prepared[0].shot.content_basis,
     )
     await _publish(client, GOLDEN_A_PROJECT, deliverable_digest="sha256:" + final["final_sha256"])
-    return {"project_name": GOLDEN_A_PROJECT, "kind": "GOLDEN_A", **final}
+    return {
+        "project_name": GOLDEN_A_PROJECT,
+        "kind": "GOLDEN_A",
+        "script_lock": {"source_digest": source_digest, "script_digest": script_digest},
+        **final,
+    }
 
 
 async def _materialize_golden_b(client, data_root: Path, profile_key: str) -> dict[str, Any]:
@@ -411,6 +416,29 @@ async def _final_audio_decision(project: str) -> str | None:
         return result.scalar_one_or_none()
 
 
+async def _locked_before_first_gate_c(project: str, locked_at: str) -> bool:
+    """Gate B precedes production: the script lock is older than the project's first Gate C receipt."""
+    from datetime import UTC
+
+    from sqlalchemy import func, select
+
+    from lib.db import async_session_factory
+    from lib.db.models.gates import FinalCutReceiptModel
+
+    if not locked_at:
+        return False
+    async with async_session_factory() as session:
+        first = (
+            await session.execute(
+                select(func.min(FinalCutReceiptModel.selected_at)).where(FinalCutReceiptModel.project_name == project)
+            )
+        ).scalar_one_or_none()
+    if first is None:
+        return False
+    first_at = first if first.tzinfo is not None else first.replace(tzinfo=UTC)
+    return datetime.fromisoformat(locked_at) < first_at
+
+
 async def _final_cut_receipt_count(project: str) -> int:
     from sqlalchemy import func, select
 
@@ -452,8 +480,18 @@ async def check(
             if not published:
                 problems.append("GATE_D_MISSING")
             script_locks = history.get("script_lock", [])
-            if product["kind"] == "GOLDEN_A" and (not script_locks or script_locks[-1].get("action") != "LOCK"):
-                problems.append("GATE_B_MISSING")
+            if product["kind"] == "GOLDEN_A":
+                lock = script_locks[-1] if script_locks else {}
+                expected = product.get("script_lock") or {}
+                if lock.get("action") != "LOCK":
+                    problems.append("GATE_B_MISSING")
+                elif (lock.get("source_digest"), lock.get("script_digest")) != (
+                    expected.get("source_digest"),
+                    expected.get("script_digest"),
+                ):
+                    problems.append("GATE_B_DIGEST_MISMATCH")
+                elif not await _locked_before_first_gate_c(project, lock.get("created_at", "")):
+                    problems.append("GATE_B_AFTER_PRODUCTION")
             if product["kind"] != "GOLDEN_A" and not product.get("narrative_lock_decision_id"):
                 problems.append("GATE_B_MISSING")
             if await _final_audio_decision(project) not in ("AUDIO", "MUTE"):
