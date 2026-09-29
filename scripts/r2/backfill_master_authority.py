@@ -10,7 +10,8 @@ selected host version as a candidate object and promotes it, with the determinis
 
 It prints a JSON summary: promoted, already current, and diverged artifacts. An artifact is
 diverged when its database head names another candidate, or when its selected host version has no
-recorded output digest or no longer hashes to it, or when another writer moves its head first.
+recorded output digest, its file is gone or no longer hashes to it (checked again on every rerun),
+or another writer moves its head first.
 The exit status is 2 when any artifact is diverged; nothing is changed for that artifact.
 
 Each artifact is decided and promoted in one transaction that holds its master authority row lock
@@ -29,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.artifact_manifest import ArtifactKey, ArtifactKind
 from lib.candidate_store import CandidateStoreError
+from lib.content_digest import sha256_file
 from lib.db import async_session_factory
 from lib.db.repositories.host_hardening import (
     CandidateIdentityConflictError,
@@ -44,6 +46,7 @@ from server.services.master_authority import master_authority_unit, projected_ma
 
 _DIVERGENT_PROMOTION = (
     CandidateStoreError,
+    FileNotFoundError,
     CandidateObjectConflictError,
     CandidateIdentityConflictError,
     MasterHeadConflictError,
@@ -94,6 +97,20 @@ async def backfill_project(*, user_id: str, project_name: str, project_dir: Path
     return summary
 
 
+def _verified_staged_version(
+    host: GoldenAHostIntegration, target_ref: str, host_version_ref: str
+) -> tuple[Path, str] | None:
+    """The selected host version file and its recorded digest, or ``None`` when the record is missing,
+    has no digest, or its file is gone or no longer hashes to it."""
+    try:
+        version_file, staged_digest = host.staged_version(target_ref, host_version_ref)
+        if "sha256:" + sha256_file(version_file) != staged_digest:
+            return None
+    except (KeyError, ValueError, OSError):
+        return None
+    return version_file, staged_digest
+
+
 async def _backfill_locked(
     session: AsyncSession,
     *,
@@ -110,12 +127,14 @@ async def _backfill_locked(
     head = await MasterAuthorityRepository(session).get_current(
         user_id=user_id, project_name=project_name, artifact_key=artifact_key
     )
-    if head is not None:
-        return "current" if head.candidate_id == expected else "diverged"
-    try:
-        version_file, staged_digest = await asyncio.to_thread(host.staged_version, target_ref, record.host_version_ref)
-    except (KeyError, ValueError):
+    if head is not None and head.candidate_id != expected:
         return "diverged"
+    staged = await asyncio.to_thread(_verified_staged_version, host, target_ref, record.host_version_ref)
+    if staged is None:
+        return "diverged"
+    version_file, staged_digest = staged
+    if head is not None:
+        return "current" if head.content_digest == staged_digest else "diverged"
     await master_authority_unit(session, defer_commit=True).promote_staged(
         user_id=user_id,
         project_name=project_name,

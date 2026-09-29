@@ -26,3 +26,24 @@ A later Gate C approval waits for that commit, then promotes over it. Any M7 pro
 | `ruff check .`, `ruff format`, `basedpyright --warnings` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |
 
 The independent review is bundled with M8-A round 3.
+
+## Round 3 follow-up
+
+The Codex review of M8-A, round 3 (`dc13cc93..07cb27f9`), confirmed the race fix but did not accept V2-02d. It found two backfill paths that report the wrong result:
+
+1. **Missing snapshot file.** The selected host version's snapshot file was missing. `prepare_candidate` raised `FileNotFoundError`, which aborted `--all` before the summary.
+2. **Changed bytes on a rerun.** On a rerun, a head that names the expected candidate returned `current` without re-reading the selected version, even if its bytes had changed.
+
+**Rule.** Under the row lock, every artifact checks one thing first: the selected host version exists, has a recorded digest, and its file still hashes to that digest. If it does not, the artifact is `diverged`.
+
+- An existing head is `current` only when it names the expected candidate and its content digest equals the verified staged digest.
+- A promotion runs only after the check.
+- A file that disappears between the check and the registration (`FileNotFoundError`) is also reported as `diverged`.
+
+| Check | Result |
+|---|---|
+| `test_a_missing_version_file_is_reported_and_the_run_continues` | old: `FileNotFoundError` escapes; new: exit 2, SH01 diverged, SH02 promoted |
+| `test_a_rerun_reports_a_version_whose_bytes_changed_as_diverged` | old: both artifacts reported `current`; new: exit 2, SH01 diverged, SH02 current |
+| Backfill tests on SQLite and on PG16 | 4 passed, 1 skipped (PG-only); 5 passed |
+| M7 unit, scripts/r2, Gate C/D/export routes on SQLite | 514 passed, 4 skipped. `test_verify_m7_scope_git` fails only on the uncommitted tree; it was rerun after the commit. |
+| `ruff`, `basedpyright` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |

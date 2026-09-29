@@ -136,6 +136,44 @@ async def test_a_divergent_head_is_reported_and_exits_2(
     assert summary[PROJECT]["diverged"] == [sh01]
 
 
+def _selected_version_file(project_dir: Path, artifact_key: str) -> Path:
+    record = composition.projected_master_records(project_dir)[artifact_key]
+    target_ref = str(ArtifactKey.decode(artifact_key).components[1])
+    host = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1)
+    return host.staged_version(target_ref, record.host_version_ref)[0]
+
+
+async def test_a_missing_version_file_is_reported_and_the_run_continues(
+    legacy_dir: Path, session_factory: Factory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    sh01, sh02 = sorted(composition.projected_master_records(project_dir))
+    _selected_version_file(project_dir, sh01).unlink()
+
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    assert status == 2
+    assert (summary["diverged"], summary["promoted"]) == ([sh01], [sh02])
+
+
+async def test_a_rerun_reports_a_version_whose_bytes_changed_as_diverged(
+    legacy_dir: Path, session_factory: Factory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    await backfill.backfill_project(user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
+    sh01, sh02 = sorted(composition.projected_master_records(project_dir))
+    _selected_version_file(project_dir, sh01).write_bytes(b"replaced after the promotion")
+
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    assert status == 2
+    assert (summary["diverged"], summary["current"]) == ([sh01], [sh02])
+
+
 async def test_a_gate_c_approval_between_the_head_check_and_the_promotion_is_not_overwritten(
     legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
