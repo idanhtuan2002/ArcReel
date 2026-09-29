@@ -327,6 +327,21 @@ class GoldenAHostIntegration:
             host_version_ref=str(replay_version),
         )
 
+    def version_file_for(self, target_ref: str, host_version_ref: str) -> Path:
+        """The immutable host version file that ``host_version_ref`` names for ``target_ref``."""
+        version = int(host_version_ref)
+        record = next(
+            (
+                item
+                for item in self.versions.get_versions(self.resource_type, target_ref)["versions"]
+                if item["version"] == version
+            ),
+            None,
+        )
+        if record is None:
+            raise KeyError(f"{target_ref} has no host version {host_version_ref}")
+        return VersionManager.resolve_snapshot_path(self.project_dir, self.resource_type, record["file"]).resolve()
+
     def approve(
         self,
         registered: RegisteredGoldenACandidate,

@@ -797,3 +797,15 @@ def blocking_file_read_gate(
         yield gate
     finally:
         gate.release()
+
+
+class GateProjectManager:
+    """A project manager whose projects are directories under ``project_root``, created on demand."""
+
+    def __init__(self, project_root: Path) -> None:
+        self.project_root = project_root
+
+    def get_project_path(self, project_name: str) -> Path:
+        path = self.project_root / project_name
+        path.mkdir(parents=True, exist_ok=True)
+        return path

@@ -10,18 +10,15 @@ from functools import cache
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.artifact_manifest import ArtifactKey
 from lib.db.repositories.gates import FinalCutReceiptRepository
 from lib.version_manager import VersionManager
-from server.auth import CurrentUserInfo, create_download_token, get_current_user
-from server.error_handlers import register_error_handlers
+from server.auth import CurrentUserInfo, create_download_token
 from server.routers import gates
-from tests.auth_deps import AUTH_DEPENDENCIES
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -30,38 +27,8 @@ PROJECT = "demo-project"
 BASIS = {"basis_type": "FACTUAL", "basis_version": "v1", "refs": ["research:RP-1"]}
 
 
-class _FakeProjectManager:
-    def __init__(self, project_root: Path) -> None:
-        self.project_root = project_root
-
-    def get_project_path(self, project_name: str) -> Path:
-        path = self.project_root / project_name
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
-
 def _sha(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
-
-
-@pytest.fixture
-def project_dir(tmp_path: Path) -> Path:
-    path = tmp_path / "projects" / PROJECT
-    (path / "production").mkdir(parents=True)
-    return path
-
-
-@pytest.fixture
-async def gate_export_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory, project_dir: Path):
-    monkeypatch.setattr(gates, "async_session_factory", session_factory)
-    monkeypatch.setattr(gates, "get_project_manager", lambda: _FakeProjectManager(project_dir.parent))
-    app = FastAPI()
-    app.dependency_overrides[get_current_user] = lambda: USER
-    app.include_router(gates.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
-    app.include_router(gates.self_auth_router, prefix="/api/v1")
-    register_error_handlers(app)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
-        yield http
 
 
 @cache
@@ -134,7 +101,9 @@ def _body(target_ref: str, data: bytes, **produced: object) -> dict[str, object]
     }
 
 
-async def _approve_shot(gate_export_client: AsyncClient, project_dir: Path, shot: str, data: bytes) -> str:
+async def _approve_shot(gate_export_client: AsyncClient, project_dir: Path, shot: str, tag: bytes) -> str:
+    """Approve a real media shot whose bytes are unique per ``tag`` (a master must probe as media)."""
+    data = _media(tag)
     (project_dir / "production" / f"{shot}.mp4").write_bytes(data)
     response = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=_body(shot, data))
     assert response.status_code == 200, response.text

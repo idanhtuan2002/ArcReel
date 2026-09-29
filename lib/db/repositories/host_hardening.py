@@ -878,6 +878,19 @@ class MasterAuthorityRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def list_current_keys(self, *, user_id: str, project_name: str) -> list[str]:
+        """The artifact keys of this project that have a promoted master head."""
+        rows = await self.session.execute(
+            select(MasterAuthorityModel.artifact_key)
+            .where(
+                MasterAuthorityModel.user_id == user_id,
+                MasterAuthorityModel.project_name == project_name,
+                MasterAuthorityModel.current_version > 0,
+            )
+            .order_by(MasterAuthorityModel.artifact_key)
+        )
+        return list(rows.scalars().all())
+
     async def get_current(self, *, user_id: str, project_name: str, artifact_key: str) -> MasterHeadSnapshot | None:
         authority = (
             await self.session.execute(

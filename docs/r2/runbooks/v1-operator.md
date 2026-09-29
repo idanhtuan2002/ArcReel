@@ -141,6 +141,30 @@ A file written into `output/` by another tool under the same name also makes the
   `GET /api/v1/admission` shows both settings.
 - **When it takes effect.** Both apply at the worker's next claim cycle, and a restart keeps them.
 
+## 4b. Master authority (V2, ADR-0096)
+
+- **What changed.** A Gate C approval promotes the master in the database first, then writes
+  the file manifest's approved master as its projection.
+- **Routes that refuse divergence.** Publish approval, the deliverable listing and a composite
+  final's Gate C refuse a project whose database masters and file masters disagree. They return
+  409 with a `master_diverged` detail.
+- **Release step for existing projects.** A project approved before this release has file
+  masters only, which the routes above refuse. Run this once, with the application stopped or
+  idle:
+
+      uv run python -m scripts.r2.backfill_master_authority --user-id default --all
+
+  The JSON summary lists, for each project:
+  - `promoted`: new database heads;
+  - `current`: heads that already agree;
+  - `diverged`: heads that disagree.
+
+  A rerun is safe: it promotes nothing new.
+- **If the exit status is 2**, some artifact is diverged, and nothing was changed for it. Keep
+  the summary. Re-approve the artifact through Gate C, which writes a new head and its projection.
+- **A failed Gate C** that fails after the database promotion converges on a retry with the
+  same `approval_record`.
+
 ## 5. Backup, restore and recovery
 
 - **Procedure:** follow `docs/r2/runbooks/m7-backup-restore.md`. The steps are:

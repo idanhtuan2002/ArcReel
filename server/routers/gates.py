@@ -31,6 +31,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from lib.async_thread import run_noninterruptible_sync
+from lib.candidate_store import CandidateStoreError
 from lib.db import async_session_factory
 from lib.db.adaptation_uow import adaptation_uow_factory
 from lib.db.repositories.gates import (
@@ -40,6 +41,7 @@ from lib.db.repositories.gates import (
     PublishApprovalRepository,
     ScriptLockRepository,
 )
+from lib.db.repositories.host_hardening import MasterHeadConflictError
 from lib.project_manager import get_project_manager
 from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.session_authority import SessionAuthenticatedShowrunnerAuthority
@@ -52,6 +54,12 @@ from r2.contracts.gates import (
     GreenlightDecision,
     PublishApprovalDecision,
     ScriptLockDecision,
+)
+from r2.host_hardening.master_authority import CandidateObjectConflictError, MasterDivergedError
+from r2.host_hardening.promotion import (
+    CandidateArtifactMismatchError,
+    PromotionExpectedVersionConflictError,
+    PromotionReceiptReplayMismatchError,
 )
 from r2.m3.deliverables import (
     COMPOSITE_CONTRACT_TYPE,
@@ -69,6 +77,7 @@ from r2.m3.host_integration import GoldenAHostIntegration, StagedOperationConfli
 from r2.m3.render_plan import RenderedCutAsset
 from r2.production.artifact_metadata import DependencySnapshot
 from server.auth import DOWNLOAD_TOKEN_EXPIRY_SECONDS, CurrentUser, create_download_token, verify_download_token
+from server.services.master_authority import master_authority_unit, verify_masters
 
 router = APIRouter()
 # Token-authenticated like the project ZIP export (ADR-0071): registered without the session dependency.
@@ -210,6 +219,25 @@ async def script_lock(project_name: str, req: ScriptLockRequest, user: CurrentUs
     return history[-1].model_dump(mode="json")
 
 
+_MASTER_CONFLICTS = (
+    CandidateArtifactMismatchError,
+    CandidateObjectConflictError,
+    CandidateStoreError,
+    MasterHeadConflictError,
+    PromotionExpectedVersionConflictError,
+    PromotionReceiptReplayMismatchError,
+)
+
+
+async def _require_consistent_masters(user_id: str, project_name: str, project_dir) -> None:
+    """Refuse a master-consuming request while any master disagrees with its projection (ADR-0096)."""
+    try:
+        async with async_session_factory() as session:
+            await verify_masters(session, user_id=user_id, project_name=project_name, project_dir=project_dir)
+    except MasterDivergedError as exc:
+        raise HTTPException(status_code=409, detail=f"master_diverged: {exc}") from exc
+
+
 @router.post("/projects/{project_name}/gates/final-cut")
 async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, user: CurrentUser) -> dict[str, object]:
     project_dir = get_project_manager().get_project_path(project_name)
@@ -274,11 +302,14 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
                 detail=f"audio_decision {decision} does not match the final's audio track",
             )
 
-    def _stage_and_approve():
+    if composite:
+        await _require_consistent_masters(user.id, project_name, project_dir)
+
+    def _stage():
         dependencies = (
             composite_dependencies(host, req.produced.source_master_refs) if composite else req.direct_dependencies
         )
-        registered = host.stage_candidate(
+        return host.stage_candidate(
             target_ref=req.target_ref,
             content_fingerprint=req.content_fingerprint,
             produced=produced,
@@ -290,6 +321,8 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             operation_id=operation_id,
             request_digest=request_digest,
         )
+
+    def _project_and_export(registered):
         approved = host.approve(
             registered,
             approval_record=req.approval_record,
@@ -303,11 +336,33 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         return approved, export
 
     try:
-        approved_master, export = await run_noninterruptible_sync(_stage_and_approve)
+        registered = await run_noninterruptible_sync(_stage)
     except SourceMasterMismatchError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except StagedOperationConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    # The database master head is the authority (ADR-0096); the manifest master is projected after it.
+    version_file = await run_noninterruptible_sync(
+        lambda: host.version_file_for(req.target_ref, registered.host_version_ref)
+    )
+    try:
+        async with async_session_factory() as session:
+            await master_authority_unit(session).promote_staged(
+                user_id=user.id,
+                project_name=project_name,
+                project_dir=project_dir.resolve(),
+                artifact_key=registered.artifact_key,
+                generation_candidate_id=registered.candidate.id,
+                version_file=version_file,
+                approval_record=req.approval_record,
+                command_id=operation_id,
+            )
+    except _MASTER_CONFLICTS as exc:
+        raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
+
+    try:
+        approved_master, export = await run_noninterruptible_sync(lambda: _project_and_export(registered))
     except PostApprovalExportError as exc:
         raise _gate_c_retry_error(req.approval_record) from exc
 
@@ -357,6 +412,7 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
 async def publish_approval(project_name: str, req: PublishApprovalRequest, user: CurrentUser) -> dict[str, object]:
     if req.action == "APPROVE_PUBLISH":
         project_dir = get_project_manager().get_project_path(project_name)
+        await _require_consistent_masters(user.id, project_name, project_dir)
         deliverable = await run_noninterruptible_sync(
             lambda: exportable_deliverable(project_dir, req.deliverable_digest)
         )
@@ -427,6 +483,7 @@ def _deliverable_view(project_dir) -> list[dict[str, object]]:
 async def create_deliverable_token(project_name: str, user: CurrentUser) -> dict[str, object]:
     """Issue a short-lived download token and list the project's approved finals."""
     project_dir = get_project_manager().get_project_path(project_name)
+    await _require_consistent_masters(user.id, project_name, project_dir)
     deliverables = await run_noninterruptible_sync(lambda: _deliverable_view(project_dir))
     return {
         "download_token": create_download_token(user.sub, project_name),

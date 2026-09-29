@@ -16,6 +16,8 @@ a path-escape attempt before touching disk.
 from __future__ import annotations
 
 import hashlib
+import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -42,6 +44,16 @@ class _FakeProjectManager:
         path = self.project_root / project_name
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+
+def _real_video() -> bytes:
+    """A real short MP4: a Gate C master must probe as media."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "shot.mp4"
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=64x36:d=0.5", str(out)], check=True
+        )
+        return out.read_bytes()
 
 
 def _make_app(
@@ -151,7 +163,7 @@ async def test_final_cut_stages_and_approves_a_real_file(
     production_dir = project_dir / "production"
     production_dir.mkdir(parents=True)
     rendered_file = production_dir / "SH01.mp4"
-    rendered_bytes = b"not a real video, just proving the route stages+approves a real file"
+    rendered_bytes = _real_video()
     rendered_file.write_bytes(rendered_bytes)
 
     app = _make_app(monkeypatch, session_factory, project_root, authed=True)

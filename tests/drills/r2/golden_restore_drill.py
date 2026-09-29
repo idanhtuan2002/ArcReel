@@ -398,6 +398,21 @@ async def _download_digest(client, project: str, digest: str) -> str | None:
     return "sha256:" + hashlib.sha256(response.content).hexdigest()
 
 
+async def _master_authority_consistent(project: str, project_dir: Path) -> bool:
+    """The restored database master heads and the projected file masters agree (ADR-0096)."""
+    from lib.db import async_session_factory
+    from lib.db.base import DEFAULT_USER_ID
+    from r2.host_hardening.master_authority import MasterDivergedError
+    from server.services.master_authority import verify_masters
+
+    try:
+        async with async_session_factory() as session:
+            await verify_masters(session, user_id=DEFAULT_USER_ID, project_name=project, project_dir=project_dir)
+    except MasterDivergedError:
+        return False
+    return True
+
+
 async def _final_audio_decision(project: str) -> str | None:
     from sqlalchemy import select
 
@@ -503,6 +518,8 @@ async def check(
                 problems.append("GATE_B_MISSING")
             if await _final_audio_decision(project) not in ("AUDIO", "MUTE"):
                 problems.append("AUDIO_DECISION_MISSING")
+            if not await _master_authority_consistent(project, data_root / project):
+                problems.append("MASTER_AUTHORITY_DIVERGED")
             deliverable_digest = published[-1]["deliverable_digest"] if published else ""
 
             project_dir = data_root / project
