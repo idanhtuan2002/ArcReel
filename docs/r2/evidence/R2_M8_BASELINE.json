@@ -1,0 +1,279 @@
+{
+  "schema_version": 1,
+  "base_head": "cca1eeafcd28e1c579831033a09b24186fc0b3b0",
+  "accepted_m7_candidate_head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
+  "branch": "impl/r2-m8a-exploration-promotion",
+  "alembic_heads": [
+    "c9e1f4a2b701"
+  ],
+  "m7_evidence": [
+    {
+      "path": "docs/r2/evidence/R2_M7_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "4cfa038beda73708891b3f9995393bcb06a6d33152cb1b4ab61cbb0572e2345c",
+      "status": "M7_IMPLEMENTATION_ACCEPTED"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V1_PRODUCTION_CANDIDATE_2026-09-28.md",
+      "sha256": "14dee8814c29f3533dd6ce50113fa20550f5252fb6ecf79edf8bde32f0c38d4c",
+      "status": "PRODUCTION_CANDIDATE"
+    }
+  ],
+  "design_artifacts": [
+    {
+      "path": "docs/research/2026-09-13-r2-m8-reuse-first-comprehensive-research.md",
+      "sha256": "0fdb6631da38a7e7647c49d1621fbb51aab285cb3664b8ba8dd31304ac60669b"
+    },
+    {
+      "path": "docs/research/2026-09-13-r2-m8-architecture-options.md",
+      "sha256": "7aef9b01a7a1f28cf490c10092220a3ce946bcd94ab42b037053a0dafd68a797"
+    },
+    {
+      "path": "docs/adr/0079-m8-integrated-exploration-learning-format-kernel.md",
+      "sha256": "019420b3dd6969f1b6164cefafed00cfe483660d10d4c5ac4cfdddbc421784ce"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-09-13-r2-m8-canvas-learning-multiformat-design.md",
+      "sha256": "34c1f1d2fcc1c0b5967dcf0f6180f04405435cf0d4c65702b6aa6346bc455dba"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8-canvas-learning-multiformat.md",
+      "sha256": "ec25cf2b95a7ff78ba2403beb54990d0a42be746519b417389b9c53683ebac88"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8a-exploration-promotion.md",
+      "sha256": "98717a37916df653a88e0927c4b3c376402ea56c280db79a71233f8d38da843c"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8b-creative-canvas.md",
+      "sha256": "f43bdc1d634564d27dcd578c3246616cf8afa108edbab0b1c4fc74ad5d0c7f19"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8c-spatial-candidates.md",
+      "sha256": "f3fbbeced89b6b291eef6fc6c49e9465a19ccff1493a3d2b92083fe4beec9df1"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8d-learning-recommendations.md",
+      "sha256": "4e2f6aca8ed8d827ddbafdc1b19e642e4074c25ae09f4e64ad9a4e67b3e1de1d"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8e-multiformat-projection.md",
+      "sha256": "3b1cef09e83f5476c4e19890e29623a9d7b2045b0fedee9be26a48db76acee0c"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8f-integrated-utility.md",
+      "sha256": "e1bc0c83c78cfdefe242967c36555d2b393e6d1183f8d372cbc6011326092756"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_2026-09-13.json",
+      "sha256": "5e0aac609f0b74edc1d9e4cfd640b986b97331c22115f71c99358d83899029b5"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V1_RELEASE_SPONSOR_DECISION_2026-09-28.json",
+      "sha256": "3eb51b4b0ed533c16b6a03a7076c97e11f70bf30b3cc20ba75ed47d6feb17d37"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_START_DECISION_2026-09-29.json",
+      "sha256": "00d61294a5eae096fd27b4d6d8d5c35bf993e26f64eca4fca14fe5fdca06e6e7"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_CODEX_REVIEW_2026-09-29.md",
+      "sha256": "543a909a59f37160dd8135f4ad9ef829d16d254ae2089051d07e61af9fddc3a2"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_CODEX_CONFIRMATION_REVIEW_2026-09-29.md",
+      "sha256": "95107a59f003b81c0f86570d008a6f2cda13af495b7a5443d77127edc24f2fb3"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_DESIGN_MANIFEST_2026-09-13.json",
+      "sha256": "b676dce6bcd81c5a56be85af0b249201bf83148802ff6ddce843a9a057c4f946"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2026-09-29.json",
+      "sha256": "a0b35c9d3a75e1482502d376f6ec939f1dbf6d2f0118e32a35137b2157705e2e"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2_2026-09-29.json",
+      "sha256": "a178356c6b95af5a3acc916098f1c5516443a3a3b2c658a9b64d88d0aacd8f07"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_3_2026-09-29.json",
+      "sha256": "dd0ebdb2ff50156c8fda59e1c2c2ad32ec1248c1965fd4f06ceb7797b0530237"
+    },
+    {
+      "path": "docs/adr/0095-m8a-defers-the-production-binding-promotion-target.md",
+      "sha256": "aa596634fc7fb95ee0a1558b537465fb8dbe07de2cf4c49d8fb139e59a13fab6"
+    },
+    {
+      "path": "docs/adr/0096-v2-the-m7-master-head-is-the-sole-master-authority.md",
+      "sha256": "a887f2edbc5446ae330bb414c662ad7ad94776e4955f9177de77a1477fbd2643"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_02_CODEX_REVIEW_2026-09-29.md",
+      "sha256": "00882870008fa41e43926741446aa7e89c1fa1b56e467736a87d7c9adea1c714"
+    }
+  ],
+  "seams": [
+    {
+      "qualified_name": "r2.host_hardening.promotion:AtomicPromotionService.promote",
+      "path": "r2/host_hardening/promotion.py",
+      "signature": "(self, *, user_id: str, project_name: str, artifact_key: str, candidate_id: str, expected_master_version: int, approval_record: str, command_id: str) -> MasterHeadSnapshot",
+      "sha256": "8da45070aa7e831c8e67b097743ac18d0741979a864fbbf8fe30cf5d454174cb"
+    },
+    {
+      "qualified_name": "r2.host_hardening.master_resolver:DatabaseMasterResolver.get_exact",
+      "path": "r2/host_hardening/master_resolver.py",
+      "signature": "(self, *, user_id: str, project_name: str, artifact_key: str) -> MasterHeadSnapshot | None",
+      "sha256": "465814788192115e0cb16ae1cd2fd8a4c06f10a651ad67293c46d1b71d63060a"
+    },
+    {
+      "qualified_name": "lib.db.repositories.host_hardening:CommandReceiptRepository.get_exact",
+      "path": "lib/db/repositories/host_hardening.py",
+      "signature": "(self, *, user_id: str, project_name: str, actor_scope: str, command_id: str) -> CommandReceipt | None",
+      "sha256": "f77c91a4fc267d1ab36199a4ecbedf91c4f40f7af96ee30fe9c75700a8a29ace"
+    },
+    {
+      "qualified_name": "lib.db.repositories.host_hardening:CommandReceiptRepository.add",
+      "path": "lib/db/repositories/host_hardening.py",
+      "signature": "(self, *, user_id: str, project_name: str, receipt: CommandReceipt) -> None",
+      "sha256": "682efd03ac0cfd0b9b4d5363c3aa53e27daee933ce219233c6675b8e5267a519"
+    },
+    {
+      "qualified_name": "lib.db.repositories.host_hardening:MasterAuthorityRepository.append_promoted_event",
+      "path": "lib/db/repositories/host_hardening.py",
+      "signature": "(self, *, user_id: str, project_name: str, snapshot: MasterHeadSnapshot) -> None",
+      "sha256": "c205666218a60d908fbf141e9c76e7230aa1a4ecc43c3c5d993c5757a0022a30"
+    },
+    {
+      "qualified_name": "r2.host_hardening.master_authority:MasterAuthorityUnit.promote_staged",
+      "path": "r2/host_hardening/master_authority.py",
+      "signature": "(self, *, user_id: str, project_name: str, project_dir: Path, artifact_key: str, generation_candidate_id: str, version_file: Path, expected_content_digest: str, approval_record: str, command_id: str) -> MasterHeadSnapshot",
+      "sha256": "543a8d98965ba702b205074db397d861c21d195d1293ab80db446ca4a80fba5c"
+    },
+    {
+      "qualified_name": "server.services.master_authority:master_authority_unit",
+      "path": "server/services/master_authority.py",
+      "signature": "(session: AsyncSession) -> MasterAuthorityUnit",
+      "sha256": "74e27031ee6651c381107256508d5a50c83cece492cce55a86e42a602ad803fe"
+    },
+    {
+      "qualified_name": "server.services.master_authority:project_if_current",
+      "path": "server/services/master_authority.py",
+      "signature": "(session: AsyncSession, *, user_id: str, project_name: str, artifact_key: str, candidate_id: str, project: Callable[[], Awaitable[T]]) -> T",
+      "sha256": "de77a10a683ccb24e2614f8b0b17e4ff667835f9603619ed24ac172ff6ce5f32"
+    },
+    {
+      "qualified_name": "server.services.master_authority:verify_masters",
+      "path": "server/services/master_authority.py",
+      "signature": "(session: AsyncSession, *, user_id: str, project_name: str, project_dir: Path) -> None",
+      "sha256": "8b3a4884c2684dd6a5930133b3d3ee2d157ebb98d206af4ed84d9a6b7a465d48"
+    }
+  ],
+  "donors": [
+    {
+      "name": "DramaClaw",
+      "url": "https://github.com/dramaclaw/dramaclaw",
+      "commit": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+      "files": [
+        {
+          "path": "frontend/src/features/canvas/application/canvasServices.ts",
+          "sha256": "649c4936482f7b55b6a1e7553fe8e7d425a902004e3c67b60d5299d1e28ee3bb"
+        },
+        {
+          "path": "frontend/src/stores/canvasStore.ts",
+          "sha256": "d04d3f2da71d2e1e1cd7c353f0fb35eccd171000eec14d207e4f8e9f1ff61f0c"
+        },
+        {
+          "path": "frontend/src/features/freezone/commit/promoteToAsset.ts",
+          "sha256": "f3a301bb28e91435716c72ef596dae0692c27a111ef057859e1ddaf078d579f2"
+        },
+        {
+          "path": "src/novelvideo/director_world/scene_spatial_contract.py",
+          "sha256": "975e634cdd99500be5e29901da4930db14d5b81b1d14e6616e7e2e71081f1c92"
+        }
+      ]
+    },
+    {
+      "name": "OpenMontage",
+      "url": "https://github.com/calesthio/OpenMontage",
+      "commit": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "files": [
+        {
+          "path": "skills/pipelines/explainer/research-director.md",
+          "sha256": "420641d56fed790a19f7d9c85795ec0728138c692552e06cdcf106f506e151f3"
+        },
+        {
+          "path": "schemas/artifacts/research_brief.schema.json",
+          "sha256": "0d263fb8f46c6ef8e8f31492d679506c22ecfe0dd379d44432dac658ff0401f3"
+        },
+        {
+          "path": "schemas/artifacts/decision_log.schema.json",
+          "sha256": "4fb3b3dac79b1b9c742523f7c6878ffc8c64049b0fe5f811d26076761eca773f"
+        },
+        {
+          "path": "tools/video/video_compose.py",
+          "sha256": "41013b025a722b2e93dcbe7b206bd15828e7e82562dba3a531f16425a75a1eca"
+        },
+        {
+          "path": "tools/analysis/composition_validator.py",
+          "sha256": "ce597d6ee336fab8f817e33d3509020b7de965c697949432ac9a683c8cff6a34"
+        },
+        {
+          "path": "tools/analysis/visual_qa.py",
+          "sha256": "be5df568c8f810ea3d8b48cf3373a43f0598a92030a4c1414fd5a79fbc37c7dc"
+        },
+        {
+          "path": "remotion-composer/src/Root.tsx",
+          "sha256": "ac9f4b1e7db4acb96ef309a494668d537189527e1c8f583cced56e1f2c8ee8c5"
+        }
+      ]
+    }
+  ],
+  "scope_allowlist": [
+    "alembic/versions/8a8c4a0e0001_add_exploration_authority.py",
+    "docs/r2/evidence/R2_M8_A_EXPLORATION_PROMOTION.json",
+    "docs/r2/evidence/R2_M8_BASELINE.json",
+    "docs/r2/evidence/schemas/R2_M8_A_EXPLORATION_PROMOTION.schema.json",
+    "docs/r2/evidence/schemas/R2_M8_BASELINE.schema.json",
+    "lib/db/models/__init__.py",
+    "lib/db/models/advanced_creative.py",
+    "lib/db/repositories/__init__.py",
+    "lib/db/repositories/advanced_creative.py",
+    "lib/i18n/en/errors.py",
+    "lib/i18n/vi/errors.py",
+    "lib/i18n/zh/errors.py",
+    "r2/advanced_creative/__init__.py",
+    "r2/advanced_creative/digests.py",
+    "r2/advanced_creative/errors.py",
+    "r2/advanced_creative/exploration.py",
+    "r2/advanced_creative/parity.py",
+    "r2/advanced_creative/ports.py",
+    "r2/advanced_creative/promotion.py",
+    "r2/contracts/__init__.py",
+    "r2/contracts/advanced_creative.py",
+    "scripts/r2/verify_donor_parity.py",
+    "scripts/r2/verify_m8_evidence.py",
+    "scripts/r2/verify_m8_scope.py",
+    "server/app.py",
+    "server/routers/advanced_creative.py",
+    "server/services/advanced_creative.py",
+    "tests/architecture/test_m8_advanced_creative_boundaries.py",
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+    "tests/integration/lib/db/repositories/test_advanced_creative.py",
+    "tests/integration/r2/advanced_creative/test_promotion_atomicity.py",
+    "tests/unit/r2/advanced_creative/test_digests.py",
+    "tests/unit/r2/advanced_creative/test_exploration.py",
+    "tests/unit/r2/advanced_creative/test_parity.py",
+    "tests/unit/r2/advanced_creative/test_promotion.py",
+    "tests/unit/r2/contracts/test_advanced_creative.py",
+    "tests/unit/scripts/r2/test_verify_donor_parity.py",
+    "tests/unit/scripts/r2/test_verify_m8_evidence.py",
+    "tests/unit/scripts/r2/test_verify_m8_scope.py",
+    "tests/unit/server/routers/test_advanced_creative_router.py"
+  ],
+  "graph": {
+    "project": "r2-m8a",
+    "generation": "2026-09-29T05:59:04Z",
+    "coverage": "no_recorded_issue for every seam path (check_index_coverage, fast mode; scripts/ excluded by design)"
+  },
+  "created_at": "2026-09-29T06:00:00Z"
+}

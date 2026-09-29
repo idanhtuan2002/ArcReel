@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R2 M8 accepted baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "base_head",
+    "accepted_m7_candidate_head",
+    "branch",
+    "alembic_heads",
+    "m7_evidence",
+    "design_artifacts",
+    "seams",
+    "donors",
+    "scope_allowlist",
+    "graph",
+    "created_at"
+  ],
+  "$defs": {
+    "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "path": {"type": "string", "minLength": 1, "pattern": "^[^/].*"}
+  },
+  "properties": {
+    "schema_version": {"const": 1},
+    "base_head": {"$ref": "#/$defs/sha1"},
+    "accepted_m7_candidate_head": {"$ref": "#/$defs/sha1"},
+    "branch": {"type": "string", "minLength": 1},
+    "alembic_heads": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 1},
+    "m7_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "status"],
+        "properties": {
+          "path": {"$ref": "#/$defs/path"},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "status": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "design_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {"path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/sha256"}}
+      }
+    },
+    "seams": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["qualified_name", "path", "signature", "sha256"],
+        "properties": {
+          "qualified_name": {"type": "string", "pattern": "^[A-Za-z_][\\w.]*:[A-Za-z_][\\w.]*$"},
+          "path": {"$ref": "#/$defs/path"},
+          "signature": {"type": "string", "minLength": 2},
+          "sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "donors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "url", "commit", "files"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "url": {"type": "string", "pattern": "^https://"},
+          "commit": {"$ref": "#/$defs/sha1"},
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256"],
+              "properties": {"path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/sha256"}}
+            }
+          }
+        }
+      }
+    },
+    "scope_allowlist": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/path"}, "uniqueItems": true},
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "generation", "coverage"],
+      "properties": {
+        "project": {"type": "string", "minLength": 1},
+        "generation": {"type": "string", "minLength": 1},
+        "coverage": {"type": "string", "minLength": 1}
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}
