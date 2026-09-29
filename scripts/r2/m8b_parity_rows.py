@@ -17,12 +17,15 @@ case tagged ``"evidences": ["failure_safety"]`` (a failure path: invalid input, 
 failed save, a corrupt draft, a full quota); otherwise it is ``UNVERIFIED``. ``determinism``
 compares two port runs.
 
-``performance`` and ``resources`` come from ``--timing`` files: both sides time every case of
+``performance`` and ``resources`` come from ``--timing`` files: both sides measure every case of
 a harness with the same runner (tools/parity/dramaclaw/timingRunner.ts). Per case, the port's
-median must be at most ``PERF_RATIO`` times the donor's plus ``PERF_SLACK_MS`` (``IMPROVED``
-when every case is at most ``PERF_FASTER`` times the donor's), and the port's observation bytes
-at most ``RESOURCE_RATIO`` times the donor's plus ``RESOURCE_SLACK_BYTES`` (the absolute slacks
-keep microsecond- and few-byte cases from failing on a ratio alone). A behavior with an untimed case is ``UNVERIFIED``.
+median time must be at most ``PERF_RATIO`` times the donor's plus ``PERF_SLACK_MS``
+(``IMPROVED`` when every case is at most ``PERF_FASTER`` times the donor's). For resources, the
+heap the case retains after garbage collection must be at most ``HEAP_RATIO`` times the donor's
+plus ``HEAP_SLACK_BYTES``, and the localStorage bytes it leaves at most ``STORAGE_RATIO`` times
+the donor's plus ``STORAGE_SLACK_BYTES``; an unmeasured heap is ``UNVERIFIED``. The absolute
+slacks keep microsecond-, few-kilobyte- and few-byte cases from failing on a ratio alone. A
+behavior with an unmeasured case is ``UNVERIFIED``.
 ``--dimension`` files override any dimension for a behavior.
 
     uv run python scripts/r2/m8b_parity_rows.py --baseline <donor-baseline.json> \\
@@ -55,8 +58,10 @@ COMPARED = ("functionality", "correctness", "data_integrity", "observability")
 PERF_RATIO = 1.5
 PERF_SLACK_MS = 0.05
 PERF_FASTER = 0.67
-RESOURCE_RATIO = 1.1
-RESOURCE_SLACK_BYTES = 64
+HEAP_RATIO = 1.5
+HEAP_SLACK_BYTES = 64 * 1024
+STORAGE_RATIO = 1.1
+STORAGE_SLACK_BYTES = 64
 
 
 @dataclass(frozen=True)
@@ -71,8 +76,8 @@ class HarnessRun:
 @dataclass(frozen=True)
 class TimingRun:
     name: str
-    donor: Mapping[str, Mapping[str, float]]
-    port: Mapping[str, Mapping[str, float]]
+    donor: Mapping[str, Mapping[str, float | None]]
+    port: Mapping[str, Mapping[str, float | None]]
 
 
 def _cases(run: HarnessRun) -> list[Mapping[str, object]]:
@@ -159,7 +164,10 @@ def measure_behavior(
         donor_ms, port_ms = float(donor["median_ms"]), float(port["median_ms"])
         if port_ms > donor_ms * PERF_RATIO + PERF_SLACK_MS:
             return ParityDisposition.UNVERIFIED, ParityDisposition.UNVERIFIED, refs
-        if port["observation_bytes"] > donor["observation_bytes"] * RESOURCE_RATIO + RESOURCE_SLACK_BYTES:
+        donor_heap, port_heap = donor.get("retained_heap_bytes"), port.get("retained_heap_bytes")
+        if donor_heap is None or port_heap is None or port_heap > donor_heap * HEAP_RATIO + HEAP_SLACK_BYTES:
+            return ParityDisposition.UNVERIFIED, ParityDisposition.UNVERIFIED, refs
+        if port["storage_bytes"] > donor["storage_bytes"] * STORAGE_RATIO + STORAGE_SLACK_BYTES:
             return ParityDisposition.UNVERIFIED, ParityDisposition.UNVERIFIED, refs
         faster = faster and port_ms <= donor_ms * PERF_FASTER and donor_ms - port_ms > PERF_SLACK_MS
     if not cases:

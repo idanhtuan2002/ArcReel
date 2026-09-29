@@ -1,116 +1,154 @@
 {
   "single-flight-and-coalesce": {
     "reps": 25,
-    "median_ms": 0.0105,
-    "p95_ms": 0.0122,
+    "median_ms": 0.0521,
+    "p95_ms": 0.0602,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 1081
   },
   "waiter-released-only-by-covering-save": {
     "reps": 25,
-    "median_ms": 0.0097,
-    "p95_ms": 0.0128,
+    "median_ms": 0.046,
+    "p95_ms": 0.0569,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 930
   },
   "dispose-releases-waiters": {
     "reps": 25,
-    "median_ms": 0.0075,
-    "p95_ms": 0.0103,
+    "median_ms": 0.0458,
+    "p95_ms": 0.0631,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 783
   },
   "failure-stops-pump": {
     "reps": 25,
-    "median_ms": 0.0183,
-    "p95_ms": 0.02,
+    "median_ms": 0.0914,
+    "p95_ms": 0.116,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 1148
   },
   "request-as-previous-lands": {
     "reps": 25,
-    "median_ms": 0.007,
-    "p95_ms": 0.0083,
+    "median_ms": 0.0422,
+    "p95_ms": 0.0465,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 610
   },
   "canvas-switch-isolation": {
     "reps": 25,
-    "median_ms": 0.0084,
-    "p95_ms": 0.0093,
+    "median_ms": 0.0436,
+    "p95_ms": 0.0531,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 799
   },
   "save-decisions": {
     "reps": 25,
-    "median_ms": 0.0014,
-    "p95_ms": 0.0024,
+    "median_ms": 0.0154,
+    "p95_ms": 0.0218,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 495
   },
   "payload-limits": {
     "reps": 25,
-    "median_ms": 0.0009,
-    "p95_ms": 0.0009,
+    "median_ms": 0.0144,
+    "p95_ms": 0.0199,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 157
   },
   "autosave-hold": {
     "reps": 25,
-    "median_ms": 0.0378,
-    "p95_ms": 0.0468,
+    "median_ms": 0.1765,
+    "p95_ms": 0.1864,
+    "retained_heap_bytes": 368,
+    "storage_bytes": 517,
     "observation_bytes": 575
   },
   "draft-round-trip-and-scope": {
     "reps": 25,
-    "median_ms": 0.0818,
-    "p95_ms": 0.1007,
+    "median_ms": 0.3136,
+    "p95_ms": 0.4019,
+    "retained_heap_bytes": 1920,
+    "storage_bytes": 867,
     "observation_bytes": 308
   },
   "draft-shedding": {
     "reps": 25,
-    "median_ms": 28.935,
-    "p95_ms": 29.671,
+    "median_ms": 28.3104,
+    "p95_ms": 29.3212,
+    "retained_heap_bytes": 1802128,
+    "storage_bytes": 1801119,
     "observation_bytes": 478
   },
   "draft-pruning": {
     "reps": 25,
-    "median_ms": 0.1329,
-    "p95_ms": 0.1414,
+    "median_ms": 0.3517,
+    "p95_ms": 0.3853,
+    "retained_heap_bytes": 3608,
+    "storage_bytes": 512,
     "observation_bytes": 344
   },
   "draft-user-isolation": {
     "reps": 25,
-    "median_ms": 0.0504,
-    "p95_ms": 0.0684,
+    "median_ms": 0.2414,
+    "p95_ms": 0.2696,
+    "retained_heap_bytes": 1352,
+    "storage_bytes": 659,
     "observation_bytes": 390
   },
   "hydrate-decisions": {
     "reps": 25,
-    "median_ms": 0.2889,
-    "p95_ms": 0.3475,
+    "median_ms": 0.5182,
+    "p95_ms": 0.5977,
+    "retained_heap_bytes": 7256,
+    "storage_bytes": 517,
     "observation_bytes": 69
   },
   "save-failure-classification": {
     "reps": 25,
-    "median_ms": 0.0019,
-    "p95_ms": 0.0022,
+    "median_ms": 0.019,
+    "p95_ms": 0.0235,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 52
   },
   "save-status": {
     "reps": 25,
-    "median_ms": 0.009,
-    "p95_ms": 0.0112,
+    "median_ms": 0.0632,
+    "p95_ms": 0.0845,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 511
   },
   "quota-safe-write": {
     "reps": 25,
-    "median_ms": 0.0965,
-    "p95_ms": 0.1214,
+    "median_ms": 0.2599,
+    "p95_ms": 0.3223,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 221
   },
   "quota-legacy-error-name": {
     "reps": 25,
-    "median_ms": 0.0466,
-    "p95_ms": 0.0487,
+    "median_ms": 0.199,
+    "p95_ms": 0.2245,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 97
   },
   "coalesce-after-failure": {
     "reps": 25,
-    "median_ms": 0.0195,
-    "p95_ms": 0.0212,
+    "median_ms": 0.0935,
+    "p95_ms": 0.1091,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 517,
     "observation_bytes": 1544
   }
 }

@@ -8,7 +8,7 @@ import type { CandidateHead, CanvasRevisionWire, LineageBinding } from "../api/t
 import { createEmptyBookmarks } from "../domain/bookmarks";
 import { addNode, clearCanvas } from "../domain/graph";
 import type { CanvasNode } from "../domain/types";
-import { readConflictSnapshot, readDraft, writeDraft } from "../recovery/draftRecovery";
+import { readConflictSnapshot, readDraft, writeConflictSnapshot, writeDraft } from "../recovery/draftRecovery";
 import { useCanvasStore } from "../state/canvasStore";
 import { canvasSaveScope, deriveSaveState, useSaveStatusStore } from "../state/saveStatusStore";
 import { AUTOSAVE_DELAY_MS, CanvasPersistence, type PersistenceDeps, RETRY_DELAY_MS } from "./canvasPersistence";
@@ -357,5 +357,99 @@ describe("saving", () => {
 
     expect(timers.delays()).toEqual([]);
     expect(readDraft(SCOPE)?.nodes.map((node) => node.id)).toEqual(["a"]);
+  });
+});
+
+describe("kept-aside work and late responses", () => {
+  const draftFrom = (baseRevision: number, label: string) => ({
+    baseRevision,
+    nodes: [note("a", label)],
+    edges: [],
+    viewport: null,
+    metadata: null,
+    history: null,
+    mutation: { userEditsSinceHydrate: 1, lastMutationSource: "user_edit" as const, pendingClearIntent: false },
+    updatedAt: 1,
+  });
+
+  it("offers kept-aside work again when the Canvas is reopened", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+    persistence.close();
+
+    await persistence.openCanvas(PROJECT, 1);
+
+    expect(store().conflict?.nodes[0].data.label).toBe("mine");
+  });
+
+  it("keeps both an older kept-aside version and a newer conflicting draft", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeConflictSnapshot(SCOPE, {
+      nodes: [note("a", "older")],
+      edges: [],
+      viewport: null,
+      metadata: null,
+      timestamp: new Date(0).toISOString(),
+    });
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+
+    await persistence.openCanvas(PROJECT, 1);
+
+    expect(store().conflict?.nodes[0].data.label).toBe("older");
+    expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
+  });
+
+  it("does not keep another Canvas's graph aside when the user switches during a 409", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    store().edit((graph) => addNode(graph, note("mine")));
+    await server.saveElsewhere([note("theirs")]);
+    let releaseHead: () => void = () => undefined;
+    const original = server.getCandidateHead.getMockImplementation();
+    let calls = 0;
+    server.getCandidateHead.mockImplementation((project: string, id: string) => {
+      calls += 1;
+      if (calls === 1) {
+        return new Promise((resolve, reject) => {
+          releaseHead = () => void original?.(project, id).then(resolve, reject);
+        });
+      }
+      return original?.(project, id) ?? Promise.reject(new Error("no head"));
+    });
+
+    timers.fire(AUTOSAVE_DELAY_MS);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await persistence.openCanvas(PROJECT, 2);
+    store().edit((graph) => addNode(graph, note("episode-2")));
+    releaseHead();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(readConflictSnapshot(SCOPE)).toBeNull();
+    expect(readDraft(SCOPE)?.nodes.map((node) => node.id)).toEqual(["mine"]);
+    expect(store().graph.nodes.map((node) => node.id)).toEqual(["episode-2"]);
+  });
+
+  it("keeps the draft of an edit made while a save was in flight", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    let release: () => void = () => undefined;
+    const original = server.appendCanvasRevision.getMockImplementation();
+    server.appendCanvasRevision.mockImplementationOnce(
+      (...args: Parameters<FakeServer["appendCanvasRevision"]>) =>
+        new Promise((resolve, reject) => {
+          release = () => void original?.(...args).then(resolve, reject);
+        }),
+    );
+    store().edit((graph) => addNode(graph, note("a")));
+    timers.fire(AUTOSAVE_DELAY_MS);
+    await vi.waitFor(() => expect(server.appendCanvasRevision).toHaveBeenCalledTimes(1));
+
+    store().edit((graph) => addNode(graph, note("b")));
+    timers.fire(300);
+    release();
+    await vi.waitFor(() => expect(saveState().status).toBe("saved"));
+
+    expect(readDraft(SCOPE)?.nodes.map((node) => node.id)).toEqual(["a", "b"]);
   });
 });

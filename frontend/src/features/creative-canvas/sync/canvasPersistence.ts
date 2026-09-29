@@ -34,6 +34,7 @@ import {
   clearConflictSnapshot,
   clearDraft,
   decideDraftRecovery,
+  readConflictSnapshot,
   readDraft,
   writeConflictSnapshot,
   writeDraft,
@@ -160,7 +161,9 @@ export class CanvasPersistence {
         metadataOf(remote.bookmarks),
       );
       const state = this.store.getState();
-      let conflict: ConflictSnapshot | null = null;
+      // Work kept aside earlier stays reachable until the user settles it.
+      const keptAside = readConflictSnapshot(draftScope);
+      let conflict: ConflictSnapshot | null = keptAside;
       if (decision.kind === "draft") {
         state.replace({
           graph: hydrateDraft(state.graph, decision.draft),
@@ -168,7 +171,7 @@ export class CanvasPersistence {
         });
       } else {
         state.replace({ graph: loadGraph(state.graph, remote.nodes, remote.edges), bookmarks: remote.bookmarks });
-        if (decision.kind === "conflict") {
+        if (decision.kind === "conflict" && !keptAside) {
           conflict = {
             nodes: decision.draft.nodes,
             edges: decision.draft.edges,
@@ -323,7 +326,7 @@ export class CanvasPersistence {
     const open = this.open;
     if (!open || open.session !== session) return false;
     const { t } = this.deps;
-    const { graph, bookmarks, phase, conflict } = this.store.getState();
+    const { graph, bookmarks, phase, conflict, editSeq } = this.store.getState();
     if (conflict) return false;
     const decision = decideSaveAction({
       hydrated: phase === "ready",
@@ -370,7 +373,7 @@ export class CanvasPersistence {
         t("creative_canvas_save_failed"),
       );
       if (outcome.kind === "conflict" && (await this.headMoved(open))) {
-        return this.keepAsideAndReload(open, outcome.message);
+        return this.open === open ? this.keepAsideAndReload(open, outcome.message) : false;
       }
       if (outcome.kind === "retry") {
         this.retryTimer = this.deps.setTimer(() => {
@@ -387,7 +390,10 @@ export class CanvasPersistence {
       const current = this.store.getState().graph;
       this.store.getState().replace({ graph: acknowledgeClear(current) });
     }
-    if (!session.hasUnsavedContentBeyond(version)) clearDraft(open.draftScope);
+    // The draft is the only copy of edits made after this save read the graph: keep it then.
+    if (this.store.getState().editSeq === editSeq && !session.hasUnsavedContentBeyond(version)) {
+      clearDraft(open.draftScope);
+    }
     writeSaveStatus(open.saveScope, "saved");
     return true;
   }
@@ -404,6 +410,11 @@ export class CanvasPersistence {
   }
 
   private async keepAsideAndReload(open: OpenCanvas, message: string): Promise<false> {
+    if (readConflictSnapshot(open.draftScope)) {
+      // One slot of kept-aside work is already taken: the local work stays in the draft instead.
+      this.writeDraftNow(open);
+      return this.fail(open, message);
+    }
     const { graph, bookmarks } = this.store.getState();
     const conflict: ConflictSnapshot = {
       nodes: [...graph.nodes],

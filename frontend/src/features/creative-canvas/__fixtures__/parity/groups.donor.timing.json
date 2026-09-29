@@ -1,80 +1,106 @@
 {
   "group-two-nodes-and-undo": {
     "reps": 25,
-    "median_ms": 0.2436,
-    "p95_ms": 0.2874,
+    "median_ms": 0.5312,
+    "p95_ms": 0.7213,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 2894
   },
   "group-needs-two-top-level-members": {
     "reps": 25,
-    "median_ms": 0.1915,
-    "p95_ms": 0.2154,
+    "median_ms": 0.491,
+    "p95_ms": 0.5592,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 2721
   },
   "ungroup-restores-absolute-positions": {
     "reps": 25,
-    "median_ms": 0.1745,
-    "p95_ms": 0.2085,
+    "median_ms": 0.3898,
+    "p95_ms": 0.4796,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 4367
   },
   "fit-grows-and-pushes-inward": {
     "reps": 25,
-    "median_ms": 0.1076,
-    "p95_ms": 0.1129,
+    "median_ms": 0.2718,
+    "p95_ms": 0.3122,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 2511
   },
   "arrange-modes": {
     "reps": 25,
-    "median_ms": 0.2174,
-    "p95_ms": 0.252,
+    "median_ms": 0.4646,
+    "p95_ms": 0.5428,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 4079
   },
   "storyboard-merge-and-edges": {
     "reps": 25,
-    "median_ms": 0.4089,
-    "p95_ms": 0.5197,
+    "median_ms": 0.743,
+    "p95_ms": 0.8076,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 10880
   },
   "storyboard-add-members": {
     "reps": 25,
-    "median_ms": 0.3058,
-    "p95_ms": 0.3611,
+    "median_ms": 0.635,
+    "p95_ms": 0.746,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 4807
   },
   "duplicate-sibling": {
     "reps": 25,
-    "median_ms": 0.1363,
-    "p95_ms": 0.1788,
+    "median_ms": 0.3499,
+    "p95_ms": 0.4326,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 2206
   },
   "duplicate-group-with-members": {
     "reps": 25,
-    "median_ms": 0.3299,
-    "p95_ms": 0.3608,
+    "median_ms": 0.6672,
+    "p95_ms": 0.7202,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 6617
   },
   "storyboard-reload-keeps-reanchored-edges": {
     "reps": 25,
-    "median_ms": 0.2802,
-    "p95_ms": 0.3217,
+    "median_ms": 0.618,
+    "p95_ms": 0.7032,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 3476
   },
   "group-missing-targets": {
     "reps": 25,
-    "median_ms": 0.0708,
-    "p95_ms": 0.0725,
+    "median_ms": 0.2199,
+    "p95_ms": 0.2646,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 2702
   },
   "storyboard-invalid-edits": {
     "reps": 25,
-    "median_ms": 0.2,
-    "p95_ms": 0.2068,
+    "median_ms": 0.4752,
+    "p95_ms": 0.5501,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 7431
   },
   "duplicate-missing": {
     "reps": 25,
-    "median_ms": 0.0678,
-    "p95_ms": 0.0732,
+    "median_ms": 0.2016,
+    "p95_ms": 0.2404,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 0,
     "observation_bytes": 1817
   }
 }

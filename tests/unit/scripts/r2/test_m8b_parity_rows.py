@@ -87,9 +87,15 @@ def test_rows_merge_measured_dimensions_and_record_intentional_differences() -> 
     assert rows[1].donor_test_refs == ("t-b",)
 
 
-def _timing(port_ms: float, port_bytes: int = 100) -> TimingRun:
-    donor = {"median_ms": 1.0, "p95_ms": 1.2, "reps": 25, "observation_bytes": 100}
-    port = {"median_ms": port_ms, "p95_ms": port_ms, "reps": 25, "observation_bytes": port_bytes}
+def _timing(port_ms: float, port_heap: int | None = 1000, port_storage: int = 100) -> TimingRun:
+    donor = {"median_ms": 1.0, "p95_ms": 1.2, "reps": 25, "retained_heap_bytes": 1000, "storage_bytes": 100}
+    port = {
+        "median_ms": port_ms,
+        "p95_ms": port_ms,
+        "reps": 25,
+        "retained_heap_bytes": port_heap,
+        "storage_bytes": port_storage,
+    }
     return TimingRun(name="graph", donor={"same": donor}, port={"same": port})
 
 
@@ -106,8 +112,14 @@ def test_performance_and_resources_compare_both_sides_timings() -> None:
     )
     assert measure_behavior("A", [_run()], {"graph": _timing(0.5)})[0] is ParityDisposition.IMPROVED
     assert measure_behavior("A", [_run()], {"graph": _timing(1.6)})[0] is ParityDisposition.UNVERIFIED
-    assert measure_behavior("A", [_run()], {"graph": _timing(1.0, port_bytes=174)})[1] is ParityDisposition.PARITY
-    assert measure_behavior("A", [_run()], {"graph": _timing(1.0, port_bytes=175)})[1] is ParityDisposition.UNVERIFIED
+    assert (
+        measure_behavior("A", [_run()], {"graph": _timing(1.0, port_heap=1500 + 65536)})[1] is ParityDisposition.PARITY
+    )
+    assert measure_behavior("A", [_run()], {"graph": _timing(1.0, port_heap=1501 + 65536)})[1] is (
+        ParityDisposition.UNVERIFIED
+    )
+    assert measure_behavior("A", [_run()], {"graph": _timing(1.0, port_heap=None)})[1] is ParityDisposition.UNVERIFIED
+    assert measure_behavior("A", [_run()], {"graph": _timing(1.0, port_storage=175)})[1] is ParityDisposition.UNVERIFIED
 
 
 def test_an_untimed_case_is_unverified() -> None:

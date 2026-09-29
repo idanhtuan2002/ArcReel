@@ -826,7 +826,8 @@ def test_canvas_meets_the_frozen_benchmark_protocol(preview_url: str, browser: B
                 "status_clarified": "PASS" if not failures else "FAIL",
                 "clarifications": [
                     f"frame-time p95 may exceed its threshold by one clock quantum ({CLOCK_QUANTUM_MS} ms): "
-                    "the idle floor (idle_frame_ms) of an untouched Canvas already reaches it",
+                    "the frame times of an untouched Canvas (idle_frame_ms: p99, max and the share above "
+                    "16.7 ms) already spread over that quantum at 60 Hz",
                     "the initial bundle must hold no Creative Canvas or React Flow module "
                     "(initial_canvas_modules empty); its byte delta, which only the lazy route "
                     "registration adds, is reported strictly",
@@ -834,7 +835,12 @@ def test_canvas_meets_the_frozen_benchmark_protocol(preview_url: str, browser: B
                 "clock_quantum_ms": CLOCK_QUANTUM_MS,
                 "failures": failures,
                 "strict_only_failures": strict_only,
-                "idle_frame_ms": _summary(idle),
+                "idle_frame_ms": {
+                    **_summary(idle),
+                    "p99": round(nearest_rank(idle, 99), 2),
+                    "max": round(max(idle), 2),
+                    "share_above_16_7": round(sum(value > 16.7 for value in idle) / len(idle), 4),
+                },
                 "machine": _machine(),
                 "browser": browser.version,
                 "runs": runs,

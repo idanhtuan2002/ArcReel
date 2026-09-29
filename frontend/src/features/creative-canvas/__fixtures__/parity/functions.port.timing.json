@@ -1,50 +1,66 @@
 {
   "storyboard-aspect-and-cols": {
     "reps": 25,
-    "median_ms": 0.0046,
-    "p95_ms": 0.0052,
+    "median_ms": 0.0251,
+    "p95_ms": 0.0322,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 12,
     "observation_bytes": 213
   },
   "storyboard-cells-and-grid": {
     "reps": 25,
-    "median_ms": 0.0169,
-    "p95_ms": 0.0264,
+    "median_ms": 0.0743,
+    "p95_ms": 0.0901,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 12,
     "observation_bytes": 1817
   },
   "bookmarks": {
     "reps": 25,
-    "median_ms": 0.0307,
-    "p95_ms": 0.043,
+    "median_ms": 0.0974,
+    "p95_ms": 0.1528,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 12,
     "observation_bytes": 479
   },
   "group-selection": {
     "reps": 25,
-    "median_ms": 0.055,
-    "p95_ms": 0.0911,
+    "median_ms": 0.1268,
+    "p95_ms": 0.1493,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 12,
     "observation_bytes": 122
   },
   "group-colors": {
     "reps": 25,
-    "median_ms": 0.0025,
-    "p95_ms": 0.0045,
+    "median_ms": 0.0169,
+    "p95_ms": 0.0275,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 12,
     "observation_bytes": 420
   },
   "auto-layout": {
     "reps": 25,
-    "median_ms": 0.4631,
-    "p95_ms": 0.507,
+    "median_ms": 0.7383,
+    "p95_ms": 0.8381,
+    "retained_heap_bytes": 1120,
+    "storage_bytes": 12,
     "observation_bytes": 938
   },
   "lod-tier": {
     "reps": 25,
-    "median_ms": 0.0088,
-    "p95_ms": 0.0098,
+    "median_ms": 0.0365,
+    "p95_ms": 0.049,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 12,
     "observation_bytes": 319
   },
   "layout-and-selection-edge-inputs": {
     "reps": 25,
-    "median_ms": 0.0226,
-    "p95_ms": 0.0243,
+    "median_ms": 0.1072,
+    "p95_ms": 0.1214,
+    "retained_heap_bytes": 0,
+    "storage_bytes": 12,
     "observation_bytes": 132
   }
 }
