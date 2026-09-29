@@ -57,6 +57,12 @@ delegated the choice.
    - Publish approval, deliverable listing and download read between two such checks. If a
      head moved in between (a Gate C committed meanwhile), they refuse with 409
      `master_moving`, so a reader never acts on files of a head that is no longer current.
+   - A publish approval records its decision in a transaction that holds the row locks of the
+     heads it read, entered only if they are still the heads. No promotion can land between the
+     check and the decision.
+   - A composite Gate C locks its source shots together with the final in phase 1 (keys in
+     sorted order), and checks them there. No source can move while the final stages and
+     promotes.
    - The file checks already in `r2/m3/deliverables.py` stay as a second line.
 5. **Backfill.** `scripts/r2/backfill_master_authority.py` promotes every existing file master
    that has no database head. Masters here are episode videos: Gate C's `resource_type` is

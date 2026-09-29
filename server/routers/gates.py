@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import Callable, Collection, Iterator
+from collections.abc import AsyncGenerator, Callable, Collection, Iterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import BinaryIO, Literal
@@ -29,6 +30,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.async_thread import run_noninterruptible_sync
 from lib.candidate_store import CandidateStoreError
@@ -82,7 +84,7 @@ from server.services.master_authority import (
     MasterSupersededError,
     master_authority_unit,
     project_if_current,
-    serialized_artifact,
+    serialized_artifacts,
     verify_masters,
 )
 
@@ -254,11 +256,15 @@ async def _require_consistent_masters(
         raise HTTPException(status_code=409, detail=f"master_diverged: {exc}") from exc
 
 
-async def _stable_read[T](user_id: str, project_name: str, project_dir, read: Callable[[], T]) -> T:
-    """Run ``read`` between two master checks and refuse if a head moved in between.
+async def _stable_read[T](
+    user_id: str, project_name: str, project_dir, read: Callable[[], T]
+) -> tuple[T, tuple[tuple[str, int, str], ...]]:
+    """Run ``read`` between two master checks; refuse if a head moved in between.
 
-    A Gate C can commit a new head while a reader works from the files of the previous one; the
-    second check makes every reader see one committed, projected state, or retry.
+    Returns the read and the heads it was made against. A Gate C can commit a new head while a
+    reader works from the files of the previous one; the second check makes every reader see one
+    committed, projected state, or retry. A writer acting on the read re-checks those heads under
+    their row locks (``_locked_to_heads``).
     """
     before = await _require_consistent_masters(user_id, project_name, project_dir)
     result = await run_noninterruptible_sync(read)
@@ -268,7 +274,27 @@ async def _stable_read[T](user_id: str, project_name: str, project_dir, read: Ca
         if callable(close):
             close()
         raise HTTPException(status_code=409, detail="master_moving: a Gate C approval landed during this read; retry")
-    return result
+    return result, after
+
+
+@asynccontextmanager
+async def _locked_to_heads(
+    user_id: str, project_name: str, project_dir, heads: tuple[tuple[str, int, str], ...]
+) -> AsyncGenerator[AsyncSession]:
+    """A transaction holding the row locks of ``heads``, entered only if they are still the heads."""
+    async with serialized_artifacts(
+        async_session_factory,
+        user_id=user_id,
+        project_name=project_name,
+        artifact_keys=[key for key, _version, _candidate in heads],
+    ) as session:
+        try:
+            current = await verify_masters(session, user_id=user_id, project_name=project_name, project_dir=project_dir)
+        except MasterDivergedError as exc:
+            raise HTTPException(status_code=409, detail=f"master_diverged: {exc}") from exc
+        if current != heads:
+            raise HTTPException(status_code=409, detail="master_moving: a Gate C approval landed; retry")
+        yield session
 
 
 @router.post("/projects/{project_name}/gates/final-cut")
@@ -335,14 +361,16 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
                 detail=f"audio_decision {decision} does not match the final's audio track",
             )
 
-    if composite:
-        # A composite reads its source shot masters, so those are the ones that must agree.
-        source_keys = [
+    # A composite reads its source shot masters; phase 1 locks and checks them with the final.
+    source_keys = (
+        [
             host.artifact_key_for(ref.partition(":")[0])
             for ref in req.produced.source_master_refs
             if ref.partition(":")[0]
         ]
-        await _require_consistent_masters(user.id, project_name, project_dir, source_keys)
+        if composite
+        else []
+    )
 
     staged_dependencies: list[DependencySnapshot] = []
 
@@ -392,6 +420,17 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         return approved, export
 
     async def _stage_and_promote(session):
+        if source_keys:
+            try:
+                await verify_masters(
+                    session,
+                    user_id=user.id,
+                    project_name=project_name,
+                    project_dir=project_dir,
+                    artifact_keys=source_keys,
+                )
+            except MasterDivergedError as exc:
+                raise HTTPException(status_code=409, detail=f"master_diverged: {exc}") from exc
         try:
             registered = await run_noninterruptible_sync(_stage)
         except SourceMasterMismatchError as exc:
@@ -428,8 +467,11 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
     artifact_key = host.artifact_key_for(req.target_ref)
     # The database master head is the authority (ADR-0096). Phase 1 stages, checks and promotes in
     # one transaction under the artifact's row lock, and commits: files never run ahead of it.
-    async with serialized_artifact(
-        async_session_factory, user_id=user.id, project_name=project_name, artifact_key=artifact_key
+    async with serialized_artifacts(
+        async_session_factory,
+        user_id=user.id,
+        project_name=project_name,
+        artifact_keys=[artifact_key, *source_keys],
     ) as session:
         registered = await _stage_and_promote(session)
     # Phase 2 projects and exports under the row lock again, only while this candidate is the head,
@@ -494,9 +536,10 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
 
 @router.post("/projects/{project_name}/gates/publish-approval")
 async def publish_approval(project_name: str, req: PublishApprovalRequest, user: CurrentUser) -> dict[str, object]:
+    project_dir = get_project_manager().get_project_path(project_name)
+    heads: tuple[tuple[str, int, str], ...] = ()
     if req.action == "APPROVE_PUBLISH":
-        project_dir = get_project_manager().get_project_path(project_name)
-        deliverable = await _stable_read(
+        deliverable, heads = await _stable_read(
             user.id, project_name, project_dir, lambda: exportable_deliverable(project_dir, req.deliverable_digest)
         )
         if deliverable is None:
@@ -516,9 +559,16 @@ async def publish_approval(project_name: str, req: PublishApprovalRequest, user:
         sequence=1,  # ignored by append(); the repository assigns the real, race-safe value
         created_at=datetime.now(UTC),
     )
+    if req.action == "APPROVE_PUBLISH":
+        # The decision commits only while the heads it was read against are still the heads; a
+        # promotion of any of them waits for this transaction.
+        async with _locked_to_heads(user.id, project_name, project_dir, heads) as session:
+            await PublishApprovalRepository(session).append(decision)
+    else:
+        async with async_session_factory() as session:
+            await PublishApprovalRepository(session).append(decision)
+            await session.commit()
     async with async_session_factory() as session:
-        await PublishApprovalRepository(session).append(decision)
-        await session.commit()
         history = await PublishApprovalRepository(session).list_for_project(user_id=user.id, project_name=project_name)
     return history[-1].model_dump(mode="json")
 
@@ -566,7 +616,9 @@ def _deliverable_view(project_dir) -> list[dict[str, object]]:
 async def create_deliverable_token(project_name: str, user: CurrentUser) -> dict[str, object]:
     """Issue a short-lived download token and list the project's approved finals."""
     project_dir = get_project_manager().get_project_path(project_name)
-    deliverables = await _stable_read(user.id, project_name, project_dir, lambda: _deliverable_view(project_dir))
+    deliverables, _heads = await _stable_read(
+        user.id, project_name, project_dir, lambda: _deliverable_view(project_dir)
+    )
     return {
         "download_token": create_download_token(user.sub, project_name),
         "expires_in": DOWNLOAD_TOKEN_EXPIRY_SECONDS,
@@ -593,7 +645,7 @@ async def download_deliverable(
     project_dir = get_project_manager().get_project_path(project_name)
     # The host resolves every authenticated subject to DEFAULT_USER_ID (server/auth.py), and the
     # database head may have moved since the token was issued.
-    result = await _stable_read(
+    result, _heads = await _stable_read(
         DEFAULT_USER_ID, project_name, project_dir, lambda: verified_export_snapshot(project_dir, digest)
     )
     if result is None:

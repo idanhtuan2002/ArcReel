@@ -54,17 +54,9 @@ def master_authority_unit(session: AsyncSession, *, defer_commit: bool = False) 
 _ROW_CREATE_ATTEMPTS = 5
 
 
-@asynccontextmanager
-async def serialized_artifact(
+async def _ensure_authority_row(
     session_factory: async_sessionmaker[AsyncSession], *, user_id: str, project_name: str, artifact_key: str
-) -> AsyncGenerator[AsyncSession]:
-    """One transaction that holds the artifact's authority row write lock until it commits.
-
-    The row is created first if absent. The transaction then rewrites it unchanged, which takes
-    the row lock on PostgreSQL and the database write lock on SQLite, across processes. Everything
-    one Gate C does to the artifact (stage, check, promote, project) runs inside, so no other
-    approval can interleave. An error rolls the promotion back with the rest.
-    """
+) -> None:
     for attempt in range(_ROW_CREATE_ATTEMPTS):
         try:
             async with session_factory() as session:
@@ -72,23 +64,54 @@ async def serialized_artifact(
                     user_id=user_id, project_name=project_name, artifact_key=artifact_key
                 )
                 await session.commit()
-            break
+            return
         except (IntegrityError, NoResultFound):
             # A concurrent approval is creating the same row; it is visible once that commits.
             if attempt == _ROW_CREATE_ATTEMPTS - 1:
                 raise
             await asyncio.sleep(0.05 * (attempt + 1))
+
+
+@asynccontextmanager
+async def serialized_artifacts(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    user_id: str,
+    project_name: str,
+    artifact_keys: Collection[str],
+) -> AsyncGenerator[AsyncSession]:
+    """One transaction that holds the authority row write locks of ``artifact_keys`` until it commits.
+
+    Missing rows are created first. The transaction then rewrites each row unchanged, in sorted
+    key order, which takes the row locks on PostgreSQL and the database write lock on SQLite,
+    across processes. Every writer that depends on those heads (a Gate C promotion or
+    projection, a Gate D decision) runs inside, so none can interleave with another; the sorted
+    order keeps multi-row holders from deadlocking. An error rolls everything back.
+    """
+    keys = sorted(set(artifact_keys))
+    for key in keys:
+        await _ensure_authority_row(session_factory, user_id=user_id, project_name=project_name, artifact_key=key)
     async with session_factory() as session, session.begin():
-        await session.execute(
-            update(MasterAuthorityModel)
-            .where(
-                MasterAuthorityModel.user_id == user_id,
-                MasterAuthorityModel.project_name == project_name,
-                MasterAuthorityModel.artifact_key == artifact_key,
+        for key in keys:
+            await session.execute(
+                update(MasterAuthorityModel)
+                .where(
+                    MasterAuthorityModel.user_id == user_id,
+                    MasterAuthorityModel.project_name == project_name,
+                    MasterAuthorityModel.artifact_key == key,
+                )
+                .values(current_version=MasterAuthorityModel.current_version)
             )
-            .values(current_version=MasterAuthorityModel.current_version)
-        )
         yield session
+
+
+def serialized_artifact(
+    session_factory: async_sessionmaker[AsyncSession], *, user_id: str, project_name: str, artifact_key: str
+):
+    """``serialized_artifacts`` for one artifact."""
+    return serialized_artifacts(
+        session_factory, user_id=user_id, project_name=project_name, artifact_keys=(artifact_key,)
+    )
 
 
 class MasterSupersededError(RuntimeError):
@@ -192,5 +215,6 @@ __all__ = [
     "projected_master_records",
     "projected_masters",
     "serialized_artifact",
+    "serialized_artifacts",
     "verify_masters",
 ]

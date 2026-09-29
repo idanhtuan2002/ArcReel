@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
+import contextlib
 import hashlib
 import subprocess
 import time
@@ -334,3 +336,70 @@ async def test_a_head_committed_while_gate_d_reads_refuses_the_decision(
     async with session_factory() as session:
         count = (await session.execute(select(func.count()).select_from(PublishApprovalDecisionModel))).scalar_one()
     assert count == 0
+
+
+async def test_a_head_committed_after_gate_d_read_refuses_the_decision(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from lib.db.models.gates import PublishApprovalDecisionModel
+
+    sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")]
+    final = _media(b"approved final")
+    assert (await _approve_final(gate_export_client, project_dir, final, sources)).status_code == 200
+    real_serialized = gates.serialized_artifacts
+    injected = {"done": False}
+
+    def approval_lands_before_the_decision_lock(*args, **kwargs):
+        @contextlib.asynccontextmanager
+        async def locked():
+            if not injected["done"]:
+                # Both reads agreed; a consistent Gate C of the source shot commits first.
+                injected["done"] = True
+                await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one again")
+            async with real_serialized(*args, **kwargs) as session:
+                yield session
+
+        return locked()
+
+    monkeypatch.setattr(gates, "serialized_artifacts", approval_lands_before_the_decision_lock)
+
+    response = await _publish(gate_export_client, _sha(final))
+
+    assert response.status_code == 409, response.text
+    async with session_factory() as session:
+        count = (await session.execute(select(func.count()).select_from(PublishApprovalDecisionModel))).scalar_one()
+    assert count == 0
+
+
+async def test_a_composite_holds_its_source_shots_while_it_stages_and_promotes(
+    concurrent_gate_client: AsyncClient, project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # On PostgreSQL this proves the source row lock; SQLite's write lock covers the whole database.
+    sources = [await _approve_shot(concurrent_gate_client, project_dir, "SH01", b"shot one")]
+    loop = asyncio.get_running_loop()
+    real_stage = GoldenAHostIntegration.stage_candidate
+    order: list[str] = []
+    shot_approval: dict[str, object] = {}
+
+    def stage(self, **kwargs):
+        if kwargs["target_ref"] == "FINAL" and "started" not in shot_approval:
+            # While the final stages, a Gate C of its source shot starts and must wait for it.
+            shot_approval["started"] = asyncio.run_coroutine_threadsafe(
+                _approve_shot(concurrent_gate_client, project_dir, "SH01", b"shot one again"), loop
+            )
+            time.sleep(1.5)
+            started = shot_approval["started"]
+            assert isinstance(started, concurrent.futures.Future)
+            order.append("shot-still-waiting" if not started.done() else "shot-finished-early")
+        return real_stage(self, **kwargs)
+
+    monkeypatch.setattr(GoldenAHostIntegration, "stage_candidate", stage)
+
+    final = await _approve_final(concurrent_gate_client, project_dir, _media(b"final"), sources)
+    order.append("final-done")
+    started = shot_approval["started"]
+    assert isinstance(started, concurrent.futures.Future)
+    await asyncio.wrap_future(started)
+
+    assert final.status_code == 200, final.text
+    assert order == ["shot-still-waiting", "final-done"]
