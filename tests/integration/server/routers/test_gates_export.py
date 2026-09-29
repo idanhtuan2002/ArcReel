@@ -65,6 +65,32 @@ async def gate_export_client(monkeypatch: pytest.MonkeyPatch, session_factory: F
 
 
 @cache
+def _two_track_media(tag: bytes) -> bytes:
+    """A real MP4 whose first audio track is silent and whose second is an audible tone."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "two-track.mp4"
+        subprocess.run(
+            [
+                *("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=64x36:d=1"),
+                *(
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "anullsrc=r=44100:cl=mono",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "sine=frequency=440:duration=1",
+                ),
+                *("-map", "0:v", "-map", "1:a", "-map", "2:a", "-metadata", f"comment={tag.hex()}"),
+                *("-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(out)),
+            ],
+            check=True,
+        )
+        return out.read_bytes()
+
+
+@cache
 def _media(tag: bytes, *, tone: bool = False) -> bytes:
     """A real one-second MP4 whose bytes are unique per ``tag``: silent, or with an audible tone."""
     audio_in = ["-f", "lavfi", "-i", "sine=frequency=440:duration=1"] if tone else []
@@ -412,3 +438,22 @@ async def test_a_factual_script_lock_is_recorded_in_the_gate_history(gate_export
         ("REVOKE", 2, body["script_digest"]),
     ]
     assert history[0]["authorization"]["authenticated_principal"] == USER.sub
+
+
+async def test_mute_is_refused_when_any_audio_track_is_audible(
+    gate_export_client: AsyncClient, project_dir: Path
+) -> None:
+    sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")]
+
+    response = await _approve_final(gate_export_client, project_dir, _two_track_media(b"two"), sources)
+
+    assert response.status_code == 400
+
+
+async def test_a_script_lock_needs_well_formed_digests(gate_export_client: AsyncClient) -> None:
+    response = await gate_export_client.post(
+        f"/api/v1/projects/{PROJECT}/gates/script-lock",
+        json={"source_digest": "whatever", "script_digest": "sha256:" + "b" * 64, "action": "LOCK"},
+    )
+
+    assert response.status_code == 422

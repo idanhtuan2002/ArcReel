@@ -242,3 +242,21 @@ async def test_an_agent_route_the_cli_cannot_price_is_refused_before_any_call(
 
     scope = await _usd_scope(db_factory)
     assert scope.reserved_total == Decimal(0)
+
+
+async def test_a_canary_setup_failure_leaves_no_budget_hold(db_factory, agent_release: Path, monkeypatch) -> None:
+    await _agent_credential(db_factory)
+
+    async def broken_env():
+        raise RuntimeError("credential store unavailable")
+
+    monkeypatch.setattr("server.agent_runtime.options_assembler.load_provider_env_overrides", broken_env)
+
+    async def must_not_run(env, cap, workdir):
+        raise AssertionError("no paid call may be made")
+
+    with pytest.raises(RuntimeError):
+        await qualify_route.run_agent_canary(_agent_args(), session_factory=db_factory, agent_query=must_not_run)
+
+    scope = await _usd_scope(db_factory)
+    assert scope.reserved_total == Decimal(0)

@@ -1155,8 +1155,9 @@ class TestAgentBackfillChannel:
 
         settled: list[tuple[str, Decimal]] = []
 
-        async def fake_reconcile(_factory, *, reservation_ref: str, actual_usd: Decimal) -> None:
+        async def fake_reconcile(_factory, *, reservation_ref: str, actual_usd: Decimal) -> bool:
             settled.append((reservation_ref, actual_usd))
+            return True
 
         monkeypatch.setattr(session_manager_module, "reconcile_agent_connection", fake_reconcile)
         managed = _managed_session()
@@ -1169,6 +1170,62 @@ class TestAgentBackfillChannel:
         await manager._settle_budget(managed)
 
         assert settled == [("agent_session:abc", Decimal("0.4"))]
+        assert managed.budget_reservation_ref is None
+
+    async def test_a_resumed_process_books_only_spend_beyond_the_restored_totals(
+        self, manager: SessionManager, acct: _AccountingDb, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from decimal import Decimal
+
+        from server.agent_runtime import session_manager as session_manager_module
+
+        settled: list[Decimal] = []
+
+        async def fake_reconcile(_factory, *, reservation_ref: str, actual_usd: Decimal) -> bool:
+            settled.append(actual_usd)
+            return True
+
+        monkeypatch.setattr(session_manager_module, "reconcile_agent_connection", fake_reconcile)
+        first = _managed_session()
+        first.resolved_sdk_id = "sdk-1"
+        await manager._record_assistant_usage(
+            first, {"model": "claude-sonnet-4", "usage": dict(_AGENT_USAGE), "total_cost_usd": 0.4}, "completed"
+        )
+        manager._note_graceful_exit(first)
+
+        # The resumed CLI restores $0.40 and reports $0.45 after $0.05 of new spend.
+        resumed = _managed_session()
+        resumed.budget_reservation_ref = "agent_session:r"
+        manager._restore_booking_baseline(resumed, project_name="demo", sdk_session_id="sdk-1")
+        grown = {key: value + 1_000 for key, value in _AGENT_USAGE.items()}
+        await manager._record_assistant_usage(
+            resumed, {"model": "claude-sonnet-4", "usage": grown, "total_cost_usd": 0.45}, "completed"
+        )
+        await manager._settle_budget(resumed)
+
+        rows = await acct.fetch_rows()
+        assert [row["cost_amount"] for row in rows] == [pytest.approx(0.4), pytest.approx(0.05)]
+        assert settled == [Decimal("0.05")]
+
+    async def test_a_failed_settlement_keeps_its_reference_for_a_retry(
+        self, manager: SessionManager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from decimal import Decimal
+
+        from server.agent_runtime import session_manager as session_manager_module
+
+        outcomes = [False, True]
+
+        async def flaky_reconcile(_factory, *, reservation_ref: str, actual_usd: Decimal) -> bool:
+            return outcomes.pop(0)
+
+        monkeypatch.setattr(session_manager_module, "reconcile_agent_connection", flaky_reconcile)
+        managed = _managed_session()
+        managed.budget_reservation_ref = "agent_session:x"
+
+        await manager._settle_budget(managed)
+        assert managed.budget_reservation_ref == "agent_session:x"
+        await manager._settle_budget(managed)
         assert managed.budget_reservation_ref is None
 
     async def test_non_completed_turn_records_failed_but_keeps_reported_cost(

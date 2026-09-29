@@ -228,6 +228,8 @@ class ManagedSession:
     booked_tokens: tuple[int, int, int] = (0, 0, 0)
     # Release mode: the budget reservation this session's CLI process runs under (ADR-0093).
     budget_reservation_ref: str | None = None
+    # Cost the CLI restored into this process on resume; not spent on this connection.
+    connection_cost_baseline_usd: float = 0.0
     interrupt_requested: bool = False
     last_activity: float | None = None  # updated on every send/receive
     _cleanup_task: asyncio.Task | None = None  # current cleanup timer (idle TTL or terminal delay)
@@ -372,6 +374,11 @@ class SessionManager:
         # 优雅 send_disconnect 的等待上限；超时后各调用点再走无界的 cancel 兜底。
         self._session_actor_shutdown_timeout: float = 15.0
         self._connect_locks: dict[str, asyncio.Lock] = {}
+        # Per project: the session whose CLI process exited gracefully last, with its final
+        # cumulative cost and usage. The CLI restores exactly that session's totals when it is
+        # resumed (it saves them as the project's lastSessionId on exit), so a resume of it
+        # starts booking from these totals instead of counting them again.
+        self._last_graceful_exit: dict[str, tuple[str, float, tuple[int, int, int]]] = {}
         # 实例不变量缓存：避免每次构建 access policy 都重做 path resolve。
         self._project_root_resolved = self.project_root.resolve()
         # agent_runtime_profile 实际位置：``ARCREEL_PROFILE_DIR`` env 覆盖 >
@@ -605,8 +612,10 @@ class SessionManager:
                 stderr=startup_stderr,
                 max_budget_usd=float(budget[1]) if budget is not None else None,
             )
-        except Exception as exc:
+        except BaseException as exc:
             await self._release_budget(budget)
+            if not isinstance(exc, Exception):
+                raise
             sdk_stderr = startup_stderr.render()
             startup_stderr.stop()
             raise _make_agent_startup_error(
@@ -815,6 +824,8 @@ class SessionManager:
                 if isinstance(msg_dict, _ActorExitNotice):
                     # Every result of the process is booked by now (the inbox is ordered).
                     await self._settle_budget(managed)
+                    if msg_dict.error is None:
+                        self._note_graceful_exit(managed)
                     if msg_dict.error is not None:
                         if managed.resolved_sdk_id is not None:
                             await self._mark_session_terminal(managed, "error", "session actor failed")
@@ -948,8 +959,10 @@ class SessionManager:
                     session_id=None if resumable else meta.id,
                     max_budget_usd=float(budget[1]) if budget is not None else None,
                 )
-            except Exception as exc:
+            except BaseException as exc:
                 await self._release_budget(budget)
+                if not isinstance(exc, Exception):
+                    raise
                 sdk_stderr = startup_stderr.render()
                 startup_stderr.stop()
                 raise _make_agent_startup_error(
@@ -977,6 +990,8 @@ class SessionManager:
                 resolved_sdk_id=meta.id,  # 标记为已注册，防止重复创建 DB 记录
             )
             managed.budget_reservation_ref = budget[0] if budget is not None else None
+            if resumable:
+                self._restore_booking_baseline(managed, project_name=meta.project_name, sdk_session_id=meta.id)
             managed.sdk_id_event.set()  # 已有会话不需要等待 sdk_id
             managed.entry_pipeline = self._build_entry_pipeline(managed)
             managed_ref[0] = managed
@@ -1273,6 +1288,7 @@ class SessionManager:
         if total_cost_usd is not None:
             if total_cost_usd < managed.booked_cost_usd:
                 managed.booked_cost_usd = 0.0
+                managed.connection_cost_baseline_usd = 0.0
             cost_delta: float | None = total_cost_usd - managed.booked_cost_usd
             managed.booked_cost_usd = total_cost_usd
         else:
@@ -1429,15 +1445,35 @@ class SessionManager:
             self._connect_locks.pop(session_id, None)
             self._disconnecting.discard(session_id)
 
+    def _note_graceful_exit(self, managed: ManagedSession) -> None:
+        """Remember the project's last gracefully exited session and its final CLI totals."""
+        if managed.resolved_sdk_id is not None:
+            self._last_graceful_exit[managed.project_name] = (
+                managed.resolved_sdk_id,
+                managed.booked_cost_usd,
+                managed.booked_tokens,
+            )
+
+    def _restore_booking_baseline(self, managed: ManagedSession, *, project_name: str, sdk_session_id: str) -> None:
+        """Start booking a resumed process from the totals the CLI restores into it, if it restores any."""
+        restored = self._last_graceful_exit.get(project_name)
+        if restored is not None and restored[0] == sdk_session_id:
+            managed.booked_cost_usd = restored[1]
+            managed.booked_tokens = restored[2]
+            managed.connection_cost_baseline_usd = restored[1]
+
     async def _settle_budget(self, managed: ManagedSession) -> None:
-        """Reconcile the session's Agent budget reservation to what its process booked; idempotent."""
+        """Reconcile the session's Agent budget reservation to what this connection spent; idempotent.
+
+        The reference is cleared only after a successful reconciliation, so a failed attempt is
+        retried by the next settlement point (actor exit, eviction).
+        """
         ref = managed.budget_reservation_ref
         if ref is None:
             return
-        managed.budget_reservation_ref = None
-        await reconcile_agent_connection(
-            async_session_factory, reservation_ref=ref, actual_usd=Decimal(str(managed.booked_cost_usd))
-        )
+        spent = Decimal(str(managed.booked_cost_usd)) - Decimal(str(managed.connection_cost_baseline_usd))
+        if await reconcile_agent_connection(async_session_factory, reservation_ref=ref, actual_usd=spent):
+            managed.budget_reservation_ref = None
 
     @staticmethod
     async def _release_budget(budget: tuple[str, Decimal] | None) -> None:

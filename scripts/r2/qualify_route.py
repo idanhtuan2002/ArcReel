@@ -234,9 +234,10 @@ async def run_agent_canary(
             "only anthropic-official with Claude models can qualify (ADR-0093); no paid call was made"
         )
     binding = agent_route_binding(credential)
-    reserved = await reserve_agent_connection(session_factory, amount=AGENT_CANARY_RESERVATION, purpose="agent_canary")
+    # Load the credentials before reserving: a setup failure then leaves no hold behind.
     env = await load_provider_env_overrides()
     env["CLAUDE_CODE_MAX_RETRIES"] = "0"
+    reserved = await reserve_agent_connection(session_factory, amount=AGENT_CANARY_RESERVATION, purpose="agent_canary")
     started = datetime.now(UTC)
     cost = Decimal(0)
     try:
