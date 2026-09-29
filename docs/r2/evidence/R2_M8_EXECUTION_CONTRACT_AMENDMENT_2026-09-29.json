@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_2026-09-13.json",
+  "amends_sha256": "5e0aac609f0b74edc1d9e4cfd640b986b97331c22115f71c99358d83899029b5",
+  "reason": "ADR-0089 re-sequenced delivery after the M8 design (bounded V1 first). The M7 authority seams reached production through the V1 lineage, not through the original M7-E packet. See docs/research/2026-09-29-r2-v2-m8-rebase.md (option B1).",
+  "precedence": "Where this amendment names a field, it replaces that field of the amended contract and every packet plan statement derived from it. Every other field and plan statement is unchanged.",
+  "m7_prerequisite": {
+    "final_evidence_path": "docs/r2/evidence/R2_V1_PRODUCTION_CANDIDATE_2026-09-28.md",
+    "required_status": "PRODUCTION_CANDIDATE",
+    "independent_acceptance_path": "docs/r2/evidence/R2_M7_IMPLEMENTATION_ACCEPTANCE.json",
+    "required_independent_status": "M7_IMPLEMENTATION_ACCEPTED",
+    "accepted_candidate_head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
+    "acceptance_commit": "b2816af4",
+    "required_alembic_head": "c9e1f4a2b701",
+    "required_checkpoint_evidence": "the paths and hashes listed in m7_evidence_sha256 of the independent acceptance",
+    "required_properties": [
+      "evidence files parse, and their recorded hashes match at the acceptance commit",
+      "the independent acceptance records the candidate HEAD, and its required_skips and material_unknowns are empty",
+      "the acceptance commit changes only its acceptance evidence, and its parent is the accepted candidate HEAD",
+      "the acceptance commit is an ancestor of the executor base; every commit between them changes only docs/ (the M8 design materialization and this amendment)",
+      "the executor worktree starts at the executor base commit (the commit that adds this amendment)",
+      "HEAD is clean and has exactly one Alembic head, c9e1f4a2b701",
+      "all recorded verification commands have zero exit status"
+    ],
+    "on_failure": "M8_PREREQUISITE_NOT_ACCEPTED"
+  },
+  "required_m7_symbols_resolved": [
+    {"symbol": "AtomicPromotionService.promote", "path": "r2/host_hardening/promotion.py"},
+    {"symbol": "MasterResolver.get_exact", "resolved_as": "DatabaseMasterResolver.get_exact", "path": "r2/host_hardening/master_resolver.py"},
+    {"symbol": "CommandReceiptRepository.get_exact/add", "path": "lib/db/repositories/host_hardening.py"}
+  ],
+  "seam_note": "The symbols above were located by source search. Task A0.2 still owns graph discovery, signatures, hashes and the ProductionBinding writer, the unit-of-work owner and the project-event seams. Any missing or non-atomic seam stops with M8_BASE_SEAM_CHANGED. Since the M8 design, the host has gained Gate receipts, the script lock and O2a export (ADR-0090, ADR-0092), the paid-route gate and Agent budget (ADR-0091, ADR-0093), and admission filters (ADR-0094). A0.2 must record them as neighbouring seams and must not write to them.",
+  "packet_overrides": {
+    "M8-A": {
+      "base_branch": "r2-v2/main",
+      "implementation_branch": "impl/r2-m8a-exploration-promotion",
+      "migration": {"revision": "8a8c4a0e0001", "down_revision": "c9e1f4a2b701"},
+      "a0_expected_alembic_head": "c9e1f4a2b701",
+      "downgrade_target_in_a2": "c9e1f4a2b701",
+      "database": "PostgreSQL 16 (the V1-verified version). The M8 design uses no PostgreSQL 18-only feature; the plans name 18 only in their tech-stack lines."
+    },
+    "all_packets": {
+      "database": "PostgreSQL 16"
+    }
+  },
+  "unchanged": [
+    "execution_policy (first packet M8-A, one packet at a time, stop instead of guess, no production operations)",
+    "scope_policy and the M8-A exact owned file map",
+    "production_binding_policy",
+    "donors",
+    "packet_inputs, including human decisions required by M8-B, M8-E and M8-F",
+    "stop_receipt"
+  ],
+  "created_at": "2026-09-29"
+}
