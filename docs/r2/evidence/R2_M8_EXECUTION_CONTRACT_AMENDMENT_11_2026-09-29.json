@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_10_2026-09-29.json"
+  ],
+  "reason": "The M8-A round 6 review (dc13cc93..72d1de78) swept the whole backfill against its outcome model. It reported three blocking paths (R6-1 a database head without a projection, R6-2 a projection changed between the scan and the lock, R6-3 a project that vanishes during --all) and three non-blocking ones (R6-4, R6-5, R6-6), all in one round. The fourth V2-02d follow-up (fc8bda2d) closes all six. M8-A is re-based onto it.",
+  "m7_prerequisite_changes": {
+    "executor_base": "the commit that adds this eleventh amendment",
+    "intermediate_commits": "As amendment 10, plus the fourth V2-02d follow-up (fc8bda2d), which changes only scripts/r2/backfill_master_authority.py, its test and the V2-02d evidence.",
+    "packets_added": [
+      {
+        "packet": "V2-02d serialized backfill, with the round 3 to 6 follow-ups",
+        "evidence": "docs/r2/evidence/R2_V2_02D_BACKFILL_SERIALIZATION_2026-09-29.md",
+        "head": "fc8bda2d",
+        "status": "REVIEW_BUNDLED_WITH_M8_A_ROUND_7",
+        "acceptance_rule": "M8-A is not accepted unless its round 7 independent review, whose range starts at dc13cc93, also accepts V2-02d."
+      }
+    ]
+  },
+  "packet_overrides": {
+    "M8-A": {
+      "rebase": "The M8-A commits on bb764ae9 are re-applied onto this executor base. The baseline is re-frozen with base_head = this commit."
+    }
+  },
+  "created_at": "2026-09-29"
+}
