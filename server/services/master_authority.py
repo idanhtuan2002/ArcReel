@@ -7,13 +7,16 @@ head stays the one authority and the file manifest stays its guarded projection.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import ValidationError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.artifact_manifest import ProjectArtifactManifestAdapter
+from lib.artifact_manifest import ArtifactKind, ProjectArtifactManifestAdapter
 from lib.db.repositories.host_hardening import (
     CandidateObjectRepository,
     MasterAuthorityRepository,
@@ -42,11 +45,37 @@ def master_authority_unit(session: AsyncSession) -> MasterAuthorityUnit:
     )
 
 
+_LOCAL_ARTIFACT_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+@asynccontextmanager
+async def artifact_master_lock(
+    session_factory: async_sessionmaker[AsyncSession], *, user_id: str, project_name: str, artifact_key: str
+) -> AsyncGenerator[None]:
+    """Serialize one artifact's stage, promotion and projection, so projections land in promotion order.
+
+    PostgreSQL holds a session-level advisory lock on a dedicated connection, released on exit or
+    when the connection ends. Another database has one writer, so a process-local lock suffices.
+    """
+    key = f"master-authority:{user_id}:{project_name}:{artifact_key}"
+    async with session_factory() as session:
+        if session.get_bind().dialect.name == "postgresql":
+            await session.execute(text("SELECT pg_advisory_lock(hashtextextended(:key, 0))"), {"key": key})
+            try:
+                yield
+            finally:
+                await session.execute(text("SELECT pg_advisory_unlock(hashtextextended(:key, 0))"), {"key": key})
+            return
+    async with _LOCAL_ARTIFACT_LOCKS.setdefault(key, asyncio.Lock()):
+        yield
+
+
 def projected_master_records(project_dir: Path) -> dict[str, ApprovedMasterMetadata]:
     """The file manifest's approved masters by artifact key."""
     records: dict[str, ApprovedMasterMetadata] = {}
     for key, entry in ProjectArtifactManifestAdapter(Path(project_dir)).snapshot_entries().items():
-        if entry.r2 is None:
+        # Gate C masters are episode videos; no host route approves another kind.
+        if key.kind is not ArtifactKind.EPISODE_VIDEO or entry.r2 is None:
             continue
         try:
             metadata = R2ArtifactMetadata.model_validate(entry.r2)
@@ -82,6 +111,7 @@ async def verify_masters(session: AsyncSession, *, user_id: str, project_name: s
 
 
 __all__ = [
+    "artifact_master_lock",
     "file_master_projection",
     "master_authority_unit",
     "projected_master_records",

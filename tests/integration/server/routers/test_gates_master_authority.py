@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -15,13 +17,14 @@ from lib.db.models.host_hardening import MasterHeadVersionModel, ProjectEventMod
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from r2.host_hardening.master_authority import m7_candidate_id
 from r2.m3.host_integration import GoldenAHostIntegration
-from server.services.master_authority import master_authority_unit, projected_masters
+from server.services.master_authority import master_authority_unit, projected_masters, verify_masters
 from tests.integration.server.routers.test_gates_export import (
     PROJECT,
     USER,
     _approve_final,
     _approve_shot,
     _body,
+    _download,
     _media,
     _publish,
     _sha,
@@ -98,6 +101,8 @@ async def test_a_diverged_master_is_refused_by_every_consuming_route(
     final = _media(b"approved final")
     assert (await _approve_final(gate_export_client, project_dir, final, sources)).status_code == 200
     export_digest = _sha(final)
+    listing = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/export/deliverable/token")
+    issued_token = listing.json()["download_token"]
 
     # Another writer moves the SH01 head without projecting it.
     shot_key = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for("SH01")
@@ -112,15 +117,17 @@ async def test_a_diverged_master_is_refused_by_every_consuming_route(
             artifact_key=shot_key,
             generation_candidate_id="CAND-SH01-V99",
             version_file=other,
+            expected_content_digest=_sha(await asyncio.to_thread(other.read_bytes)),
             approval_record="APR-rogue",
             command_id="rogue",
         )
 
     publish = await _publish(gate_export_client, export_digest)
     token = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/export/deliverable/token")
+    download = await _download(gate_export_client, export_digest, issued_token)
     composite = await _approve_final(gate_export_client, project_dir, _media(b"another final"), sources)
 
-    for response in (publish, token, composite):
+    for response in (publish, token, download, composite):
         assert response.status_code == 409, response.text
         assert "master_diverged" in response.text
 
@@ -154,3 +161,41 @@ async def test_a_projection_refused_after_promotion_is_a_conflict_not_a_server_e
 
     assert response.status_code == 409
     assert "master_projection_refused" in response.text
+
+
+async def test_overlapping_gate_c_approvals_of_one_artifact_are_serialized(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_stage = GoldenAHostIntegration.stage_candidate
+    real_approve = GoldenAHostIntegration.approve
+    events: list[str] = []
+
+    def slow_stage(self, *args, **kwargs):
+        events.append("stage")
+        time.sleep(0.3)
+        return real_stage(self, *args, **kwargs)
+
+    def recorded_approve(self, *args, **kwargs):
+        approved = real_approve(self, *args, **kwargs)
+        events.append("project")
+        return approved
+
+    monkeypatch.setattr(GoldenAHostIntegration, "stage_candidate", slow_stage)
+    monkeypatch.setattr(GoldenAHostIntegration, "approve", recorded_approve)
+    first, second = _media(b"shot one"), _media(b"shot one again")
+
+    async def approve(data: bytes):
+        (project_dir / "production" / f"SH01-{hashlib.sha256(data).hexdigest()[:8]}.mp4").write_bytes(data)
+        body = _body("SH01", data)
+        produced = body["produced"]
+        assert isinstance(produced, dict)
+        produced["relative_path"] = f"SH01-{hashlib.sha256(data).hexdigest()[:8]}.mp4"
+        return await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=body)
+
+    responses = await asyncio.gather(approve(first), approve(second))
+
+    assert [r.status_code for r in responses] == [200, 200]
+    # Each approval projects before the next one stages.
+    assert events == ["stage", "project", "stage", "project"]
+    async with session_factory() as session:
+        await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)

@@ -122,6 +122,7 @@ async def test_a_divergent_head_is_reported_and_exits_2(
             artifact_key=sh01,
             generation_candidate_id="CAND-rogue",
             version_file=Path(sh02_object.object_ref),
+            expected_content_digest=sh02_object.content_digest,
             approval_record="APR-rogue",
             command_id="rogue",
         )

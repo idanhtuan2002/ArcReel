@@ -34,6 +34,7 @@ from lib.async_thread import run_noninterruptible_sync
 from lib.candidate_store import CandidateStoreError
 from lib.db import async_session_factory
 from lib.db.adaptation_uow import adaptation_uow_factory
+from lib.db.base import DEFAULT_USER_ID
 from lib.db.repositories.gates import (
     FinalCutReceiptRepository,
     GateSequenceConflictError,
@@ -41,7 +42,7 @@ from lib.db.repositories.gates import (
     PublishApprovalRepository,
     ScriptLockRepository,
 )
-from lib.db.repositories.host_hardening import MasterHeadConflictError
+from lib.db.repositories.host_hardening import CandidateIdentityConflictError, MasterHeadConflictError
 from lib.project_manager import get_project_manager
 from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.session_authority import SessionAuthenticatedShowrunnerAuthority
@@ -77,7 +78,7 @@ from r2.m3.host_integration import GoldenAHostIntegration, StagedOperationConfli
 from r2.m3.render_plan import RenderedCutAsset
 from r2.production.artifact_metadata import DependencySnapshot
 from server.auth import DOWNLOAD_TOKEN_EXPIRY_SECONDS, CurrentUser, create_download_token, verify_download_token
-from server.services.master_authority import master_authority_unit, verify_masters
+from server.services.master_authority import artifact_master_lock, master_authority_unit, verify_masters
 
 router = APIRouter()
 # Token-authenticated like the project ZIP export (ADR-0071): registered without the session dependency.
@@ -221,6 +222,7 @@ async def script_lock(project_name: str, req: ScriptLockRequest, user: CurrentUs
 
 _MASTER_CONFLICTS = (
     CandidateArtifactMismatchError,
+    CandidateIdentityConflictError,
     CandidateObjectConflictError,
     CandidateStoreError,
     MasterHeadConflictError,
@@ -335,48 +337,61 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             raise PostApprovalExportError("approved final requires export reconciliation") from exc
         return approved, export
 
-    try:
-        registered = await run_noninterruptible_sync(_stage)
-    except SourceMasterMismatchError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except StagedOperationConflictError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    async def _stage_promote_project():
+        try:
+            registered = await run_noninterruptible_sync(_stage)
+        except SourceMasterMismatchError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except StagedOperationConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    # The database master head is the authority (ADR-0096); the manifest master is projected after it,
-    # so every check the projection makes runs first.
-    def _approvable_version_file():
-        host.check_approvable(registered)
-        return host.version_file_for(req.target_ref, registered.host_version_ref)
+        # The database master head is the authority (ADR-0096); the manifest master is projected after
+        # it, so every check the projection makes runs first, against the staged output's digest.
+        def _approvable_version():
+            host.check_approvable(registered)
+            return host.staged_version(req.target_ref, registered.host_version_ref)
 
-    try:
-        version_file = await run_noninterruptible_sync(_approvable_version_file)
-    except (KeyError, ValueError) as exc:
-        raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
-    try:
-        async with async_session_factory() as session:
-            await master_authority_unit(session).promote_staged(
-                user_id=user.id,
-                project_name=project_name,
-                project_dir=project_dir.resolve(),
-                artifact_key=registered.artifact_key,
-                generation_candidate_id=registered.candidate.id,
-                version_file=version_file,
-                approval_record=req.approval_record,
-                command_id=operation_id,
-            )
-    except _MASTER_CONFLICTS as exc:
-        raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
+        try:
+            version_file, staged_digest = await run_noninterruptible_sync(_approvable_version)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
+        try:
+            async with async_session_factory() as session:
+                await master_authority_unit(session).promote_staged(
+                    user_id=user.id,
+                    project_name=project_name,
+                    project_dir=project_root,
+                    artifact_key=registered.artifact_key,
+                    generation_candidate_id=registered.candidate.id,
+                    version_file=version_file,
+                    expected_content_digest=staged_digest,
+                    approval_record=req.approval_record,
+                    command_id=operation_id,
+                )
+        except _MASTER_CONFLICTS as exc:
+            raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
 
-    try:
-        approved_master, export = await run_noninterruptible_sync(lambda: _project_and_export(registered))
-    except PostApprovalExportError as exc:
-        raise _gate_c_retry_error(req.approval_record) from exc
-    except (KeyError, ValueError) as exc:
-        # A concurrent change refused the projection after the database promotion. Master-consuming
-        # routes refuse the project as diverged until a new Gate C approval projects its head.
-        raise HTTPException(
-            status_code=409, detail=f"master_projection_refused: re-approve this artifact at Gate C ({exc})"
-        ) from exc
+        try:
+            return await run_noninterruptible_sync(lambda: _project_and_export(registered))
+        except PostApprovalExportError as exc:
+            raise _gate_c_retry_error(req.approval_record) from exc
+        except (KeyError, ValueError) as exc:
+            # The projection refused after the database promotion. Master-consuming routes refuse the
+            # project as diverged until a new Gate C approval projects its head.
+            raise HTTPException(
+                status_code=409, detail=f"master_projection_refused: re-approve this artifact at Gate C ({exc})"
+            ) from exc
+
+    project_root = await run_noninterruptible_sync(project_dir.resolve)
+    # One artifact's stage, promotion and projection run under one lock, so projections cannot land
+    # out of promotion order.
+    async with artifact_master_lock(
+        async_session_factory,
+        user_id=user.id,
+        project_name=project_name,
+        artifact_key=host.artifact_key_for(req.target_ref),
+    ):
+        approved_master, export = await _stage_promote_project()
 
     receipt = FinalCutReceipt(
         user_id=user.id,
@@ -521,6 +536,9 @@ async def download_deliverable(
         raise HTTPException(status_code=401, detail="download token invalid") from exc
 
     project_dir = get_project_manager().get_project_path(project_name)
+    # The host resolves every authenticated subject to DEFAULT_USER_ID (server/auth.py), and the
+    # database head may have moved since the token was issued.
+    await _require_consistent_masters(DEFAULT_USER_ID, project_name, project_dir)
     result = await run_noninterruptible_sync(lambda: verified_export_snapshot(project_dir, digest))
     if result is None:
         raise HTTPException(status_code=404, detail="no current approved deliverable has this digest")

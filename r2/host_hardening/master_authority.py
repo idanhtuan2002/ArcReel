@@ -63,11 +63,6 @@ def stream_probe_digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def _sha256_file(path: Path) -> str:
-    with path.open("rb") as handle:
-        return "sha256:" + hashlib.file_digest(handle, "sha256").hexdigest()
-
-
 SelectedGenerationCandidate = Callable[[str, str], str | None]
 """``(project_name, artifact_key)`` -> the file manifest's selected generation candidate id."""
 
@@ -124,9 +119,11 @@ class MasterAuthorityUnit:
         artifact_key: str,
         generation_candidate_id: str,
         version_file: Path,
+        expected_content_digest: str,
         approval_record: str,
         command_id: str,
     ) -> MasterHeadSnapshot:
+        """Promote ``version_file`` if its bytes still hash to ``expected_content_digest`` (the staged output)."""
         candidate_id = m7_candidate_id(artifact_key, generation_candidate_id)
         replay = await self._receipts.get_exact(
             user_id=user_id, project_name=project_name, artifact_key=artifact_key, command_id=command_id
@@ -139,6 +136,7 @@ class MasterAuthorityUnit:
                 artifact_key=artifact_key,
                 candidate_id=candidate_id,
                 version_file=version_file,
+                expected_content_digest=expected_content_digest,
             )
             expected = await self._authorities.get_current_version(
                 user_id=user_id, project_name=project_name, artifact_key=artifact_key
@@ -164,8 +162,9 @@ class MasterAuthorityUnit:
         artifact_key: str,
         candidate_id: str,
         version_file: Path,
+        expected_content_digest: str,
     ) -> None:
-        digest = await asyncio.to_thread(_sha256_file, version_file)
+        digest = expected_content_digest
         verified = await asyncio.to_thread(
             lambda: prepare_candidate(
                 identity=CandidateIdentity(
@@ -201,9 +200,18 @@ async def verify_project_masters(
     database_keys: Iterable[str],
     projected_keys: Iterable[str],
 ) -> None:
-    """Raise ``MasterDivergedError`` if any artifact's database head and projection disagree."""
+    """Raise ``MasterDivergedError`` unless every database head has an equal projection and vice versa.
+
+    Unlike the resolver alone, a database head whose projection is missing is a divergence: every
+    promotion is projected before its artifact is read, so a missing projection is an unfinished or
+    refused one.
+    """
+    database = set(database_keys)
+    unprojected = sorted(database - set(projected_keys))
+    if unprojected:
+        raise MasterDivergedError(f"M7_MASTER_DIVERGED: {unprojected[0]!r} has a database head but no projection")
     resolver = DatabaseMasterResolver(authorities=authorities, legacy_projection=projection)
-    for artifact_key in sorted(set(database_keys) | set(projected_keys)):
+    for artifact_key in sorted(database | set(projected_keys)):
         await resolver.get_exact(user_id=user_id, project_name=project_name, artifact_key=artifact_key)
 
 

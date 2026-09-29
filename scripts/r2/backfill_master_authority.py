@@ -8,9 +8,10 @@ selected host version as a candidate object and promotes it, with the determinis
     --user-id <id> --project <name>     one project
     --user-id <id> --all                every project
 
-It prints a JSON summary: promoted, already current, and diverged artifacts. The exit status is 2
-when any artifact's database head disagrees with its file master; nothing is changed for that
-artifact.
+It prints a JSON summary: promoted, already current, and diverged artifacts. An artifact is
+diverged when its database head names another candidate, or when its selected host version has no
+recorded output digest or no longer hashes to it. The exit status is 2 when any artifact is
+diverged; nothing is changed for that artifact.
 """
 
 from __future__ import annotations
@@ -22,10 +23,11 @@ import sys
 from pathlib import Path
 
 from lib.artifact_manifest import ArtifactKey, ArtifactKind
+from lib.candidate_store import CandidateStoreError
 from lib.db import async_session_factory
-from lib.db.repositories.host_hardening import MasterAuthorityRepository
+from lib.db.repositories.host_hardening import CandidateIdentityConflictError, MasterAuthorityRepository
 from lib.project_manager import get_project_manager
-from r2.host_hardening.master_authority import m7_candidate_id
+from r2.host_hardening.master_authority import CandidateObjectConflictError, m7_candidate_id
 from r2.m3.host_integration import GoldenAHostIntegration
 from server.services.master_authority import master_authority_unit, projected_master_records
 
@@ -58,18 +60,29 @@ async def backfill_project(*, user_id: str, project_name: str, project_dir: Path
             continue
         episode, target_ref = int(key.components[0]), str(key.components[1])
         host = GoldenAHostIntegration(project_dir, resource_type="videos", episode=episode)
-        version_file = await asyncio.to_thread(host.version_file_for, target_ref, record.host_version_ref)
-        async with async_session_factory() as session:
-            await master_authority_unit(session).promote_staged(
-                user_id=user_id,
-                project_name=project_name,
-                project_dir=root,
-                artifact_key=artifact_key,
-                generation_candidate_id=record.selected_candidate_id,
-                version_file=version_file,
-                approval_record=record.approval_record,
-                command_id=f"backfill:{artifact_key}:{record.selected_candidate_id}",
+        try:
+            version_file, staged_digest = await asyncio.to_thread(
+                host.staged_version, target_ref, record.host_version_ref
             )
+        except (KeyError, ValueError):
+            summary["diverged"].append(artifact_key)
+            continue
+        try:
+            async with async_session_factory() as session:
+                await master_authority_unit(session).promote_staged(
+                    user_id=user_id,
+                    project_name=project_name,
+                    project_dir=root,
+                    artifact_key=artifact_key,
+                    generation_candidate_id=record.selected_candidate_id,
+                    version_file=version_file,
+                    expected_content_digest=staged_digest,
+                    approval_record=record.approval_record,
+                    command_id=f"backfill:{artifact_key}:{record.selected_candidate_id}",
+                )
+        except (CandidateStoreError, CandidateObjectConflictError, CandidateIdentityConflictError):
+            summary["diverged"].append(artifact_key)
+            continue
         summary["promoted"].append(artifact_key)
     return summary
 

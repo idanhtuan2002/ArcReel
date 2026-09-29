@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.candidate_store import CandidateStoreError
 from lib.db.models.host_hardening import CandidateObjectModel, MasterHeadVersionModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from r2.host_hardening.master_authority import (
@@ -40,6 +42,10 @@ def _video(path: Path, tag: str) -> Path:
     return path
 
 
+def _digest(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 async def _promote(
     factory: Factory,
     project_dir: Path,
@@ -48,7 +54,9 @@ async def _promote(
     generation_id: str,
     command: str,
     approval: str = "APR-1",
+    expected_digest: str | None = None,
 ):
+    expected = expected_digest or _digest(version_file)
     async with factory() as session:
         return await composition.master_authority_unit(session).promote_staged(
             user_id=USER,
@@ -57,6 +65,7 @@ async def _promote(
             artifact_key=KEY,
             generation_candidate_id=generation_id,
             version_file=version_file,
+            expected_content_digest=expected,
             approval_record=approval,
             command_id=command,
         )
@@ -125,6 +134,22 @@ async def test_changed_bytes_under_a_registered_candidate_write_nothing(
     assert await _count(session_factory, MasterHeadVersionModel) == 1
 
 
+async def test_bytes_changed_after_staging_are_refused_before_the_first_registration(
+    session_factory: Factory, tmp_path: Path
+) -> None:
+    version = _video(tmp_path / "videos" / "versions" / "S01_v1.mp4", "one")
+    staged = _digest(version)
+    _video(version, "tampered")
+
+    with pytest.raises(CandidateStoreError):
+        await _promote(
+            session_factory, tmp_path, version, generation_id="CAND-S01-V1", command="op-1", expected_digest=staged
+        )
+
+    assert await _count(session_factory, MasterHeadVersionModel) == 0
+    assert await _count(session_factory, CandidateObjectModel) == 0
+
+
 async def test_verify_accepts_a_matching_projection_and_refuses_a_divergent_one(
     session_factory: Factory, tmp_path: Path
 ) -> None:
@@ -144,7 +169,8 @@ async def test_verify_accepts_a_matching_projection_and_refuses_a_divergent_one(
             )
 
     await verify({KEY: "CAND-S01-V1"})
-    await verify({})  # projection not yet written: no opinion, not a divergence
+    with pytest.raises(MasterDivergedError):
+        await verify({})  # a database head without its projection is unfinished or refused
     with pytest.raises(MasterDivergedError):
         await verify({KEY: "CAND-S01-V9"})
     with pytest.raises(MasterDivergedError):

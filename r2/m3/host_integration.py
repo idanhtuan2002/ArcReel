@@ -327,8 +327,16 @@ class GoldenAHostIntegration:
             host_version_ref=str(replay_version),
         )
 
-    def version_file_for(self, target_ref: str, host_version_ref: str) -> Path:
-        """The immutable host version file that ``host_version_ref`` names for ``target_ref``."""
+    def staged_version(self, target_ref: str, host_version_ref: str) -> tuple[Path, str]:
+        """The staged host version file and its recorded ``sha256:`` output digest."""
+        record = self._version_record(target_ref, host_version_ref)
+        output_sha256 = record.get("output_sha256")
+        if not isinstance(output_sha256, str) or not output_sha256:
+            raise ValueError(f"{target_ref} version {host_version_ref} has no recorded output digest")
+        path = VersionManager.resolve_snapshot_path(self.project_dir, self.resource_type, record["file"]).resolve()
+        return path, "sha256:" + output_sha256.removeprefix("sha256:").lower()
+
+    def _version_record(self, target_ref: str, host_version_ref: str) -> dict:
         version = int(host_version_ref)
         record = next(
             (
@@ -340,7 +348,7 @@ class GoldenAHostIntegration:
         )
         if record is None:
             raise KeyError(f"{target_ref} has no host version {host_version_ref}")
-        return VersionManager.resolve_snapshot_path(self.project_dir, self.resource_type, record["file"]).resolve()
+        return record
 
     def check_approvable(self, registered: RegisteredGoldenACandidate) -> None:
         """Raise ``KeyError``/``ValueError`` if ``approve`` would refuse ``registered`` now."""
