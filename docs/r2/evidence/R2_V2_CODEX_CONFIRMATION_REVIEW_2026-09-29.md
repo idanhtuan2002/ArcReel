@@ -182,3 +182,19 @@ Verdict: **CHANGES_REQUIRED** (`M7_IMPLEMENTATION_NOT_ACCEPTED`).
 - PG16: 19 passed.
 - basedpyright: 0/0.
 - lint-imports: 20 kept.
+
+---
+
+# Fourth confirmation review (job `task-mum2gy9m-62p42u`, reviewed HEAD `6746ce57`)
+
+Verdict: **CHANGES_REQUIRED** (`M7_IMPLEMENTATION_NOT_ACCEPTED`). This is a verification blocker only.
+
+- **Sweep cutoff finding:** FIXED. The cutoff is set once, when `session_manager.py` is imported (line 73). Each manager takes it (line 391) and passes it to the sweep (line 1502), and the sweep query filters on it at `budget_guard.py:270`.
+- **Earlier fixes:** reconfirmed with no regression. These are the cancelled start, the patrol retries, the resume baseline, and the ADR-0092 and ADR-0093 disclosures.
+- **New defects in `fd8f58bb..6746ce57`:** none.
+- **Required skips:** the reviewer ran in a write-capable sandbox limited to `.venv/tmp-review/`, and it could not run the tests:
+  - **SQLite:** 733 setup errors, because the shared schema migration timed out.
+  - **PostgreSQL:** the sandbox is not allowed to create local sockets. The reviewer interrupted the run (exit 130).
+  - The final `git status` was empty.
+
+The remaining gate is test execution by someone other than the authoring agent, at this HEAD.
