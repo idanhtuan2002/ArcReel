@@ -1,0 +1,1661 @@
+{
+  "fixture_set": "graph-history-v1",
+  "results": {
+    "normalize-drops-dangling-edges": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "a",
+            "target": "b",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          }
+        ],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      }
+    ],
+    "normalize-detaches-missing-parent": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "orphan",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      }
+    ],
+    "normalize-orders-parents-first": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "g",
+            "type": "group",
+            "parentId": null,
+            "x": 100,
+            "y": 100
+          },
+          {
+            "id": "child",
+            "type": "note",
+            "parentId": "g",
+            "x": 10,
+            "y": 10
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      }
+    ],
+    "delete-group-with-descendants": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "g",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "c1",
+            "type": "note",
+            "parentId": "g",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "c2",
+            "type": "note",
+            "parentId": "g",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "x",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "c1",
+            "target": "x",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          },
+          {
+            "id": "e2",
+            "source": "x",
+            "target": "c2",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          }
+        ],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "delete",
+        "nodes": [
+          {
+            "id": "x",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [
+          {
+            "id": "g",
+            "type": "group",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "c1",
+            "type": "note",
+            "parentId": "g",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "c2",
+            "type": "note",
+            "parentId": "g",
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "x",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "c1",
+            "target": "x",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          },
+          {
+            "id": "e2",
+            "source": "x",
+            "target": "c2",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          }
+        ],
+        "past": 0,
+        "future": 1,
+        "selected": null,
+        "edits": 2,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "redo",
+        "nodes": [
+          {
+            "id": "x",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 3,
+        "source": "user_edit",
+        "pendingClear": false
+      }
+    ],
+    "delete-edge": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "a",
+            "target": "b",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          }
+        ],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "deleteEdge",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "a",
+            "target": "b",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          }
+        ],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "deleteEdge",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "a",
+            "target": "b",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          }
+        ],
+        "past": 0,
+        "future": 1,
+        "selected": null,
+        "edits": 2,
+        "source": "user_edit",
+        "pendingClear": false
+      }
+    ],
+    "delete-to-empty": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "select",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": "b",
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "delete",
+        "nodes": [
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "b",
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "delete",
+        "nodes": [],
+        "edges": [],
+        "past": 2,
+        "future": 0,
+        "selected": null,
+        "edits": 2,
+        "source": "delete_to_empty",
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 1,
+        "selected": null,
+        "edits": 3,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "redo",
+        "nodes": [],
+        "edges": [],
+        "past": 2,
+        "future": 0,
+        "selected": null,
+        "edits": 4,
+        "source": "delete_to_empty",
+        "pendingClear": false
+      }
+    ],
+    "clear-and-acknowledge": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "clear",
+        "nodes": [],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "manual_clear",
+        "pendingClear": true
+      },
+      {
+        "op": "ack",
+        "nodes": [],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "manual_clear",
+        "pendingClear": false
+      },
+      {
+        "op": "clear",
+        "nodes": [],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "manual_clear",
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 1,
+        "selected": null,
+        "edits": 2,
+        "source": "user_edit",
+        "pendingClear": false
+      }
+    ],
+    "selection-resolved-on-undo": [
+      {
+        "op": "load",
+        "nodes": [],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "add",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 5,
+            "y": 7
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "select",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 5,
+            "y": 7
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": "a",
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [],
+        "edges": [],
+        "past": 0,
+        "future": 1,
+        "selected": null,
+        "edits": 2,
+        "source": "delete_to_empty",
+        "pendingClear": false
+      },
+      {
+        "op": "redo",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 5,
+            "y": 7
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 3,
+        "source": "user_edit",
+        "pendingClear": false
+      }
+    ],
+    "history-bounded-60-adds": [
+      {
+        "op": "load",
+        "nodes": [],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "addMany",
+        "nodes": [
+          {
+            "id": "n0",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n1",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n2",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n3",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n4",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n5",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n6",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n7",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n8",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n9",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n10",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n11",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n12",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n13",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n14",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n15",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n16",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n17",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n18",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n19",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n20",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n21",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n22",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n23",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n24",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n25",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n26",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n27",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n28",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n29",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n30",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n31",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n32",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n33",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n34",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n35",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n36",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n37",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n38",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n39",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n40",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n41",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n42",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n43",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n44",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n45",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n46",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n47",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n48",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n49",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n50",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n51",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n52",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n53",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n54",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n55",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n56",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n57",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n58",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n59",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 50,
+        "future": 0,
+        "selected": null,
+        "edits": 60,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "undoMany",
+        "nodes": [
+          {
+            "id": "n0",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n1",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n2",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n3",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n4",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n5",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n6",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n7",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n8",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n9",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 50,
+        "selected": null,
+        "edits": 110,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "redoMany",
+        "nodes": [
+          {
+            "id": "n0",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n1",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n2",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n3",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n4",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n5",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n6",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n7",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n8",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n9",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n10",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n11",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "n12",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 3,
+        "future": 47,
+        "selected": null,
+        "edits": 113,
+        "source": "user_edit",
+        "pendingClear": false
+      }
+    ],
+    "history-measure-drag-resize": [
+      {
+        "op": "load",
+        "nodes": [],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "add",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "changes",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "changes",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 2,
+        "future": 0,
+        "selected": null,
+        "edits": 2,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "changes",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 5,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 2,
+        "future": 0,
+        "selected": null,
+        "edits": 2,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "changes",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 9,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 2,
+        "future": 0,
+        "selected": null,
+        "edits": 2,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "changes",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 9,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 3,
+        "future": 0,
+        "selected": null,
+        "edits": 3,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "changes",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 9,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 3,
+        "future": 0,
+        "selected": null,
+        "edits": 3,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 2,
+        "future": 1,
+        "selected": null,
+        "edits": 4,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 1,
+        "future": 2,
+        "selected": null,
+        "edits": 5,
+        "source": "user_edit",
+        "pendingClear": false
+      }
+    ],
+    "connect-once": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "connect",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "a",
+            "target": "b",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          }
+        ],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "connect",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "source": "a",
+            "target": "b",
+            "sourceHandle": "source",
+            "targetHandle": "target"
+          }
+        ],
+        "past": 1,
+        "future": 0,
+        "selected": null,
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "id": "b",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 1,
+        "selected": null,
+        "edits": 2,
+        "source": "user_edit",
+        "pendingClear": false
+      }
+    ],
+    "restore-history-bounded": [
+      {
+        "op": "load",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "restoreHistoryOf",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 50,
+        "future": 0,
+        "selected": null,
+        "edits": 0,
+        "source": null,
+        "pendingClear": false
+      },
+      {
+        "op": "undo",
+        "nodes": [
+          {
+            "id": "h59",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 49,
+        "future": 1,
+        "selected": null,
+        "edits": 1,
+        "source": "user_edit",
+        "pendingClear": false
+      }
+    ],
+    "hydrate-draft": [
+      {
+        "op": "hydrate",
+        "nodes": [
+          {
+            "id": "a",
+            "type": "note",
+            "parentId": null,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "edges": [],
+        "past": 0,
+        "future": 0,
+        "selected": null,
+        "edits": 3,
+        "source": "manual_clear",
+        "pendingClear": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "corrections": [
+    {
+      "harness": "graph",
+      "case": "connect-once",
+      "from_step": 2,
+      "behavior": "G03",
+      "description": "A duplicate connection is not an edit. The donor pushes a no-op undo step and counts an edit, so the next undo appears to do nothing. The port records nothing, and the next undo reverts the real connection."
+    }
+  ]
+}

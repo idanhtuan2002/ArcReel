@@ -120,7 +120,7 @@
     },
     {
       "behavior_id": "G02",
-      "description": "delete nodes with descendants; surviving children of a deleted parent keep their absolute position; incident edges removed",
+      "description": "delete nodes together with their descendants; edges touching a deleted node are removed; unknown or blank ids are ignored",
       "donor_refs": [
         "canvasStore.deleteNodes",
         "collectNodeIdsWithDescendants"
@@ -132,7 +132,7 @@
     },
     {
       "behavior_id": "G03",
-      "description": "delete edge",
+      "description": "connect and delete edges; a duplicate connection is not an edit",
       "donor_refs": [
         "canvasStore.deleteEdge"
       ],
@@ -520,7 +520,7 @@
       "planned_disposition": "PARITY"
     }
   ],
-  "behavior_inventory_digest": "sha256:357be889473ce46bc7d80cacf1dd07b341d04efff557602f9a86239e908e2447",
+  "behavior_inventory_digest": "sha256:0b381c0551fd9802213b7da02d55cefc2160fb716297f596583564182edc56fd",
   "excluded": [
     "generation, task, resume and credit logic (useNodeGenerationTaskState, resumeGeneration, generationTaskArbitration)",
     "asset library, upload, cross-project paste and asset migration",

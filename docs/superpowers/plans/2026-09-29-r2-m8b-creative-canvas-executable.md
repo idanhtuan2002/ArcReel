@@ -55,8 +55,8 @@ These follow from the spec; none is a new architecture choice.
 
 All new, unless marked.
 
-- `frontend/src/features/creative-canvas/domain/{graph,groups,storyboardOrder,history,bookmarks,selection,layout,payloadLimits,clearIntent,nodeTypes}.ts` and `__tests__/`
-- `frontend/src/features/creative-canvas/recovery/{saveCoordinator,draftRecovery,storageQuota,autosaveHold}.ts` and `__tests__/`
+- `frontend/src/features/creative-canvas/domain/{graph,groups,storyboardOrder,history,bookmarks,selection,layout,payloadLimits,clearIntent,nodeTypes}.ts`, each with a colocated `*.test.ts` (repository rule FE-TESTS-DIR)
+- `frontend/src/features/creative-canvas/recovery/{saveCoordinator,draftRecovery,storageQuota,autosaveHold}.ts` with colocated tests
 - `frontend/src/features/creative-canvas/state/canvasSlice.ts` and a test
 - `frontend/src/features/creative-canvas/api/explorationClient.ts` and a test (the M8-A endpoints only)
 - `frontend/src/features/creative-canvas/ui/**` (the page, the React Flow adapter, node components, the keyboard and a11y layer, conflict and preview UI) and tests
