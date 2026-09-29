@@ -68,3 +68,63 @@ delegated the choice.
   promotion. `FormatCandidate` is the kind that can reach a master today, into an M8-owned slot
   whose first master comes from an M7 promotion.
 - **Scope.** Contract amendment 4 adds the two host files and their tests to the M8-A scope.
+
+## Concurrency model (written before A3 code, per amendment 5)
+
+**Actors on M8 rows and M8 slots:**
+
+- **Append a revision.** It writes `m8_candidate_heads` and `m8_candidate_revisions`, plus a
+  command receipt.
+- **Create a preview.** It reads the candidate revision and the slot's current master head,
+  then writes `m8_promotion_previews` and a command receipt.
+- **Promote.** It writes `m8_promotion_authorizations` and `m8_promotion_receipts`, plus a
+  command receipt. It also writes, through the M7 authority on the same session, the slot's
+  `master_authorities` row and `master_head_versions`, the M7 promotion receipt and the
+  project event.
+- **Other host writers** of a slot's `master_authorities` row: Gate C phase 1 and phase 2 touch
+  only manifest `EPISODE_VIDEO` keys, and Gate D's multi-row lock covers only the heads that
+  `verify_masters` returns, which are also manifest `EPISODE_VIDEO` keys. Rule 3 below keeps an
+  M8 slot from ever being one of those keys, so no host writer shares a row with M8.
+
+**Invariants:**
+
+1. **Revisions.** A candidate's revisions are append-only, and its head advances by
+   compare-and-set only.
+2. **Promotion.** A promotion commits only if, inside its own transaction and under its locks,
+   all of these still hold:
+   - the preview is unexpired;
+   - the preview digest equals the authorization's;
+   - the candidate head version is the expected one;
+   - the revision payload digest is the previewed one;
+   - the slot's master head (version, candidate id, content digest) is the previewed one;
+   - the promoted candidate object exists with the payload's `rendered_artifact_digest`.
+3. **Target slots.** An M8 target slot is never a manifest artifact key.
+4. **One transaction per operation.** An operation commits every row it writes (M8 and M7) in
+   one transaction or none of them. An exact replay returns the stored result before any
+   currentness check.
+
+**Lock protocol.** This is the normative spec §6 order, and it follows the V2-02b rule that a
+write depending on a head holds that head's lock:
+
+1. the command key (a transaction advisory lock on PostgreSQL);
+2. the candidate head (`FOR UPDATE`);
+3. the preview (`FOR UPDATE`), promote only;
+4. the slot's `master_authorities` row (a no-op `UPDATE` on an existing row), promote only.
+   A preview does not lock the slot: it reads the head, and the promotion revalidates it
+   under the lock.
+
+**Why there is no deadlock:**
+
+- Every M8 operation takes its locks in that fixed order and holds them to one commit.
+- No host writer shares an M8 slot row (rule 3).
+- Different candidates and different slots never share a lock.
+
+**Why there are no stale writes:**
+
+- Every write that depends on the slot head (the promotion) runs after the slot row lock and
+  re-reads the head inside it.
+- A preview may go stale after it is written, but the promotion refuses a stale preview with
+  `m8_promotion_binding_stale`.
+
+**SQLite.** It serializes all writers on the database write lock, so the order above cannot
+cycle there either. The concurrency tests run on PostgreSQL.
