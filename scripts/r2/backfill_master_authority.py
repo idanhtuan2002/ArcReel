@@ -8,11 +8,15 @@ selected host version as a candidate object and promotes it, with the determinis
     --user-id <id> --project <name>     one project
     --user-id <id> --all                every project
 
-It prints a JSON summary: promoted, already current, and diverged artifacts. An artifact is
-diverged when its database head names another candidate, or when its selected host version has no
-recorded output digest, its file is gone or no longer hashes to it (checked again on every rerun),
-or another writer moves its head first.
-The exit status is 2 when any artifact is diverged; nothing is changed for that artifact.
+It prints a JSON summary per project: promoted, already current, diverged and skipped artifacts, and
+unreadable manifests. An artifact is diverged when its R2 metadata does not validate, when its
+database head names another candidate, or when its selected host version has no recorded output
+digest, its file is gone or no longer hashes to it (checked again on every rerun), or another writer
+moves its head first; nothing is changed for that artifact. A project whose manifest cannot be read
+is reported unreadable and the run continues.
+
+The exit status is 3 when ``ffprobe`` is missing (nothing is read or written), 2 when any artifact is
+diverged or any manifest unreadable, and 0 otherwise. A database failure aborts the run.
 
 Each artifact is decided and promoted in one transaction that holds its master authority row lock
 (``serialized_artifact``, the V2-02b rule), so a concurrent Gate C approval is never overwritten.
@@ -24,6 +28,7 @@ import argparse
 import asyncio
 import json
 import logging
+import shutil
 import sys
 from pathlib import Path
 
@@ -43,9 +48,18 @@ from r2.host_hardening.master_authority import CandidateObjectConflictError, m7_
 from r2.host_hardening.promotion import PromotionExpectedVersionConflictError, PromotionReceiptReplayMismatchError
 from r2.m3.host_integration import GoldenAHostIntegration
 from r2.production import ApprovedMasterMetadata
-from server.services.master_authority import master_authority_unit, projected_master_records, serialized_artifact
+from server.services.master_authority import master_authority_unit, scan_master_records, serialized_artifact
 
 logger = logging.getLogger(__name__)
+
+
+class MissingMediaProbeError(RuntimeError):
+    """``ffprobe`` is not installed; candidate registration cannot verify any master."""
+
+
+def _require_media_probe() -> None:
+    if shutil.which("ffprobe") is None:
+        raise MissingMediaProbeError("ffprobe is required to verify masters and was not found on PATH")
 
 
 class _UnverifiableVersionError(Exception):
@@ -73,9 +87,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def backfill_project(*, user_id: str, project_name: str, project_dir: Path) -> dict[str, list[str]]:
-    summary: dict[str, list[str]] = {"promoted": [], "current": [], "diverged": [], "skipped": []}
-    records = await asyncio.to_thread(projected_master_records, project_dir)
-    root = await asyncio.to_thread(Path(project_dir).resolve)
+    _require_media_probe()
+    summary: dict[str, list[str]] = {"promoted": [], "current": [], "diverged": [], "skipped": [], "unreadable": []}
+    try:
+        records, invalid = await asyncio.to_thread(scan_master_records, project_dir)
+        root = await asyncio.to_thread(Path(project_dir).resolve)
+    except Exception as error:
+        # Reading the manifest touches only project files; any failure makes this project unreadable.
+        logger.warning("backfill: the manifest of %s is not readable: %r", project_name, error)
+        summary["unreadable"].append(f"{type(error).__name__}: {error}")
+        return summary
+    for artifact_key in invalid:
+        logger.warning("backfill: %s has R2 metadata that does not validate", artifact_key)
+        summary["diverged"].append(artifact_key)
     for artifact_key, record in sorted(records.items()):
         key = ArtifactKey.decode(artifact_key)
         if key.kind is not ArtifactKind.EPISODE_VIDEO:
@@ -175,9 +199,15 @@ async def _run(args: argparse.Namespace) -> dict[str, dict[str, list[str]]]:
 
 
 async def main_async(argv: list[str] | None = None) -> int:
-    result = await _run(build_parser().parse_args(argv))
+    args = build_parser().parse_args(argv)
+    try:
+        _require_media_probe()
+    except MissingMediaProbeError as error:
+        print(f"backfill: {error}", file=sys.stderr)
+        return 3
+    result = await _run(args)
     print(json.dumps(result, indent=2))
-    return 2 if any(summary["diverged"] for summary in result.values()) else 0
+    return 2 if any(summary["diverged"] or summary["unreadable"] for summary in result.values()) else 0
 
 
 def main(argv: list[str] | None = None) -> int:

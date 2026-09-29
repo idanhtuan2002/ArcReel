@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.artifact_manifest import ArtifactKey
+from lib.artifact_manifest import MANIFEST_FILENAME, ArtifactKey, ProjectArtifactManifestAdapter
 from lib.db.models.host_hardening import (
     CandidateObjectModel,
     MasterAuthorityModel,
@@ -20,9 +21,14 @@ from lib.db.models.host_hardening import (
     ProjectEventModel,
     PromotionReceiptModel,
 )
-from lib.db.repositories.host_hardening import CandidateObjectRepository, MasterAuthorityRepository
+from lib.db.repositories.host_hardening import (
+    CandidateObjectRepository,
+    MasterAuthorityRepository,
+    MasterHeadConflictError,
+)
 from r2.host_hardening import master_authority as master_authority_module
 from r2.host_hardening.master_authority import MasterDivergedError, m7_candidate_id
+from r2.host_hardening.promotion import AtomicPromotionService
 from r2.m3.host_integration import GoldenAHostIntegration
 from scripts.r2 import backfill_master_authority as backfill
 from server.auth import get_current_user
@@ -227,6 +233,81 @@ async def test_a_file_failure_during_registration_rolls_the_artifact_back_and_th
     assert status == 2
     assert (summary["diverged"], summary["promoted"]) == ([sh01], [sh02])
     assert sh01_head is None
+
+
+async def test_an_episode_master_whose_metadata_does_not_validate_is_reported(
+    legacy_dir: Path, session_factory: Factory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    sh01, sh02 = sorted(composition.projected_master_records(project_dir))
+    adapter = ProjectArtifactManifestAdapter(project_dir)
+    key = ArtifactKey.decode(sh01)
+    entry = adapter.snapshot_entries()[key]
+    assert isinstance(entry.r2, dict)
+    broken = {**entry.r2, "approved_master": {**entry.r2["approved_master"], "host_version_ref": ""}}
+    adapter.put_entry(key, dataclasses.replace(entry, r2=broken))
+
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    assert status == 2
+    assert (summary["diverged"], summary["promoted"]) == ([sh01], [sh02])
+
+
+async def test_a_missing_media_probe_fails_the_run_before_any_write(
+    legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    monkeypatch.setattr(backfill.shutil, "which", lambda _name: None)
+
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    captured = capsys.readouterr()
+    async with session_factory() as session:
+        heads = (await session.execute(select(func.count()).select_from(MasterHeadVersionModel))).scalar_one()
+    assert status == 3
+    assert "ffprobe" in captured.err
+    assert (captured.out, heads) == ("", 0)
+
+
+async def test_an_unreadable_manifest_is_reported_and_exits_2(
+    legacy_dir: Path, session_factory: Factory, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    (project_dir / MANIFEST_FILENAME).write_text("{not json", encoding="utf-8")
+
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    assert status == 2
+    assert (summary["promoted"], summary["diverged"], len(summary["unreadable"])) == ([], [], 1)
+
+
+async def test_a_conflict_after_registration_rolls_the_candidate_back(
+    legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    sh01, sh02 = sorted(composition.projected_master_records(project_dir))
+    promote = AtomicPromotionService.promote
+
+    async def conflict_on_sh01(self: AtomicPromotionService, **fields: object):
+        if fields["artifact_key"] == sh01:
+            raise MasterHeadConflictError("a concurrent promotion won")
+        return await promote(self, **fields)
+
+    monkeypatch.setattr(AtomicPromotionService, "promote", conflict_on_sh01)
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    async with session_factory() as session:
+        registered = (await session.execute(select(CandidateObjectModel.artifact_key))).scalars().all()
+    assert status == 2
+    assert (summary["diverged"], summary["promoted"]) == ([sh01], [sh02])
+    assert registered == [sh02]
 
 
 async def test_a_gate_c_approval_between_the_head_check_and_the_promotion_is_not_overwritten(

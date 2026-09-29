@@ -153,9 +153,11 @@ async def project_if_current[T](
         return await project()
 
 
-def projected_master_records(project_dir: Path) -> dict[str, ApprovedMasterMetadata]:
-    """The file manifest's approved masters by artifact key."""
+def scan_master_records(project_dir: Path) -> tuple[dict[str, ApprovedMasterMetadata], list[str]]:
+    """The file manifest's approved masters by artifact key, and the episode-video keys whose R2
+    metadata does not validate."""
     records: dict[str, ApprovedMasterMetadata] = {}
+    invalid: list[str] = []
     for key, entry in ProjectArtifactManifestAdapter(Path(project_dir)).snapshot_entries().items():
         # Gate C masters are episode videos; no host route approves another kind.
         if key.kind is not ArtifactKind.EPISODE_VIDEO or entry.r2 is None:
@@ -163,10 +165,16 @@ def projected_master_records(project_dir: Path) -> dict[str, ApprovedMasterMetad
         try:
             metadata = R2ArtifactMetadata.model_validate(entry.r2)
         except ValidationError:
+            invalid.append(key.encode())
             continue
         if metadata.approved_master is not None:
             records[key.encode()] = metadata.approved_master
-    return records
+    return records, sorted(invalid)
+
+
+def projected_master_records(project_dir: Path) -> dict[str, ApprovedMasterMetadata]:
+    """The file manifest's approved masters by artifact key."""
+    return scan_master_records(project_dir)[0]
 
 
 def projected_masters(project_dir: Path) -> dict[str, str]:
@@ -214,6 +222,7 @@ __all__ = [
     "project_if_current",
     "projected_master_records",
     "projected_masters",
+    "scan_master_records",
     "serialized_artifact",
     "serialized_artifacts",
     "verify_masters",

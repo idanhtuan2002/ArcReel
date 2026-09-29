@@ -64,3 +64,41 @@ Rather than add another exception type, the rule now separates two boundaries:
 | Backfill tests: SQLite / PG16 (with Gate C/D master authority routes) | 7 passed, 1 skipped / 20 passed |
 | M7 unit, scripts/r2, Gate C/D/export routes on SQLite | 517 passed, 4 skipped. `test_verify_m7_scope_git` fails only on the uncommitted tree; it was rerun after the commit. |
 | `ruff`, `basedpyright` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |
+
+## Round 5 follow-up: the complete outcome model
+
+The Codex review of M8-A, round 5 (`dc13cc93..96a84875`), confirmed R4-1 and accepted V2-02c. It raised two findings, both present before V2-02d:
+
+- **R5-1.** `projected_master_records` silently dropped an episode-video entry whose R2 metadata failed validation. A run could therefore exit 0 with an unbackfilled master.
+- **R5-2.** On a host without `ffprobe`, every valid master was reported `diverged` instead of the run failing as infrastructure.
+
+To stop finding outcome paths one review at a time, the model below was written before this follow-up's code. Every path of the command is listed here.
+
+| Level | Condition | Outcome |
+|---|---|---|
+| Run | `ffprobe` missing | exit 3 before any project is read or written; stderr names the tool |
+| Run | database failure | the exception aborts the run (infrastructure, not data) |
+| Project | the manifest cannot be read (any failure while reading project files) | `unreadable: [reason]`; the next project continues; exit 2 |
+| Artifact | a non-episode-video key | `skipped` (never a Gate C master) |
+| Artifact | episode-video R2 metadata that fails validation | `diverged`, logged |
+| Artifact | a head names another candidate | `diverged` |
+| Artifact | the selected version cannot be verified (the verification boundary) | `diverged`, logged |
+| Artifact | a head names the expected candidate and the verified digest matches | `current` |
+| Artifact | a head names the expected candidate, but the digests differ | `diverged` |
+| Artifact | no head; verified; registration and promotion succeed | `promoted` |
+| Artifact | no head; an M7 conflict or a file failure during registration | the transaction rolls back, then `diverged` |
+
+The exit status is 3 for a missing tool. It is 2 when any artifact is `diverged` or any project is `unreadable`. Otherwise it is 0.
+
+### Round 5 verification
+
+| Check | Result |
+|---|---|
+| `test_an_episode_master_whose_metadata_does_not_validate_is_reported` | old: the entry is omitted (SH01 not reported); new: exit 2, SH01 diverged, SH02 promoted |
+| `test_a_missing_media_probe_fails_the_run_before_any_write` | old: every master diverged; new: exit 3, `ffprobe` named on stderr, no summary, no head |
+| `test_an_unreadable_manifest_is_reported_and_exits_2` | old: the manifest error aborts the run; new: exit 2 with one `unreadable` reason |
+| `test_a_conflict_after_registration_rolls_the_candidate_back` | old and new: SH01 diverged and its registered candidate rolled back (a coverage test; round 5 noted the earlier test failed before any write) |
+| Backfill tests on SQLite | 11 passed, 1 skipped (the skip needs PostgreSQL) |
+| Backfill tests and the Gate C/D master authority routes on PG16 | 24 passed |
+| M7 unit, scripts/r2, Gate C/D/export routes and `tests/integration/server/services` on SQLite | 1171 passed, 5 skipped. `test_verify_m7_scope_git` fails only on the uncommitted tree; it was rerun after the commit. |
+| `ruff`, `basedpyright` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |
