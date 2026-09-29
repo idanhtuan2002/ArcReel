@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "base_head": "dc13cc93f4fb9a9bdfc05fc84dffda86d398e526",
+  "base_head": "50b82db6c531de006c12d12bacc3e689d52031cd",
   "accepted_m7_candidate_head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
   "branch": "impl/r2-m8a-exploration-promotion",
   "alembic_heads": [
@@ -116,6 +116,10 @@
       "sha256": "e94e32bf0b8a208df59b4cae9224b18d480d2263b1ab02ef32fce902c74c99c2"
     },
     {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_6_2026-09-29.json",
+      "sha256": "8ae6ab4ce4d7c3abec7e9a1e9470a35defdf7868367a3fe743211fc98a37b8d5"
+    },
+    {
       "path": "docs/r2/evidence/R2_V2_02B_GATE_C_SERIALIZATION_2026-09-29.md",
       "sha256": "4447bdff42f112eeb907598d56c750f4b4fff6d8b05ede2d3b3052b7838deef6"
     }
@@ -125,7 +129,7 @@
       "qualified_name": "r2.host_hardening.promotion:AtomicPromotionService.promote",
       "path": "r2/host_hardening/promotion.py",
       "signature": "(self, *, user_id: str, project_name: str, artifact_key: str, candidate_id: str, expected_master_version: int, approval_record: str, command_id: str) -> MasterHeadSnapshot",
-      "sha256": "8da45070aa7e831c8e67b097743ac18d0741979a864fbbf8fe30cf5d454174cb"
+      "sha256": "c8a36a06dbd5dce9f6e87ec7b8a3597923153ee77239ed549234ae94716d68e3"
     },
     {
       "qualified_name": "r2.host_hardening.master_resolver:DatabaseMasterResolver.get_exact",
