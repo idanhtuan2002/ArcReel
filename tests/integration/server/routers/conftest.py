@@ -39,3 +39,19 @@ async def gate_export_client(monkeypatch: pytest.MonkeyPatch, session_factory: F
     register_error_handlers(app)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
         yield http
+
+
+@pytest.fixture
+async def concurrent_gate_client(
+    monkeypatch: pytest.MonkeyPatch, concurrent_session_factory: Factory, project_dir: Path
+):
+    """The gates client on independent connections, so database locks act between requests."""
+    monkeypatch.setattr(gates, "async_session_factory", concurrent_session_factory)
+    monkeypatch.setattr(gates, "get_project_manager", lambda: GateProjectManager(project_dir.parent))
+    app = FastAPI()
+    app.dependency_overrides[get_current_user] = lambda: GATE_USER
+    app.include_router(gates.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
+    app.include_router(gates.self_auth_router, prefix="/api/v1")
+    register_error_handlers(app)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
+        yield http

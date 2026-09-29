@@ -164,9 +164,9 @@ A file written into `output/` by another tool under the same name also makes the
   the summary. Re-approve the artifact through Gate C, which writes a new head and its projection.
 - **A failed Gate C** that fails after the database promotion converges on a retry with the
   same `approval_record`.
-- **Overlapping approvals.** Gate C approvals of one artifact run one at a time. Each one
-  stages, promotes and projects before the next starts, so the later approval is the master and
-  its projection agrees.
+- **Overlapping approvals.** When two Gate C approvals of one artifact overlap, the newer
+  promotion becomes the master and is projected. An approval superseded before its projection
+  gets 409 `master_superseded`, writes nothing, and needs no further action.
 
 ## 5. Backup, restore and recovery
 

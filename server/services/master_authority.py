@@ -7,7 +7,7 @@ head stays the one authority and the file manifest stays its guarded projection.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Collection
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -155,11 +155,25 @@ def file_master_projection(project_dir: Path) -> FileMasterProjection:
     return FileMasterProjection(lambda _project, artifact_key: projected_masters(project_dir).get(artifact_key))
 
 
-async def verify_masters(session: AsyncSession, *, user_id: str, project_name: str, project_dir: Path) -> None:
-    """Raise ``MasterDivergedError`` if any of the project's masters disagrees with its projection."""
+async def verify_masters(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    project_name: str,
+    project_dir: Path,
+    artifact_keys: Collection[str] | None = None,
+) -> None:
+    """Raise ``MasterDivergedError`` if a master disagrees with its projection.
+
+    ``artifact_keys`` limits the check to the masters a request consumes; ``None`` checks all.
+    """
     authorities = MasterAuthorityRepository(session)
     database_keys = await authorities.list_current_keys(user_id=user_id, project_name=project_name)
     projected = await asyncio.to_thread(projected_masters, project_dir)
+    if artifact_keys is not None:
+        wanted = set(artifact_keys)
+        database_keys = [key for key in database_keys if key in wanted]
+        projected = {key: value for key, value in projected.items() if key in wanted}
     await verify_project_masters(
         user_id=user_id,
         project_name=project_name,

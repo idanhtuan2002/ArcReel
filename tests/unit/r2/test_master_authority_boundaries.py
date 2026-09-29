@@ -45,5 +45,5 @@ def test_the_manifest_master_is_approved_only_by_the_projection_step_and_the_off
 def test_the_gate_c_route_promotes_the_database_head_before_projecting() -> None:
     source = (_ROOT / "server" / "routers" / "gates.py").read_text(encoding="utf-8")
 
-    # ``host.approve`` runs inside ``_project``, which is called after the promotion.
-    assert source.index(".promote_staged(") < source.index("lambda: _project(registered)")
+    # ``host.approve`` runs inside ``_project_and_export``, which is called after the promotion.
+    assert source.index(".promote_staged(") < source.index("lambda: _project_and_export(registered)")

@@ -21,23 +21,27 @@ delegated the choice.
      registered through `prepare_candidate` (verify-in-place) and `CandidateObjectRepository`.
    - **Its id.** The M7 `candidate_id` is `m7c:` followed by the first 40 hex digits of
      `sha256(artifact_key + "\n" + generation_candidate_id)`.
-3. **Gate C.** The final-cut route runs one transaction per artifact that holds the artifact's
-   authority row write lock. It creates the row if absent, then rewrites it unchanged, which
-   takes the row lock on PostgreSQL and the database write lock on SQLite, across processes.
-   Inside the transaction it runs these steps in order:
-   1. stage the host version;
-   2. run the projection's checks;
-   3. register the candidate object and promote the master head, with `command_id` equal to
-      the route's operation id. The promotion writes its receipt and the promoted event;
-   4. project the file manifest through the existing `ProductionApprovalService`;
-   5. commit.
+3. **Gate C.** The final-cut route runs in two phases. Each phase holds the artifact's
+   authority row write lock for one transaction: a no-op rewrite of the row, which takes the
+   row lock on PostgreSQL and the database write lock on SQLite, across processes. The row is
+   created first if absent.
+   1. **Phase 1** stages the host version, runs the projection's checks, registers the
+      candidate object and promotes the master head, then commits. `command_id` is the route's
+      operation id. The promotion writes its receipt and the promoted event. Files never run
+      ahead of the database.
+   2. **Phase 2** runs only while the promoted candidate is still the head. It restores that
+      candidate's semantic state in the manifest, because a later stage whose promotion rolled
+      back may have overwritten it. It then projects the manifest master through
+      `ProductionApprovalService`, and writes the composite export copy.
 
-   No other approval of the artifact can interleave, so a later stage can never invalidate an
-   earlier promotion's projection. A failure at any step rolls the promotion back. The export
-   copy and the Gate C receipt follow the commit. A failure after the commit, or a commit that
-   fails after projecting, is retried by the same `approval_record`: the promotion replays or
-   is redone, and the projection is idempotent. (V2-02b replaced a two-transaction ordering
-   whose concurrent stages could leave a head without its projection.)
+   **Failures:**
+   - An approval superseded before phase 2 gets 409 `master_superseded` and writes nothing, so
+     neither the projection nor the export can go backwards.
+   - A failure in phase 2 is retried by the same `approval_record`: the promotion replays, and
+     the projection and export are idempotent.
+
+   Composite approvals first verify only the source shot masters they read. (V2-02b replaced an
+   ordering whose concurrent stages could leave a head without its projection.)
 4. **Projection and reads.**
    - `FileMasterProjection` implements `LegacyMasterProjection` from the manifest's
      `approved_master`, mapped through the same candidate-id function.

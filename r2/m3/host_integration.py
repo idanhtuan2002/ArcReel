@@ -350,6 +350,36 @@ class GoldenAHostIntegration:
             raise KeyError(f"{target_ref} has no host version {host_version_ref}")
         return record
 
+    def restore_semantic_state(
+        self,
+        *,
+        target_ref: str,
+        content_fingerprint: str,
+        content_basis: ContentBasis,
+        direct_dependencies: Sequence[DependencySnapshot],
+        contract_version: int,
+        contract_schema_version: str,
+        contract_type: str = "ShotSpec",
+    ) -> None:
+        """Make the manifest's semantic state the given candidate's again, keeping its approved master.
+
+        A later stage of the same artifact overwrites this state; the projection of a promoted
+        candidate restores it first, so a stage whose promotion was rolled back cannot refuse it.
+        """
+        self._ensure_manifest_entry(
+            artifact_key=self.artifact_key_for(target_ref),
+            metadata=self._metadata(
+                target_ref=target_ref,
+                content_fingerprint=content_fingerprint,
+                content_basis=content_basis,
+                direct_dependencies=direct_dependencies,
+                contract_version=contract_version,
+                contract_schema_version=contract_schema_version,
+                contract_type=contract_type,
+            ),
+            target_ref=target_ref,
+        )
+
     def check_approvable(self, registered: RegisteredGoldenACandidate) -> None:
         """Raise ``KeyError``/``ValueError`` if ``approve`` would refuse ``registered`` now."""
         ProductionApprovalService(self._port(registered.candidate.target_ref)).check(

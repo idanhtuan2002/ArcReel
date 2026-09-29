@@ -17,6 +17,7 @@ from lib.db.models.host_hardening import MasterHeadVersionModel, ProjectEventMod
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from r2.host_hardening.master_authority import m7_candidate_id
 from r2.m3.host_integration import GoldenAHostIntegration
+from server.routers import gates
 from server.services.master_authority import master_authority_unit, projected_masters, verify_masters
 from tests.integration.server.routers.test_gates_export import (
     PROJECT,
@@ -148,25 +149,70 @@ async def test_a_refused_projection_check_writes_no_database_head(
     assert await _count(session_factory, MasterHeadVersionModel) == 0
 
 
-async def test_a_projection_refused_after_promotion_rolls_the_promotion_back(
+async def test_a_projection_refused_after_the_commit_asks_for_a_retry_that_converges(
     gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def refuse(self, *args, **kwargs):
-        raise ValueError("candidate content_fingerprint does not match current semantic state")
+    real_approve = GoldenAHostIntegration.approve
+    calls = {"n": 0}
 
-    monkeypatch.setattr(GoldenAHostIntegration, "approve", refuse)
+    def refuse_once(self, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ValueError("candidate content_fingerprint does not match current semantic state")
+        return real_approve(self, *args, **kwargs)
+
+    monkeypatch.setattr(GoldenAHostIntegration, "approve", refuse_once)
     data = _media(b"shot one")
     (project_dir / "production" / "SH01.mp4").write_bytes(data)
+    body = _body("SH01", data)
 
-    response = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=_body("SH01", data))
+    refused = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=body)
+    retried = await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=body)
 
-    assert response.status_code == 409
-    assert "master_conflict" in response.text
-    assert await _count(session_factory, MasterHeadVersionModel) == 0
+    assert refused.status_code == 503
+    assert "GATE_C_RETRY_SAME_APPROVAL_RECORD" in refused.text
+    assert retried.status_code == 200, retried.text
+    assert await _count(session_factory, MasterHeadVersionModel) == 1
+    async with session_factory() as session:
+        await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
+
+
+async def test_an_approval_superseded_before_its_projection_writes_nothing(
+    concurrent_gate_client: AsyncClient,
+    project_dir: Path,
+    concurrent_session_factory: Factory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sources = [await _approve_shot(concurrent_gate_client, project_dir, "SH01", b"shot one")]
+    older, newer = _media(b"older final"), _media(b"newer final")
+    real_project_if_current = gates.project_if_current
+    injected = {"done": False}
+
+    async def newer_approval_first(*args, **kwargs):
+        # Between the older approval's promotion and its projection, a newer one runs completely.
+        if not injected["done"] and (project_dir / "production" / "FINAL.mp4").read_bytes() == older:
+            injected["done"] = True
+            response = await _approve_final(concurrent_gate_client, project_dir, newer, sources)
+            assert response.status_code == 200, response.text
+        return await real_project_if_current(*args, **kwargs)
+
+    monkeypatch.setattr(gates, "project_if_current", newer_approval_first)
+
+    stale = await _approve_final(concurrent_gate_client, project_dir, older, sources)
+
+    assert injected["done"]
+    assert stale.status_code == 409
+    assert "master_superseded" in stale.text
+    assert (project_dir / "output" / "ep1-FINAL.mp4").read_bytes() == newer
+    async with concurrent_session_factory() as session:
+        await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
 
 
 async def test_overlapping_gate_c_approvals_of_one_artifact_end_consistent(
-    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+    concurrent_gate_client: AsyncClient,
+    project_dir: Path,
+    concurrent_session_factory: Factory,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     real_stage = GoldenAHostIntegration.stage_candidate
 
@@ -183,15 +229,19 @@ async def test_overlapping_gate_c_approvals_of_one_artifact_end_consistent(
         produced = body["produced"]
         assert isinstance(produced, dict)
         produced["relative_path"] = name
-        return await gate_export_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=body)
+        return await concurrent_gate_client.post(f"/api/v1/projects/{PROJECT}/gates/final-cut", json=body)
 
     for round_ in range(3):
         responses = await asyncio.gather(
             approve(_media(b"shot one %d" % round_)), approve(_media(b"shot one again %d" % round_))
         )
 
-        # Serialized per artifact: both approvals succeed, the later one is the master, and the
-        # database head and its projection agree.
-        assert [r.status_code for r in responses] == [200, 200], [r.text for r in responses]
-        async with session_factory() as session:
+        # The newest promotion wins; an approval superseded before its projection writes nothing.
+        # Either way the database head and its projection agree.
+        assert 200 in [r.status_code for r in responses], [r.text for r in responses]
+        for response in responses:
+            assert response.status_code == 200 or (
+                response.status_code == 409 and "master_superseded" in response.text
+            ), response.text
+        async with concurrent_session_factory() as session:
             await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)

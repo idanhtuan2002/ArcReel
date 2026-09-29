@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import BinaryIO, Literal
@@ -56,7 +56,7 @@ from r2.contracts.gates import (
     PublishApprovalDecision,
     ScriptLockDecision,
 )
-from r2.host_hardening.master_authority import CandidateObjectConflictError, MasterDivergedError
+from r2.host_hardening.master_authority import CandidateObjectConflictError, MasterDivergedError, m7_candidate_id
 from r2.host_hardening.promotion import (
     CandidateArtifactMismatchError,
     PromotionExpectedVersionConflictError,
@@ -78,7 +78,13 @@ from r2.m3.host_integration import GoldenAHostIntegration, StagedOperationConfli
 from r2.m3.render_plan import RenderedCutAsset
 from r2.production.artifact_metadata import DependencySnapshot
 from server.auth import DOWNLOAD_TOKEN_EXPIRY_SECONDS, CurrentUser, create_download_token, verify_download_token
-from server.services.master_authority import master_authority_unit, serialized_artifact, verify_masters
+from server.services.master_authority import (
+    MasterSupersededError,
+    master_authority_unit,
+    project_if_current,
+    serialized_artifact,
+    verify_masters,
+)
 
 router = APIRouter()
 # Token-authenticated like the project ZIP export (ADR-0071): registered without the session dependency.
@@ -231,11 +237,19 @@ _MASTER_CONFLICTS = (
 )
 
 
-async def _require_consistent_masters(user_id: str, project_name: str, project_dir) -> None:
-    """Refuse a master-consuming request while any master disagrees with its projection (ADR-0096)."""
+async def _require_consistent_masters(
+    user_id: str, project_name: str, project_dir, artifact_keys: Collection[str] | None = None
+) -> None:
+    """Refuse a master-consuming request while a master it reads disagrees with its projection (ADR-0096)."""
     try:
         async with async_session_factory() as session:
-            await verify_masters(session, user_id=user_id, project_name=project_name, project_dir=project_dir)
+            await verify_masters(
+                session,
+                user_id=user_id,
+                project_name=project_name,
+                project_dir=project_dir,
+                artifact_keys=artifact_keys,
+            )
     except MasterDivergedError as exc:
         raise HTTPException(status_code=409, detail=f"master_diverged: {exc}") from exc
 
@@ -305,12 +319,21 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             )
 
     if composite:
-        await _require_consistent_masters(user.id, project_name, project_dir)
+        # A composite reads its source shot masters, so those are the ones that must agree.
+        source_keys = [
+            host.artifact_key_for(ref.partition(":")[0])
+            for ref in req.produced.source_master_refs
+            if ref.partition(":")[0]
+        ]
+        await _require_consistent_masters(user.id, project_name, project_dir, source_keys)
+
+    staged_dependencies: list[DependencySnapshot] = []
 
     def _stage():
         dependencies = (
             composite_dependencies(host, req.produced.source_master_refs) if composite else req.direct_dependencies
         )
+        staged_dependencies[:] = list(dependencies)
         return host.stage_candidate(
             target_ref=req.target_ref,
             content_fingerprint=req.content_fingerprint,
@@ -324,21 +347,31 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             request_digest=request_digest,
         )
 
-    def _project(registered):
-        return host.approve(
+    def _project_and_export(registered):
+        # The promoted candidate defines the artifact's semantic state; a later stage whose
+        # promotion was rolled back may have overwritten it.
+        host.restore_semantic_state(
+            target_ref=req.target_ref,
+            content_fingerprint=req.content_fingerprint,
+            content_basis=req.content_basis,
+            direct_dependencies=staged_dependencies,
+            contract_version=req.contract_version,
+            contract_schema_version=req.contract_schema_version,
+            contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
+        )
+        approved = host.approve(
             registered,
             approval_record=req.approval_record,
             selected_by=user.sub,
             selected_at=datetime.now(UTC),
         )
-
-    def _export():
         try:
-            return write_export_copy(host, req.target_ref) if composite else None
+            export = write_export_copy(host, req.target_ref) if composite else None
         except Exception as exc:
             raise PostApprovalExportError("approved final requires export reconciliation") from exc
+        return approved, export
 
-    async def _stage_promote_project(session):
+    async def _stage_and_promote(session):
         try:
             registered = await run_noninterruptible_sync(_stage)
         except SourceMasterMismatchError as exc:
@@ -346,8 +379,7 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         except StagedOperationConflictError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-        # The database master head is the authority (ADR-0096); the manifest master is its
-        # projection. Every check the projection makes runs first, against the staged output.
+        # Every check the projection makes runs first, against the staged output.
         def _approvable_version():
             host.check_approvable(registered)
             return host.staged_version(req.target_ref, registered.host_version_ref)
@@ -370,25 +402,32 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             )
         except _MASTER_CONFLICTS as exc:
             raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
-        try:
-            return await run_noninterruptible_sync(lambda: _project(registered))
-        except (KeyError, ValueError) as exc:
-            # Refused projections roll the promotion back with the rest of the transaction.
-            raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
+        return registered
 
     project_root = await run_noninterruptible_sync(project_dir.resolve)
-    # One transaction holds the artifact's row lock across stage, check, promotion and projection,
-    # so no other approval of the artifact interleaves and the projection commits with its head.
+    artifact_key = host.artifact_key_for(req.target_ref)
+    # The database master head is the authority (ADR-0096). Phase 1 stages, checks and promotes in
+    # one transaction under the artifact's row lock, and commits: files never run ahead of it.
     async with serialized_artifact(
-        async_session_factory,
-        user_id=user.id,
-        project_name=project_name,
-        artifact_key=host.artifact_key_for(req.target_ref),
+        async_session_factory, user_id=user.id, project_name=project_name, artifact_key=artifact_key
     ) as session:
-        approved_master = await _stage_promote_project(session)
+        registered = await _stage_and_promote(session)
+    # Phase 2 projects and exports under the row lock again, only while this candidate is the head,
+    # so an older approval can never overwrite a newer projection or export.
     try:
-        export = await run_noninterruptible_sync(_export)
-    except PostApprovalExportError as exc:
+        async with async_session_factory() as session:
+            approved_master, export = await project_if_current(
+                session,
+                user_id=user.id,
+                project_name=project_name,
+                artifact_key=artifact_key,
+                candidate_id=m7_candidate_id(artifact_key, registered.candidate.id),
+                project=lambda: run_noninterruptible_sync(lambda: _project_and_export(registered)),
+            )
+    except MasterSupersededError as exc:
+        raise HTTPException(status_code=409, detail=f"master_superseded: {exc}") from exc
+    except (PostApprovalExportError, KeyError, ValueError) as exc:
+        # The head is committed; retrying the same approval_record projects and exports it.
         raise _gate_c_retry_error(req.approval_record) from exc
 
     receipt = FinalCutReceipt(
