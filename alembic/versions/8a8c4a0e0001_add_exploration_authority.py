@@ -2,7 +2,7 @@
 
 Six append-only M8 evidence tables: candidate heads and revisions, command receipts, promotion
 previews, authorizations and receipts. No cascade deletion from any evidence table, including the
-``users.id`` owner key (``RESTRICT``). Candidate and revision keys carry ``(user_id, project_name)``.
+``users.id`` owner key (``RESTRICT``). Candidate, revision and preview references carry ``(user_id, project_name)``.
 Downgrade removes only these six tables, in reverse dependency order.
 
 Revision ID: 8a8c4a0e0001
@@ -147,6 +147,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("preview_id", name="pk_m8_promotion_previews"),
         sa.UniqueConstraint("user_id", "project_name", "preview_command_id", name="uq_m8_promotion_previews_command"),
+        sa.UniqueConstraint("user_id", "project_name", "preview_id", name="uq_m8_promotion_previews_scope"),
     )
     with op.batch_alter_table("m8_promotion_previews", schema=None) as batch_op:
         batch_op.create_index("ix_m8_promotion_previews_expiry", ["expires_at"], unique=False)
@@ -166,7 +167,13 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(), server_default="default", nullable=False),
         sa.CheckConstraint("decision = 'APPROVE'", name="ck_m8_promotion_authorizations_decision"),
         sa.ForeignKeyConstraint(
-            ["preview_id"], ["m8_promotion_previews.preview_id"], name="fk_m8_promotion_authorizations_preview"
+            ["user_id", "project_name", "preview_id"],
+            [
+                "m8_promotion_previews.user_id",
+                "m8_promotion_previews.project_name",
+                "m8_promotion_previews.preview_id",
+            ],
+            name="fk_m8_promotion_authorizations_preview",
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("user_id", "project_name", "command_id", name="pk_m8_promotion_authorizations"),
@@ -210,7 +217,13 @@ def upgrade() -> None:
             name="fk_m8_promotion_receipts_revision",
         ),
         sa.ForeignKeyConstraint(
-            ["preview_id"], ["m8_promotion_previews.preview_id"], name="fk_m8_promotion_receipts_preview"
+            ["user_id", "project_name", "preview_id"],
+            [
+                "m8_promotion_previews.user_id",
+                "m8_promotion_previews.project_name",
+                "m8_promotion_previews.preview_id",
+            ],
+            name="fk_m8_promotion_receipts_preview",
         ),
         sa.ForeignKeyConstraint(
             ["user_id", "project_name", "command_id"],

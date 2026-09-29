@@ -4,8 +4,8 @@ previews, authorizations and receipts (plan 2026-09-13 M8-A fixed persistence ma
 Evidence rows are append-only and are never cascade-deleted, not even with their owner: the
 ``users.id`` foreign key is ``RESTRICT``, not the ``UserOwnedMixin`` ``CASCADE``. Only the candidate
 head row is mutable, through an explicit ``head_version`` compare-and-set. A candidate's identity is
-``(user_id, project_name, candidate_id)``; every reference to a candidate or revision carries that
-scope, so the same ID in two scopes names two independent candidates. Canonical bytes and digests,
+``(user_id, project_name, candidate_id)``; every reference to a candidate, revision or preview carries
+that scope, so the same ID in two scopes names two independent candidates. Canonical bytes and digests,
 not database JSON ordering, are the hash authority.
 """
 
@@ -117,6 +117,7 @@ class M8PromotionPreviewModel(_EvidenceOwner, Base):
     __table_args__ = (
         PrimaryKeyConstraint("preview_id", name="pk_m8_promotion_previews"),
         UniqueConstraint("user_id", "project_name", "preview_command_id", name="uq_m8_promotion_previews_command"),
+        UniqueConstraint("user_id", "project_name", "preview_id", name="uq_m8_promotion_previews_scope"),
         ForeignKeyConstraint(
             ["user_id", "project_name", "candidate_id", "candidate_revision"],
             [
@@ -166,7 +167,13 @@ class M8PromotionAuthorizationModel(_EvidenceOwner, Base):
             "user_id", "project_name", "authorization_digest", name="uq_m8_promotion_authorizations_digest"
         ),
         ForeignKeyConstraint(
-            ["preview_id"], ["m8_promotion_previews.preview_id"], name="fk_m8_promotion_authorizations_preview"
+            ["user_id", "project_name", "preview_id"],
+            [
+                "m8_promotion_previews.user_id",
+                "m8_promotion_previews.project_name",
+                "m8_promotion_previews.preview_id",
+            ],
+            name="fk_m8_promotion_authorizations_preview",
         ),
         CheckConstraint("decision = 'APPROVE'", name="ck_m8_promotion_authorizations_decision"),
     )
@@ -188,7 +195,13 @@ class M8PromotionReceiptModel(_EvidenceOwner, Base):
         PrimaryKeyConstraint("receipt_id", name="pk_m8_promotion_receipts"),
         UniqueConstraint("user_id", "project_name", "command_id", name="uq_m8_promotion_receipts_command"),
         ForeignKeyConstraint(
-            ["preview_id"], ["m8_promotion_previews.preview_id"], name="fk_m8_promotion_receipts_preview"
+            ["user_id", "project_name", "preview_id"],
+            [
+                "m8_promotion_previews.user_id",
+                "m8_promotion_previews.project_name",
+                "m8_promotion_previews.preview_id",
+            ],
+            name="fk_m8_promotion_receipts_preview",
         ),
         ForeignKeyConstraint(
             ["user_id", "project_name", "candidate_id", "candidate_revision"],

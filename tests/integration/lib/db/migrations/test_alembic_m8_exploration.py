@@ -42,6 +42,7 @@ EXPECTED_NAMES = {
         "ck_m8_promotion_previews_ttl",
         "ck_m8_promotion_previews_master_coupling",
         "ix_m8_promotion_previews_expiry",
+        "uq_m8_promotion_previews_scope",
     },
     "m8_promotion_authorizations": {
         "pk_m8_promotion_authorizations",
@@ -155,6 +156,14 @@ def test_keys_are_scoped_match_the_orm_and_never_cascade(alembic_cfg: tuple[Conf
     )
     assert revision_ref in _reflected_keys(inspector, "m8_promotion_previews")[1]
     assert revision_ref in _reflected_keys(inspector, "m8_promotion_receipts")[1]
+    preview_ref = (
+        ("user_id", "project_name", "preview_id"),
+        "m8_promotion_previews",
+        ("user_id", "project_name", "preview_id"),
+        "NO ACTION",
+    )
+    assert preview_ref in _reflected_keys(inspector, "m8_promotion_authorizations")[1]
+    assert preview_ref in _reflected_keys(inspector, "m8_promotion_receipts")[1]
 
 
 def test_downgrade_removes_only_the_m8_tables(alembic_cfg: tuple[Config, Path]) -> None:

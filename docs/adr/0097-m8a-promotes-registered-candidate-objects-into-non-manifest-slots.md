@@ -149,7 +149,9 @@ The rules below were written before the fixes. Each has a test that fails withou
    would return 409 where an unknown ID returns 200. The spec prevails over the plan's
    persistence map. The candidate head and revision keys are
    `(user_id, project_name, candidate_id[, revision])`. The previews and receipts that
-   reference them use the same composite key. The same ID in two scopes names two
+   reference them use the same composite key. Authorizations and receipts reference their
+   preview by `(user_id, project_name, preview_id)` (review round 2), so the database refuses
+   evidence that binds a preview from another scope. The same ID in two scopes names two
    independent candidates.
 4. **Evidence survives user deletion.** The plan says "Do not add cascade deletion from any
    evidence table". Every M8 table's `users.id` foreign key is `ON DELETE RESTRICT`, not the

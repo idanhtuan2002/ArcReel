@@ -7,9 +7,15 @@ from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.db.models.advanced_creative import M8CandidateRevisionModel, M8CommandReceiptModel
+from lib.db.models.advanced_creative import (
+    M8CandidateRevisionModel,
+    M8CommandReceiptModel,
+    M8PromotionAuthorizationModel,
+    M8PromotionPreviewModel,
+)
 from lib.db.repositories.advanced_creative import ExplorationRepository
 from r2.advanced_creative.digests import digest_payload
 from r2.advanced_creative.errors import CandidateConflictError, CommandConflictError, ExplorationNotFoundError
@@ -240,3 +246,60 @@ async def test_concurrent_replays_of_one_command_write_once(session_factory: Fac
 
     assert all(isinstance(result, CandidateHead) for result in results), results
     assert await _count(session_factory, M8CandidateRevisionModel) == 2
+
+
+async def test_the_database_refuses_an_authorization_bound_to_a_preview_of_another_scope(
+    session_factory: Factory,
+) -> None:
+    async with session_factory() as probe:
+        if probe.get_bind().dialect.name != "postgresql":
+            pytest.skip("SQLite test databases do not enforce foreign keys")
+    await _append(session_factory, _revision(1), None, "cmd-1")
+    async with session_factory() as session:
+        session.add(
+            M8PromotionPreviewModel(
+                user_id=USER,
+                project_name=PROJECT,
+                preview_id="preview-1",
+                preview_command_id="preview-cmd-1",
+                candidate_id=CANDIDATE,
+                candidate_revision=1,
+                candidate_payload_digest=DIGEST,
+                target_kind="PRODUCTION_BINDING",
+                target_ref="binding-1",
+                expected_target_version=0,
+                expected_master_id=None,
+                expected_master_digest=None,
+                impact_json={},
+                impact_digest=DIGEST,
+                preview_digest=DIGEST,
+                authorization_scope=USER,
+                issued_at=NOW,
+                expires_at=NOW,
+                ttl_seconds=60,
+            )
+        )
+        await session.commit()
+
+    def authorization(project_name: str) -> M8PromotionAuthorizationModel:
+        return M8PromotionAuthorizationModel(
+            user_id=USER,
+            project_name=project_name,
+            command_id="auth-1",
+            preview_id="preview-1",
+            preview_digest=DIGEST,
+            actor_id=USER,
+            actor_scope=USER,
+            decision="APPROVE",
+            authorized_at=NOW,
+            authorization_digest=DIGEST,
+        )
+
+    async with session_factory() as session:
+        session.add(authorization("other"))
+        with pytest.raises(IntegrityError):
+            await session.commit()
+    async with session_factory() as session:
+        session.add(authorization(PROJECT))
+        await session.commit()
+    assert await _count(session_factory, M8PromotionAuthorizationModel) == 1
