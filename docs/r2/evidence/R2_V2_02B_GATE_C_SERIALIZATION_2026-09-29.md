@@ -311,3 +311,79 @@ Graph status and coverage calls were approval-blocked; structural conclusions us
 - The PG16 unit, Gate and backfill suites: 40 passed.
 - The broad SQLite suites: 1254 passed, 2 skipped.
 - Static gates: clean.
+
+---
+
+# Codex review 5 (job `task-mumd0tbz-2tx20e`, reviewed HEAD `71e28616`), verbatim
+
+## 1. HEAD reviewed
+
+`71e28616991a2a920a1da33e3d7d724a1fb4080b` on `fix/r2-v2-02b-serialize-gate-c`; clean worktree. I reviewed the fix range `6697e065..71e28616` and whole packet `cca1eeaf..71e28616`.
+
+## 2. Verdict
+
+**CHANGES_REQUIRED.** The new comparison closes the reported race *during* the deliverable read, but Gate D can still record an approval after the second check becomes stale.
+
+## 3. Per-finding status
+
+| Finding | Status | Evidence |
+|---|---|---|
+| Gate D, listing, or download reads across a head change | **PARTIALLY_FIXED** | [_stable_read](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:257) compares heads before and after the read and returns 409 on change. The forced Gate D test at [test_gates_master_authority.py:307](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:307) asserts no decision was inserted. The post-check decision gap remains. |
+| Crash leaves a committed head unprojected | **PARTIALLY_FIXED** | Phase 1 commits before projection at [gates.py:431](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:431). Readers fail closed while the head and projection disagree; [the runbook](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/docs/r2/runbooks/v1-operator.md:165) requires retry or re-approval. The injected failure and retry test is at [test_gates_master_authority.py:152](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:152). Recovery is not automatic. |
+| Timed overlap test | **PARTIALLY_FIXED** | Forced supersession and the new forced read interleaving are covered at [test_gates_master_authority.py:180](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:180) and [307](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:307). The separate overlap test still relies on sleep at [219](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:219); neither forced test covers the gaps below. |
+
+## 4. New findings
+
+| Severity | File:line | Scenario | Confidence |
+|---|---|---|---|
+| **High** | [gates.py:499](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:499), [519](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:519) | Gate D finishes both checks for final A. A concurrent Gate C commits a new source-shot head before `PublishApprovalRepository.append` commits. Gate D then records `APPROVE_PUBLISH` for A although A is stale. The decision insert has no head comparison or lock; the new test moves the head *inside* `_stable_read`, not in this gap. | High, source-derived; interleaving not executed |
+| **Medium** | [gates.py:345](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:345), [349](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:349) | Composite Gate C checks source heads before entering its final-artifact lock. A source Gate C can then commit a new DB head while its old file projection remains. `composite_dependencies` can read that old projection and the final approval can promote against stale source refs. Subsequent Gate D checks fail closed once they observe divergence or the new projection, but Gate C can report approval for a final already stale at promotion. | Medium, source-derived; interleaving not executed |
+
+The `master_version` comparison prevents a normal ABA promotion: each promotion increments it at [promotion.py:135](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/host_hardening/promotion.py:135), even if the candidate ID returns to an earlier value. Download streaming uses the verified temporary snapshot at [deliverables.py:345](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/deliverables.py:345) and [gates.py:603](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:603), so a later export replacement does not change its bytes. I found no additional V1 Gate C/D/O2a regression by inspection.
+
+## 5. Commands run
+
+`git status`, `git rev-parse HEAD`, both requested `git diff` ranges, targeted numbered source and test reads, `git diff --check`, and:
+
+```text
+TMPDIR=/tmp timeout 120s .venv/bin/python -m pytest -q -p no:cacheprovider \
+  tests/integration/server/routers/test_gates_master_authority.py \
+  tests/unit/r2/production/test_approval_service.py
+```
+
+Pytest stopped **before collection**: `FileNotFoundError: No usable temporary directory`. There is no fresh test result from this review.
+
+## 6. Coverage limits
+
+Codebase-memory search and status calls were approval blocked, so structural conclusions use direct source inspection. The two new interleavings, crash recovery, and PostgreSQL concurrency were not executed. Referenced tests are inspected test code, not tests passed in this review.
+
+## 7. Review record
+
+```json
+{"schema_version":1,"status":"V2_02B_NOT_ACCEPTED","reviewed_head":"71e28616991a2a920a1da33e3d7d724a1fb4080b","reviewer":"codex","reviewed_at":"2026-09-29T07:35:04Z","required_skips":["Targeted pytest stopped before collection: no usable temporary directory in the read-only sandbox"],"material_unknowns":["Post-check Gate D decision interleaving was not fault-injected","Composite source-head interleaving was not fault-injected","Crash recovery and PostgreSQL concurrency were not executed","Code-graph search and coverage were approval blocked"]}
+```
+
+## Resolution — `465cbc11`
+
+**Principle:** every write that depends on master heads runs in one transaction that holds
+those heads' row write locks. `serialized_artifacts` locks them in sorted key order, and the
+write is made only if the heads are unchanged. Gate C holds one row per phase (or the final plus
+its sources, sorted), so no multi-row holders form a cycle and there is no deadlock.
+
+| Finding | Fix | Test |
+|---|---|---|
+| High: a Gate D decision after a stale second check | The decision commits inside `_locked_to_heads(heads)`: the row locks of the heads it read, re-verified in the same transaction, with 409 `master_moving` if they changed | `test_a_head_committed_after_gate_d_read_refuses_the_decision` injects a consistent source Gate C just before the decision lock. It fails with the in-lock comparison disabled (verified) |
+| Medium: a composite checks its sources before its lock | Phase 1 locks the final and its source shots (`serialized_artifacts([final, *sources])`) and runs `verify_masters(..., artifact_keys=sources)` inside | `test_a_composite_holds_its_source_shots_while_it_stages_and_promotes`: a source Gate C started while the final stages is still waiting 1.5 s later. It fails on PostgreSQL with the source locks removed (verified); SQLite serializes all writers anyway |
+
+**Verification at `465cbc11`:**
+
+- `test_gates_master_authority.py`: 12 passed on SQLite and 12 passed on PG16. PG16 ran it twice before the final seam change, both passing.
+- The PG16 unit, Gate and backfill suites: 40 passed.
+- The broad SQLite suites: 1256 passed, 2 skipped.
+- Static gates, including `audit_tests`: clean.
+
+**Remaining by design:**
+
+- **Listing and download** return data verified between two checks. They do not write, so a
+  head that moves after the second check makes their answer historical, not inconsistent.
+- **Crash recovery** after phase 1 is fail-closed, with a retry or re-approval.
