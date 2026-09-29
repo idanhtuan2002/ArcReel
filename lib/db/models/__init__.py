@@ -15,6 +15,14 @@ from lib.db.models.adaptation import (
     AdaptationScreenplayProfileAnalysisRefModel,
     AdaptationScreenplaySceneModel,
 )
+from lib.db.models.advanced_creative import (
+    M8CandidateHeadModel,
+    M8CandidateRevisionModel,
+    M8CommandReceiptModel,
+    M8PromotionAuthorizationModel,
+    M8PromotionPreviewModel,
+    M8PromotionReceiptModel,
+)
 from lib.db.models.agent_credential import AgentAnthropicCredential
 from lib.db.models.api_call import ApiCall
 from lib.db.models.api_key import ApiKey
@@ -101,6 +109,12 @@ __all__ = [
     "FinalCutReceiptModel",
     "GenerationBatch",
     "GreenlightDecisionModel",
+    "M8CandidateHeadModel",
+    "M8CandidateRevisionModel",
+    "M8CommandReceiptModel",
+    "M8PromotionAuthorizationModel",
+    "M8PromotionPreviewModel",
+    "M8PromotionReceiptModel",
     "MasterAuthorityModel",
     "MasterHeadVersionModel",
     "NarrativeChangeSetModel",
