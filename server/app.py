@@ -50,6 +50,7 @@ from server.error_handlers import register_error_handlers
 from server.remote_mcp import remote_mcp_host
 from server.routers import (
     admission,
+    advanced_creative,
     agent_config,
     agent_memory,
     api_keys,
@@ -645,6 +646,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["内容确认"],
+)
+app.include_router(
+    advanced_creative.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["M8 exploration"],
 )
 app.include_router(
     shot_uploads.router,

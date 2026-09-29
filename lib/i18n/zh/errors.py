@@ -407,4 +407,9 @@ MESSAGES = {
     "memory_invalid_filename": "记忆文件名 '{filename}' 非法：只允许目录顶层的 .md 文件",
     "memory_file_not_found": "记忆文件 '{filename}' 不存在",
     "memory_file_too_large": "记忆文件 '{filename}' 超出大小限制（最大 {limit_kib} KiB）",
+    "m8_exploration_not_found": "未找到该探索项",
+    "m8_command_conflict": "该命令 ID 已用于其他请求",
+    "m8_candidate_conflict": "候选已变更，请重新加载后重试",
+    "m8_promotion_binding_stale": "预览已过期或失效，请重新生成预览",
+    "m8_promotion_target_unavailable": "该提升目标暂不可用",
 }

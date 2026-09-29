@@ -459,4 +459,9 @@ MESSAGES = {
     "memory_invalid_filename": "Tên tệp ký ức '{filename}' không hợp lệ: chỉ cho phép tệp .md ở thư mục gốc",
     "memory_file_not_found": "Tệp ký ức '{filename}' không tồn tại",
     "memory_file_too_large": "Tệp ký ức '{filename}' vượt quá giới hạn kích thước (tối đa {limit_kib} KiB)",
+    "m8_exploration_not_found": "Không tìm thấy mục khám phá này",
+    "m8_command_conflict": "Mã lệnh này đã được dùng cho một yêu cầu khác",
+    "m8_candidate_conflict": "Candidate đã thay đổi; hãy tải lại rồi thử lại",
+    "m8_promotion_binding_stale": "Bản xem trước đã cũ hoặc hết hạn; hãy tạo bản xem trước mới",
+    "m8_promotion_target_unavailable": "Đích promote này hiện không khả dụng",
 }

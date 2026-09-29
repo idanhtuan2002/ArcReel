@@ -459,4 +459,9 @@ MESSAGES = {
     "memory_invalid_filename": "Invalid memory file name '{filename}': only top-level .md files are allowed",
     "memory_file_not_found": "Memory file '{filename}' does not exist",
     "memory_file_too_large": "Memory file '{filename}' exceeds the size limit (max {limit_kib} KiB)",
+    "m8_exploration_not_found": "This exploration item was not found",
+    "m8_command_conflict": "This command ID was already used for a different request",
+    "m8_candidate_conflict": "The candidate changed; reload it and try again",
+    "m8_promotion_binding_stale": "The preview is out of date or expired; create a new preview",
+    "m8_promotion_target_unavailable": "This promotion target is not available",
 }
