@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_5_2026-09-29.json"
+  ],
+  "reason": "The independent Codex review of M8-A (dc13cc93..21821568) found that AtomicPromotionService appended the head version before taking the master_authorities row lock, the reverse of the V2-02b row-lock holders and the M8 slot authority. On PostgreSQL, such a holder and an unserialized promotion of the same slot deadlock. The fix belongs to M7, which owns the promotion: V2-02c (34bd4346). M8-A is re-based onto it.",
+  "m7_prerequisite_changes": {
+    "executor_base": "the commit that adds this sixth amendment",
+    "intermediate_commits": "As amendment 5, plus V2-02c (34bd4346), which changes only r2/host_hardening/promotion.py, the MasterAuthorityRepository docstring, their tests and its evidence.",
+    "packets_added": [
+      {
+        "packet": "V2-02c M7 promotion lock order",
+        "evidence": "docs/r2/evidence/R2_V2_02C_M7_LOCK_ORDER_2026-09-29.md",
+        "head": "34bd4346",
+        "status": "REVIEW_BUNDLED_WITH_M8_A_ROUND_2",
+        "acceptance_rule": "M8-A is not accepted unless its round-2 independent review, whose range starts at dc13cc93, also accepts V2-02c."
+      }
+    ]
+  },
+  "packet_overrides": {
+    "M8-A": {
+      "rebase": "The M8-A commits on dc13cc93 are re-applied onto this executor base. The baseline is re-frozen with base_head = this commit; the AtomicPromotionService.promote seam hash changes.",
+      "lock_protocol": "Unchanged from amendment 5. In addition, every same-slot writer takes the master_authorities row before any master_head_versions row."
+    }
+  },
+  "created_at": "2026-09-29"
+}
