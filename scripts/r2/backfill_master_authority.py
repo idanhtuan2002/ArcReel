@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -44,9 +45,16 @@ from r2.m3.host_integration import GoldenAHostIntegration
 from r2.production import ApprovedMasterMetadata
 from server.services.master_authority import master_authority_unit, projected_master_records, serialized_artifact
 
+logger = logging.getLogger(__name__)
+
+
+class _UnverifiableVersionError(Exception):
+    """The selected version's file failed while the candidate was being registered."""
+
+
 _DIVERGENT_PROMOTION = (
     CandidateStoreError,
-    FileNotFoundError,
+    _UnverifiableVersionError,
     CandidateObjectConflictError,
     CandidateIdentityConflictError,
     MasterHeadConflictError,
@@ -74,8 +82,6 @@ async def backfill_project(*, user_id: str, project_name: str, project_dir: Path
             summary["skipped"].append(artifact_key)
             continue
         expected = m7_candidate_id(artifact_key, record.selected_candidate_id)
-        episode, target_ref = int(key.components[0]), str(key.components[1])
-        host = GoldenAHostIntegration(project_dir, resource_type="videos", episode=episode)
         try:
             async with serialized_artifact(
                 async_session_factory, user_id=user_id, project_name=project_name, artifact_key=artifact_key
@@ -87,8 +93,7 @@ async def backfill_project(*, user_id: str, project_name: str, project_dir: Path
                     root=root,
                     artifact_key=artifact_key,
                     expected=expected,
-                    host=host,
-                    target_ref=target_ref,
+                    key=key,
                     record=record,
                 )
         except _DIVERGENT_PROMOTION:
@@ -97,16 +102,22 @@ async def backfill_project(*, user_id: str, project_name: str, project_dir: Path
     return summary
 
 
-def _verified_staged_version(
-    host: GoldenAHostIntegration, target_ref: str, host_version_ref: str
-) -> tuple[Path, str] | None:
-    """The selected host version file and its recorded digest, or ``None`` when the record is missing,
-    has no digest, or its file is gone or no longer hashes to it."""
+def _verified_staged_version(project_dir: Path, key: ArtifactKey, host_version_ref: str) -> tuple[Path, str] | None:
+    """The selected host version file and its recorded digest, or ``None`` when it cannot be verified.
+
+    This reads only the project's version metadata and files, never the database. Any failure here
+    (a missing or malformed record, no recorded digest, an unmanaged or escaping path, an unreadable
+    file or different bytes) means the selected version is not verifiable, so the artifact is
+    diverged; the failure is logged.
+    """
     try:
-        version_file, staged_digest = host.staged_version(target_ref, host_version_ref)
+        host = GoldenAHostIntegration(project_dir, resource_type="videos", episode=int(key.components[0]))
+        version_file, staged_digest = host.staged_version(str(key.components[1]), host_version_ref)
         if "sha256:" + sha256_file(version_file) != staged_digest:
+            logger.warning("backfill: %s version %s no longer hashes to its recorded digest", key, host_version_ref)
             return None
-    except (KeyError, ValueError, OSError):
+    except Exception as error:
+        logger.warning("backfill: %s version %s is not verifiable: %r", key, host_version_ref, error)
         return None
     return version_file, staged_digest
 
@@ -119,8 +130,7 @@ async def _backfill_locked(
     root: Path,
     artifact_key: str,
     expected: str,
-    host: GoldenAHostIntegration,
-    target_ref: str,
+    key: ArtifactKey,
     record: ApprovedMasterMetadata,
 ) -> str:
     """Decide and stage one artifact under its authority row lock; the caller's transaction commits."""
@@ -129,23 +139,27 @@ async def _backfill_locked(
     )
     if head is not None and head.candidate_id != expected:
         return "diverged"
-    staged = await asyncio.to_thread(_verified_staged_version, host, target_ref, record.host_version_ref)
+    staged = await asyncio.to_thread(_verified_staged_version, root, key, record.host_version_ref)
     if staged is None:
         return "diverged"
     version_file, staged_digest = staged
     if head is not None:
         return "current" if head.content_digest == staged_digest else "diverged"
-    await master_authority_unit(session, defer_commit=True).promote_staged(
-        user_id=user_id,
-        project_name=project_name,
-        project_dir=root,
-        artifact_key=artifact_key,
-        generation_candidate_id=record.selected_candidate_id,
-        version_file=version_file,
-        expected_content_digest=staged_digest,
-        approval_record=record.approval_record,
-        command_id=f"backfill:{artifact_key}:{record.selected_candidate_id}",
-    )
+    try:
+        await master_authority_unit(session, defer_commit=True).promote_staged(
+            user_id=user_id,
+            project_name=project_name,
+            project_dir=root,
+            artifact_key=artifact_key,
+            generation_candidate_id=record.selected_candidate_id,
+            version_file=version_file,
+            expected_content_digest=staged_digest,
+            approval_record=record.approval_record,
+            command_id=f"backfill:{artifact_key}:{record.selected_candidate_id}",
+        )
+    except OSError as error:
+        # The file changed or vanished after the check; raising rolls the transaction back.
+        raise _UnverifiableVersionError(str(error)) from error
     return "promoted"
 
 

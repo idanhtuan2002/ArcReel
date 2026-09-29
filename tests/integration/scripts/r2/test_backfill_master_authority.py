@@ -21,6 +21,7 @@ from lib.db.models.host_hardening import (
     PromotionReceiptModel,
 )
 from lib.db.repositories.host_hardening import CandidateObjectRepository, MasterAuthorityRepository
+from r2.host_hardening import master_authority as master_authority_module
 from r2.host_hardening.master_authority import MasterDivergedError, m7_candidate_id
 from r2.m3.host_integration import GoldenAHostIntegration
 from scripts.r2 import backfill_master_authority as backfill
@@ -172,6 +173,60 @@ async def test_a_rerun_reports_a_version_whose_bytes_changed_as_diverged(
     summary = json.loads(capsys.readouterr().out)[PROJECT]
     assert status == 2
     assert (summary["diverged"], summary["current"]) == ([sh01], [sh02])
+
+
+def _set_selected_record_file(project_dir: Path, artifact_key: str, value: object) -> None:
+    record = composition.projected_master_records(project_dir)[artifact_key]
+    target_ref = str(ArtifactKey.decode(artifact_key).components[1])
+    versions_file = project_dir / "versions" / "versions.json"
+    data = json.loads(versions_file.read_text(encoding="utf-8"))
+    for version in data["videos"][target_ref]["versions"]:
+        if version["version"] == int(record.host_version_ref):
+            version["file"] = value
+    versions_file.write_text(json.dumps(data), encoding="utf-8")
+
+
+@pytest.mark.parametrize("recorded_file", ["../outside.mp4", 5])
+async def test_an_unmanaged_or_malformed_version_record_is_reported_and_the_run_continues(
+    legacy_dir: Path, session_factory: Factory, capsys: pytest.CaptureFixture[str], recorded_file: object
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    sh01, sh02 = sorted(composition.projected_master_records(project_dir))
+    _set_selected_record_file(project_dir, sh01, recorded_file)
+
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    assert status == 2
+    assert (summary["diverged"], summary["promoted"]) == ([sh01], [sh02])
+
+
+async def test_a_file_failure_during_registration_rolls_the_artifact_back_and_the_run_continues(
+    legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    sh01, sh02 = sorted(composition.projected_master_records(project_dir))
+    sh01_file = _selected_version_file(project_dir, sh01)
+    register = master_authority_module.prepare_candidate
+
+    def prepare_or_fail(*, source_file: Path, **kwargs: object):
+        if source_file == sh01_file:
+            raise PermissionError(f"{source_file} is not readable")
+        return register(source_file=source_file, **kwargs)
+
+    monkeypatch.setattr(master_authority_module, "prepare_candidate", prepare_or_fail)
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    async with session_factory() as session:
+        sh01_head = await MasterAuthorityRepository(session).get_current(
+            user_id=USER.id, project_name=PROJECT, artifact_key=sh01
+        )
+    assert status == 2
+    assert (summary["diverged"], summary["promoted"]) == ([sh01], [sh02])
+    assert sh01_head is None
 
 
 async def test_a_gate_c_approval_between_the_head_check_and_the_promotion_is_not_overwritten(

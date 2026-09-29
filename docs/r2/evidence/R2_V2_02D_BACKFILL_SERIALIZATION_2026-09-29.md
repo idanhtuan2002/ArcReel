@@ -47,3 +47,20 @@ The Codex review of M8-A, round 3 (`dc13cc93..07cb27f9`), confirmed the race fix
 | Backfill tests on SQLite and on PG16 | 4 passed, 1 skipped (PG-only); 5 passed |
 | M7 unit, scripts/r2, Gate C/D/export routes on SQLite | 514 passed, 4 skipped. `test_verify_m7_scope_git` fails only on the uncommitted tree; it was rerun after the commit. |
 | `ruff`, `basedpyright` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |
+
+## Round 4 follow-up
+
+The Codex review of M8-A, round 4 (`dc13cc93..809e1358`), confirmed both round 3 fixes. It found one more abort: a selected version record whose `file` lies outside the managed snapshot bucket raised `UnmanagedSnapshotPathError` (a `BadRequestError`). That exception escaped the handler.
+
+Rather than add another exception type, the rule now separates two boundaries:
+
+- **The verification boundary** reads only project version metadata and files, never the database. It builds the host integration, reads the record, resolves the path, and hashes the file. Any failure there means the selected version cannot be verified. The artifact is then `diverged` and the failure is logged.
+- **The registration step** runs after the check, inside the locked transaction. An `OSError` there comes from the file changing or vanishing after the check. It is raised as `_UnverifiableVersionError`, which rolls the transaction back and reports the artifact as `diverged`. A database failure is not an `OSError` at this point, because the connection is already live, so it still aborts the run.
+
+| Check | Result |
+|---|---|
+| `test_an_unmanaged_or_malformed_version_record_is_reported_and_the_run_continues[../outside.mp4]`, `[5]` | old: `UnmanagedSnapshotPathError` escapes; new: exit 2, SH01 diverged, SH02 promoted |
+| `test_a_file_failure_during_registration_rolls_the_artifact_back_and_the_run_continues` | old: `PermissionError` escapes; new: exit 2, SH01 diverged with no head, SH02 promoted |
+| Backfill tests: SQLite / PG16 (with Gate C/D master authority routes) | 7 passed, 1 skipped / 20 passed |
+| M7 unit, scripts/r2, Gate C/D/export routes on SQLite | 517 passed, 4 skipped. `test_verify_m7_scope_git` fails only on the uncommitted tree; it was rerun after the commit. |
+| `ruff`, `basedpyright` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |
