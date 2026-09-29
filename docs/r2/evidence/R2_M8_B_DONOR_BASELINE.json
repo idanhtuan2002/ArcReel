@@ -178,16 +178,16 @@
     },
     {
       "behavior_id": "G07",
-      "description": "group, ungroup, fit group to children, arrange children, group growth",
+      "description": "plain groups: group (top-level members, bounds and padding), ungroup to absolute positions, grow-only fit to children, arrange children in a row, column or grid; group colour presets",
       "donor_refs": [
         "canvasStore.groupNodes",
         "ungroupNode",
         "fitGroupToChildren",
-        "arrangeGroupChildren"
+        "arrangeGroupChildren",
+        "groupColors.ts"
       ],
       "donor_tests": [
-        "canvas-store-group-grow",
-        "canvas-store-auto-group-spawn"
+        "canvas-store-group-grow"
       ],
       "planned_disposition": "PARITY"
     },
@@ -217,8 +217,7 @@
         "convertStoryboardGroupToPlain"
       ],
       "donor_tests": [
-        "canvas-store-storyboard-group",
-        "canvas-store-projection-group"
+        "canvas-store-storyboard-group"
       ],
       "planned_disposition": "PARITY"
     },
@@ -520,7 +519,7 @@
       "planned_disposition": "PARITY"
     }
   ],
-  "behavior_inventory_digest": "sha256:0b381c0551fd9802213b7da02d55cefc2160fb716297f596583564182edc56fd",
+  "behavior_inventory_digest": "sha256:ef2cf31e44bfd28b726cf4b4b11a614ace539f819060b6fcfa0b028dab22068f",
   "excluded": [
     "generation, task, resume and credit logic (useNodeGenerationTaskState, resumeGeneration, generationTaskArbitration)",
     "asset library, upload, cross-project paste and asset migration",
@@ -528,7 +527,10 @@
     "storyboard split node (image grid slicing, addStoryboardSplitNode, updateStoryboardFrame, reorderStoryboardFrame)",
     "audio and voice generation, export image and compose nodes, skill and style nodes",
     "useCanvasSync React hook, freezone shell, project shell and routing, donor i18n content",
-    "auto-commit, push, billing, companion"
+    "auto-commit, push, billing, companion",
+    "autoGroupSpawn (auto-grouping of generated or spawned nodes; the donor tests canvas-store-auto-group-spawn cover it and still run unmodified in the baseline)",
+    "protected projection groups (isProtectedProjectionGroupNode; the donor tests canvas-store-projection-group cover it and still run unmodified in the baseline)",
+    "the donor node-type connection matrix (isUpstreamConnectionAllowed, handle rules): the ArcReel Canvas links content nodes freely"
   ],
   "created_at": "2026-09-29T00:00:00Z"
 }

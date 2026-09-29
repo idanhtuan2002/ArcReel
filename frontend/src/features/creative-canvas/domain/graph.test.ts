@@ -30,16 +30,30 @@ function edge(id: string, source: string, target: string): CanvasEdge {
 
 describe("normalizeGraph", () => {
   it("drops edges whose endpoints are missing and fills default handles and type", () => {
-    const graph = normalizeGraph([node("a"), node("b")], [edge("e1", "a", "b"), edge("e2", "a", "missing")]);
+    const graph = normalizeGraph(
+      [node("a"), node("b")],
+      [edge("e1", "a", "b"), edge("e2", "a", "missing")],
+    );
 
     expect(graph.edges).toEqual([
-      { id: "e1", source: "a", target: "b", sourceHandle: "source", targetHandle: "target", type: "disconnectableEdge" },
+      {
+        id: "e1",
+        source: "a",
+        target: "b",
+        sourceHandle: "source",
+        targetHandle: "target",
+        type: "disconnectableEdge",
+      },
     ]);
   });
 
   it("keeps the first position of a duplicated id with the later value, and orders parents before children", () => {
     const graph = normalizeGraph(
-      [node("child", { parentId: "g" }), node("g", { type: "group" }), node("child", { parentId: "g", data: { v: 2 } })],
+      [
+        node("child", { parentId: "g" }),
+        node("g", { type: "group" }),
+        node("child", { parentId: "g", data: { v: 2 } }),
+      ],
       [],
     );
 
@@ -48,7 +62,10 @@ describe("normalizeGraph", () => {
   });
 
   it("detaches a child whose parent is missing", () => {
-    const graph = normalizeGraph([node("orphan", { parentId: "gone", extent: "parent" })], []);
+    const graph = normalizeGraph(
+      [node("orphan", { parentId: "gone", extent: "parent" })],
+      [],
+    );
 
     expect(graph.nodes[0].parentId).toBeUndefined();
     expect(graph.nodes[0].extent).toBeUndefined();
@@ -97,8 +114,14 @@ describe("history", () => {
   });
 
   it("restoreHistory normalizes and bounds a stored history", () => {
-    const snapshots = Array.from({ length: 60 }, (_, index) => ({ nodes: [node(`n${index}`)], edges: [] }));
-    const state = restoreHistory(createGraphState(), { past: snapshots, future: [] });
+    const snapshots = Array.from({ length: 60 }, (_, index) => ({
+      nodes: [node(`n${index}`)],
+      edges: [],
+    }));
+    const state = restoreHistory(createGraphState(), {
+      past: snapshots,
+      future: [],
+    });
 
     expect(state.history.past).toHaveLength(MAX_HISTORY_STEPS);
     expect(state.history.past[0].nodes[0].id).toBe("n10");
@@ -108,11 +131,18 @@ describe("history", () => {
 describe("node changes", () => {
   it("auto-measurement does not push history; a finished resize does", () => {
     let state = addNode(createGraphState(), node("a"));
-    state = applyNodeChanges(state, [{ type: "dimensions", id: "a", dimensions: { width: 320, height: 200 } }]);
+    state = applyNodeChanges(state, [
+      { type: "dimensions", id: "a", dimensions: { width: 320, height: 200 } },
+    ]);
     expect(state.history.past).toHaveLength(1);
 
     state = applyNodeChanges(state, [
-      { type: "dimensions", id: "a", resizing: false, dimensions: { width: 400, height: 300 } },
+      {
+        type: "dimensions",
+        id: "a",
+        resizing: false,
+        dimensions: { width: 400, height: 300 },
+      },
     ]);
     expect(state.history.past).toHaveLength(2);
     expect(state.nodes[0].width).toBe(400);
@@ -120,9 +150,15 @@ describe("node changes", () => {
 
   it("a drag snapshots once at the first move and pushes one step at the end", () => {
     let state = addNode(createGraphState(), node("a"));
-    state = applyNodeChanges(state, [{ type: "position", id: "a", position: { x: 5, y: 0 }, dragging: true }]);
-    state = applyNodeChanges(state, [{ type: "position", id: "a", position: { x: 9, y: 0 }, dragging: true }]);
-    state = applyNodeChanges(state, [{ type: "position", id: "a", position: { x: 9, y: 0 }, dragging: false }]);
+    state = applyNodeChanges(state, [
+      { type: "position", id: "a", position: { x: 5, y: 0 }, dragging: true },
+    ]);
+    state = applyNodeChanges(state, [
+      { type: "position", id: "a", position: { x: 9, y: 0 }, dragging: true },
+    ]);
+    state = applyNodeChanges(state, [
+      { type: "position", id: "a", position: { x: 9, y: 0 }, dragging: false },
+    ]);
 
     expect(state.history.past).toHaveLength(2);
     expect(state.history.past[1].nodes[0].position).toEqual({ x: 0, y: 0 });
@@ -169,7 +205,11 @@ describe("delete and clear", () => {
   });
 
   it("deleteEdge pushes history and ignores unknown ids", () => {
-    const state = loadGraph(createGraphState(), [node("a"), node("b")], [edge("e", "a", "b")]);
+    const state = loadGraph(
+      createGraphState(),
+      [node("a"), node("b")],
+      [edge("e", "a", "b")],
+    );
 
     expect(deleteEdge(state, "missing")).toBe(state);
     const next = deleteEdge(state, "e");
@@ -189,7 +229,11 @@ describe("delete and clear", () => {
   });
 
   it("load resets the mutation state; hydrateDraft restores it", () => {
-    const loaded = loadGraph(addNode(createGraphState(), node("a")), [node("b")], []);
+    const loaded = loadGraph(
+      addNode(createGraphState(), node("a")),
+      [node("b")],
+      [],
+    );
     expect(loaded.userEditsSinceHydrate).toBe(0);
     expect(loaded.lastMutationSource).toBeNull();
 
@@ -197,7 +241,11 @@ describe("delete and clear", () => {
       nodes: [node("a")],
       edges: [],
       history: null,
-      mutation: { userEditsSinceHydrate: 3, lastMutationSource: "manual_clear", pendingClearIntent: true },
+      mutation: {
+        userEditsSinceHydrate: 3,
+        lastMutationSource: "manual_clear",
+        pendingClearIntent: true,
+      },
     });
     expect(hydrated.userEditsSinceHydrate).toBe(3);
     expect(hydrated.pendingClearIntent).toBe(true);
@@ -208,7 +256,11 @@ describe("delete and clear", () => {
     const connected = addEdge(state, { source: "a", target: "b" }, "e1");
 
     expect(connected.edges).toHaveLength(1);
-    expect(addEdge(connected, { source: "a", target: "b" }, "e2")).toBe(connected);
-    expect(addEdge(state, { source: "a", target: "missing" }, "e3")).toBe(state);
+    expect(addEdge(connected, { source: "a", target: "b" }, "e2")).toBe(
+      connected,
+    );
+    expect(addEdge(state, { source: "a", target: "missing" }, "e3")).toBe(
+      state,
+    );
   });
 });

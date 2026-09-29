@@ -6,6 +6,13 @@
       "from_step": 2,
       "behavior": "G03",
       "description": "A duplicate connection is not an edit. The donor pushes a no-op undo step and counts an edit, so the next undo appears to do nothing. The port records nothing, and the next undo reverts the real connection."
+    },
+    {
+      "harness": "groups",
+      "case": "storyboard-reload-keeps-reanchored-edges",
+      "from_step": 2,
+      "behavior": "G09",
+      "description": "A storyboard group keeps its re-anchored outside edges across a save and reload. The donor's load normalization drops every edge touching a group node (groups have no handles), so a reloaded storyboard loses those connections and ungrouping cannot restore them. The port keeps and restores them."
     }
   ]
 }

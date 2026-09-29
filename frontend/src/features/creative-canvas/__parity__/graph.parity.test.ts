@@ -1,16 +1,23 @@
 import { describe, expect, it } from "vitest";
 
 import fixtures from "../__fixtures__/parity/graph.json";
-import { type FixtureCase, type GraphObservation, runGraphCase } from "./graphAdapter";
+import {
+  type FixtureCase,
+  type GraphObservation,
+  runGraphCase,
+} from "./graphAdapter";
 
 const cases = fixtures.cases as unknown as FixtureCase[];
 
 describe("graph parity fixtures on the port", () => {
-  it.each(cases.map((fixture) => [fixture.id, fixture] as const))("%s replays", (_id, fixture) => {
-    const observations = runGraphCase(fixture);
+  it.each(cases.map((fixture) => [fixture.id, fixture] as const))(
+    "%s replays",
+    (_id, fixture) => {
+      const observations = runGraphCase(fixture);
 
-    expect(observations).toHaveLength(fixture.ops.length);
-  });
+      expect(observations).toHaveLength(fixture.ops.length);
+    },
+  );
 
   it("matches the recorded port observations (the parity harness input)", async () => {
     const results: Record<string, GraphObservation[]> = {};

@@ -6,7 +6,14 @@
  */
 
 /** Node types of the ArcReel Canvas v1. Media nodes reference existing assets only. */
-export const CANVAS_NODE_TYPES = ["beat", "note", "frame", "clip", "audio", "group"] as const;
+export const CANVAS_NODE_TYPES = [
+  "beat",
+  "note",
+  "frame",
+  "clip",
+  "audio",
+  "group",
+] as const;
 export type CanvasNodeType = (typeof CANVAS_NODE_TYPES)[number];
 
 export interface XY {
@@ -20,8 +27,15 @@ export interface CanvasNode {
   position: XY;
   width?: number;
   height?: number;
+  /** The rendered size reported by the graph adapter, preferred over width/height. */
+  measured?: { width?: number; height?: number };
+  style?: { width?: number; height?: number };
   parentId?: string;
   extent?: "parent";
+  hidden?: boolean;
+  selected?: boolean;
+  /** CSS selector of the only element that drags the node (storyboard group header). */
+  dragHandle?: string;
   data: Record<string, unknown>;
 }
 
@@ -32,6 +46,7 @@ export interface CanvasEdge {
   sourceHandle?: string;
   targetHandle?: string;
   type?: string;
+  hidden?: boolean;
   data?: Record<string, unknown>;
 }
 
@@ -72,7 +87,12 @@ export interface CanvasGraphState extends MutationState {
 
 export type NodeChange =
   | { type: "position"; id: string; position?: XY; dragging?: boolean }
-  | { type: "dimensions"; id: string; dimensions?: { width: number; height: number }; resizing?: boolean }
+  | {
+      type: "dimensions";
+      id: string;
+      dimensions?: { width: number; height: number };
+      resizing?: boolean;
+    }
   | { type: "select"; id: string; selected: boolean }
   | { type: "remove"; id: string };
 

@@ -23,7 +23,14 @@ import {
   selectNode,
   undo,
 } from "../domain/graph";
-import type { CanvasEdge, CanvasGraphState, CanvasNode, CanvasNodeType, MutationState, NodeChange } from "../domain/types";
+import type {
+  CanvasEdge,
+  CanvasGraphState,
+  CanvasNode,
+  CanvasNodeType,
+  MutationState,
+  NodeChange,
+} from "../domain/types";
 
 export interface FixtureNode {
   id: string;
@@ -41,7 +48,12 @@ export interface FixtureEdge {
 
 export type FixtureOp =
   | { op: "load"; nodes: FixtureNode[]; edges: FixtureEdge[] }
-  | { op: "hydrate"; nodes: FixtureNode[]; edges: FixtureEdge[]; mutation: MutationState }
+  | {
+      op: "hydrate";
+      nodes: FixtureNode[];
+      edges: FixtureEdge[];
+      mutation: MutationState;
+    }
   | { op: "add"; node: FixtureNode }
   | { op: "addMany"; count: number; prefix: string }
   | { op: "connect"; source: string; target: string; id: string }
@@ -65,8 +77,20 @@ export interface FixtureCase {
 
 export interface GraphObservation {
   op: string;
-  nodes: { id: string; type: string; parentId: string | null; x: number; y: number }[];
-  edges: { id: string; source: string; target: string; sourceHandle: string; targetHandle: string }[];
+  nodes: {
+    id: string;
+    type: string;
+    parentId: string | null;
+    x: number;
+    y: number;
+  }[];
+  edges: {
+    id: string;
+    source: string;
+    target: string;
+    sourceHandle: string;
+    targetHandle: string;
+  }[];
   past: number;
   future: number;
   selected: string | null;
@@ -131,7 +155,10 @@ function apply(state: CanvasGraphState, op: FixtureOp): CanvasGraphState {
     case "addMany": {
       let next = state;
       for (let index = 0; index < op.count; index += 1) {
-        next = addNode(next, toNode({ id: `${op.prefix}${index}`, type: "note" }));
+        next = addNode(
+          next,
+          toNode({ id: `${op.prefix}${index}`, type: "note" }),
+        );
       }
       return next;
     }

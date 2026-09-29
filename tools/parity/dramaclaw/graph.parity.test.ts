@@ -23,7 +23,7 @@ type PortType = "beat" | "note" | "frame" | "clip" | "audio" | "group";
 const TO_DONOR: Record<PortType, string> = {
   beat: CANVAS_NODE_TYPES.textAnnotation,
   note: CANVAS_NODE_TYPES.textAnnotation,
-  frame: CANVAS_NODE_TYPES.upload,
+  frame: CANVAS_NODE_TYPES.exportImage,
   clip: CANVAS_NODE_TYPES.video,
   audio: CANVAS_NODE_TYPES.audio,
   group: CANVAS_NODE_TYPES.group,

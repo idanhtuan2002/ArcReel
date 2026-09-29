@@ -42,7 +42,8 @@ export function createGraphState(): CanvasGraphState {
 function normalizeHandle(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
-  if (!trimmed || trimmed === "null" || trimmed === "undefined") return undefined;
+  if (!trimmed || trimmed === "null" || trimmed === "undefined")
+    return undefined;
   return trimmed;
 }
 
@@ -100,7 +101,10 @@ function normalizeNodes(nodes: readonly CanvasNode[]): CanvasNode[] {
   return sortParentsBeforeChildren(detachMissingParents(dedupeById(nodes)));
 }
 
-function normalizeEdges(edges: readonly CanvasEdge[], nodes: readonly CanvasNode[]): CanvasEdge[] {
+function normalizeEdges(
+  edges: readonly CanvasEdge[],
+  nodes: readonly CanvasNode[],
+): CanvasEdge[] {
   const ids = new Set(nodes.map((node) => node.id));
   const normalized = edges
     .filter((edge) => ids.has(edge.source) && ids.has(edge.target))
@@ -118,19 +122,28 @@ export function normalizeGraph(
   edges: readonly CanvasEdge[],
 ): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
   const normalizedNodes = normalizeNodes(nodes);
-  return { nodes: normalizedNodes, edges: normalizeEdges(edges, normalizedNodes) };
+  return {
+    nodes: normalizedNodes,
+    edges: normalizeEdges(edges, normalizedNodes),
+  };
 }
 
 // ─── history ───────────────────────────────────────────────────────────────
 
-function snapshot(state: Pick<CanvasGraphState, "nodes" | "edges">): HistorySnapshot {
+function snapshot(
+  state: Pick<CanvasGraphState, "nodes" | "edges">,
+): HistorySnapshot {
   return { nodes: state.nodes, edges: state.edges };
 }
 
 /** Append a snapshot, skipping one identical to the last, and keep the newest MAX_HISTORY_STEPS. */
-function pushSnapshot(snapshots: readonly HistorySnapshot[], next: HistorySnapshot): readonly HistorySnapshot[] {
+function pushSnapshot(
+  snapshots: readonly HistorySnapshot[],
+  next: HistorySnapshot,
+): readonly HistorySnapshot[] {
   const last = snapshots[snapshots.length - 1];
-  if (last && last.nodes === next.nodes && last.edges === next.edges) return snapshots;
+  if (last && last.nodes === next.nodes && last.edges === next.edges)
+    return snapshots;
   const result = [...snapshots, next];
   if (result.length > MAX_HISTORY_STEPS) result.shift();
   return result;
@@ -138,7 +151,8 @@ function pushSnapshot(snapshots: readonly HistorySnapshot[], next: HistorySnapsh
 
 function normalizeHistory(history?: HistoryState | null): HistoryState {
   if (!history) return { past: [], future: [] };
-  const normalize = (item: HistorySnapshot): HistorySnapshot => normalizeGraph(item.nodes, item.edges);
+  const normalize = (item: HistorySnapshot): HistorySnapshot =>
+    normalizeGraph(item.nodes, item.edges);
   return {
     past: history.past.slice(-MAX_HISTORY_STEPS).map(normalize),
     future: history.future.slice(-MAX_HISTORY_STEPS).map(normalize),
@@ -153,16 +167,22 @@ function trackEdit(
   state: Pick<MutationState, "userEditsSinceHydrate">,
   source: MutationSource = "user_edit",
 ): Pick<MutationState, "userEditsSinceHydrate" | "lastMutationSource"> {
-  return { userEditsSinceHydrate: state.userEditsSinceHydrate + 1, lastMutationSource: source };
+  return {
+    userEditsSinceHydrate: state.userEditsSinceHydrate + 1,
+    lastMutationSource: source,
+  };
 }
 
-function resolveSelection(selected: string | null, nodes: readonly CanvasNode[]): string | null {
+function resolveSelection(
+  selected: string | null,
+  nodes: readonly CanvasNode[],
+): string | null {
   if (!selected) return null;
   return nodes.some((node) => node.id === selected) ? selected : null;
 }
 
 /** Commit an edit: push the pre-edit snapshot, clear redo, count the edit. */
-function commitEdit(
+export function commitEdit(
   state: CanvasGraphState,
   nodes: readonly CanvasNode[],
   edges: readonly CanvasEdge[],
@@ -172,16 +192,25 @@ function commitEdit(
     ...state,
     nodes,
     edges,
-    history: { past: pushSnapshot(state.history.past, snapshot(state)), future: [] },
+    history: {
+      past: pushSnapshot(state.history.past, snapshot(state)),
+      future: [],
+    },
     dragSnapshot: null,
     ...trackEdit(state, source),
   };
 }
 
-export function undo(state: CanvasGraphState): { state: CanvasGraphState; changed: boolean } {
+export function undo(state: CanvasGraphState): {
+  state: CanvasGraphState;
+  changed: boolean;
+} {
   const target = state.history.past[state.history.past.length - 1];
   if (!target) return { state, changed: false };
-  const source: MutationSource = isDeleteToEmpty(state.nodes.length, target.nodes.length)
+  const source: MutationSource = isDeleteToEmpty(
+    state.nodes.length,
+    target.nodes.length,
+  )
     ? "delete_to_empty"
     : "user_edit";
   return {
@@ -201,10 +230,16 @@ export function undo(state: CanvasGraphState): { state: CanvasGraphState; change
   };
 }
 
-export function redo(state: CanvasGraphState): { state: CanvasGraphState; changed: boolean } {
+export function redo(state: CanvasGraphState): {
+  state: CanvasGraphState;
+  changed: boolean;
+} {
   const target = state.history.future[state.history.future.length - 1];
   if (!target) return { state, changed: false };
-  const source: MutationSource = isDeleteToEmpty(state.nodes.length, target.nodes.length)
+  const source: MutationSource = isDeleteToEmpty(
+    state.nodes.length,
+    target.nodes.length,
+  )
     ? "delete_to_empty"
     : "user_edit";
   return {
@@ -224,7 +259,10 @@ export function redo(state: CanvasGraphState): { state: CanvasGraphState; change
   };
 }
 
-export function restoreHistory(state: CanvasGraphState, history: HistoryState): CanvasGraphState {
+export function restoreHistory(
+  state: CanvasGraphState,
+  history: HistoryState,
+): CanvasGraphState {
   return { ...state, history: normalizeHistory(history) };
 }
 
@@ -277,11 +315,17 @@ export function hydrateDraft(
 
 // ─── edits ─────────────────────────────────────────────────────────────────
 
-export function addNode(state: CanvasGraphState, node: CanvasNode): CanvasGraphState {
+export function addNode(
+  state: CanvasGraphState,
+  node: CanvasNode,
+): CanvasGraphState {
   return commitEdit(state, [...state.nodes, node], state.edges);
 }
 
-function connectionExists(edges: readonly CanvasEdge[], edge: CanvasEdge): boolean {
+function connectionExists(
+  edges: readonly CanvasEdge[],
+  edge: CanvasEdge,
+): boolean {
   return edges.some(
     (item) =>
       item.source === edge.source &&
@@ -291,7 +335,11 @@ function connectionExists(edges: readonly CanvasEdge[], edge: CanvasEdge): boole
   );
 }
 
-export function addEdge(state: CanvasGraphState, connection: Connection, edgeId: string): CanvasGraphState {
+export function addEdge(
+  state: CanvasGraphState,
+  connection: Connection,
+  edgeId: string,
+): CanvasGraphState {
   const ids = new Set(state.nodes.map((node) => node.id));
   if (!ids.has(connection.source) || !ids.has(connection.target)) return state;
   const edge: CanvasEdge = {
@@ -306,7 +354,10 @@ export function addEdge(state: CanvasGraphState, connection: Connection, edgeId:
   return commitEdit(state, state.nodes, [...state.edges, edge]);
 }
 
-function collectWithDescendants(nodes: readonly CanvasNode[], seeds: readonly string[]): Set<string> {
+function collectWithDescendants(
+  nodes: readonly CanvasNode[],
+  seeds: readonly string[],
+): Set<string> {
   const result = new Set(seeds);
   let changed = true;
   while (changed) {
@@ -321,21 +372,41 @@ function collectWithDescendants(nodes: readonly CanvasNode[], seeds: readonly st
   return result;
 }
 
-export function deleteNodes(state: CanvasGraphState, nodeIds: readonly string[]): CanvasGraphState {
-  const unique = Array.from(new Set(nodeIds.filter((id) => id.trim().length > 0)));
-  const existing = unique.filter((id) => state.nodes.some((node) => node.id === id));
+export function deleteNodes(
+  state: CanvasGraphState,
+  nodeIds: readonly string[],
+): CanvasGraphState {
+  const unique = Array.from(
+    new Set(nodeIds.filter((id) => id.trim().length > 0)),
+  );
+  const existing = unique.filter((id) =>
+    state.nodes.some((node) => node.id === id),
+  );
   if (existing.length === 0) return state;
   const doomed = collectWithDescendants(state.nodes, existing);
   const nodes = state.nodes.filter((node) => !doomed.has(node.id));
-  const edges = state.edges.filter((edge) => !doomed.has(edge.source) && !doomed.has(edge.target));
-  const source: MutationSource = isDeleteToEmpty(state.nodes.length, nodes.length) ? "delete_to_empty" : "user_edit";
+  const edges = state.edges.filter(
+    (edge) => !doomed.has(edge.source) && !doomed.has(edge.target),
+  );
+  const source: MutationSource = isDeleteToEmpty(
+    state.nodes.length,
+    nodes.length,
+  )
+    ? "delete_to_empty"
+    : "user_edit";
   return {
     ...commitEdit(state, nodes, edges, source),
-    selectedNodeId: state.selectedNodeId && doomed.has(state.selectedNodeId) ? null : state.selectedNodeId,
+    selectedNodeId:
+      state.selectedNodeId && doomed.has(state.selectedNodeId)
+        ? null
+        : state.selectedNodeId,
   };
 }
 
-export function deleteEdge(state: CanvasGraphState, edgeId: string): CanvasGraphState {
+export function deleteEdge(
+  state: CanvasGraphState,
+  edgeId: string,
+): CanvasGraphState {
   if (!state.edges.some((edge) => edge.id === edgeId)) return state;
   return commitEdit(
     state,
@@ -346,21 +417,39 @@ export function deleteEdge(state: CanvasGraphState, edgeId: string): CanvasGraph
 
 export function clearCanvas(state: CanvasGraphState): CanvasGraphState {
   if (state.nodes.length === 0 && state.edges.length === 0) return state;
-  return { ...commitEdit(state, [], [], "manual_clear"), selectedNodeId: null, pendingClearIntent: true };
+  return {
+    ...commitEdit(state, [], [], "manual_clear"),
+    selectedNodeId: null,
+    pendingClearIntent: true,
+  };
 }
 
 export function acknowledgeClear(state: CanvasGraphState): CanvasGraphState {
-  return state.pendingClearIntent ? { ...state, pendingClearIntent: false } : state;
+  return state.pendingClearIntent
+    ? { ...state, pendingClearIntent: false }
+    : state;
 }
 
-export function selectNode(state: CanvasGraphState, nodeId: string | null): CanvasGraphState {
-  return state.selectedNodeId === nodeId ? state : { ...state, selectedNodeId: nodeId };
+export function selectNode(
+  state: CanvasGraphState,
+  nodeId: string | null,
+): CanvasGraphState {
+  return state.selectedNodeId === nodeId
+    ? state
+    : { ...state, selectedNodeId: nodeId };
 }
 
 // ─── node changes (drag, resize, measure, select, remove) ──────────────────
 
-function applyChangesToNodes(nodes: readonly CanvasNode[], changes: readonly NodeChange[]): CanvasNode[] {
-  const removed = new Set(changes.filter((change) => change.type === "remove").map((change) => change.id));
+function applyChangesToNodes(
+  nodes: readonly CanvasNode[],
+  changes: readonly NodeChange[],
+): CanvasNode[] {
+  const removed = new Set(
+    changes
+      .filter((change) => change.type === "remove")
+      .map((change) => change.id),
+  );
   return nodes
     .filter((node) => !removed.has(node.id))
     .map((node) => {
@@ -368,9 +457,16 @@ function applyChangesToNodes(nodes: readonly CanvasNode[], changes: readonly Nod
       for (const change of changes) {
         if (change.id !== node.id) continue;
         if (change.type === "position" && change.position) {
-          next = { ...next, position: { x: change.position.x, y: change.position.y } };
+          next = {
+            ...next,
+            position: { x: change.position.x, y: change.position.y },
+          };
         } else if (change.type === "dimensions" && change.dimensions) {
-          next = { ...next, width: change.dimensions.width, height: change.dimensions.height };
+          next = {
+            ...next,
+            width: change.dimensions.width,
+            height: change.dimensions.height,
+          };
         }
       }
       return next;
@@ -382,13 +478,26 @@ function applyChangesToNodes(nodes: readonly CanvasNode[], changes: readonly Nod
  * not edits. A drag or resize snapshots once at its first move and pushes one
  * history step when it ends; any other meaningful change pushes immediately.
  */
-export function applyNodeChanges(state: CanvasGraphState, changes: readonly NodeChange[]): CanvasGraphState {
+export function applyNodeChanges(
+  state: CanvasGraphState,
+  changes: readonly NodeChange[],
+): CanvasGraphState {
   const nodes = applyChangesToNodes(state.nodes, changes);
-  const meaningful = changes.some((change) => change.type !== "select" && change.type !== "dimensions");
-  const dragMove = changes.some((change) => change.type === "position" && Boolean(change.dragging));
-  const dragEnd = changes.some((change) => change.type === "position" && change.dragging === false);
-  const resizeMove = changes.some((change) => change.type === "dimensions" && Boolean(change.resizing));
-  const resizeEnd = changes.some((change) => change.type === "dimensions" && change.resizing === false);
+  const meaningful = changes.some(
+    (change) => change.type !== "select" && change.type !== "dimensions",
+  );
+  const dragMove = changes.some(
+    (change) => change.type === "position" && Boolean(change.dragging),
+  );
+  const dragEnd = changes.some(
+    (change) => change.type === "position" && change.dragging === false,
+  );
+  const resizeMove = changes.some(
+    (change) => change.type === "dimensions" && Boolean(change.resizing),
+  );
+  const resizeEnd = changes.some(
+    (change) => change.type === "dimensions" && change.resizing === false,
+  );
   const interactionMove = dragMove || resizeMove;
   const interactionEnd = dragEnd || resizeEnd;
 
@@ -397,15 +506,26 @@ export function applyNodeChanges(state: CanvasGraphState, changes: readonly Node
   let edited = false;
   if (interactionMove && !dragSnapshot) dragSnapshot = snapshot(state);
   if (interactionEnd) {
-    history = { past: pushSnapshot(state.history.past, dragSnapshot ?? snapshot(state)), future: [] };
+    history = {
+      past: pushSnapshot(state.history.past, dragSnapshot ?? snapshot(state)),
+      future: [],
+    };
     dragSnapshot = null;
     edited = true;
   } else if (meaningful && !interactionMove) {
-    history = { past: pushSnapshot(state.history.past, snapshot(state)), future: [] };
+    history = {
+      past: pushSnapshot(state.history.past, snapshot(state)),
+      future: [],
+    };
     dragSnapshot = null;
     edited = true;
   }
-  const source: MutationSource = isDeleteToEmpty(state.nodes.length, nodes.length) ? "delete_to_empty" : "user_edit";
+  const source: MutationSource = isDeleteToEmpty(
+    state.nodes.length,
+    nodes.length,
+  )
+    ? "delete_to_empty"
+    : "user_edit";
   return {
     ...state,
     nodes,

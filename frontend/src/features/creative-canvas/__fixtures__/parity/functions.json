@@ -1,0 +1,202 @@
+{
+  "fixture_set": "pure-functions-v1",
+  "cases": [
+    {
+      "id": "storyboard-aspect-and-cols",
+      "behaviors": ["G09"],
+      "calls": [
+        { "fn": "resolveStoryboardAspectRatio", "args": ["16:9"] },
+        { "fn": "resolveStoryboardAspectRatio", "args": ["9:16"] },
+        { "fn": "resolveStoryboardAspectRatio", "args": ["nope"] },
+        { "fn": "resolveStoryboardAspectRatio", "args": [null] },
+        { "fn": "resolveStoryboardCols", "args": [0] },
+        { "fn": "resolveStoryboardCols", "args": [1] },
+        { "fn": "resolveStoryboardCols", "args": [5] },
+        { "fn": "resolveStoryboardCols", "args": [10] },
+        { "fn": "resolveStoryboardCols", "args": [5, 2] },
+        { "fn": "resolveStoryboardCols", "args": [5, 9] },
+        { "fn": "resolveStoryboardCols", "args": [5, 0] },
+        { "fn": "resolveStoryboardCols", "args": [5, 2.6] },
+        { "fn": "resolveStoryboardCols", "args": [5, { "$num": "NaN" }] }
+      ]
+    },
+    {
+      "id": "storyboard-cells-and-grid",
+      "behaviors": ["G09"],
+      "calls": [
+        { "fn": "computeStoryboardCell", "args": [520, 420, "16:9"] },
+        { "fn": "computeStoryboardCell", "args": [300, 900, "16:9"] },
+        { "fn": "computeStoryboardCell", "args": [0, 0, "1:1"] },
+        { "fn": "computeStoryboardCell", "args": [640.4, 360.6, "4:3"] },
+        { "fn": "storyboardSlotRect", "args": [0, 3, 560, 315] },
+        { "fn": "storyboardSlotRect", "args": [4, 3, 560, 315] },
+        {
+          "fn": "computeStoryboardGridLayout",
+          "args": [{ "count": 5, "cellWidth": 560, "cellHeight": 315 }]
+        },
+        {
+          "fn": "computeStoryboardGridLayout",
+          "args": [{ "count": 0, "cellWidth": 560, "cellHeight": 315 }]
+        },
+        {
+          "fn": "computeStoryboardGridLayout",
+          "args": [{ "count": 3, "cellWidth": 10, "cellHeight": 10, "cols": 3 }]
+        },
+        {
+          "fn": "computeStoryboardGridLayout",
+          "args": [{ "count": -2.4, "cellWidth": 0, "cellHeight": -5 }]
+        },
+        {
+          "fn": "computeStoryboardBoardLayout",
+          "args": [{ "count": 9, "aspectKey": "9:16" }]
+        },
+        {
+          "fn": "computeStoryboardBoardLayout",
+          "args": [{ "count": 4, "cols": 4 }]
+        }
+      ]
+    },
+    {
+      "id": "bookmarks",
+      "behaviors": ["K01"],
+      "calls": [
+        { "fn": "createEmptyBookmarks", "args": [] },
+        { "fn": "digitToBookmarkIndex", "args": ["1"] },
+        { "fn": "digitToBookmarkIndex", "args": ["0"] },
+        { "fn": "digitToBookmarkIndex", "args": ["a"] },
+        { "fn": "digitToBookmarkIndex", "args": ["12"] },
+        { "fn": "bookmarkIndexToDigit", "args": [0] },
+        { "fn": "bookmarkIndexToDigit", "args": [9] },
+        { "fn": "bookmarkIndexToDigit", "args": [10] },
+        { "fn": "bookmarkIndexToDigit", "args": [1.5] },
+        { "fn": "isViewportBookmark", "args": [{ "x": 1, "y": 2, "zoom": 1 }] },
+        { "fn": "isViewportBookmark", "args": [{ "x": 1, "y": 2, "zoom": 0 }] },
+        {
+          "fn": "isViewportBookmark",
+          "args": [{ "x": 1, "y": { "$num": "Infinity" }, "zoom": 1 }]
+        },
+        { "fn": "isViewportBookmark", "args": [null] },
+        {
+          "fn": "normalizeBookmarks",
+          "args": [
+            [
+              { "x": 1, "y": 2, "zoom": 1, "extra": true },
+              null,
+              { "x": 0, "y": 0, "zoom": -1 },
+              "junk",
+              { "x": 3, "y": 4, "zoom": 2 },
+              null,
+              null,
+              null,
+              null,
+              null,
+              { "x": 9, "y": 9, "zoom": 1 }
+            ]
+          ]
+        },
+        { "fn": "normalizeBookmarks", "args": ["not-an-array"] },
+        {
+          "fn": "bookmarkCenterInFlow",
+          "args": [
+            { "x": 100, "y": 50, "zoom": 2 },
+            { "width": 800, "height": 600 }
+          ]
+        },
+        {
+          "fn": "projectToMinimap",
+          "args": [
+            { "x": 50, "y": 50 },
+            { "x": 0, "y": 0, "width": 100, "height": 100 },
+            { "width": 200, "height": 150 }
+          ]
+        },
+        {
+          "fn": "projectToMinimap",
+          "args": [
+            { "x": 500, "y": -50 },
+            { "x": 0, "y": 0, "width": 0, "height": 100 },
+            { "width": 200, "height": 150 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "group-selection",
+      "behaviors": ["G08"],
+      "calls": [
+        {
+          "fn": "collectBatchDeletableIds",
+          "args": [
+            [
+              { "id": "g", "type": "group" },
+              { "id": "a", "type": "note", "parentId": "g" },
+              { "id": "b", "type": "note", "parentId": "g" },
+              { "id": "c", "type": "note" }
+            ],
+            ["a", "b"]
+          ]
+        },
+        {
+          "fn": "collectBatchDeletableIds",
+          "args": [
+            [
+              { "id": "g", "type": "group" },
+              { "id": "a", "type": "note", "parentId": "g" },
+              { "id": "b", "type": "note", "parentId": "g" }
+            ],
+            ["a"]
+          ]
+        },
+        {
+          "fn": "collectBatchDeletableIds",
+          "args": [[{ "id": "g", "type": "group" }], ["missing"]]
+        },
+        {
+          "fn": "collectDuplicableIds",
+          "args": [
+            [
+              { "id": "outer", "type": "group" },
+              { "id": "inner", "type": "group", "parentId": "outer" },
+              { "id": "a", "type": "note", "parentId": "inner" },
+              { "id": "b", "type": "note", "parentId": "outer" }
+            ],
+            ["a", "b"]
+          ]
+        },
+        {
+          "fn": "collectDuplicableIds",
+          "args": [
+            [
+              { "id": "g", "type": "group" },
+              { "id": "a", "type": "note", "parentId": "g" },
+              { "id": "b", "type": "note", "parentId": "g" }
+            ],
+            ["b"]
+          ]
+        },
+        {
+          "fn": "collectDuplicableIds",
+          "args": [
+            [
+              { "id": "x", "type": "group", "parentId": "y" },
+              { "id": "y", "type": "group", "parentId": "x" },
+              { "id": "a", "type": "note", "parentId": "x" }
+            ],
+            ["a"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "group-colors",
+      "behaviors": ["G07"],
+      "calls": [
+        { "fn": "groupColorPresets", "args": [] },
+        { "fn": "groupColorBackground", "args": ["#3b82f6"] },
+        { "fn": "groupColorBackground", "args": [null] },
+        { "fn": "groupColorBorder", "args": ["#3b82f6"] },
+        { "fn": "groupColorBorder", "args": [""] }
+      ]
+    }
+  ]
+}
