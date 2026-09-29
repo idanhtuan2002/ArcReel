@@ -310,6 +310,115 @@ async def test_a_conflict_after_registration_rolls_the_candidate_back(
     assert registered == [sh02]
 
 
+def _without_projection(project_dir: Path, artifact_key: str, how: str) -> None:
+    adapter = ProjectArtifactManifestAdapter(project_dir)
+    key = ArtifactKey.decode(artifact_key)
+    if how == "entry removed":
+        adapter.delete_entry(key)
+        return
+    entry = adapter.snapshot_entries()[key]
+    assert isinstance(entry.r2, dict)
+    r2 = None if how == "r2 cleared" else {**entry.r2, "approved_master": None}
+    adapter.put_entry(key, dataclasses.replace(entry, r2=r2))
+
+
+@pytest.mark.parametrize("how", ["entry removed", "r2 cleared", "approval cleared"])
+async def test_a_database_head_without_a_projection_is_reported(
+    legacy_dir: Path, session_factory: Factory, capsys: pytest.CaptureFixture[str], how: str
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    await backfill.backfill_project(user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
+    sh01, sh02 = sorted(composition.projected_master_records(project_dir))
+    _without_projection(project_dir, sh01, how)
+
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    assert status == 2
+    assert (summary["diverged"], summary["current"]) == ([sh01], [sh02])
+
+
+async def test_a_projection_removed_after_the_scan_is_not_promoted(
+    legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    sh01, sh02 = sorted(composition.projected_master_records(project_dir))
+    scan = composition.scan_master_records
+    scans: list[int] = []
+
+    def scan_then_remove_sh01(path: Path):
+        result = scan(path)
+        if not scans:
+            _without_projection(project_dir, sh01, "entry removed")
+        scans.append(1)
+        return result
+
+    monkeypatch.setattr(backfill, "scan_master_records", scan_then_remove_sh01)
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    summary = json.loads(capsys.readouterr().out)[PROJECT]
+    async with session_factory() as session:
+        sh01_head = await MasterAuthorityRepository(session).get_current(
+            user_id=USER.id, project_name=PROJECT, artifact_key=sh01
+        )
+    assert status == 2
+    assert (summary["diverged"], summary["promoted"]) == ([sh01], [sh02])
+    assert sh01_head is None
+
+
+class _ProjectsWithAGhost:
+    def __init__(self, manager: GateProjectManager) -> None:
+        self._manager = manager
+
+    def list_projects(self) -> list[str]:
+        return ["ghost", PROJECT]
+
+    def get_project_path(self, name: str) -> Path:
+        if name == "ghost":
+            raise FileNotFoundError("project 'ghost' was removed")
+        return self._manager.get_project_path(name)
+
+
+async def test_a_project_that_vanishes_during_all_is_reported_and_the_run_continues(
+    legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    manager = _ProjectsWithAGhost(GateProjectManager(project_dir.parent))
+    monkeypatch.setattr(backfill, "get_project_manager", lambda: manager)
+
+    status = await backfill.main_async(["--user-id", USER.id, "--all"])
+
+    result = json.loads(capsys.readouterr().out)
+    assert status == 2
+    assert len(result["ghost"]["unreadable"]) == 1
+    assert len(result[PROJECT]["promoted"]) == 2
+
+
+async def test_a_media_probe_lost_during_the_run_exits_3(
+    legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_dir = legacy_dir
+    await _legacy_project(project_dir, session_factory)
+    which = backfill.shutil.which
+    calls: list[str] = []
+
+    def lost_after_the_preflights(name: str) -> str | None:
+        # The first two lookups are the run and project preflights; the registration probe is next.
+        calls.append(name)
+        return which(name) if len(calls) <= 2 else None
+
+    monkeypatch.setattr(backfill.shutil, "which", lost_after_the_preflights)
+    status = await backfill.main_async(["--user-id", USER.id, "--project", PROJECT])
+
+    captured = capsys.readouterr()
+    assert status == 3
+    assert "ffprobe" in captured.err
+    assert captured.out == ""
+
+
 async def test_a_gate_c_approval_between_the_head_check_and_the_promotion_is_not_overwritten(
     legacy_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:

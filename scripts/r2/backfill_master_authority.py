@@ -8,15 +8,22 @@ selected host version as a candidate object and promotes it, with the determinis
     --user-id <id> --project <name>     one project
     --user-id <id> --all                every project
 
-It prints a JSON summary per project: promoted, already current, diverged and skipped artifacts, and
-unreadable manifests. An artifact is diverged when its R2 metadata does not validate, when its
-database head names another candidate, or when its selected host version has no recorded output
-digest, its file is gone or no longer hashes to it (checked again on every rerun), or another writer
-moves its head first; nothing is changed for that artifact. A project whose manifest cannot be read
-is reported unreadable and the run continues.
+It prints a JSON summary per project: promoted, already current and diverged artifacts, and
+unreadable projects. An artifact is diverged, and gets no master head, when any of these holds:
 
-The exit status is 3 when ``ffprobe`` is missing (nothing is read or written), 2 when any artifact is
-diverged or any manifest unreadable, and 0 otherwise. A database failure aborts the run.
+- its R2 metadata does not validate;
+- its database head has no manifest projection;
+- its projection is gone when it is read again under the row lock;
+- its database head names another candidate;
+- its selected host version has no recorded output digest, or its file is gone or no longer hashes
+  to it (checked again on every rerun);
+- another writer moves its head first.
+
+A project whose path or manifest cannot be read is reported unreadable, and the run continues. The
+complete outcome model is in docs/r2/evidence/R2_V2_02D_BACKFILL_SERIALIZATION_2026-09-29.md.
+
+The exit status is 3 when ``ffprobe`` is missing at the start or lost during the run, 2 when any
+artifact is diverged or any project unreadable, and 0 otherwise. A database failure aborts the run.
 
 Each artifact is decided and promoted in one transaction that holds its master authority row lock
 (``serialized_artifact``, the V2-02b rule), so a concurrent Gate C approval is never overwritten.
@@ -34,7 +41,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.artifact_manifest import ArtifactKey, ArtifactKind
+from lib.artifact_manifest import ArtifactKey, ArtifactKind, decode_artifact_key_parts
 from lib.candidate_store import CandidateStoreError
 from lib.content_digest import sha256_file
 from lib.db import async_session_factory
@@ -47,7 +54,6 @@ from lib.project_manager import get_project_manager
 from r2.host_hardening.master_authority import CandidateObjectConflictError, m7_candidate_id
 from r2.host_hardening.promotion import PromotionExpectedVersionConflictError, PromotionReceiptReplayMismatchError
 from r2.m3.host_integration import GoldenAHostIntegration
-from r2.production import ApprovedMasterMetadata
 from server.services.master_authority import master_authority_unit, scan_master_records, serialized_artifact
 
 logger = logging.getLogger(__name__)
@@ -86,9 +92,20 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _empty_summary() -> dict[str, list[str]]:
+    return {"promoted": [], "current": [], "diverged": [], "unreadable": []}
+
+
+def _is_episode_video(artifact_key: str) -> bool:
+    return (
+        decode_artifact_key_parts(artifact_key) is not None
+        and ArtifactKey.decode(artifact_key).kind is ArtifactKind.EPISODE_VIDEO
+    )
+
+
 async def backfill_project(*, user_id: str, project_name: str, project_dir: Path) -> dict[str, list[str]]:
     _require_media_probe()
-    summary: dict[str, list[str]] = {"promoted": [], "current": [], "diverged": [], "skipped": [], "unreadable": []}
+    summary = _empty_summary()
     try:
         records, invalid = await asyncio.to_thread(scan_master_records, project_dir)
         root = await asyncio.to_thread(Path(project_dir).resolve)
@@ -97,32 +114,31 @@ async def backfill_project(*, user_id: str, project_name: str, project_dir: Path
         logger.warning("backfill: the manifest of %s is not readable: %r", project_name, error)
         summary["unreadable"].append(f"{type(error).__name__}: {error}")
         return summary
+    async with async_session_factory() as session:
+        database_keys = await MasterAuthorityRepository(session).list_current_keys(
+            user_id=user_id, project_name=project_name
+        )
     for artifact_key in invalid:
         logger.warning("backfill: %s has R2 metadata that does not validate", artifact_key)
         summary["diverged"].append(artifact_key)
-    for artifact_key, record in sorted(records.items()):
-        key = ArtifactKey.decode(artifact_key)
-        if key.kind is not ArtifactKind.EPISODE_VIDEO:
-            summary["skipped"].append(artifact_key)
-            continue
-        expected = m7_candidate_id(artifact_key, record.selected_candidate_id)
+    for artifact_key in database_keys:
+        if _is_episode_video(artifact_key) and artifact_key not in records and artifact_key not in invalid:
+            logger.warning("backfill: %s has a database head but no manifest projection", artifact_key)
+            summary["diverged"].append(artifact_key)
+    for artifact_key in sorted(records):
         try:
             async with serialized_artifact(
                 async_session_factory, user_id=user_id, project_name=project_name, artifact_key=artifact_key
             ) as session:
                 outcome = await _backfill_locked(
-                    session,
-                    user_id=user_id,
-                    project_name=project_name,
-                    root=root,
-                    artifact_key=artifact_key,
-                    expected=expected,
-                    key=key,
-                    record=record,
+                    session, user_id=user_id, project_name=project_name, root=root, artifact_key=artifact_key
                 )
         except _DIVERGENT_PROMOTION:
+            # A registration probe that failed because ffprobe disappeared is a tool failure.
+            _require_media_probe()
             outcome = "diverged"
         summary[outcome].append(artifact_key)
+    summary["diverged"].sort()
     return summary
 
 
@@ -153,11 +169,23 @@ async def _backfill_locked(
     project_name: str,
     root: Path,
     artifact_key: str,
-    expected: str,
-    key: ArtifactKey,
-    record: ApprovedMasterMetadata,
 ) -> str:
-    """Decide and stage one artifact under its authority row lock; the caller's transaction commits."""
+    """Decide and stage one artifact under its authority row lock; the caller's transaction commits.
+
+    The manifest is read again under the lock (Gate C writes its projection under the same lock), so
+    a projection removed or changed after the project scan is never promoted from the stale scan.
+    """
+    try:
+        records, _ = await asyncio.to_thread(scan_master_records, root)
+    except Exception as error:
+        logger.warning("backfill: the manifest was not readable under the lock of %s: %r", artifact_key, error)
+        return "diverged"
+    record = records.get(artifact_key)
+    if record is None:
+        logger.warning("backfill: the projection of %s changed before its lock", artifact_key)
+        return "diverged"
+    key = ArtifactKey.decode(artifact_key)
+    expected = m7_candidate_id(artifact_key, record.selected_candidate_id)
     head = await MasterAuthorityRepository(session).get_current(
         user_id=user_id, project_name=project_name, artifact_key=artifact_key
     )
@@ -190,22 +218,27 @@ async def _backfill_locked(
 async def _run(args: argparse.Namespace) -> dict[str, dict[str, list[str]]]:
     manager = get_project_manager()
     names = manager.list_projects() if args.all else [args.project]
-    return {
-        name: await backfill_project(
-            user_id=args.user_id, project_name=name, project_dir=manager.get_project_path(name)
-        )
-        for name in names
-    }
+    results: dict[str, dict[str, list[str]]] = {}
+    for name in names:
+        try:
+            project_dir = await asyncio.to_thread(manager.get_project_path, name)
+        except Exception as error:
+            logger.warning("backfill: project %s is not readable: %r", name, error)
+            results[name] = _empty_summary()
+            results[name]["unreadable"].append(f"{type(error).__name__}: {error}")
+            continue
+        results[name] = await backfill_project(user_id=args.user_id, project_name=name, project_dir=project_dir)
+    return results
 
 
 async def main_async(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         _require_media_probe()
+        result = await _run(args)
     except MissingMediaProbeError as error:
         print(f"backfill: {error}", file=sys.stderr)
         return 3
-    result = await _run(args)
     print(json.dumps(result, indent=2))
     return 2 if any(summary["diverged"] or summary["unreadable"] for summary in result.values()) else 0
 

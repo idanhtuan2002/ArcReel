@@ -102,3 +102,40 @@ The exit status is 3 for a missing tool. It is 2 when any artifact is `diverged`
 | Backfill tests and the Gate C/D master authority routes on PG16 | 24 passed |
 | M7 unit, scripts/r2, Gate C/D/export routes and `tests/integration/server/services` on SQLite | 1171 passed, 5 skipped. `test_verify_m7_scope_git` fails only on the uncommitted tree; it was rerun after the commit. |
 | `ruff`, `basedpyright` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |
+
+## Round 6 follow-up: the model, revised against an exhaustive sweep
+
+Round 6 (`dc13cc93..72d1de78`) swept the whole backfill against the model above. It found three blocking and three non-blocking paths, all reported in one round. The model is revised as follows before the code changes:
+
+| Level | Condition | Outcome | Round 6 item |
+|---|---|---|---|
+| Run | `ffprobe` missing at start, or lost mid-run (a registration probe fails and `ffprobe` is gone) | exit 3; stderr names the tool; artifacts promoted earlier stay promoted, and a rerun replays them | R6-5 |
+| Run | the project listing itself fails, or the database fails | the exception aborts the run | — |
+| Run | `--all` selects no project | `{}` and exit 0 (nothing to backfill) | informational |
+| Project | the project's path lookup or its manifest read fails | `unreadable: [reason]`; the next project continues; exit 2 | R6-3 |
+| Artifact | an episode-video database head whose key has no valid manifest projection (entry absent, `r2` null, no `approved_master`, or a missing manifest) | `diverged`, logged | R6-1 |
+| Artifact | episode-video R2 metadata that fails validation | `diverged`, logged | R5-1 |
+| Artifact | under the row lock, the manifest is read again; the key's approved master is gone or unreadable | `diverged`, logged; nothing is promoted from the stale scan | R6-2 |
+| Artifact | a head names another candidate | `diverged` | — |
+| Artifact | the selected version cannot be verified | `diverged`, logged | R4-1 |
+| Artifact | expected head, verified digest matches | `current` | — |
+| Artifact | expected head, digests differ | `diverged` | R3 |
+| Artifact | no head; verified; registered and promoted | `promoted` | — |
+| Artifact | no head; an M7 conflict or a registration file failure | the transaction rolls back, then `diverged` | R5 |
+
+Non-episode manifest keys are never Gate C masters. The scanner leaves them out, so the summary has no `skipped` list (R6-4).
+
+A `diverged` or `unreadable` artifact gets no master head. `serialized_artifact` may leave its authority row at version 0, which is the lock row and is not a promoted master. `verify_masters` lists only rows above version 0 (R6-6).
+
+### Round 6 verification
+
+| Check | Result |
+|---|---|
+| `test_a_database_head_without_a_projection_is_reported[entry removed / r2 cleared / approval cleared]` (R6-1) | old: SH01 omitted, exit 0; new: exit 2, SH01 diverged, SH02 current |
+| `test_a_projection_removed_after_the_scan_is_not_promoted` (R6-2) | old: SH01 promoted from the stale scan; new: exit 2, SH01 diverged with no head, SH02 promoted |
+| `test_a_project_that_vanishes_during_all_is_reported_and_the_run_continues` (R6-3) | old: `FileNotFoundError` aborts the run; new: exit 2, `ghost` unreadable, the real project promoted |
+| `test_a_media_probe_lost_during_the_run_exits_3` (R6-5) | old: SH01 diverged, exit 2; new: exit 3, `ffprobe` on stderr, no summary |
+| R6-4 (the unreachable `skipped` list) and R6-6 (the version-0 lock row) | the dead branch and the summary key are removed; the docstring and the model describe the lock row |
+| Backfill tests on SQLite / PG16 (with Gate C/D master authority routes) | 17 passed, 1 skipped / 30 passed |
+| M7 unit, scripts/r2, Gate C/D/export routes and `tests/integration/server/services` on SQLite | 1177 passed, 5 skipped. `test_verify_m7_scope_git` fails only on the uncommitted tree; it was rerun after the commit. |
+| `ruff`, `basedpyright` (changed files), `lint-imports`, `audit_tests.py --check`, `deptry` | clean |
