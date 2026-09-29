@@ -5,7 +5,8 @@ The verifier fails closed unless every prerequisite holds:
 - **Branch and base.** The branch is the M8-A implementation branch, not the design branch.
   The recorded executor base is an ancestor of HEAD, and every change since it, committed or
   not, is inside the exact scope allowlist.
-- **Alembic.** There is exactly one Alembic head, the recorded one.
+- **Alembic.** The executor base has exactly one Alembic head, the recorded one. Later M8
+  migrations are in the scope allowlist.
 - **M7 evidence and design artifacts.** They still hash to the recorded values. The
   acceptance names the recorded candidate HEAD with the recorded status.
 - **Authority seams.** Each keeps its path, signature and source hash.
@@ -222,7 +223,7 @@ def observe(repo: Path, baseline: Mapping[str, object], donors: Mapping[str, Pat
         for line in _git(repo, "status", "--porcelain=v1", "--untracked-files=all").stdout.splitlines()
         if line.strip()
     ]
-    heads, _digest = _alembic_revision_metadata_at_ref(repo, "HEAD")
+    heads, _digest = _alembic_revision_metadata_at_ref(repo, base) if ancestor else ((), "")
     tracked = [
         str(entry["path"]) for entry in _records(baseline["m7_evidence"]) + _records(baseline["design_artifacts"])
     ]
