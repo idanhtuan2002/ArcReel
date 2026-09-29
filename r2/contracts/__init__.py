@@ -1,3 +1,4 @@
+from . import advanced_creative
 from .capabilities import (
     CapabilityDescriptor,
     CapabilityFeatureSupport,
@@ -392,6 +393,7 @@ __all__ = [
     "UpdateKnowledgeOperation",
     "UpstreamDisposition",
     "VisualIdentityProfile",
+    "advanced_creative",
     "canonical_json_bytes",
     "command_receipt_result_envelope",
     "compute_content_fingerprint",

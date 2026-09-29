@@ -1,0 +1,49 @@
+"""M8 domain errors; each carries the stable API error key it maps to (plan A3 fixed API surface)."""
+
+from __future__ import annotations
+
+
+class M8Error(RuntimeError):
+    """Base of every M8 domain failure."""
+
+    code = "m8_error"
+
+
+class ExplorationNotFoundError(M8Error):
+    """An unknown or foreign identity; the two are indistinguishable to callers."""
+
+    code = "m8_exploration_not_found"
+
+
+class CommandConflictError(M8Error):
+    """A command id already used in this scope with a different semantic digest."""
+
+    code = "m8_command_conflict"
+
+
+class CandidateConflictError(M8Error):
+    """The candidate head or its predecessor no longer matches the caller's expectation."""
+
+    code = "m8_candidate_conflict"
+
+
+class PromotionBindingStaleError(M8Error):
+    """A preview or authorization binding is stale, expired or no longer matches current state."""
+
+    code = "m8_promotion_binding_stale"
+
+
+class PromotionTargetUnavailableError(M8Error):
+    """The promotion target, or the authority seam behind it, is unavailable."""
+
+    code = "m8_promotion_target_unavailable"
+
+
+__all__ = [
+    "CandidateConflictError",
+    "CommandConflictError",
+    "ExplorationNotFoundError",
+    "M8Error",
+    "PromotionBindingStaleError",
+    "PromotionTargetUnavailableError",
+]
