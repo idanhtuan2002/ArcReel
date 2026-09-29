@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.project_manager import ProjectManager
 from r2.advanced_creative.digests import digest_payload
+from r2.advanced_creative.lineage import resolve_episode_lineage
 from r2.contracts.advanced_creative import (
     CanvasCandidate,
     ExplorationKind,
@@ -188,3 +192,72 @@ async def test_a_promotion_for_an_unknown_preview_is_not_found(m8_client: AsyncC
     )
 
     assert response.status_code == 404
+
+
+def _project(root: Path, episodes: list[dict[str, object]], scripts: dict[str, bytes]) -> ProjectManager:
+    project_dir = root / PROJECT
+    (project_dir / "scripts").mkdir(parents=True)
+    (project_dir / "project.json").write_text(json.dumps({"title": PROJECT, "episodes": episodes}), encoding="utf-8")
+    for name, data in scripts.items():
+        (project_dir / "scripts" / name).write_bytes(data)
+    return ProjectManager(root)
+
+
+async def test_the_lineage_binds_the_indexed_script_of_the_episode(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    projects = _project(
+        tmp_path,
+        [{"episode": 1, "script_file": "scripts/episode_1.json"}, {"episode": 2, "script_file": "episode_2.json"}],
+        {"episode_1.json": b"one", "episode_2.json": b"two"},
+    )
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+
+    first = await m8_client.get(f"{BASE}/lineage", params={"episode": 1})
+    second = await m8_client.get(f"{BASE}/lineage", params={"episode": 2})
+
+    assert first.status_code == 200
+    assert first.json() == resolve_episode_lineage(PROJECT, 1, b"one").model_dump(mode="json")
+    assert second.json() == resolve_episode_lineage(PROJECT, 2, b"two").model_dump(mode="json")
+
+
+@pytest.mark.parametrize(
+    ("episodes", "episode"),
+    [
+        ([{"episode": 1, "script_file": "episode_1.json"}], 2),
+        ([{"episode": 1}], 1),
+        ([{"episode": 1, "script_file": "missing.json"}], 1),
+        ([{"episode": 1, "script_file": "../project.json"}], 1),
+    ],
+    ids=["unindexed-episode", "no-script-file", "missing-script", "script-outside-scripts"],
+)
+async def test_an_episode_without_a_readable_indexed_script_has_no_lineage(
+    m8_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    episodes: list[dict[str, object]],
+    episode: int,
+) -> None:
+    projects = _project(tmp_path, episodes, {"episode_1.json": b"one"})
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+
+    response = await m8_client.get(f"{BASE}/lineage", params={"episode": episode})
+
+    assert response.status_code == 404
+
+
+async def test_an_unknown_project_has_no_lineage(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: ProjectManager(tmp_path))
+
+    response = await m8_client.get(f"{BASE}/lineage", params={"episode": 1})
+
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("query", ["", "?episode=0", "?episode=x"])
+async def test_the_lineage_episode_is_validated(m8_client: AsyncClient, query: str) -> None:
+    response = await m8_client.get(f"{BASE}/lineage{query}")
+
+    assert response.status_code == 422

@@ -13,10 +13,12 @@ from fastapi import APIRouter, Query
 
 from lib.api_errors import ApiError, ConflictError, NotFoundError
 from lib.db import async_session_factory
+from lib.project_manager import get_project_manager
 from r2.advanced_creative.errors import ExplorationNotFoundError, M8Error
 from r2.contracts.advanced_creative import (
     CandidateHead,
     ExplorationRevision,
+    LineageBinding,
     M8ContractModel,
     PromotionAuthorization,
     PromotionPreview,
@@ -24,7 +26,7 @@ from r2.contracts.advanced_creative import (
     PromotionTarget,
 )
 from server.auth import CurrentUser
-from server.services.advanced_creative import exploration_promotion, exploration_service
+from server.services.advanced_creative import episode_lineage, exploration_promotion, exploration_service
 
 router = APIRouter()
 
@@ -58,6 +60,12 @@ async def _run[T](operation: Callable[[], Awaitable[T]]) -> T:
         return await operation()
     except M8Error as error:
         raise _api_error(error) from error
+
+
+@router.get("/projects/{project_name}/m8/exploration/lineage")
+async def get_lineage(project_name: str, user: CurrentUser, episode: int = Query(ge=1)) -> LineageBinding:
+    """The server-resolved lineage a revision for this episode binds (ADR-0098)."""
+    return await _run(lambda: episode_lineage(get_project_manager(), project_name, episode))
 
 
 @router.post("/projects/{project_name}/m8/exploration/revisions")

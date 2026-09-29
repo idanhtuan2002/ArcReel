@@ -6,6 +6,7 @@ master authority on the same session with a deferred commit, so M8 and M7 rows l
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 
 from sqlalchemy import update
@@ -20,9 +21,13 @@ from lib.db.repositories.host_hardening import (
     MasterHeadConflictError,
     PromotionReceiptRepository,
 )
-from r2.advanced_creative.errors import CommandConflictError, PromotionBindingStaleError
+from lib.path_safety import PathTraversalError, safe_join
+from lib.project_manager import ProjectManager, find_episode
+from r2.advanced_creative.errors import CommandConflictError, ExplorationNotFoundError, PromotionBindingStaleError
 from r2.advanced_creative.exploration import ExplorationService
+from r2.advanced_creative.lineage import resolve_episode_lineage
 from r2.advanced_creative.promotion import ExplorationPromotion
+from r2.contracts.advanced_creative import LineageBinding
 from r2.contracts.host_hardening import MasterHeadSnapshot, VerifiedCandidateObject
 from r2.host_hardening.master_authority import MasterAuthorityUnit
 from r2.host_hardening.promotion import (
@@ -132,3 +137,23 @@ def exploration_promotion(session: AsyncSession) -> ExplorationPromotion:
 
 
 __all__ = ["HostSlotAuthority", "exploration_promotion", "exploration_service"]
+
+
+def _episode_script_bytes(projects: ProjectManager, project_name: str, episode: int) -> bytes:
+    try:
+        project_dir = projects.get_project_path(project_name)
+        entry = find_episode(projects.load_project_readonly(project_name), episode)
+        script_file = entry.get("script_file") if entry is not None else None
+        if not isinstance(script_file, str) or not script_file:
+            raise ExplorationNotFoundError("the episode has no indexed script")
+        path = safe_join(project_dir / "scripts", ProjectManager.normalize_script_filename(script_file))
+        return path.read_bytes()
+    except (OSError, ValueError, PathTraversalError) as error:
+        raise ExplorationNotFoundError("the episode script cannot be read") from error
+
+
+async def episode_lineage(projects: ProjectManager, project_name: str, episode: int) -> LineageBinding:
+    """The lineage a Canvas revision of this episode binds (ADR-0098); not found for an episode
+    without a readable indexed script."""
+    script = await asyncio.to_thread(_episode_script_bytes, projects, project_name, episode)
+    return resolve_episode_lineage(project_name, episode, script)
