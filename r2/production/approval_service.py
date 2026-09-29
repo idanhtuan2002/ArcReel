@@ -29,15 +29,20 @@ class ProductionApprovalService:
         artifact_key: str,
         candidate: GenerationCandidate,
         host_version_ref: str,
+        semantic_state: R2ArtifactMetadata | None = None,
     ) -> R2ArtifactMetadata:
-        """Raise ``KeyError``/``ValueError`` if ``promote`` would refuse this candidate; return the metadata."""
+        """Raise ``KeyError``/``ValueError`` if ``promote`` would refuse this candidate; return the metadata.
+
+        ``semantic_state`` checks against metadata the caller will write before promoting, instead
+        of the manifest's current metadata.
+        """
         snapshot = self._host.load_artifact(artifact_key)
         if snapshot is None:
             raise KeyError(artifact_key)
         if snapshot.r2_raw is None:
             raise ValueError("artifact is not R2-aware")
 
-        metadata = R2ArtifactMetadata.model_validate(snapshot.r2_raw)
+        metadata = semantic_state or R2ArtifactMetadata.model_validate(snapshot.r2_raw)
 
         if candidate.lifecycle_state is not GenerationLifecycleStatus.GENERATED:
             raise ValueError("candidate must be GENERATED before promotion")

@@ -345,11 +345,22 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
             operation_id=operation_id,
             request_digest=request_digest,
+            keep_approved_semantic_state=True,
+        )
+
+    def _semantic_state():
+        return host.semantic_state_for(
+            target_ref=req.target_ref,
+            content_fingerprint=req.content_fingerprint,
+            content_basis=req.content_basis,
+            direct_dependencies=staged_dependencies,
+            contract_version=req.contract_version,
+            contract_schema_version=req.contract_schema_version,
+            contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
         )
 
     def _project_and_export(registered):
-        # The promoted candidate defines the artifact's semantic state; a later stage whose
-        # promotion was rolled back may have overwritten it.
+        # The promoted candidate defines the artifact's semantic state from here on.
         host.restore_semantic_state(
             target_ref=req.target_ref,
             content_fingerprint=req.content_fingerprint,
@@ -381,7 +392,7 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
 
         # Every check the projection makes runs first, against the staged output.
         def _approvable_version():
-            host.check_approvable(registered)
+            host.check_approvable(registered, _semantic_state())
             return host.staged_version(req.target_ref, registered.host_version_ref)
 
         try:

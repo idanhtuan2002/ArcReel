@@ -136,7 +136,7 @@ async def test_a_diverged_master_is_refused_by_every_consuming_route(
 async def test_a_refused_projection_check_writes_no_database_head(
     gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def refuse(self, registered):
+    def refuse(self, registered, semantic_state=None):
         raise ValueError("candidate content_fingerprint does not match current semantic state")
 
     monkeypatch.setattr(GoldenAHostIntegration, "check_approvable", refuse)
@@ -245,3 +245,29 @@ async def test_overlapping_gate_c_approvals_of_one_artifact_end_consistent(
             ), response.text
         async with concurrent_session_factory() as session:
             await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
+
+
+async def test_a_final_whose_promotion_fails_after_staging_leaves_the_old_final_stale(
+    gate_export_client: AsyncClient, project_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from r2.host_hardening.master_authority import MasterAuthorityUnit
+
+    old_sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one v1")]
+    old_final = _media(b"final from v1")
+    assert (await _approve_final(gate_export_client, project_dir, old_final, old_sources)).status_code == 200
+    new_sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one v2")]
+    assert (await _publish(gate_export_client, _sha(old_final))).status_code == 409  # stale after v2
+
+    real_promote = MasterAuthorityUnit.promote_staged
+
+    async def fail_final(self, **kwargs):
+        if kwargs["generation_candidate_id"].startswith("CAND-FINAL-"):
+            raise RuntimeError("database unavailable")
+        return await real_promote(self, **kwargs)
+
+    monkeypatch.setattr(MasterAuthorityUnit, "promote_staged", fail_final)
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        await _approve_final(gate_export_client, project_dir, _media(b"final from v2"), new_sources)
+
+    # The failed stage did not make the old final look current against the new shot master.
+    assert (await _publish(gate_export_client, _sha(old_final))).status_code == 409

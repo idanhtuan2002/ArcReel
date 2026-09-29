@@ -25,14 +25,18 @@ delegated the choice.
    authority row write lock for one transaction: a no-op rewrite of the row, which takes the
    row lock on PostgreSQL and the database write lock on SQLite, across processes. The row is
    created first if absent.
-   1. **Phase 1** stages the host version, runs the projection's checks, registers the
-      candidate object and promotes the master head, then commits. `command_id` is the route's
+   1. **Phase 1** stages the host version and runs the projection's checks. It then registers
+      the candidate object, promotes the master head, and commits. `command_id` is the route's
       operation id. The promotion writes its receipt and the promoted event. Files never run
       ahead of the database.
-   2. **Phase 2** runs only while the promoted candidate is still the head. It restores that
-      candidate's semantic state in the manifest, because a later stage whose promotion rolled
-      back may have overwritten it. It then projects the manifest master through
-      `ProductionApprovalService`, and writes the composite export copy.
+
+      Staging does not overwrite the semantic state (fingerprint and dependencies) of an
+      artifact that already has an approved master. The checks run against the state the
+      candidate would have. So a stage whose promotion fails, or is still in flight, cannot
+      make the old master look current against new dependencies.
+   2. **Phase 2** runs only while the promoted candidate is still the head. It writes that
+      candidate's semantic state to the manifest. It then projects the manifest master through
+      `ProductionApprovalService` and writes the composite export copy.
 
    **Failures:**
    - An approval superseded before phase 2 gets 409 `master_superseded` and writes nothing, so

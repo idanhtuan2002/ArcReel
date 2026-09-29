@@ -163,7 +163,10 @@ A file written into `output/` by another tool under the same name also makes the
 - **If the exit status is 2**, some artifact is diverged, and nothing was changed for it. Keep
   the summary. Re-approve the artifact through Gate C, which writes a new head and its projection.
 - **A failed Gate C** that fails after the database promotion converges on a retry with the
-  same `approval_record`.
+  same `approval_record`. This includes a 503 `GATE_C_RETRY_SAME_APPROVAL_RECORD` and a server
+  that stopped mid-request.
+- **Until that retry,** routes that read the artifact refuse with 409 `master_diverged`.
+- **If the original request is lost,** re-approve the artifact at Gate C.
 - **Overlapping approvals.** When two Gate C approvals of one artifact overlap, the newer
   promotion becomes the master and is projected. An approval superseded before its projection
   gets 409 `master_superseded`, writes nothing, and needs no further action.

@@ -238,7 +238,15 @@ class GoldenAHostIntegration:
         contract_type: str = "ShotSpec",
         operation_id: str | None = None,
         request_digest: str | None = None,
+        keep_approved_semantic_state: bool = False,
     ) -> RegisteredGoldenACandidate:
+        """Stage ``produced`` as a new host version of ``target_ref``.
+
+        With ``keep_approved_semantic_state``, an artifact that already has an approved master keeps
+        its semantic state (fingerprint and dependencies) until the new candidate is promoted, so a
+        stage whose promotion never lands cannot make the old master look current against new
+        dependencies. The promoting caller then writes the state through ``restore_semantic_state``.
+        """
         if produced.target_ref != target_ref:
             raise ValueError("produced asset target does not match candidate target")
         if (operation_id is None) != (request_digest is None):
@@ -267,11 +275,12 @@ class GoldenAHostIntegration:
                 contract_schema_version=contract_schema_version,
                 contract_type=contract_type,
             )
-            self._ensure_manifest_entry(
-                artifact_key=artifact_key,
-                metadata=metadata,
-                target_ref=target_ref,
-            )
+            if not (keep_approved_semantic_state and metadata.approved_master is not None):
+                self._ensure_manifest_entry(
+                    artifact_key=artifact_key,
+                    metadata=metadata,
+                    target_ref=target_ref,
+                )
 
             staged_dir = safe_project_subdir(self.project_dir, "r2_m3_staged")
             staged_dir.mkdir(parents=True, exist_ok=True)
@@ -380,12 +389,41 @@ class GoldenAHostIntegration:
             target_ref=target_ref,
         )
 
-    def check_approvable(self, registered: RegisteredGoldenACandidate) -> None:
-        """Raise ``KeyError``/``ValueError`` if ``approve`` would refuse ``registered`` now."""
+    def semantic_state_for(
+        self,
+        *,
+        target_ref: str,
+        content_fingerprint: str,
+        content_basis: ContentBasis,
+        direct_dependencies: Sequence[DependencySnapshot],
+        contract_version: int,
+        contract_schema_version: str,
+        contract_type: str = "ShotSpec",
+    ) -> R2ArtifactMetadata:
+        """The metadata ``restore_semantic_state`` would write for these arguments."""
+        return self._metadata(
+            target_ref=target_ref,
+            content_fingerprint=content_fingerprint,
+            content_basis=content_basis,
+            direct_dependencies=direct_dependencies,
+            contract_version=contract_version,
+            contract_schema_version=contract_schema_version,
+            contract_type=contract_type,
+        )
+
+    def check_approvable(
+        self, registered: RegisteredGoldenACandidate, semantic_state: R2ArtifactMetadata | None = None
+    ) -> None:
+        """Raise ``KeyError``/``ValueError`` if ``approve`` would refuse ``registered``.
+
+        ``semantic_state`` is the metadata the caller will write before approving; by default the
+        manifest's current metadata is used.
+        """
         ProductionApprovalService(self._port(registered.candidate.target_ref)).check(
             artifact_key=registered.artifact_key,
             candidate=registered.candidate,
             host_version_ref=registered.host_version_ref,
+            semantic_state=semantic_state,
         )
 
     def approve(
