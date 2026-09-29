@@ -202,7 +202,7 @@ export class CanvasPersistence {
       if (decision.kind === "draft") this.scheduleAutosave();
     } catch (error) {
       if (signal.aborted || isAbort(error)) return;
-      const message = error instanceof Error && error.message ? error.message : this.deps.t("creativeCanvas.load.failed");
+      const message = error instanceof Error && error.message ? error.message : this.deps.t("creative_canvas_load_failed");
       this.store.getState().replace({ phase: "error", loadError: message });
     } finally {
       if (this.loading === loading) this.loading = null;
@@ -336,7 +336,7 @@ export class CanvasPersistence {
       pendingClearIntent: graph.pendingClearIntent,
     });
     if (decision.kind === "skip") return false;
-    if (decision.kind === "block") return this.fail(open, t("creativeCanvas.save.dangerousEmpty"));
+    if (decision.kind === "block") return this.fail(open, t("creative_canvas_save_dangerous_empty"));
     const violation = checkPayloadLimits(graph.nodes.length, graph.edges.length, null);
     if (violation) return this.fail(open, describePayloadViolation(violation, t));
 
@@ -367,7 +367,7 @@ export class CanvasPersistence {
       const outcome = classifySaveOutcome(
         statusOf(error),
         { detail: error instanceof Error ? error.message : undefined },
-        t("creativeCanvas.save.failed"),
+        t("creative_canvas_save_failed"),
       );
       if (outcome.kind === "conflict" && (await this.headMoved(open))) {
         return this.keepAsideAndReload(open, outcome.message);

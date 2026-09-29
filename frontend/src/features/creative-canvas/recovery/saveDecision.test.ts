@@ -220,16 +220,16 @@ describe("describePayloadViolation", () => {
 
   it("names the violated field and its numbers", () => {
     expect(describePayloadViolation({ field: "nodes", actual: 50_001, limit: MAX_NODES }, t)).toBe(
-      'creativeCanvas.save.nodesOverLimit {"actual":50001,"limit":50000}',
+      'creative_canvas_nodes_over_limit {"actual":50001,"limit":50000}',
     );
     expect(describePayloadViolation({ field: "edges", actual: 200_001, limit: MAX_EDGES }, t)).toBe(
-      'creativeCanvas.save.edgesOverLimit {"actual":200001,"limit":200000}',
+      'creative_canvas_edges_over_limit {"actual":200001,"limit":200000}',
     );
   });
 
   it("renders the body size in KB", () => {
     expect(describePayloadViolation({ field: "body", actual: 6 * 1024 * 1024, limit: MAX_BODY_BYTES }, t)).toBe(
-      'creativeCanvas.save.bodyOverLimit {"actual":6144,"limit":5120}',
+      'creative_canvas_body_over_limit {"actual":6144,"limit":5120}',
     );
   });
 });

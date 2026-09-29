@@ -2,9 +2,10 @@
  * The open Canvas: its graph, viewport bookmarks, load phase and any conflict
  * the persistence layer set aside. One Canvas is open at a time.
  *
- * `edit` is the only path for user edits; it applies a pure domain function
- * and counts as an edit for autosave. `replace` swaps in content the
- * persistence layer loaded and never triggers a save.
+ * `edit` is the only path for user interaction; it applies a pure domain
+ * function, and counts as an edit for autosave when the domain tracked one.
+ * `replace` swaps in content the persistence layer loaded and never triggers
+ * a save.
  */
 import { create } from "zustand";
 
@@ -46,7 +47,10 @@ export const useCanvasStore = create<CanvasStoreState>()((set) => ({
   edit: (update) =>
     set((state) => {
       const graph = update(state.graph);
-      return graph === state.graph ? state : { graph, editSeq: state.editSeq + 1 };
+      if (graph === state.graph) return state;
+      // Selection and in-progress drags change the graph without counting as an edit.
+      const edited = graph.userEditsSinceHydrate !== state.graph.userEditsSinceHydrate;
+      return { graph, editSeq: edited ? state.editSeq + 1 : state.editSeq };
     }),
   editBookmarks: (update) =>
     set((state) => {

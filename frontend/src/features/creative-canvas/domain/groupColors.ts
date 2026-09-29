@@ -12,31 +12,31 @@ export interface GroupColorPreset {
 }
 
 export const GROUP_COLOR_PRESETS: readonly GroupColorPreset[] = [
-  { key: "red", labelKey: "creativeCanvas.groupColor.red", value: "#ef4444" },
+  { key: "red", labelKey: "creative_canvas_group_color_red", value: "#ef4444" },
   {
     key: "orange",
-    labelKey: "creativeCanvas.groupColor.orange",
+    labelKey: "creative_canvas_group_color_orange",
     value: "#f97316",
   },
   {
     key: "yellow",
-    labelKey: "creativeCanvas.groupColor.yellow",
+    labelKey: "creative_canvas_group_color_yellow",
     value: "#eab308",
   },
   {
     key: "green",
-    labelKey: "creativeCanvas.groupColor.green",
+    labelKey: "creative_canvas_group_color_green",
     value: "#22c55e",
   },
-  { key: "cyan", labelKey: "creativeCanvas.groupColor.cyan", value: "#06b6d4" },
-  { key: "blue", labelKey: "creativeCanvas.groupColor.blue", value: "#3b82f6" },
+  { key: "cyan", labelKey: "creative_canvas_group_color_cyan", value: "#06b6d4" },
+  { key: "blue", labelKey: "creative_canvas_group_color_blue", value: "#3b82f6" },
   {
     key: "purple",
-    labelKey: "creativeCanvas.groupColor.purple",
+    labelKey: "creative_canvas_group_color_purple",
     value: "#8b5cf6",
   },
-  { key: "pink", labelKey: "creativeCanvas.groupColor.pink", value: "#ec4899" },
-  { key: "gray", labelKey: "creativeCanvas.groupColor.gray", value: "#6b7280" },
+  { key: "pink", labelKey: "creative_canvas_group_color_pink", value: "#ec4899" },
+  { key: "gray", labelKey: "creative_canvas_group_color_gray", value: "#6b7280" },
 ];
 
 /** The group card background: the base colour at about 12% opacity (8-digit hex). */

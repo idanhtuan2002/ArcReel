@@ -341,7 +341,7 @@ describe("saving", () => {
     store().replace({ graph: { ...store().graph, nodes: [] } });
     store().edit((graph) => ({ ...graph, userEditsSinceHydrate: graph.userEditsSinceHydrate + 1 }));
     await autosave();
-    expect(saveState()).toMatchObject({ status: "error", error: "creativeCanvas.save.dangerousEmpty" });
+    expect(saveState()).toMatchObject({ status: "error", error: "creative_canvas_save_dangerous_empty" });
 
     store().edit((graph) => clearCanvas(addNode(graph, note("b"))));
     await autosave();

@@ -113,12 +113,12 @@ export type Translate = (key: string, params?: Record<string, unknown>) => strin
 /** The user-facing message of a payload-limit violation. */
 export function describePayloadViolation(violation: PayloadLimitViolation, t: Translate): string {
   if (violation.field === "nodes") {
-    return t("creativeCanvas.save.nodesOverLimit", { actual: violation.actual, limit: violation.limit });
+    return t("creative_canvas_nodes_over_limit", { actual: violation.actual, limit: violation.limit });
   }
   if (violation.field === "edges") {
-    return t("creativeCanvas.save.edgesOverLimit", { actual: violation.actual, limit: violation.limit });
+    return t("creative_canvas_edges_over_limit", { actual: violation.actual, limit: violation.limit });
   }
-  return t("creativeCanvas.save.bodyOverLimit", {
+  return t("creative_canvas_body_over_limit", {
     actual: Math.round(violation.actual / 1024),
     limit: Math.round(violation.limit / 1024),
   });
