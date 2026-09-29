@@ -107,3 +107,81 @@ The two-phase Gate C:
   `master_superseded` (runbook §4b).
 - **Transient refusals.** Between phase 1 and phase 2, a master-consuming read of the same
   artifact may get a transient 409 `master_diverged`.
+
+---
+
+# Codex review 2 (job `task-mumc22w3-swd1lt`, reviewed HEAD `7666071b`), verbatim
+
+## 1. HEAD reviewed
+
+`7666071ba976b72a3bc0e0cf39b0419ee8ac74ec` on `fix/r2-v2-02b-serialize-gate-c`; the worktree was clean. I reviewed `18c50eec..7666071b` and the whole packet `cca1eeaf..7666071b`.
+
+## 2. Verdict
+
+**CHANGES_REQUIRED.** The two phase change addresses the export ordering, but a failed or in progress stage can make an *old* approved final appear current against *new* source dependencies. That can let the old export through Gate D and download.
+
+## 3. Prior findings
+
+| Prior finding | Status | Evidence and test |
+|---|---|---|
+| Export outside the artifact lock | **FIXED** | [gates.py:418](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:418) calls `project_if_current`, which checks the head while holding the write lock at [master_authority.py:115](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/services/master_authority.py:115); export runs within that call at [gates.py:369](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:369). The forced supersession test checks that an older approval cannot replace the newer export at [test_gates_master_authority.py:180](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:180). |
+| Projection before database commit | **FIXED** for the reported ordering | Phase 1 exits and commits at [gates.py:411](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:411) before phase 2 projects at [gates.py:418](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:418). No test injects a phase 1 commit failure. A committed head can still await projection or remain unprojected after a phase 2 failure; the retry test covers one such failure at [test_gates_master_authority.py:152](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:152). |
+| Timed test does not force the critical interleaving | **PARTIALLY_FIXED** | The new wrapper forces a newer complete approval between the older promotion and projection at [test_gates_master_authority.py:191](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:191). The separate overlapping test still uses timing at [test_gates_master_authority.py:219](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/tests/integration/server/routers/test_gates_master_authority.py:219); neither test forces a phase 1 commit failure or the stale-dependency scenario below. |
+
+## 4. New findings
+
+| Severity | File:line | Scenario | Confidence |
+|---|---|---|---|
+| **High** | [host_integration.py:260](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/host_integration.py:260), [host_integration.py:182](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/host_integration.py:182), [artifact_bridge.py:198](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/production/artifact_bridge.py:198) | Approve final A from shot v1; then approve shot v2, making A stale. Start final B from v2 and fail after `stage_candidate` writes B’s dependencies but before promotion commits. The manifest keeps A’s `approved_master` while carrying B’s current dependencies. Currency checks those dependencies, and [current_deliverables at deliverables.py:289](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/r2/m3/deliverables.py:289) can consequently mark A’s unchanged bytes and export as current. The database head and projected master still agree, so the route’s master check does not catch it. This window also exists during phase 1. No test exercises it. | High |
+| **Medium** | [gates.py:414](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:414), [gates.py:429](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:429) | A crash, cancellation, or phase 2 failure after the phase 1 commit can leave the head without its projection until the same approval is retried. The documented retry converges for injected failures, but no automatic reconciliation or bounded recovery is established here. Readers of that artifact receive the documented transient 409; without a retry it is persistent. | High |
+
+The narrowed composite check covers the named source keys at [gates.py:321](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:321). A diverged unrelated master can therefore pass that pre-check, while the publish, listing, and download routes still call the project-wide check at [gates.py:475](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:475), [gates.py:546](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:546), and [gates.py:559](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/routers/gates.py:559). I found no basis to mark that narrowing as a separate defect. SQLite’s database-wide write lock also spans staging and, in phase 2, copying the export ([master_authority.py:81](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/services/master_authority.py:81), [master_authority.py:115](/home/anhtuan/content-production-os/.worktrees/r2-v2-02b/server/services/master_authority.py:115)); its contention cost was not measured.
+
+## 5. Commands run
+
+Read-only `git status`, `git rev-parse`, both requested `git diff` ranges, targeted `nl`/`rg` source inspection, and the graph project lookup. I attempted:
+
+```bash
+TMPDIR=/tmp timeout 90s .venv/bin/python -m pytest -q -p no:cacheprovider tests/integration/server/routers/test_gates_master_authority.py tests/unit/r2/test_master_authority_boundaries.py
+```
+
+Pytest failed **before collection** with `FileNotFoundError: No usable temporary directory found`. No test passed in this review.
+
+## 6. Coverage limits
+
+The graph project lookup succeeded, but subsequent graph status and search calls were approval blocked; structural conclusions above come from direct source inspection. I could not execute the targeted tests, PostgreSQL concurrency cases, commit-failure injection, or SQLite contention measurements. The reported test coverage is therefore inspection of test code, not a fresh passing result.
+
+## 7. Review record
+
+```json
+{
+  "schema_version": 1,
+  "status": "V2_02B_NOT_ACCEPTED",
+  "reviewed_head": "7666071ba976b72a3bc0e0cf39b0419ee8ac74ec",
+  "reviewer": "codex",
+  "reviewed_at": "2026-09-29T07:08:02Z",
+  "required_skips": [
+    "Targeted pytest failed before collection: no usable temporary directory in the read-only sandbox"
+  ],
+  "material_unknowns": [
+    "Phase 1 commit failure and stale-dependency scenario were not fault-injected",
+    "PostgreSQL concurrent behavior and SQLite write-lock contention were not executed",
+    "Graph status and search were approval blocked"
+  ]
+}
+```
+
+## Resolution — `32510633`
+
+| Finding | Fix | Test |
+|---|---|---|
+| High: a failed or in-flight stage makes an old approved final look current against new dependencies | `stage_candidate(keep_approved_semantic_state=True)` leaves an approved artifact's semantic state alone. Phase 1 checks the candidate against the state it would have (`semantic_state_for`, `check_approvable(semantic_state=...)`). Phase 2 writes the state only while the candidate is the head | `test_a_final_whose_promotion_fails_after_staging_leaves_the_old_final_stale`, which fails with the flag off (verified) |
+| Medium: a head left unprojected after a crash | Fail-closed: readers of the artifact refuse with 409 `master_diverged`. Recovery is a retry with the same `approval_record` (a client retry on 503 or after a lost connection), or a new Gate C approval. Runbook §4b now states it | `test_a_projection_refused_after_the_commit_asks_for_a_retry_that_converges` |
+| Prior Medium: the overlapping test relies on timing | The forced-interleaving test is the deterministic guard. The overlapping test runs on independent connections as a stress check | — |
+
+**Verification at `32510633`:**
+
+- `test_gates_master_authority.py`: 8 passed on SQLite, 8 passed ×2 on PG16.
+- The broad SQLite suites: 1249 passed, 2 skipped. The one failure before the fix was a stale test double signature, now fixed.
+- The PG16 master-authority, Gate and backfill suites: 40 passed.
+- Static gates: clean.
