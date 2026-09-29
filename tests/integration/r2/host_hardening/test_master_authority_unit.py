@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -241,3 +242,57 @@ async def test_a_projection_holds_the_artifact_until_it_commits(session_factory:
     await asyncio.gather(first, second)
 
     assert order == ["first-start", "first-end", "second"]
+
+
+async def test_a_registered_candidate_is_promoted_in_the_callers_transaction(
+    session_factory: Factory, tmp_path: Path
+) -> None:
+    from lib.db.repositories.host_hardening import CandidateObjectRepository, PromotionReceiptRepository
+    from r2.host_hardening.master_authority import MasterAuthorityUnit
+
+    first = _video(tmp_path / "videos" / "versions" / "S01_v1.mp4", "one")
+    second = _video(tmp_path / "videos" / "versions" / "S01_v2.mp4", "two")
+    await _promote(session_factory, tmp_path, first, generation_id="CAND-S01-V1", command="op-1")
+    await _promote(session_factory, tmp_path, second, generation_id="CAND-S01-V2", command="op-2")
+    first_id = m7_candidate_id(KEY, "CAND-S01-V1")
+
+    async def noop() -> None:
+        return None
+
+    async with session_factory() as session:
+        unit = MasterAuthorityUnit(
+            candidates=CandidateObjectRepository(session),
+            authorities=MasterAuthorityRepository(session),
+            receipts=PromotionReceiptRepository(session),
+            commit=noop,
+            clock=lambda: datetime.now(UTC),
+        )
+        head = await unit.promote_registered(
+            user_id=USER,
+            project_name=PROJECT,
+            artifact_key=KEY,
+            candidate_id=first_id,
+            expected_master_version=2,
+            approval_record="APR-back",
+            command_id="op-3",
+        )
+        await session.rollback()
+
+    assert (head.master_version, head.candidate_id) == (3, first_id)
+    async with session_factory() as session:
+        current = await MasterAuthorityRepository(session).get_current(
+            user_id=USER, project_name=PROJECT, artifact_key=KEY
+        )
+    assert current is not None
+    assert current.master_version == 2  # the caller rolled back; nothing was committed
+
+
+async def test_verify_masters_ignores_slots_that_have_no_file_projection(
+    session_factory: Factory, tmp_path: Path
+) -> None:
+    version = _video(tmp_path / "videos" / "versions" / "S01_v1.mp4", "one")
+    await _promote(session_factory, tmp_path, version, generation_id="CAND-S01-V1", command="op-1")
+
+    async with session_factory() as session:
+        # KEY is not a manifest artifact key, so its head has no projection to compare.
+        await composition.verify_masters(session, user_id=USER, project_name=PROJECT, project_dir=tmp_path)

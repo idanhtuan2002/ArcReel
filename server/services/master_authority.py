@@ -17,7 +17,7 @@ from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.artifact_manifest import ArtifactKind, ProjectArtifactManifestAdapter
+from lib.artifact_manifest import ArtifactKind, ProjectArtifactManifestAdapter, decode_artifact_key_parts
 from lib.db.models.host_hardening import MasterAuthorityModel
 from lib.db.repositories.host_hardening import (
     CandidateObjectRepository,
@@ -182,6 +182,12 @@ def projected_masters(project_dir: Path) -> dict[str, str]:
     return {key: record.selected_candidate_id for key, record in projected_master_records(project_dir).items()}
 
 
+def _is_projected_kind(artifact_key: str) -> bool:
+    """Only manifest episode-video masters are projected; other slots (e.g. M8's) have no file master."""
+    parts = decode_artifact_key_parts(artifact_key)
+    return parts is not None and parts.kind == ArtifactKind.EPISODE_VIDEO.value
+
+
 def file_master_projection(project_dir: Path) -> FileMasterProjection:
     return FileMasterProjection(lambda _project, artifact_key: projected_masters(project_dir).get(artifact_key))
 
@@ -199,7 +205,11 @@ async def verify_masters(
     ``artifact_keys`` limits the check to the masters a request consumes; ``None`` checks all.
     """
     authorities = MasterAuthorityRepository(session)
-    database_keys = await authorities.list_current_keys(user_id=user_id, project_name=project_name)
+    database_keys = [
+        key
+        for key in await authorities.list_current_keys(user_id=user_id, project_name=project_name)
+        if _is_projected_kind(key)
+    ]
     projected = await asyncio.to_thread(projected_masters, project_dir)
     if artifact_keys is not None:
         wanted = set(artifact_keys)

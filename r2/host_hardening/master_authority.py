@@ -153,6 +153,28 @@ class MasterAuthorityUnit:
             command_id=command_id,
         )
 
+    async def promote_registered(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        artifact_key: str,
+        candidate_id: str,
+        expected_master_version: int,
+        approval_record: str,
+        command_id: str,
+    ) -> MasterHeadSnapshot:
+        """Promote an already registered candidate object; commits through this unit's ``commit``."""
+        return await self._service.promote(
+            user_id=user_id,
+            project_name=project_name,
+            artifact_key=artifact_key,
+            candidate_id=candidate_id,
+            expected_master_version=expected_master_version,
+            approval_record=approval_record,
+            command_id=command_id,
+        )
+
     async def _register(
         self,
         *,
