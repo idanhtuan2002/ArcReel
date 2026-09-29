@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_2026-09-13.json",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2026-09-29.json"
+  ],
+  "reason": "The M8-A A0.2 stop M8_BASE_SEAM_CHANGED (docs/r2/evidence/R2_M8_A_STOP_2026-09-29.json) is resolved by ADR-0095",
+  "decision": "docs/adr/0095-m8a-defers-the-production-binding-promotion-target.md",
+  "m7_prerequisite_changes": {
+    "executor_base": "the commit that adds this second amendment; the acceptance commit b2816af4 is its ancestor, and every commit between them changes only docs/"
+  },
+  "packet_overrides": {
+    "M8-A": {
+      "seam_requirement": "The ARTIFACT_SLOT seam must be present and atomic, as A0.2 verified. The PRODUCTION_BINDING seam is not required: that target fails closed with m8_promotion_target_unavailable (409) before any write.",
+      "a3_test_replacement": {
+        "replaces": "ProductionBinding translation rejecting GAP assertions",
+        "with": "a PRODUCTION_BINDING target is refused as unavailable by create_preview and promote, and no preview, authorization, receipt or command receipt row is written"
+      }
+    },
+    "M8-C": {
+      "promotion_prerequisite": "an independently accepted persistent ProductionBinding authority with an atomic CAS writer; on missing, M8_REQUIRED_EVIDENCE_MISSING for the promotion step only"
+    }
+  },
+  "created_at": "2026-09-29"
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "packet": "M8-A",
+  "task": "A0.2",
+  "stop_code": "M8_BASE_SEAM_CHANGED",
+  "head": "278818009a06557dc8bad75e8cf5c34a0f715c32",
+  "dirty_paths": ["docs/r2/evidence/R2_M8_STOP.json (uncommitted receipt; committed on r2-v2/main as R2_M8_A_STOP_2026-09-29.json)"],
+  "failed_checks": [
+    {
+      "check": "the PRODUCTION_BINDING promotion target has an existing atomic authority seam (spec §4 target table, 'Task A0 must identify its exact service/repository/transaction seam')",
+      "result": "ABSENT",
+      "detail": "ProductionBinding exists only as the contract class r2/contracts/preparation.py:20, used by fingerprints and the production_intelligence fixture loader. No ORM model, repository, service or transaction writes it. Checked with the codebase-memory project r2-m8a (search_code 'ProductionBinding(' in r2|lib|server: 0 constructor hits) and a grep of lib/db/models, lib/db/repositories, r2/host_hardening and server/services."
+    }
+  ],
+  "passed_checks": [
+    "A0.1 under amendment R2_M8_EXECUTION_CONTRACT_AMENDMENT_2026-09-29.json: clean tree, branch impl/r2-m8a-exploration-promotion, one Alembic head c9e1f4a2b701, acceptance commit b2816af4 (parent dc030c61), only docs/ changed since it",
+    "ARTIFACT_SLOT seams present: AtomicPromotionService.promote (r2/host_hardening/promotion.py:83-175, UoW through an injected commit), DatabaseMasterResolver.get_exact (r2/host_hardening/master_resolver.py:39-54), CommandReceiptRepository.get_exact/add (lib/db/repositories/host_hardening.py:733-770), MasterAuthorityRepository.append_promoted_event (project-event append, lib/db/repositories/host_hardening.py:1011-1029); sole production caller GoldenAHostIntegration.approve (r2/m3/host_integration.py:330)",
+    "donor pins: DramaClaw b299bfd9 four selected files match the research hashes; OpenMontage 08e2151f present locally"
+  ],
+  "evidence_refs": [
+    "docs/superpowers/specs/2026-09-13-r2-m8-canvas-learning-multiformat-design.md#4 (promotion target table)",
+    "docs/superpowers/plans/2026-09-13-r2-m8a-exploration-promotion.md#task-a0",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2026-09-29.json"
+  ],
+  "created_at": "2026-09-29"
+}
