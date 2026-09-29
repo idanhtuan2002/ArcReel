@@ -8,8 +8,10 @@ import asyncio
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.db.models.host_hardening import MasterAuthorityModel
 from lib.db.repositories.host_hardening import (
     ActiveAttemptReferenceCheckImpl,
     BackupSetRepository,
@@ -22,6 +24,7 @@ from lib.db.repositories.host_hardening import (
     PromotionReceiptRepository,
 )
 from r2.contracts.host_hardening import MasterHeadSnapshot, PromotionReceipt, VerifiedCandidateObject
+from r2.host_hardening.promotion import AtomicPromotionService, PromotionExpectedVersionConflictError
 from r2.host_hardening.retention import CandidateRetentionPolicy
 
 type Factory = async_sessionmaker[AsyncSession]
@@ -449,3 +452,94 @@ async def test_concurrent_promotion_has_exactly_one_winner(session_factory: Fact
     assert head is not None
     assert head.master_version == 1
     assert head.candidate_id in ("cand-1", "cand-2")
+
+
+def _promotion_service(session: AsyncSession) -> AtomicPromotionService:
+    return AtomicPromotionService(
+        candidates=CandidateObjectRepository(session),
+        authorities=MasterAuthorityRepository(session),
+        receipts=PromotionReceiptRepository(session),
+        clock=lambda: NOW,
+        commit=session.commit,
+    )
+
+
+async def _wait_for_a_lock_waiter(session_factory: Factory) -> None:
+    async with session_factory() as probe:
+        for _ in range(200):
+            waiting = (
+                await probe.execute(
+                    text(
+                        "SELECT count(*) FROM pg_stat_activity "
+                        "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+                    )
+                )
+            ).scalar_one()
+            if waiting:
+                return
+            await probe.rollback()
+            await asyncio.sleep(0.02)
+    pytest.fail("the second promotion never waited on the authority row lock")
+
+
+async def test_a_promotion_waits_on_a_held_authority_row_before_appending_history(
+    session_factory: Factory,
+) -> None:
+    """A row-lock holder (``serialized_artifacts``, an M8 slot lock) then promoting the same slot
+    must not deadlock against an unserialized promotion started in between."""
+    await _skip_unless_postgres(session_factory)
+    async with session_factory() as setup_session:
+        candidates = CandidateObjectRepository(setup_session)
+        await candidates.insert(user_id=USER, project_name=PROJECT, candidate=_candidate("cand-1"), created_at=NOW)
+        await candidates.insert(user_id=USER, project_name=PROJECT, candidate=_candidate("cand-2"), created_at=NOW)
+        await MasterAuthorityRepository(setup_session).get_current_version(
+            user_id=USER, project_name=PROJECT, artifact_key=ARTIFACT_KEY
+        )
+        await setup_session.commit()
+
+    async with session_factory() as holder:
+        await holder.execute(
+            update(MasterAuthorityModel)
+            .where(
+                MasterAuthorityModel.user_id == USER,
+                MasterAuthorityModel.project_name == PROJECT,
+                MasterAuthorityModel.artifact_key == ARTIFACT_KEY,
+            )
+            .values(current_version=MasterAuthorityModel.current_version)
+        )
+
+        async def _unserialized() -> MasterHeadSnapshot:
+            async with session_factory() as session:
+                return await _promotion_service(session).promote(
+                    user_id=USER,
+                    project_name=PROJECT,
+                    artifact_key=ARTIFACT_KEY,
+                    candidate_id="cand-2",
+                    expected_master_version=0,
+                    approval_record="approval-cand-2",
+                    command_id="cmd-unserialized",
+                )
+
+        contender = asyncio.create_task(_unserialized())
+        await _wait_for_a_lock_waiter(session_factory)
+        winner = await asyncio.wait_for(
+            _promotion_service(holder).promote(
+                user_id=USER,
+                project_name=PROJECT,
+                artifact_key=ARTIFACT_KEY,
+                candidate_id="cand-1",
+                expected_master_version=0,
+                approval_record="approval-cand-1",
+                command_id="cmd-holder",
+            ),
+            timeout=10.0,
+        )
+
+    with pytest.raises((MasterHeadConflictError, PromotionExpectedVersionConflictError)):
+        await asyncio.wait_for(contender, timeout=10.0)
+    async with session_factory() as session:
+        head = await MasterAuthorityRepository(session).get_current(
+            user_id=USER, project_name=PROJECT, artifact_key=ARTIFACT_KEY
+        )
+    assert winner.candidate_id == "cand-1"
+    assert head == winner

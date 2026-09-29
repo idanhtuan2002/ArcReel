@@ -63,12 +63,13 @@ class _FakeAuthorities:
     async def insert_head_version(self, *, user_id, project_name, master_head_version_id, snapshot, promoted_at):
         del user_id, project_name, master_head_version_id, promoted_at
         self.inserted_versions.append(snapshot)
+        if snapshot.master_version == self.current_version:
+            self.current_snapshot = snapshot
 
     async def advance_head(self, *, user_id, project_name, artifact_key, expected_current_version, new_version):
         del user_id, project_name, artifact_key
         self.advanced.append((expected_current_version, new_version))
         self.current_version = new_version
-        self.current_snapshot = self.inserted_versions[-1]
 
     async def append_promoted_event(self, *, user_id, project_name, snapshot) -> None:
         del user_id, project_name

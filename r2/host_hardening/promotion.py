@@ -142,19 +142,22 @@ class AtomicPromotionService:
             approval_record=approval_record,
         )
         now = self._clock()
-        await self._authorities.insert_head_version(
-            user_id=user_id,
-            project_name=project_name,
-            master_head_version_id=self._master_head_version_id_factory(),
-            snapshot=snapshot,
-            promoted_at=now,
-        )
+        # The pointer CAS takes the authority row's write lock before the history row is
+        # appended. Every same-slot writer thus locks the row first, so none waits on another's
+        # uncommitted history row while holding the row lock that one needs.
         await self._authorities.advance_head(
             user_id=user_id,
             project_name=project_name,
             artifact_key=artifact_key,
             expected_current_version=current_version,
             new_version=new_version,
+        )
+        await self._authorities.insert_head_version(
+            user_id=user_id,
+            project_name=project_name,
+            master_head_version_id=self._master_head_version_id_factory(),
+            snapshot=snapshot,
+            promoted_at=now,
         )
         await self._receipts.add(
             user_id=user_id,

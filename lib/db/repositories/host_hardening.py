@@ -864,15 +864,15 @@ class CandidateObjectRepository:
 class MasterAuthorityRepository:
     """Append-only master-head history plus its one CASed pointer.
 
-    Purely optimistic, matching ``ExecutionAttemptRepository.acquire_lease``
-    rather than ``CanonRepository.lock_branch``'s ``SELECT ... FOR UPDATE``:
-    ``get_current_version`` never blocks a concurrent caller,
-    ``insert_head_version`` appends immutable history (its own unique
-    constraint is the CAS boundary against a concurrent same-version write),
-    and ``advance_head`` moves the pointer only if it still matches
-    ``expected_current_version``. A pessimistic lock here would let one
-    promotion's held row lock deadlock against another promotion waiting on
-    the same barrier-like coordination a real worker queue can create.
+    Optimistic, matching ``ExecutionAttemptRepository.acquire_lease`` rather
+    than ``CanonRepository.lock_branch``'s ``SELECT ... FOR UPDATE``:
+    ``get_current_version`` never blocks a concurrent caller, and
+    ``advance_head`` moves the pointer only if it still matches
+    ``expected_current_version``. ``insert_head_version`` appends immutable
+    history; its unique constraint is the CAS boundary against a concurrent
+    same-version write. A promotion calls ``advance_head`` first: its ``UPDATE``
+    takes the authority row's write lock, the same lock ``serialized_artifacts``
+    holds, so every same-slot writer takes that row before any history row.
     """
 
     def __init__(self, session: AsyncSession) -> None:
