@@ -1309,7 +1309,9 @@ class TestAgentBackfillChannel:
         await manager._patrol_once()
         await manager._patrol_once()
 
-        assert sweeps == [manager._started_at, manager._started_at]
+        # The cutoff is the process start, shared by every manager, so a sweep never reaches a hold
+        # another manager of this process created.
+        assert sweeps == [session_manager_module.HOST_PROCESS_STARTED_AT] * 2
 
     async def test_non_completed_turn_records_failed_but_keeps_reported_cost(
         self, manager: SessionManager, acct: _AccountingDb

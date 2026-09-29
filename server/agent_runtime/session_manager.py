@@ -68,6 +68,10 @@ from server.sse_channel import IDLE, EvictNonCriticalAndSignal, SseChannel
 
 logger = logging.getLogger(__name__)
 
+#: The host process's start. Every Agent budget hold this process creates is later, so the orphan
+#: sweep's cutoff never includes a hold of any session manager in this process.
+HOST_PROCESS_STARTED_AT = datetime.now(UTC)
+
 from claude_agent_sdk import ClaudeSDKClient, tag_session
 from claude_agent_sdk.types import (
     PermissionResultAllow,
@@ -384,7 +388,7 @@ class SessionManager:
         # spend to commit. The patrol retries them.
         self._unsettled_budgets: dict[str, Decimal] = {}
         # Holds of earlier host runs are swept once; the patrol retries until a sweep succeeds.
-        self._started_at = datetime.now(UTC)
+        self._started_at = HOST_PROCESS_STARTED_AT
         self._orphaned_budgets_settled = False
         # 实例不变量缓存：避免每次构建 access policy 都重做 path resolve。
         self._project_root_resolved = self.project_root.resolve()
