@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "status": "M8_READY_ON_V2_LINEAGE",
+  "amends": [
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_9_2026-09-29.json"
+  ],
+  "reason": "The M8-A round 5 review (dc13cc93..96a84875) confirmed R4-1 but did not accept V2-02d. It found two outcome paths that predate V2-02d: invalid R2 metadata was silently omitted, and a missing ffprobe was reported as divergence. The third V2-02d follow-up (40972905) implements one outcome model for every backfill path. M8-A is re-based onto it.",
+  "m7_prerequisite_changes": {
+    "executor_base": "the commit that adds this tenth amendment",
+    "intermediate_commits": "As amendment 9, plus the third V2-02d follow-up (40972905). It changes scripts/r2/backfill_master_authority.py, server/services/master_authority.py (scan_master_records, which keeps projected_master_records' behavior), their test and the V2-02d evidence.",
+    "packets_added": [
+      {
+        "packet": "V2-02d serialized backfill, with the round 3, 4 and 5 follow-ups",
+        "evidence": "docs/r2/evidence/R2_V2_02D_BACKFILL_SERIALIZATION_2026-09-29.md",
+        "head": "40972905",
+        "status": "REVIEW_BUNDLED_WITH_M8_A_ROUND_6",
+        "acceptance_rule": "M8-A is not accepted unless its round 6 independent review, whose range starts at dc13cc93, also accepts V2-02d."
+      }
+    ]
+  },
+  "packet_overrides": {
+    "M8-A": {
+      "rebase": "The M8-A commits on 109d25d7 are re-applied onto this executor base. The baseline is re-frozen with base_head = this commit."
+    }
+  },
+  "created_at": "2026-09-29"
+}
