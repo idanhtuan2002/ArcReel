@@ -248,14 +248,15 @@ async def reconcile_agent_connection(session_factory, *, reservation_ref: str, a
     return True
 
 
-async def settle_orphaned_agent_connections(session_factory) -> tuple[str, ...]:
-    """Reconcile every claimed Agent session hold at its full amount; call before any session starts.
+async def settle_orphaned_agent_connections(session_factory, *, created_before: datetime) -> tuple[str, ...]:
+    """Reconcile, at its full amount, every claimed Agent session hold created before ``created_before``.
 
-    A claimed hold never expires. At host startup no Agent process is alive, so a claimed
-    ``agent_session`` hold belongs to a process that ended without settling (a crash, or a
-    reconciliation that failed until the host stopped). Its booked spend is not known here; the
-    reserved amount is the process's hard cap, so committing it never under-counts beyond the
-    overshoot the cap allows. Route canaries use another purpose and are not touched.
+    A claimed hold never expires. ``created_before`` is the current host process's start: an
+    ``agent_session`` hold created earlier belongs to a process of a previous host run that ended
+    without settling (a crash, or a reconciliation that failed until the host stopped), and holds
+    of this run are never touched, so the sweep is safe to retry at any time. The booked spend is
+    not known here; the reserved amount is the process's hard cap, so committing it never
+    under-counts beyond the overshoot the cap allows. Route canaries use another purpose.
     """
     if current_release_mode() is ReleaseMode.DEV:
         return ()
@@ -266,13 +267,15 @@ async def settle_orphaned_agent_connections(session_factory) -> tuple[str, ...]:
                     BudgetReservationModel.reservation_ref.startswith(f"{AGENT_SESSION_PURPOSE}:"),
                     BudgetReservationModel.state == BudgetReservationState.CLAIMED.value,
                     BudgetReservationModel.reconciled_at.is_(None),
+                    BudgetReservationModel.created_at < created_before,
                 )
             )
         ).all()
     settled = []
     for ref, amount in rows:
-        if await reconcile_agent_connection(session_factory, reservation_ref=ref, actual_usd=Decimal(amount)):
-            settled.append(ref)
+        if not await reconcile_agent_connection(session_factory, reservation_ref=ref, actual_usd=Decimal(amount)):
+            raise RuntimeError(f"orphaned agent budget hold {ref} could not be reconciled")
+        settled.append(ref)
     if settled:
         logger.warning("settled %d orphaned agent budget holds at their reserved amount", len(settled))
     return tuple(settled)

@@ -274,18 +274,28 @@ async def test_an_agent_connection_takes_no_reservation_in_dev(db_factory, monke
 
 
 async def test_orphaned_agent_holds_are_committed_at_their_reserved_amount(db_factory, release_mode: None) -> None:
+    from datetime import timedelta
+
     from lib.budget_guard import reserve_agent_connection, settle_orphaned_agent_connections
 
     await _create_scope(db_factory, "10")
     orphan = await reserve_agent_connection(db_factory)
     canary = await reserve_agent_connection(db_factory, amount=Decimal("0.10"), purpose="agent_canary")
+    host_started = datetime.now(UTC) + timedelta(seconds=1)
+    live = await reserve_agent_connection(db_factory, amount=Decimal("0.50"))
     assert orphan is not None
     assert canary is not None
+    assert live is not None
+    async with db_factory() as session:
+        row = await session.get(BudgetReservationModel, live[0])
+        assert row is not None
+        row.created_at = host_started + timedelta(seconds=1)
+        await session.commit()
 
-    settled = await settle_orphaned_agent_connections(db_factory)
+    settled = await settle_orphaned_agent_connections(db_factory, created_before=host_started)
 
     assert settled == (orphan[0],)
     scope = await _scope(db_factory)
     assert scope is not None
-    assert (scope.reserved_total, scope.committed_total) == (Decimal("0.10"), Decimal("1.00"))
-    assert await settle_orphaned_agent_connections(db_factory) == ()
+    assert (scope.reserved_total, scope.committed_total) == (Decimal("0.60"), Decimal("1.00"))
+    assert await settle_orphaned_agent_connections(db_factory, created_before=host_started) == ()

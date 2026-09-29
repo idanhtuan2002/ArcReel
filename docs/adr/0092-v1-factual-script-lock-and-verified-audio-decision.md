@@ -24,6 +24,11 @@ The sponsor delegated the choice to research:
 - **How it relates to drama.** Screenplay admission stays the Gate B for drama. A product needs
   one of the two, not both.
 - **What changes it.** A changed source or script is a new revision and needs a new lock.
+- **What the server checks.** Only the digest format (`sha256:<64 hex>`). The server does not
+  recompute the digests from the source and script bytes. The lock records the operator's decision about
+  the named revisions, like Gate A's `source_digest`. The release dossier checks the recorded
+  digests against the product's own revisions, and it checks that the lock came before
+  production.
 
 **The audio decision at Gate C.**
 

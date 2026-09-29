@@ -1290,6 +1290,27 @@ class TestAgentBackfillChannel:
 
         assert attempts == [("agent_session:e", Decimal("0.3"))] * 2
 
+    async def test_a_failed_orphan_sweep_is_retried_by_the_patrol_until_it_succeeds(
+        self, manager: SessionManager, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from server.agent_runtime import session_manager as session_manager_module
+
+        sweeps: list[datetime] = []
+
+        async def flaky_sweep(_factory, *, created_before: datetime) -> tuple[str, ...]:
+            sweeps.append(created_before)
+            if len(sweeps) == 1:
+                raise RuntimeError("database unavailable")
+            return ()
+
+        monkeypatch.setattr(session_manager_module, "settle_orphaned_agent_connections", flaky_sweep)
+
+        await manager._patrol_once()
+        await manager._patrol_once()
+        await manager._patrol_once()
+
+        assert sweeps == [manager._started_at, manager._started_at]
+
     async def test_non_completed_turn_records_failed_but_keeps_reported_cost(
         self, manager: SessionManager, acct: _AccountingDb
     ) -> None:
