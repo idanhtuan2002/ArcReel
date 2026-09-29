@@ -17,12 +17,27 @@ from lib.db.repositories.advanced_creative import ExplorationRepository
 from lib.db.repositories.host_hardening import (
     CandidateObjectRepository,
     MasterAuthorityRepository,
+    MasterHeadConflictError,
     PromotionReceiptRepository,
 )
+from r2.advanced_creative.errors import CommandConflictError, PromotionBindingStaleError
 from r2.advanced_creative.exploration import ExplorationService
 from r2.advanced_creative.promotion import ExplorationPromotion
 from r2.contracts.host_hardening import MasterHeadSnapshot, VerifiedCandidateObject
 from r2.host_hardening.master_authority import MasterAuthorityUnit
+from r2.host_hardening.promotion import (
+    CandidateArtifactMismatchError,
+    CandidateNotFoundError,
+    PromotionExpectedVersionConflictError,
+    PromotionReceiptReplayMismatchError,
+)
+
+_STALE_M7_BINDINGS = (
+    CandidateArtifactMismatchError,
+    CandidateNotFoundError,
+    MasterHeadConflictError,
+    PromotionExpectedVersionConflictError,
+)
 
 
 def _utc_now() -> datetime:
@@ -82,15 +97,20 @@ class HostSlotAuthority:
             commit=_deferred_commit,
             clock=_utc_now,
         )
-        return await unit.promote_registered(
-            user_id=user_id,
-            project_name=project_name,
-            artifact_key=target_ref,
-            candidate_id=candidate_id,
-            expected_master_version=expected_master_version,
-            approval_record=approval_record,
-            command_id=command_id,
-        )
+        try:
+            return await unit.promote_registered(
+                user_id=user_id,
+                project_name=project_name,
+                artifact_key=target_ref,
+                candidate_id=candidate_id,
+                expected_master_version=expected_master_version,
+                approval_record=approval_record,
+                command_id=command_id,
+            )
+        except PromotionReceiptReplayMismatchError as error:
+            raise CommandConflictError("the M7 promotion command was already used differently") from error
+        except _STALE_M7_BINDINGS as error:
+            raise PromotionBindingStaleError("the M7 authority refused the bound candidate or head") from error
 
 
 def exploration_service(session: AsyncSession) -> ExplorationService:

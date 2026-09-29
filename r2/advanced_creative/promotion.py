@@ -6,6 +6,10 @@ slot's authority row. Under them it revalidates every bound field. It then stage
 authorization, the M7 promotion (head version, pointer, M7 receipt, project event) and the M8
 receipts, and commits once. An exact replay returns the stored receipt before any currentness
 check.
+
+Under the locks the promotion also recomputes the revision's payload digest from its stored payload
+and lineage, and requires the rendered object to be registered for the target slot (ADR-0097 review
+round 1).
 """
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 
-from r2.advanced_creative.digests import digest_canonical, digest_command
+from r2.advanced_creative.digests import digest_canonical, digest_command, digest_payload
 from r2.advanced_creative.errors import (
     CandidateConflictError,
     CommandConflictError,
@@ -109,7 +113,11 @@ class ExplorationPromotion:
             candidate_id=preview.candidate_id,
             revision=preview.candidate_revision,
         )
-        if revision is None or revision.payload_digest != preview.candidate_payload_digest:
+        if (
+            revision is None
+            or revision.payload_digest != preview.candidate_payload_digest
+            or digest_payload(revision.payload, revision.lineage) != revision.payload_digest
+        ):
             raise PromotionBindingStaleError("the previewed revision no longer matches")
         payload = promotable_format(revision)
         target_ref = preview.target.target_ref
@@ -125,8 +133,12 @@ class ExplorationPromotion:
         candidate_object = await self._slots.candidate_object(
             user_id=user_id, project_name=project_name, candidate_id=payload.rendered_artifact_ref
         )
-        if candidate_object is None or candidate_object.content_digest != payload.rendered_artifact_digest:
-            raise PromotionBindingStaleError("the rendered artifact is not the registered candidate object")
+        if (
+            candidate_object is None
+            or candidate_object.artifact_key != target_ref
+            or candidate_object.content_digest != payload.rendered_artifact_digest
+        ):
+            raise PromotionBindingStaleError("the rendered artifact is not a candidate object registered for this slot")
 
         authorization_digest = await self._store.stage_authorization(user_id=user_id, authorization=authorization)
         promoted = await self._slots.promote(

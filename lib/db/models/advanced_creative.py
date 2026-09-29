@@ -1,9 +1,12 @@
 """M8 exploration evidence: candidate heads and immutable revisions, command receipts, promotion
 previews, authorizations and receipts (plan 2026-09-13 M8-A fixed persistence map).
 
-Evidence rows are append-only and are never cascade-deleted; only the candidate head row is
-mutable, through an explicit ``head_version`` compare-and-set. Canonical bytes and digests, not
-database JSON ordering, are the hash authority.
+Evidence rows are append-only and are never cascade-deleted, not even with their owner: the
+``users.id`` foreign key is ``RESTRICT``, not the ``UserOwnedMixin`` ``CASCADE``. Only the candidate
+head row is mutable, through an explicit ``head_version`` compare-and-set. A candidate's identity is
+``(user_id, project_name, candidate_id)``; every reference to a candidate or revision carries that
+scope, so the same ID in two scopes names two independent candidates. Canonical bytes and digests,
+not database JSON ordering, are the hash authority.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from sqlalchemy import (
     JSON,
     CheckConstraint,
     DateTime,
+    ForeignKey,
     ForeignKeyConstraint,
     Index,
     Integer,
@@ -24,18 +28,27 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from lib.db.base import Base, UserOwnedMixin
+from lib.db.base import DEFAULT_USER_ID, Base
 
 _ID = String(255)
 _DIGEST = String(71)
 _ENUM = String(32)
 
 
-class M8CandidateHeadModel(UserOwnedMixin, Base):
+class _EvidenceOwner:
+    user_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        server_default=DEFAULT_USER_ID,
+        index=True,
+    )
+
+
+class M8CandidateHeadModel(_EvidenceOwner, Base):
     __tablename__ = "m8_candidate_heads"
     __table_args__ = (
-        PrimaryKeyConstraint("candidate_id", name="pk_m8_candidate_heads"),
-        UniqueConstraint("user_id", "project_name", "candidate_id", name="uq_m8_candidate_heads_scope"),
+        PrimaryKeyConstraint("user_id", "project_name", "candidate_id", name="pk_m8_candidate_heads"),
         CheckConstraint("current_revision >= 1", name="ck_m8_candidate_heads_current_revision"),
         CheckConstraint("head_version >= 1", name="ck_m8_candidate_heads_head_version"),
         Index("ix_m8_candidate_heads_scope", "user_id", "project_name"),
@@ -49,14 +62,15 @@ class M8CandidateHeadModel(UserOwnedMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-class M8CandidateRevisionModel(UserOwnedMixin, Base):
+class M8CandidateRevisionModel(_EvidenceOwner, Base):
     __tablename__ = "m8_candidate_revisions"
     __table_args__ = (
-        PrimaryKeyConstraint("candidate_id", "revision", name="pk_m8_candidate_revisions"),
+        PrimaryKeyConstraint("user_id", "project_name", "candidate_id", "revision", name="pk_m8_candidate_revisions"),
         ForeignKeyConstraint(
-            ["candidate_id"], ["m8_candidate_heads.candidate_id"], name="fk_m8_candidate_revisions_candidate"
+            ["user_id", "project_name", "candidate_id"],
+            ["m8_candidate_heads.user_id", "m8_candidate_heads.project_name", "m8_candidate_heads.candidate_id"],
+            name="fk_m8_candidate_revisions_candidate",
         ),
-        UniqueConstraint("user_id", "project_name", "candidate_id", "revision", name="uq_m8_candidate_revisions_scope"),
         CheckConstraint("kind IN ('CANVAS', 'SPATIAL', 'FORMAT')", name="ck_m8_candidate_revisions_kind"),
         CheckConstraint("revision >= 1", name="ck_m8_candidate_revisions_revision"),
         CheckConstraint(
@@ -76,7 +90,7 @@ class M8CandidateRevisionModel(UserOwnedMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-class M8CommandReceiptModel(UserOwnedMixin, Base):
+class M8CommandReceiptModel(_EvidenceOwner, Base):
     __tablename__ = "m8_command_receipts"
     __table_args__ = (
         PrimaryKeyConstraint(
@@ -98,14 +112,19 @@ class M8CommandReceiptModel(UserOwnedMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-class M8PromotionPreviewModel(UserOwnedMixin, Base):
+class M8PromotionPreviewModel(_EvidenceOwner, Base):
     __tablename__ = "m8_promotion_previews"
     __table_args__ = (
         PrimaryKeyConstraint("preview_id", name="pk_m8_promotion_previews"),
         UniqueConstraint("user_id", "project_name", "preview_command_id", name="uq_m8_promotion_previews_command"),
         ForeignKeyConstraint(
-            ["candidate_id", "candidate_revision"],
-            ["m8_candidate_revisions.candidate_id", "m8_candidate_revisions.revision"],
+            ["user_id", "project_name", "candidate_id", "candidate_revision"],
+            [
+                "m8_candidate_revisions.user_id",
+                "m8_candidate_revisions.project_name",
+                "m8_candidate_revisions.candidate_id",
+                "m8_candidate_revisions.revision",
+            ],
             name="fk_m8_promotion_previews_revision",
         ),
         CheckConstraint("expected_target_version >= 0", name="ck_m8_promotion_previews_target_version"),
@@ -139,7 +158,7 @@ class M8PromotionPreviewModel(UserOwnedMixin, Base):
     ttl_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
-class M8PromotionAuthorizationModel(UserOwnedMixin, Base):
+class M8PromotionAuthorizationModel(_EvidenceOwner, Base):
     __tablename__ = "m8_promotion_authorizations"
     __table_args__ = (
         PrimaryKeyConstraint("user_id", "project_name", "command_id", name="pk_m8_promotion_authorizations"),
@@ -163,7 +182,7 @@ class M8PromotionAuthorizationModel(UserOwnedMixin, Base):
     authorization_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
 
 
-class M8PromotionReceiptModel(UserOwnedMixin, Base):
+class M8PromotionReceiptModel(_EvidenceOwner, Base):
     __tablename__ = "m8_promotion_receipts"
     __table_args__ = (
         PrimaryKeyConstraint("receipt_id", name="pk_m8_promotion_receipts"),
@@ -172,8 +191,13 @@ class M8PromotionReceiptModel(UserOwnedMixin, Base):
             ["preview_id"], ["m8_promotion_previews.preview_id"], name="fk_m8_promotion_receipts_preview"
         ),
         ForeignKeyConstraint(
-            ["candidate_id", "candidate_revision"],
-            ["m8_candidate_revisions.candidate_id", "m8_candidate_revisions.revision"],
+            ["user_id", "project_name", "candidate_id", "candidate_revision"],
+            [
+                "m8_candidate_revisions.user_id",
+                "m8_candidate_revisions.project_name",
+                "m8_candidate_revisions.candidate_id",
+                "m8_candidate_revisions.revision",
+            ],
             name="fk_m8_promotion_receipts_revision",
         ),
         ForeignKeyConstraint(

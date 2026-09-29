@@ -1,8 +1,9 @@
 """add M8 exploration authority (plan 2026-09-13 M8-A, execution contract amendments)
 
 Six append-only M8 evidence tables: candidate heads and revisions, command receipts, promotion
-previews, authorizations and receipts. No cascade deletion from any evidence table; downgrade
-removes only these six tables, in reverse dependency order.
+previews, authorizations and receipts. No cascade deletion from any evidence table, including the
+``users.id`` owner key (``RESTRICT``). Candidate and revision keys carry ``(user_id, project_name)``.
+Downgrade removes only these six tables, in reverse dependency order.
 
 Revision ID: 8a8c4a0e0001
 Revises: c9e1f4a2b701
@@ -45,9 +46,8 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(), server_default="default", nullable=False),
         sa.CheckConstraint("current_revision >= 1", name="ck_m8_candidate_heads_current_revision"),
         sa.CheckConstraint("head_version >= 1", name="ck_m8_candidate_heads_head_version"),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("candidate_id", name="pk_m8_candidate_heads"),
-        sa.UniqueConstraint("user_id", "project_name", "candidate_id", name="uq_m8_candidate_heads_scope"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("user_id", "project_name", "candidate_id", name="pk_m8_candidate_heads"),
     )
     with op.batch_alter_table("m8_candidate_heads", schema=None) as batch_op:
         batch_op.create_index("ix_m8_candidate_heads_scope", ["user_id", "project_name"], unique=False)
@@ -68,7 +68,7 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "operation IN ('APPEND_REVISION', 'PREVIEW', 'PROMOTE')", name="ck_m8_command_receipts_operation"
         ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint(
             "user_id", "project_name", "actor_scope", "operation", "command_id", name="pk_m8_command_receipts"
         ),
@@ -95,12 +95,13 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("revision >= 1", name="ck_m8_candidate_revisions_revision"),
         sa.ForeignKeyConstraint(
-            ["candidate_id"], ["m8_candidate_heads.candidate_id"], name="fk_m8_candidate_revisions_candidate"
+            ["user_id", "project_name", "candidate_id"],
+            ["m8_candidate_heads.user_id", "m8_candidate_heads.project_name", "m8_candidate_heads.candidate_id"],
+            name="fk_m8_candidate_revisions_candidate",
         ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("candidate_id", "revision", name="pk_m8_candidate_revisions"),
-        sa.UniqueConstraint(
-            "user_id", "project_name", "candidate_id", "revision", name="uq_m8_candidate_revisions_scope"
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint(
+            "user_id", "project_name", "candidate_id", "revision", name="pk_m8_candidate_revisions"
         ),
     )
     with op.batch_alter_table("m8_candidate_revisions", schema=None) as batch_op:
@@ -134,11 +135,16 @@ def upgrade() -> None:
         sa.CheckConstraint("expected_target_version >= 0", name="ck_m8_promotion_previews_target_version"),
         sa.CheckConstraint("ttl_seconds > 0 AND ttl_seconds <= 3600", name="ck_m8_promotion_previews_ttl"),
         sa.ForeignKeyConstraint(
-            ["candidate_id", "candidate_revision"],
-            ["m8_candidate_revisions.candidate_id", "m8_candidate_revisions.revision"],
+            ["user_id", "project_name", "candidate_id", "candidate_revision"],
+            [
+                "m8_candidate_revisions.user_id",
+                "m8_candidate_revisions.project_name",
+                "m8_candidate_revisions.candidate_id",
+                "m8_candidate_revisions.revision",
+            ],
             name="fk_m8_promotion_previews_revision",
         ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("preview_id", name="pk_m8_promotion_previews"),
         sa.UniqueConstraint("user_id", "project_name", "preview_command_id", name="uq_m8_promotion_previews_command"),
     )
@@ -162,7 +168,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["preview_id"], ["m8_promotion_previews.preview_id"], name="fk_m8_promotion_authorizations_preview"
         ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("user_id", "project_name", "command_id", name="pk_m8_promotion_authorizations"),
         sa.UniqueConstraint(
             "user_id", "project_name", "authorization_digest", name="uq_m8_promotion_authorizations_digest"
@@ -194,8 +200,13 @@ def upgrade() -> None:
             name="ck_m8_promotion_receipts_master_coupling",
         ),
         sa.ForeignKeyConstraint(
-            ["candidate_id", "candidate_revision"],
-            ["m8_candidate_revisions.candidate_id", "m8_candidate_revisions.revision"],
+            ["user_id", "project_name", "candidate_id", "candidate_revision"],
+            [
+                "m8_candidate_revisions.user_id",
+                "m8_candidate_revisions.project_name",
+                "m8_candidate_revisions.candidate_id",
+                "m8_candidate_revisions.revision",
+            ],
             name="fk_m8_promotion_receipts_revision",
         ),
         sa.ForeignKeyConstraint(
@@ -210,7 +221,7 @@ def upgrade() -> None:
             ],
             name="fk_m8_promotion_receipts_authorization",
         ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("receipt_id", name="pk_m8_promotion_receipts"),
         sa.UniqueConstraint("user_id", "project_name", "command_id", name="uq_m8_promotion_receipts_command"),
     )

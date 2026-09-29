@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.candidate_store import prepare_candidate
 from lib.db.models.advanced_creative import (
+    M8CandidateRevisionModel,
     M8CommandReceiptModel,
     M8PromotionAuthorizationModel,
     M8PromotionReceiptModel,
@@ -94,18 +95,23 @@ async def _slot_with_master(factory: Factory, root: Path) -> tuple[str, str]:
             approval_record="APR-a",
             command_id="seed-a",
         )
-    second = _video(root / "objects" / "b.mp4", "b")
-    candidate_id = "m7c:render-b"
+    return await _registered_object(factory, root, "b")
+
+
+async def _registered_object(factory: Factory, root: Path, tag: str, artifact_key: str = SLOT) -> tuple[str, str]:
+    """Register a new candidate object for ``artifact_key``; returns its id and digest."""
+    video = _video(root / "objects" / f"{tag}.mp4", tag)
+    candidate_id = f"m7c:render-{tag}"
     verified = prepare_candidate(
         identity=CandidateIdentity(
             candidate_id=candidate_id,
             user_id=USER,
             project_name=PROJECT,
-            artifact_key=SLOT,
-            expected_content_digest=_sha(second),
+            artifact_key=artifact_key,
+            expected_content_digest=_sha(video),
         ),
-        source_file=second,
-        final_path=second,
+        source_file=video,
+        final_path=video,
         media_root=root,
         media_probe=stream_probe_digest,
     )
@@ -371,6 +377,67 @@ async def test_an_authority_failure_rolls_every_row_back(
 
     assert await _count(session_factory, M8PromotionAuthorizationModel) == 0
     assert await _count(session_factory, M8PromotionReceiptModel) == 0
+    assert (await _master(session_factory)).master_version == 1
+
+
+async def test_a_stored_payload_changed_under_its_digest_is_refused(session_factory: Factory, tmp_path: Path) -> None:
+    object_id, object_digest = await _slot_with_master(session_factory, tmp_path)
+    await _append(session_factory, _format_revision(object_id, object_digest))
+    preview = await _preview(session_factory)
+    other_id, other_digest = await _registered_object(session_factory, tmp_path, "c")
+    async with session_factory() as session:
+        row = (await session.execute(select(M8CandidateRevisionModel))).scalar_one()
+        row.payload_json = row.payload_json | {
+            "rendered_artifact_ref": other_id,
+            "rendered_artifact_digest": other_digest,
+        }
+        await session.commit()
+
+    with pytest.raises(PromotionBindingStaleError):
+        await _promote(session_factory, _authorization(preview))
+
+    assert await _count(session_factory, M8PromotionReceiptModel) == 0
+    assert (await _master(session_factory)).master_version == 1
+
+
+async def test_an_object_registered_for_another_slot_is_refused(session_factory: Factory, tmp_path: Path) -> None:
+    await _slot_with_master(session_factory, tmp_path)
+    foreign_id, foreign_digest = await _registered_object(
+        session_factory, tmp_path, "elsewhere", artifact_key="m8-slot:demo:square-1"
+    )
+    await _append(session_factory, _format_revision(foreign_id, foreign_digest))
+    preview = await _preview(session_factory)
+
+    with pytest.raises(PromotionBindingStaleError):
+        await _promote(session_factory, _authorization(preview))
+
+    assert await _count(session_factory, M8PromotionAuthorizationModel) == 0
+    assert (await _master(session_factory)).master_version == 1
+
+
+async def test_a_failure_after_the_authority_staged_its_writes_rolls_every_row_back(
+    session_factory: Factory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    object_id, object_digest = await _slot_with_master(session_factory, tmp_path)
+    await _append(session_factory, _format_revision(object_id, object_digest))
+    preview = await _preview(session_factory)
+    staged: list[int] = []
+    original = ExplorationRepository.stage_promotion_receipt
+
+    async def fail_after_the_m7_writes(self, **kwargs):
+        staged.append(
+            int((await self.session.execute(select(func.count()).select_from(MasterHeadVersionModel))).scalar_one())
+        )
+        raise RuntimeError("receipt store unavailable")
+
+    monkeypatch.setattr(ExplorationRepository, "stage_promotion_receipt", fail_after_the_m7_writes)
+    with pytest.raises(RuntimeError, match="receipt store unavailable"):
+        await _promote(session_factory, _authorization(preview))
+    monkeypatch.setattr(ExplorationRepository, "stage_promotion_receipt", original)
+
+    assert staged == [2]
+    assert await _count(session_factory, MasterHeadVersionModel) == 1
+    assert await _count(session_factory, M8PromotionAuthorizationModel) == 0
     assert (await _master(session_factory)).master_version == 1
 
 

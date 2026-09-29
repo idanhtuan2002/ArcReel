@@ -116,7 +116,11 @@ write depending on a head holds that head's lock:
 **Why there is no deadlock:**
 
 - Every M8 operation takes its locks in that fixed order and holds them to one commit.
-- No host writer shares an M8 slot row (rule 3).
+- An M8 slot's first head is written by an M7 promotion, so M7 writers do share M8 slot
+  rows. Since V2-02c (amendment 6), every M7 promotion runs its pointer compare-and-set
+  before it appends the head version. Every same-slot writer (Gate C/D, backfill, M8) therefore
+  takes the `master_authorities` row before any `master_head_versions` row, so no writer waits
+  on another's uncommitted history row while holding the row that one needs.
 - Different candidates and different slots never share a lock.
 
 **Why there are no stale writes:**
@@ -128,3 +132,30 @@ write depending on a head holds that head's lock:
 
 **SQLite.** It serializes all writers on the database write lock, so the order above cannot
 cycle there either. The concurrency tests run on PostgreSQL.
+
+## Review round 1 resolutions (Codex, `dc13cc93..21821568`)
+
+The rules below were written before the fixes. Each has a test that fails without the fix.
+
+1. **The promotion recomputes the payload digest.** Under the locks, the promotion recomputes
+   `digest_payload(payload, lineage)` from the stored revision. It must equal both the stored
+   `payload_digest` and the preview's `candidate_payload_digest`. A stored row whose bytes
+   changed while its digest did not is refused with `m8_promotion_binding_stale`.
+2. **One lock order for every same-slot writer.** This is covered by V2-02c and the deadlock
+   argument above.
+3. **Candidate identity is scoped.** The spec requires that "all public reads and writes scope
+   by `(user_id, project_name)`; foreign and unknown IDs are indistinguishable". The plan's
+   global `candidate_id` primary key breaks this for writes: a genesis that reuses a foreign ID
+   would return 409 where an unknown ID returns 200. The spec prevails over the plan's
+   persistence map. The candidate head and revision keys are
+   `(user_id, project_name, candidate_id[, revision])`. The previews and receipts that
+   reference them use the same composite key. The same ID in two scopes names two
+   independent candidates.
+4. **Evidence survives user deletion.** The plan says "Do not add cascade deletion from any
+   evidence table". Every M8 table's `users.id` foreign key is `ON DELETE RESTRICT`, not the
+   `UserOwnedMixin` default of `CASCADE`.
+5. **The rendered object must be registered for the target slot.** Under the slot lock, the
+   promotion requires the candidate object's `artifact_key` to equal the target slot. If it does
+   not, the promotion is refused with `m8_promotion_binding_stale` before M7 is called. The
+   slot authority also translates the M7 promotion conflicts it can still raise into M8 errors,
+   so no validly shaped request reaches an unhandled server error.

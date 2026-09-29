@@ -114,6 +114,23 @@ async def test_a_foreign_revision_is_indistinguishable_from_an_unknown_one(m8_cl
     assert foreign.json() == unknown.json()
 
 
+async def test_a_genesis_reusing_a_foreign_id_is_indistinguishable_from_a_new_one(m8_client: AsyncClient) -> None:
+    assert (await m8_client.post(f"{BASE}/revisions", json=_append_body())).status_code == 200
+    other = "/api/v1/projects/other/m8/exploration"
+    reused = _append_body(project="other")
+    fresh = _append_body(project="other")
+    fresh["candidate"]["candidate_id"] = "c-new"  # type: ignore[index]
+    fresh["command_id"] = "cmd-2"
+
+    reused_response = await m8_client.post(f"{other}/revisions", json=reused)
+    fresh_response = await m8_client.post(f"{other}/revisions", json=fresh)
+    own_history = await m8_client.get(f"{BASE}/candidates/c-1/revisions")
+
+    assert (reused_response.status_code, fresh_response.status_code) == (200, 200)
+    assert reused_response.json() == {"candidate_id": "c-1", "current_revision": 1, "head_version": 1}
+    assert [item["lineage"]["project_name"] for item in own_history.json()] == [PROJECT]
+
+
 @pytest.mark.parametrize("query", ["limit=0", "limit=101", "after_revision=-1"])
 async def test_pagination_bounds_are_validated(m8_client: AsyncClient, query: str) -> None:
     response = await m8_client.get(f"{BASE}/candidates/c-1/revisions?{query}")

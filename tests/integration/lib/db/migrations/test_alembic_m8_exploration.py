@@ -22,7 +22,6 @@ M8_TABLES = {
 EXPECTED_NAMES = {
     "m8_candidate_heads": {
         "pk_m8_candidate_heads",
-        "uq_m8_candidate_heads_scope",
         "ck_m8_candidate_heads_current_revision",
         "ck_m8_candidate_heads_head_version",
         "ix_m8_candidate_heads_scope",
@@ -30,7 +29,6 @@ EXPECTED_NAMES = {
     "m8_candidate_revisions": {
         "pk_m8_candidate_revisions",
         "fk_m8_candidate_revisions_candidate",
-        "uq_m8_candidate_revisions_scope",
         "ck_m8_candidate_revisions_kind",
         "ck_m8_candidate_revisions_revision",
         "ck_m8_candidate_revisions_parent",
@@ -60,6 +58,8 @@ EXPECTED_NAMES = {
         "ck_m8_promotion_receipts_master_coupling",
     },
 }
+
+type _ForeignKey = tuple[tuple[str, ...], str, tuple[str, ...], str]
 
 
 def _engine(db_path: Path) -> sa.Engine:
@@ -101,6 +101,60 @@ def test_the_six_tables_have_the_named_constraints_and_match_the_orm(alembic_cfg
             for column in M8CandidateHeadModel.metadata.tables[table].columns
         }
         assert reflected == declared, table
+
+
+def _reflected_keys(inspector: sa.Inspector, table: str) -> tuple[list[str], set[_ForeignKey]]:
+    foreign = {
+        (
+            tuple(fk["constrained_columns"]),
+            fk["referred_table"],
+            tuple(fk["referred_columns"]),
+            str((fk.get("options") or {}).get("ondelete", "NO ACTION")).upper(),
+        )
+        for fk in inspector.get_foreign_keys(table)
+    }
+    return list(inspector.get_pk_constraint(table)["constrained_columns"]), foreign
+
+
+def _declared_keys(table: sa.Table) -> tuple[list[str], set[_ForeignKey]]:
+    foreign = {
+        (
+            tuple(column.name for column in constraint.columns),
+            constraint.referred_table.name,
+            tuple(element.column.name for element in constraint.elements),
+            (constraint.ondelete or "NO ACTION").upper(),
+        )
+        for constraint in table.foreign_key_constraints
+    }
+    return [column.name for column in table.primary_key.columns], foreign
+
+
+def test_keys_are_scoped_match_the_orm_and_never_cascade(alembic_cfg: tuple[Config, Path]) -> None:
+    cfg, db_path = alembic_cfg
+    command.upgrade(cfg, "head")
+    inspector = sa.inspect(_engine(db_path))
+    tables = M8CandidateHeadModel.metadata.tables
+
+    for table in sorted(M8_TABLES):
+        primary, foreign = _reflected_keys(inspector, table)
+        assert (primary, foreign) == _declared_keys(tables[table]), table
+        assert ((("user_id",), "users", ("id",), "RESTRICT")) in foreign, table
+        assert all(rule != "CASCADE" for *_, rule in foreign), table
+    assert _reflected_keys(inspector, "m8_candidate_heads")[0] == ["user_id", "project_name", "candidate_id"]
+    assert _reflected_keys(inspector, "m8_candidate_revisions")[0] == [
+        "user_id",
+        "project_name",
+        "candidate_id",
+        "revision",
+    ]
+    revision_ref = (
+        ("user_id", "project_name", "candidate_id", "candidate_revision"),
+        "m8_candidate_revisions",
+        ("user_id", "project_name", "candidate_id", "revision"),
+        "NO ACTION",
+    )
+    assert revision_ref in _reflected_keys(inspector, "m8_promotion_previews")[1]
+    assert revision_ref in _reflected_keys(inspector, "m8_promotion_receipts")[1]
 
 
 def test_downgrade_removes_only_the_m8_tables(alembic_cfg: tuple[Config, Path]) -> None:

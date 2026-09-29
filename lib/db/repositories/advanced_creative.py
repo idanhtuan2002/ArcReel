@@ -278,6 +278,8 @@ class ExplorationRepository:
             advanced = await self.session.execute(
                 update(M8CandidateHeadModel)
                 .where(
+                    M8CandidateHeadModel.user_id == user_id,
+                    M8CandidateHeadModel.project_name == project_name,
                     M8CandidateHeadModel.candidate_id == candidate.candidate_id,
                     M8CandidateHeadModel.head_version == head.head_version,
                 )
