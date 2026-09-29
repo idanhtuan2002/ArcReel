@@ -98,7 +98,7 @@ export function StoryboardFilmstrip({ onShowShot }: StoryboardFilmstripProps) {
           STORYBOARD
           <span className="sr-only"> — {t("creative_canvas_filmstrip_label")}</span>
         </h2>
-        <p id="canvas-filmstrip-hint" className="truncate text-[11px] text-text-4">
+        <p id="canvas-filmstrip-hint" className="truncate text-[11px] text-text-3">
           {shots.length > 0 ? t("creative_canvas_filmstrip_hint") : t("creative_canvas_filmstrip_empty")}
         </p>
       </div>
@@ -134,6 +134,8 @@ export function StoryboardFilmstrip({ onShowShot }: StoryboardFilmstripProps) {
                     <img
                       src={API.getFileUrl(project, path)}
                       alt=""
+                      width={112}
+                      height={63}
                       loading="lazy"
                       decoding="async"
                       draggable={false}

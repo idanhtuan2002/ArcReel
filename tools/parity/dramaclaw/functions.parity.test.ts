@@ -10,6 +10,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { computeAutoLayout } from "@/features/canvas/application/autoLayout";
+import {
+  LOW_DETAIL_ZOOM_THRESHOLD,
+  isLowDetailZoom,
+  isNodeMediaActive,
+  setNodeMediaActive,
+} from "@/features/canvas/application/canvasLod";
 import { CANVAS_NODE_TYPES, type CanvasEdge, type CanvasNode } from "@/features/canvas/domain/canvasNodes";
 import { GROUP_COLOR_PRESETS, groupColorBackground, groupColorBorder } from "@/features/canvas/domain/groupColors";
 import { collectBatchDeletableIds } from "@/features/canvas/domain/groupSelectionDelete";
@@ -87,6 +93,14 @@ const FUNCTIONS: Record<string, (...args: any[]) => unknown> = {
   groupColorPresets: () => GROUP_COLOR_PRESETS.map(({ key, value }) => ({ key, value })),
   groupColorBackground: (color) => groupColorBackground(color),
   groupColorBorder: (color) => groupColorBorder(color),
+  lowDetailZoomThreshold: () => LOW_DETAIL_ZOOM_THRESHOLD,
+  isLowDetailZoom: (zoom) => isLowDetailZoom(zoom),
+  mediaActiveAfter: (ops: [string, boolean][], queries: string[]) => {
+    for (const [id, active] of ops) setNodeMediaActive(id, active);
+    const out = queries.map((id) => isNodeMediaActive(id));
+    for (const [id] of ops) setNodeMediaActive(id, false);
+    return out;
+  },
 };
 
 interface FunctionCase {

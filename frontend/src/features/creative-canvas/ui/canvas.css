@@ -72,3 +72,9 @@
     transition: none;
   }
 }
+
+/* Long strips render only the frames on screen. */
+.filmstrip-frame {
+  content-visibility: auto;
+  contain-intrinsic-size: 112px 84px;
+}

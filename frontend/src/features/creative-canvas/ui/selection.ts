@@ -1,7 +1,9 @@
 /**
- * Selection is view state held on the nodes (`selected`), which React Flow
- * renders from. The ported domain reducers treat a select change as a non-edit
- * and leave node flags alone, so the adapter applies it here.
+ * View state React Flow renders from and the domain does not own: selection
+ * (`selected`) and auto-measured size (`measured`). The ported domain reducers
+ * treat both as non-edits and leave these fields alone, so the adapter applies
+ * them here, as React Flow's own `applyNodeChanges` does: a measurement sets
+ * `measured`, and only a resize writes `width` and `height` through the domain.
  */
 import { applyNodeChanges, selectNode } from "../domain/graph";
 import type { CanvasGraphState, NodeChange } from "../domain/types";
@@ -43,4 +45,24 @@ export function selectOnly(graph: CanvasGraphState, nodeId: string): CanvasGraph
           : [],
     ),
   );
+}
+
+export interface Measurement {
+  id: string;
+  width: number;
+  height: number;
+}
+
+/** Record React Flow's auto-measured sizes; visible-only rendering needs them. Not an edit. */
+export function applyMeasurements(graph: CanvasGraphState, measurements: readonly Measurement[]): CanvasGraphState {
+  if (measurements.length === 0) return graph;
+  const byId = new Map(measurements.map((item) => [item.id, item] as const));
+  let changed = false;
+  const nodes = graph.nodes.map((node) => {
+    const next = byId.get(node.id);
+    if (!next || (node.measured?.width === next.width && node.measured.height === next.height)) return node;
+    changed = true;
+    return { ...node, measured: { width: next.width, height: next.height } };
+  });
+  return changed ? { ...graph, nodes } : graph;
 }

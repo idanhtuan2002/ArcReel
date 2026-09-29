@@ -644,6 +644,77 @@
           "changedCount": 12
         }
       }
+    ],
+    "lod-tier": [
+      {
+        "value": 0.35
+      },
+      {
+        "value": true
+      },
+      {
+        "value": true
+      },
+      {
+        "value": true
+      },
+      {
+        "value": true
+      },
+      {
+        "value": true
+      },
+      {
+        "value": false
+      },
+      {
+        "value": false
+      },
+      {
+        "value": false
+      },
+      {
+        "value": false
+      },
+      {
+        "value": false
+      },
+      {
+        "value": false
+      },
+      {
+        "value": false
+      },
+      {
+        "value": false
+      },
+      {
+        "value": [
+          false
+        ]
+      },
+      {
+        "value": [
+          true,
+          false
+        ]
+      },
+      {
+        "value": [
+          false
+        ]
+      },
+      {
+        "value": [
+          false
+        ]
+      },
+      {
+        "value": [
+          false,
+          true
+        ]
+      }
     ]
   }
 }

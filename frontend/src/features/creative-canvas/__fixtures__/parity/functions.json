@@ -1002,6 +1002,189 @@
           ]
         }
       ]
+    },
+    {
+      "id": "lod-tier",
+      "behaviors": [
+        "U01"
+      ],
+      "calls": [
+        {
+          "fn": "lowDetailZoomThreshold",
+          "args": []
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.05
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.2
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.34
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.3499
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.35
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.3501
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.5
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            1
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            2
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            {
+              "$num": "NaN"
+            }
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            {
+              "$num": "Infinity"
+            }
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            {
+              "$num": "-Infinity"
+            }
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [],
+            [
+              "n1"
+            ]
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [
+              [
+                "n1",
+                true
+              ]
+            ],
+            [
+              "n1",
+              "n2"
+            ]
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [
+              [
+                "n1",
+                true
+              ],
+              [
+                "n1",
+                false
+              ]
+            ],
+            [
+              "n1"
+            ]
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [
+              [
+                "n1",
+                true
+              ],
+              [
+                "n1",
+                false
+              ],
+              [
+                "n1",
+                false
+              ]
+            ],
+            [
+              "n1"
+            ]
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [
+              [
+                "n1",
+                true
+              ],
+              [
+                "n2",
+                true
+              ],
+              [
+                "n1",
+                false
+              ]
+            ],
+            [
+              "n1",
+              "n2"
+            ]
+          ]
+        }
+      ]
     }
   ]
 }

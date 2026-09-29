@@ -33,6 +33,7 @@ import {
   storyboardSlotRect,
 } from "../domain/storyboardLayout";
 import { computeAutoLayout } from "../domain/layout";
+import { LOW_DETAIL_ZOOM_THRESHOLD, isLowDetailZoom, isNodeMediaActive, setNodeMediaActive } from "../domain/lod";
 import type { CanvasEdge, CanvasNode } from "../domain/types";
 
 export interface FunctionCall {
@@ -132,6 +133,14 @@ const FUNCTIONS: Record<string, (args: Args) => unknown> = {
   groupColorBackground: ([color]) =>
     groupColorBackground(color as string | null),
   groupColorBorder: ([color]) => groupColorBorder(color as string | null),
+  lowDetailZoomThreshold: () => LOW_DETAIL_ZOOM_THRESHOLD,
+  isLowDetailZoom: ([zoom]) => isLowDetailZoom(num(zoom)),
+  mediaActiveAfter: ([ops, queries]) => {
+    for (const [id, active] of ops as [string, boolean][]) setNodeMediaActive(id, active);
+    const out = (queries as string[]).map((id) => isNodeMediaActive(id));
+    for (const [id] of ops as [string, boolean][]) setNodeMediaActive(id, false);
+    return out;
+  },
 };
 
 /** One JSON-safe result per call: `{value}` or `{error}` when the function throws. */

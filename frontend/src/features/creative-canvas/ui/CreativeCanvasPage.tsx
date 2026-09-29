@@ -231,7 +231,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
           {t("creative_canvas_back")}
         </Link>
         <div className="min-w-0">
-          <p className="font-mono text-[10px] tracking-[0.18em] text-text-4">
+          <p className="font-mono text-[10px] tracking-[0.18em] text-text-3">
             EPISODE {String(episode).padStart(2, "0")} · CANVAS
           </p>
           <h1 className="truncate font-editorial text-xl leading-tight text-text">
@@ -285,7 +285,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
       {hasConflict ? (
         <ConflictBanner onUseMine={() => persistence.resolveConflict("mine")} onDiscardMine={() => persistence.resolveConflict("server")} />
       ) : null}
-      <main className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1">
         {phase === "error" ? (
           <div role="alert" className="grid h-full place-items-center">
             <div className="text-center">
@@ -313,7 +313,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
             {t("creative_canvas_loading")}
           </p>
         )}
-      </main>
+      </div>
       {phase === "ready" ? <StoryboardFilmstrip onShowShot={onShowShot} /> : null}
     </div>
   );

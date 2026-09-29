@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { addNode, createGraphState } from "../domain/graph";
 import type { CanvasGraphState } from "../domain/types";
-import { applyFlowNodeChanges, applySelection, selectOnly } from "./selection";
+import { applyFlowNodeChanges, applyMeasurements, applySelection, selectOnly } from "./selection";
 
 function graph(): CanvasGraphState {
   let state = createGraphState();
@@ -48,5 +48,18 @@ describe("canvas selection", () => {
 
     expect(state.nodes.map((node) => node.id)).toEqual(["b", "c"]);
     expect(selectedIds(state)).toEqual(["b"]);
+  });
+});
+
+describe("canvas measurements", () => {
+  it("records measured sizes without counting an edit or touching width and height", () => {
+    const before = graph();
+
+    const after = applyMeasurements(before, [{ id: "a", width: 100, height: 50 }]);
+
+    expect(after.nodes[0].measured).toEqual({ width: 100, height: 50 });
+    expect(after.nodes[0].width).toBeUndefined();
+    expect(after.userEditsSinceHydrate).toBe(before.userEditsSinceHydrate);
+    expect(applyMeasurements(after, [{ id: "a", width: 100, height: 50 }])).toBe(after);
   });
 });

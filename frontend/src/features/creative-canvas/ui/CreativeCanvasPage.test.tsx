@@ -118,6 +118,9 @@ describe("Creative Canvas page", () => {
     expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "舍弃我的版本" }));
+    expect(useCanvasStore.getState().conflict).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认舍弃" }));
 
     expect(useCanvasStore.getState().conflict).toBeNull();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

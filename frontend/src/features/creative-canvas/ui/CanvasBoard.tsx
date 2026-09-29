@@ -6,7 +6,7 @@
  * elements, one memoized node component, a boolean LOD selector per node, and
  * turning shadows and transitions off while the view or a node is moving.
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Background,
@@ -23,10 +23,11 @@ import {
 } from "@xyflow/react";
 
 import { addEdge, deleteEdge } from "../domain/graph";
+import { PANNING_CLASS_RELEASE_DELAY_MS } from "../domain/lod";
 import type { NodeChange } from "../domain/types";
 import { useCanvasStore } from "../state/canvasStore";
 import { CanvasNodeView } from "./CanvasNodeView";
-import { applyFlowNodeChanges } from "./selection";
+import { applyFlowNodeChanges, applyMeasurements, type Measurement } from "./selection";
 
 const NODE_TYPES: NodeTypes = {
   beat: CanvasNodeView,
@@ -41,10 +42,20 @@ const DELETE_KEYS = ["Backspace", "Delete"];
 const MULTI_SELECT_KEYS = ["Shift", "Meta", "Control"];
 const PRO_OPTIONS = { hideAttribution: true };
 
-/** The React Flow node changes the domain understands; React Flow's own add/replace are not used. */
+/** React Flow's auto-measurements: a size change that is neither a resize nor sets attributes. */
+export function toMeasurements(changes: readonly FlowNodeChange[]): Measurement[] {
+  return changes.flatMap((change) =>
+    change.type === "dimensions" && change.dimensions && change.resizing === undefined && !change.setAttributes
+      ? [{ id: change.id, width: change.dimensions.width, height: change.dimensions.height }]
+      : [],
+  );
+}
+
+/** The React Flow node changes the domain understands; auto-measurements, add and replace are not passed on. */
 export function toDomainChanges(changes: readonly FlowNodeChange[]): NodeChange[] {
   const mapped: NodeChange[] = [];
   for (const change of changes) {
+    if (change.type === "dimensions" && change.resizing === undefined && !change.setAttributes) continue;
     if (change.type === "position") {
       mapped.push({ type: "position", id: change.id, position: change.position, dragging: change.dragging });
     } else if (change.type === "dimensions") {
@@ -79,7 +90,10 @@ export function CanvasBoard({ label, newId }: CanvasBoardProps) {
   const onNodesChange = useCallback(
     (changes: FlowNodeChange[]) => {
       const mapped = toDomainChanges(changes);
-      if (mapped.length > 0) edit((graph) => applyFlowNodeChanges(graph, mapped));
+      const measurements = toMeasurements(changes);
+      if (mapped.length > 0 || measurements.length > 0) {
+        edit((graph) => applyMeasurements(applyFlowNodeChanges(graph, mapped), measurements));
+      }
     },
     [edit],
   );
@@ -109,11 +123,26 @@ export function CanvasBoard({ label, newId }: CanvasBoardProps) {
     [edit, newId],
   );
 
+  const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setMoving = useCallback((moving: boolean) => {
-    if (!shellRef.current) return;
-    if (moving) shellRef.current.dataset.moving = "true";
-    else delete shellRef.current.dataset.moving;
+    if (releaseTimer.current !== null) clearTimeout(releaseTimer.current);
+    releaseTimer.current = null;
+    if (moving) {
+      if (shellRef.current) shellRef.current.dataset.moving = "true";
+      return;
+    }
+    // Effects return a little after the gesture ends, past its inertia tail.
+    releaseTimer.current = setTimeout(() => {
+      releaseTimer.current = null;
+      if (shellRef.current) delete shellRef.current.dataset.moving;
+    }, PANNING_CLASS_RELEASE_DELAY_MS);
   }, []);
+  useEffect(
+    () => () => {
+      if (releaseTimer.current !== null) clearTimeout(releaseTimer.current);
+    },
+    [],
+  );
   const onMoveStart = useCallback(() => setMoving(true), [setMoving]);
   const onMoveEnd = useCallback(() => setMoving(false), [setMoving]);
 

@@ -2093,6 +2093,7 @@ export default {
   'creative_canvas_conflict_body': 'You are seeing the latest saved version. Your version is kept aside.',
   'creative_canvas_conflict_use_mine': 'Use my version',
   'creative_canvas_conflict_discard_mine': 'Discard my version',
+  'creative_canvas_conflict_confirm_discard': 'Discard for good',
   'creative_canvas_filmstrip_label': 'Storyboard order',
   'creative_canvas_filmstrip_empty': 'Select two or more frames and choose Make storyboard to set a shot order.',
   'creative_canvas_filmstrip_hint': 'Arrow keys move between shots. Alt + arrow keys reorder. Enter shows the shot on the canvas.',

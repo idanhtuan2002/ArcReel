@@ -37,10 +37,12 @@ import math
 import os
 import platform
 import random
+import signal
 import socket
 import subprocess
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -215,6 +217,7 @@ def episode_graph(nodes: int, edges_count: int, seed: int = SEED) -> dict[str, A
         "viewport_bookmarks": [
             {"slot": 0, "x": 0, "y": 0, "zoom": 0.5},
             {"slot": 1, "x": 0, "y": 0, "zoom": 1.0},
+            {"slot": 2, "x": 0, "y": 0, "zoom": 0.2},
         ],
     }
 
@@ -315,18 +318,27 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-@pytest.fixture(scope="module")
-def preview_url() -> Iterator[str]:
+@contextmanager
+def preview_server() -> Generator[str]:
+    """``vite preview`` of frontend/dist on a free port; skips when the build is missing."""
     if not (DIST / "index.html").is_file():
         pytest.skip("frontend/dist is missing; run (cd frontend && pnpm build)")
     port = _free_port()
     process = subprocess.Popen(
-        ["pnpm", "exec", "vite", "preview", "--port", str(port), "--strictPort", "--host", "127.0.0.1"],
+        [
+            str(FRONTEND / "node_modules" / ".bin" / "vite"),
+            "preview",
+            "--port",
+            str(port),
+            "--strictPort",
+            "--host",
+            "127.0.0.1",
+        ],
         cwd=FRONTEND,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
-    url = f"http://127.0.0.1:{port}"
     try:
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
@@ -337,20 +349,33 @@ def preview_url() -> Iterator[str]:
                 time.sleep(0.2)
         else:
             pytest.fail("vite preview did not start")
-        yield url
+        yield f"http://127.0.0.1:{port}"
     finally:
-        process.terminate()
+        os.killpg(process.pid, signal.SIGTERM)
         process.wait(timeout=10)
 
 
-@pytest.fixture(scope="module")
-def browser() -> Iterator[Browser]:
+@contextmanager
+def chromium() -> Generator[Browser]:
+    """The Chromium bundled with the repository's Playwright, headless."""
     with sync_api.sync_playwright() as playwright:
         launched = playwright.chromium.launch()
         try:
             yield launched
         finally:
             launched.close()
+
+
+@pytest.fixture(scope="module")
+def preview_url() -> Iterator[str]:
+    with preview_server() as url:
+        yield url
+
+
+@pytest.fixture(scope="module")
+def browser() -> Iterator[Browser]:
+    with chromium() as launched:
+        yield launched
 
 
 # Installed before the app loads: frame recorder and open-to-interactive probe.
@@ -408,10 +433,6 @@ def _event_latency(page: Page, since: float, names: tuple[str, ...]) -> float:
     entries = page.evaluate("(since) => window.__bench.events.filter((e) => e.start >= since)", since)
     durations = [float(entry["duration"]) for entry in entries if entry["name"] in names]
     return max(durations) if durations else 16.0
-
-
-def _visible(page: Page, selector: str) -> Any:
-    return page.locator(selector).filter(visible=True)
 
 
 def _node_box(page: Page, node_id: str) -> FloatRect:
@@ -492,37 +513,81 @@ def discrete_cycle(page: Page) -> dict[str, float]:
     return out
 
 
+def _inside_beat(page: Page) -> FloatRect:
+    """The box of a beat node fully inside the rendered viewport, read in one frame."""
+    handle = page.wait_for_function(
+        """() => {
+            const pane = document.querySelector('.react-flow__renderer').getBoundingClientRect();
+            for (const el of document.querySelectorAll('.react-flow__node-beat')) {
+                const r = el.getBoundingClientRect();
+                if (r.width > 0 && r.left >= pane.left && r.top >= pane.top && r.right <= pane.right && r.bottom <= pane.bottom) {
+                    return { x: r.left, y: r.top, width: r.width, height: r.height };
+                }
+            }
+            return null;
+        }"""
+    )
+    box: FloatRect = handle.json_value()
+    return box
+
+
 def _frames(page: Page, action: Callable[[], None]) -> list[float]:
     page.evaluate("window.__bench.startFrames()")
     action()
     return [float(value) for value in page.evaluate("window.__bench.stopFrames()")]
 
 
+_VIEWPORT = "document.querySelector('.react-flow__viewport').style.transform"
+
+
+def _empty_pane_point(page: Page) -> tuple[float, float]:
+    """A point where the pane itself is under the pointer, so a drag pans the view."""
+    point = page.wait_for_function(
+        """() => {
+            const r = document.querySelector('.react-flow__renderer').getBoundingClientRect();
+            for (let fy = 0.5; fy < 0.95; fy += 0.05) {
+                for (let fx = 0.5; fx < 0.95; fx += 0.05) {
+                    const x = r.left + r.width * fx, y = r.top + r.height * fy;
+                    const el = document.elementFromPoint(x, y);
+                    if (el && el.classList.contains('react-flow__pane')) return [x, y];
+                }
+            }
+            return null;
+        }"""
+    ).json_value()
+    return float(point[0]), float(point[1])
+
+
 def continuous_run(page: Page) -> dict[str, list[float]]:
-    """Frame times of pan, zoom and node drag at zoom 0.5 and 1.0 (bookmarks 1 and 2)."""
+    """Frame times of pan, zoom and node drag at zoom 0.5 and 1.0 (bookmarks 1 and 2).
+
+    Each gesture is checked to have moved the view or the node; a gesture that did nothing
+    would measure an idle page.
+    """
     out: dict[str, list[float]] = {"pan": [], "zoom": [], "node_drag": []}
-    pane = page.locator(".react-flow__renderer").bounding_box()
-    assert pane is not None
-    cx, cy = pane["x"] + pane["width"] / 2, pane["y"] + pane["height"] / 2
     for slot in ("1", "2"):
         page.evaluate("document.activeElement instanceof HTMLElement && document.activeElement.blur()")
         page.keyboard.press(slot)
         page.wait_for_timeout(400)
+        px, py = _empty_pane_point(page)
+        seen: dict[str, str] = {}
 
-        def pan() -> None:
-            page.keyboard.down("Space")
-            page.mouse.move(cx, cy)
+        def pan(x: float = px, y: float = py, seen: dict[str, str] = seen) -> None:
+            before = page.evaluate(_VIEWPORT)
+            page.mouse.move(x, y)
             page.mouse.down()
-            page.mouse.move(cx - 300, cy - 150, steps=40)
-            page.mouse.move(cx, cy, steps=40)
+            page.mouse.move(x - 300, y - 150, steps=40)
+            seen["pan"] = "moved" if page.evaluate(_VIEWPORT) != before else "still"
+            page.mouse.move(x, y, steps=40)
             page.mouse.up()
-            page.keyboard.up("Space")
 
-        def zoom() -> None:
-            page.mouse.move(cx, cy)
+        def zoom(x: float = px, y: float = py, seen: dict[str, str] = seen) -> None:
+            before = page.evaluate(_VIEWPORT)
+            page.mouse.move(x, y)
             for _ in range(15):
                 page.mouse.wheel(0, -40)
                 page.wait_for_timeout(16)
+            seen["zoom"] = "moved" if page.evaluate(_VIEWPORT) != before else "still"
             for _ in range(15):
                 page.mouse.wheel(0, 40)
                 page.wait_for_timeout(16)
@@ -531,18 +596,22 @@ def continuous_run(page: Page) -> dict[str, list[float]]:
         out["zoom"] += _frames(page, zoom)
         page.keyboard.press(slot)
         page.wait_for_timeout(400)
-        beat = _visible(page, ".react-flow__node-beat").first
-        box = beat.bounding_box()
-        assert box is not None
+        box = _inside_beat(page)
 
-        def drag(start: FloatRect = box) -> None:
+        def drag(start: FloatRect = box, seen: dict[str, str] = seen) -> None:
             page.mouse.move(start["x"] + 12, start["y"] + 10)
             page.mouse.down()
             page.mouse.move(start["x"] + 212, start["y"] + 110, steps=40)
+            moved = page.evaluate(
+                "(p) => document.elementFromPoint(p[0], p[1])?.closest('.react-flow__node') !== null",
+                [start["x"] + 212 + 6, start["y"] + 110 + 6],
+            )
+            seen["node_drag"] = "moved" if moved else "still"
             page.mouse.move(start["x"] + 12, start["y"] + 10, steps=40)
             page.mouse.up()
 
         out["node_drag"] += _frames(page, drag)
+        assert seen == {"pan": "moved", "zoom": "moved", "node_drag": "moved"}, (slot, seen)
     return out
 
 
@@ -750,6 +819,35 @@ def test_canvas_meets_the_frozen_benchmark_protocol(preview_url: str, browser: B
         encoding="utf-8",
     )
     assert not failures, failures
+
+
+def test_lod_renders_compact_nodes_and_turns_effects_off_while_moving(preview_url: str, browser: Browser) -> None:
+    page = open_canvas(browser, preview_url, FakeApi(episode_graph(400, 600)))
+    try:
+        media = "document.querySelectorAll('.react-flow__node:not(.react-flow__node-group) img, .react-flow__node video').length"
+        page.keyboard.press("2")  # zoom 1.0
+        page.wait_for_function(f"{media} > 0")
+        mounted_full = page.locator(".react-flow__node").count()
+
+        page.keyboard.press("3")  # zoom 0.2, below the LOD threshold
+        page.wait_for_timeout(300)
+        assert page.evaluate(media) == 0
+        assert page.locator(".react-flow__node input, .react-flow__node textarea").count() == 0
+        assert page.locator(".react-flow__node").count() > mounted_full
+
+        page.keyboard.press("2")
+        page.wait_for_timeout(300)
+        assert page.locator(".react-flow__node").count() < 400
+
+        x, y = _empty_pane_point(page)
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x - 100, y - 50, steps=10)
+        assert page.evaluate("document.querySelector('.canvas-shell').dataset.moving") == "true"
+        page.mouse.up()
+        page.wait_for_function("document.querySelector('.canvas-shell').dataset.moving === undefined", timeout=2000)
+    finally:
+        page.context.close()
 
 
 def _sha256_file(path: Path) -> str:

@@ -2,7 +2,7 @@
  * One node view for every Canvas node type. Below the LOD zoom threshold a node
  * shows only its type kicker and title: no text fields, images or video.
  */
-import { memo, useState, type KeyboardEvent } from "react";
+import { memo, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Handle, Position, useStore, type NodeProps, type ReactFlowState } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
@@ -11,14 +11,12 @@ import { API } from "@/api";
 
 import { isStoryboardGroupNode } from "../domain/geometry";
 import { commitEdit } from "../domain/graph";
+import { isLowDetailZoom, isNodeMediaActive, setNodeMediaActive } from "../domain/lod";
 import type { CanvasNode } from "../domain/types";
 import { useCanvasStore } from "../state/canvasStore";
 import { useCanvasProject } from "./canvasContext";
 
-/** Below this zoom a node renders as a compact card (the LOD step of the benchmark protocol). */
-export const LOD_ZOOM = 0.35;
-
-const lowDetail = (state: ReactFlowState) => state.transform[2] < LOD_ZOOM;
+const lowDetail = (state: ReactFlowState) => isLowDetailZoom(state.transform[2]);
 
 const KICKERS: Record<string, string> = {
   beat: "BEAT",
@@ -70,14 +68,26 @@ function CommitField({
   multiline?: boolean;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  // An unmount (a compact LOD tier, a deleted node) fires no blur: commit the pending draft then.
+  const pending = useRef<string | null>(null);
+  const change = (next: string | null) => {
+    pending.current = next;
+    setDraft(next);
+  };
+  useEffect(
+    () => () => {
+      if (pending.current !== null) updateNodeData(nodeId, { [field]: pending.current });
+    },
+    [nodeId, field],
+  );
   const shown = draft ?? value;
   const commit = () => {
     if (draft !== null) updateNodeData(nodeId, { [field]: draft });
-    setDraft(null);
+    change(null);
   };
   const onKeyDown = (event: KeyboardEvent) => {
     event.stopPropagation();
-    if (event.key === "Escape") setDraft(null);
+    if (event.key === "Escape") change(null);
     if (event.key === "Enter" && !multiline) (event.target as HTMLElement).blur();
   };
   const className =
@@ -85,18 +95,22 @@ function CommitField({
   return multiline ? (
     <textarea
       aria-label={label}
+      name={field}
+      autoComplete="off"
       className={`${className} min-h-24`}
       value={shown}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => change(event.target.value)}
       onBlur={commit}
       onKeyDown={onKeyDown}
     />
   ) : (
     <input
       aria-label={label}
+      name={field}
+      autoComplete="off"
       className={`${className} font-medium`}
       value={shown}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => change(event.target.value)}
       onBlur={commit}
       onKeyDown={onKeyDown}
     />
@@ -109,18 +123,30 @@ function MediaStill({ path, alt }: { path: string; alt: string }) {
     <img
       src={API.getFileUrl(project, path)}
       alt={alt}
+      width={320}
+      height={180}
       loading="lazy"
       decoding="async"
       draggable={false}
-      className="aspect-video w-full rounded-md bg-surface-2 object-cover"
+      className="aspect-video h-auto w-full rounded-md bg-surface-2 object-cover"
     />
   );
 }
 
-function ClipMedia({ node, title }: { node: NodeProps["data"] & object; title: string }) {
+function useMediaActivity(nodeId: string) {
+  useEffect(() => () => setNodeMediaActive(nodeId, false), [nodeId]);
+  return {
+    onPlay: () => setNodeMediaActive(nodeId, true),
+    onPause: () => setNodeMediaActive(nodeId, false),
+    onEnded: () => setNodeMediaActive(nodeId, false),
+  };
+}
+
+function ClipMedia({ nodeId, node, title }: { nodeId: string; node: NodeProps["data"] & object; title: string }) {
   const { t } = useTranslation("dashboard");
   const project = useCanvasProject();
   const [playing, setPlaying] = useState(false);
+  const activity = useMediaActivity(nodeId);
   const clip = typeof node.assetRef === "string" ? node.assetRef : "";
   const still = typeof node.thumbnailRef === "string" ? node.thumbnailRef : "";
   if (playing && clip) {
@@ -132,6 +158,7 @@ function ClipMedia({ node, title }: { node: NodeProps["data"] & object; title: s
         muted
         className="nodrag aspect-video w-full rounded-md bg-black"
         aria-label={title}
+        {...activity}
       />
     );
   }
@@ -147,6 +174,15 @@ function ClipMedia({ node, title }: { node: NodeProps["data"] & object; title: s
         ▶
       </span>
     </button>
+  );
+}
+
+function AudioMedia({ nodeId, path, title }: { nodeId: string; path: string; title: string }) {
+  const project = useCanvasProject();
+  const activity = useMediaActivity(nodeId);
+  return (
+    // eslint-disable-next-line jsx-a11y/media-has-caption -- a referenced project audio file has no caption source
+    <audio className="nodrag w-full" controls preload="none" src={API.getFileUrl(project, path)} aria-label={title} {...activity} />
   );
 }
 
@@ -169,8 +205,8 @@ function StoryboardBoard({ id }: { id: string }) {
 
 function CanvasNodeViewImpl({ id, type, data, selected }: NodeProps) {
   const { t } = useTranslation("dashboard");
-  const compact = useStore(lowDetail);
-  const project = useCanvasProject();
+  // Playing media keeps its full view below the LOD zoom.
+  const compact = useStore(lowDetail) && !isNodeMediaActive(id);
   const node = { data: data };
   const title = stringData(node, "label") || stringData(node, "displayName") || t("creative_canvas_untitled");
   const storyboard = type === "group" && isStoryboardGroupNode({ id, type: "group", position: { x: 0, y: 0 }, data: node.data });
@@ -210,12 +246,11 @@ function CanvasNodeViewImpl({ id, type, data, selected }: NodeProps) {
       {compact ? null : text ? (
         <CommitField nodeId={id} field="text" value={stringData(node, "text")} label={t("creative_canvas_text_field")} multiline />
       ) : type === "clip" ? (
-        <ClipMedia node={node.data} title={title} />
+        <ClipMedia nodeId={id} node={node.data} title={title} />
       ) : assetRef && type === "frame" ? (
         <MediaStill path={assetRef} alt={title} />
       ) : assetRef && type === "audio" ? (
-        // eslint-disable-next-line jsx-a11y/media-has-caption -- a referenced project audio file has no caption source
-        <audio className="nodrag w-full" controls preload="none" src={API.getFileUrl(project, assetRef)} aria-label={title} />
+        <AudioMedia nodeId={id} path={assetRef} title={title} />
       ) : null}
       <Handle type="source" position={Position.Right} className="canvas-handle" />
     </div>

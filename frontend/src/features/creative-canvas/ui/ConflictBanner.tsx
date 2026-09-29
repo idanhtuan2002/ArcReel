@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface ConflictBannerProps {
@@ -8,6 +9,8 @@ interface ConflictBannerProps {
 /** Shown while local work is kept aside after another tab or device saved the Canvas. */
 export function ConflictBanner({ onUseMine, onDiscardMine }: ConflictBannerProps) {
   const { t } = useTranslation("dashboard");
+  // Discarding deletes the kept-aside work for good, so it takes a second, confirming click.
+  const [confirming, setConfirming] = useState(false);
   return (
     <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-warm-ring bg-warm-soft px-4 py-2 text-sm">
       <span className="font-mono text-[10px] tracking-[0.18em] text-warm">CONFLICT</span>
@@ -24,10 +27,10 @@ export function ConflictBanner({ onUseMine, onDiscardMine }: ConflictBannerProps
       </button>
       <button
         type="button"
-        onClick={onDiscardMine}
+        onClick={() => (confirming ? onDiscardMine() : setConfirming(true))}
         className="rounded-md border border-hairline-strong px-3 py-1 text-xs text-text-2 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        {t("creative_canvas_conflict_discard_mine")}
+        {confirming ? t("creative_canvas_conflict_confirm_discard") : t("creative_canvas_conflict_discard_mine")}
       </button>
     </div>
   );

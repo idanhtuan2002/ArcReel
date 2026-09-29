@@ -2092,6 +2092,7 @@ export default {
   'creative_canvas_conflict_body': '当前显示的是最新保存的版本，你的版本已另行保留。',
   'creative_canvas_conflict_use_mine': '使用我的版本',
   'creative_canvas_conflict_discard_mine': '舍弃我的版本',
+  'creative_canvas_conflict_confirm_discard': '确认舍弃',
   'creative_canvas_filmstrip_label': '分镜顺序',
   'creative_canvas_filmstrip_empty': '选择两个及以上画面并点击“生成分镜板”即可设定镜头顺序。',
   'creative_canvas_filmstrip_hint': '方向键切换镜头，Alt + 方向键调整顺序，Enter 在画布上显示该镜头。',
