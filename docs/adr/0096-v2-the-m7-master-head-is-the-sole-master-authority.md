@@ -54,6 +54,9 @@ delegated the choice.
      for each artifact it reads, and refuses a divergence with 409 `master_diverged`. The
      routes are Gate C composite dependencies, publish approval, deliverable listing and
      download.
+   - Publish approval, deliverable listing and download read between two such checks. If a
+     head moved in between (a Gate C committed meanwhile), they refuse with 409
+     `master_moving`, so a reader never acts on files of a head that is no longer current.
    - The file checks already in `r2/m3/deliverables.py` stay as a second line.
 5. **Backfill.** `scripts/r2/backfill_master_authority.py` promotes every existing file master
    that has no database head. Masters here are episode videos: Gate C's `resource_type` is

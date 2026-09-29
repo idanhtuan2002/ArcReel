@@ -199,20 +199,25 @@ async def verify_project_masters(
     projection: FileMasterProjection,
     database_keys: Iterable[str],
     projected_keys: Iterable[str],
-) -> None:
+) -> tuple[tuple[str, int, str], ...]:
     """Raise ``MasterDivergedError`` unless every database head has an equal projection and vice versa.
 
     Unlike the resolver alone, a database head whose projection is missing is a divergence: every
     promotion is projected before its artifact is read, so a missing projection is an unfinished or
-    refused one.
+    refused one. Returns the verified heads as ``(artifact_key, master_version, candidate_id)``, so a
+    reader can tell whether they moved while it read.
     """
     database = set(database_keys)
     unprojected = sorted(database - set(projected_keys))
     if unprojected:
         raise MasterDivergedError(f"M7_MASTER_DIVERGED: {unprojected[0]!r} has a database head but no projection")
     resolver = DatabaseMasterResolver(authorities=authorities, legacy_projection=projection)
+    heads: list[tuple[str, int, str]] = []
     for artifact_key in sorted(database | set(projected_keys)):
-        await resolver.get_exact(user_id=user_id, project_name=project_name, artifact_key=artifact_key)
+        head = await resolver.get_exact(user_id=user_id, project_name=project_name, artifact_key=artifact_key)
+        if head is not None:
+            heads.append((artifact_key, head.master_version, head.candidate_id))
+    return tuple(heads)
 
 
 __all__ = [

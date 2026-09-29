@@ -162,8 +162,8 @@ async def verify_masters(
     project_name: str,
     project_dir: Path,
     artifact_keys: Collection[str] | None = None,
-) -> None:
-    """Raise ``MasterDivergedError`` if a master disagrees with its projection.
+) -> tuple[tuple[str, int, str], ...]:
+    """Raise ``MasterDivergedError`` if a master disagrees with its projection; return the verified heads.
 
     ``artifact_keys`` limits the check to the masters a request consumes; ``None`` checks all.
     """
@@ -174,7 +174,7 @@ async def verify_masters(
         wanted = set(artifact_keys)
         database_keys = [key for key in database_keys if key in wanted]
         projected = {key: value for key, value in projected.items() if key in wanted}
-    await verify_project_masters(
+    return await verify_project_masters(
         user_id=user_id,
         project_name=project_name,
         authorities=authorities,

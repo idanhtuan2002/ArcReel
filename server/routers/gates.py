@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import Collection, Iterator
+from collections.abc import Callable, Collection, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import BinaryIO, Literal
@@ -239,11 +239,11 @@ _MASTER_CONFLICTS = (
 
 async def _require_consistent_masters(
     user_id: str, project_name: str, project_dir, artifact_keys: Collection[str] | None = None
-) -> None:
+) -> tuple[tuple[str, int, str], ...]:
     """Refuse a master-consuming request while a master it reads disagrees with its projection (ADR-0096)."""
     try:
         async with async_session_factory() as session:
-            await verify_masters(
+            return await verify_masters(
                 session,
                 user_id=user_id,
                 project_name=project_name,
@@ -252,6 +252,23 @@ async def _require_consistent_masters(
             )
     except MasterDivergedError as exc:
         raise HTTPException(status_code=409, detail=f"master_diverged: {exc}") from exc
+
+
+async def _stable_read[T](user_id: str, project_name: str, project_dir, read: Callable[[], T]) -> T:
+    """Run ``read`` between two master checks and refuse if a head moved in between.
+
+    A Gate C can commit a new head while a reader works from the files of the previous one; the
+    second check makes every reader see one committed, projected state, or retry.
+    """
+    before = await _require_consistent_masters(user_id, project_name, project_dir)
+    result = await run_noninterruptible_sync(read)
+    after = await _require_consistent_masters(user_id, project_name, project_dir)
+    if before != after:
+        close = getattr(result[1], "close", None) if isinstance(result, tuple) and len(result) == 2 else None
+        if callable(close):
+            close()
+        raise HTTPException(status_code=409, detail="master_moving: a Gate C approval landed during this read; retry")
+    return result
 
 
 @router.post("/projects/{project_name}/gates/final-cut")
@@ -479,9 +496,8 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
 async def publish_approval(project_name: str, req: PublishApprovalRequest, user: CurrentUser) -> dict[str, object]:
     if req.action == "APPROVE_PUBLISH":
         project_dir = get_project_manager().get_project_path(project_name)
-        await _require_consistent_masters(user.id, project_name, project_dir)
-        deliverable = await run_noninterruptible_sync(
-            lambda: exportable_deliverable(project_dir, req.deliverable_digest)
+        deliverable = await _stable_read(
+            user.id, project_name, project_dir, lambda: exportable_deliverable(project_dir, req.deliverable_digest)
         )
         if deliverable is None:
             raise HTTPException(
@@ -550,8 +566,7 @@ def _deliverable_view(project_dir) -> list[dict[str, object]]:
 async def create_deliverable_token(project_name: str, user: CurrentUser) -> dict[str, object]:
     """Issue a short-lived download token and list the project's approved finals."""
     project_dir = get_project_manager().get_project_path(project_name)
-    await _require_consistent_masters(user.id, project_name, project_dir)
-    deliverables = await run_noninterruptible_sync(lambda: _deliverable_view(project_dir))
+    deliverables = await _stable_read(user.id, project_name, project_dir, lambda: _deliverable_view(project_dir))
     return {
         "download_token": create_download_token(user.sub, project_name),
         "expires_in": DOWNLOAD_TOKEN_EXPIRY_SECONDS,
@@ -578,8 +593,9 @@ async def download_deliverable(
     project_dir = get_project_manager().get_project_path(project_name)
     # The host resolves every authenticated subject to DEFAULT_USER_ID (server/auth.py), and the
     # database head may have moved since the token was issued.
-    await _require_consistent_masters(DEFAULT_USER_ID, project_name, project_dir)
-    result = await run_noninterruptible_sync(lambda: verified_export_snapshot(project_dir, digest))
+    result = await _stable_read(
+        DEFAULT_USER_ID, project_name, project_dir, lambda: verified_export_snapshot(project_dir, digest)
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="no current approved deliverable has this digest")
     deliverable, snapshot = result

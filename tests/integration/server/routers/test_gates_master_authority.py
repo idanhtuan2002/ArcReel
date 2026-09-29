@@ -302,3 +302,35 @@ async def test_no_manifest_write_pairs_the_old_master_with_the_new_semantic_stat
         assert not (
             approved.get("selected_candidate_id") == old_master and metadata["content_fingerprint"] == new_fingerprint
         ), metadata
+
+
+async def test_a_head_committed_while_gate_d_reads_refuses_the_decision(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from lib.db.models.gates import PublishApprovalDecisionModel
+
+    sources = [await _approve_shot(gate_export_client, project_dir, "SH01", b"shot one")]
+    final = _media(b"approved final")
+    assert (await _approve_final(gate_export_client, project_dir, final, sources)).status_code == 200
+    loop = asyncio.get_running_loop()
+    real_read = gates.exportable_deliverable
+
+    def read_while_an_approval_lands(*args, **kwargs):
+        # The read sees the final as current; a complete, consistent Gate C approval of its source
+        # shot lands before the read returns.
+        deliverable = real_read(*args, **kwargs)
+        future = asyncio.run_coroutine_threadsafe(
+            _approve_shot(gate_export_client, project_dir, "SH01", b"shot one again"), loop
+        )
+        future.result(timeout=60)
+        return deliverable
+
+    monkeypatch.setattr(gates, "exportable_deliverable", read_while_an_approval_lands)
+
+    response = await _publish(gate_export_client, _sha(final))
+
+    assert response.status_code == 409, response.text
+    assert "master_moving" in response.text
+    async with session_factory() as session:
+        count = (await session.execute(select(func.count()).select_from(PublishApprovalDecisionModel))).scalar_one()
+    assert count == 0
