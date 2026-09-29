@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "packet": "M8-B",
+  "task": "B3",
+  "stop_code": "M8_BASE_SEAM_CHANGED",
+  "head": "4a064b75",
+  "dirty_paths": [],
+  "failed_checks": [
+    {
+      "check": "a Canvas save can build the M8-A ExplorationRevision it appends (LineageBinding and payload_digest) from an accepted host seam",
+      "result": "NO_LINEAGE_SEAM",
+      "detail": "The M8-A API (server/routers/advanced_creative.py) returns no lineage. The M8 spec section 5 defines LineageBinding but names no source for content_basis_digest, creative profile, policy digest or approved master. ContentBasis is built only by scripts/r2/v1_operator.py and fixtures; creative profiles exist only on adaptation branches, which no seam links to an episode; no host seam names an episode's final master. Filling these values client-side would invent architecture."
+    }
+  ],
+  "resolution": "ADR-0098 (server-resolved lineage, read-only route) implemented as V2-02e; B3 resumes on the amended executor base.",
+  "evidence_refs": [
+    "docs/research/2026-09-29-r2-m8b-canvas-lineage-seam.md",
+    "docs/adr/0098-m8-lineage-is-server-resolved.md"
+  ],
+  "created_at": "2026-09-29"
+}
