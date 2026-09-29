@@ -149,3 +149,36 @@ The fix is `cb8f8eff` on `r2-v1/maintenance`, merged into `r2-v2/main` as `b94b7
 - **SQLite:** 1077 passed (agent runtime, accounting, budget guard, host_hardening).
 - **PG16** (`arcreel_v201`): 19 passed (budget guard, concurrent admission).
 - **Static gates:** basedpyright 0/0, lint-imports and audit_tests clean.
+
+---
+
+# Third confirmation review (reviewed HEAD `fd8f58bb`)
+
+Verdict: **CHANGES_REQUIRED** (`M7_IMPLEMENTATION_NOT_ACCEPTED`).
+
+- **Cancelled `start()`:** FIXED.
+- **Sweep retry:** PARTIALLY_FIXED.
+- **ADR-0092 disclosure:** FIXED.
+- **Previously fixed items:** reconfirmed with no regression.
+- **New Moderate finding** (medium confidence): the sweep cutoff was set when a `SessionManager` was constructed. A second manager in the same process could therefore sweep a live hold of the first manager.
+- **Required skip:** the reviewer's sandbox had no writable temporary directory, so no tests ran.
+
+## Resolution of the third review (main agent, 2026-09-29)
+
+**Fix.** Commit `6ab361a7`, merged into V2 as `25ef7307`.
+
+- The cutoff is now `HOST_PROCESS_STARTED_AT`, the process start, set when the module is imported and shared by every manager.
+- A hold that any manager of this process creates is later than the cutoff, so a sweep never selects it.
+- ADR-0093 now states the sweep boundary and the one-host-process limit.
+
+**Tests.**
+
+- `test_a_failed_orphan_sweep_is_retried_by_the_patrol_until_it_succeeds` asserts the shared process cutoff.
+- The integration sweep test already leaves a hold created after the cutoff in place.
+
+**Verification at `25ef7307`.**
+
+- SQLite: 1086 passed.
+- PG16: 19 passed.
+- basedpyright: 0/0.
+- lint-imports: 20 kept.
