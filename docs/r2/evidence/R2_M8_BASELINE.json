@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "base_head": "cca1eeafcd28e1c579831033a09b24186fc0b3b0",
+  "base_head": "dc13cc93f4fb9a9bdfc05fc84dffda86d398e526",
   "accepted_m7_candidate_head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
   "branch": "impl/r2-m8a-exploration-promotion",
   "alembic_heads": [
@@ -105,11 +105,19 @@
     },
     {
       "path": "docs/adr/0096-v2-the-m7-master-head-is-the-sole-master-authority.md",
-      "sha256": "a887f2edbc5446ae330bb414c662ad7ad94776e4955f9177de77a1477fbd2643"
+      "sha256": "3a2b60a1510c29b3eef01caecc68c4d9bb2d7d604960cff3bcc9045a5bd3b87a"
     },
     {
       "path": "docs/r2/evidence/R2_V2_02_CODEX_REVIEW_2026-09-29.md",
       "sha256": "00882870008fa41e43926741446aa7e89c1fa1b56e467736a87d7c9adea1c714"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_5_2026-09-29.json",
+      "sha256": "e94e32bf0b8a208df59b4cae9224b18d480d2263b1ab02ef32fce902c74c99c2"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_02B_GATE_C_SERIALIZATION_2026-09-29.md",
+      "sha256": "4447bdff42f112eeb907598d56c750f4b4fff6d8b05ede2d3b3052b7838deef6"
     }
   ],
   "seams": [
@@ -152,8 +160,8 @@
     {
       "qualified_name": "server.services.master_authority:master_authority_unit",
       "path": "server/services/master_authority.py",
-      "signature": "(session: AsyncSession) -> MasterAuthorityUnit",
-      "sha256": "74e27031ee6651c381107256508d5a50c83cece492cce55a86e42a602ad803fe"
+      "signature": "(session: AsyncSession, *, defer_commit: bool=False) -> MasterAuthorityUnit",
+      "sha256": "82e13681fd06b3cb9c4b3c20a4fd0a9cc877d26e478664822c9de4ed037ae78d"
     },
     {
       "qualified_name": "server.services.master_authority:project_if_current",
@@ -164,8 +172,8 @@
     {
       "qualified_name": "server.services.master_authority:verify_masters",
       "path": "server/services/master_authority.py",
-      "signature": "(session: AsyncSession, *, user_id: str, project_name: str, project_dir: Path) -> None",
-      "sha256": "8b3a4884c2684dd6a5930133b3d3ee2d157ebb98d206af4ed84d9a6b7a465d48"
+      "signature": "(session: AsyncSession, *, user_id: str, project_name: str, project_dir: Path, artifact_keys: Collection[str] | None=None) -> tuple[tuple[str, int, str], ...]",
+      "sha256": "21b69dc55e9603c0fc6e9d509a289cd7a66335cecf752837371920efb586eb53"
     }
   ],
   "donors": [
@@ -280,5 +288,5 @@
     "generation": "2026-09-29T05:59:04Z",
     "coverage": "no_recorded_issue for every seam path (check_index_coverage, fast mode; scripts/ excluded by design)"
   },
-  "created_at": "2026-09-29T06:00:00Z"
+  "created_at": "2026-09-29T08:00:00Z"
 }
