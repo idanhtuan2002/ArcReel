@@ -12,7 +12,7 @@ workflow 收——用户手上最常见的文件是 ComfyUI 自己导出的 work
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Body, Depends
