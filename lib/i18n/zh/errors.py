@@ -65,6 +65,15 @@ MESSAGES = {
     "task_fail_resume_endpoint_changed_detail": "该模型的接口已更换，无法接续提交前发起的生成：{detail}",
     "task_fail_declarative_template_render_failed": "调用端点请求渲染失败：{detail}",
     "task_fail_declarative_response_extract_failed": "调用端点响应提取失败：{detail}",
+    "task_fail_comfyui_image_drop_unsupported": "这份 workflow 的成片链路依赖节点 {node} 读入的图，参考图或首尾帧不足时无法改图，请补齐图片或改用别的 workflow",
+    "task_fail_comfyui_upload_failed": "素材上传到 ComfyUI 失败：{detail}",
+    "task_fail_comfyui_node_errors": "ComfyUI 拒收这份 workflow，共 {nodes} 个节点报错，首条：{summary}",
+    "task_fail_comfyui_job_lost": "ComfyUI 上找不到这次执行（{prompt_id}），队列与历史里都没有它，ComfyUI 多半重启过，请重试",
+    "task_fail_comfyui_execution_error": "ComfyUI 执行失败：{detail}（出错节点：{node}）",
+    "task_fail_comfyui_interrupted": "ComfyUI 上的这次执行被中断，请重试",
+    "task_fail_comfyui_output_missing": "ComfyUI 已执行完毕，但产物节点 {nodes} 没有产出任何文件，请检查该节点的节点绑定与 workflow 的成片链路",
+    "task_fail_comfyui_output_type_mismatch": "ComfyUI 产出的 {filename} 不是这个端点应产出的文件类型（应为 {expected}），请把产物节点的节点绑定指到导出最终产物的那个节点，或在该保存节点上改用受支持的格式（如 SaveVideo 选 h264-mp4）",
+    "task_fail_comfyui_output_container_mismatch": "ComfyUI 产出的 {filename} 文件内容不是这个端点应产出的容器（应为 {expected}），请在保存节点上改用受支持的格式（如 SaveVideo 选 h264-mp4）",
     "task_fail_artifact_download_failed": "视频生成任务已成功但下载失败，可重试下载：{detail}",
     "task_fail_cascade_blocked_dependency": "因依赖任务 {dependency_task_id} 失败而被阻塞：{reason}",
     "prompt_must_be_string_or_scene_object": "prompt 必须是字符串或包含 scene/composition 的对象",
@@ -113,6 +122,7 @@ MESSAGES = {
     "tts_novel_text_missing": "分镜「{segment_id}」没有可配音的小说原文",
     "tts_narration_text_missing": "该单元没有可合成的旁白正文",
     "tts_not_applicable": "TTS 仅适用于旁白归属的画外音单元；请选择后期配音交付",
+    "tts_duration_endpoint_fixed": "该 workflow 的成片时长由端点固定，ArcReel 无法为旁白申请足够长的成片；请选择后期配音交付",
     "tts_not_configured": "使用 TTS 交付前，请先配置语音合成供应商",
     "tts_missing": "使用 TTS 交付前，请先为该单元生成旁白配音",
     "tts_generating": "旁白配音仍在生成；请等待完成后再使用 TTS 交付",
@@ -218,7 +228,9 @@ MESSAGES = {
     "endpoint_test_definition_and_model_ref_exclusive": "调用端点定义与测试模型只能提供其一",
     "endpoint_test_too_many_assets": "素材文件数量超过 {limit} 个上限",
     "endpoint_test_credentials_ambiguous": "凭证只能提供其一：选择供应商，或内联填写接口地址与 API Key",
-    "endpoint_test_model_unavailable": "该模型已禁用或不是视频模型，无法用于测试连接",
+    "endpoint_test_mode_unsupported_for_kind": "这种调用端点（{kind}）不支持该项端点测试",
+    "endpoint_test_preview_failed": "无法按这份定义与这组参数渲染出请求：{detail}",
+    "endpoint_test_model_unavailable": "该模型已禁用，或它的调用端点不支持测试连接",
     "endpoint_test_provider_base_url_required": "该模型的调用端点需要接口地址，请先给这个供应商填写 base_url",
     "model_not_found": "模型不存在",
     "trial_run_already_running": "已有一个测试连接在进行中，请等它结束或取消后再试",
@@ -234,6 +246,27 @@ MESSAGES = {
     "endpoint_media_type_mismatch": "模型 endpoint 与媒体类型不一致: {detail}",
     "backend_creation_failed": "Backend 创建失败: {err_msg}",
     "connectivity_check_unsupported_format": "发现格式 {discovery_format} 暂不支持连通性检查",
+    "connectivity_check_comfyui_ok": "ComfyUI 可达，版本 {version}",
+    "connectivity_check_comfyui_ok_unknown_version": "ComfyUI 可达，未回传版本号",
+    "discovery_not_applicable_comfyui": (
+        "ComfyUI 协议没有可发现的模型列表：能调用什么由 workflow 自身决定，请改为导入 ComfyUI 端点并挂到模型行上"
+    ),
+    "custom_endpoint_kind_conflicts_with_attachment": (
+        "这份定义换了容器类型，与该端点当前的挂接不相容：模型 {model_id}（供应商 {provider}）的协议接不了它。请先改动模型行的挂接，再替换定义"
+    ),
+    "custom_endpoint_media_type_conflicts_with_attachment": (
+        "这份定义产出的是{media_type}，与端点当前的媒体类型不同，而模型 {model_id}（供应商 {provider}）还挂着它："
+        "模型行归哪一路由端点决定。请先摘掉挂接，再替换定义"
+    ),
+    "comfyui_endpoint_requires_comfyui_provider": (
+        "模型 {model_id} 挂的 ComfyUI 端点 {endpoint} 只能用在 ComfyUI 协议的供应商上"
+    ),
+    "comfyui_provider_requires_comfyui_endpoint": (
+        "ComfyUI 协议的供应商只能挂 ComfyUI 端点，模型 {model_id} 的 {endpoint} 不是"
+    ),
+    "capability_overrides_not_supported_for_comfyui": (
+        "模型 {model_id} 挂的是 ComfyUI 端点，能力只从节点绑定推导，不支持能力覆盖"
+    ),
     "capability_overrides_video_only": "模型 {model_id} 的 endpoint {endpoint} 不是视频类，不支持能力覆盖",
     "capability_override_invalid_value": "模型 {model_id} 的能力项 {capability} 取值类型不正确，应为 {expected}",
     "capability_override_last_frame_unsupported": "模型 {model_id} 的 endpoint {endpoint} 不支持尾帧生成，无法覆盖 last_frame 为开启",
@@ -291,6 +324,7 @@ MESSAGES = {
     "ref_missing_asset": "参考图引用的{type}「{name}」不在项目资产库中，请先生成",
     "ref_duration_exceeded": "脚本编排 {total}s 超出 {model} 最大档位，已按 {duration}s 生成，成片短于脚本编排",
     "ref_duration_rounded_up": "脚本编排 {total}s 不在 {model} 的时长档位内，已按 {duration}s 生成，成片长于脚本编排",
+    "comfyui_multiple_outputs": "ComfyUI 这次产出了 {count} 个文件，已取其中的 {filename}",
     "ref_too_many_images": "参考图数量 {count} 超出 {model} 上限 {max_count}，已取前 {max_count} 张",
     "ref_payload_too_large": "参考图请求体超出供应商限制，已二次压缩重试",
     "ref_payload_floor_exceeded": "参考图过大或过多，压缩到最低画质仍超出供应商请求体上限，请减少参考图数量或降低分辨率后重试",

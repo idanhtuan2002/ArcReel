@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from lib.config.resolver import ConfigResolver
     from lib.image_backends.base import ImageBackend
     from lib.reference_compression import CompressedRef, PayloadLimits, ReferenceSpec
+    from lib.video_backends.base import VideoGenerationResult
     from r2.host_hardening.host_submit import AttemptSubmitter
 
 from lib.async_thread import run_noninterruptible_sync
@@ -154,6 +155,32 @@ def segment_id_for(call_type: CallType, resource_type: str, resource_id: str) ->
     if allowed is None:
         raise ValueError(f"unknown ledger channel: {call_type!r}")
     return resource_id if resource_type in allowed else None
+
+
+def _merge_result_provenance(version_metadata: dict[str, Any], result: "VideoGenerationResult") -> None:
+    """把只有生成过一次才知道的事实并进版本元数据，在落盘之前。
+
+    元数据的其余部分在提交之前就已定稿（它们是请求的一部分），而实发种子与实发 workflow 的指纹
+    要到 backend 跑完才存在——ComfyUI 的 ``policy: "random"`` 是提交那一刻现随机的，不写下来这
+    一版就再也复现不了。
+
+    ``seed`` 只在 backend 报了实发值时覆盖：多数通道原样回显请求里的那一个，覆盖是恒等；回报了
+    与请求不同的那些（供应商自行决定种子），写下来的才是真正生成用的。
+    """
+    if result.seed is not None:
+        version_metadata["seed"] = result.seed
+    version_metadata.update(result.provenance or {})
+
+
+def _collect_result_warnings(warnings: list[dict[str, Any]] | None, result: "VideoGenerationResult") -> None:
+    """把 backend 执行期产生的提示并进调用方的收集器，交由它落到任务 ``result.warnings``。
+
+    收集器由调用方传入而不是从这里返回：视频两条路的返回值都是定死的四元组，再加一位会波及每一个
+    调用点与一批用例，而调用方本就各自持有一张要落进结果的 warning 列表。
+    """
+    if warnings is None or not result.warnings:
+        return
+    warnings.extend(dict(warning) for warning in result.warnings)
 
 
 class MediaGenerator:
@@ -858,6 +885,7 @@ class MediaGenerator:
         formal_output: bool = False,
         before_formal_commit: Callable[[Path, int, Mapping[str, Any]], Awaitable[None]] | None = None,
         commit_formal_output: Callable[[Path, Path, int, Mapping[str, Any]], PaidVersionCommit] | None = None,
+        warnings: list[dict[str, Any]] | None = None,
         **version_metadata,
     ) -> tuple[Path, int, Any, str | None]:
         """
@@ -880,6 +908,8 @@ class MediaGenerator:
             before_submit: 首次 provider 提交紧前执行一次的异步持久化钩子；
                 返回值并入当次版本元数据
             formal_output: 将 provider 产物先写入同目录临时文件，成功后再与版本历史一起提交
+            warnings: 调用方持有的 warning 收集器；backend 执行期产生的提示就地追加进去，
+                随后由调用方落进任务 ``result.warnings``
             **version_metadata: 额外元数据
 
         Returns:
@@ -1099,6 +1129,8 @@ class MediaGenerator:
             final_request = video_requests[-1]
             if final_request.execution_id is not None:
                 version_metadata["execution_id"] = final_request.execution_id
+            _merge_result_provenance(version_metadata, result)
+            _collect_result_warnings(warnings, result)
             call.success(result)
 
         await self._prepare_formal_video_commit(
@@ -1144,6 +1176,7 @@ class MediaGenerator:
         formal_output: bool = False,
         before_formal_commit: Callable[[Path, int, Mapping[str, Any]], Awaitable[None]] | None = None,
         commit_formal_output: Callable[[Path, Path, int, Mapping[str, Any]], PaidVersionCommit] | None = None,
+        warnings: list[dict[str, Any]] | None = None,
         **version_metadata,
     ) -> tuple[Path, int, Any, str | None]:
         """接续 provider 上已发起的 video job：调 backend.resume_video 而非 generate。
@@ -1236,6 +1269,10 @@ class MediaGenerator:
 
         video_ref = None
         video_uri = result.video_uri
+        # 与首跑同一处置：同一笔任务在重启前后落下的版本元数据必须是同一份，否则「这一版用的
+        # 哪个种子」会因为进程什么时候重启过而不一样。
+        _merge_result_provenance(version_metadata, result)
+        _collect_result_warnings(warnings, result)
 
         # Resume 成功：精准翻 pending → success。ledger.resume_success 收 backend 结果对象，
         # 与视频通道成功分支同源做 union 分发（usage_tokens / generate_audio / 实际计费时长），

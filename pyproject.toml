@@ -156,6 +156,9 @@ ignore_imports = [
     "lib.project_manager -> lib.text_backends.base",
     "lib.text_generator -> lib.text_backends.base",
     "lib.text_generator -> lib.text_backends.factory",
+    # 失败渲染按 ComfyUI 产物白名单投影 comfyui_output_type_mismatch 的期望扩展名；comfyui.artifacts
+    # 只依赖同包的纯函数与失败码，是一张静态白名单的叶子，task_repo 经此可达不引入运行时依赖。
+    "lib.task_failure -> lib.custom_provider.comfyui.artifacts",
     # 中间模块反向引用 custom_provider（provider_id 解析与自定义供应商记账）
     "lib.backend_assembly.assembler -> lib.custom_provider",
     "lib.backend_assembly.assembler -> lib.custom_provider.loader",
@@ -164,6 +167,44 @@ ignore_imports = [
     "lib.db.repositories.custom_provider_repo -> lib.custom_provider",
     "lib.db.repositories.custom_provider_repo -> lib.custom_provider.endpoints",
     "lib.db.models.custom_provider -> lib.custom_provider",
+]
+
+# ComfyUI 端点定义不经声明式运行时（docs/adr/0081）：两种 kind 的定义不同构，共用的只有诊断载体、
+# 诊断翻译与 kind 常量三件事。comfyui 子包一旦够到声明式的模板引擎、取值路径或它的校验实现，就是把
+# 「JSON in/out + 提交 / 轮询」的假设搬进节点图这一侧，保存期与填值期从此各说各话。反向也不许：
+# 分派表在 endpoint_definition.validator，它 import comfyui.validator 是唯一允许的方向。
+[[tool.importlinter.contracts]]
+name = "ComfyUI 端点实现不依赖声明式运行时"
+type = "forbidden"
+source_modules = ["lib.custom_provider.comfyui"]
+forbidden_modules = [
+    "lib.custom_provider.declarative_backend",
+    "lib.custom_provider.endpoint_definition.validator",
+    "lib.custom_provider.endpoint_definition.template_engine",
+    "lib.custom_provider.endpoint_definition.response_extractor",
+    "lib.custom_provider.endpoint_definition.jsonpath_subset",
+]
+
+# 同一条墙的另一半：ComfyUI 的客户端与 backend 落在 lib.custom_provider 顶层（子包够不到
+# lib.video_backends.base——那条链会间接绕回声明式 backend），于是上一条契约的 source_modules
+# 看不住它们。这里按直接 import 立一条同义契约：allow_indirect_imports 只查这几个模块自己写下的
+# import，正是把它们逼出子包的那条间接链绕开的一格。新增顶层 comfyui_* 模块时加进 source_modules。
+[[tool.importlinter.contracts]]
+name = "ComfyUI 顶层实现模块不直接依赖声明式运行时"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = [
+    "lib.custom_provider.comfyui_client",
+    "lib.custom_provider.comfyui_execution",
+    "lib.custom_provider.comfyui_backend",
+    "lib.custom_provider.comfyui_image_backend",
+]
+forbidden_modules = [
+    "lib.custom_provider.declarative_backend",
+    "lib.custom_provider.endpoint_definition.validator",
+    "lib.custom_provider.endpoint_definition.template_engine",
+    "lib.custom_provider.endpoint_definition.response_extractor",
+    "lib.custom_provider.endpoint_definition.jsonpath_subset",
 ]
 
 # 路线中立层不得依赖某一条具体路线的子包。违约条目类型（draft_violation）、草稿信封

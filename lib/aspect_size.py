@@ -145,3 +145,17 @@ def resolution_to_short_edge(
 
     logger.warning("无法解析 resolution=%r，回退默认短边 %d", resolution, default_short)
     return default_short
+
+
+def short_edge_to_resolution(short_edge: int, *, tier_map: dict[str, int]) -> str:
+    """把短边像素说成一句展示文字：恰好命中某一档就报档位词，否则报像素本身。
+
+    :func:`resolution_to_short_edge` 的展示侧逆向。档位是离散的，任意短边未必落在某一档上
+    （workflow 作者调的 848 不是 720p 也不是 1080p），而这句话出现的地方是「不选档位会得到
+    什么」——把 848 说成最近的 720p 会让用户以为选中那一档能得到同一份画面，实际短边会从 848
+    变成 720。故只在字面相等时才借档位词，其余报实际短边，用户至少看见的是真实数字。
+    """
+    for tier, edge in tier_map.items():
+        if edge == short_edge:
+            return tier
+    return f"{short_edge}px"

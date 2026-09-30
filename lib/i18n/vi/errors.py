@@ -67,6 +67,15 @@ MESSAGES = {
     ),
     "task_fail_declarative_template_render_failed": "Không thể kết xuất yêu cầu endpoint: {detail}",
     "task_fail_declarative_response_extract_failed": "Không thể trích xuất phản hồi endpoint: {detail}",
+    "task_fail_comfyui_image_drop_unsupported": "Chuỗi tạo thành phẩm của workflow này phụ thuộc vào ảnh do node {node} đọc vào, nên không thể chỉnh lại đồ thị khi thiếu ảnh; hãy bổ sung ảnh hoặc dùng workflow khác",
+    "task_fail_comfyui_upload_failed": "Tải tư liệu lên ComfyUI thất bại: {detail}",
+    "task_fail_comfyui_node_errors": "ComfyUI từ chối workflow này; có {nodes} node báo lỗi, đầu tiên: {summary}",
+    "task_fail_comfyui_job_lost": "ComfyUI không còn biết đến lần chạy này ({prompt_id}); nó không có trong hàng đợi lẫn lịch sử, nhiều khả năng ComfyUI đã khởi động lại — hãy thử lại",
+    "task_fail_comfyui_execution_error": "ComfyUI thất bại khi thực thi: {detail} (node lỗi: {node})",
+    "task_fail_comfyui_interrupted": "Lần chạy trên ComfyUI đã bị gián đoạn; hãy thử lại",
+    "task_fail_comfyui_output_missing": "ComfyUI đã chạy xong nhưng node thành phẩm {nodes} không tạo ra tệp nào; hãy kiểm tra liên kết node của nó và chuỗi tạo thành phẩm của workflow",
+    "task_fail_comfyui_output_type_mismatch": "ComfyUI tạo ra {filename}, không phải loại tệp mà endpoint này cần xuất (cần {expected}); hãy trỏ liên kết node thành phẩm tới node xuất thành phẩm cuối cùng, hoặc đổi node lưu đó sang định dạng được hỗ trợ (với SaveVideo, hãy chọn h264-mp4)",
+    "task_fail_comfyui_output_container_mismatch": "Nội dung của {filename} do ComfyUI tạo ra không phải container mà endpoint này cần xuất (cần {expected}); hãy đổi node lưu sang định dạng được hỗ trợ (với SaveVideo, hãy chọn h264-mp4)",
     "task_fail_artifact_download_failed": "Đã tạo video nhưng tải tệp xuống thất bại; hãy thử tải lại: {detail}",
     "task_fail_cascade_blocked_dependency": "Bị chặn do tác vụ phụ thuộc {dependency_task_id} thất bại: {reason}",
     "prompt_must_be_string_or_scene_object": "prompt phải là chuỗi hoặc đối tượng chứa scene/composition",
@@ -118,6 +127,10 @@ MESSAGES = {
     "tts_novel_text_missing": "Phân cảnh '{segment_id}' không có văn bản tiểu thuyết để thuyết minh",
     "tts_narration_text_missing": "Đơn vị này không có lời thuyết minh để tổng hợp",
     "tts_not_applicable": "TTS chỉ áp dụng cho đơn vị có lời dẫn thuộc người thuyết minh; hãy chọn hậu kỳ",
+    "tts_duration_endpoint_fixed": (
+        "Thời lượng thành phẩm của workflow này do endpoint quyết định, ArcReel không thể yêu cầu video đủ dài "
+        "cho lời dẫn; hãy chọn hậu kỳ"
+    ),
     "tts_not_configured": "Hãy cấu hình nhà cung cấp chuyển văn bản thành giọng nói trước khi dùng TTS",
     "tts_missing": "Hãy tạo âm thanh thuyết minh cho đơn vị này trước khi dùng TTS",
     "tts_generating": "Âm thanh thuyết minh vẫn đang được tạo; hãy chờ hoàn tất trước khi dùng TTS",
@@ -231,7 +244,9 @@ MESSAGES = {
     "endpoint_test_definition_and_model_ref_exclusive": "Chỉ được cung cấp một trong hai: định nghĩa endpoint hoặc mô hình cần chạy thử",
     "endpoint_test_too_many_assets": "Số lượng tệp tài nguyên vượt quá giới hạn {limit}",
     "endpoint_test_credentials_ambiguous": "Chỉ được cung cấp một nguồn thông tin xác thực: chọn nhà cung cấp, hoặc điền trực tiếp địa chỉ API và API Key",
-    "endpoint_test_model_unavailable": "Mô hình này đã bị tắt hoặc không phải mô hình video, không thể chạy kiểm tra kết nối",
+    "endpoint_test_mode_unsupported_for_kind": "Loại endpoint này ({kind}) không hỗ trợ kiểm tra endpoint đó",
+    "endpoint_test_preview_failed": "Không thể kết xuất yêu cầu từ định nghĩa này và bộ tham số này: {detail}",
+    "endpoint_test_model_unavailable": "Mô hình này đã bị tắt, hoặc endpoint của nó không hỗ trợ kiểm tra kết nối",
     "endpoint_test_provider_base_url_required": "Điểm cuối của mô hình này cần địa chỉ API; hãy điền base_url cho nhà cung cấp trước",
     "model_not_found": "Không tìm thấy mô hình",
     "trial_run_already_running": "Đã có một lần chạy thử đang diễn ra, hãy đợi nó kết thúc hoặc hủy trước",
@@ -247,6 +262,29 @@ MESSAGES = {
     "endpoint_media_type_mismatch": "media_type của endpoint không khớp: {detail}",
     "backend_creation_failed": "Tạo backend thất bại: {err_msg}",
     "connectivity_check_unsupported_format": "Không hỗ trợ kiểm tra kết nối với {discovery_format}",
+    "connectivity_check_comfyui_ok": "ComfyUI có thể truy cập, phiên bản {version}",
+    "connectivity_check_comfyui_ok_unknown_version": "ComfyUI có thể truy cập; không trả về số phiên bản",
+    "discovery_not_applicable_comfyui": (
+        "Giao thức ComfyUI không có danh sách mô hình để phát hiện: gọi được gì là do chính workflow quyết định. "
+        "Hãy nhập một endpoint ComfyUI và gắn nó vào một dòng mô hình"
+    ),
+    "custom_endpoint_kind_conflicts_with_attachment": (
+        "Định nghĩa thay thế đổi loại endpoint nên không còn khớp với liên kết hiện tại: giao thức của nhà cung cấp cho mô hình {model_id} (nhà cung cấp {provider}) không nhận được nó. Hãy đổi liên kết của dòng mô hình trước, rồi mới thay định nghĩa"
+    ),
+    "custom_endpoint_media_type_conflicts_with_attachment": (
+        "Định nghĩa này tạo ra {media_type}, khác với loại phương tiện hiện tại của endpoint, trong khi mô hình "
+        "{model_id} (nhà cung cấp {provider}) vẫn đang gắn với nó: endpoint quyết định mô hình thuộc luồng nào. "
+        "Hãy gỡ liên kết trước, rồi mới thay thế định nghĩa"
+    ),
+    "comfyui_endpoint_requires_comfyui_provider": (
+        "Endpoint ComfyUI {endpoint} của mô hình {model_id} chỉ dùng được trên nhà cung cấp giao thức ComfyUI"
+    ),
+    "comfyui_provider_requires_comfyui_endpoint": (
+        "Nhà cung cấp giao thức ComfyUI chỉ nhận endpoint ComfyUI; {endpoint} của mô hình {model_id} thì không"
+    ),
+    "capability_overrides_not_supported_for_comfyui": (
+        "Mô hình {model_id} dùng endpoint ComfyUI, năng lực chỉ suy ra từ liên kết node; không hỗ trợ ghi đè năng lực"
+    ),
     "capability_overrides_video_only": (
         "Endpoint {endpoint} của mô hình {model_id} không phải loại video; không hỗ trợ ghi đè năng lực"
     ),
@@ -315,6 +353,7 @@ MESSAGES = {
     "ref_missing_asset": "Tham chiếu đến {type} '{name}' không có trong thư viện tài nguyên dự án, vui lòng tạo trước",
     "ref_duration_exceeded": "Kịch bản dài {total}s, vượt mức thời lượng lớn nhất của {model}; đã tạo ở {duration}s nên video ngắn hơn kịch bản",
     "ref_duration_rounded_up": "Kịch bản dài {total}s, không thuộc các mức thời lượng của {model}; đã tạo ở {duration}s nên video dài hơn kịch bản",
+    "comfyui_multiple_outputs": "Lần chạy này ComfyUI tạo ra {count} tệp; đã giữ {filename}",
     "ref_too_many_images": "Số lượng ảnh tham chiếu {count} vượt giới hạn {max_count} của {model}, đã giữ {max_count} ảnh đầu tiên",
     "ref_payload_too_large": "Dữ liệu ảnh tham chiếu vượt giới hạn của nhà cung cấp, đã thử lại với mức nén bổ sung",
     "ref_payload_floor_exceeded": "Ảnh tham chiếu quá lớn hoặc quá nhiều; ngay cả khi nén ở mức chất lượng thấp nhất vẫn vượt giới hạn kích thước yêu cầu của nhà cung cấp. Vui lòng giảm số lượng ảnh tham chiếu hoặc độ phân giải rồi thử lại",

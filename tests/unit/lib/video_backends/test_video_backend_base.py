@@ -40,6 +40,7 @@ from lib.video_backends.base import (
     poll_with_retry,
     provider_reason_summary,
     recording_poll,
+    request_with_scoped_credentials,
     should_retry_download,
     should_retry_poll,
     should_retry_signed_download,
@@ -1295,6 +1296,49 @@ class TestRedirectMethodRewrite:
     )
     def test_rewrite_rule(self, status_code: int, method: str, expected: bool):
         assert _rewrites_to_get(status_code, method) is expected
+
+
+class TestScopedRedirectBody:
+    """multipart 请求体与凭证同作用域：同源续跳原样重发，跨源续跳整份丢弃。"""
+
+    async def test_a_cross_origin_307_forwards_no_multipart_body(self):
+        with capture_http() as router:
+            router.post("https://comfy.test/upload/image").mock(
+                return_value=httpx.Response(307, headers={"Location": "https://elsewhere.test/upload"})
+            )
+            moved = router.post("https://elsewhere.test/upload").mock(return_value=httpx.Response(200))
+            async with httpx.AsyncClient() as client:
+                await request_with_scoped_credentials(
+                    client,
+                    "POST",
+                    "https://comfy.test/upload/image",
+                    headers={"X-API-Key": "secret"},
+                    json=None,
+                    files={"image": ("a.png", b"PNGDATA", "image/png")},
+                    data={"overwrite": "true"},
+                )
+
+        request = moved.calls.last.request
+        assert request.content == b""
+        assert "X-API-Key" not in request.headers
+
+    async def test_a_same_origin_307_resends_the_multipart_body(self):
+        with capture_http() as router:
+            router.post("https://comfy.test/upload/image").mock(
+                return_value=httpx.Response(307, headers={"Location": "https://comfy.test/v2/upload"})
+            )
+            moved = router.post("https://comfy.test/v2/upload").mock(return_value=httpx.Response(200))
+            async with httpx.AsyncClient() as client:
+                await request_with_scoped_credentials(
+                    client,
+                    "POST",
+                    "https://comfy.test/upload/image",
+                    headers=None,
+                    json=None,
+                    files={"image": ("a.png", b"PNGDATA", "image/png")},
+                )
+
+        assert b"PNGDATA" in moved.calls.last.request.content
 
 
 class TestWithArtifactRetry:

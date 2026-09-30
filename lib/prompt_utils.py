@@ -29,6 +29,19 @@ def normalize_style(style: str | None) -> str:
     return _STYLE_PREFIX_RE.sub("", (style or "").strip())
 
 
+# 提示词正文里的排除项行：顶行起的排除项前缀，前缀后是本行的排除项措辞。前缀有三种：``Avoid:``，
+# 以及 ``lib.prompt_builders`` 的反向提示词尾巴所用的「画面避免：」「禁止出现：」。识别按前缀而非
+# 整行——纯文本回贴带回来的可能是任一历史版本的完整声明，整行比对只认得出被写死的那一版。前缀后
+# 只吃空格与制表符，换行不进前缀；措辞末尾的句号不进排除项文本。
+_AVOID_LINE = re.compile(r"^(?:Avoid:|画面避免：|禁止出现：)[ \t]*(.*?)。?$")
+
+# 排除项拼接与追加到负向节点字面值时的分隔符。
+_AVOID_SEPARATOR = "，"
+
+# 正文里连续空行的塌缩上限：删掉 Avoid 行后留下的空行按此并成一个，与模版引擎对自身产生的连续
+# 换行所做的塌缩同一口径。
+_BLANK_RUN = re.compile(r"\n{3,}")
+
 # 预设选项：真相源是 lib.script_models 的 Literal 词表，此处派生避免双写漂移
 SHOT_TYPES: list[str] = list(get_args(ShotType))
 CAMERA_MOTIONS: list[str] = list(get_args(CameraMotion))
@@ -243,6 +256,45 @@ def _attach_drama_speech_text(text: str, item: Mapping[str, Any] | None, *, char
 def _speech_section(ordered: dict[str, Any]) -> str:
     """渲染一个发声声明段，键名与缩进沿用 ``video_prompt_to_yaml``，两种形态判重可比。"""
     return yaml.dump(ordered, allow_unicode=True, default_flow_style=False, sort_keys=False).rstrip()
+
+
+def split_avoid_lines(text: str) -> tuple[str, str]:
+    """把提示词正文里的排除项行拆出来，返回 ``(正文, 排除项文本)``。
+
+    正文里的排除项行（``Avoid:``、「画面避免：」「禁止出现：」起头）是各通道共享的排除项声明，由
+    提示词构造按产出媒体注入。多数供应商没有负向
+    参数，这些行只能留在正文里当措辞；ComfyUI 端点有负向提示词的节点绑定，故要把它们从正文
+    拆出来单独填。两侧共用这一份识别：正文该删哪些行的判据只有一条，通道之间不会一边删一边留。
+
+    正文按行去掉全部排除项行后，连续空行塌缩成一个、首尾空白去掉——被删的行常自带前后空行，
+    不塌缩会在正文中间留下一段空白。排除项文本按出现顺序以「，」拼接，逐行去掉前缀后的措辞
+    原样保留，空措辞的行不进拼接（它只是个孤零零的 ``Avoid:``）。
+    """
+    kept: list[str] = []
+    avoided: list[str] = []
+    for line in text.split("\n"):
+        match = _AVOID_LINE.match(line)
+        if match is None:
+            kept.append(line)
+            continue
+        phrase = match.group(1).strip()
+        if phrase:
+            avoided.append(phrase)
+    body = _BLANK_RUN.sub("\n\n", "\n".join(kept)).strip()
+    return body, _AVOID_SEPARATOR.join(avoided)
+
+
+def append_avoid_text(literal: str, avoid_text: str) -> str:
+    """把拆出的排除项文本追加到负向节点的字面值之后。
+
+    追加而不覆盖：workflow 作者写在负向节点里的措辞是这份 workflow 的一部分（触发词、质量
+    词），抹掉它等于改写作者的底稿。字面值为空时直接写入，不留一个前导分隔符。
+    """
+    if not literal.strip():
+        return avoid_text
+    if not avoid_text:
+        return literal
+    return f"{literal}{_AVOID_SEPARATOR}{avoid_text}"
 
 
 def strip_voice_profiles(video_prompt: dict[str, Any]) -> dict[str, Any]:

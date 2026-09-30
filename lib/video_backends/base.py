@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 from urllib.parse import urlsplit
 
 import httpx
@@ -830,6 +830,15 @@ class _Hop:
         return _Hop(str(target), self.headers, None, self.auth_query)
 
 
+@dataclass(frozen=True)
+class _Body:
+    """一次请求的请求体。跟随重定向改写成 GET 时整个丢掉，三个字段不会各丢一半。"""
+
+    json: object | None = None
+    files: Mapping[str, Any] | None = None
+    data: Mapping[str, Any] | None = None
+
+
 async def request_with_scoped_credentials(
     client: httpx.AsyncClient,
     method: str,
@@ -838,6 +847,8 @@ async def request_with_scoped_credentials(
     headers: Mapping[str, str] | None,
     json: object | None,
     auth_query: Mapping[str, str] | None = None,
+    files: Mapping[str, Any] | None = None,
+    data: Mapping[str, Any] | None = None,
 ) -> httpx.Response:
     """发一次请求并自行逐跳跟随重定向，跳出本请求的源时卸掉 ``headers`` 里的凭证。
 
@@ -849,19 +860,24 @@ async def request_with_scoped_credentials(
 
     跨源续跳除卸掉凭证外也不转发请求体：307 / 308 保留方法，但请求体同样只在凭证作用域内。
     同源续跳按 :func:`_rewrites_to_get` 的规则处置，307 / 308 原样重发。
+
+    ``files`` / ``data`` 走 multipart 的请求体，与 ``json`` 三选一；同源续跳时原样重发，故 ``files``
+    的内容要是字节而不是文件句柄——句柄读到结尾后第二跳会发出一个空体。跨源续跳三者一并丢弃。
     """
     credential_origin = url_origin(url)
     # 首跳的 auth.query 已经拼在 url 上，params 不重复带；只在同源续跳时补回。
     hop = _Hop(url, headers, None, auth_query)
     current_method = method.upper()
-    current_json = json
+    body = _Body(json, files, data)
     for _ in range(_MAX_REDIRECTS + 1):
         response = await client.request(
             current_method,
             hop.url,
             headers=hop.headers,
             params=hop.params,
-            json=current_json,
+            json=body.json,
+            files=body.files,
+            data=body.data,
             follow_redirects=False,
         )
         location = _redirect_location(response)
@@ -869,10 +885,10 @@ async def request_with_scoped_credentials(
             return response
         if _rewrites_to_get(response.status_code, current_method):
             current_method = "GET"
-            current_json = None
+            body = _Body()
         hop = hop.redirected_to(location, credential_origin)
         if url_origin(hop.url) != credential_origin:
-            current_json = None
+            body = _Body()
     raise RuntimeError(f"request exceeded {_MAX_REDIRECTS} redirects: {_without_query(url)}")
 
 
@@ -1273,6 +1289,16 @@ class VideoGenerationResult:
     task_id: str | None = None
     generate_audio: bool | None = None
 
+    # 这一次生成才确定、且要随成片一起留档的事实（如 ComfyUI 的实发 workflow 指纹）。调用方把
+    # 它并进产物版本元数据：请求侧的那份元数据在提交前就已定稿，装不下只有执行过一次才知道的值。
+    # 键名由各 backend 自己定，内容必须可 JSON 序列化——它会原样落进版本记录。
+    provenance: Mapping[str, Any] | None = None
+
+    # 执行期产生的非阻断提示，形状与任务 ``result.warnings`` 同为 ``{"key", "params"}``：这一次
+    # 生成是成功的，但有一件事该让用户知道（如 ComfyUI 一次产出多个文件、只取了第一个）。调用方
+    # 把它并进任务结果，由读接口按当前语言渲染；``key`` 须在 ``lib/i18n`` 的各语言表里都有一条。
+    warnings: tuple[Mapping[str, Any], ...] = ()
+
 
 async def notify_provider_response(request: VideoGenerationRequest, stage: ProviderResponseStage, body: object) -> None:
     """把 HTTP 式调用通道的供应商响应及其阶段送到可选诊断回调。
@@ -1285,12 +1311,23 @@ async def notify_provider_response(request: VideoGenerationRequest, stage: Provi
     的口径与拒因摘要、失败日志同为 ``redact_provider_text``：通用遮蔽器只认得出常见的凭证
     参数名，厂商私有的查询参数要靠查询串整体剥离兜住。
     """
-    if request.on_provider_response is None:
+    await notify_provider_response_to(request.on_provider_response, stage, body, label=request.task_id)
+
+
+async def notify_provider_response_to(
+    sink: Callable[[ProviderResponseStage, object], Awaitable[None]] | None,
+    stage: ProviderResponseStage,
+    body: object,
+    *,
+    label: str | None = None,
+) -> None:
+    """同上，但只收回调本身：图像请求没有 ``task_id``，只能把标识交给调用方给。"""
+    if sink is None:
         return
     try:
-        await request.on_provider_response(stage, sanitize_diagnostic_payload(body, redact_text=redact_provider_text))
+        await sink(stage, sanitize_diagnostic_payload(body, redact_text=redact_provider_text))
     except Exception:
-        logger.warning("供应商响应留痕写入失败 task_id=%s", request.task_id, exc_info=True)
+        logger.warning("供应商响应留痕写入失败 task_id=%s", label, exc_info=True)
 
 
 def recording_poll[T](

@@ -1,4 +1,5 @@
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import ClassVar
@@ -15,8 +16,8 @@ from lib.media_generator import (
     task_video_staging_path,
 )
 from lib.version_manager import PaidVersionCommit
-from tests.factories import custom_endpoint_definition
-from tests.fakes import FakeConfigResolver, bounded_poll_clock, select_formal_video
+from tests.factories import comfyui_endpoint_definition, custom_endpoint_definition
+from tests.fakes import MP4_BYTES, PNG_BYTES, FakeConfigResolver, bounded_poll_clock, select_formal_video
 from tests.http_capture import capture_http
 
 
@@ -49,6 +50,8 @@ class _FakeVideoResult:
         self.usage_tokens = 0
         self.generate_audio = True
         self.duration_seconds = duration_seconds
+        self.seed = None
+        self.provenance = None
 
 
 class _FakeVideoBackend:
@@ -255,6 +258,155 @@ class TestMediaGenerator:
                 "usage": {"duration": 7.5},
             },
         )
+
+    async def test_comfyui_video_records_the_actual_seed_and_workflow_fingerprint(self, tmp_path):
+        """两者都只有生成过一次才知道：元数据在提交前定稿，装不下它们，故落盘前再并一次。"""
+        from lib.custom_provider.backends import CustomVideoBackend
+        from lib.custom_provider.comfyui.request_builder import workflow_sha256
+        from lib.custom_provider.comfyui_backend import ComfyuiVideoBackend
+
+        gen = _build_generator(tmp_path)
+        gen._video_provider_id = "custom-1"
+        delegate = ComfyuiVideoBackend(
+            provider_id="custom-1",
+            model="wan-t2v",
+            base_url="https://comfy.test",
+            api_key="",
+            definition=comfyui_endpoint_definition(),
+        )
+        # 不注入合成能力：请求闸门读的正是 delegate 自己那份由绑定推导出来的声明，注入一份合成
+        # 值会把这条用例要守的那一段跳过去。
+        gen._video_backend = CustomVideoBackend(provider_id="custom-1", delegate=delegate, model="wan-t2v")
+        history = {
+            "status": {"completed": True},
+            "outputs": {"9": {"gifs": [{"filename": "final.mp4", "subfolder": "video", "type": "output"}]}},
+        }
+
+        with capture_http() as router, bounded_poll_clock():
+            submit = router.post("https://comfy.test/prompt").mock(
+                return_value=httpx.Response(200, json={"prompt_id": "p-1"})
+            )
+            router.get("https://comfy.test/history/p-1").mock(return_value=httpx.Response(200, json=history))
+            router.get("https://comfy.test/view").mock(return_value=httpx.Response(200, content=MP4_BYTES))
+
+            output, _version, _ref, _uri = await gen.generate_video_async(
+                prompt="一只猫走过屋顶",
+                resource_type="videos",
+                resource_id="E1S01",
+                duration_seconds=5,
+            )
+
+        sent = json.loads(submit.calls.last.request.content)["prompt"]
+        assert output.read_bytes() == MP4_BYTES
+        assert gen.versions.add_calls[-1]["workflow_sha256"] == workflow_sha256(sent)
+        assert gen.versions.add_calls[-1]["seed"] == sent["3"]["inputs"]["seed"]
+
+    async def test_comfyui_execution_warnings_reach_the_caller(self, tmp_path):
+        """backend 执行期的提示要一路走到任务 result.warnings，日志只有运维看得到。"""
+        from lib.custom_provider.backends import CustomVideoBackend
+        from lib.custom_provider.comfyui_backend import ComfyuiVideoBackend
+        from lib.video_backends.base import VideoCapabilities
+
+        gen = _build_generator(tmp_path)
+        gen._video_provider_id = "custom-1"
+        delegate = ComfyuiVideoBackend(
+            provider_id="custom-1",
+            model="wan-t2v",
+            base_url="https://comfy.test",
+            api_key="",
+            definition=comfyui_endpoint_definition(),
+        )
+        gen._video_backend = CustomVideoBackend(
+            provider_id="custom-1", delegate=delegate, model="wan-t2v"
+        ).with_video_capabilities(VideoCapabilities(text_to_video=True), overrides={"text_to_video": True})
+        history = {
+            "status": {"completed": True},
+            "outputs": {
+                "9": {
+                    "gifs": [
+                        {"filename": "final_00001.mp4", "subfolder": "video", "type": "output"},
+                        {"filename": "final_00002.mp4", "subfolder": "video", "type": "output"},
+                    ]
+                }
+            },
+        }
+        collected: list[dict] = []
+
+        with capture_http() as router, bounded_poll_clock():
+            router.post("https://comfy.test/prompt").mock(return_value=httpx.Response(200, json={"prompt_id": "p-1"}))
+            router.get("https://comfy.test/history/p-1").mock(return_value=httpx.Response(200, json=history))
+            router.get("https://comfy.test/view").mock(return_value=httpx.Response(200, content=MP4_BYTES))
+
+            await gen.generate_video_async(
+                prompt="一只猫走过屋顶",
+                resource_type="videos",
+                resource_id="E1S01",
+                duration_seconds=5,
+                warnings=collected,
+            )
+
+        assert collected == [{"key": "comfyui_multiple_outputs", "params": {"count": 2, "filename": "final_00001.mp4"}}]
+
+    async def test_comfyui_image_to_image_stores_the_artifact_as_an_image_version(self, tmp_path):
+        """图像通道端到端一条：参考图上传 → 提交 → 轮询 → 产物入库为一版分镜图。
+
+        走 ``generate_image_async`` 而不是直接调 backend：i2i 的能力闸门、参考图压缩与版本入库都在
+        那条路上，backend 单测看不到它们。
+        """
+        from lib.custom_provider.backends import CustomImageBackend
+        from lib.custom_provider.comfyui_image_backend import ComfyuiImageBackend
+
+        definition = comfyui_endpoint_definition(media_type="image")
+        definition["workflow"]["20"] = {"class_type": "LoadImage", "inputs": {"image": "draft.png"}}
+        definition["bindings"] = {
+            "prompt": [{"node": "6", "input": "text", "class_type": "CLIPTextEncode"}],
+            "reference_images": [{"node": "20", "input": "image", "class_type": "LoadImage"}],
+            "seed": [{"node": "3", "input": "seed", "class_type": "KSampler", "policy": "random"}],
+            "output": [{"node": "9", "class_type": "SaveImage"}],
+        }
+        definition["workflow"]["9"] = {"class_type": "SaveImage", "inputs": {"images": ["8", 0]}}
+
+        gen = _build_generator(tmp_path)
+        gen._image_provider_id = "custom-1"
+        delegate = ComfyuiImageBackend(
+            provider_id="custom-1",
+            model="qwen-edit",
+            base_url="https://comfy.test",
+            api_key="",
+            definition=definition,
+            job_label="job-7",
+        )
+        gen._image_backend = CustomImageBackend(provider_id="custom-1", delegate=delegate, model="qwen-edit")
+        reference = _solid_png(tmp_path, "ref.png", 64, 64)
+        history = {
+            "status": {"completed": True},
+            "outputs": {"9": {"images": [{"filename": "ArcReel_00001_.png", "subfolder": "", "type": "output"}]}},
+        }
+
+        with capture_http() as router:
+            upload = router.post("https://comfy.test/upload/image").mock(
+                return_value=httpx.Response(200, json={"name": "job-7-reference_images-1.png", "subfolder": "arcreel"})
+            )
+            submit = router.post("https://comfy.test/prompt").mock(
+                return_value=httpx.Response(200, json={"prompt_id": "p-1"})
+            )
+            router.get("https://comfy.test/history/p-1").mock(return_value=httpx.Response(200, json=history))
+            router.get("https://comfy.test/view").mock(return_value=httpx.Response(200, content=PNG_BYTES))
+
+            output, version = await gen.generate_image_async(
+                prompt="把这张图改成夜景",
+                resource_type="storyboards",
+                resource_id="E1S01",
+                reference_images=[reference],
+            )
+
+        assert output.read_bytes() == PNG_BYTES
+        assert version == 1
+        assert upload.call_count == 1
+        assert gen.versions.add_calls[-1]["resource_id"] == "E1S01"
+        sent = json.loads(submit.calls.last.request.content)["prompt"]
+        assert sent["20"]["inputs"]["image"] == "arcreel/job-7-reference_images-1.png"
+        assert gen.ledger.outcomes[0]["status"] == "success"
 
     async def test_cancelled_formal_image_generation_never_replaces_the_canonical_file(self, tmp_path):
         gen = _build_generator(tmp_path)

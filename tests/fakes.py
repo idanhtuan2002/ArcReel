@@ -25,6 +25,11 @@ if TYPE_CHECKING:
 
 _NO_SDK_MESSAGES: tuple[dict[str, Any], ...] = ()
 
+#: 带真实文件头的产物替身字节。取件路径按文件头判容器（见
+#: ``lib.custom_provider.comfyui.artifacts.container_matches``），裸占位字节会被判容器不符。
+MP4_BYTES = b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00mp4-bytes"
+PNG_BYTES = b"\x89PNG\r\n\x1a\npng-bytes"
+
 
 async def empty_sdk_response_stream() -> AsyncIterator[dict[str, Any]]:
     """不产出任何消息即结束的 SDK 响应流。
@@ -809,3 +814,13 @@ class GateProjectManager:
         path = self.project_root / project_name
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+
+def bind_safe_session_factory(monkeypatch, factory) -> None:
+    """把全局 ``lib.db.safe_session_factory`` 指向给定的 session 工厂。
+
+    worker 侧的 ``_requeue_single_task`` 与 ``CapacityTable.from_db`` 在函数内晚导入这个全局
+    名字、绕开注入的协作者自己开 session，测试只能从这一处换；工厂由调用方给，可以是真库的
+    ``async_sessionmaker``，也可以是只出一个假 session 的上下文管理器。
+    """
+    monkeypatch.setattr("lib.db.safe_session_factory", factory)

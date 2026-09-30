@@ -67,6 +67,15 @@ MESSAGES = {
     ),
     "task_fail_declarative_template_render_failed": "Endpoint request rendering failed: {detail}",
     "task_fail_declarative_response_extract_failed": "Endpoint response extraction failed: {detail}",
+    "task_fail_comfyui_image_drop_unsupported": "This workflow's output depends on the image read by node {node}, so it cannot be rewired for fewer images; supply the missing images or use another workflow",
+    "task_fail_comfyui_upload_failed": "Uploading the asset to ComfyUI failed: {detail}",
+    "task_fail_comfyui_node_errors": "ComfyUI refused this workflow; {nodes} node(s) reported errors, first: {summary}",
+    "task_fail_comfyui_job_lost": "ComfyUI no longer knows about this run ({prompt_id}); it is in neither the queue nor the history, so ComfyUI most likely restarted — please retry",
+    "task_fail_comfyui_execution_error": "ComfyUI failed during execution: {detail} (failing node: {node})",
+    "task_fail_comfyui_interrupted": "The run on ComfyUI was interrupted; please retry",
+    "task_fail_comfyui_output_missing": "ComfyUI finished but output node {nodes} produced no file; check its node bindings and the workflow's output chain",
+    "task_fail_comfyui_output_type_mismatch": "ComfyUI produced {filename}, which is not a file type this endpoint should output (expected {expected}); point the output node bindings at the node that exports the final artifact, or switch that save node to a supported format (for SaveVideo, pick h264-mp4)",
+    "task_fail_comfyui_output_container_mismatch": "The contents of {filename} produced by ComfyUI are not a container this endpoint should output (expected {expected}); switch the save node to a supported format (for SaveVideo, pick h264-mp4)",
     "task_fail_artifact_download_failed": "Video generation succeeded but artifact download failed; retry the download: {detail}",
     "task_fail_cascade_blocked_dependency": "Blocked by failed dependency task {dependency_task_id}: {reason}",
     "prompt_must_be_string_or_scene_object": "prompt must be a string or an object containing scene/composition",
@@ -118,6 +127,10 @@ MESSAGES = {
     "tts_novel_text_missing": "Shot '{segment_id}' has no novel text to narrate",
     "tts_narration_text_missing": "This unit has no narrator text to synthesize",
     "tts_not_applicable": "TTS applies only to narrator-owned voiceover units; choose post-production delivery",
+    "tts_duration_endpoint_fixed": (
+        "This workflow's output duration is fixed by the endpoint, so ArcReel cannot request a clip long enough "
+        "for the narration; choose post-production delivery"
+    ),
     "tts_not_configured": "Configure a text-to-speech provider before using TTS delivery",
     "tts_missing": "Generate narration audio for this unit before using TTS delivery",
     "tts_generating": "Narration audio is still generating; wait for it to finish before using TTS delivery",
@@ -233,7 +246,9 @@ MESSAGES = {
     "endpoint_test_definition_and_model_ref_exclusive": "Provide either an endpoint definition or a model to test, not both",
     "endpoint_test_too_many_assets": "Too many asset files; the limit is {limit}",
     "endpoint_test_credentials_ambiguous": "Provide one credential source only: select a provider, or fill in the base URL and API key inline",
-    "endpoint_test_model_unavailable": "This model is disabled or not a video model, so it cannot run a test connection",
+    "endpoint_test_mode_unsupported_for_kind": "This kind of endpoint ({kind}) does not support that endpoint test",
+    "endpoint_test_preview_failed": "Could not render a request from this definition and these parameters: {detail}",
+    "endpoint_test_model_unavailable": "This model is disabled, or its endpoint does not support a test connection",
     "endpoint_test_provider_base_url_required": "This model's endpoint needs an API address; set a base_url on the provider first",
     "model_not_found": "Model not found",
     "trial_run_already_running": "A trial run is already in progress. Wait for it to finish or cancel it first",
@@ -249,6 +264,30 @@ MESSAGES = {
     "endpoint_media_type_mismatch": "Endpoint media_type mismatch: {detail}",
     "backend_creation_failed": "Backend creation failed: {err_msg}",
     "connectivity_check_unsupported_format": "Connectivity checks are not supported for {discovery_format}",
+    "connectivity_check_comfyui_ok": "ComfyUI is reachable, version {version}",
+    "connectivity_check_comfyui_ok_unknown_version": "ComfyUI is reachable; it did not report a version",
+    "discovery_not_applicable_comfyui": (
+        "The ComfyUI protocol has no model list to discover: what can be called is decided by the workflow "
+        "itself. Import a ComfyUI endpoint and attach it to a model row instead"
+    ),
+    "custom_endpoint_kind_conflicts_with_attachment": (
+        "The replacement definition changes the endpoint kind, which no longer fits the current attachment: the provider protocol of model {model_id} (provider {provider}) cannot take it. Change the model row's attachment first, then replace the definition"
+    ),
+    "custom_endpoint_media_type_conflicts_with_attachment": (
+        "This definition produces {media_type}, which differs from the endpoint's current media type, while model "
+        "{model_id} (provider {provider}) is still attached: an endpoint decides which lane its models belong to. "
+        "Detach the models first, then replace the definition"
+    ),
+    "comfyui_endpoint_requires_comfyui_provider": (
+        "ComfyUI endpoint {endpoint} on model {model_id} can only be used on a ComfyUI protocol provider"
+    ),
+    "comfyui_provider_requires_comfyui_endpoint": (
+        "A ComfyUI protocol provider only accepts ComfyUI endpoints; {endpoint} on model {model_id} is not one"
+    ),
+    "capability_overrides_not_supported_for_comfyui": (
+        "Model {model_id} uses a ComfyUI endpoint, whose capabilities are derived from node bindings alone; "
+        "capability overrides are not supported"
+    ),
     "capability_overrides_video_only": (
         "Endpoint {endpoint} of model {model_id} is not a video endpoint; capability overrides are not supported"
     ),
@@ -317,6 +356,7 @@ MESSAGES = {
     "ref_missing_asset": "Reference to {type} '{name}' is not in the project asset library, please generate it first",
     "ref_duration_exceeded": "The script runs {total}s, beyond {model}'s longest duration option; generated at {duration}s, so the clip is shorter than the script",
     "ref_duration_rounded_up": "The script runs {total}s, which is not one of {model}'s duration options; generated at {duration}s, so the clip is longer than the script",
+    "comfyui_multiple_outputs": "ComfyUI produced {count} files this run; kept {filename}",
     "ref_too_many_images": "Reference image count {count} exceeds {model} limit of {max_count}, kept the first {max_count}",
     "ref_payload_too_large": "Reference image payload exceeded provider limits, retried with extra compression",
     "ref_payload_floor_exceeded": "Reference images are too large or too many; even compressed to the lowest quality they still exceed the provider's request size limit. Please reduce the number of reference images or their resolution and try again",

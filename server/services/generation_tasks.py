@@ -97,6 +97,7 @@ from lib.prompt_builders import (
 )
 from lib.prompt_utils import render_storyboard_video_prompt
 from lib.reference_catalog import build_reference_catalog
+from lib.reference_video.duration_slots import DEFAULT_PLANNED_DURATION_SECONDS
 from lib.reference_video.execution_checkpoint import (
     NarrationExecutionFacts,
     ProviderMediaInput,
@@ -2453,9 +2454,11 @@ async def execute_video_task(
                 supported_durations,
                 resolution=resolution,
             )
-            if not candidates:
+            if not candidates and not ctx.video.duration_endpoint_fixed:
                 raise ValueError("TTS video request requires a current integer planned duration")
-            current_planned_duration = candidates[0]
+            # 时长由端点固定的模型行没有档位可借（合法空集），退到共享的规划篇幅默认值：这次
+            # 请求随后由公共投影判为 tts_duration_endpoint_fixed，而不是死在缺少规划秒数上。
+            current_planned_duration = next(iter(candidates), DEFAULT_PLANNED_DURATION_SECONDS)
         constrained_durations = constrain_durations(
             registry_provider_id,
             model_name,
@@ -2471,6 +2474,7 @@ async def execute_video_task(
             planned_duration_seconds=current_planned_duration,
             supported_durations=constrained_durations,
             confirmed_request_duration_seconds=delivery_options.confirmed_request_duration_seconds,
+            duration_endpoint_fixed=ctx.video.duration_endpoint_fixed,
             resolver=ResolvedTtsSettingsResolver.from_audio_lane(ctx.audio),
             tts_in_progress=await tts_task_in_progress(
                 project_name=project_name,
@@ -2497,6 +2501,7 @@ async def execute_video_task(
             planned_duration_seconds=current_planned_duration,
             supported_durations=constrained_durations,
             confirmed_request_duration_seconds=delivery_options.confirmed_request_duration_seconds,
+            duration_endpoint_fixed=ctx.video.duration_endpoint_fixed,
             current_visual_duration_seconds=current_visual_duration,
         )
         if not delivery_projection.allowed:
@@ -2690,6 +2695,8 @@ async def execute_video_task(
         if task_id is not None
         else None
     )
+    #: backend 执行期产生的非阻断提示（如 ComfyUI 一次产出多个文件），随结果落进任务 result。
+    warnings: list[dict[str, Any]] = []
     try:
         await asyncio.to_thread(assert_current_artifact_input_claims_usable, project_path, formal_input_claims)
         async with AsyncExitStack() as attempt_stack:
@@ -2726,6 +2733,7 @@ async def execute_video_task(
                 visual_basis_digest=visual_basis_digest,
                 generate_audio=ctx.video.requested_generate_audio,
                 poll_timeout_seconds=poll_timeout_seconds,
+                warnings=warnings,
             )
 
         async def _finalize() -> dict[str, Any]:
@@ -2737,6 +2745,7 @@ async def execute_video_task(
                 version=version,
                 video_uri=video_uri,
                 generator=generator,
+                warnings=warnings,
             )
 
         return await complete_video_artifact_commit(
@@ -2747,6 +2756,7 @@ async def execute_video_task(
             version=version,
             video_uri=video_uri,
             finalize=_finalize,
+            warnings=warnings,
         )
     finally:
         if artifact_committer is not None:
@@ -2764,8 +2774,13 @@ async def _finalize_video_task(
     version: int,
     video_uri: str | None,
     generator: Any,
+    warnings: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
-    """Normal + resume 共用的 finalize 逻辑：写 scene asset + 抽缩略图 + 返回 result dict。"""
+    """Normal + resume 共用的 finalize 逻辑：写 scene asset + 抽缩略图 + 返回 result dict。
+
+    ``warnings`` 为空时结果不带该键：读侧按「有没有这个键」判断这一版带不带提示，恒写一个空
+    列表会让每一版都多出一个永远为空的形状。
+    """
 
     def _update_video_metadata():
         get_project_manager().update_scene_asset(
@@ -2808,7 +2823,7 @@ async def _finalize_video_task(
 
     created_at, execution_id = await asyncio.to_thread(_version_facts)
 
-    result = {
+    result: dict[str, Any] = {
         "version": version,
         "file_path": f"videos/scene_{resource_id}.mp4",
         "created_at": created_at,
@@ -2818,6 +2833,8 @@ async def _finalize_video_task(
     }
     if execution_id is not None:
         result["execution_id"] = execution_id
+    if warnings:
+        result["warnings"] = list(warnings)
     return result
 
 

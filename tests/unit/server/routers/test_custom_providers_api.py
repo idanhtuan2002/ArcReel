@@ -8,23 +8,25 @@ from __future__ import annotations
 
 import json
 from collections.abc import Generator
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.config.service import ConfigService
-from lib.custom_provider.endpoints import ENDPOINT_REGISTRY, declarative_endpoint_spec
-from lib.db import get_async_session
-from server.auth import CurrentUserInfo, get_current_user
-from server.error_handlers import register_error_handlers
+from lib.custom_provider.endpoints import (
+    ENDPOINT_REGISTRY,
+    EndpointSpec,
+    declarative_endpoint_spec,
+    get_endpoint_spec,
+)
 from server.routers import custom_providers
-from tests.auth_deps import AUTH_DEPENDENCIES
+from tests.factories import custom_endpoint_definition
 from tests.http_capture import capture_http, only_request
 
 _EXAMPLE_TEMPLATE_PATH = (
@@ -43,29 +45,8 @@ def _example_template_definition() -> dict[str, Any]:
 
 
 @pytest.fixture
-async def app_session_factory(db_engine):
-    return async_sessionmaker(db_engine, expire_on_commit=False)
-
-
-@pytest.fixture
-def app(app_session_factory) -> FastAPI:
-    """创建绑定内存数据库的 FastAPI 应用。"""
-    _app = FastAPI()
-
-    async def _override_session():
-        async with app_session_factory() as db_session:
-            yield db_session
-
-    _app.dependency_overrides[get_async_session] = _override_session
-    _app.dependency_overrides[get_current_user] = lambda: CurrentUserInfo(id="test", sub="test", role="admin")
-    _app.include_router(custom_providers.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
-    register_error_handlers(_app)
-    return _app
-
-
-@pytest.fixture
-def custom_providers_client(app) -> Generator[TestClient, None, None]:
-    with TestClient(app) as c:
+def custom_providers_client(custom_providers_app) -> Generator[TestClient, None, None]:
+    with TestClient(custom_providers_app) as c:
         yield c
 
 
@@ -245,6 +226,11 @@ class TestEndpointCatalog:
                 "request_path_template",
                 "image_capabilities",
                 "end_image_capable",
+                "size_fixed",
+                "duration_fixed",
+                "duration_frame_rate_missing",
+                "duration_tier_empty",
+                "native_resolution",
             }
             assert entry["request_method"] == "POST"
             assert entry["request_path_template"].startswith("/")
@@ -1604,6 +1590,136 @@ async def test_split_image_endpoints_may_both_be_default(custom_providers_client
     assert defaults == {"m1": True, "m2": True}
 
 
+def _builtin_specs(models) -> dict[str, EndpointSpec]:
+    """内置端点的 spec 表，形状与 `_resolve_model_endpoint_specs` 的产出一致。"""
+    return {m.endpoint: get_endpoint_spec(m.endpoint) for m in models}
+
+
+def _custom_endpoint_spec(key: str, media_type: str) -> EndpointSpec:
+    """一条 ce- 端点的 spec，媒体类型按需改写——键前缀推不出媒体类型，只能由 spec 带过来。"""
+    spec = declarative_endpoint_spec(key, custom_endpoint_definition(), source="custom")
+    return replace(spec, media_type=media_type)
+
+
+def test_to_db_dict_reads_the_media_type_from_the_resolved_spec():
+    """时长档位归一只对视频端点做；ce- 端点是不是视频，由解析好的 spec 说了算。"""
+    from server.routers.custom_providers import ModelInput
+
+    model = ModelInput(model_id="m1", display_name="m1", endpoint="ce-7", supported_durations=[])
+
+    # video：空列表下游视为非法，归一为缺省再由 preset 兜底
+    assert model.to_db_dict(_custom_endpoint_spec("ce-7", "video"))["supported_durations"] != "[]"
+    # 非 video：不归一，原样落库
+    assert model.to_db_dict(_custom_endpoint_spec("ce-7", "image"))["supported_durations"] == "[]"
+
+
+def test_check_unique_defaults_reads_the_media_type_from_the_resolved_spec():
+    """两条 ce- 默认模型冲不冲突，取决于 spec 的媒体类型，而不是键前缀。"""
+    from fastapi import HTTPException
+
+    from server.routers.custom_providers import ModelInput, _check_unique_defaults
+
+    models = [
+        ModelInput(model_id="m1", display_name="m1", endpoint="ce-7", is_default=True),
+        ModelInput(model_id="m2", display_name="m2", endpoint="ce-8", is_default=True),
+    ]
+
+    def t(key, **params):
+        return f"{key}:{params}"
+
+    same_lane = {"ce-7": _custom_endpoint_spec("ce-7", "audio"), "ce-8": _custom_endpoint_spec("ce-8", "audio")}
+    with pytest.raises(HTTPException) as excinfo:
+        _check_unique_defaults(models, same_lane, t)
+    assert excinfo.value.status_code == 422
+
+    split_lanes = {"ce-7": _custom_endpoint_spec("ce-7", "audio"), "ce-8": _custom_endpoint_spec("ce-8", "video")}
+    _check_unique_defaults(models, split_lanes, t)
+
+
+def test_check_unique_defaults_refuses_two_image_defaults_that_declare_no_capabilities():
+    """能力集为空的图像端点分不开彼此：两条这样的默认放过去，取默认模型时会一次查出两行。
+
+    ``ce-`` 端点的能力位内置查表查不到，此前整条被跳过，于是这类默认从不参与互斥校验。
+    """
+    from fastapi import HTTPException
+
+    from server.routers.custom_providers import ModelInput, _check_unique_defaults
+
+    models = [
+        ModelInput(model_id="m1", display_name="m1", endpoint="ce-7", is_default=True),
+        ModelInput(model_id="m2", display_name="m2", endpoint="ce-8", is_default=True),
+    ]
+    specs = {"ce-7": _custom_endpoint_spec("ce-7", "image"), "ce-8": _custom_endpoint_spec("ce-8", "image")}
+
+    def t(key, **params):
+        return f"{key}:{params}"
+
+    with pytest.raises(HTTPException) as excinfo:
+        _check_unique_defaults(models, specs, t)
+
+    assert excinfo.value.status_code == 422
+
+
+def _comfyui_image_spec(key: str, *, reference_slots: int) -> EndpointSpec:
+    """一条 ComfyUI 图像端点的 spec：参考图格子决定它落在 t2i 还是 i2i 那一格。"""
+    from lib.custom_provider.endpoints import comfyui_endpoint_spec
+    from tests.factories import comfyui_endpoint_definition
+
+    definition = comfyui_endpoint_definition(media_type="image")
+    if reference_slots:
+        definition["workflow"]["20"] = {"class_type": "LoadImage", "inputs": {"image": "draft.png"}}
+        definition["bindings"]["reference_images"] = [
+            {"node": "20", "input": "image", "class_type": "LoadImage"}
+        ] * reference_slots
+    return comfyui_endpoint_spec(key, definition)
+
+
+def test_check_unique_defaults_separates_two_comfyui_image_endpoints_by_capability():
+    """一份文生图 workflow 与一份图生图 workflow 各设默认：能力集不相交，互不冲突。"""
+    from server.routers.custom_providers import ModelInput, _check_unique_defaults
+
+    models = [
+        ModelInput(model_id="t2i", display_name="t2i", endpoint="ce-7", is_default=True),
+        ModelInput(model_id="i2i", display_name="i2i", endpoint="ce-8", is_default=True),
+    ]
+    specs = {
+        "ce-7": _comfyui_image_spec("ce-7", reference_slots=0),
+        "ce-8": _comfyui_image_spec("ce-8", reference_slots=1),
+    }
+
+    _check_unique_defaults(models, specs, lambda key, **params: key)
+
+
+def test_check_unique_defaults_rejects_two_comfyui_text_to_image_defaults():
+    """两份都只会文生图：同一格里两个默认，取默认模型时会一次查出两行。"""
+    from fastapi import HTTPException
+
+    from server.routers.custom_providers import ModelInput, _check_unique_defaults
+
+    models = [
+        ModelInput(model_id="m1", display_name="m1", endpoint="ce-7", is_default=True),
+        ModelInput(model_id="m2", display_name="m2", endpoint="ce-8", is_default=True),
+    ]
+    specs = {
+        "ce-7": _comfyui_image_spec("ce-7", reference_slots=0),
+        "ce-8": _comfyui_image_spec("ce-8", reference_slots=0),
+    }
+
+    with pytest.raises(HTTPException) as excinfo:
+        _check_unique_defaults(models, specs, lambda key, **params: f"{key}:{params}")
+
+    assert excinfo.value.status_code == 422
+
+
+def test_check_unique_defaults_allows_one_image_default_without_capabilities():
+    """一条这样的默认没有分不开的对象，照常放行。"""
+    from server.routers.custom_providers import ModelInput, _check_unique_defaults
+
+    models = [ModelInput(model_id="m1", display_name="m1", endpoint="ce-7", is_default=True)]
+
+    _check_unique_defaults(models, {"ce-7": _custom_endpoint_spec("ce-7", "image")}, lambda key, **params: key)
+
+
 def test_check_unique_defaults_rejects_two_generations_defaults():
     """同 provider 内两条 -generations 都设默认 → 422。"""
     from fastapi import HTTPException
@@ -1619,7 +1735,7 @@ def test_check_unique_defaults_rejects_two_generations_defaults():
         return f"{key}:{params}"
 
     with pytest.raises(HTTPException) as excinfo:
-        _check_unique_defaults(models, t)
+        _check_unique_defaults(models, _builtin_specs(models), t)
     assert excinfo.value.status_code == 422
 
 
@@ -1638,7 +1754,7 @@ def test_check_unique_defaults_rejects_wildcard_with_split():
         return f"{key}:{params}"
 
     with pytest.raises(HTTPException):
-        _check_unique_defaults(models, t)
+        _check_unique_defaults(models, _builtin_specs(models), t)
 
 
 def test_check_unique_defaults_text_still_media_type_exclusive():
@@ -1656,7 +1772,7 @@ def test_check_unique_defaults_text_still_media_type_exclusive():
         return f"{key}:{params}"
 
     with pytest.raises(HTTPException):
-        _check_unique_defaults(models, t)
+        _check_unique_defaults(models, _builtin_specs(models), t)
 
 
 # ---------------------------------------------------------------------------

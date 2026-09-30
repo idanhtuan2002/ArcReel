@@ -43,6 +43,7 @@ _ORPHAN_RESCAN_LEASE_LOST_MULT = 3
 from lib.api_errors import ApiError
 from lib.budget_guard import BudgetExceededError, BudgetScopeMissingError
 from lib.config.resolver import VideoBucketCapabilityError
+from lib.custom_provider.comfyui.failures import ComfyuiError
 from lib.custom_provider.declarative_backend import DeclarativeRuntimeError
 from lib.generation_queue import (
     I2I_ONLY_TASK_TYPES,
@@ -137,7 +138,8 @@ def _encode_task_failure_message(exc: Exception) -> str:
         | DeclarativeRuntimeError
         | PaidRouteUnqualifiedError
         | BudgetScopeMissingError
-        | BudgetExceededError,
+        | BudgetExceededError
+        | ComfyuiError,
     ):
         # 结构化执行拒绝没有通用兜底 code 可退，退回 str(exc)（即 code 本身）——
         # 非结构化文本在读侧原样透传，不会丢失原因。
@@ -161,6 +163,10 @@ def _try_encode_failure(code: str, params: dict[str, Any]) -> str | None:
         # RecursionError：嵌套过深的容器，default=str 不接管容器本身）。
         logger.warning("失败 params 无法序列化，降级为通用失败原因: code=%s", code)
     return None
+
+
+#: ComfyUI 协议供应商每条 lane 的缺省并发：一台 ComfyUI 服务后面通常只有一张显卡。
+COMFYUI_LANE_DEFAULT = 1
 
 
 def _parse_lane_max(config: dict[str, str], key: str, default: int, provider_id: str) -> int:
@@ -230,6 +236,23 @@ class CapacityTable:
         """
         return meta.default_concurrency.get(lane, global_default)
 
+    @staticmethod
+    def _custom_lane_default(provider: Any, column: int | None, global_default: int) -> int:
+        """自定义供应商某条 lane 的上限：列有值取列值，列为 NULL 取协议默认。
+
+        ComfyUI 协议的供应商是用户自己的一张显卡，图像与视频各开 1 条即占满；全局默认（视频 3、
+        图像 5）会让几个任务同时抢同一张卡，排队都排在远端、本地看不见。用户仍可把列显式调高。
+        其余协议面向的是商业 API，按全局默认走。
+
+        与 :meth:`_lane_default` 分开：那一条读的是内置供应商注册表的声明默认，自定义供应商没有
+        注册表条目，声明来源只有协议本身。
+        """
+        from lib.custom_provider.discovery_formats import is_comfyui_protocol
+
+        if column is not None:
+            return column
+        return COMFYUI_LANE_DEFAULT if is_comfyui_protocol(provider.discovery_format) else global_default
+
     @classmethod
     def from_env(cls) -> CapacityTable:
         """从环境变量 / 默认值构造（DB 不可用前或测试用）。"""
@@ -255,8 +278,9 @@ class CapacityTable:
         """从 ConfigService + PROVIDER_REGISTRY + 自定义供应商加载容量表。"""
         from lib.config.registry import PROVIDER_REGISTRY
         from lib.config.service import ConfigService
-        from lib.custom_provider.endpoints import static_media_type
+        from lib.custom_provider.endpoint_resolution import resolve_endpoint_spec
         from lib.db import safe_session_factory
+        from lib.db.repositories.custom_endpoint_repo import CustomEndpointRepository
         from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 
         default_image = _read_int_env("IMAGE_MAX_WORKERS", 5, minimum=1)
@@ -284,16 +308,32 @@ class CapacityTable:
                 limits[provider_id] = cls._lane_limits(meta.media_types, image_max, video_max, audio_max)
 
             repo = CustomProviderRepository(session)
+            get_custom_endpoint = CustomEndpointRepository(session).get
+            # 同一端点可能挂在多行乃至多个供应商上，媒体类型按端点键缓存，整张表只读一次库。
+            media_type_by_endpoint: dict[str, str] = {}
             for provider, models in await repo.list_providers_with_models():
                 pid = provider.provider_id  # "custom-{id}"
-                # 自定义供应商的模型行可以挂 ce- 端点：按内置注册表查会抛 ValueError，
-                # 让整张容量表的刷新一起作废，该供应商停在 video 容量 0 上收不了任务。
-                media_types = {static_media_type(m.endpoint) for m in models if m.is_enabled}
+                # 模型行可以挂 ce- 端点，媒体类型写在它那份定义里，只能解析 spec 取。
+                media_types: set[str] = set()
+                for m in models:
+                    if not m.is_enabled:
+                        continue
+                    media_type = media_type_by_endpoint.get(m.endpoint)
+                    if media_type is None:
+                        try:
+                            media_type = (await resolve_endpoint_spec(m.endpoint, get_custom_endpoint)).media_type
+                        except ValueError:
+                            # 端点已不在：该行发起生成必然失败，不凭它开 lane，也不作废整张表的刷新。
+                            logger.warning("无法解析模型 endpoint，容量表跳过该行: endpoint=%r", m.endpoint)
+                            continue
+                        media_type_by_endpoint[m.endpoint] = media_type
+                    media_types.add(media_type)
                 # 自定义供应商不在内置注册表，无声明默认层 → 两层回退：列有值取列值，
-                # 列为 NULL 走全局默认。投影仍交给 _lane_limits 统一处理不支持的 lane。
-                image_max = provider.image_max_workers if provider.image_max_workers is not None else default_image
-                video_max = provider.video_max_workers if provider.video_max_workers is not None else default_video
-                audio_max = provider.audio_max_workers if provider.audio_max_workers is not None else default_audio
+                # 列为 NULL 取协议默认（见 _custom_lane_default）。投影仍交给 _lane_limits
+                # 统一处理不支持的 lane。
+                image_max = cls._custom_lane_default(provider, provider.image_max_workers, default_image)
+                video_max = cls._custom_lane_default(provider, provider.video_max_workers, default_video)
+                audio_max = cls._custom_lane_default(provider, provider.audio_max_workers, default_audio)
                 limits[pid] = cls._lane_limits(media_types, image_max, video_max, audio_max)
 
         logger.info("从 DB 加载供应商容量表: %s", limits)
