@@ -6,7 +6,8 @@
  * head moved. Each version is stored under its own localStorage key (the draft
  * TTL pruning covers these keys). When storage cannot take it, the version is
  * held in memory instead: that copy outlives closing and reopening the Canvas,
- * but not the browser tab, so the page warns before unloading while any exists.
+ * but not the browser tab, so the unload guard (`unloadGuard.ts`) warns before
+ * unloading while any exists.
  */
 
 import {
@@ -16,6 +17,7 @@ import {
   type DraftScope,
 } from "./draftRecovery";
 import { safeLocalStorageSet } from "./storageQuota";
+import { setUnstoredWork } from "./unloadGuard";
 
 export interface KeptAsideVersion {
   /** Its localStorage key, or null when it is held in memory only. */
@@ -94,6 +96,7 @@ export function keepAside(scope: DraftScope, snapshot: ConflictSnapshot): KeptAs
   if (safeLocalStorageSet(key, JSON.stringify(snapshot))) return { key, snapshot };
   const version: KeptAsideVersion = { key: null, snapshot };
   inMemory.set(base, [...(inMemory.get(base) ?? []), version]);
+  setUnstoredWork(`kept:${base}`, true);
   return version;
 }
 
@@ -111,6 +114,7 @@ export function settleKeptAside(scope: DraftScope, version: KeptAsideVersion): v
   const rest = (inMemory.get(base) ?? []).filter((item) => item !== version);
   if (rest.length > 0) inMemory.set(base, rest);
   else inMemory.delete(base);
+  setUnstoredWork(`kept:${base}`, rest.length > 0);
 }
 
 /** Whether any version is held only in memory, which the browser tab closing would lose. */
@@ -120,5 +124,6 @@ export function hasUnstoredKeptAside(): boolean {
 
 /** Test helper: forget every in-memory version. */
 export function resetKeptAsideMemory(): void {
+  for (const base of inMemory.keys()) setUnstoredWork(`kept:${base}`, false);
   inMemory.clear();
 }

@@ -35,7 +35,6 @@ import { addNode, redo, undo } from "../domain/graph";
 import { groupNodes, mergeStoryboardGroup, ungroupNode, type GroupDeps } from "../domain/groups";
 import { useCanvasStore } from "../state/canvasStore";
 import { canvasSaveScope, useSaveState } from "../state/saveStatusStore";
-import { hasUnstoredKeptAside } from "../recovery/keptAside";
 import { CanvasPersistence, defaultPersistenceDeps } from "../sync/canvasPersistence";
 import { CanvasBoard } from "./CanvasBoard";
 import { CanvasProjectContext } from "./canvasContext";
@@ -154,14 +153,6 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
     return () => persistence.close();
   }, [persistence, projectName, episode]);
 
-  // A version kept aside only in memory is lost when the tab closes: ask the browser to confirm.
-  useEffect(() => {
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (hasUnstoredKeptAside()) event.preventDefault();
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, []);
 
   const groupDeps = useMemo<GroupDeps>(
     () => ({

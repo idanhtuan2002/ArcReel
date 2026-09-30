@@ -10,6 +10,7 @@ import { addNode, clearCanvas, commitEdit } from "../domain/graph";
 import type { CanvasNode } from "../domain/types";
 import { readDraft, writeConflictSnapshot, writeDraft } from "../recovery/draftRecovery";
 import { hasUnstoredKeptAside, readKeptAside, resetKeptAsideMemory } from "../recovery/keptAside";
+import { hasUnstoredWork, resetUnstoredWork } from "../recovery/unloadGuard";
 import { useCanvasStore } from "../state/canvasStore";
 import { registerPendingFieldEdit } from "../state/pendingFieldEdits";
 import { canvasSaveScope, deriveSaveState, useSaveStatusStore } from "../state/saveStatusStore";
@@ -160,6 +161,7 @@ async function autosave(): Promise<void> {
 beforeEach(() => {
   window.localStorage.clear();
   resetKeptAsideMemory();
+  resetUnstoredWork();
   useSaveStatusStore.getState().reset();
   store().reset();
   server = new FakeServer();
@@ -727,6 +729,70 @@ describe("kept-aside work and late responses", () => {
     expect(store().conflict?.nodes.map((node) => node.id)).toEqual(["mine"]);
     expect(store().graph.nodes.map((node) => node.id)).toEqual(["mine"]);
     expect(saveState().status).toBe("error");
+  });
+
+  it("lets a choice wait for the reload in flight instead of racing it", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    store().edit((graph) => addNode(graph, note("mine")));
+    await server.saveElsewhere([note("theirs")]);
+    const original = server.getCanvasRevision.getMockImplementation();
+    let release: () => void = () => undefined;
+    server.getCanvasRevision.mockImplementationOnce(
+      (...args: Parameters<FakeServer["getCanvasRevision"]>) =>
+        new Promise((resolve, reject) => {
+          release = () => void original?.(...args).then(resolve, reject);
+        }),
+    );
+    timers.fire(AUTOSAVE_DELAY_MS);
+    await vi.waitFor(() => expect(store().conflict).not.toBeNull());
+    const reads = server.getCanvasRevision.mock.calls.length;
+
+    const choice = persistence.resolveConflict("mine");
+    release();
+    await choice;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(server.getCanvasRevision.mock.calls.length).toBe(reads);
+    expect(store().graph.nodes.map((node) => node.id)).toEqual(["mine"]);
+    expect(store().conflict).toBeNull();
+  });
+
+  it("keeps the unload guard on after leaving the Canvas while a version is held in memory", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    store().edit((graph) => addNode(graph, note("mine")));
+    await server.saveElsewhere([note("theirs")]);
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("unavailable", "SecurityError");
+    });
+    await autosave();
+
+    persistence.close();
+    const unload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unload);
+
+    expect(hasUnstoredWork()).toBe(true);
+    expect(unload.defaultPrevented).toBe(true);
+    spy.mockRestore();
+  });
+
+  it("guards unloading while a chosen version is unsaved and unstored, until it saves", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("unavailable", "SecurityError");
+    });
+
+    await persistence.resolveConflict("mine");
+    timers.fire(300);
+    expect(hasUnstoredWork()).toBe(true);
+
+    await autosave();
+    spy.mockRestore();
+
+    expect(saveState().status).toBe("saved");
+    expect(hasUnstoredWork()).toBe(false);
   });
 });
 

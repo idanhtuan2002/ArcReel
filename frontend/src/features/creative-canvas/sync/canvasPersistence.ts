@@ -53,6 +53,7 @@ import {
   type Translate,
 } from "../recovery/saveDecision";
 import { createCanvasSaveSession, type CanvasSaveSession } from "../recovery/saveCoordinator";
+import { setUnstoredWork } from "../recovery/unloadGuard";
 import { useCanvasStore, type CanvasStoreState } from "../state/canvasStore";
 import { flushPendingFieldEdits } from "../state/pendingFieldEdits";
 import { canvasSaveScope, writeSaveStatus } from "../state/saveStatusStore";
@@ -106,6 +107,10 @@ interface OpenCanvas {
   unsavedResolution: boolean;
   /** `editSeq` when the screen last matched the server (loaded, saved or reloaded); null if it never did. */
   cleanEditSeq: number | null;
+  /** The server reload in flight; choices wait for it instead of starting another. */
+  reloading: Promise<void> | null;
+  /** Bumped by every reload and by every choice; a reload applies only if nothing moved since it began. */
+  screenSeq: number;
 }
 
 function snapshotOf(draft: StoredDraft): ConflictSnapshot {
@@ -220,6 +225,8 @@ export class CanvasPersistence {
         serverShown: !hydrate,
         unsavedResolution: false,
         cleanEditSeq: hydrate ? null : this.store.getState().editSeq,
+        reloading: null,
+        screenSeq: 0,
       };
       writeSaveStatus(saveScope, "idle");
       this.store.getState().replace({ phase: "ready" });
@@ -253,7 +260,11 @@ export class CanvasPersistence {
     if (open) {
       flushPendingFieldEdits();
       const unsaved = this.store.getState().editSeq !== open.cleanEditSeq;
-      if (unsaved && !this.writeDraftNow(open)) keepAside(open.draftScope, this.localSnapshot());
+      if (unsaved && !this.writeDraftNow(open)) {
+        keepAside(open.draftScope, this.localSnapshot());
+        // The kept-aside copy, stored or guarded in memory, now carries this work.
+        this.markUnstored(open, false);
+      }
       open.session.dispose();
     }
     this.open = null;
@@ -280,7 +291,7 @@ export class CanvasPersistence {
 
   private async settle(open: OpenCanvas, version: KeptAsideVersion, choice: "server" | "mine"): Promise<void> {
     if (!open.serverShown) {
-      await this.reloadServer(open);
+      await (open.reloading ?? this.reloadServer(open));
       if (this.open !== open || open.shown !== version) return;
       if (!open.serverShown) {
         this.fail(open, this.deps.t("creative_canvas_load_failed"));
@@ -289,6 +300,8 @@ export class CanvasPersistence {
     }
     settleKeptAside(open.draftScope, version);
     open.shown = null;
+    // No reload that began before this choice may replace its result.
+    open.screenSeq += 1;
     // Edits are refused while a version is shown: clear it, apply the choice, then show the next.
     this.store.getState().replace({ conflict: null, conflictMode: "kept" });
     if (choice === "mine") {
@@ -357,10 +370,13 @@ export class CanvasPersistence {
     }, DRAFT_DELAY_MS);
   }
 
-  /** Write the work on screen to the draft; false when storage refused it. */
+  /**
+   * Write the work on screen to the draft; false when storage refused it. Unsaved work the draft
+   * could not hold keeps the unload guard on until a save lands.
+   */
   private writeDraftNow(open: OpenCanvas): boolean {
-    const { graph, bookmarks } = this.store.getState();
-    return writeDraft(open.draftScope, {
+    const { graph, bookmarks, editSeq } = this.store.getState();
+    const written = writeDraft(open.draftScope, {
       baseRevision: open.head?.current_revision ?? null,
       nodes: [...graph.nodes],
       edges: [...graph.edges],
@@ -374,6 +390,12 @@ export class CanvasPersistence {
       },
       updatedAt: this.deps.now().getTime(),
     });
+    this.markUnstored(open, !written && editSeq !== open.cleanEditSeq);
+    return written;
+  }
+
+  private markUnstored(open: OpenCanvas, unstored: boolean): void {
+    setUnstoredWork(`draft:${open.saveScope}`, unstored);
   }
 
   private cancelAutosave(): void {
@@ -468,6 +490,7 @@ export class CanvasPersistence {
     if (this.store.getState().editSeq === editSeq && !session.hasUnsavedContentBeyond(version)) {
       clearDraft(open.draftScope);
       open.cleanEditSeq = editSeq;
+      this.markUnstored(open, false);
     }
     writeSaveStatus(open.saveScope, "saved");
     return true;
@@ -488,24 +511,34 @@ export class CanvasPersistence {
    * Load the server's current revision onto the screen. On failure the graph on screen is
    * kept and `serverShown` is false, so a later choice loads it again.
    */
-  private async reloadServer(open: OpenCanvas): Promise<void> {
-    try {
-      const head = await this.readHead(open.projectName, open.candidateId);
-      const remote = head
-        ? fromCanvasPayload(
-            (await this.deps.client.getCanvasRevision(open.projectName, open.candidateId, head.current_revision)).payload,
-          )
-        : EMPTY;
-      if (this.open !== open) return;
-      open.head = head;
-      open.lastRemoteNodeCount = remote.nodes.length;
-      open.serverShown = true;
-      const state = this.store.getState();
-      state.replace({ graph: loadGraph(state.graph, remote.nodes, remote.edges), bookmarks: remote.bookmarks });
-      open.cleanEditSeq = this.store.getState().editSeq;
-    } catch {
-      if (this.open === open) open.serverShown = false;
-    }
+  private reloadServer(open: OpenCanvas): Promise<void> {
+    open.screenSeq += 1;
+    const seq = open.screenSeq;
+    const run = (async () => {
+      try {
+        const head = await this.readHead(open.projectName, open.candidateId);
+        const remote = head
+          ? fromCanvasPayload(
+              (await this.deps.client.getCanvasRevision(open.projectName, open.candidateId, head.current_revision)).payload,
+            )
+          : EMPTY;
+        // A later reload or a choice made meanwhile owns the screen now.
+        if (this.open !== open || open.screenSeq !== seq) return;
+        open.head = head;
+        open.lastRemoteNodeCount = remote.nodes.length;
+        open.serverShown = true;
+        const state = this.store.getState();
+        state.replace({ graph: loadGraph(state.graph, remote.nodes, remote.edges), bookmarks: remote.bookmarks });
+        open.cleanEditSeq = this.store.getState().editSeq;
+      } catch {
+        if (this.open === open && open.screenSeq === seq) open.serverShown = false;
+      }
+    })();
+    const tracked = run.finally(() => {
+      if (open.reloading === tracked) open.reloading = null;
+    });
+    open.reloading = tracked;
+    return tracked;
   }
 
   /** After a 409 on a moved head: keep the local work aside, then load the server content. */
