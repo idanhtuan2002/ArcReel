@@ -26,6 +26,7 @@ from uuid import uuid4
 
 import httpx
 
+from lib.artifact_download_guard import artifact_http_client
 from lib.custom_provider.comfyui.bindings import targets_of
 from lib.custom_provider.comfyui.capabilities import takes_reference_images
 from lib.custom_provider.comfyui.request_builder import MediaInputs, build_workflow
@@ -36,6 +37,7 @@ from lib.image_backends.base import (
     ImageGenerationRequest,
     ImageGenerationResult,
 )
+from lib.video_backends.base import ProviderResponseStage, notify_provider_response_to
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +113,7 @@ class ComfyuiImageBackend:
 
     async def generate(self, request: ImageGenerationRequest) -> ImageGenerationResult:
         job_label = self._job_label or uuid4().hex
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS, follow_redirects=True) as http:
+        async with artifact_http_client(timeout=HTTP_TIMEOUT_SECONDS, follow_redirects=True) as http:
             media = await self._upload_media(http, request, job_label=job_label)
             built = build_workflow(
                 self._definition,
@@ -121,12 +123,22 @@ class ComfyuiImageBackend:
                 media=media,
                 seed=request.seed,
             )
-            prompt_id = await self._client.submit_prompt(http, built.workflow, client_id=client_id_for(job_label))
+
+            async def record(stage: ProviderResponseStage, body: object) -> None:
+                await notify_provider_response_to(request.on_provider_response, stage, body)
+
+            prompt_id = await self._client.submit_prompt(
+                http,
+                built.workflow,
+                client_id=client_id_for(job_label),
+                record=record,
+            )
             picked = await self._execution.fetch_artifact(
                 http,
                 prompt_id,
                 output_path=request.output_path,
                 poll_timeout_seconds=IMAGE_POLL_TIMEOUT_SECONDS,
+                record=record,
             )
             return ImageGenerationResult(
                 image_path=request.output_path,
