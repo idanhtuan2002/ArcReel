@@ -29,7 +29,7 @@
     "donor_test_inventory_digest": "sha256:f531f02129e601563200dd2d2001494811ac58c1434b86666ca945c229f19afc",
     "fixture_set_digest": "sha256:2539ff0a1b7a4f04647a7d643c8c6e1de10097a69f44289864c2f6b245c77ea6"
   },
-  "integrated_head": "5d9bc6a7f7e0aacdc80504ef841f326a6f6e0dc7",
+  "integrated_head": "5a2a1b208f827646ca7d50211f783908667ad473",
   "rows": [
     {
       "behavior_id": "G01",
@@ -908,25 +908,25 @@
   ],
   "commands": [
     {
-      "at": "5d9bc6a7",
+      "at": "5a2a1b20",
       "cmd": "PARITY_TIMING=1 tools/parity/dramaclaw/run.sh <harness>.parity.test.ts <out> for graph, functions, groups, recovery",
       "exit": 0,
       "note": "donor b299bfd9 vitest 4.1.6; port reruns byte-identical"
     },
     {
-      "at": "5d9bc6a7",
+      "at": "5a2a1b20",
       "cmd": "(cd frontend && pnpm check)",
       "exit": 0,
       "result": "211 files, 2399 passed, 4 skipped (timing tests, env-gated)"
     },
     {
-      "at": "5d9bc6a7",
+      "at": "5a2a1b20",
       "cmd": "uv run python -m pytest tests/e2e/test_m8b_canvas_a11y.py tests/e2e/test_m8b_canvas_benchmark.py (lod, generator)",
       "exit": 0,
       "result": "9 passed"
     },
     {
-      "at": "5d9bc6a7",
+      "at": "5a2a1b20",
       "cmd": "ARCREEL_M8B_BENCHMARK=1 ARCREEL_M8B_BASE_DIST=<d8d74299 build> uv run python -m pytest tests/e2e/test_m8b_canvas_benchmark.py::test_canvas_meets_the_frozen_benchmark_protocol",
       "result": "docs/r2/evidence/R2_M8_B_CANVAS_BENCHMARK_RESULT.json"
     }
