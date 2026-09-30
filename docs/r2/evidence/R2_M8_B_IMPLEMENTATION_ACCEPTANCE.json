@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "packet": "M8-B",
+  "status": "M8_B_ACCEPTED",
+  "accepted_head": "488a183a",
+  "branch": "impl/r2-m8b-creative-canvas",
+  "executor_base": "d8d74299",
+  "reviewer": "codex",
+  "review_record": "docs/r2/evidence/R2_M8_B_CODEX_REVIEW_2026-09-30.md",
+  "review_rounds": [
+    {
+      "round": 1,
+      "head": "9c7007da",
+      "job": "task-mun7ujjy-kfksdx",
+      "verdict": {
+        "status": "M8_B_NOT_ACCEPTED",
+        "head": "9c7007da",
+        "blocking_findings": 5
+      }
+    },
+    {
+      "round": 2,
+      "head": "1e8f4bb3",
+      "job": "task-mun91tvz-rnyoie",
+      "verdict": {
+        "status": "M8_B_NOT_ACCEPTED",
+        "head": "1e8f4bb3",
+        "blocking_findings": 2,
+        "open_conditions": [
+          "Sponsor decision on status_strict FAIL versus status_clarified PASS"
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "head": "326a52ad",
+      "job": "task-muna1e6t-wu6agv",
+      "verdict": {
+        "status": "M8_B_NOT_ACCEPTED",
+        "head": "326a52ad",
+        "blocking_findings": 3,
+        "open_conditions": [
+          "Sponsor decision on benchmark strict verdict"
+        ]
+      }
+    },
+    {
+      "round": 4,
+      "head": "86311a0e",
+      "job": "task-munfwn4i-7p4a7x",
+      "verdict": {
+        "status": "M8_B_NOT_ACCEPTED",
+        "head": "86311a0e",
+        "blocking_findings": 3,
+        "open_conditions": [
+          "Sponsor decision on the benchmark strict verdict"
+        ]
+      }
+    },
+    {
+      "round": 5,
+      "head": "217d2f64",
+      "job": "task-munh2127-h0bbpg",
+      "verdict": {
+        "status": "M8_B_NOT_ACCEPTED",
+        "head": "217d2f64",
+        "blocking_findings": 3,
+        "open_conditions": [
+          "Preserve an unkept local graph across close/reopen when storage writes fail, or prevent close from discarding it",
+          "Preserve the first selected mine version when a waiting draft cannot move to the kept-aside slot",
+          "Keep conflict protection until a requested server reload succeeds"
+        ]
+      }
+    },
+    {
+      "round": 6,
+      "head": "96910737",
+      "job": "task-muni38e1-85nhyn",
+      "verdict": {
+        "status": "M8_B_NOT_ACCEPTED",
+        "head": "96910737",
+        "blocking_findings": 2,
+        "open_conditions": [
+          "Guard reload results against a conflict choice or later graph change.",
+          "Keep the unload guard active while any in-memory version or unsaved selected graph lacks durable storage."
+        ]
+      }
+    },
+    {
+      "round": 7,
+      "head": "04f503b8",
+      "job": "task-muniqz0e-8dfnx9",
+      "verdict": {
+        "status": "M8_B_NOT_ACCEPTED",
+        "head": "04f503b8",
+        "blocking_findings": 1,
+        "open_conditions": [
+          "Guard the chosen graph from the moment a mine choice removes its kept-aside copy until a durable draft or server save exists."
+        ]
+      }
+    },
+    {
+      "round": 8,
+      "head": "488a183a",
+      "job": "task-munjlf4i-wsfpay",
+      "verdict": {
+        "status": "M8_B_ACCEPTED",
+        "head": "488a183a",
+        "blocking_findings": 0,
+        "open_conditions": [
+          "Fresh before/after Vitest execution was unavailable in the read-only environment; the baseline failures are established from test assertions and source behavior, while the fixed-head pass is reported in parity evidence."
+        ]
+      }
+    }
+  ],
+  "evidence": {
+    "donor_parity": {
+      "path": "docs/r2/evidence/R2_M8_B_CANVAS_PARITY.json",
+      "integrated_head": "c71c6e6f",
+      "verify_donor_parity": "M8_DONOR_PARITY_OK",
+      "behaviors": 35,
+      "dimensions_per_behavior": 8
+    },
+    "benchmark": {
+      "path": "docs/r2/evidence/R2_M8_B_CANVAS_BENCHMARK_RESULT.json",
+      "recorded_at": "488a183a (app code as c71c6e6f)",
+      "status_clarified": "PASS",
+      "status_strict": "FAIL",
+      "sponsor_decision": "docs/r2/evidence/R2_M8_B_BENCHMARK_CLARIFICATION_SPONSOR_DECISION_2026-09-30.json (r2-v2/main b6b54b9b)",
+      "variance": "a run at c71c6e6f (recorded in 42085be3) failed the clarified 100-node drag p95 (33.3 ms) under a load average of about 4.5; the rerun passed. Recorded as nonblocking variability by round 8."
+    },
+    "frontend_check": "(cd frontend && pnpm check): 214 files, 2428 passed, 4 skipped (env-gated timing tests) at c71c6e6f",
+    "browser_e2e": "tests/e2e/test_m8b_canvas_a11y.py plus LOD and generator tests: 9 passed at c71c6e6f",
+    "scope": "verify_m8_scope.py: M8_BASELINE_OK"
+  },
+  "prerequisites": [
+    "docs/r2/evidence/R2_M8_A_IMPLEMENTATION_ACCEPTANCE.json",
+    "docs/r2/evidence/R2_V2_02E_M8_LINEAGE_2026-09-30.md",
+    "docs/adr/0098-m8-lineage-is-server-resolved.md"
+  ],
+  "coverage_limits": [
+    "Codex reviewed source and recorded evidence read-only; it could not execute Vitest or the harnesses in its sandbox.",
+    "One transient browser e2e failure in five runs at 5d9bc6a7 did not reproduce.",
+    "Kept-aside versions held in memory survive Canvas navigation but not the tab; the unload guard asks the browser to confirm, which the user can accept.",
+    "Kept-aside versions stored on the device follow the ported seven-day TTL pruning under quota pressure (donor behavior R03)."
+  ],
+  "created_at": "2026-09-30"
+}
