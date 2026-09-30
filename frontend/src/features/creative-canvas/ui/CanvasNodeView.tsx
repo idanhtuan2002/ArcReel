@@ -14,6 +14,7 @@ import { commitEdit } from "../domain/graph";
 import { isLowDetailZoom, isNodeMediaActive, setNodeMediaActive } from "../domain/lod";
 import type { CanvasNode } from "../domain/types";
 import { useCanvasStore } from "../state/canvasStore";
+import { registerPendingFieldEdit } from "../state/pendingFieldEdits";
 import { useCanvasProject } from "./canvasContext";
 
 const lowDetail = (state: ReactFlowState) => isLowDetailZoom(state.transform[2]);
@@ -75,12 +76,21 @@ function CommitField({
     pending.current = next;
     setDraft(next);
   };
-  useEffect(
-    () => () => {
-      if (pending.current !== null) updateNodeData(nodeId, { [field]: pending.current });
-    },
-    [nodeId, field],
-  );
+  useEffect(() => {
+    // Commit pending typing when the Canvas captures the graph, and on unmount (which fires no blur).
+    const flush = () => {
+      if (pending.current === null) return;
+      const value = pending.current;
+      pending.current = null;
+      updateNodeData(nodeId, { [field]: value });
+      setDraft(null);
+    };
+    const unregister = registerPendingFieldEdit(flush);
+    return () => {
+      unregister();
+      flush();
+    };
+  }, [nodeId, field]);
   const shown = draft ?? value;
   const commit = () => {
     if (draft !== null) updateNodeData(nodeId, { [field]: draft });

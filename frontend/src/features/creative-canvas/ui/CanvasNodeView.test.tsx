@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { addNode } from "../domain/graph";
 import { setNodeMediaActive } from "../domain/lod";
 import { useCanvasStore } from "../state/canvasStore";
+import { flushPendingFieldEdits } from "../state/pendingFieldEdits";
 import { CanvasNodeView } from "./CanvasNodeView";
 import { CanvasProjectContext } from "./canvasContext";
 
@@ -89,4 +90,14 @@ describe("canvas node view", () => {
     expect(useCanvasStore.getState().editSeq).toBe(before + 1);
     expect(useCanvasStore.getState().graph.nodes[0].data.label).toBe("Changed");
   });
+
+  it("commits typing still in a field when the Canvas flushes pending edits", () => {
+    renderNode({ id: "b1", type: "beat", data: { label: "Hook", text: "" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "标题" }), { target: { value: "Typed" } });
+
+    act(() => flushPendingFieldEdits());
+
+    expect(useCanvasStore.getState().graph.nodes[0].data.label).toBe("Typed");
+  });
 });
+

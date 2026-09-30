@@ -2092,6 +2092,8 @@ export default {
   'creative_canvas_conflict_use_mine': 'Dùng bản của tôi',
   'creative_canvas_conflict_discard_mine': 'Bỏ bản của tôi',
   'creative_canvas_conflict_confirm_discard': 'Bỏ hẳn',
+  'creative_canvas_conflict_unkept_body': 'Không lưu được bản của bạn trên thiết bị này, bản đó vẫn đang hiển thị. Giữ lại để lưu đè lên bản mới nhất, hoặc tải bản mới nhất.',
+  'creative_canvas_conflict_load_latest': 'Tải bản mới nhất',
   'creative_canvas_filmstrip_label': 'Thứ tự storyboard',
   'creative_canvas_filmstrip_empty': 'Chọn từ hai frame trở lên rồi chọn Tạo storyboard để sắp thứ tự shot.',
   'creative_canvas_filmstrip_hint': 'Phím mũi tên để chuyển shot. Alt + mũi tên để đổi thứ tự. Enter để hiện shot trên canvas.',

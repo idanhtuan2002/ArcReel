@@ -51,6 +51,7 @@ import {
 } from "../recovery/saveDecision";
 import { createCanvasSaveSession, type CanvasSaveSession } from "../recovery/saveCoordinator";
 import { useCanvasStore, type CanvasStoreState } from "../state/canvasStore";
+import { flushPendingFieldEdits } from "../state/pendingFieldEdits";
 import { canvasSaveScope, writeSaveStatus } from "../state/saveStatusStore";
 
 export const AUTOSAVE_DELAY_MS = 1_200;
@@ -100,8 +101,16 @@ interface OpenCanvas {
    * write the draft slot.
    */
   pendingConflictDraft: boolean;
-  /** Where the durable copy of the shown conflict lives: its own slot, or (when that write failed) the draft slot. */
-  conflictCopy: "snapshot" | "draft" | null;
+  /**
+   * Where the copy of the shown conflict lives: its own slot, the draft slot (when the slot
+   * write failed), or only memory (when no storage write succeeded; the local work then stays
+   * on screen and the server content is not loaded until the user chooses).
+   */
+  conflictCopy: "snapshot" | "draft" | "memory" | null;
+  /** The server head seen by a 409 whose content was not loaded (`conflictCopy === "memory"`). */
+  deferredHead: CandidateHead | null;
+  /** A "mine" choice applied while another conflict waited; it is saved once none is left. */
+  unsavedResolution: boolean;
 }
 
 function snapshotOf(draft: StoredDraft): ConflictSnapshot {
@@ -214,6 +223,8 @@ export class CanvasPersistence {
         lastRemoteNodeCount: remote.nodes.length,
         pendingConflictDraft: decision.kind === "conflict" && keptAside !== null,
         conflictCopy,
+        deferredHead: null,
+        unsavedResolution: false,
         session: createCanvasSaveSession({
           canvasKey: `${projectName}:${candidateId}`,
           generation,
@@ -244,6 +255,7 @@ export class CanvasPersistence {
     }
     this.autosaveTimer = this.draftTimer = this.retryTimer = null;
     if (this.open) {
+      flushPendingFieldEdits();
       if (this.store.getState().editSeq > 0) this.writeDraftNow(this.open);
       this.open.session.dispose();
     }
@@ -266,6 +278,10 @@ export class CanvasPersistence {
     const open = this.open;
     const conflict = this.store.getState().conflict;
     if (!open || !conflict) return;
+    if (open.conflictCopy === "memory") {
+      this.resolveUnkeptConflict(open, choice);
+      return;
+    }
     const settledCopy = open.conflictCopy;
     // The next kept-aside version, if a conflicting draft waited behind this one.
     const waiting = open.pendingConflictDraft ? readDraft(open.draftScope) : null;
@@ -289,17 +305,42 @@ export class CanvasPersistence {
     open.pendingConflictDraft = false;
     open.conflictCopy = null;
     // Edits are refused while a conflict is shown: settle the choice first, then show the next one.
-    this.store.getState().replace({ conflict: null });
+    this.store.getState().replace({ conflict: null, conflictMode: "kept" });
     if (choice === "mine") {
       this.store.getState().edit((graph) => commitEdit(graph, conflict.nodes, conflict.edges));
       if (conflict.metadata) this.store.getState().editBookmarks(() => bookmarksOf(conflict.metadata));
+      open.unsavedResolution = true;
     }
     if (next) {
       open.conflictCopy = nextCopy;
       this.store.getState().replace({ conflict: next });
+      return;
+    }
+    if (open.unsavedResolution) {
+      // A "mine" choice made earlier in this sequence could not save while a conflict waited.
+      open.unsavedResolution = false;
+      this.scheduleAutosave();
     } else if (choice === "server") {
       writeSaveStatus(open.saveScope, "idle");
     }
+  }
+
+  /** Settle a conflict whose local work never reached storage and is still on screen. */
+  private resolveUnkeptConflict(open: OpenCanvas, choice: "server" | "mine"): void {
+    const head = open.deferredHead;
+    open.conflictCopy = null;
+    open.deferredHead = null;
+    this.store.getState().replace({ conflict: null, conflictMode: "kept" });
+    if (choice === "mine") {
+      // Save the work on screen on top of the head that moved.
+      open.head = head;
+      open.unsavedResolution = false;
+      this.scheduleAutosave(0);
+      return;
+    }
+    void this.reloadServer(open, null).then(() => {
+      if (this.open === open) writeSaveStatus(open.saveScope, "idle");
+    });
   }
 
   private async readHead(projectName: string, candidateId: string, signal?: AbortSignal): Promise<CandidateHead | null> {
@@ -332,12 +373,13 @@ export class CanvasPersistence {
     }, DRAFT_DELAY_MS);
   }
 
-  private writeDraftNow(open: OpenCanvas): void {
+  /** Write the draft; false when it was not written. */
+  private writeDraftNow(open: OpenCanvas): boolean {
     // The draft slot may hold the only copy of kept-aside work: a draft waiting behind a kept-aside
     // version, or the shown conflict itself when its own slot could not be written. Never overwrite it.
-    if (open.pendingConflictDraft || open.conflictCopy === "draft") return;
+    if (open.pendingConflictDraft || open.conflictCopy === "draft") return false;
     const { graph, bookmarks } = this.store.getState();
-    writeDraft(open.draftScope, {
+    return writeDraft(open.draftScope, {
       baseRevision: open.head?.current_revision ?? null,
       nodes: [...graph.nodes],
       edges: [...graph.edges],
@@ -461,7 +503,7 @@ export class CanvasPersistence {
   }
 
   /** Load the server's current revision and show `conflict` as kept-aside work. */
-  private async reloadServer(open: OpenCanvas, conflict: ConflictSnapshot): Promise<void> {
+  private async reloadServer(open: OpenCanvas, conflict: ConflictSnapshot | null): Promise<void> {
     try {
       const head = await this.readHead(open.projectName, open.candidateId);
       const remote = head
@@ -483,33 +525,49 @@ export class CanvasPersistence {
     }
   }
 
+  /**
+   * After a 409 on a moved head: keep the local work, then load the server content.
+   * The local work is written to the kept-aside slot, or else to the draft slot. When no
+   * storage write succeeds, the local work stays on screen and only the new head is read;
+   * the user then chooses between keeping it (saved on the new head) and loading the server.
+   */
   private async keepAsideAndReload(open: OpenCanvas, message: string): Promise<false> {
-    const taken = readConflictSnapshot(open.draftScope);
-    if (taken) {
-      // The kept-aside slot is taken: the local work waits in the draft behind that version.
-      this.writeDraftNow(open);
-      open.pendingConflictDraft = true;
-      open.conflictCopy = "snapshot";
-      await this.reloadServer(open, taken);
-      return this.fail(open, message);
-    }
+    flushPendingFieldEdits();
     const { graph, bookmarks } = this.store.getState();
-    const conflict: ConflictSnapshot = {
+    const local: ConflictSnapshot = {
       nodes: [...graph.nodes],
       edges: [...graph.edges],
       viewport: null,
       metadata: metadataOf(bookmarks),
       timestamp: this.deps.now().toISOString(),
     };
-    if (writeConflictSnapshot(open.draftScope, conflict)) {
+    const taken = readConflictSnapshot(open.draftScope);
+    if (!taken && writeConflictSnapshot(open.draftScope, local)) {
       clearDraft(open.draftScope);
       open.conflictCopy = "snapshot";
+      await this.reloadServer(open, local);
+    } else if (this.writeDraftNow(open)) {
+      if (taken) {
+        // The kept-aside slot is taken: the local work waits in the draft behind that version.
+        open.pendingConflictDraft = true;
+        open.conflictCopy = "snapshot";
+        await this.reloadServer(open, taken);
+      } else {
+        open.conflictCopy = "draft";
+        await this.reloadServer(open, local);
+      }
     } else {
-      // The kept-aside slot cannot be written: the local work stays in the draft slot.
-      this.writeDraftNow(open);
-      open.conflictCopy = "draft";
+      let head: CandidateHead | null = open.head;
+      try {
+        head = await this.readHead(open.projectName, open.candidateId);
+      } catch {
+        // Keep the known head: "keep mine" then meets another 409 and comes back here.
+      }
+      if (this.open !== open) return false;
+      open.conflictCopy = "memory";
+      open.deferredHead = head;
+      this.store.getState().replace({ conflict: local, conflictMode: "unkept" });
     }
-    await this.reloadServer(open, conflict);
     return this.fail(open, message);
   }
 }

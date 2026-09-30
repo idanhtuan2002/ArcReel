@@ -113,6 +113,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
   const phase = useCanvasStore((state) => state.phase);
   const loadError = useCanvasStore((state) => state.loadError);
   const hasConflict = useCanvasStore((state) => state.conflict !== null);
+  const conflictMode = useCanvasStore((state) => state.conflictMode);
   const empty = useCanvasStore((state) => state.graph.nodes.length === 0);
   const canUndo = useCanvasStore((state) => state.graph.history.past.length > 0);
   const canRedo = useCanvasStore((state) => state.graph.history.future.length > 0);
@@ -282,7 +283,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
         </div>
       </header>
       {hasConflict ? (
-        <ConflictBanner onUseMine={() => persistence.resolveConflict("mine")} onDiscardMine={() => persistence.resolveConflict("server")} />
+        <ConflictBanner mode={conflictMode} onUseMine={() => persistence.resolveConflict("mine")} onDiscardMine={() => persistence.resolveConflict("server")} />
       ) : null}
       <div className="relative min-h-0 flex-1">
         {phase === "error" ? (

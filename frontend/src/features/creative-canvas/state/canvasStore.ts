@@ -25,21 +25,32 @@ export interface CanvasStoreState {
   loadError: string | null;
   /** Local content kept aside because the server moved; the user decides what happens to it. */
   conflict: ConflictSnapshot | null;
+  /**
+   * "kept": the local work is kept aside and the server content is shown. "unkept": no copy
+   * could be stored; the local work is still shown and the server content is not loaded.
+   */
+  conflictMode: "kept" | "unkept";
   /** Bumped by every user edit; the persistence layer autosaves on change. */
   editSeq: number;
   edit: (update: (graph: CanvasGraphState) => CanvasGraphState) => void;
   editBookmarks: (update: (bookmarks: ViewportBookmarks) => ViewportBookmarks) => void;
-  replace: (patch: Partial<Pick<CanvasStoreState, "graph" | "bookmarks" | "phase" | "loadError" | "conflict">>) => void;
+  replace: (
+    patch: Partial<Pick<CanvasStoreState, "graph" | "bookmarks" | "phase" | "loadError" | "conflict" | "conflictMode">>,
+  ) => void;
   reset: () => void;
 }
 
-function initial(): Pick<CanvasStoreState, "graph" | "bookmarks" | "phase" | "loadError" | "conflict" | "editSeq"> {
+function initial(): Pick<
+  CanvasStoreState,
+  "graph" | "bookmarks" | "phase" | "loadError" | "conflict" | "conflictMode" | "editSeq"
+> {
   return {
     graph: createGraphState(),
     bookmarks: createEmptyBookmarks(),
     phase: "idle",
     loadError: null,
     conflict: null,
+    conflictMode: "kept",
     editSeq: 0,
   };
 }

@@ -6,10 +6,11 @@ import { digestPayload } from "../api/canonical";
 import { toCanvasPayload } from "../api/serialize";
 import type { CandidateHead, CanvasRevisionWire, LineageBinding } from "../api/types";
 import { createEmptyBookmarks } from "../domain/bookmarks";
-import { addNode, clearCanvas } from "../domain/graph";
+import { addNode, clearCanvas, commitEdit } from "../domain/graph";
 import type { CanvasNode } from "../domain/types";
 import { readConflictSnapshot, readDraft, writeConflictSnapshot, writeDraft } from "../recovery/draftRecovery";
 import { useCanvasStore } from "../state/canvasStore";
+import { registerPendingFieldEdit } from "../state/pendingFieldEdits";
 import { canvasSaveScope, deriveSaveState, useSaveStatusStore } from "../state/saveStatusStore";
 import { AUTOSAVE_DELAY_MS, CanvasPersistence, type PersistenceDeps, RETRY_DELAY_MS } from "./canvasPersistence";
 
@@ -564,6 +565,94 @@ describe("kept-aside work and late responses", () => {
     spy.mockRestore();
     await persistence.openCanvas(PROJECT, 1);
     expect(store().conflict?.nodes[0].data.label).toBe("mine");
+  });
+
+  it("keeps text still being typed when another tab saved first", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    store().edit((graph) => addNode(graph, note("a", "before")));
+    await server.saveElsewhere([note("theirs")]);
+    let typing: string | null = "typed, not blurred";
+    const unregister = registerPendingFieldEdit(() => {
+      if (typing === null) return;
+      const label = typing;
+      typing = null;
+      store().edit((graph) =>
+        commitEdit(
+          graph,
+          graph.nodes.map((node) => (node.id === "a" ? { ...node, data: { ...node.data, label } } : node)),
+          graph.edges,
+        ),
+      );
+    });
+
+    await autosave();
+    unregister();
+
+    expect(readConflictSnapshot(SCOPE)?.nodes[0].data.label).toBe("typed, not blurred");
+  });
+
+  it("keeps local work on screen when no copy can be stored, and saves it on request", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    store().edit((graph) => addNode(graph, note("mine")));
+    await server.saveElsewhere([note("theirs")]);
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("unavailable", "SecurityError");
+    });
+
+    await autosave();
+
+    expect(store().conflictMode).toBe("unkept");
+    expect(store().graph.nodes.map((node) => node.id)).toEqual(["mine"]);
+
+    persistence.resolveConflict("mine");
+    timers.fire(0);
+    await vi.waitFor(() => expect(saveState().status).toBe("saved"));
+    spy.mockRestore();
+
+    expect(server.heads.get(CANDIDATE)?.current_revision).toBe(2);
+    expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes.map((node) => node.node_id)).toEqual(["mine"]);
+  });
+
+  it("loads the latest version on request when no copy could be stored", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    store().edit((graph) => addNode(graph, note("mine")));
+    await server.saveElsewhere([note("theirs")]);
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("unavailable", "SecurityError");
+    });
+    await autosave();
+    spy.mockRestore();
+
+    persistence.resolveConflict("server");
+
+    await vi.waitFor(() => expect(store().graph.nodes.map((node) => node.id)).toEqual(["theirs"]));
+    expect(store().conflict).toBeNull();
+  });
+
+  it("saves a first 'mine' choice after the next stacked conflict is settled with 'server'", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeConflictSnapshot(SCOPE, {
+      nodes: [note("a", "older")],
+      edges: [],
+      viewport: null,
+      metadata: null,
+      timestamp: new Date(0).toISOString(),
+    });
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+
+    const appended = server.appendCanvasRevision.mock.calls.length;
+    persistence.resolveConflict("mine");
+    // The user takes a moment: the autosave of that choice runs while the next conflict is shown.
+    timers.fire(AUTOSAVE_DELAY_MS);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(server.appendCanvasRevision.mock.calls.length).toBe(appended);
+    persistence.resolveConflict("server");
+    await autosave();
+
+    expect(store().conflict).toBeNull();
+    expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes[0].body.data).toMatchObject({ label: "older" });
   });
 });
 
