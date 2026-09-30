@@ -1,38 +1,39 @@
 {
   "schema_version": 1,
   "protocol_sha256": "sha256:61e24ea23fc46b099b6212ca36a90aa84673be5efa9faebc7b63e1ebeea240d3",
-  "head": "186638a8f4e3df0ab9a3c747cf24233cb7acc875",
-  "status": "PASS",
+  "head": "c71c6e6f9a5b60fe01720419f382d757326869c3",
+  "status": "FAIL",
   "status_strict": "FAIL",
-  "status_clarified": "PASS",
+  "status_clarified": "FAIL",
   "clarifications": [
     "frame-time p95 may exceed its threshold by one clock quantum (0.1 ms): the frame times of an untouched Canvas (idle_frame_ms: p99, max and the share above 16.7 ms) already spread over that quantum at 60 Hz",
     "the initial bundle must hold no Creative Canvas or React Flow module (initial_canvas_modules empty); its byte delta, which only the lazy route registration adds, is reported strictly"
   ],
   "clock_quantum_ms": 0.1,
-  "failures": [],
+  "failures": [
+    "100 nodes: continuous node_drag {'n': 582, 'p50': 16.7, 'p95': 33.3}"
+  ],
   "strict_only_failures": [
-    "25 nodes: continuous pan {'n': 481, 'p50': 16.7, 'p95': 16.7}",
+    "25 nodes: continuous pan {'n': 485, 'p50': 16.7, 'p95': 16.8}",
     "25 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.7}",
-    "25 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.8}",
-    "50 nodes: continuous pan {'n': 480, 'p50': 16.7, 'p95': 16.8}",
+    "25 nodes: continuous node_drag {'n': 481, 'p50': 16.7, 'p95': 16.7}",
+    "50 nodes: continuous pan {'n': 481, 'p50': 16.7, 'p95': 16.7}",
     "50 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.8}",
     "50 nodes: continuous node_drag {'n': 481, 'p50': 16.7, 'p95': 16.8}",
-    "100 nodes: continuous pan {'n': 485, 'p50': 16.7, 'p95': 16.7}",
-    "100 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.7}",
-    "100 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.7}",
-    "200 nodes: continuous pan {'n': 490, 'p50': 16.7, 'p95': 16.7}",
-    "200 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.7}",
-    "200 nodes: continuous node_drag {'n': 481, 'p50': 16.7, 'p95': 16.8}",
-    "initial bundle delta 0.42 KB (route registration only)"
+    "100 nodes: continuous pan {'n': 681, 'p50': 16.7, 'p95': 16.7}",
+    "100 nodes: continuous zoom {'n': 545, 'p50': 16.7, 'p95': 16.7}",
+    "200 nodes: continuous pan {'n': 529, 'p50': 16.7, 'p95': 16.8}",
+    "200 nodes: continuous zoom {'n': 547, 'p50': 16.7, 'p95': 16.8}",
+    "200 nodes: continuous node_drag {'n': 517, 'p50': 16.7, 'p95': 16.8}",
+    "initial bundle delta 0.41 KB (route registration only)"
   ],
   "idle_frame_ms": {
-    "n": 1797,
+    "n": 1792,
     "p50": 16.7,
     "p95": 16.7,
     "p99": 16.8,
-    "max": 16.8,
-    "share_above_16_7": 0.3951
+    "max": 33.3,
+    "share_above_16_7": 0.3956
   },
   "machine": {
     "cpu": "",
@@ -51,8 +52,8 @@
       "edges": 37,
       "open_ms": {
         "n": 3,
-        "p50": 871.6,
-        "p95": 887.5
+        "p50": 907.0,
+        "p95": 925.8
       },
       "discrete_ms": {
         "add_node": {
@@ -78,6 +79,65 @@
         "undo_redo": {
           "n": 30,
           "p50": 16.0,
+          "p95": 24.0
+        },
+        "delete": {
+          "n": 30,
+          "p50": 16.0,
+          "p95": 16.0
+        }
+      },
+      "continuous_frame_ms": {
+        "pan": {
+          "n": 485,
+          "p50": 16.7,
+          "p95": 16.8
+        },
+        "zoom": {
+          "n": 540,
+          "p50": 16.7,
+          "p95": 16.7
+        },
+        "node_drag": {
+          "n": 481,
+          "p50": 16.7,
+          "p95": 16.7
+        }
+      },
+      "frame_limit_ms": 16.7
+    },
+    {
+      "nodes": 50,
+      "edges": 75,
+      "open_ms": {
+        "n": 3,
+        "p50": 910.8,
+        "p95": 975.0
+      },
+      "discrete_ms": {
+        "add_node": {
+          "n": 30,
+          "p50": 16.0,
+          "p95": 24.0
+        },
+        "node_text_edit_commit": {
+          "n": 30,
+          "p50": 16.0,
+          "p95": 16.0
+        },
+        "connect_edge": {
+          "n": 30,
+          "p50": 16.0,
+          "p95": 16.0
+        },
+        "group_ungroup": {
+          "n": 30,
+          "p50": 24.0,
+          "p95": 24.0
+        },
+        "undo_redo": {
+          "n": 30,
+          "p50": 24.0,
           "p95": 24.0
         },
         "delete": {
@@ -91,65 +151,6 @@
           "n": 481,
           "p50": 16.7,
           "p95": 16.7
-        },
-        "zoom": {
-          "n": 540,
-          "p50": 16.7,
-          "p95": 16.7
-        },
-        "node_drag": {
-          "n": 480,
-          "p50": 16.7,
-          "p95": 16.8
-        }
-      },
-      "frame_limit_ms": 16.7
-    },
-    {
-      "nodes": 50,
-      "edges": 75,
-      "open_ms": {
-        "n": 3,
-        "p50": 885.1,
-        "p95": 887.3
-      },
-      "discrete_ms": {
-        "add_node": {
-          "n": 30,
-          "p50": 16.0,
-          "p95": 24.0
-        },
-        "node_text_edit_commit": {
-          "n": 30,
-          "p50": 16.0,
-          "p95": 16.0
-        },
-        "connect_edge": {
-          "n": 30,
-          "p50": 16.0,
-          "p95": 16.0
-        },
-        "group_ungroup": {
-          "n": 30,
-          "p50": 24.0,
-          "p95": 24.0
-        },
-        "undo_redo": {
-          "n": 30,
-          "p50": 24.0,
-          "p95": 24.0
-        },
-        "delete": {
-          "n": 30,
-          "p50": 16.0,
-          "p95": 16.0
-        }
-      },
-      "continuous_frame_ms": {
-        "pan": {
-          "n": 480,
-          "p50": 16.7,
-          "p95": 16.8
         },
         "zoom": {
           "n": 540,
@@ -169,19 +170,19 @@
       "edges": 150,
       "open_ms": {
         "n": 3,
-        "p50": 902.5,
-        "p95": 922.4
+        "p50": 1375.6,
+        "p95": 1682.9
       },
       "discrete_ms": {
         "add_node": {
           "n": 30,
-          "p50": 24.0,
-          "p95": 24.0
+          "p50": 32.0,
+          "p95": 64.0
         },
         "node_text_edit_commit": {
           "n": 30,
           "p50": 16.0,
-          "p95": 16.0
+          "p95": 24.0
         },
         "connect_edge": {
           "n": 30,
@@ -190,35 +191,35 @@
         },
         "group_ungroup": {
           "n": 30,
-          "p50": 24.0,
-          "p95": 24.0
+          "p50": 48.0,
+          "p95": 72.0
         },
         "undo_redo": {
           "n": 30,
-          "p50": 24.0,
-          "p95": 24.0
+          "p50": 40.0,
+          "p95": 56.0
         },
         "delete": {
           "n": 30,
           "p50": 16.0,
-          "p95": 16.0
+          "p95": 32.0
         }
       },
       "continuous_frame_ms": {
         "pan": {
-          "n": 485,
+          "n": 681,
           "p50": 16.7,
           "p95": 16.7
         },
         "zoom": {
-          "n": 540,
+          "n": 545,
           "p50": 16.7,
           "p95": 16.7
         },
         "node_drag": {
-          "n": 480,
+          "n": 582,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 33.3
         }
       },
       "frame_limit_ms": 16.7
@@ -228,19 +229,19 @@
       "edges": 300,
       "open_ms": {
         "n": 3,
-        "p50": 965.3,
-        "p95": 984.3
+        "p50": 975.6,
+        "p95": 1675.4
       },
       "discrete_ms": {
         "add_node": {
           "n": 30,
           "p50": 24.0,
-          "p95": 24.0
+          "p95": 48.0
         },
         "node_text_edit_commit": {
           "n": 30,
           "p50": 16.0,
-          "p95": 16.0
+          "p95": 24.0
         },
         "connect_edge": {
           "n": 30,
@@ -250,32 +251,32 @@
         "group_ungroup": {
           "n": 30,
           "p50": 24.0,
-          "p95": 24.0
+          "p95": 56.0
         },
         "undo_redo": {
           "n": 30,
           "p50": 24.0,
-          "p95": 24.0
+          "p95": 56.0
         },
         "delete": {
           "n": 30,
           "p50": 16.0,
-          "p95": 16.0
+          "p95": 32.0
         }
       },
       "continuous_frame_ms": {
         "pan": {
-          "n": 490,
+          "n": 529,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         },
         "zoom": {
-          "n": 540,
+          "n": 547,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         },
         "node_drag": {
-          "n": 481,
+          "n": 517,
           "p50": 16.7,
           "p95": 16.8
         }
@@ -287,8 +288,8 @@
       "edges": 600,
       "open_ms": {
         "n": 3,
-        "p50": 1069.3,
-        "p95": 1069.7
+        "p50": 1045.3,
+        "p95": 1062.4
       },
       "discrete_ms": {
         "add_node": {
@@ -309,7 +310,7 @@
         "group_ungroup": {
           "n": 30,
           "p50": 24.0,
-          "p95": 32.0
+          "p95": 24.0
         },
         "undo_redo": {
           "n": 30,
@@ -324,14 +325,14 @@
       },
       "continuous_frame_ms": {
         "pan": {
-          "n": 484,
+          "n": 487,
           "p50": 16.7,
           "p95": 16.7
         },
         "zoom": {
           "n": 540,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         },
         "node_drag": {
           "n": 485,
@@ -343,9 +344,9 @@
     }
   ],
   "top_rung_heap_mb": {
-    "empty_canvas": 5.43,
-    "top_rung": 15.15,
-    "canvas": 9.72
+    "empty_canvas": 5.44,
+    "top_rung": 15.18,
+    "canvas": 9.75
   },
   "low_end": {
     "cpu_throttling_rate": 4,
@@ -354,12 +355,12 @@
       "add_node": {
         "n": 30,
         "p50": 32.0,
-        "p95": 40.0
+        "p95": 48.0
       },
       "node_text_edit_commit": {
         "n": 30,
         "p50": 16.0,
-        "p95": 24.0
+        "p95": 16.0
       },
       "connect_edge": {
         "n": 30,
@@ -385,13 +386,13 @@
   },
   "bundle": {
     "initial_gzip_kb": 442.28,
-    "lazy_canvas_chunk_gzip_kb": 73.98,
+    "lazy_canvas_chunk_gzip_kb": 73.99,
     "lazy_canvas_chunk_files": [
-      "CreativeCanvasPage-DUaVljVV.js",
+      "CreativeCanvasPage-BSe6VnX-.js",
       "CreativeCanvasPage-vg-mh5S2.css"
     ],
     "base_initial_gzip_kb": 441.87,
-    "initial_delta_gzip_kb": 0.42,
+    "initial_delta_gzip_kb": 0.41,
     "initial_canvas_modules": []
   },
   "event_timing_floor_ms": 16,
