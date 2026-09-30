@@ -199,3 +199,38 @@ The ports went through the path-remap + `git apply -3` script (upstream pre-imag
 - **`ab714d98`** → `6c6590cd`: clean.
 - **`24e79da0`**: fixed the missing `Callable` import in `custom_endpoints.py`. It came from the `56cb567d` conflict resolution and was caught by ruff F821.
 - **Completeness re-check:** a `git log d15192b3..4b277b4c` over both the flat and the package ComfyUI paths lists only these commits, plus the excluded market commits (`82850227`, `07d84da6`, `074d81ce`) and the reorg commits (`e00e28b8`, `1a943710`, `9d89cc84`). The ComfyUI hunks of the reorg commits are imports and docstrings only.
+
+## T10 — fork admission and security checks (ADR-0099 §2–4)
+
+Each check is covered by an existing donor or fork test unless it says "new".
+
+| Check | Where it is covered |
+|---|---|
+| Route class | `custom_media` is decided by the `custom-` provider-id prefix alone (`r2/host_hardening/paid_routes.py:147`), independent of `discovery_format`. Existing `test_paid_routes.py`. |
+| Qualification | Every generation and trial run goes through `require_paid_route` (`trial_run.py:297`). Existing tests. |
+| Budget (§2) | **New:** `test_budget_guard.py::test_an_unpriced_comfyui_call_holds_the_floor_and_reconciles_to_zero`. A ComfyUI provider row with no prices reserves `MIN_RESERVATION` (0.01) and settles with 0 reserved and 0 committed. Upstream has no budget guard, so there was no donor test. |
+| Lane default (§3) | Donor `test_generation_worker_capacity_table.py::test_from_db_comfyui_provider_defaults_each_lane_to_one`. |
+| Downloads (§4) | Donor tests: probe to a metadata destination refused (`test_custom_providers_comfyui.py`), `/view` redirect to 169.254.169.254 refused, body over the video limit aborted (`test_comfyui_video_backend.py`), remote stop to a metadata base URL never sent (`test_comfyui_execution.py`), and a cross-origin 307 dropping a multipart body. The last one is a fork test from T5. |
+| Credentials | Donor `test_comfyui_definition_validator.py::test_the_api_key_placeholder_is_refused_outside_auth`. |
+| Denylist | `test_provider_syntax_guard.py` is unchanged and passes. |
+| `container_sniff` | Covered indirectly by donor tests: an image container is refused, whitelisted containers pass, a video container mismatch is reported. Upstream has no direct test, and none was added. |
+
+## T11 — frontend and docs
+
+- `pnpm -C frontend check` (typecheck, eslint, knip, vitest): 219 files, 2562 passed / 4 skipped.
+- `pnpm -C website check`: passed.
+- The ComfyUI import-shape flows (raw API workflow → binding editor, paste path, media-type re-wrap, re-import) are covered by donor tests in `EndpointsSection.test.tsx`. That closes the T1 note about the dropped `EndpointImportDialog.test.tsx`.
+
+## T12 — gates at `a4c4dbe3`
+
+- `ruff check .`: clean.
+- `ruff format --check .`: 1 file, `tests/unit/r2/advanced_creative/test_m8b_canonical_digest_fixture.py`. That is M8-B's file, unchanged from `r2-v2/main`, and out of V2-03 scope.
+- `basedpyright --warnings`: 0 / 0 / 0.
+- `lint-imports`: 22 kept, 0 broken.
+- `deptry`: no issues.
+- `audit_tests.py --check`: 0 violations.
+- **Targeted pytest** (union of every T1–T10 path; script `t12.sh`): 5834 passed, 1 skipped, 56.95s.
+- **Coverage limits:**
+  - The full pytest suite was not run (standing instruction).
+  - No real ComfyUI server was exercised; all ComfyUI HTTP is mocked, per the no-paid-call and no-live-infrastructure rules.
+  - The PostgreSQL-only tests in the set skip on SQLite.
