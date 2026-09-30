@@ -11,11 +11,18 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from lib.budget_guard import BudgetExceededError, BudgetScopeMissingError, budget_scope_ref, call_reference
+from lib.budget_guard import (
+    MIN_RESERVATION,
+    BudgetExceededError,
+    BudgetScopeMissingError,
+    budget_scope_ref,
+    call_reference,
+)
 from lib.budget_reservation import BudgetReservationState
 from lib.db.models.api_call import ApiCall
 from lib.db.models.budget_reservation import BudgetReservationModel
 from lib.db.repositories.budget_reservation_repo import BudgetReservationRepository
+from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.ledger import Ledger
 from r2.host_hardening.paid_routes import RELEASE_MODE_ENV
 
@@ -110,6 +117,38 @@ async def test_the_reservation_is_claimed_before_submit_and_reconciled_to_the_se
     assert reservation.reconciled_at is not None
     assert scope is not None
     assert (scope.reserved_total, scope.committed_total) == (Decimal("0"), Decimal(str(row.cost_amount)))
+
+
+async def test_an_unpriced_comfyui_call_holds_the_floor_and_reconciles_to_zero(
+    db_factory: async_sessionmaker, release_mode
+) -> None:
+    """ComfyUI 跑在用户自己的显卡上，模型行不填价：预留按下限占位，结算后归零（ADR-0099 §2）。"""
+    async with db_factory() as session:
+        provider = await CustomProviderRepository(session).create_provider(
+            display_name="我的 ComfyUI",
+            discovery_format="comfyui",
+            base_url="http://127.0.0.1:8188",
+            api_key="",
+            models=[{"model_id": "wan-t2v", "display_name": "Wan T2V", "endpoint": "ce-1", "is_enabled": True}],
+        )
+        await session.commit()
+        provider_id = f"custom-{provider.id}"
+    await _create_scope(db_factory, "5")
+    ledger = Ledger(session_factory=db_factory)
+
+    async with ledger.record(
+        project_name="demo", call_type="video", duration_seconds=8, provider=provider_id, model="wan-t2v"
+    ) as call:
+        held = await _reservation(db_factory, call.call_id)
+        assert held is not None
+        assert (held.state, held.reserved_amount) == (BudgetReservationState.CLAIMED, MIN_RESERVATION)
+        call.success(_VideoResult())
+
+    row = await _only_call(db_factory)
+    scope = await _scope(db_factory)
+    assert Decimal(str(row.cost_amount)) == 0
+    assert scope is not None
+    assert (scope.reserved_total, scope.committed_total) == (Decimal("0"), Decimal("0"))
 
 
 async def test_an_exhausted_scope_refuses_the_call(db_factory: async_sessionmaker, release_mode) -> None:
