@@ -785,7 +785,7 @@ describe("kept-aside work and late responses", () => {
     });
 
     await persistence.resolveConflict("mine");
-    timers.fire(300);
+    // No draft timer has run: the choice itself must leave the guard on.
     expect(hasUnstoredWork()).toBe(true);
 
     await autosave();
@@ -793,6 +793,18 @@ describe("kept-aside work and late responses", () => {
 
     expect(saveState().status).toBe("saved");
     expect(hasUnstoredWork()).toBe(false);
+  });
+
+  it("drafts a chosen version as it is applied, before its kept-aside copy goes", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+
+    await persistence.resolveConflict("mine");
+
+    expect(readKeptAside(SCOPE)).toEqual([]);
+    expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
   });
 });
 

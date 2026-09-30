@@ -298,7 +298,6 @@ export class CanvasPersistence {
         return;
       }
     }
-    settleKeptAside(open.draftScope, version);
     open.shown = null;
     // No reload that began before this choice may replace its result.
     open.screenSeq += 1;
@@ -309,7 +308,10 @@ export class CanvasPersistence {
       this.store.getState().edit((graph) => commitEdit(graph, snapshot.nodes, snapshot.edges));
       if (snapshot.metadata) this.store.getState().editBookmarks(() => bookmarksOf(snapshot.metadata));
       open.unsavedResolution = true;
+      // The chosen graph gets its draft copy (or the unload guard) before its kept-aside copy goes.
+      this.writeDraftNow(open);
     }
+    settleKeptAside(open.draftScope, version);
     if (this.showNext(open)) return;
     if (open.unsavedResolution) {
       open.unsavedResolution = false;
