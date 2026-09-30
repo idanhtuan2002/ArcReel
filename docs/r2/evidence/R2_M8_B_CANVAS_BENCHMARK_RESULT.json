@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "protocol_sha256": "sha256:61e24ea23fc46b099b6212ca36a90aa84673be5efa9faebc7b63e1ebeea240d3",
-  "head": "4b4723ab74eff7f0d1caf1117b2f52f07f94d5fe",
+  "head": "186638a8f4e3df0ab9a3c747cf24233cb7acc875",
   "status": "PASS",
   "status_strict": "FAIL",
   "status_clarified": "PASS",
@@ -14,25 +14,25 @@
   "strict_only_failures": [
     "25 nodes: continuous pan {'n': 481, 'p50': 16.7, 'p95': 16.7}",
     "25 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.7}",
-    "25 nodes: continuous node_drag {'n': 484, 'p50': 16.7, 'p95': 16.7}",
-    "50 nodes: continuous pan {'n': 480, 'p50': 16.7, 'p95': 16.7}",
-    "50 nodes: continuous zoom {'n': 541, 'p50': 16.7, 'p95': 16.7}",
-    "50 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.8}",
-    "100 nodes: continuous pan {'n': 482, 'p50': 16.7, 'p95': 16.8}",
+    "25 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.8}",
+    "50 nodes: continuous pan {'n': 480, 'p50': 16.7, 'p95': 16.8}",
+    "50 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.8}",
+    "50 nodes: continuous node_drag {'n': 481, 'p50': 16.7, 'p95': 16.8}",
+    "100 nodes: continuous pan {'n': 485, 'p50': 16.7, 'p95': 16.7}",
     "100 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.7}",
-    "100 nodes: continuous node_drag {'n': 483, 'p50': 16.7, 'p95': 16.7}",
-    "200 nodes: continuous pan {'n': 489, 'p50': 16.7, 'p95': 16.7}",
+    "100 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.7}",
+    "200 nodes: continuous pan {'n': 490, 'p50': 16.7, 'p95': 16.7}",
     "200 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.7}",
-    "200 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.7}",
+    "200 nodes: continuous node_drag {'n': 481, 'p50': 16.7, 'p95': 16.8}",
     "initial bundle delta 0.42 KB (route registration only)"
   ],
   "idle_frame_ms": {
-    "n": 1793,
+    "n": 1797,
     "p50": 16.7,
     "p95": 16.7,
     "p99": 16.8,
     "max": 16.8,
-    "share_above_16_7": 0.3932
+    "share_above_16_7": 0.3951
   },
   "machine": {
     "cpu": "",
@@ -51,8 +51,8 @@
       "edges": 37,
       "open_ms": {
         "n": 3,
-        "p50": 869.0,
-        "p95": 878.4
+        "p50": 871.6,
+        "p95": 887.5
       },
       "discrete_ms": {
         "add_node": {
@@ -73,7 +73,7 @@
         "group_ungroup": {
           "n": 30,
           "p50": 24.0,
-          "p95": 32.0
+          "p95": 24.0
         },
         "undo_redo": {
           "n": 30,
@@ -98,9 +98,9 @@
           "p95": 16.7
         },
         "node_drag": {
-          "n": 484,
+          "n": 480,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         }
       },
       "frame_limit_ms": 16.7
@@ -110,8 +110,8 @@
       "edges": 75,
       "open_ms": {
         "n": 3,
-        "p50": 892.6,
-        "p95": 899.5
+        "p50": 885.1,
+        "p95": 887.3
       },
       "discrete_ms": {
         "add_node": {
@@ -149,15 +149,15 @@
         "pan": {
           "n": 480,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         },
         "zoom": {
-          "n": 541,
+          "n": 540,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         },
         "node_drag": {
-          "n": 480,
+          "n": 481,
           "p50": 16.7,
           "p95": 16.8
         }
@@ -169,8 +169,8 @@
       "edges": 150,
       "open_ms": {
         "n": 3,
-        "p50": 876.8,
-        "p95": 889.0
+        "p50": 902.5,
+        "p95": 922.4
       },
       "discrete_ms": {
         "add_node": {
@@ -206,66 +206,7 @@
       },
       "continuous_frame_ms": {
         "pan": {
-          "n": 482,
-          "p50": 16.7,
-          "p95": 16.8
-        },
-        "zoom": {
-          "n": 540,
-          "p50": 16.7,
-          "p95": 16.7
-        },
-        "node_drag": {
-          "n": 483,
-          "p50": 16.7,
-          "p95": 16.7
-        }
-      },
-      "frame_limit_ms": 16.7
-    },
-    {
-      "nodes": 200,
-      "edges": 300,
-      "open_ms": {
-        "n": 3,
-        "p50": 935.9,
-        "p95": 978.1
-      },
-      "discrete_ms": {
-        "add_node": {
-          "n": 30,
-          "p50": 24.0,
-          "p95": 24.0
-        },
-        "node_text_edit_commit": {
-          "n": 30,
-          "p50": 16.0,
-          "p95": 16.0
-        },
-        "connect_edge": {
-          "n": 30,
-          "p50": 16.0,
-          "p95": 24.0
-        },
-        "group_ungroup": {
-          "n": 30,
-          "p50": 24.0,
-          "p95": 24.0
-        },
-        "undo_redo": {
-          "n": 30,
-          "p50": 24.0,
-          "p95": 24.0
-        },
-        "delete": {
-          "n": 30,
-          "p50": 16.0,
-          "p95": 16.0
-        }
-      },
-      "continuous_frame_ms": {
-        "pan": {
-          "n": 489,
+          "n": 485,
           "p50": 16.7,
           "p95": 16.7
         },
@@ -283,12 +224,71 @@
       "frame_limit_ms": 16.7
     },
     {
+      "nodes": 200,
+      "edges": 300,
+      "open_ms": {
+        "n": 3,
+        "p50": 965.3,
+        "p95": 984.3
+      },
+      "discrete_ms": {
+        "add_node": {
+          "n": 30,
+          "p50": 24.0,
+          "p95": 24.0
+        },
+        "node_text_edit_commit": {
+          "n": 30,
+          "p50": 16.0,
+          "p95": 16.0
+        },
+        "connect_edge": {
+          "n": 30,
+          "p50": 16.0,
+          "p95": 16.0
+        },
+        "group_ungroup": {
+          "n": 30,
+          "p50": 24.0,
+          "p95": 24.0
+        },
+        "undo_redo": {
+          "n": 30,
+          "p50": 24.0,
+          "p95": 24.0
+        },
+        "delete": {
+          "n": 30,
+          "p50": 16.0,
+          "p95": 16.0
+        }
+      },
+      "continuous_frame_ms": {
+        "pan": {
+          "n": 490,
+          "p50": 16.7,
+          "p95": 16.7
+        },
+        "zoom": {
+          "n": 540,
+          "p50": 16.7,
+          "p95": 16.7
+        },
+        "node_drag": {
+          "n": 481,
+          "p50": 16.7,
+          "p95": 16.8
+        }
+      },
+      "frame_limit_ms": 16.7
+    },
+    {
       "nodes": 400,
       "edges": 600,
       "open_ms": {
         "n": 3,
-        "p50": 1067.7,
-        "p95": 1125.2
+        "p50": 1069.3,
+        "p95": 1069.7
       },
       "discrete_ms": {
         "add_node": {
@@ -309,7 +309,7 @@
         "group_ungroup": {
           "n": 30,
           "p50": 24.0,
-          "p95": 24.0
+          "p95": 32.0
         },
         "undo_redo": {
           "n": 30,
@@ -324,9 +324,9 @@
       },
       "continuous_frame_ms": {
         "pan": {
-          "n": 489,
+          "n": 484,
           "p50": 16.7,
-          "p95": 16.8
+          "p95": 16.7
         },
         "zoom": {
           "n": 540,
@@ -334,7 +334,7 @@
           "p95": 16.7
         },
         "node_drag": {
-          "n": 489,
+          "n": 485,
           "p50": 16.7,
           "p95": 16.8
         }
@@ -343,9 +343,9 @@
     }
   ],
   "top_rung_heap_mb": {
-    "empty_canvas": 5.44,
-    "top_rung": 15.17,
-    "canvas": 9.73
+    "empty_canvas": 5.43,
+    "top_rung": 15.15,
+    "canvas": 9.72
   },
   "low_end": {
     "cpu_throttling_rate": 4,
@@ -354,12 +354,12 @@
       "add_node": {
         "n": 30,
         "p50": 32.0,
-        "p95": 48.0
+        "p95": 40.0
       },
       "node_text_edit_commit": {
         "n": 30,
         "p50": 16.0,
-        "p95": 16.0
+        "p95": 24.0
       },
       "connect_edge": {
         "n": 30,
@@ -379,15 +379,15 @@
       "delete": {
         "n": 30,
         "p50": 24.0,
-        "p95": 24.0
+        "p95": 32.0
       }
     }
   },
   "bundle": {
     "initial_gzip_kb": 442.28,
-    "lazy_canvas_chunk_gzip_kb": 73.8,
+    "lazy_canvas_chunk_gzip_kb": 73.98,
     "lazy_canvas_chunk_files": [
-      "CreativeCanvasPage-DL8BlVyx.js",
+      "CreativeCanvasPage-DUaVljVV.js",
       "CreativeCanvasPage-vg-mh5S2.css"
     ],
     "base_initial_gzip_kb": 441.87,
