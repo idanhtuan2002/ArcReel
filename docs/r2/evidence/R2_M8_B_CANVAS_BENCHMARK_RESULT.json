@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "protocol_sha256": "sha256:61e24ea23fc46b099b6212ca36a90aa84673be5efa9faebc7b63e1ebeea240d3",
-  "head": "52ee375608db953176145ec0078a63d2d307d8f9",
+  "head": "5d9bc6a7f7e0aacdc80504ef841f326a6f6e0dc7",
   "status": "PASS",
   "status_strict": "FAIL",
   "status_clarified": "PASS",
@@ -12,27 +12,27 @@
   "clock_quantum_ms": 0.1,
   "failures": [],
   "strict_only_failures": [
-    "25 nodes: continuous pan {'n': 480, 'p50': 16.7, 'p95': 16.8}",
+    "25 nodes: continuous pan {'n': 480, 'p50': 16.7, 'p95': 16.7}",
     "25 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.8}",
-    "25 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.8}",
+    "25 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.7}",
     "50 nodes: continuous pan {'n': 480, 'p50': 16.7, 'p95': 16.8}",
-    "50 nodes: continuous zoom {'n': 539, 'p50': 16.7, 'p95': 16.7}",
+    "50 nodes: continuous zoom {'n': 541, 'p50': 16.7, 'p95': 16.7}",
     "50 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.7}",
     "100 nodes: continuous pan {'n': 481, 'p50': 16.7, 'p95': 16.7}",
     "100 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.8}",
-    "100 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.7}",
-    "200 nodes: continuous pan {'n': 480, 'p50': 16.7, 'p95': 16.7}",
+    "100 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.8}",
+    "200 nodes: continuous pan {'n': 483, 'p50': 16.7, 'p95': 16.8}",
     "200 nodes: continuous zoom {'n': 540, 'p50': 16.7, 'p95': 16.7}",
     "200 nodes: continuous node_drag {'n': 480, 'p50': 16.7, 'p95': 16.8}",
-    "initial bundle delta 0.41 KB (route registration only)"
+    "initial bundle delta 0.42 KB (route registration only)"
   ],
   "idle_frame_ms": {
-    "n": 1793,
+    "n": 1792,
     "p50": 16.7,
-    "p95": 16.7,
+    "p95": 16.8,
     "p99": 16.8,
     "max": 16.8,
-    "share_above_16_7": 0.401
+    "share_above_16_7": 0.3956
   },
   "machine": {
     "cpu": "",
@@ -51,8 +51,8 @@
       "edges": 37,
       "open_ms": {
         "n": 3,
-        "p50": 851.6,
-        "p95": 876.2
+        "p50": 828.6,
+        "p95": 867.6
       },
       "discrete_ms": {
         "add_node": {
@@ -90,7 +90,7 @@
         "pan": {
           "n": 480,
           "p50": 16.7,
-          "p95": 16.8
+          "p95": 16.7
         },
         "zoom": {
           "n": 540,
@@ -100,7 +100,7 @@
         "node_drag": {
           "n": 480,
           "p50": 16.7,
-          "p95": 16.8
+          "p95": 16.7
         }
       },
       "frame_limit_ms": 16.7
@@ -110,8 +110,8 @@
       "edges": 75,
       "open_ms": {
         "n": 3,
-        "p50": 851.3,
-        "p95": 865.2
+        "p50": 848.3,
+        "p95": 895.8
       },
       "discrete_ms": {
         "add_node": {
@@ -152,7 +152,7 @@
           "p95": 16.8
         },
         "zoom": {
-          "n": 539,
+          "n": 541,
           "p50": 16.7,
           "p95": 16.7
         },
@@ -169,8 +169,8 @@
       "edges": 150,
       "open_ms": {
         "n": 3,
-        "p50": 896.6,
-        "p95": 919.5
+        "p50": 892.7,
+        "p95": 904.2
       },
       "discrete_ms": {
         "add_node": {
@@ -218,7 +218,7 @@
         "node_drag": {
           "n": 480,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         }
       },
       "frame_limit_ms": 16.7
@@ -228,8 +228,8 @@
       "edges": 300,
       "open_ms": {
         "n": 3,
-        "p50": 944.6,
-        "p95": 960.1
+        "p50": 930.1,
+        "p95": 956.6
       },
       "discrete_ms": {
         "add_node": {
@@ -265,9 +265,9 @@
       },
       "continuous_frame_ms": {
         "pan": {
-          "n": 480,
+          "n": 483,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         },
         "zoom": {
           "n": 540,
@@ -287,8 +287,8 @@
       "edges": 600,
       "open_ms": {
         "n": 3,
-        "p50": 1028.5,
-        "p95": 1046.7
+        "p50": 1019.7,
+        "p95": 1048.3
       },
       "discrete_ms": {
         "add_node": {
@@ -324,9 +324,9 @@
       },
       "continuous_frame_ms": {
         "pan": {
-          "n": 484,
+          "n": 483,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         },
         "zoom": {
           "n": 540,
@@ -336,15 +336,15 @@
         "node_drag": {
           "n": 483,
           "p50": 16.7,
-          "p95": 16.7
+          "p95": 16.8
         }
       },
       "frame_limit_ms": 33.0
     }
   ],
   "top_rung_heap_mb": {
-    "empty_canvas": 5.42,
-    "top_rung": 15.2,
+    "empty_canvas": 5.43,
+    "top_rung": 15.21,
     "canvas": 9.78
   },
   "low_end": {
@@ -369,12 +369,12 @@
       "group_ungroup": {
         "n": 30,
         "p50": 40.0,
-        "p95": 40.0
+        "p95": 48.0
       },
       "undo_redo": {
         "n": 30,
         "p50": 32.0,
-        "p95": 40.0
+        "p95": 32.0
       },
       "delete": {
         "n": 30,
@@ -385,13 +385,13 @@
   },
   "bundle": {
     "initial_gzip_kb": 442.28,
-    "lazy_canvas_chunk_gzip_kb": 73.06,
+    "lazy_canvas_chunk_gzip_kb": 73.21,
     "lazy_canvas_chunk_files": [
-      "CreativeCanvasPage-CsQMrZai.js",
+      "CreativeCanvasPage-DdE1VQ_O.js",
       "CreativeCanvasPage-vg-mh5S2.css"
     ],
     "base_initial_gzip_kb": 441.87,
-    "initial_delta_gzip_kb": 0.41,
+    "initial_delta_gzip_kb": 0.42,
     "initial_canvas_modules": []
   },
   "event_timing_floor_ms": 16,
