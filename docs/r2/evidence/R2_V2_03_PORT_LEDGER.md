@@ -179,3 +179,23 @@ In every one of them the declarative behaviour is unchanged.
 - **Targeted pytest:** 5103 passed, 1 skipped. The set was custom_provider, image and video backends, the five routers, the worker capacity/module, media_generator, task_failure, prompt_utils, server/services, i18n, `r2/host_hardening`, `lib/db`, `test_imports` and config.
 - `lint-imports`: 22 kept.
 - **Frontend:** `pnpm typecheck` OK, `pnpm lint` OK, vitest 2556 passed / 4 skipped (218 files).
+
+## T9 — Series B forward-ports
+
+The ports went through the path-remap + `git apply -3` script (upstream pre-image blobs), then an import remap to the flat layout.
+
+- **`42b08c67`** → `56d88e6f`: the whole commit minus market. `lib/generation/task_failure.py` maps to `lib/task_failure.py`. Added an import-linter `ignore_imports` entry `lib.task_failure -> lib.custom_provider.comfyui.artifacts`: the layers contract reached `artifacts` through `video_backends.base → generation_queue → task_repo → task_failure`, and `artifacts` is a static-whitelist leaf.
+- **`8faf1450`** → `4b30292f`: only the ComfyUI `/system_stats` probe through `artifact_http_client`. The fork already had the Anthropic discovery guard and the redirect-body scope (`420b3d89`). The donor's metadata-destination probe test is included.
+- **`a300b786`**: nothing to port. The fork keeps `_encode_task_failure_message`, and the one ported test call site uses it.
+- **`62456ef1`** (+ the ComfyUI call sites of `2c4ca6d6`) → `da466ff3`:
+  - Added `lib/container_sniff.py` and `notify_provider_response_to` (prerequisite 2), plus the artifact container whitelist and the image-endpoint trial run.
+  - Not taken: the intermediate `CallPurpose` ledger tag, which the fork does not have.
+  - `2c4ca6d6` was missed by the gate-1 trace, because it touched the pre-`9d89cc84` flat paths. Its ComfyUI hunks are the `artifact_http_client` switch (video, image, remote stop) and `download_output(max_bytes)`. The fork adaptations made at T5/T8 turned out to be identical to it. **This closes the T5 OPEN item**; new donor tests cover a `/view` redirect to 169.254.169.254 (refused) and a body over `VIDEO_ARTIFACT_MAX_BYTES` (aborted).
+- **`301c8a38`** → `6d265a79`: taken in full, not "ADR hunk only" as the plan had it.
+  - The fixed-duration hunks are the ComfyUI fix: an endpoint with no `frames` binding was refused at enqueue on both video routes. The fork had the same guard (`reference_supported_durations_missing`).
+  - Remaps: `lib/script/reference_video` → `lib/reference_video`, `lib/speech` → `lib`, `server/services/tasks` → `server/services`, and the fork's `capability=` in place of `generation_type=`.
+  - Two tests were adapted to the fork's harness: the checkpoint hook takes `api_call_id`, and the second narration code depends on the fixture, so the ordering is asserted instead.
+- **`3ff6127f`** → `d9b10dd0`: ComfyUI part only (docstring and `test_comfyui_execution.py`). Not taken: the built-in provider resume-expiry gate, and upstream's removal of the replace-models route (the fork keeps the route and its tests).
+- **`ab714d98`** → `6c6590cd`: clean.
+- **`24e79da0`**: fixed the missing `Callable` import in `custom_endpoints.py`. It came from the `56cb567d` conflict resolution and was caught by ruff F821.
+- **Completeness re-check:** a `git log d15192b3..4b277b4c` over both the flat and the package ComfyUI paths lists only these commits, plus the excluded market commits (`82850227`, `07d84da6`, `074d81ce`) and the reorg commits (`e00e28b8`, `1a943710`, `9d89cc84`). The ComfyUI hunks of the reorg commits are imports and docstrings only.
