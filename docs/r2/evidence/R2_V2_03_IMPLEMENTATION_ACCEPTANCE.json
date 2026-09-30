@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "packet": "V2-03",
+  "status": "V2_03_ACCEPTED",
+  "accepted_head": "88b39633",
+  "branch": "impl/r2-v2-03-comfyui",
+  "executor_base": "2b1623fe",
+  "decisions": [
+    "docs/adr/0099-v2-03-comfyui-backport-boundary-and-local-gpu-admission.md (incl. Amendment 1)"
+  ],
+  "plan": "docs/superpowers/plans/2026-09-30-r2-v2-03-comfyui-backport.md",
+  "ledger": "docs/r2/evidence/R2_V2_03_PORT_LEDGER.md",
+  "reviewer": "codex",
+  "review_record": "docs/r2/evidence/R2_V2_03_CODEX_REVIEW_2026-09-30.md",
+  "review_rounds": [
+    {
+      "round": 1,
+      "head": "88b39633",
+      "job": "task-munsby0q-iy0z7h",
+      "verdict": {
+        "status": "V2_03_IMPLEMENTATION_ACCEPTED",
+        "head": "88b39633",
+        "blocking_findings": 0
+      }
+    }
+  ],
+  "recorded_low_findings": [
+    "git diff --check: blank line at EOF in frontend/src/components/pages/settings/endpoints/ComfyuiEndpointDetail.tsx (Low, no behavior impact; not a new round per amendment 12)"
+  ],
+  "verification": {
+    "binding": "a4c4dbe3..88b39633 differs only in docs/r2/evidence/R2_V2_03_PORT_LEDGER.md, so the a4c4dbe3 runs bind to the reviewed code",
+    "targeted_pytest": "5834 passed, 1 skipped (t12 union, a4c4dbe3)",
+    "static": "ruff check clean; ruff format --check: 1 pre-existing M8-B file unchanged from r2-v2/main; basedpyright 0/0/0; lint-imports 22 kept; deptry clean; audit_tests 0 violations",
+    "frontend": "pnpm check: 219 files, 2562 passed / 4 skipped",
+    "website": "pnpm check passed"
+  },
+  "coverage_limits": [
+    "Full pytest suite not run (standing instruction)",
+    "No live ComfyUI server exercised; all ComfyUI HTTP mocked",
+    "Codex could not run tests (read-only sandbox); runtime evidence is the main agent's",
+    "PostgreSQL-only tests in the targeted set skip on SQLite"
+  ],
+  "pushed": false
+}
