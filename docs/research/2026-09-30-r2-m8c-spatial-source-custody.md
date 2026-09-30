@@ -1,0 +1,23 @@
+# M8-C two-view source custody comparison
+
+Status: research and proposed first-source choice, not implementation acceptance. Source checkout: `design/r2-m8c-binding-authority` at `0568086f`; donor pin remains `b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83`.
+
+## Current source facts
+
+- M8 §8 requires source media digests and visible object spans, but does not prescribe that the two model input images are themselves approved M7 master rows (`docs/superpowers/specs/2026-09-13-r2-m8-canvas-learning-multiformat-design.md:646-657`).
+- The live Gate C approval route stages a host candidate, checks it, calls the M7 `master_authority_unit(...).promote_staged` and projects the file manifest (`server/routers/gates.py:370-465`). The projection scanner selects episode-video masters only (`server/services/master_authority.py:151-167`). The existing integration fixture promotes video files with `episode_video` keys (`tests/integration/r2/host_hardening/test_master_authority_unit.py:29-86`). Those source paths prove a video-master route; they do not prove a live image-master approval route.
+- The M7 candidate store is media-generic and records an immutable object reference, byte size, content digest and media-probe digest (`lib/candidate_store.py:1-25,115-174`; `r2/contracts/host_hardening.py:273-292`). `stream_probe_digest` checks ffprobe streams but does not itself prove human approval or a source image's relation to a master (`r2/host_hardening/master_authority.py:41-61`). A standalone candidate object is therefore insufficient as an approved spatial source.
+- M8-A artifact-slot promotion uses the M7 generic head for non-manifest keys, but its accepted integration fixture registers and promotes video, not a two-image source pair (`tests/integration/r2/advanced_creative/test_promotion_atomicity.py:35-121`; `server/services/advanced_creative.py:55-113`).
+- A bounded local probe with FFmpeg `8.0.1-3ubuntu2+esm4` decoded one synthetic 64×36 video into a PNG; ffprobe returned a PNG video stream. The parent file SHA-256 was `25d464e6ca00f8c3ce9b90313581d07b7f1b9bf3dad8606f557efbbc372be7d1`; the derived PNG SHA-256 was `3440aa8b4f244ff00e00606fc09e09a2779951789f96a722e95528a9d46b5722`. This proves only local decode feasibility, not deterministic cross-runtime output, approval, database registration or M8 acceptance.
+
+## Options and proposed selection
+
+| Path | Reuse and gap | Decision |
+| --- | --- | --- |
+| Two newly approved image masters | Can reuse M7 generic storage, but needs an image-specific approval/QA route and custody proof. Neither is evidenced by the existing Gate C video route. | Defer until that authority is designed and accepted. |
+| Two exact frames derived from approved video masters | Reuses the live video approval/head path and generic immutable candidate storage. Needs deterministic frame extraction, immutable derived-frame registration and parent lineage. | Select for the first M8-C vertical slice, pending a real two-video-master fixture and independent review. |
+| Two arbitrary file paths or mutable URLs | Has no exact approval/currentness or immutable content proof. | Reject. |
+
+The selected path uses two distinct project-scoped approved M7 video master heads as `MASTER` and `REVERSE` parents. For each, a server-owned extraction command fixes the exact master identity/digest, frame timestamp, decoder/transform version, pixel format, output encoding and frame digest. It registers the frame bytes as an immutable derived candidate object under a deterministic identity bound to that parent and extraction recipe. The spatial model sees the two frame bytes; `SpatialImageSpan.source_digest` names the frame digest, while the source-binding record also carries the approved parent video master and its candidate-object digest. Promotion and live consumption recheck both parent heads and derived frame objects. A changed parent master invalidates the frame source for a new promotion; prior candidate evidence remains immutable history.
+
+The design must not call a derived frame an independently approved M7 image master. The approval comes from the exact current video master and the frame's deterministic lineage. The first implementation fixture must approve two videos through the actual Gate C path, extract/register both frames, verify their bytes/digests and reject stale parent, mutated frame, wrong project, unsupported timestamp and decoder-version mismatch. Until that fixture exists, this is a selected design direction rather than proven custody.
