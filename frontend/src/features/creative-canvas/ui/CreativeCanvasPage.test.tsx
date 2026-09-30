@@ -5,7 +5,7 @@ import { useProjectsStore } from "@/stores/projects-store";
 import type { ProjectData } from "@/types";
 
 import { writeConflictSnapshot } from "../recovery/draftRecovery";
-import { resetKeptAsideMemory } from "../recovery/keptAside";
+import { keepAside, resetKeptAsideMemory } from "../recovery/keptAside";
 import { useCanvasStore } from "../state/canvasStore";
 import { useSaveStatusStore } from "../state/saveStatusStore";
 import CreativeCanvasPage from "./CreativeCanvasPage";
@@ -128,4 +128,20 @@ describe("Creative Canvas page", () => {
     await waitFor(() => expect(useCanvasStore.getState().conflict).toBeNull());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });;
+
+  it("asks again before discarding the next kept-aside version", async () => {
+    const scope = { userId: "default", projectName: "demo", candidateId: "canvas-episode-1" };
+    writeConflictSnapshot(scope, { nodes: [], edges: [], viewport: null, metadata: null, timestamp: new Date(0).toISOString() });
+    keepAside(scope, { nodes: [], edges: [], viewport: null, metadata: { second: true }, timestamp: new Date(1).toISOString() });
+    await renderReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "舍弃我的版本" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认舍弃" }));
+    await waitFor(() => expect(useCanvasStore.getState().conflict?.metadata).toEqual({ second: true }));
+
+    fireEvent.click(screen.getByRole("button", { name: "舍弃我的版本" }));
+
+    expect(useCanvasStore.getState().conflict?.metadata).toEqual({ second: true });
+  });
 });
+

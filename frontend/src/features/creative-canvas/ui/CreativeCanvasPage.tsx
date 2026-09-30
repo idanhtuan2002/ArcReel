@@ -59,6 +59,21 @@ function isTyping(target: EventTarget | null): boolean {
   );
 }
 
+const conflictIds = new WeakMap<object, number>();
+let lastConflictId = 0;
+
+/** A stable id per shown conflict object. */
+function conflictIdentity(conflict: object | null): number {
+  if (!conflict) return 0;
+  let id = conflictIds.get(conflict);
+  if (id === undefined) {
+    lastConflictId += 1;
+    id = lastConflictId;
+    conflictIds.set(conflict, id);
+  }
+  return id;
+}
+
 function contentMode(value: unknown): EditorContentMode {
   return value === "drama" || value === "ad" ? value : "narration";
 }
@@ -114,6 +129,8 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
   const phase = useCanvasStore((state) => state.phase);
   const loadError = useCanvasStore((state) => state.loadError);
   const hasConflict = useCanvasStore((state) => state.conflict !== null);
+  // One banner per kept-aside version: a confirmation started for one never carries to the next.
+  const conflictKey = useCanvasStore((state) => conflictIdentity(state.conflict));
   const conflictMode = useCanvasStore((state) => state.conflictMode);
   const empty = useCanvasStore((state) => state.graph.nodes.length === 0);
   const canUndo = useCanvasStore((state) => state.graph.history.past.length > 0);
@@ -293,7 +310,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
         </div>
       </header>
       {hasConflict ? (
-        <ConflictBanner mode={conflictMode} onUseMine={() => void persistence.resolveConflict("mine")} onDiscardMine={() => void persistence.resolveConflict("server")} />
+        <ConflictBanner key={conflictKey} mode={conflictMode} onUseMine={() => void persistence.resolveConflict("mine")} onDiscardMine={() => void persistence.resolveConflict("server")} />
       ) : null}
       <div className="relative min-h-0 flex-1">
         {phase === "error" ? (
