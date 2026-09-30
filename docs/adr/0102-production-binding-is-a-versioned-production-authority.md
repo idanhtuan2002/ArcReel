@@ -22,6 +22,7 @@ The accepted M8 design assigns `SpatialCandidate` to `PRODUCTION_BINDING`. A can
 
 ## Interface consequences
 
+- A public caller cannot append a `SpatialCandidate` through M8-A's generic revision endpoint. Only a server-owned completion service may append one after a verified successful M7 execution, exact raw-response/source digests and schema-first normalization. Existing user-authored Canvas/Format revision behavior is a separate arm.
 - The current M8 preview request has only candidate, revision, target and command ID. A separate typed spatial-preview request and persisted proposal must bind the selected assertions and binding/source identities. The untyped `impact` field cannot carry a client-authored binding body. Existing artifact-slot preview/receipt bytes and digests remain valid; the spatial target gets a separately versioned wire and persistence arm.
 - The production snapshot and spatial resolver are new contracts. Existing Golden fixtures remain offline values unless explicitly registered; no backfill silently turns them into production authority.
 - A binding version may attach a spatial constraint while preserving the v1 field schema. Its version changes; snapshot fingerprints must include the envelope digest so a spatial change cannot masquerade as the previous production input.
