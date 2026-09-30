@@ -138,8 +138,8 @@ capability packet ([`docs/adr/0079-m8-integrated-exploration-learning-format-ker
 
 | Path | Directly supported by current facts | Requirement or unresolved item shown by current sources |
 | --- | --- | --- |
-| A. Persistent `ProductionBinding` plus typed `SpatialConstraintSet` and a production consumer | The current binding-read locations provide concrete potential snapshot consumers: readiness uses binding identity and content fingerprints serialize binding content. The prompt/compiler and M7 request seams identify where a generation consumer would need to receive semantic constraints. The donor provides an example of spatial data affecting a generated request. | `ProductionBinding` has no spatial field, and the current prompt/compiler/M7 request interfaces do not carry one. ADR-0102 is **proposed**, says this path needs a typed immutable constraint set, an exact reference/digest on a binding version, and a consumer that uses it; it also says neither path is accepted and requires a sponsor decision plus a checked consumer/read path ([`docs/adr/0102-production-binding-is-a-versioned-production-authority.md:17`](../adr/0102-production-binding-is-a-versioned-production-authority.md#L17)-[`24`](../adr/0102-production-binding-is-a-versioned-production-authority.md#L24)). |
-| B. Candidate-only spatial evidence plus roadmap amendment | Current contracts, M8-C C1 scope, and the refusal path support retaining validated `SpatialCandidate` revisions without a binding write. This preserves visible/inferred/gap and lock evidence in the candidate payload. | It does not satisfy the design's current `SpatialCandidate -> PRODUCTION_BINDING` promotion target or C2 promotion wording. ADR-0102 describes this as an interim scope that leaves promotion unavailable and requires a roadmap amendment so M8-D is not described as starting from accepted M8-C ([`docs/adr/0102-production-binding-is-a-versioned-production-authority.md:21`](../adr/0102-production-binding-is-a-versioned-production-authority.md#L21)-[`24`](../adr/0102-production-binding-is-a-versioned-production-authority.md#L24)). |
+| A. Persistent `ProductionBinding` plus typed `SpatialConstraintSet` and a production consumer | The current binding-read locations provide concrete potential snapshot consumers: readiness uses binding identity and content fingerprints serialize binding content. The prompt/compiler and M7 request seams identify where a generation consumer would need to receive semantic constraints. The donor provides an example of spatial data affecting a generated request. | `ProductionBinding` has no spatial field, and the current prompt/compiler/M7 request interfaces do not carry one. [ADR-0102](../adr/0102-production-binding-is-a-versioned-production-authority.md) now selects this direction as a **proposed** design; its acceptance gates are still open. |
+| B. Candidate-only spatial evidence plus roadmap amendment | Current contracts, M8-C C1 scope, and the refusal path support retaining validated `SpatialCandidate` revisions without a binding write. This preserves visible/inferred/gap and lock evidence in the candidate payload. | It does not satisfy the design's current `SpatialCandidate -> PRODUCTION_BINDING` promotion target or C2 promotion wording. [ADR-0102](../adr/0102-production-binding-is-a-versioned-production-authority.md) treats this as interim behavior, not M8-C acceptance. |
 
 ## Unknowns and limits
 
@@ -155,6 +155,6 @@ capability packet ([`docs/adr/0079-m8-integrated-exploration-learning-format-ker
   prompt-injection behavior cannot establish parity, success under provider
   execution, or an R2 authority design. Any selected donor-derived behavior
   remains subject to the R2-DEC-031 evidence requirements above.
-- ADR-0102 is a proposal, not an accepted decision. Its storage, CAS,
-  transaction, authorization, wire-contract, and migration statements are not
-  adopted by this note.
+- ADR-0102 has selected path A as a proposal, not an accepted decision. Its
+  storage, CAS, transaction, authorization, wire-contract, and migration
+  statements are not adopted by this factual comparison.
