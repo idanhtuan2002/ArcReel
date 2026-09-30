@@ -97,6 +97,7 @@ from lib.prompt_builders import (
 )
 from lib.prompt_utils import render_storyboard_video_prompt
 from lib.reference_catalog import build_reference_catalog
+from lib.reference_video.duration_slots import DEFAULT_PLANNED_DURATION_SECONDS
 from lib.reference_video.execution_checkpoint import (
     NarrationExecutionFacts,
     ProviderMediaInput,
@@ -2453,9 +2454,11 @@ async def execute_video_task(
                 supported_durations,
                 resolution=resolution,
             )
-            if not candidates:
+            if not candidates and not ctx.video.duration_endpoint_fixed:
                 raise ValueError("TTS video request requires a current integer planned duration")
-            current_planned_duration = candidates[0]
+            # 时长由端点固定的模型行没有档位可借（合法空集），退到共享的规划篇幅默认值：这次
+            # 请求随后由公共投影判为 tts_duration_endpoint_fixed，而不是死在缺少规划秒数上。
+            current_planned_duration = next(iter(candidates), DEFAULT_PLANNED_DURATION_SECONDS)
         constrained_durations = constrain_durations(
             registry_provider_id,
             model_name,
@@ -2471,6 +2474,7 @@ async def execute_video_task(
             planned_duration_seconds=current_planned_duration,
             supported_durations=constrained_durations,
             confirmed_request_duration_seconds=delivery_options.confirmed_request_duration_seconds,
+            duration_endpoint_fixed=ctx.video.duration_endpoint_fixed,
             resolver=ResolvedTtsSettingsResolver.from_audio_lane(ctx.audio),
             tts_in_progress=await tts_task_in_progress(
                 project_name=project_name,
@@ -2497,6 +2501,7 @@ async def execute_video_task(
             planned_duration_seconds=current_planned_duration,
             supported_durations=constrained_durations,
             confirmed_request_duration_seconds=delivery_options.confirmed_request_duration_seconds,
+            duration_endpoint_fixed=ctx.video.duration_endpoint_fixed,
             current_visual_duration_seconds=current_visual_duration,
         )
         if not delivery_projection.allowed:
