@@ -103,3 +103,36 @@ reconciliation.
 - **Exempting ComfyUI from qualification and budget in release mode.** This would create a second admission policy for one provider kind.
 - **A GPU-time price.** Upstream deliberately does not price user-owned hardware, and no evaluation requires it.
 - **ComfyUI as an orchestrator or as the Canvas.** This was already excluded by the packet.
+
+## Amendment 1 (2026-09-30, gate 3): the donor is upstream `d15192b3`, not `4b277b4c`
+
+Gate 3 research found a better donor. The boundary and Decisions 2–4 are unchanged.
+
+**Facts.**
+- Upstream `d15192b3` is the last ComfyUI commit before the package reorg `e00e28b8`. At that commit ComfyUI is still built on the flat layout this fork uses:
+  - the pure definition modules live in `lib/custom_provider/comfyui/{bindings,graph,validator,workflow}.py`;
+  - the backends live in `lib/custom_provider/comfyui_{backend,client,execution,image_backend}.py`;
+  - the routers import `lib.i18n.Translator`;
+  - nothing imports `arcreel_market_core`.
+- This fork's custom-provider seam files are byte-identical to the merge base `6ddedc77`. The exceptions are `discovery.py` and `endpoint_test/trial_run.py`.
+- A probe cherry-picked the 18 ComfyUI commits `69967549..d15192b3` onto `r2-v2/main`, oldest first. Every commit applies. Twelve commits conflict, in:
+  - the seam files;
+  - `prompt_utils`;
+  - the frontend endpoint UI;
+  - the market;
+  - the docs.
+- Taking upstream's whole file for every conflict fails at import: it pulls in intermediate upstream changes, such as `lib.prompt_style`. Conflicts must be resolved hunk by hunk.
+- This fork has no market module at all: neither `lib/market` nor a frontend `settings/market`.
+
+**Amended Decision 1.**
+- The backport cherry-picks `69967549..d15192b3` with `-x`. The donor's flat file layout is kept, and nothing is vendored into a `definition/` directory.
+- Conflicts are resolved by keeping the fork's file and applying only that commit's own hunks.
+- Market hunks are dropped.
+- The seven later ComfyUI commits are then forward-ported onto the flat layout by path remapping: `42b08c67`, `8faf1450`, `a300b786`, `62456ef1`, `301c8a38`, `3ff6127f`, `ab714d98`. Only their ComfyUI-relevant hunks are taken.
+- The four prerequisites are delivered inside this series:
+  1. kind dispatch arrives in `56cb567d` and `fe4bd3a1`;
+  2. `container_sniff` and `notify_provider_response_to` arrive in `62456ef1`;
+  3. the ComfyUI discovery and probe path arrives in `1cf11b02` and `8faf1450`;
+  4. the failure encoding arrives in `d027b2e6`, plus `a300b786` adapted to the fork's `_encode_task_failure_message`.
+- Each prerequisite keeps its own tests.
+- Upstream ADR-0081 and ADR-0082 are imported as ADR-0100 and ADR-0101, marked as imported reference.
