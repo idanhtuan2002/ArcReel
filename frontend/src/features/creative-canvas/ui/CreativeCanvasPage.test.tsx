@@ -1,9 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useProjectsStore } from "@/stores/projects-store";
 import type { ProjectData } from "@/types";
 
+import { writeConflictSnapshot } from "../recovery/draftRecovery";
+import { resetKeptAsideMemory } from "../recovery/keptAside";
 import { useCanvasStore } from "../state/canvasStore";
 import { useSaveStatusStore } from "../state/saveStatusStore";
 import CreativeCanvasPage from "./CreativeCanvasPage";
@@ -29,6 +31,7 @@ let contextResponse: () => Response;
 
 beforeEach(() => {
   window.localStorage.clear();
+  resetKeptAsideMemory();
   useCanvasStore.getState().reset();
   useSaveStatusStore.getState().reset();
   useProjectsStore.setState({
@@ -107,22 +110,22 @@ describe("Creative Canvas page", () => {
   });
 
   it("offers both choices for work kept aside and clears the conflict on a choice", async () => {
+    writeConflictSnapshot(
+      { userId: "default", projectName: "demo", candidateId: "canvas-episode-1" },
+      { nodes: [], edges: [], viewport: null, metadata: null, timestamp: new Date(0).toISOString() },
+    );
     await renderReady();
-    act(() => {
-      useCanvasStore.getState().replace({
-        conflict: { nodes: [], edges: [], viewport: null, metadata: null, timestamp: new Date(0).toISOString() },
-      });
-    });
 
     expect(screen.getByRole("alert")).toHaveTextContent(/此画布已在其他标签页或设备上更改。/);
     expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "添加节拍" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "舍弃我的版本" }));
     expect(useCanvasStore.getState().conflict).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "确认舍弃" }));
 
-    expect(useCanvasStore.getState().conflict).toBeNull();
+    await waitFor(() => expect(useCanvasStore.getState().conflict).toBeNull());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
+  });;
 });

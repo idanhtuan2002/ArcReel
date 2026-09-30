@@ -263,6 +263,11 @@ export function writeDraft(scope: DraftScope, input: DraftInput): boolean {
 
 // ─── conflict snapshots and viewports ──────────────────────────────────────
 
+/** The localStorage key of a Canvas's kept-aside versions; each version adds a `#<id>` suffix. */
+export function conflictScopeKey(scope: DraftScope): string {
+  return scopeKey(CONFLICT_PREFIX, scope);
+}
+
 export function writeConflictSnapshot(scope: DraftScope, snapshot: ConflictSnapshot): boolean {
   try {
     return safeLocalStorageSet(scopeKey(CONFLICT_PREFIX, scope), JSON.stringify(snapshot));

@@ -9,10 +9,15 @@
  *
  * Each save rereads the context, so a revision binds the lineage current when
  * it is saved. A 409 is resolved by rereading the head: when another tab or
- * device moved it, the local content is kept aside as a conflict snapshot, the
- * server content is loaded, and autosave stops until the user decides. Nothing
- * is overwritten automatically. A 409 on an unmoved head is reported as an
- * error.
+ * device moved it, the local work is kept aside (`keptAside.ts`) and the
+ * server content is loaded. While any version is kept aside the Canvas is
+ * read-only, and the user settles the versions one by one, oldest first:
+ * "mine" applies a version on top of the server content, "server" drops it.
+ * Nothing is overwritten automatically. A 409 on an unmoved head is reported
+ * as an error.
+ *
+ * The draft slot only ever holds the work on screen; kept-aside versions have
+ * their own keys, or live in memory when storage refuses them.
  */
 
 import { ApiRequestError } from "@/api";
@@ -31,17 +36,15 @@ import { createEmptyBookmarks, type ViewportBookmarks } from "../domain/bookmark
 import { acknowledgeClear, commitEdit, hydrateDraft, loadGraph } from "../domain/graph";
 import { isCanvasAutosaveHeld, subscribeCanvasAutosaveRelease } from "../recovery/autosaveHold";
 import {
-  clearConflictSnapshot,
   clearDraft,
   decideDraftRecovery,
-  readConflictSnapshot,
   readDraft,
-  writeConflictSnapshot,
   writeDraft,
   type ConflictSnapshot,
   type DraftScope,
   type StoredDraft,
 } from "../recovery/draftRecovery";
+import { keepAside, readKeptAside, settleKeptAside, type KeptAsideVersion } from "../recovery/keptAside";
 import {
   checkPayloadLimits,
   classifySaveOutcome,
@@ -95,24 +98,14 @@ interface OpenCanvas {
   head: CandidateHead | null;
   lastRemoteNodeCount: number;
   session: CanvasSaveSession;
-  /**
-   * A conflicting draft waits in the draft slot behind an older kept-aside version. It is
-   * moved into the kept-aside slot as soon as that version is settled, before any edit can
-   * write the draft slot.
-   */
-  pendingConflictDraft: boolean;
-  /**
-   * Where the copy of the shown conflict lives: its own slot, the draft slot (when the slot
-   * write failed), or only memory (when no storage write succeeded; the local work then stays
-   * on screen and the server content is not loaded until the user chooses).
-   */
-  conflictCopy: "snapshot" | "draft" | "memory" | null;
-  /** The server head seen by a 409 whose content was not loaded (`conflictCopy === "memory"`). */
-  deferredHead: CandidateHead | null;
-  /** A "mine" choice applied while another conflict waited; it is saved once none is left. */
-  unsavedResolution: boolean;
-  /** Whether the graph on screen is the server's content, as the kept-aside banner says. */
+  /** The kept-aside version shown to the user, the oldest one. */
+  shown: KeptAsideVersion | null;
+  /** Whether the graph on screen is the server's content; both choices need it first. */
   serverShown: boolean;
+  /** A "mine" choice not saved yet because more versions waited; saved once none is left. */
+  unsavedResolution: boolean;
+  /** `editSeq` when the screen last matched the server (loaded, saved or reloaded); null if it never did. */
+  cleanEditSeq: number | null;
 }
 
 function snapshotOf(draft: StoredDraft): ConflictSnapshot {
@@ -190,31 +183,23 @@ export class CanvasPersistence {
         remote.edges,
         metadataOf(remote.bookmarks),
       );
+      // A conflicting draft is kept aside; so is any draft while older versions wait, so that a
+      // choice about an older version can never replace it silently.
+      const waiting = readKeptAside(draftScope).length > 0;
+      if (decision.kind === "conflict" || (decision.kind === "draft" && waiting)) {
+        const version = keepAside(draftScope, snapshotOf(decision.draft));
+        if (version.key) clearDraft(draftScope);
+      }
+      const queue = readKeptAside(draftScope);
       const state = this.store.getState();
-      // Work kept aside earlier stays reachable until the user settles it.
-      const keptAside = readConflictSnapshot(draftScope);
-      let conflict: ConflictSnapshot | null = keptAside;
-      let conflictCopy: OpenCanvas["conflictCopy"] = keptAside ? "snapshot" : null;
-      // A draft behind an unresolved kept-aside version waits its turn instead of hydrating, so a
-      // choice about the older version can never replace it silently.
-      const draftWaits = keptAside !== null && decision.kind !== "remote";
-      if (decision.kind === "draft" && !draftWaits) {
+      const hydrate = decision.kind === "draft" && queue.length === 0;
+      if (hydrate) {
         state.replace({
           graph: hydrateDraft(state.graph, decision.draft),
           bookmarks: bookmarksOf(decision.draft.metadata),
         });
       } else {
         state.replace({ graph: loadGraph(state.graph, remote.nodes, remote.edges), bookmarks: remote.bookmarks });
-        if (decision.kind === "conflict" && !keptAside) {
-          conflict = snapshotOf(decision.draft);
-          // The draft is the only copy until the kept-aside slot holds it.
-          if (writeConflictSnapshot(draftScope, conflict)) {
-            clearDraft(draftScope);
-            conflictCopy = "snapshot";
-          } else {
-            conflictCopy = "draft";
-          }
-        }
       }
       const saveScope = canvasSaveScope(projectName, candidateId);
       this.open = {
@@ -226,21 +211,21 @@ export class CanvasPersistence {
         context,
         head,
         lastRemoteNodeCount: remote.nodes.length,
-        pendingConflictDraft: draftWaits,
-        conflictCopy,
-        deferredHead: null,
-        unsavedResolution: false,
-        serverShown: !(decision.kind === "draft" && !draftWaits),
         session: createCanvasSaveSession({
           canvasKey: `${projectName}:${candidateId}`,
           generation,
           runSave: (version, session) => this.runSave(version, session),
         }),
+        shown: null,
+        serverShown: !hydrate,
+        unsavedResolution: false,
+        cleanEditSeq: hydrate ? null : this.store.getState().editSeq,
       };
       writeSaveStatus(saveScope, "idle");
-      this.store.getState().replace({ phase: "ready", conflict });
+      this.store.getState().replace({ phase: "ready" });
+      this.showNext(this.open);
       this.watchEdits(projectName);
-      if (decision.kind === "draft" && !draftWaits) this.scheduleAutosave();
+      if (hydrate) this.scheduleAutosave();
     } catch (error) {
       if (signal.aborted || isAbort(error)) return;
       const message = error instanceof Error && error.message ? error.message : this.deps.t("creative_canvas_load_failed");
@@ -250,7 +235,11 @@ export class CanvasPersistence {
     }
   }
 
-  /** Leave the Canvas. The local draft stays; an append already on the wire is left to finish. */
+  /**
+   * Leave the Canvas. The work on screen goes to the draft; when storage refuses it, it is
+   * kept aside in memory and offered again when the Canvas reopens. An append already on the
+   * wire is left to finish.
+   */
   close(): void {
     this.loading?.abort();
     this.loading = null;
@@ -260,10 +249,12 @@ export class CanvasPersistence {
       if (timer !== null) this.deps.clearTimer(timer);
     }
     this.autosaveTimer = this.draftTimer = this.retryTimer = null;
-    if (this.open) {
+    const open = this.open;
+    if (open) {
       flushPendingFieldEdits();
-      if (this.store.getState().editSeq > 0) this.writeDraftNow(this.open);
-      this.open.session.dispose();
+      const unsaved = this.store.getState().editSeq !== open.cleanEditSeq;
+      if (unsaved && !this.writeDraftNow(open)) keepAside(open.draftScope, this.localSnapshot());
+      open.session.dispose();
     }
     this.open = null;
   }
@@ -277,81 +268,63 @@ export class CanvasPersistence {
   }
 
   /**
-   * Settle a conflict. `"server"` drops the kept-aside local content. `"mine"`
-   * puts it back on top of the server content as one undoable edit and saves it.
+   * Settle the shown kept-aside version. `"server"` drops it; `"mine"` applies it on top of the
+   * server content as one undoable edit. Both first make sure the server content is on screen;
+   * if it cannot be loaded, the version stays shown and nothing changes.
    */
-  resolveConflict(choice: "server" | "mine"): void {
+  resolveConflict(choice: "server" | "mine"): Promise<void> {
     const open = this.open;
-    const conflict = this.store.getState().conflict;
-    if (!open || !conflict) return;
-    if (open.conflictCopy === "memory") {
-      this.resolveUnkeptConflict(open, choice);
-      return;
-    }
-    const settledCopy = open.conflictCopy;
-    // The next kept-aside version, if a conflicting draft waited behind this one.
-    const waiting = open.pendingConflictDraft ? readDraft(open.draftScope) : null;
-    let next: ConflictSnapshot | null = null;
-    let nextCopy: OpenCanvas["conflictCopy"] = null;
-    if (waiting) {
-      next = snapshotOf(waiting);
-      // Replace the settled version in its slot; if that fails, free the slot and retry once.
-      let moved = writeConflictSnapshot(open.draftScope, next);
-      if (!moved) {
-        clearConflictSnapshot(open.draftScope);
-        moved = writeConflictSnapshot(open.draftScope, next);
+    if (!open?.shown) return Promise.resolve();
+    return this.settle(open, open.shown, choice);
+  }
+
+  private async settle(open: OpenCanvas, version: KeptAsideVersion, choice: "server" | "mine"): Promise<void> {
+    if (!open.serverShown) {
+      await this.reloadServer(open);
+      if (this.open !== open || open.shown !== version) return;
+      if (!open.serverShown) {
+        this.fail(open, this.deps.t("creative_canvas_load_failed"));
+        return;
       }
-      if (moved) clearDraft(open.draftScope);
-      nextCopy = moved ? "snapshot" : "draft";
-    } else if (settledCopy === "snapshot") {
-      clearConflictSnapshot(open.draftScope);
-    } else if (settledCopy === "draft" && choice === "server") {
-      clearDraft(open.draftScope);
     }
-    open.pendingConflictDraft = false;
-    open.conflictCopy = null;
-    // Edits are refused while a conflict is shown: settle the choice first, then show the next one.
+    settleKeptAside(open.draftScope, version);
+    open.shown = null;
+    // Edits are refused while a version is shown: clear it, apply the choice, then show the next.
     this.store.getState().replace({ conflict: null, conflictMode: "kept" });
     if (choice === "mine") {
-      this.store.getState().edit((graph) => commitEdit(graph, conflict.nodes, conflict.edges));
-      if (conflict.metadata) this.store.getState().editBookmarks(() => bookmarksOf(conflict.metadata));
+      const { snapshot } = version;
+      this.store.getState().edit((graph) => commitEdit(graph, snapshot.nodes, snapshot.edges));
+      if (snapshot.metadata) this.store.getState().editBookmarks(() => bookmarksOf(snapshot.metadata));
       open.unsavedResolution = true;
     }
-    if (next) {
-      open.conflictCopy = nextCopy;
-      this.store.getState().replace({ conflict: next });
-      return;
-    }
+    if (this.showNext(open)) return;
     if (open.unsavedResolution) {
-      // A "mine" choice made earlier in this sequence could not save while a conflict waited.
       open.unsavedResolution = false;
       this.scheduleAutosave();
-    } else if (choice === "server" && !open.serverShown) {
-      // Loading the server content failed earlier: load it now, as the choice says.
-      void this.reloadServer(open, null).then(() => {
-        if (this.open === open && open.serverShown) writeSaveStatus(open.saveScope, "idle");
-      });
-    } else if (choice === "server") {
+    } else {
       writeSaveStatus(open.saveScope, "idle");
     }
   }
 
-  /** Settle a conflict whose local work never reached storage and is still on screen. */
-  private resolveUnkeptConflict(open: OpenCanvas, choice: "server" | "mine"): void {
-    const head = open.deferredHead;
-    open.conflictCopy = null;
-    open.deferredHead = null;
-    this.store.getState().replace({ conflict: null, conflictMode: "kept" });
-    if (choice === "mine") {
-      // Save the work on screen on top of the head that moved.
-      open.head = head;
-      open.unsavedResolution = false;
-      this.scheduleAutosave(0);
-      return;
-    }
-    void this.reloadServer(open, null).then(() => {
-      if (this.open === open && open.serverShown) writeSaveStatus(open.saveScope, "idle");
-    });
+  /** Show the oldest kept-aside version, if any; true when one is shown. */
+  private showNext(open: OpenCanvas): boolean {
+    const [next] = readKeptAside(open.draftScope);
+    open.shown = next ?? null;
+    this.store
+      .getState()
+      .replace({ conflict: next?.snapshot ?? null, conflictMode: next && !next.key ? "unkept" : "kept" });
+    return next !== undefined;
+  }
+
+  private localSnapshot(): ConflictSnapshot {
+    const { graph, bookmarks } = this.store.getState();
+    return {
+      nodes: [...graph.nodes],
+      edges: [...graph.edges],
+      viewport: null,
+      metadata: metadataOf(bookmarks),
+      timestamp: this.deps.now().toISOString(),
+    };
   }
 
   private async readHead(projectName: string, candidateId: string, signal?: AbortSignal): Promise<CandidateHead | null> {
@@ -384,11 +357,8 @@ export class CanvasPersistence {
     }, DRAFT_DELAY_MS);
   }
 
-  /** Write the draft; false when it was not written. */
+  /** Write the work on screen to the draft; false when storage refused it. */
   private writeDraftNow(open: OpenCanvas): boolean {
-    // The draft slot may hold the only copy of kept-aside work: a draft waiting behind a kept-aside
-    // version, or the shown conflict itself when its own slot could not be written. Never overwrite it.
-    if (open.pendingConflictDraft || open.conflictCopy === "draft") return false;
     const { graph, bookmarks } = this.store.getState();
     return writeDraft(open.draftScope, {
       baseRevision: open.head?.current_revision ?? null,
@@ -497,6 +467,7 @@ export class CanvasPersistence {
     // The draft is the only copy of edits made after this save read the graph: keep it then.
     if (this.store.getState().editSeq === editSeq && !session.hasUnsavedContentBeyond(version)) {
       clearDraft(open.draftScope);
+      open.cleanEditSeq = editSeq;
     }
     writeSaveStatus(open.saveScope, "saved");
     return true;
@@ -513,8 +484,11 @@ export class CanvasPersistence {
     }
   }
 
-  /** Load the server's current revision and show `conflict` as kept-aside work. */
-  private async reloadServer(open: OpenCanvas, conflict: ConflictSnapshot | null): Promise<void> {
+  /**
+   * Load the server's current revision onto the screen. On failure the graph on screen is
+   * kept and `serverShown` is false, so a later choice loads it again.
+   */
+  private async reloadServer(open: OpenCanvas): Promise<void> {
     try {
       const head = await this.readHead(open.projectName, open.candidateId);
       const remote = head
@@ -527,62 +501,22 @@ export class CanvasPersistence {
       open.lastRemoteNodeCount = remote.nodes.length;
       open.serverShown = true;
       const state = this.store.getState();
-      state.replace({
-        graph: loadGraph(state.graph, remote.nodes, remote.edges),
-        bookmarks: remote.bookmarks,
-        conflict,
-      });
+      state.replace({ graph: loadGraph(state.graph, remote.nodes, remote.edges), bookmarks: remote.bookmarks });
+      open.cleanEditSeq = this.store.getState().editSeq;
     } catch {
-      // The local work stays on screen; a later "server" choice loads the server content again.
-      if (this.open !== open) return;
-      open.serverShown = false;
-      this.store.getState().replace({ conflict });
+      if (this.open === open) open.serverShown = false;
     }
   }
 
-  /**
-   * After a 409 on a moved head: keep the local work, then load the server content.
-   * The local work is written to the kept-aside slot, or else to the draft slot. When no
-   * storage write succeeds, the local work stays on screen and only the new head is read;
-   * the user then chooses between keeping it (saved on the new head) and loading the server.
-   */
+  /** After a 409 on a moved head: keep the local work aside, then load the server content. */
   private async keepAsideAndReload(open: OpenCanvas, message: string): Promise<false> {
     flushPendingFieldEdits();
-    const { graph, bookmarks } = this.store.getState();
-    const local: ConflictSnapshot = {
-      nodes: [...graph.nodes],
-      edges: [...graph.edges],
-      viewport: null,
-      metadata: metadataOf(bookmarks),
-      timestamp: this.deps.now().toISOString(),
-    };
-    const taken = readConflictSnapshot(open.draftScope);
-    if (!taken && writeConflictSnapshot(open.draftScope, local)) {
-      clearDraft(open.draftScope);
-      open.conflictCopy = "snapshot";
-      await this.reloadServer(open, local);
-    } else if (this.writeDraftNow(open)) {
-      if (taken) {
-        // The kept-aside slot is taken: the local work waits in the draft behind that version.
-        open.pendingConflictDraft = true;
-        open.conflictCopy = "snapshot";
-        await this.reloadServer(open, taken);
-      } else {
-        open.conflictCopy = "draft";
-        await this.reloadServer(open, local);
-      }
-    } else {
-      let head: CandidateHead | null = open.head;
-      try {
-        head = await this.readHead(open.projectName, open.candidateId);
-      } catch {
-        // Keep the known head: "keep mine" then meets another 409 and comes back here.
-      }
-      if (this.open !== open) return false;
-      open.conflictCopy = "memory";
-      open.deferredHead = head;
-      this.store.getState().replace({ conflict: local, conflictMode: "unkept" });
-    }
+    const version = keepAside(open.draftScope, this.localSnapshot());
+    // Stored under its own key, the draft copy is redundant; held in memory, the draft stays too.
+    if (version.key) clearDraft(open.draftScope);
+    this.showNext(open);
+    open.serverShown = false;
+    await this.reloadServer(open);
     return this.fail(open, message);
   }
 }

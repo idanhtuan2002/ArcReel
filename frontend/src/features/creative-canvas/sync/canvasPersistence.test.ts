@@ -8,7 +8,8 @@ import type { CandidateHead, CanvasRevisionWire, LineageBinding } from "../api/t
 import { createEmptyBookmarks } from "../domain/bookmarks";
 import { addNode, clearCanvas, commitEdit } from "../domain/graph";
 import type { CanvasNode } from "../domain/types";
-import { readConflictSnapshot, readDraft, writeConflictSnapshot, writeDraft } from "../recovery/draftRecovery";
+import { readDraft, writeConflictSnapshot, writeDraft } from "../recovery/draftRecovery";
+import { hasUnstoredKeptAside, readKeptAside, resetKeptAsideMemory } from "../recovery/keptAside";
 import { useCanvasStore } from "../state/canvasStore";
 import { registerPendingFieldEdit } from "../state/pendingFieldEdits";
 import { canvasSaveScope, deriveSaveState, useSaveStatusStore } from "../state/saveStatusStore";
@@ -147,6 +148,7 @@ function deps(): PersistenceDeps {
 }
 
 const store = () => useCanvasStore.getState();
+const keptFirst = () => readKeptAside(SCOPE)[0]?.snapshot ?? null;
 const saveState = () => deriveSaveState(useSaveStatusStore.getState().scopes, canvasSaveScope(PROJECT, CANDIDATE));
 
 async function autosave(): Promise<void> {
@@ -157,6 +159,7 @@ async function autosave(): Promise<void> {
 
 beforeEach(() => {
   window.localStorage.clear();
+  resetKeptAsideMemory();
   useSaveStatusStore.getState().reset();
   store().reset();
   server = new FakeServer();
@@ -228,7 +231,7 @@ describe("opening a Canvas", () => {
 
     expect(store().graph.nodes[0].data.label).toBe("newer");
     expect(store().conflict?.nodes[0].data.label).toBe("mine");
-    expect(readConflictSnapshot(SCOPE)).not.toBeNull();
+    expect(keptFirst()).not.toBeNull();
     expect(timers.delays()).toEqual([]);
   });
 
@@ -298,7 +301,7 @@ describe("saving", () => {
     expect(saveState().status).toBe("saved");
     expect(server.heads.get(CANDIDATE)?.current_revision).toBe(2);
     expect(store().conflict).toBeNull();
-    expect(readConflictSnapshot(SCOPE)).toBeNull();
+    expect(keptFirst()).toBeNull();
   });
 
   it("drops local work aside on request and keeps the server content", async () => {
@@ -401,9 +404,9 @@ describe("kept-aside work and late responses", () => {
     await persistence.openCanvas(PROJECT, 1);
 
     expect(store().conflict?.nodes[0].data.label).toBe("older");
-    expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
+    expect(readKeptAside(SCOPE).map((item) => item.snapshot.nodes[0].data.label)).toEqual(["older", "mine"]);
+    expect(readDraft(SCOPE)).toBeNull();
   });
-
   it("does not keep another Canvas's graph aside when the user switches during a 409", async () => {
     await persistence.openCanvas(PROJECT, 1);
     store().edit((graph) => addNode(graph, note("mine")));
@@ -428,7 +431,7 @@ describe("kept-aside work and late responses", () => {
     releaseHead();
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(readConflictSnapshot(SCOPE)).toBeNull();
+    expect(keptFirst()).toBeNull();
     expect(readDraft(SCOPE)?.nodes.map((node) => node.id)).toEqual(["mine"]);
     expect(store().graph.nodes.map((node) => node.id)).toEqual(["episode-2"]);
   });
@@ -466,29 +469,26 @@ describe("kept-aside work and late responses", () => {
       timestamp: new Date(0).toISOString(),
     });
     writeDraft(SCOPE, draftFrom(1, "mine"));
+
     await persistence.openCanvas(PROJECT, 1);
 
-    persistence.resolveConflict("mine");
-    timers.fire(300);
-
+    await persistence.resolveConflict("mine");
     expect(store().graph.nodes[0].data.label).toBe("older");
     expect(store().conflict?.nodes[0].data.label).toBe("mine");
-    expect(readConflictSnapshot(SCOPE)?.nodes[0].data.label).toBe("mine");
 
     persistence.close();
     await persistence.openCanvas(PROJECT, 1);
-    expect(store().conflict?.nodes[0].data.label).toBe("mine");
+    // The applied first choice was drafted on close and is kept aside with the remaining version,
+    // ordered by when each was edited.
+    expect(readKeptAside(SCOPE).map((item) => item.snapshot.nodes[0].data.label)).toEqual(["older", "mine"]);
 
-    // The unsaved result of the first choice was drafted on close; it waits its turn.
-    persistence.resolveConflict("mine");
-    expect(store().conflict?.nodes[0].data.label).toBe("older");
-    persistence.resolveConflict("server");
+    await persistence.resolveConflict("mine");
+    await persistence.resolveConflict("server");
     await autosave();
 
     expect(store().conflict).toBeNull();
-    expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes[0].body.data).toMatchObject({ label: "mine" });
+    expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes[0].body.data).toMatchObject({ label: "older" });
   });
-
   it("offers a same-base draft after an older kept-aside version instead of hydrating it", async () => {
     await server.saveElsewhere([note("a")]);
     writeConflictSnapshot(SCOPE, {
@@ -522,7 +522,7 @@ describe("kept-aside work and late responses", () => {
     await vi.waitFor(() => expect(store().graph.nodes.map((node) => node.id)).toEqual(["theirs"]));
   });
 
-  it("keeps a waiting draft when the Canvas closes during a stacked conflict", async () => {
+  it("keeps every waiting version when the Canvas closes during a stacked conflict", async () => {
     await server.saveElsewhere([note("a")]);
     await server.saveElsewhere([note("a", "newer")]);
     writeConflictSnapshot(SCOPE, {
@@ -533,15 +533,17 @@ describe("kept-aside work and late responses", () => {
       timestamp: new Date(0).toISOString(),
     });
     writeDraft(SCOPE, draftFrom(1, "mine"));
+
     await persistence.openCanvas(PROJECT, 1);
 
     store().edit((graph) => addNode(graph, note("while-deciding")));
     timers.fire(300);
     persistence.close();
+    await persistence.openCanvas(PROJECT, 1);
 
-    expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
+    expect(readKeptAside(SCOPE).map((item) => item.snapshot.nodes[0].data.label)).toEqual(["older", "mine"]);
+    expect(store().graph.nodes.map((node) => node.id)).toEqual(["a"]);
   });
-
   it("refuses edits while kept-aside work waits for the user", async () => {
     await server.saveElsewhere([note("a")]);
     await server.saveElsewhere([note("a", "newer")]);
@@ -574,35 +576,30 @@ describe("kept-aside work and late responses", () => {
     spy.mockRestore();
   });
 
-  it("keeps the waiting draft when it cannot move into the kept-aside slot", async () => {
+  it("keeps a conflicting draft in memory when storage refuses it, across close and reopen", async () => {
     await server.saveElsewhere([note("a")]);
     await server.saveElsewhere([note("a", "newer")]);
-    writeConflictSnapshot(SCOPE, {
-      nodes: [note("a", "older")],
-      edges: [],
-      viewport: null,
-      metadata: null,
-      timestamp: new Date(0).toISOString(),
-    });
     writeDraft(SCOPE, draftFrom(1, "mine"));
-    await persistence.openCanvas(PROJECT, 1);
     const originalSetItem = Storage.prototype.setItem;
     const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
       if (key.startsWith("arcreel:creative-canvas:conflict:")) throw new DOMException("full", "QuotaExceededError");
       originalSetItem.call(this, key, value);
     });
 
-    persistence.resolveConflict("mine");
-    timers.fire(300);
-    persistence.close();
-
-    expect(store().conflict?.nodes[0].data.label).toBe("mine");
-    expect(readDraft(SCOPE)?.nodes[0].data.label).toBe("mine");
-    spy.mockRestore();
     await persistence.openCanvas(PROJECT, 1);
-    expect(store().conflict?.nodes[0].data.label).toBe("mine");
-  });
+    expect(store().conflictMode).toBe("unkept");
+    expect(hasUnstoredKeptAside()).toBe(true);
+    persistence.close();
+    await persistence.openCanvas(PROJECT, 1);
+    spy.mockRestore();
 
+    expect(store().conflict?.nodes[0].data.label).toBe("mine");
+    expect(readKeptAside(SCOPE).map((item) => item.snapshot.nodes[0].data.label)).toEqual(["mine"]);
+    await persistence.resolveConflict("mine");
+    await autosave();
+    expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes[0].body.data).toMatchObject({ label: "mine" });
+    expect(hasUnstoredKeptAside()).toBe(false);
+  });
   it("keeps text still being typed when another tab saved first", async () => {
     await persistence.openCanvas(PROJECT, 1);
     store().edit((graph) => addNode(graph, note("a", "before")));
@@ -624,10 +621,10 @@ describe("kept-aside work and late responses", () => {
     await autosave();
     unregister();
 
-    expect(readConflictSnapshot(SCOPE)?.nodes[0].data.label).toBe("typed, not blurred");
+    expect(keptFirst()?.nodes[0].data.label).toBe("typed, not blurred");
   });
 
-  it("keeps local work on screen when no copy can be stored, and saves it on request", async () => {
+  it("keeps local work in memory when no copy can be stored, and saves it on request", async () => {
     await persistence.openCanvas(PROJECT, 1);
     store().edit((graph) => addNode(graph, note("mine")));
     await server.saveElsewhere([note("theirs")]);
@@ -638,17 +635,19 @@ describe("kept-aside work and late responses", () => {
     await autosave();
 
     expect(store().conflictMode).toBe("unkept");
-    expect(store().graph.nodes.map((node) => node.id)).toEqual(["mine"]);
+    expect(store().graph.nodes.map((node) => node.id)).toEqual(["theirs"]);
+    expect(store().conflict?.nodes.map((node) => node.id)).toEqual(["mine"]);
 
-    persistence.resolveConflict("mine");
-    timers.fire(0);
-    await vi.waitFor(() => expect(saveState().status).toBe("saved"));
+    persistence.close();
+    await persistence.openCanvas(PROJECT, 1);
+    expect(store().conflict?.nodes.map((node) => node.id)).toEqual(["mine"]);
+
+    await persistence.resolveConflict("mine");
+    await autosave();
     spy.mockRestore();
 
-    expect(server.heads.get(CANDIDATE)?.current_revision).toBe(2);
     expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes.map((node) => node.node_id)).toEqual(["mine"]);
   });
-
   it("loads the latest version on request when no copy could be stored", async () => {
     await persistence.openCanvas(PROJECT, 1);
     store().edit((graph) => addNode(graph, note("mine")));
@@ -689,6 +688,45 @@ describe("kept-aside work and late responses", () => {
 
     expect(store().conflict).toBeNull();
     expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes[0].body.data).toMatchObject({ label: "older" });
+  });
+
+  it("keeps the first 'mine' choice across close and reopen when storage fails", async () => {
+    await server.saveElsewhere([note("a")]);
+    await server.saveElsewhere([note("a", "newer")]);
+    writeConflictSnapshot(SCOPE, {
+      nodes: [note("a", "older")],
+      edges: [],
+      viewport: null,
+      metadata: null,
+      timestamp: new Date(0).toISOString(),
+    });
+    writeDraft(SCOPE, draftFrom(1, "mine"));
+    await persistence.openCanvas(PROJECT, 1);
+    await persistence.resolveConflict("mine");
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("unavailable", "SecurityError");
+    });
+
+    persistence.close();
+    await persistence.openCanvas(PROJECT, 1);
+    spy.mockRestore();
+
+    expect(readKeptAside(SCOPE).map((item) => item.snapshot.nodes[0].data.label).sort()).toEqual(["mine", "older"]);
+  });
+
+  it("keeps the conflict shown when the server content still cannot be loaded", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    store().edit((graph) => addNode(graph, note("mine")));
+    await server.saveElsewhere([note("theirs")]);
+    server.getCanvasRevision.mockRejectedValueOnce(new ApiRequestError("offline", undefined, 503));
+    await autosave();
+    server.getCanvasRevision.mockRejectedValueOnce(new ApiRequestError("offline", undefined, 503));
+
+    await persistence.resolveConflict("server");
+
+    expect(store().conflict?.nodes.map((node) => node.id)).toEqual(["mine"]);
+    expect(store().graph.nodes.map((node) => node.id)).toEqual(["mine"]);
+    expect(saveState().status).toBe("error");
   });
 });
 

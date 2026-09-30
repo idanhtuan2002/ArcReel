@@ -35,6 +35,7 @@ import { addNode, redo, undo } from "../domain/graph";
 import { groupNodes, mergeStoryboardGroup, ungroupNode, type GroupDeps } from "../domain/groups";
 import { useCanvasStore } from "../state/canvasStore";
 import { canvasSaveScope, useSaveState } from "../state/saveStatusStore";
+import { hasUnstoredKeptAside } from "../recovery/keptAside";
 import { CanvasPersistence, defaultPersistenceDeps } from "../sync/canvasPersistence";
 import { CanvasBoard } from "./CanvasBoard";
 import { CanvasProjectContext } from "./canvasContext";
@@ -135,6 +136,15 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
     void persistence.openCanvas(projectName, episode);
     return () => persistence.close();
   }, [persistence, projectName, episode]);
+
+  // A version kept aside only in memory is lost when the tab closes: ask the browser to confirm.
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (hasUnstoredKeptAside()) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
 
   const groupDeps = useMemo<GroupDeps>(
     () => ({
@@ -283,7 +293,7 @@ function CanvasWorkspace({ projectName, episode }: CreativeCanvasPageProps) {
         </div>
       </header>
       {hasConflict ? (
-        <ConflictBanner mode={conflictMode} onUseMine={() => persistence.resolveConflict("mine")} onDiscardMine={() => persistence.resolveConflict("server")} />
+        <ConflictBanner mode={conflictMode} onUseMine={() => void persistence.resolveConflict("mine")} onDiscardMine={() => void persistence.resolveConflict("server")} />
       ) : null}
       <div className="relative min-h-0 flex-1">
         {phase === "error" ? (

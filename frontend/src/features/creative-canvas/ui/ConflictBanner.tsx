@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface ConflictBannerProps {
-  /** "kept": the local work is kept aside and the server content shown. "unkept": no copy was stored. */
+  /** "kept": the version is stored on this device. "unkept": it is held in memory until the tab closes. */
   mode: "kept" | "unkept";
   onUseMine: () => void;
   onDiscardMine: () => void;
@@ -29,14 +29,10 @@ export function ConflictBanner({ mode, onUseMine, onDiscardMine }: ConflictBanne
       </button>
       <button
         type="button"
-        onClick={() => (confirming || mode === "unkept" ? onDiscardMine() : setConfirming(true))}
+        onClick={() => (confirming ? onDiscardMine() : setConfirming(true))}
         className="rounded-md border border-hairline-strong px-3 py-1 text-xs text-text-2 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        {mode === "unkept"
-          ? t("creative_canvas_conflict_load_latest")
-          : confirming
-            ? t("creative_canvas_conflict_confirm_discard")
-            : t("creative_canvas_conflict_discard_mine")}
+        {confirming ? t("creative_canvas_conflict_confirm_discard") : t("creative_canvas_conflict_discard_mine")}
       </button>
     </div>
   );
