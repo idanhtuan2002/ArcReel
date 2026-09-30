@@ -246,7 +246,9 @@ class ComfyuiExecution:
         """best-effort 叫停远端：失败只记日志，本地状态机不动。
 
         另开一个短超时的客户端而不是复用生成那一路的：这几个请求发在任务已经取消或超时之后，
-        一台不响应的 ComfyUI 不该把 worker 的关停再拖上生成路径那一份超时。
+        一台不响应的 ComfyUI 不该把 worker 的关停再拖上生成路径那一份超时。这个客户端同样经
+        :func:`~lib.artifact_download_guard.artifact_http_client` 做目的地校验，被拒的
+        目的地与其他失败一样只记日志。
 
         版本现打一次 ``/system_stats`` 而不是构造时缓存：一台 ComfyUI 会在两次生成之间被升级，
         而这个判断只在取消的那一刻用得上，读不到就按低版本路径走。
