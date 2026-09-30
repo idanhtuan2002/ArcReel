@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "decision": "ACCEPT_MEASUREMENT_CLARIFICATIONS",
+  "decided_by": "sponsor",
+  "decided_at": "2026-09-30",
+  "protocol": "docs/r2/evidence/R2_M8_B_CANVAS_BENCHMARK_PROTOCOL.json",
+  "context": "The M8-B benchmark result (R2_M8_B_CANVAS_BENCHMARK_RESULT.json, branch impl/r2-m8b-creative-canvas) reports status_strict FAIL and status_clarified PASS. The thresholds are unchanged; the sponsor accepts two measurement clarifications of how they are read.",
+  "clarifications": [
+    {
+      "threshold": "thresholds.continuous_interaction_frame_time_p95_ms",
+      "reading": "A frame-time p95 may exceed its threshold by one clock quantum (0.1 ms).",
+      "evidence": "An untouched, empty Canvas measured the same way has idle p95, p99 and max of 16.8 ms, with about 39-40% of samples above 16.7 ms (60 Hz plus Chromium's coarsened timer). Several strict entries read 16.700000000000273 ms, a floating-point artifact of rAF deltas."
+    },
+    {
+      "threshold": "thresholds.bundle.initial_app_bundle_delta_kb_gzip",
+      "reading": "The initial app bundle must hold no Creative Canvas or React Flow module (checked on a sourcemapped build). The byte delta of the lazy route registration, which any lazy route adds, is reported but does not fail the gate.",
+      "evidence": "Measured initial delta 0.41-0.42 KB gzip, JS only (route registration and the lazy import's preload list); initial_canvas_modules is empty; the lazy Canvas chunk is 72.9 KB gzip against a 250 KB limit."
+    }
+  ],
+  "unchanged": "Every other threshold and the pass rule apply as frozen. The clarified verdict is the acceptance verdict; the strict verdict stays recorded."
+}
