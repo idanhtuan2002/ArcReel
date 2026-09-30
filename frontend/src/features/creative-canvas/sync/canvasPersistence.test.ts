@@ -479,11 +479,47 @@ describe("kept-aside work and late responses", () => {
     await persistence.openCanvas(PROJECT, 1);
     expect(store().conflict?.nodes[0].data.label).toBe("mine");
 
+    // The unsaved result of the first choice was drafted on close; it waits its turn.
     persistence.resolveConflict("mine");
+    expect(store().conflict?.nodes[0].data.label).toBe("older");
+    persistence.resolveConflict("server");
     await autosave();
 
     expect(store().conflict).toBeNull();
     expect(server.revisions.get(CANDIDATE)?.at(-1)?.payload.nodes[0].body.data).toMatchObject({ label: "mine" });
+  });
+
+  it("offers a same-base draft after an older kept-aside version instead of hydrating it", async () => {
+    await server.saveElsewhere([note("a")]);
+    writeConflictSnapshot(SCOPE, {
+      nodes: [note("a", "older")],
+      edges: [],
+      viewport: null,
+      metadata: null,
+      timestamp: new Date(0).toISOString(),
+    });
+    writeDraft(SCOPE, draftFrom(1, "offline edit"));
+
+    await persistence.openCanvas(PROJECT, 1);
+
+    expect(store().graph.nodes[0].data.label).toBe("a");
+    expect(store().conflict?.nodes[0].data.label).toBe("older");
+    persistence.resolveConflict("server");
+    expect(store().conflict?.nodes[0].data.label).toBe("offline edit");
+  });
+
+  it("loads the server content on a 'server' choice when loading it failed before", async () => {
+    await persistence.openCanvas(PROJECT, 1);
+    store().edit((graph) => addNode(graph, note("mine")));
+    await server.saveElsewhere([note("theirs")]);
+    server.getCanvasRevision.mockRejectedValueOnce(new ApiRequestError("offline", undefined, 503));
+
+    await autosave();
+    expect(store().graph.nodes.map((node) => node.id)).toEqual(["mine"]);
+
+    persistence.resolveConflict("server");
+
+    await vi.waitFor(() => expect(store().graph.nodes.map((node) => node.id)).toEqual(["theirs"]));
   });
 
   it("keeps a waiting draft when the Canvas closes during a stacked conflict", async () => {

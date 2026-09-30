@@ -111,6 +111,8 @@ interface OpenCanvas {
   deferredHead: CandidateHead | null;
   /** A "mine" choice applied while another conflict waited; it is saved once none is left. */
   unsavedResolution: boolean;
+  /** Whether the graph on screen is the server's content, as the kept-aside banner says. */
+  serverShown: boolean;
 }
 
 function snapshotOf(draft: StoredDraft): ConflictSnapshot {
@@ -193,7 +195,10 @@ export class CanvasPersistence {
       const keptAside = readConflictSnapshot(draftScope);
       let conflict: ConflictSnapshot | null = keptAside;
       let conflictCopy: OpenCanvas["conflictCopy"] = keptAside ? "snapshot" : null;
-      if (decision.kind === "draft") {
+      // A draft behind an unresolved kept-aside version waits its turn instead of hydrating, so a
+      // choice about the older version can never replace it silently.
+      const draftWaits = keptAside !== null && decision.kind !== "remote";
+      if (decision.kind === "draft" && !draftWaits) {
         state.replace({
           graph: hydrateDraft(state.graph, decision.draft),
           bookmarks: bookmarksOf(decision.draft.metadata),
@@ -221,10 +226,11 @@ export class CanvasPersistence {
         context,
         head,
         lastRemoteNodeCount: remote.nodes.length,
-        pendingConflictDraft: decision.kind === "conflict" && keptAside !== null,
+        pendingConflictDraft: draftWaits,
         conflictCopy,
         deferredHead: null,
         unsavedResolution: false,
+        serverShown: !(decision.kind === "draft" && !draftWaits),
         session: createCanvasSaveSession({
           canvasKey: `${projectName}:${candidateId}`,
           generation,
@@ -234,7 +240,7 @@ export class CanvasPersistence {
       writeSaveStatus(saveScope, "idle");
       this.store.getState().replace({ phase: "ready", conflict });
       this.watchEdits(projectName);
-      if (decision.kind === "draft") this.scheduleAutosave();
+      if (decision.kind === "draft" && !draftWaits) this.scheduleAutosave();
     } catch (error) {
       if (signal.aborted || isAbort(error)) return;
       const message = error instanceof Error && error.message ? error.message : this.deps.t("creative_canvas_load_failed");
@@ -320,6 +326,11 @@ export class CanvasPersistence {
       // A "mine" choice made earlier in this sequence could not save while a conflict waited.
       open.unsavedResolution = false;
       this.scheduleAutosave();
+    } else if (choice === "server" && !open.serverShown) {
+      // Loading the server content failed earlier: load it now, as the choice says.
+      void this.reloadServer(open, null).then(() => {
+        if (this.open === open && open.serverShown) writeSaveStatus(open.saveScope, "idle");
+      });
     } else if (choice === "server") {
       writeSaveStatus(open.saveScope, "idle");
     }
@@ -339,7 +350,7 @@ export class CanvasPersistence {
       return;
     }
     void this.reloadServer(open, null).then(() => {
-      if (this.open === open) writeSaveStatus(open.saveScope, "idle");
+      if (this.open === open && open.serverShown) writeSaveStatus(open.saveScope, "idle");
     });
   }
 
@@ -514,6 +525,7 @@ export class CanvasPersistence {
       if (this.open !== open) return;
       open.head = head;
       open.lastRemoteNodeCount = remote.nodes.length;
+      open.serverShown = true;
       const state = this.store.getState();
       state.replace({
         graph: loadGraph(state.graph, remote.nodes, remote.edges),
@@ -521,7 +533,10 @@ export class CanvasPersistence {
         conflict,
       });
     } catch {
-      if (this.open === open) this.store.getState().replace({ conflict });
+      // The local work stays on screen; a later "server" choice loads the server content again.
+      if (this.open !== open) return;
+      open.serverShown = false;
+      this.store.getState().replace({ conflict });
     }
   }
 
