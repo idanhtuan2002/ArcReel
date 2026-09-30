@@ -1,0 +1,130 @@
+{
+  "normalize-drops-dangling-edges": {
+    "reps": 25,
+    "median_ms": 0.0055,
+    "p95_ms": 0.0424,
+    "resident_bytes": 276,
+    "storage_bytes": 12,
+    "observation_bytes": 289
+  },
+  "normalize-detaches-missing-parent": {
+    "reps": 25,
+    "median_ms": 0.0068,
+    "p95_ms": 0.0081,
+    "resident_bytes": 178,
+    "storage_bytes": 12,
+    "observation_bytes": 181
+  },
+  "normalize-orders-parents-first": {
+    "reps": 25,
+    "median_ms": 0.0061,
+    "p95_ms": 0.0107,
+    "resident_bytes": 193,
+    "storage_bytes": 12,
+    "observation_bytes": 202
+  },
+  "delete-group-with-descendants": {
+    "reps": 25,
+    "median_ms": 0.0168,
+    "p95_ms": 0.0581,
+    "resident_bytes": 547,
+    "storage_bytes": 12,
+    "observation_bytes": 640
+  },
+  "delete-edge": {
+    "reps": 25,
+    "median_ms": 0.0115,
+    "p95_ms": 0.0145,
+    "resident_bytes": 300,
+    "storage_bytes": 12,
+    "observation_bytes": 431
+  },
+  "delete-to-empty": {
+    "reps": 25,
+    "median_ms": 0.0151,
+    "p95_ms": 0.0212,
+    "resident_bytes": 229,
+    "storage_bytes": 12,
+    "observation_bytes": 282
+  },
+  "clear-and-acknowledge": {
+    "reps": 25,
+    "median_ms": 0.0085,
+    "p95_ms": 0.015,
+    "resident_bytes": 146,
+    "storage_bytes": 12,
+    "observation_bytes": 139
+  },
+  "selection-resolved-on-undo": {
+    "reps": 25,
+    "median_ms": 0.0082,
+    "p95_ms": 0.0135,
+    "resident_bytes": 143,
+    "storage_bytes": 12,
+    "observation_bytes": 139
+  },
+  "history-bounded-60-adds": {
+    "reps": 25,
+    "median_ms": 0.0807,
+    "p95_ms": 0.1387,
+    "resident_bytes": 8296,
+    "storage_bytes": 12,
+    "observation_bytes": 111364
+  },
+  "history-measure-drag-resize": {
+    "reps": 25,
+    "median_ms": 0.0125,
+    "p95_ms": 0.0138,
+    "resident_bytes": 349,
+    "storage_bytes": 12,
+    "observation_bytes": 379
+  },
+  "connect-once": {
+    "reps": 25,
+    "median_ms": 0.0077,
+    "p95_ms": 0.0129,
+    "resident_bytes": 300,
+    "storage_bytes": 12,
+    "observation_bytes": 431
+  },
+  "restore-history-bounded": {
+    "reps": 25,
+    "median_ms": 0.0906,
+    "p95_ms": 0.1134,
+    "resident_bytes": 4269,
+    "storage_bytes": 12,
+    "observation_bytes": 4364
+  },
+  "hydrate-draft": {
+    "reps": 25,
+    "median_ms": 0.0026,
+    "p95_ms": 0.0092,
+    "resident_bytes": 119,
+    "storage_bytes": 12,
+    "observation_bytes": 116
+  },
+  "delete-unknown-and-empty": {
+    "reps": 25,
+    "median_ms": 0.0067,
+    "p95_ms": 0.0071,
+    "resident_bytes": 276,
+    "storage_bytes": 12,
+    "observation_bytes": 290
+  },
+  "undo-redo-on-empty-history": {
+    "reps": 25,
+    "median_ms": 0.0091,
+    "p95_ms": 0.0107,
+    "resident_bytes": 257,
+    "storage_bytes": 12,
+    "observation_bytes": 384
+  },
+  "select-missing-node": {
+    "reps": 25,
+    "median_ms": 0.0069,
+    "p95_ms": 0.0071,
+    "resident_bytes": 203,
+    "storage_bytes": 12,
+    "observation_bytes": 262
+  }
+}

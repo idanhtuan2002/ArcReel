@@ -1,0 +1,1260 @@
+{
+  "fixture_set": "pure-functions-v1",
+  "cases": [
+    {
+      "id": "storyboard-aspect-and-cols",
+      "behaviors": [
+        "G09"
+      ],
+      "calls": [
+        {
+          "fn": "resolveStoryboardAspectRatio",
+          "args": [
+            "16:9"
+          ]
+        },
+        {
+          "fn": "resolveStoryboardAspectRatio",
+          "args": [
+            "9:16"
+          ]
+        },
+        {
+          "fn": "resolveStoryboardAspectRatio",
+          "args": [
+            "nope"
+          ]
+        },
+        {
+          "fn": "resolveStoryboardAspectRatio",
+          "args": [
+            null
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            0
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            1
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            5
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            10
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            5,
+            2
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            5,
+            9
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            5,
+            0
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            5,
+            2.6
+          ]
+        },
+        {
+          "fn": "resolveStoryboardCols",
+          "args": [
+            5,
+            {
+              "$num": "NaN"
+            }
+          ]
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "storyboard-cells-and-grid",
+      "behaviors": [
+        "G09"
+      ],
+      "calls": [
+        {
+          "fn": "computeStoryboardCell",
+          "args": [
+            520,
+            420,
+            "16:9"
+          ]
+        },
+        {
+          "fn": "computeStoryboardCell",
+          "args": [
+            300,
+            900,
+            "16:9"
+          ]
+        },
+        {
+          "fn": "computeStoryboardCell",
+          "args": [
+            0,
+            0,
+            "1:1"
+          ]
+        },
+        {
+          "fn": "computeStoryboardCell",
+          "args": [
+            640.4,
+            360.6,
+            "4:3"
+          ]
+        },
+        {
+          "fn": "storyboardSlotRect",
+          "args": [
+            0,
+            3,
+            560,
+            315
+          ]
+        },
+        {
+          "fn": "storyboardSlotRect",
+          "args": [
+            4,
+            3,
+            560,
+            315
+          ]
+        },
+        {
+          "fn": "computeStoryboardGridLayout",
+          "args": [
+            {
+              "count": 5,
+              "cellWidth": 560,
+              "cellHeight": 315
+            }
+          ]
+        },
+        {
+          "fn": "computeStoryboardGridLayout",
+          "args": [
+            {
+              "count": 0,
+              "cellWidth": 560,
+              "cellHeight": 315
+            }
+          ]
+        },
+        {
+          "fn": "computeStoryboardGridLayout",
+          "args": [
+            {
+              "count": 3,
+              "cellWidth": 10,
+              "cellHeight": 10,
+              "cols": 3
+            }
+          ]
+        },
+        {
+          "fn": "computeStoryboardGridLayout",
+          "args": [
+            {
+              "count": -2.4,
+              "cellWidth": 0,
+              "cellHeight": -5
+            }
+          ]
+        },
+        {
+          "fn": "computeStoryboardBoardLayout",
+          "args": [
+            {
+              "count": 9,
+              "aspectKey": "9:16"
+            }
+          ]
+        },
+        {
+          "fn": "computeStoryboardBoardLayout",
+          "args": [
+            {
+              "count": 4,
+              "cols": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bookmarks",
+      "behaviors": [
+        "K01"
+      ],
+      "calls": [
+        {
+          "fn": "createEmptyBookmarks",
+          "args": []
+        },
+        {
+          "fn": "digitToBookmarkIndex",
+          "args": [
+            "1"
+          ]
+        },
+        {
+          "fn": "digitToBookmarkIndex",
+          "args": [
+            "0"
+          ]
+        },
+        {
+          "fn": "digitToBookmarkIndex",
+          "args": [
+            "a"
+          ]
+        },
+        {
+          "fn": "digitToBookmarkIndex",
+          "args": [
+            "12"
+          ]
+        },
+        {
+          "fn": "bookmarkIndexToDigit",
+          "args": [
+            0
+          ]
+        },
+        {
+          "fn": "bookmarkIndexToDigit",
+          "args": [
+            9
+          ]
+        },
+        {
+          "fn": "bookmarkIndexToDigit",
+          "args": [
+            10
+          ]
+        },
+        {
+          "fn": "bookmarkIndexToDigit",
+          "args": [
+            1.5
+          ]
+        },
+        {
+          "fn": "isViewportBookmark",
+          "args": [
+            {
+              "x": 1,
+              "y": 2,
+              "zoom": 1
+            }
+          ]
+        },
+        {
+          "fn": "isViewportBookmark",
+          "args": [
+            {
+              "x": 1,
+              "y": 2,
+              "zoom": 0
+            }
+          ]
+        },
+        {
+          "fn": "isViewportBookmark",
+          "args": [
+            {
+              "x": 1,
+              "y": {
+                "$num": "Infinity"
+              },
+              "zoom": 1
+            }
+          ]
+        },
+        {
+          "fn": "isViewportBookmark",
+          "args": [
+            null
+          ]
+        },
+        {
+          "fn": "normalizeBookmarks",
+          "args": [
+            [
+              {
+                "x": 1,
+                "y": 2,
+                "zoom": 1,
+                "extra": true
+              },
+              null,
+              {
+                "x": 0,
+                "y": 0,
+                "zoom": -1
+              },
+              "junk",
+              {
+                "x": 3,
+                "y": 4,
+                "zoom": 2
+              },
+              null,
+              null,
+              null,
+              null,
+              null,
+              {
+                "x": 9,
+                "y": 9,
+                "zoom": 1
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "normalizeBookmarks",
+          "args": [
+            "not-an-array"
+          ]
+        },
+        {
+          "fn": "bookmarkCenterInFlow",
+          "args": [
+            {
+              "x": 100,
+              "y": 50,
+              "zoom": 2
+            },
+            {
+              "width": 800,
+              "height": 600
+            }
+          ]
+        },
+        {
+          "fn": "projectToMinimap",
+          "args": [
+            {
+              "x": 50,
+              "y": 50
+            },
+            {
+              "x": 0,
+              "y": 0,
+              "width": 100,
+              "height": 100
+            },
+            {
+              "width": 200,
+              "height": 150
+            }
+          ]
+        },
+        {
+          "fn": "projectToMinimap",
+          "args": [
+            {
+              "x": 500,
+              "y": -50
+            },
+            {
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 100
+            },
+            {
+              "width": 200,
+              "height": 150
+            }
+          ]
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "group-selection",
+      "behaviors": [
+        "G08"
+      ],
+      "calls": [
+        {
+          "fn": "collectBatchDeletableIds",
+          "args": [
+            [
+              {
+                "id": "g",
+                "type": "group"
+              },
+              {
+                "id": "a",
+                "type": "note",
+                "parentId": "g"
+              },
+              {
+                "id": "b",
+                "type": "note",
+                "parentId": "g"
+              },
+              {
+                "id": "c",
+                "type": "note"
+              }
+            ],
+            [
+              "a",
+              "b"
+            ]
+          ]
+        },
+        {
+          "fn": "collectBatchDeletableIds",
+          "args": [
+            [
+              {
+                "id": "g",
+                "type": "group"
+              },
+              {
+                "id": "a",
+                "type": "note",
+                "parentId": "g"
+              },
+              {
+                "id": "b",
+                "type": "note",
+                "parentId": "g"
+              }
+            ],
+            [
+              "a"
+            ]
+          ]
+        },
+        {
+          "fn": "collectBatchDeletableIds",
+          "args": [
+            [
+              {
+                "id": "g",
+                "type": "group"
+              }
+            ],
+            [
+              "missing"
+            ]
+          ]
+        },
+        {
+          "fn": "collectDuplicableIds",
+          "args": [
+            [
+              {
+                "id": "outer",
+                "type": "group"
+              },
+              {
+                "id": "inner",
+                "type": "group",
+                "parentId": "outer"
+              },
+              {
+                "id": "a",
+                "type": "note",
+                "parentId": "inner"
+              },
+              {
+                "id": "b",
+                "type": "note",
+                "parentId": "outer"
+              }
+            ],
+            [
+              "a",
+              "b"
+            ]
+          ]
+        },
+        {
+          "fn": "collectDuplicableIds",
+          "args": [
+            [
+              {
+                "id": "g",
+                "type": "group"
+              },
+              {
+                "id": "a",
+                "type": "note",
+                "parentId": "g"
+              },
+              {
+                "id": "b",
+                "type": "note",
+                "parentId": "g"
+              }
+            ],
+            [
+              "b"
+            ]
+          ]
+        },
+        {
+          "fn": "collectDuplicableIds",
+          "args": [
+            [
+              {
+                "id": "x",
+                "type": "group",
+                "parentId": "y"
+              },
+              {
+                "id": "y",
+                "type": "group",
+                "parentId": "x"
+              },
+              {
+                "id": "a",
+                "type": "note",
+                "parentId": "x"
+              }
+            ],
+            [
+              "a"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "group-colors",
+      "behaviors": [
+        "G07"
+      ],
+      "calls": [
+        {
+          "fn": "groupColorPresets",
+          "args": []
+        },
+        {
+          "fn": "groupColorBackground",
+          "args": [
+            "#3b82f6"
+          ]
+        },
+        {
+          "fn": "groupColorBackground",
+          "args": [
+            null
+          ]
+        },
+        {
+          "fn": "groupColorBorder",
+          "args": [
+            "#3b82f6"
+          ]
+        },
+        {
+          "fn": "groupColorBorder",
+          "args": [
+            ""
+          ]
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "auto-layout",
+      "behaviors": [
+        "G11"
+      ],
+      "calls": [
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [],
+            []
+          ]
+        },
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [
+              {
+                "id": "a",
+                "type": "note",
+                "x": 500,
+                "y": 500,
+                "mw": 320,
+                "mh": 200
+              },
+              {
+                "id": "b",
+                "type": "note",
+                "x": 0,
+                "y": 0,
+                "mw": 320,
+                "mh": 200
+              },
+              {
+                "id": "c",
+                "type": "note",
+                "x": 900,
+                "y": -40,
+                "mw": 320,
+                "mh": 200
+              }
+            ],
+            [
+              {
+                "id": "a->b",
+                "source": "a",
+                "target": "b"
+              },
+              {
+                "id": "b->c",
+                "source": "b",
+                "target": "c"
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [
+              {
+                "id": "r",
+                "type": "note",
+                "x": 0,
+                "y": 0
+              },
+              {
+                "id": "x1",
+                "type": "note",
+                "x": 10,
+                "y": 10,
+                "w": 200,
+                "h": 120
+              },
+              {
+                "id": "x2",
+                "type": "note",
+                "x": 20,
+                "y": 900,
+                "w": 400,
+                "h": 300
+              },
+              {
+                "id": "y",
+                "type": "note",
+                "x": 5,
+                "y": 5
+              }
+            ],
+            [
+              {
+                "id": "r->x1",
+                "source": "r",
+                "target": "x1"
+              },
+              {
+                "id": "r->x2",
+                "source": "r",
+                "target": "x2"
+              },
+              {
+                "id": "x1->y",
+                "source": "x1",
+                "target": "y"
+              },
+              {
+                "id": "x2->y",
+                "source": "x2",
+                "target": "y"
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [
+              {
+                "id": "a",
+                "type": "note",
+                "x": 0,
+                "y": 0
+              },
+              {
+                "id": "b",
+                "type": "note",
+                "x": 0,
+                "y": 0
+              },
+              {
+                "id": "c",
+                "type": "note",
+                "x": 0,
+                "y": 0
+              }
+            ],
+            [
+              {
+                "id": "a->b",
+                "source": "a",
+                "target": "b"
+              },
+              {
+                "id": "b->c",
+                "source": "b",
+                "target": "c"
+              },
+              {
+                "id": "c->a",
+                "source": "c",
+                "target": "a"
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [
+              {
+                "id": "s1",
+                "type": "note",
+                "x": 0,
+                "y": 0
+              },
+              {
+                "id": "s2",
+                "type": "note",
+                "x": 1000,
+                "y": 0
+              },
+              {
+                "id": "t1",
+                "type": "note",
+                "x": 0,
+                "y": 2000
+              },
+              {
+                "id": "t2",
+                "type": "note",
+                "x": 50,
+                "y": 2000
+              },
+              {
+                "id": "lone",
+                "type": "note",
+                "x": -500,
+                "y": -500
+              }
+            ],
+            [
+              {
+                "id": "s1->s2",
+                "source": "s1",
+                "target": "s2"
+              },
+              {
+                "id": "t1->t2",
+                "source": "t1",
+                "target": "t2"
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [
+              {
+                "id": "g",
+                "type": "group",
+                "x": 0,
+                "y": 0,
+                "w": 600,
+                "h": 400
+              },
+              {
+                "id": "m",
+                "type": "note",
+                "x": 20,
+                "y": 40,
+                "parentId": "g"
+              },
+              {
+                "id": "o",
+                "type": "note",
+                "x": 3000,
+                "y": 3000
+              }
+            ],
+            [
+              {
+                "id": "m->o",
+                "source": "m",
+                "target": "o"
+              },
+              {
+                "id": "g->o",
+                "source": "g",
+                "target": "o"
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [
+              {
+                "id": "n0",
+                "type": "note",
+                "x": 0,
+                "y": 0,
+                "mw": 200,
+                "mh": 100
+              },
+              {
+                "id": "n1",
+                "type": "note",
+                "x": 37,
+                "y": 91,
+                "mw": 210,
+                "mh": 107
+              },
+              {
+                "id": "n2",
+                "type": "note",
+                "x": 74,
+                "y": 182,
+                "mw": 220,
+                "mh": 114
+              },
+              {
+                "id": "n3",
+                "type": "note",
+                "x": 111,
+                "y": 273,
+                "mw": 230,
+                "mh": 121
+              },
+              {
+                "id": "n4",
+                "type": "note",
+                "x": 148,
+                "y": 364,
+                "mw": 240,
+                "mh": 128
+              },
+              {
+                "id": "n5",
+                "type": "note",
+                "x": 185,
+                "y": 455,
+                "mw": 250,
+                "mh": 135
+              },
+              {
+                "id": "n6",
+                "type": "note",
+                "x": 222,
+                "y": 546,
+                "mw": 260,
+                "mh": 142
+              },
+              {
+                "id": "n7",
+                "type": "note",
+                "x": 259,
+                "y": 637,
+                "mw": 270,
+                "mh": 149
+              },
+              {
+                "id": "n8",
+                "type": "note",
+                "x": 296,
+                "y": 28,
+                "mw": 280,
+                "mh": 156
+              },
+              {
+                "id": "n9",
+                "type": "note",
+                "x": 333,
+                "y": 119,
+                "mw": 290,
+                "mh": 163
+              },
+              {
+                "id": "n10",
+                "type": "note",
+                "x": 370,
+                "y": 210,
+                "mw": 300,
+                "mh": 170
+              },
+              {
+                "id": "n11",
+                "type": "note",
+                "x": 407,
+                "y": 301,
+                "mw": 310,
+                "mh": 177
+              }
+            ],
+            [
+              {
+                "id": "n0->n3",
+                "source": "n0",
+                "target": "n3"
+              },
+              {
+                "id": "n1->n8",
+                "source": "n1",
+                "target": "n8"
+              },
+              {
+                "id": "n2->n1",
+                "source": "n2",
+                "target": "n1"
+              },
+              {
+                "id": "n3->n6",
+                "source": "n3",
+                "target": "n6"
+              },
+              {
+                "id": "n4->n11",
+                "source": "n4",
+                "target": "n11"
+              },
+              {
+                "id": "n5->n4",
+                "source": "n5",
+                "target": "n4"
+              },
+              {
+                "id": "n6->n9",
+                "source": "n6",
+                "target": "n9"
+              },
+              {
+                "id": "n7->n2",
+                "source": "n7",
+                "target": "n2"
+              },
+              {
+                "id": "n8->n7",
+                "source": "n8",
+                "target": "n7"
+              },
+              {
+                "id": "n9->n0",
+                "source": "n9",
+                "target": "n0"
+              },
+              {
+                "id": "n10->n5",
+                "source": "n10",
+                "target": "n5"
+              },
+              {
+                "id": "n11->n10",
+                "source": "n11",
+                "target": "n10"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lod-tier",
+      "behaviors": [
+        "U01"
+      ],
+      "calls": [
+        {
+          "fn": "lowDetailZoomThreshold",
+          "args": []
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.05
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.2
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.34
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.3499
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.35
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.3501
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            0.5
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            1
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            2
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            {
+              "$num": "NaN"
+            }
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            {
+              "$num": "Infinity"
+            }
+          ]
+        },
+        {
+          "fn": "isLowDetailZoom",
+          "args": [
+            {
+              "$num": "-Infinity"
+            }
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [],
+            [
+              "n1"
+            ]
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [
+              [
+                "n1",
+                true
+              ]
+            ],
+            [
+              "n1",
+              "n2"
+            ]
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [
+              [
+                "n1",
+                true
+              ],
+              [
+                "n1",
+                false
+              ]
+            ],
+            [
+              "n1"
+            ]
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [
+              [
+                "n1",
+                true
+              ],
+              [
+                "n1",
+                false
+              ],
+              [
+                "n1",
+                false
+              ]
+            ],
+            [
+              "n1"
+            ]
+          ]
+        },
+        {
+          "fn": "mediaActiveAfter",
+          "args": [
+            [
+              [
+                "n1",
+                true
+              ],
+              [
+                "n2",
+                true
+              ],
+              [
+                "n1",
+                false
+              ]
+            ],
+            [
+              "n1",
+              "n2"
+            ]
+          ]
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "layout-and-selection-edge-inputs",
+      "behaviors": [
+        "G11",
+        "G08"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "calls": [
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [],
+            []
+          ]
+        },
+        {
+          "fn": "computeAutoLayout",
+          "args": [
+            [
+              {
+                "id": "a",
+                "type": "note"
+              }
+            ],
+            [
+              {
+                "id": "e",
+                "source": "a",
+                "target": "missing"
+              }
+            ]
+          ]
+        },
+        {
+          "fn": "collectBatchDeletableIds",
+          "args": [
+            [],
+            [
+              "missing"
+            ]
+          ]
+        },
+        {
+          "fn": "collectDuplicableIds",
+          "args": [
+            [
+              {
+                "id": "a",
+                "type": "note"
+              }
+            ],
+            []
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,161 @@
+/* Darkroom skin over React Flow's base styles, plus the Canvas-only details. */
+
+.canvas-shell .react-flow {
+  --xy-background-color: var(--color-bg);
+  --xy-edge-stroke: var(--color-text-4);
+  --xy-edge-stroke-selected: var(--color-accent);
+  --xy-connectionline-stroke: var(--color-accent);
+  --xy-minimap-background-color: var(--color-bg-grad-b);
+  --xy-minimap-mask-background-color: oklch(0.148 0.009 260 / 0.7);
+  --xy-minimap-node-background-color: var(--color-surface-2);
+  --xy-controls-button-background-color: var(--color-bg-grad-a);
+  --xy-controls-button-background-color-hover: var(--color-surface-2);
+  --xy-controls-button-color: var(--color-text-2);
+  --xy-controls-button-border-color: var(--color-hairline);
+}
+
+.canvas-shell .canvas-grid {
+  color: var(--color-hairline);
+}
+
+.canvas-shell .react-flow__node:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+}
+
+.canvas-shell .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.canvas-shell .canvas-handle {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--color-hairline-strong);
+  background: var(--color-bg);
+}
+
+.canvas-shell .canvas-node {
+  transition: box-shadow 120ms ease, border-color 120ms ease;
+}
+
+/* Effects off while the view or a node is moving. */
+.canvas-shell[data-moving] .canvas-node {
+  transition: none;
+  box-shadow: none;
+}
+
+/* Sprocket holes along both edges of the storyboard strip. */
+.filmstrip::before,
+.filmstrip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-image: radial-gradient(circle at 5px 3px, var(--color-hairline) 1.6px, transparent 2px);
+  background-size: 14px 6px;
+  pointer-events: none;
+}
+
+.filmstrip::before {
+  top: 2px;
+}
+
+.filmstrip::after {
+  bottom: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-shell .canvas-node {
+    transition: none;
+  }
+}
+
+/* Long strips render only the frames on screen. */
+.filmstrip-frame {
+  content-visibility: auto;
+  contain-intrinsic-size: 112px 84px;
+}
+
+/* Canvas-only utilities: kept in this lazy stylesheet so the initial app CSS does not grow. */
+.cc-field:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+.cc-field-multi {
+  min-height: 6rem;
+}
+.cc-media {
+  height: auto;
+  background: var(--color-surface-2);
+}
+.cc-play {
+  color: oklch(0.975 0.004 265 / 0.8);
+}
+.group:hover .cc-play {
+  color: var(--color-text);
+}
+.cc-group-plain {
+  background: oklch(0.25 0.012 265 / 0.2);
+}
+.storyboard-handle {
+  cursor: grab;
+}
+.cc-node-selected {
+  box-shadow: var(--shadow-glow);
+}
+.cc-conflict {
+  background: var(--color-warm-soft);
+}
+.cc-btn-warm {
+  background: var(--color-warm);
+  color: var(--color-bg);
+}
+.cc-btn-warm:hover {
+  background: var(--color-warm-bright);
+}
+.cc-btn-warm:focus-visible {
+  outline: 2px solid var(--color-warm);
+  outline-offset: 2px;
+}
+.cc-btn-accent {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+.cc-btn-accent:hover:not(:disabled) {
+  background: var(--color-accent-2);
+}
+.cc-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  background: currentColor;
+}
+.cc-tool:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+.cc-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.cc-header {
+  column-gap: 1rem;
+  row-gap: 0.5rem;
+  padding-left: 1rem;
+  /* Keeps the workspace's floating assistant button clear of the save controls. */
+  padding-right: 4rem;
+}
+.cc-title {
+  font-size: 1.25rem;
+}
+.cc-frame-thumb {
+  background: var(--color-surface-2);
+  box-shadow: 0 0 0 1px var(--color-hairline);
+}
+.filmstrip-frame[aria-selected="true"] .cc-frame-thumb {
+  box-shadow: 0 0 0 2px var(--color-warm);
+}
+.filmstrip-frame:focus-visible .cc-frame-thumb {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}

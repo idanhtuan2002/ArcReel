@@ -1,0 +1,542 @@
+{
+  "schema_version": 1,
+  "donor": {
+    "name": "DramaClaw",
+    "repository_url": "https://github.com/dramaclaw/dramaclaw",
+    "commit": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83"
+  },
+  "selected_paths": [
+    {
+      "path": "frontend/src/stores/canvasStore.ts",
+      "sha256": "sha256:d04d3f2da71d2e1e1cd7c353f0fb35eccd171000eec14d207e4f8e9f1ff61f0c"
+    },
+    {
+      "path": "frontend/src/features/canvas/domain/storyboardGroup.ts",
+      "sha256": "sha256:c74a610edbf111c8409ebe572ec052516c4ca5e3583c6897d2e8d285d0b1cd26"
+    },
+    {
+      "path": "frontend/src/features/canvas/domain/groupSelectionDelete.ts",
+      "sha256": "sha256:356437e7f0640d0b8cb2613bad503eb0fdd92262c38e7544cfbf78d332a67e03"
+    },
+    {
+      "path": "frontend/src/features/canvas/domain/groupSelectionDuplicate.ts",
+      "sha256": "sha256:bd2dc79b6d8be75395213c1a59008da9e44821f6fbb4faf99e1a2af1468897c0"
+    },
+    {
+      "path": "frontend/src/features/canvas/domain/groupColors.ts",
+      "sha256": "sha256:a5abfdd995de7b72c1efa99ba784ebd18c08091e376cf6eb82928524d71fc4bf"
+    },
+    {
+      "path": "frontend/src/features/canvas/domain/viewportBookmarks.ts",
+      "sha256": "sha256:2a5c588a9cd55000350f7c273c14cf141fe456fd9ebc2b7d1a449e9d18a9da15"
+    },
+    {
+      "path": "frontend/src/features/canvas/application/nodeSelection.ts",
+      "sha256": "sha256:9fb66ae99effc1a6d570616b2caef32d6731ef86e9415dac6b6e6bf929f36cc7"
+    },
+    {
+      "path": "frontend/src/features/canvas/application/autoLayout.ts",
+      "sha256": "sha256:31d4c1b602f4d61b778237fc7a53620020a8b327094db319cebfc9fcc222ef7d"
+    },
+    {
+      "path": "frontend/src/features/canvas/application/bookmarkActions.ts",
+      "sha256": "sha256:c5f17d5297321f04ad2389d8de63c0c284443d3764bd7e790733719d4be934cf"
+    },
+    {
+      "path": "frontend/src/features/canvas/application/canvasLod.ts",
+      "sha256": "sha256:d2ada24cb82c15c9ca804e4bef00b0bc6309910d62e6d3764dbdf44710e8bad5"
+    },
+    {
+      "path": "frontend/src/features/canvas/Canvas.tsx",
+      "sha256": "sha256:b6ddcb00acf2f9b24c60c665d14db3cd57b8ed1c086f22706aaa22558dd9ba96"
+    },
+    {
+      "path": "frontend/src/features/freezone/canvasSaveCoordinator.ts",
+      "sha256": "sha256:4c5374a9d8fa339da0e0098a0c2c2fa532e2e085adfff568d43031fd247678b3"
+    },
+    {
+      "path": "frontend/src/features/freezone/canvasSyncCore.ts",
+      "sha256": "sha256:6d6baeca1691fb260b5cc0f9fc0ed9ade50173061ef75b841f4754bdd015deac"
+    },
+    {
+      "path": "frontend/src/features/freezone/canvasAutosaveHold.ts",
+      "sha256": "sha256:a9f25284997d9f96a13eb6fef3089ade574dd1f2f8f7491d1f779f0576f3be5f"
+    },
+    {
+      "path": "frontend/src/features/freezone/canvasDraftStorage.ts",
+      "sha256": "sha256:e5f610b0fa415dfa5efa02123b99cc05bdea41980a8f8616edab129781ddf746"
+    },
+    {
+      "path": "frontend/src/stores/save-status-store.ts",
+      "sha256": "sha256:17ee07cdd567473e8f67b06a0926e6bd53e76bf3c32764a4dfd0e15d3c10411c"
+    },
+    {
+      "path": "frontend/src/lib/localStorageQuota.ts",
+      "sha256": "sha256:8e8b9f44469af6ecadcf507c577213d965a28029de3f149a8d88fc8bedb9be9f"
+    },
+    {
+      "path": "frontend/src/features/freezone/useCanvasSync.ts",
+      "sha256": "sha256:c556f6571c1239ba8e7e7f5a144fea3721b171694106a870027ffa8cac6d8004"
+    }
+  ],
+  "reachable_surface_digest": "sha256:02302340dac4180870799ff74140b64d889b930faa1ee716b30d47bb04fe1ab9",
+  "donor_tests": [
+    "src/__tests__/features/freezone/canvasSaveCoordinator.test.ts",
+    "src/__tests__/features/freezone/canvasSyncCore.test.ts",
+    "src/__tests__/features/freezone/canvas-draft-storage.test.ts",
+    "src/__tests__/features/freezone/canvas-autosave-hold.test.ts",
+    "src/__tests__/stores/canvas-store-draft-hydrate.test.ts",
+    "src/__tests__/stores/canvas-store-undo-history.test.ts",
+    "src/__tests__/stores/canvas-store-viewport-bookmarks.test.ts",
+    "src/__tests__/stores/canvas-store-storyboard-group.test.ts",
+    "src/__tests__/stores/canvas-store-group-grow.test.ts",
+    "src/__tests__/stores/canvas-store-projection-group.test.ts",
+    "src/__tests__/stores/canvas-store-auto-group-spawn.test.ts",
+    "src/__tests__/features/canvas/viewport-bookmarks-domain.test.ts",
+    "src/__tests__/features/canvas/group-selection-delete.test.ts",
+    "src/__tests__/features/canvas/group-selection-duplicate.test.ts",
+    "src/__tests__/features/canvas/duplicate-group-nodes.test.ts",
+    "src/__tests__/features/canvas/node-selection.test.ts",
+    "src/__tests__/features/canvas/auto-layout.test.ts",
+    "src/__tests__/stores/save-status-store.test.ts",
+    "src/__tests__/lib/local-storage-quota.test.ts"
+  ],
+  "donor_test_inventory_digest": "sha256:f531f02129e601563200dd2d2001494811ac58c1434b86666ca945c229f19afc",
+  "baseline_run": {
+    "command": "npx vitest run --reporter=verbose <donor_tests> (frontend/, pnpm install --frozen-lockfile --ignore-scripts)",
+    "exit": 0,
+    "test_files": 19,
+    "tests_passed": 182,
+    "log_sha256": "51aae1a6f2152e4bb3c3ac597fe756e49438713f7e1bd164c7899cbcd2308f69"
+  },
+  "runtime_identity": "node v22.22.1; pnpm 11.5.0; vitest 4.1.6; linux-x64",
+  "behaviors": [
+    {
+      "behavior_id": "G01",
+      "description": "normalize graph: edges whose endpoints are missing are dropped",
+      "donor_refs": [
+        "canvasStore.normalizeCanvasData"
+      ],
+      "donor_tests": [
+        "canvas-store-draft-hydrate"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G02",
+      "description": "delete nodes together with their descendants; edges touching a deleted node are removed; unknown or blank ids are ignored",
+      "donor_refs": [
+        "canvasStore.deleteNodes",
+        "collectNodeIdsWithDescendants"
+      ],
+      "donor_tests": [
+        "group-selection-delete"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G03",
+      "description": "connect and delete edges; a duplicate connection is not an edit",
+      "donor_refs": [
+        "canvasStore.deleteEdge"
+      ],
+      "donor_tests": [
+        "canvas-store-undo-history"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G04",
+      "description": "a removal that empties a non-empty canvas records mutation source delete_to_empty",
+      "donor_refs": [
+        "canvasStore.isDeleteToEmpty"
+      ],
+      "donor_tests": [
+        "canvas-store-undo-history"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G05",
+      "description": "clear canvas records manual_clear and pendingClearIntent; acknowledge clears the intent",
+      "donor_refs": [
+        "canvasStore.clearCanvas",
+        "acknowledgePendingClear"
+      ],
+      "donor_tests": [
+        "canvasSyncCore"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G06",
+      "description": "selection: a removed selected node resolves to none; box selection helpers",
+      "donor_refs": [
+        "canvasStore.resolveSelectedNodeId",
+        "nodeSelection.ts"
+      ],
+      "donor_tests": [
+        "node-selection"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G07",
+      "description": "plain groups: group (top-level members, bounds and padding), ungroup to absolute positions, grow-only fit to children, arrange children in a row, column or grid; group colour presets",
+      "donor_refs": [
+        "canvasStore.groupNodes",
+        "ungroupNode",
+        "fitGroupToChildren",
+        "arrangeGroupChildren",
+        "groupColors.ts"
+      ],
+      "donor_tests": [
+        "canvas-store-group-grow"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G08",
+      "description": "group selection delete and duplicate",
+      "donor_refs": [
+        "groupSelectionDelete.ts",
+        "groupSelectionDuplicate.ts"
+      ],
+      "donor_tests": [
+        "group-selection-delete",
+        "group-selection-duplicate",
+        "duplicate-group-nodes"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G09",
+      "description": "storyboard group: merge, config, reorder members, add members, convert to plain; storyboard order",
+      "donor_refs": [
+        "storyboardGroup.ts",
+        "canvasStore.mergeStoryboardGroup",
+        "setStoryboardGroupConfig",
+        "reorderStoryboardMember",
+        "addStoryboardMembers",
+        "convertStoryboardGroupToPlain"
+      ],
+      "donor_tests": [
+        "canvas-store-storyboard-group"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G10",
+      "description": "multi-generation siblings: duplicate node(s) as siblings",
+      "donor_refs": [
+        "canvasStore.duplicateNodeAsSibling",
+        "duplicateNodesAsSiblings"
+      ],
+      "donor_tests": [
+        "duplicate-group-nodes"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "G11",
+      "description": "auto layout",
+      "donor_refs": [
+        "autoLayout.ts"
+      ],
+      "donor_tests": [
+        "auto-layout"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "H01",
+      "description": "bounded history: at most 50 past and 50 future snapshots; identical consecutive snapshots are not pushed",
+      "donor_refs": [
+        "canvasStore.pushSnapshot",
+        "MAX_HISTORY_STEPS"
+      ],
+      "donor_tests": [
+        "canvas-store-undo-history"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "H02",
+      "description": "undo and redo restore snapshots, resolve selection and record the mutation source",
+      "donor_refs": [
+        "canvasStore.undo",
+        "redo"
+      ],
+      "donor_tests": [
+        "canvas-store-undo-history"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "H03",
+      "description": "restored history is normalized and bounded",
+      "donor_refs": [
+        "canvasStore.normalizeHistory",
+        "restoreHistory"
+      ],
+      "donor_tests": [
+        "canvas-store-undo-history"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "K01",
+      "description": "viewport bookmarks: slots, set, clear, hydrate with validation",
+      "donor_refs": [
+        "viewportBookmarks.ts",
+        "bookmarkActions.ts",
+        "canvasStore.setViewportBookmark"
+      ],
+      "donor_tests": [
+        "viewport-bookmarks-domain",
+        "canvas-store-viewport-bookmarks"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S01",
+      "description": "save session: at most one request in flight",
+      "donor_refs": [
+        "canvasSaveCoordinator.ts"
+      ],
+      "donor_tests": [
+        "canvasSaveCoordinator"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S02",
+      "description": "save session: edits during a request coalesce into one follow-up that reads content at send time",
+      "donor_refs": [
+        "canvasSaveCoordinator.ts"
+      ],
+      "donor_tests": [
+        "canvasSaveCoordinator"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S03",
+      "description": "save session: a waiter is released only when a request covering its version lands",
+      "donor_refs": [
+        "canvasSaveCoordinator.ts"
+      ],
+      "donor_tests": [
+        "canvasSaveCoordinator"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S04",
+      "description": "save session: dispose drops queued work and releases every waiter as not persisted",
+      "donor_refs": [
+        "canvasSaveCoordinator.ts"
+      ],
+      "donor_tests": [
+        "canvasSaveCoordinator"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S05",
+      "description": "save session: a failed request stops the pump and releases waiters as not persisted",
+      "donor_refs": [
+        "canvasSaveCoordinator.ts"
+      ],
+      "donor_tests": [
+        "canvasSaveCoordinator"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S06",
+      "description": "save session: a save requested as the previous one lands is not stranded",
+      "donor_refs": [
+        "canvasSaveCoordinator.ts"
+      ],
+      "donor_tests": [
+        "canvasSaveCoordinator"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S07",
+      "description": "canvas switch isolation: sessions never share a promise; a late response carries its generation",
+      "donor_refs": [
+        "canvasSaveCoordinator.ts"
+      ],
+      "donor_tests": [
+        "canvasSaveCoordinator"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S08",
+      "description": "save decision: skip not_hydrated or switching; block dangerous_empty; send manual_clear for explicit clear or delete_to_empty; otherwise autosave",
+      "donor_refs": [
+        "canvasSyncCore.decideSaveAction"
+      ],
+      "donor_tests": [
+        "canvasSyncCore"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S09",
+      "description": "payload limits: node, edge and body caps",
+      "donor_refs": [
+        "canvasSyncCore.checkPayloadLimits"
+      ],
+      "donor_tests": [
+        "canvasSyncCore"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S10",
+      "description": "save response classification, mapped onto the M8-A error keys (m8_candidate_conflict, m8_command_conflict, m8_exploration_not_found, validation)",
+      "donor_refs": [
+        "canvasSyncCore.classifySaveError"
+      ],
+      "donor_tests": [
+        "canvasSyncCore"
+      ],
+      "planned_disposition": "IMPROVED"
+    },
+    {
+      "behavior_id": "S11",
+      "description": "autosave hold: stacked holds, release on last, expiry after the maximum, release listeners",
+      "donor_refs": [
+        "canvasAutosaveHold.ts"
+      ],
+      "donor_tests": [
+        "canvas-autosave-hold"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "S12",
+      "description": "save status: idle, saving, saved, error; saving keeps the last saved time",
+      "donor_refs": [
+        "save-status-store.ts"
+      ],
+      "donor_tests": [
+        "save-status-store"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "R01",
+      "description": "draft round trip with a content signature; wrong version, project, canvas or shape reads as none; corrupt JSON reads as none",
+      "donor_refs": [
+        "canvasDraftStorage.readCanvasDraft",
+        "writeCanvasDraft",
+        "canvasDraftSignature"
+      ],
+      "donor_tests": [
+        "canvas-draft-storage"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "R02",
+      "description": "oversized draft: history is shed first; still too large clears the draft",
+      "donor_refs": [
+        "canvasDraftStorage.writeCanvasDraft",
+        "CANVAS_DRAFT_MAX_BYTES"
+      ],
+      "donor_tests": [
+        "canvas-draft-storage"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "R03",
+      "description": "seven-day pruning of per-canvas keys; malformed or future-stamped entries are reclaimed",
+      "donor_refs": [
+        "canvasDraftStorage.pruneFreezoneCanvasStorage",
+        "localStorageQuota.isStaleByTtl"
+      ],
+      "donor_tests": [
+        "canvas-draft-storage",
+        "local-storage-quota"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "R04",
+      "description": "quota-safe write: run reclaimers, retry, then evict the key's own value and retry",
+      "donor_refs": [
+        "localStorageQuota.safeLocalStorageSet"
+      ],
+      "donor_tests": [
+        "local-storage-quota"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "R05",
+      "description": "draft hydrate restores nodes, edges, history and mutation state",
+      "donor_refs": [
+        "canvasStore.hydrateCanvasDraft",
+        "useCanvasSync.decideHydrateDraft (module-private; its exact source is extracted and run by the harness)"
+      ],
+      "donor_tests": [
+        "canvas-store-draft-hydrate"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "R06",
+      "description": "drafts are keyed by user, project, candidate and server revision (spec \u00a77), not project and canvas only",
+      "donor_refs": [
+        "canvasDraftStorage.draftStorageKey"
+      ],
+      "donor_tests": [
+        "canvas-draft-storage"
+      ],
+      "planned_disposition": "IMPROVED"
+    },
+    {
+      "behavior_id": "R07",
+      "description": "the hydrate decision: no draft or an already-saved draft loads the server content; a draft edited from the current server revision is restored; any other draft is a conflict kept as a snapshot and never applied automatically",
+      "donor_refs": [
+        "canvasSyncCore.classifySaveError",
+        "useCanvasSync.decideHydrateDraft (module-private; its exact source is extracted and run by the harness)"
+      ],
+      "donor_tests": [
+        "canvasSyncCore"
+      ],
+      "planned_disposition": "PARITY"
+    },
+    {
+      "behavior_id": "U01",
+      "description": "low-detail zoom: effects off during gestures, video replaced below zoom 0.35, visible-only rendering",
+      "donor_refs": [
+        "canvasLod.ts",
+        "Canvas.tsx"
+      ],
+      "donor_tests": [],
+      "planned_disposition": "PARITY"
+    }
+  ],
+  "behavior_inventory_digest": "sha256:a5912d39a2e1ca8bed5b9dcf8c82eb0f7f1ddba57a3438ab3dbfad66dae2ee5c",
+  "excluded": [
+    "generation, task, resume and credit logic (useNodeGenerationTaskState, resumeGeneration, generationTaskArbitration)",
+    "asset library, upload, cross-project paste and asset migration",
+    "Director World 3D, pano360 capture groups (addPanoCaptureGroup)",
+    "storyboard split node (image grid slicing, addStoryboardSplitNode, updateStoryboardFrame, reorderStoryboardFrame)",
+    "audio and voice generation, export image and compose nodes, skill and style nodes",
+    "useCanvasSync React hook, freezone shell, project shell and routing, donor i18n content",
+    "auto-commit, push, billing, companion",
+    "autoGroupSpawn (auto-grouping of generated or spawned nodes; the donor tests canvas-store-auto-group-spawn cover it and still run unmodified in the baseline)",
+    "protected projection groups (isProtectedProjectionGroupNode; the donor tests canvas-store-projection-group cover it and still run unmodified in the baseline)",
+    "the donor node-type connection matrix (isUpstreamConnectionAllowed, handle rules): the ArcReel Canvas links content nodes freely"
+  ],
+  "created_at": "2026-09-29T00:00:00Z"
+}

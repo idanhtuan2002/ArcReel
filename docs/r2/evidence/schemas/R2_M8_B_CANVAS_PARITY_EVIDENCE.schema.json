@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R2 M8-B Creative Canvas donor parity evidence (DonorParityReport, spec section 4 and 11)",
+  "$defs": {
+    "BehaviorParityRow": {
+      "additionalProperties": false,
+      "properties": {
+        "behavior_id": {
+          "title": "Behavior Id",
+          "type": "string"
+        },
+        "donor_test_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Donor Test Refs",
+          "type": "array"
+        },
+        "fixture_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fixture Refs",
+          "type": "array"
+        },
+        "intentional_difference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Intentional Difference"
+        },
+        "functionality": {
+          "$ref": "#/$defs/ParityDisposition"
+        },
+        "correctness": {
+          "$ref": "#/$defs/ParityDisposition"
+        },
+        "determinism": {
+          "$ref": "#/$defs/ParityDisposition"
+        },
+        "failure_safety": {
+          "$ref": "#/$defs/ParityDisposition"
+        },
+        "data_integrity": {
+          "$ref": "#/$defs/ParityDisposition"
+        },
+        "observability": {
+          "$ref": "#/$defs/ParityDisposition"
+        },
+        "performance": {
+          "$ref": "#/$defs/ParityDisposition"
+        },
+        "resources": {
+          "$ref": "#/$defs/ParityDisposition"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "behavior_id",
+        "donor_test_refs",
+        "fixture_refs",
+        "intentional_difference",
+        "functionality",
+        "correctness",
+        "determinism",
+        "failure_safety",
+        "data_integrity",
+        "observability",
+        "performance",
+        "resources",
+        "evidence_refs"
+      ],
+      "title": "BehaviorParityRow",
+      "type": "object"
+    },
+    "CanonicalJsonObject": {
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "$ref": "#/$defs/CanonicalJsonValue"
+          }
+        ],
+        "type": "array"
+      },
+      "title": "CanonicalJsonObject",
+      "type": "array"
+    },
+    "CanonicalJsonScalar": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "CanonicalJsonValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CanonicalJsonScalar"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/CanonicalJsonValue"
+          },
+          "type": "array"
+        },
+        {
+          "$ref": "#/$defs/CanonicalJsonObject"
+        }
+      ]
+    },
+    "DonorSurfaceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "repository_url": {
+          "title": "Repository Url",
+          "type": "string"
+        },
+        "commit_sha": {
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "selected_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Selected Paths",
+          "type": "array"
+        },
+        "reachable_surface_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Reachable Surface Digest",
+          "type": "string"
+        },
+        "runtime_identity": {
+          "title": "Runtime Identity",
+          "type": "string"
+        },
+        "behavior_inventory_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Behavior Inventory Digest",
+          "type": "string"
+        },
+        "donor_test_inventory_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Donor Test Inventory Digest",
+          "type": "string"
+        },
+        "fixture_set_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Fixture Set Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository_url",
+        "commit_sha",
+        "selected_paths",
+        "reachable_surface_digest",
+        "runtime_identity",
+        "behavior_inventory_digest",
+        "donor_test_inventory_digest",
+        "fixture_set_digest"
+      ],
+      "title": "DonorSurfaceRef",
+      "type": "object"
+    },
+    "ParityDisposition": {
+      "enum": [
+        "PARITY",
+        "IMPROVED",
+        "EXCLUDED",
+        "UNVERIFIED"
+      ],
+      "title": "ParityDisposition",
+      "type": "string"
+    },
+    "ParityVerdict": {
+      "enum": [
+        "PASS",
+        "BLOCKED"
+      ],
+      "title": "ParityVerdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "donor": {
+      "$ref": "#/$defs/DonorSurfaceRef"
+    },
+    "integrated_head": {
+      "title": "Integrated Head",
+      "type": "string"
+    },
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/BehaviorParityRow"
+      },
+      "title": "Rows",
+      "type": "array"
+    },
+    "commands": {
+      "items": {
+        "$ref": "#/$defs/CanonicalJsonObject"
+      },
+      "title": "Commands",
+      "type": "array"
+    },
+    "required_skips": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Skips",
+      "type": "array"
+    },
+    "material_unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Material Unknowns",
+      "type": "array"
+    },
+    "reviewer": {
+      "title": "Reviewer",
+      "type": "string"
+    },
+    "verdict": {
+      "$ref": "#/$defs/ParityVerdict"
+    }
+  },
+  "required": [
+    "contract_version",
+    "donor",
+    "integrated_head",
+    "rows",
+    "commands",
+    "required_skips",
+    "material_unknowns",
+    "reviewer",
+    "verdict"
+  ],
+  "type": "object"
+}

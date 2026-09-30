@@ -1,0 +1,693 @@
+{
+  "fixture_set": "graph-history-v1",
+  "cases": [
+    {
+      "id": "normalize-drops-dangling-edges",
+      "behaviors": [
+        "G01"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note"
+            },
+            {
+              "id": "b",
+              "type": "note"
+            }
+          ],
+          "edges": [
+            {
+              "id": "e1",
+              "source": "a",
+              "target": "b"
+            },
+            {
+              "id": "e2",
+              "source": "a",
+              "target": "zzz"
+            }
+          ]
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "normalize-detaches-missing-parent",
+      "behaviors": [
+        "G01"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "orphan",
+              "type": "note",
+              "parentId": "gone"
+            },
+            {
+              "id": "b",
+              "type": "note"
+            }
+          ],
+          "edges": []
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "normalize-orders-parents-first",
+      "behaviors": [
+        "G01"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "child",
+              "type": "note",
+              "parentId": "g",
+              "x": 10,
+              "y": 10
+            },
+            {
+              "id": "g",
+              "type": "group",
+              "x": 100,
+              "y": 100
+            }
+          ],
+          "edges": []
+        }
+      ]
+    },
+    {
+      "id": "delete-group-with-descendants",
+      "behaviors": [
+        "G02"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "g",
+              "type": "group"
+            },
+            {
+              "id": "c1",
+              "type": "note",
+              "parentId": "g"
+            },
+            {
+              "id": "c2",
+              "type": "note",
+              "parentId": "g"
+            },
+            {
+              "id": "x",
+              "type": "note"
+            }
+          ],
+          "edges": [
+            {
+              "id": "e1",
+              "source": "c1",
+              "target": "x"
+            },
+            {
+              "id": "e2",
+              "source": "x",
+              "target": "c2"
+            }
+          ]
+        },
+        {
+          "op": "delete",
+          "ids": [
+            "g"
+          ]
+        },
+        {
+          "op": "undo"
+        },
+        {
+          "op": "redo"
+        }
+      ]
+    },
+    {
+      "id": "delete-edge",
+      "behaviors": [
+        "G03"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note"
+            },
+            {
+              "id": "b",
+              "type": "note"
+            }
+          ],
+          "edges": [
+            {
+              "id": "e1",
+              "source": "a",
+              "target": "b"
+            }
+          ]
+        },
+        {
+          "op": "deleteEdge",
+          "id": "missing"
+        },
+        {
+          "op": "deleteEdge",
+          "id": "e1"
+        },
+        {
+          "op": "undo"
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "delete-to-empty",
+      "behaviors": [
+        "G04",
+        "G06"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note"
+            },
+            {
+              "id": "b",
+              "type": "note"
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "select",
+          "id": "b"
+        },
+        {
+          "op": "delete",
+          "ids": [
+            "a"
+          ]
+        },
+        {
+          "op": "delete",
+          "ids": [
+            "b",
+            "b",
+            " "
+          ]
+        },
+        {
+          "op": "undo"
+        },
+        {
+          "op": "redo"
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "clear-and-acknowledge",
+      "behaviors": [
+        "G05"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note"
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "clear"
+        },
+        {
+          "op": "ack"
+        },
+        {
+          "op": "clear"
+        },
+        {
+          "op": "undo"
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "selection-resolved-on-undo",
+      "behaviors": [
+        "G06",
+        "H02"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [],
+          "edges": []
+        },
+        {
+          "op": "add",
+          "node": {
+            "id": "a",
+            "type": "note",
+            "x": 5,
+            "y": 7
+          }
+        },
+        {
+          "op": "select",
+          "id": "a"
+        },
+        {
+          "op": "undo"
+        },
+        {
+          "op": "redo"
+        }
+      ]
+    },
+    {
+      "id": "history-bounded-60-adds",
+      "behaviors": [
+        "H01"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [],
+          "edges": []
+        },
+        {
+          "op": "addMany",
+          "count": 60,
+          "prefix": "n"
+        },
+        {
+          "op": "undoMany",
+          "count": 55
+        },
+        {
+          "op": "redoMany",
+          "count": 3
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "history-measure-drag-resize",
+      "behaviors": [
+        "H01",
+        "H02"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [],
+          "edges": []
+        },
+        {
+          "op": "add",
+          "node": {
+            "id": "a",
+            "type": "note",
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "op": "changes",
+          "changes": [
+            {
+              "type": "dimensions",
+              "id": "a",
+              "dimensions": {
+                "width": 320,
+                "height": 200
+              }
+            }
+          ]
+        },
+        {
+          "op": "changes",
+          "changes": [
+            {
+              "type": "dimensions",
+              "id": "a",
+              "resizing": false,
+              "dimensions": {
+                "width": 400,
+                "height": 300
+              }
+            }
+          ]
+        },
+        {
+          "op": "changes",
+          "changes": [
+            {
+              "type": "position",
+              "id": "a",
+              "position": {
+                "x": 5,
+                "y": 0
+              },
+              "dragging": true
+            }
+          ]
+        },
+        {
+          "op": "changes",
+          "changes": [
+            {
+              "type": "position",
+              "id": "a",
+              "position": {
+                "x": 9,
+                "y": 0
+              },
+              "dragging": true
+            }
+          ]
+        },
+        {
+          "op": "changes",
+          "changes": [
+            {
+              "type": "position",
+              "id": "a",
+              "position": {
+                "x": 9,
+                "y": 0
+              },
+              "dragging": false
+            }
+          ]
+        },
+        {
+          "op": "changes",
+          "changes": [
+            {
+              "type": "select",
+              "id": "a",
+              "selected": true
+            }
+          ]
+        },
+        {
+          "op": "undo"
+        },
+        {
+          "op": "undo"
+        }
+      ]
+    },
+    {
+      "id": "connect-once",
+      "behaviors": [
+        "G03"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note"
+            },
+            {
+              "id": "b",
+              "type": "note"
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "connect",
+          "source": "a",
+          "target": "b",
+          "id": "e1"
+        },
+        {
+          "op": "connect",
+          "source": "a",
+          "target": "b",
+          "id": "e2"
+        },
+        {
+          "op": "undo"
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "restore-history-bounded",
+      "behaviors": [
+        "H03"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note"
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "restoreHistoryOf",
+          "count": 60,
+          "prefix": "h"
+        },
+        {
+          "op": "undo"
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "hydrate-draft",
+      "behaviors": [
+        "R05"
+      ],
+      "ops": [
+        {
+          "op": "hydrate",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note"
+            }
+          ],
+          "edges": [],
+          "mutation": {
+            "userEditsSinceHydrate": 3,
+            "lastMutationSource": "manual_clear",
+            "pendingClearIntent": true
+          }
+        }
+      ],
+      "evidences": [
+        "failure_safety"
+      ]
+    },
+    {
+      "id": "delete-unknown-and-empty",
+      "behaviors": [
+        "G02"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "b",
+              "type": "note",
+              "x": 400,
+              "y": 0
+            }
+          ],
+          "edges": [
+            {
+              "id": "e",
+              "source": "a",
+              "target": "b"
+            }
+          ]
+        },
+        {
+          "op": "delete",
+          "ids": [
+            "missing"
+          ]
+        },
+        {
+          "op": "delete",
+          "ids": []
+        },
+        {
+          "op": "undo"
+        },
+        {
+          "op": "redo"
+        }
+      ]
+    },
+    {
+      "id": "undo-redo-on-empty-history",
+      "behaviors": [
+        "H01",
+        "H02"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "b",
+              "type": "note",
+              "x": 400,
+              "y": 0
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "undo"
+        },
+        {
+          "op": "redo"
+        },
+        {
+          "op": "add",
+          "node": {
+            "id": "c",
+            "type": "note",
+            "x": 800,
+            "y": 0
+          }
+        },
+        {
+          "op": "undo"
+        },
+        {
+          "op": "undo"
+        },
+        {
+          "op": "redo"
+        },
+        {
+          "op": "redo"
+        }
+      ]
+    },
+    {
+      "id": "select-missing-node",
+      "behaviors": [
+        "G06"
+      ],
+      "evidences": [
+        "failure_safety"
+      ],
+      "ops": [
+        {
+          "op": "load",
+          "nodes": [
+            {
+              "id": "a",
+              "type": "note",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "b",
+              "type": "note",
+              "x": 400,
+              "y": 0
+            }
+          ],
+          "edges": []
+        },
+        {
+          "op": "select",
+          "id": "missing"
+        },
+        {
+          "op": "select",
+          "id": null
+        },
+        {
+          "op": "delete",
+          "ids": [
+            "a"
+          ]
+        },
+        {
+          "op": "undo"
+        }
+      ]
+    }
+  ]
+}

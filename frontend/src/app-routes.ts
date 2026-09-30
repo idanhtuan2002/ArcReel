@@ -49,6 +49,6 @@ const WORKSPACE_STATIC_LEAF_ROUTES = [
  * 上 `i`，否则大小写变体的合法路径会被本模式误判为未注册子路径。
  */
 export const APP_PROJECT_WORKSPACE_PATTERN = new RegExp(
-  `^${ROUTE_APP_PROJECTS}/[^/]+(/(?:${WORKSPACE_STATIC_LEAF_ROUTES.join("|")}|${WORKSPACE_ROUTE_SOURCE}/[^/]+|${WORKSPACE_ROUTE_EPISODES}/[^/]+))?$`,
+  `^${ROUTE_APP_PROJECTS}/[^/]+(/(?:${WORKSPACE_STATIC_LEAF_ROUTES.join("|")}|${WORKSPACE_ROUTE_SOURCE}/[^/]+|${WORKSPACE_ROUTE_EPISODES}/[^/]+(?:/canvas)?))?$`,
   "i",
 );

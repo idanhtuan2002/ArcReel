@@ -80,6 +80,11 @@ def schema_problems(baseline: object) -> list[str]:
     )
 
 
+def _allowed(path: str, allowlist: Sequence[str]) -> bool:
+    """An entry is an exact path, or a directory prefix when it ends with ``/``."""
+    return any(path == entry or (entry.endswith("/") and path.startswith(entry)) for entry in allowlist)
+
+
 def _prerequisite_problems(baseline: Mapping[str, object], observed: Observed) -> list[str]:
     problems: list[str] = []
     if observed.branch == DESIGN_BRANCH:
@@ -88,8 +93,9 @@ def _prerequisite_problems(baseline: Mapping[str, object], observed: Observed) -
         problems.append(f"{PREREQUISITE}: branch is {observed.branch!r}, expected {baseline['branch']!r}")
     if not observed.base_is_ancestor:
         problems.append(f"{PREREQUISITE}: executor base {baseline['base_head']} is not an ancestor of HEAD")
-    allowlist = set(_strings(baseline["scope_allowlist"]))
-    outside = sorted(path for path in observed.changed_paths if path not in allowlist)
+    outside = sorted(
+        path for path in observed.changed_paths if not _allowed(path, _strings(baseline["scope_allowlist"]))
+    )
     if outside:
         problems.append(f"{PREREQUISITE}: changes outside the scope allowlist: {outside}")
     expected_heads = tuple(_strings(baseline["alembic_heads"]))

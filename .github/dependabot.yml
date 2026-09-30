@@ -168,6 +168,7 @@ updates:
           - "@floating-ui/*"
           - "@lobehub/*"
           - "@tanstack/react-virtual"
+          - "@xyflow/*"
           - "streamdown"
           - "driver.js"
         update-types:
@@ -188,6 +189,7 @@ updates:
           - "@vitest/*"
           - "@testing-library/*"
           - "jsdom"
+          - "axe-core"
         update-types:
           - "minor"
           - "patch"

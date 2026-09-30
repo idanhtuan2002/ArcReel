@@ -1,0 +1,66 @@
+{
+  "storyboard-aspect-and-cols": {
+    "reps": 25,
+    "median_ms": 0.0038,
+    "p95_ms": 0.004,
+    "resident_bytes": 191,
+    "storage_bytes": 0,
+    "observation_bytes": 213
+  },
+  "storyboard-cells-and-grid": {
+    "reps": 25,
+    "median_ms": 0.0166,
+    "p95_ms": 0.0209,
+    "resident_bytes": 1593,
+    "storage_bytes": 0,
+    "observation_bytes": 1817
+  },
+  "bookmarks": {
+    "reps": 25,
+    "median_ms": 0.029,
+    "p95_ms": 0.0644,
+    "resident_bytes": 353,
+    "storage_bytes": 0,
+    "observation_bytes": 479
+  },
+  "group-selection": {
+    "reps": 25,
+    "median_ms": 0.0499,
+    "p95_ms": 0.0657,
+    "resident_bytes": 135,
+    "storage_bytes": 0,
+    "observation_bytes": 122
+  },
+  "group-colors": {
+    "reps": 25,
+    "median_ms": 0.0023,
+    "p95_ms": 0.0032,
+    "resident_bytes": 392,
+    "storage_bytes": 0,
+    "observation_bytes": 420
+  },
+  "auto-layout": {
+    "reps": 25,
+    "median_ms": 0.469,
+    "p95_ms": 0.5711,
+    "resident_bytes": 1013,
+    "storage_bytes": 0,
+    "observation_bytes": 938
+  },
+  "lod-tier": {
+    "reps": 25,
+    "median_ms": 0.0077,
+    "p95_ms": 0.0091,
+    "resident_bytes": 251,
+    "storage_bytes": 0,
+    "observation_bytes": 319
+  },
+  "layout-and-selection-edge-inputs": {
+    "reps": 25,
+    "median_ms": 0.0229,
+    "p95_ms": 0.0246,
+    "resident_bytes": 146,
+    "storage_bytes": 0,
+    "observation_bytes": 132
+  }
+}

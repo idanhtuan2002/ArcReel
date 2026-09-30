@@ -1,0 +1,938 @@
+{
+  "contract_version": "1",
+  "donor": {
+    "repository_url": "https://github.com/dramaclaw/dramaclaw",
+    "commit_sha": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+    "selected_paths": [
+      "frontend/src/stores/canvasStore.ts",
+      "frontend/src/features/canvas/domain/storyboardGroup.ts",
+      "frontend/src/features/canvas/domain/groupSelectionDelete.ts",
+      "frontend/src/features/canvas/domain/groupSelectionDuplicate.ts",
+      "frontend/src/features/canvas/domain/groupColors.ts",
+      "frontend/src/features/canvas/domain/viewportBookmarks.ts",
+      "frontend/src/features/canvas/application/nodeSelection.ts",
+      "frontend/src/features/canvas/application/autoLayout.ts",
+      "frontend/src/features/canvas/application/bookmarkActions.ts",
+      "frontend/src/features/canvas/application/canvasLod.ts",
+      "frontend/src/features/canvas/Canvas.tsx",
+      "frontend/src/features/freezone/canvasSaveCoordinator.ts",
+      "frontend/src/features/freezone/canvasSyncCore.ts",
+      "frontend/src/features/freezone/canvasAutosaveHold.ts",
+      "frontend/src/features/freezone/canvasDraftStorage.ts",
+      "frontend/src/stores/save-status-store.ts",
+      "frontend/src/lib/localStorageQuota.ts",
+      "frontend/src/features/freezone/useCanvasSync.ts"
+    ],
+    "reachable_surface_digest": "sha256:02302340dac4180870799ff74140b64d889b930faa1ee716b30d47bb04fe1ab9",
+    "runtime_identity": "node v22.22.1; pnpm 11.5.0; vitest 4.1.6; linux-x64",
+    "behavior_inventory_digest": "sha256:a5912d39a2e1ca8bed5b9dcf8c82eb0f7f1ddba57a3438ab3dbfad66dae2ee5c",
+    "donor_test_inventory_digest": "sha256:f531f02129e601563200dd2d2001494811ac58c1434b86666ca945c229f19afc",
+    "fixture_set_digest": "sha256:2539ff0a1b7a4f04647a7d643c8c6e1de10097a69f44289864c2f6b245c77ea6"
+  },
+  "integrated_head": "c71c6e6f9a5b60fe01720419f382d757326869c3",
+  "rows": [
+    {
+      "behavior_id": "G01",
+      "donor_test_refs": [
+        "canvas-store-draft-hydrate"
+      ],
+      "fixture_refs": [
+        "graph:normalize-drops-dangling-edges",
+        "graph:normalize-detaches-missing-parent",
+        "graph:normalize-orders-parents-first"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:normalize-drops-dangling-edges",
+        "fixture:graph:normalize-detaches-missing-parent",
+        "fixture:graph:normalize-orders-parents-first",
+        "timing:graph:normalize-drops-dangling-edges",
+        "timing:graph:normalize-detaches-missing-parent",
+        "timing:graph:normalize-orders-parents-first"
+      ]
+    },
+    {
+      "behavior_id": "G02",
+      "donor_test_refs": [
+        "group-selection-delete"
+      ],
+      "fixture_refs": [
+        "graph:delete-group-with-descendants",
+        "graph:delete-unknown-and-empty"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:delete-group-with-descendants",
+        "fixture:graph:delete-unknown-and-empty",
+        "timing:graph:delete-group-with-descendants",
+        "timing:graph:delete-unknown-and-empty"
+      ]
+    },
+    {
+      "behavior_id": "G03",
+      "donor_test_refs": [
+        "canvas-store-undo-history"
+      ],
+      "fixture_refs": [
+        "graph:delete-edge",
+        "graph:connect-once"
+      ],
+      "intentional_difference": "A duplicate connection is not an edit. The donor pushes a no-op undo step and counts an edit, so the next undo appears to do nothing. The port records nothing, and the next undo reverts the real connection.",
+      "functionality": "IMPROVED",
+      "correctness": "IMPROVED",
+      "determinism": "PARITY",
+      "failure_safety": "IMPROVED",
+      "data_integrity": "IMPROVED",
+      "observability": "IMPROVED",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:delete-edge",
+        "fixture:graph:connect-once",
+        "timing:graph:delete-edge",
+        "timing:graph:connect-once"
+      ]
+    },
+    {
+      "behavior_id": "G04",
+      "donor_test_refs": [
+        "canvas-store-undo-history"
+      ],
+      "fixture_refs": [
+        "graph:delete-to-empty"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:delete-to-empty",
+        "timing:graph:delete-to-empty"
+      ]
+    },
+    {
+      "behavior_id": "G05",
+      "donor_test_refs": [
+        "canvasSyncCore"
+      ],
+      "fixture_refs": [
+        "graph:clear-and-acknowledge"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:clear-and-acknowledge",
+        "timing:graph:clear-and-acknowledge"
+      ]
+    },
+    {
+      "behavior_id": "G06",
+      "donor_test_refs": [
+        "node-selection"
+      ],
+      "fixture_refs": [
+        "graph:delete-to-empty",
+        "graph:selection-resolved-on-undo",
+        "graph:select-missing-node"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:delete-to-empty",
+        "fixture:graph:selection-resolved-on-undo",
+        "fixture:graph:select-missing-node",
+        "timing:graph:delete-to-empty",
+        "timing:graph:selection-resolved-on-undo",
+        "timing:graph:select-missing-node"
+      ]
+    },
+    {
+      "behavior_id": "G07",
+      "donor_test_refs": [
+        "canvas-store-group-grow"
+      ],
+      "fixture_refs": [
+        "functions:group-colors",
+        "groups:group-two-nodes-and-undo",
+        "groups:group-needs-two-top-level-members",
+        "groups:ungroup-restores-absolute-positions",
+        "groups:fit-grows-and-pushes-inward",
+        "groups:arrange-modes",
+        "groups:group-missing-targets"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:functions:group-colors",
+        "fixture:groups:group-two-nodes-and-undo",
+        "fixture:groups:group-needs-two-top-level-members",
+        "fixture:groups:ungroup-restores-absolute-positions",
+        "fixture:groups:fit-grows-and-pushes-inward",
+        "fixture:groups:arrange-modes",
+        "fixture:groups:group-missing-targets",
+        "timing:functions:group-colors",
+        "timing:groups:group-two-nodes-and-undo",
+        "timing:groups:group-needs-two-top-level-members",
+        "timing:groups:ungroup-restores-absolute-positions",
+        "timing:groups:fit-grows-and-pushes-inward",
+        "timing:groups:arrange-modes",
+        "timing:groups:group-missing-targets"
+      ]
+    },
+    {
+      "behavior_id": "G08",
+      "donor_test_refs": [
+        "group-selection-delete",
+        "group-selection-duplicate",
+        "duplicate-group-nodes"
+      ],
+      "fixture_refs": [
+        "functions:group-selection",
+        "functions:layout-and-selection-edge-inputs",
+        "groups:duplicate-group-with-members",
+        "groups:duplicate-missing"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:functions:group-selection",
+        "fixture:functions:layout-and-selection-edge-inputs",
+        "fixture:groups:duplicate-group-with-members",
+        "fixture:groups:duplicate-missing",
+        "timing:functions:group-selection",
+        "timing:functions:layout-and-selection-edge-inputs",
+        "timing:groups:duplicate-group-with-members",
+        "timing:groups:duplicate-missing"
+      ]
+    },
+    {
+      "behavior_id": "G09",
+      "donor_test_refs": [
+        "canvas-store-storyboard-group"
+      ],
+      "fixture_refs": [
+        "functions:storyboard-aspect-and-cols",
+        "functions:storyboard-cells-and-grid",
+        "groups:storyboard-merge-and-edges",
+        "groups:storyboard-add-members",
+        "groups:storyboard-reload-keeps-reanchored-edges",
+        "groups:storyboard-invalid-edits"
+      ],
+      "intentional_difference": "A storyboard group keeps its re-anchored outside edges across a save and reload. The donor's load normalization drops every edge touching a group node (groups have no handles), so a reloaded storyboard loses those connections and ungrouping cannot restore them. The port keeps and restores them.",
+      "functionality": "IMPROVED",
+      "correctness": "IMPROVED",
+      "determinism": "PARITY",
+      "failure_safety": "IMPROVED",
+      "data_integrity": "IMPROVED",
+      "observability": "IMPROVED",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:functions:storyboard-aspect-and-cols",
+        "fixture:functions:storyboard-cells-and-grid",
+        "fixture:groups:storyboard-merge-and-edges",
+        "fixture:groups:storyboard-add-members",
+        "fixture:groups:storyboard-reload-keeps-reanchored-edges",
+        "fixture:groups:storyboard-invalid-edits",
+        "timing:functions:storyboard-aspect-and-cols",
+        "timing:functions:storyboard-cells-and-grid",
+        "timing:groups:storyboard-merge-and-edges",
+        "timing:groups:storyboard-add-members",
+        "timing:groups:storyboard-reload-keeps-reanchored-edges",
+        "timing:groups:storyboard-invalid-edits"
+      ]
+    },
+    {
+      "behavior_id": "G10",
+      "donor_test_refs": [
+        "duplicate-group-nodes"
+      ],
+      "fixture_refs": [
+        "groups:duplicate-sibling",
+        "groups:duplicate-group-with-members",
+        "groups:duplicate-missing"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:groups:duplicate-sibling",
+        "fixture:groups:duplicate-group-with-members",
+        "fixture:groups:duplicate-missing",
+        "timing:groups:duplicate-sibling",
+        "timing:groups:duplicate-group-with-members",
+        "timing:groups:duplicate-missing"
+      ]
+    },
+    {
+      "behavior_id": "G11",
+      "donor_test_refs": [
+        "auto-layout"
+      ],
+      "fixture_refs": [
+        "functions:auto-layout",
+        "functions:layout-and-selection-edge-inputs"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:functions:auto-layout",
+        "fixture:functions:layout-and-selection-edge-inputs",
+        "timing:functions:auto-layout",
+        "timing:functions:layout-and-selection-edge-inputs"
+      ]
+    },
+    {
+      "behavior_id": "H01",
+      "donor_test_refs": [
+        "canvas-store-undo-history"
+      ],
+      "fixture_refs": [
+        "graph:history-bounded-60-adds",
+        "graph:history-measure-drag-resize",
+        "graph:undo-redo-on-empty-history"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:history-bounded-60-adds",
+        "fixture:graph:history-measure-drag-resize",
+        "fixture:graph:undo-redo-on-empty-history",
+        "timing:graph:history-bounded-60-adds",
+        "timing:graph:history-measure-drag-resize",
+        "timing:graph:undo-redo-on-empty-history"
+      ]
+    },
+    {
+      "behavior_id": "H02",
+      "donor_test_refs": [
+        "canvas-store-undo-history"
+      ],
+      "fixture_refs": [
+        "graph:selection-resolved-on-undo",
+        "graph:history-measure-drag-resize",
+        "graph:undo-redo-on-empty-history"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:selection-resolved-on-undo",
+        "fixture:graph:history-measure-drag-resize",
+        "fixture:graph:undo-redo-on-empty-history",
+        "timing:graph:selection-resolved-on-undo",
+        "timing:graph:history-measure-drag-resize",
+        "timing:graph:undo-redo-on-empty-history"
+      ]
+    },
+    {
+      "behavior_id": "H03",
+      "donor_test_refs": [
+        "canvas-store-undo-history"
+      ],
+      "fixture_refs": [
+        "graph:restore-history-bounded"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "IMPROVED",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:restore-history-bounded",
+        "timing:graph:restore-history-bounded"
+      ]
+    },
+    {
+      "behavior_id": "K01",
+      "donor_test_refs": [
+        "viewport-bookmarks-domain",
+        "canvas-store-viewport-bookmarks"
+      ],
+      "fixture_refs": [
+        "functions:bookmarks"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:functions:bookmarks",
+        "timing:functions:bookmarks"
+      ]
+    },
+    {
+      "behavior_id": "S01",
+      "donor_test_refs": [
+        "canvasSaveCoordinator"
+      ],
+      "fixture_refs": [
+        "recovery:single-flight-and-coalesce",
+        "recovery:coalesce-after-failure"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:single-flight-and-coalesce",
+        "fixture:recovery:coalesce-after-failure",
+        "timing:recovery:single-flight-and-coalesce",
+        "timing:recovery:coalesce-after-failure"
+      ]
+    },
+    {
+      "behavior_id": "S02",
+      "donor_test_refs": [
+        "canvasSaveCoordinator"
+      ],
+      "fixture_refs": [
+        "recovery:single-flight-and-coalesce",
+        "recovery:coalesce-after-failure"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:single-flight-and-coalesce",
+        "fixture:recovery:coalesce-after-failure",
+        "timing:recovery:single-flight-and-coalesce",
+        "timing:recovery:coalesce-after-failure"
+      ]
+    },
+    {
+      "behavior_id": "S03",
+      "donor_test_refs": [
+        "canvasSaveCoordinator"
+      ],
+      "fixture_refs": [
+        "recovery:single-flight-and-coalesce",
+        "recovery:waiter-released-only-by-covering-save",
+        "recovery:coalesce-after-failure"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:single-flight-and-coalesce",
+        "fixture:recovery:waiter-released-only-by-covering-save",
+        "fixture:recovery:coalesce-after-failure",
+        "timing:recovery:single-flight-and-coalesce",
+        "timing:recovery:waiter-released-only-by-covering-save",
+        "timing:recovery:coalesce-after-failure"
+      ]
+    },
+    {
+      "behavior_id": "S04",
+      "donor_test_refs": [
+        "canvasSaveCoordinator"
+      ],
+      "fixture_refs": [
+        "recovery:dispose-releases-waiters"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:dispose-releases-waiters",
+        "timing:recovery:dispose-releases-waiters"
+      ]
+    },
+    {
+      "behavior_id": "S05",
+      "donor_test_refs": [
+        "canvasSaveCoordinator"
+      ],
+      "fixture_refs": [
+        "recovery:failure-stops-pump"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:failure-stops-pump",
+        "timing:recovery:failure-stops-pump"
+      ]
+    },
+    {
+      "behavior_id": "S06",
+      "donor_test_refs": [
+        "canvasSaveCoordinator"
+      ],
+      "fixture_refs": [
+        "recovery:request-as-previous-lands",
+        "recovery:coalesce-after-failure"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:request-as-previous-lands",
+        "fixture:recovery:coalesce-after-failure",
+        "timing:recovery:request-as-previous-lands",
+        "timing:recovery:coalesce-after-failure"
+      ]
+    },
+    {
+      "behavior_id": "S07",
+      "donor_test_refs": [
+        "canvasSaveCoordinator"
+      ],
+      "fixture_refs": [
+        "recovery:canvas-switch-isolation"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:canvas-switch-isolation",
+        "timing:recovery:canvas-switch-isolation"
+      ]
+    },
+    {
+      "behavior_id": "S08",
+      "donor_test_refs": [
+        "canvasSyncCore"
+      ],
+      "fixture_refs": [
+        "recovery:save-decisions"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:save-decisions",
+        "timing:recovery:save-decisions"
+      ]
+    },
+    {
+      "behavior_id": "S09",
+      "donor_test_refs": [
+        "canvasSyncCore"
+      ],
+      "fixture_refs": [
+        "recovery:payload-limits"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:payload-limits",
+        "timing:recovery:payload-limits"
+      ]
+    },
+    {
+      "behavior_id": "S10",
+      "donor_test_refs": [
+        "canvasSyncCore"
+      ],
+      "fixture_refs": [
+        "recovery:save-failure-classification"
+      ],
+      "intentional_difference": "Save failures are classified by the M8-A exploration API. The donor recognizes only its own backend codes, so an unknown candidate (404), a rejected body (422), a transient server failure (503) and a network failure all become one generic error. The port distinguishes not_found, invalid and retryable outcomes; a 409 conflict is handled the same way by both.",
+      "functionality": "IMPROVED",
+      "correctness": "IMPROVED",
+      "determinism": "PARITY",
+      "failure_safety": "IMPROVED",
+      "data_integrity": "IMPROVED",
+      "observability": "IMPROVED",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:save-failure-classification",
+        "timing:recovery:save-failure-classification"
+      ]
+    },
+    {
+      "behavior_id": "S11",
+      "donor_test_refs": [
+        "canvas-autosave-hold"
+      ],
+      "fixture_refs": [
+        "recovery:autosave-hold"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:autosave-hold",
+        "timing:recovery:autosave-hold"
+      ]
+    },
+    {
+      "behavior_id": "S12",
+      "donor_test_refs": [
+        "save-status-store"
+      ],
+      "fixture_refs": [
+        "recovery:save-status"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:save-status",
+        "timing:recovery:save-status"
+      ]
+    },
+    {
+      "behavior_id": "R01",
+      "donor_test_refs": [
+        "canvas-draft-storage"
+      ],
+      "fixture_refs": [
+        "recovery:draft-round-trip-and-scope"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:draft-round-trip-and-scope",
+        "timing:recovery:draft-round-trip-and-scope"
+      ]
+    },
+    {
+      "behavior_id": "R02",
+      "donor_test_refs": [
+        "canvas-draft-storage"
+      ],
+      "fixture_refs": [
+        "recovery:draft-shedding"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:draft-shedding",
+        "timing:recovery:draft-shedding"
+      ]
+    },
+    {
+      "behavior_id": "R03",
+      "donor_test_refs": [
+        "canvas-draft-storage",
+        "local-storage-quota"
+      ],
+      "fixture_refs": [
+        "recovery:draft-pruning"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:draft-pruning",
+        "timing:recovery:draft-pruning"
+      ]
+    },
+    {
+      "behavior_id": "R04",
+      "donor_test_refs": [
+        "local-storage-quota"
+      ],
+      "fixture_refs": [
+        "recovery:quota-safe-write",
+        "recovery:quota-legacy-error-name"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:quota-safe-write",
+        "fixture:recovery:quota-legacy-error-name",
+        "timing:recovery:quota-safe-write",
+        "timing:recovery:quota-legacy-error-name"
+      ]
+    },
+    {
+      "behavior_id": "R05",
+      "donor_test_refs": [
+        "canvas-store-draft-hydrate"
+      ],
+      "fixture_refs": [
+        "graph:hydrate-draft",
+        "recovery:hydrate-decisions"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:graph:hydrate-draft",
+        "fixture:recovery:hydrate-decisions",
+        "timing:graph:hydrate-draft",
+        "timing:recovery:hydrate-decisions"
+      ]
+    },
+    {
+      "behavior_id": "R06",
+      "donor_test_refs": [
+        "canvas-draft-storage"
+      ],
+      "fixture_refs": [
+        "recovery:draft-user-isolation"
+      ],
+      "intentional_difference": "Drafts are isolated per user (spec \u00a77: keyed by user, project, candidate and server revision). The donor keys drafts by project and canvas only, so a second user of the same project and canvas in the same browser reads the first user's draft. The port returns none.",
+      "functionality": "IMPROVED",
+      "correctness": "IMPROVED",
+      "determinism": "PARITY",
+      "failure_safety": "IMPROVED",
+      "data_integrity": "IMPROVED",
+      "observability": "IMPROVED",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:draft-user-isolation",
+        "timing:recovery:draft-user-isolation"
+      ]
+    },
+    {
+      "behavior_id": "R07",
+      "donor_test_refs": [
+        "canvasSyncCore"
+      ],
+      "fixture_refs": [
+        "recovery:hydrate-decisions"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:recovery:hydrate-decisions",
+        "timing:recovery:hydrate-decisions"
+      ]
+    },
+    {
+      "behavior_id": "U01",
+      "donor_test_refs": [],
+      "fixture_refs": [
+        "functions:lod-tier"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "PARITY",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "fixture:functions:lod-tier",
+        "timing:functions:lod-tier"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "at": "c71c6e6f",
+      "cmd": "PARITY_TIMING=1 tools/parity/dramaclaw/run.sh <harness>.parity.test.ts <out> for graph, functions, groups, recovery",
+      "exit": 0,
+      "note": "donor b299bfd9 vitest 4.1.6; port reruns byte-identical"
+    },
+    {
+      "at": "c71c6e6f",
+      "cmd": "(cd frontend && pnpm check)",
+      "exit": 0,
+      "result": "211 files, 2399 passed, 4 skipped (timing tests, env-gated)"
+    },
+    {
+      "at": "c71c6e6f",
+      "cmd": "uv run python -m pytest tests/e2e/test_m8b_canvas_a11y.py tests/e2e/test_m8b_canvas_benchmark.py (lod, generator)",
+      "exit": 0,
+      "result": "9 passed"
+    },
+    {
+      "at": "c71c6e6f",
+      "cmd": "ARCREEL_M8B_BENCHMARK=1 ARCREEL_M8B_BASE_DIST=<d8d74299 build> uv run python -m pytest tests/e2e/test_m8b_canvas_benchmark.py::test_canvas_meets_the_frozen_benchmark_protocol",
+      "result": "docs/r2/evidence/R2_M8_B_CANVAS_BENCHMARK_RESULT.json"
+    }
+  ],
+  "required_skips": [],
+  "material_unknowns": [],
+  "reviewer": "codex (independent review pending; R2_M8_B_CODEX_REVIEW)",
+  "verdict": "PASS"
+}

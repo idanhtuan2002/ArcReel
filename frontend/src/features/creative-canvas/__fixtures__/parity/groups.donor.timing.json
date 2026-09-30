@@ -1,0 +1,106 @@
+{
+  "group-two-nodes-and-undo": {
+    "reps": 25,
+    "median_ms": 0.2471,
+    "p95_ms": 0.3204,
+    "resident_bytes": 1181,
+    "storage_bytes": 0,
+    "observation_bytes": 1514
+  },
+  "group-needs-two-top-level-members": {
+    "reps": 25,
+    "median_ms": 0.1869,
+    "p95_ms": 0.1935,
+    "resident_bytes": 1091,
+    "storage_bytes": 0,
+    "observation_bytes": 1341
+  },
+  "ungroup-restores-absolute-positions": {
+    "reps": 25,
+    "median_ms": 0.1736,
+    "p95_ms": 0.2083,
+    "resident_bytes": 1105,
+    "storage_bytes": 0,
+    "observation_bytes": 1576
+  },
+  "fit-grows-and-pushes-inward": {
+    "reps": 25,
+    "median_ms": 0.1068,
+    "p95_ms": 0.113,
+    "resident_bytes": 633,
+    "storage_bytes": 0,
+    "observation_bytes": 643
+  },
+  "arrange-modes": {
+    "reps": 25,
+    "median_ms": 0.2139,
+    "p95_ms": 0.2329,
+    "resident_bytes": 2295,
+    "storage_bytes": 0,
+    "observation_bytes": 4582
+  },
+  "storyboard-merge-and-edges": {
+    "reps": 25,
+    "median_ms": 0.4091,
+    "p95_ms": 0.522,
+    "resident_bytes": 3798,
+    "storage_bytes": 0,
+    "observation_bytes": 7893
+  },
+  "storyboard-add-members": {
+    "reps": 25,
+    "median_ms": 0.3097,
+    "p95_ms": 0.365,
+    "resident_bytes": 2299,
+    "storage_bytes": 0,
+    "observation_bytes": 3006
+  },
+  "duplicate-sibling": {
+    "reps": 25,
+    "median_ms": 0.1374,
+    "p95_ms": 0.1836,
+    "resident_bytes": 1126,
+    "storage_bytes": 0,
+    "observation_bytes": 1452
+  },
+  "duplicate-group-with-members": {
+    "reps": 25,
+    "median_ms": 0.335,
+    "p95_ms": 0.3728,
+    "resident_bytes": 3560,
+    "storage_bytes": 0,
+    "observation_bytes": 4928
+  },
+  "storyboard-reload-keeps-reanchored-edges": {
+    "reps": 25,
+    "median_ms": 0.3074,
+    "p95_ms": 0.3464,
+    "resident_bytes": 1321,
+    "storage_bytes": 0,
+    "observation_bytes": 1797
+  },
+  "group-missing-targets": {
+    "reps": 25,
+    "median_ms": 0.0815,
+    "p95_ms": 0.0857,
+    "resident_bytes": 409,
+    "storage_bytes": 0,
+    "observation_bytes": 404
+  },
+  "storyboard-invalid-edits": {
+    "reps": 25,
+    "median_ms": 0.2302,
+    "p95_ms": 0.2355,
+    "resident_bytes": 1067,
+    "storage_bytes": 0,
+    "observation_bytes": 1374
+  },
+  "duplicate-missing": {
+    "reps": 25,
+    "median_ms": 0.0777,
+    "p95_ms": 0.0811,
+    "resident_bytes": 409,
+    "storage_bytes": 0,
+    "observation_bytes": 404
+  }
+}

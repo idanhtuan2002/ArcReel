@@ -1,0 +1,331 @@
+{
+  "schema_version": 1,
+  "base_head": "d8d74299b6413e5ad561ebaabc88bebb1efcee27",
+  "accepted_m7_candidate_head": "dc030c611e505b27b71bf787d3f54a76a090cd3a",
+  "branch": "impl/r2-m8b-creative-canvas",
+  "alembic_heads": [
+    "8a8c4a0e0001"
+  ],
+  "m7_evidence": [
+    {
+      "path": "docs/r2/evidence/R2_M7_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "4cfa038beda73708891b3f9995393bcb06a6d33152cb1b4ab61cbb0572e2345c",
+      "status": "M7_IMPLEMENTATION_ACCEPTED"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V1_PRODUCTION_CANDIDATE_2026-09-28.md",
+      "sha256": "14dee8814c29f3533dd6ce50113fa20550f5252fb6ecf79edf8bde32f0c38d4c",
+      "status": "PRODUCTION_CANDIDATE"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_A_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "5554df8e37d2a0f039389e4eda73cb638fd647e984222dc89e09059f9f501569",
+      "status": "M8_A_ACCEPTED"
+    }
+  ],
+  "design_artifacts": [
+    {
+      "path": "docs/research/2026-09-13-r2-m8-reuse-first-comprehensive-research.md",
+      "sha256": "0fdb6631da38a7e7647c49d1621fbb51aab285cb3664b8ba8dd31304ac60669b"
+    },
+    {
+      "path": "docs/research/2026-09-13-r2-m8-architecture-options.md",
+      "sha256": "7aef9b01a7a1f28cf490c10092220a3ce946bcd94ab42b037053a0dafd68a797"
+    },
+    {
+      "path": "docs/adr/0079-m8-integrated-exploration-learning-format-kernel.md",
+      "sha256": "019420b3dd6969f1b6164cefafed00cfe483660d10d4c5ac4cfdddbc421784ce"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-09-13-r2-m8-canvas-learning-multiformat-design.md",
+      "sha256": "34c1f1d2fcc1c0b5967dcf0f6180f04405435cf0d4c65702b6aa6346bc455dba"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8-canvas-learning-multiformat.md",
+      "sha256": "ec25cf2b95a7ff78ba2403beb54990d0a42be746519b417389b9c53683ebac88"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8a-exploration-promotion.md",
+      "sha256": "98717a37916df653a88e0927c4b3c376402ea56c280db79a71233f8d38da843c"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8c-spatial-candidates.md",
+      "sha256": "f3fbbeced89b6b291eef6fc6c49e9465a19ccff1493a3d2b92083fe4beec9df1"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8d-learning-recommendations.md",
+      "sha256": "4e2f6aca8ed8d827ddbafdc1b19e642e4074c25ae09f4e64ad9a4e67b3e1de1d"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8e-multiformat-projection.md",
+      "sha256": "3b1cef09e83f5476c4e19890e29623a9d7b2045b0fedee9be26a48db76acee0c"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8f-integrated-utility.md",
+      "sha256": "e1bc0c83c78cfdefe242967c36555d2b393e6d1183f8d372cbc6011326092756"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_2026-09-13.json",
+      "sha256": "5e0aac609f0b74edc1d9e4cfd640b986b97331c22115f71c99358d83899029b5"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V1_RELEASE_SPONSOR_DECISION_2026-09-28.json",
+      "sha256": "3eb51b4b0ed533c16b6a03a7076c97e11f70bf30b3cc20ba75ed47d6feb17d37"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_START_DECISION_2026-09-29.json",
+      "sha256": "00d61294a5eae096fd27b4d6d8d5c35bf993e26f64eca4fca14fe5fdca06e6e7"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_CODEX_REVIEW_2026-09-29.md",
+      "sha256": "543a909a59f37160dd8135f4ad9ef829d16d254ae2089051d07e61af9fddc3a2"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_CODEX_CONFIRMATION_REVIEW_2026-09-29.md",
+      "sha256": "95107a59f003b81c0f86570d008a6f2cda13af495b7a5443d77127edc24f2fb3"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_DESIGN_MANIFEST_2026-09-13.json",
+      "sha256": "b676dce6bcd81c5a56be85af0b249201bf83148802ff6ddce843a9a057c4f946"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2026-09-29.json",
+      "sha256": "a0b35c9d3a75e1482502d376f6ec939f1dbf6d2f0118e32a35137b2157705e2e"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2_2026-09-29.json",
+      "sha256": "a178356c6b95af5a3acc916098f1c5516443a3a3b2c658a9b64d88d0aacd8f07"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_3_2026-09-29.json",
+      "sha256": "dd0ebdb2ff50156c8fda59e1c2c2ad32ec1248c1965fd4f06ceb7797b0530237"
+    },
+    {
+      "path": "docs/adr/0095-m8a-defers-the-production-binding-promotion-target.md",
+      "sha256": "aa596634fc7fb95ee0a1558b537465fb8dbe07de2cf4c49d8fb139e59a13fab6"
+    },
+    {
+      "path": "docs/adr/0096-v2-the-m7-master-head-is-the-sole-master-authority.md",
+      "sha256": "3a2b60a1510c29b3eef01caecc68c4d9bb2d7d604960cff3bcc9045a5bd3b87a"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_02_CODEX_REVIEW_2026-09-29.md",
+      "sha256": "00882870008fa41e43926741446aa7e89c1fa1b56e467736a87d7c9adea1c714"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_5_2026-09-29.json",
+      "sha256": "e94e32bf0b8a208df59b4cae9224b18d480d2263b1ab02ef32fce902c74c99c2"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_6_2026-09-29.json",
+      "sha256": "8ae6ab4ce4d7c3abec7e9a1e9470a35defdf7868367a3fe743211fc98a37b8d5"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_7_2026-09-29.json",
+      "sha256": "5485c8f7161ccf57923d754d53f76d8d265553c9f91df5a1c136b5906b7e1a21"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_8_2026-09-29.json",
+      "sha256": "206d5ae385bb969796586be7d562707a582baa6e1be95f8072f27ae13916452a"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_9_2026-09-29.json",
+      "sha256": "031835412bcda896bd5e30cd23061d6c0c025cec69630ff5a5f3898183b39c33"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_10_2026-09-29.json",
+      "sha256": "8835c721558b7ac10ea4b71924b8b9fc2b9dd0854903bdc1501f054f1a3aa6c2"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_11_2026-09-29.json",
+      "sha256": "2a2831919db655fb740c4eaaf4bc674ca595fdb91a7b092577513cee0d47cc62"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_12_2026-09-29.json",
+      "sha256": "45682774745b9b8281f2237bec81c681df862d99626d999c8edaa78e2e8e3b58"
+    },
+    {
+      "path": "docs/r2/evidence/R2_V2_02B_GATE_C_SERIALIZATION_2026-09-29.md",
+      "sha256": "4447bdff42f112eeb907598d56c750f4b4fff6d8b05ede2d3b3052b7838deef6"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_13_2026-09-29.json",
+      "sha256": "a6c09c1c1284777cb062b2ff20c297e501e0e51ca7d2cf01b7da0874657c2bdc"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_B_GRAPH_ENVELOPE_SPONSOR_DECISION_2026-09-29.json",
+      "sha256": "07bdb354449c03773cf1e07d5679e393a43a9bd5a6603924e1cdf4200d1b2b38"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-13-r2-m8b-creative-canvas.md",
+      "sha256": "f43bdc1d634564d27dcd578c3246616cf8afa108edbab0b1c4fc74ad5d0c7f19"
+    },
+    {
+      "path": "docs/research/2026-09-29-r2-m8b-canvas-scale.md",
+      "sha256": "a03a14959a1092831279f8fa14ee39f25c63875b4090ebb2a59b54de00a07f77"
+    },
+    {
+      "path": "docs/adr/0097-m8a-promotes-registered-candidate-objects-into-non-manifest-slots.md",
+      "sha256": "e6067b1267ebdfddb4cef48f143667ea174efb213088358d9078f995a90446ff"
+    }
+  ],
+  "seams": [
+    {
+      "qualified_name": "r2.contracts.advanced_creative:CanvasCandidate",
+      "path": "r2/contracts/advanced_creative.py",
+      "signature": "class CanvasCandidate",
+      "sha256": "bfa60e984051dc89a297248c2f9bb0a5bbe28add33827d7f08df9e946e366874"
+    },
+    {
+      "qualified_name": "r2.contracts.advanced_creative:ExplorationRevision",
+      "path": "r2/contracts/advanced_creative.py",
+      "signature": "class ExplorationRevision",
+      "sha256": "9a490bbf1d3ba54674fd9323ec6c303800fab803a4ee4526cfc76540aa0f5982"
+    },
+    {
+      "qualified_name": "r2.contracts.advanced_creative:CandidateHead",
+      "path": "r2/contracts/advanced_creative.py",
+      "signature": "class CandidateHead",
+      "sha256": "276b1e3245e0d9e6cfbb1c85a29848599f952877b697ef21deb9f513adad7ccf"
+    },
+    {
+      "qualified_name": "server.routers.advanced_creative:append_revision",
+      "path": "server/routers/advanced_creative.py",
+      "signature": "(project_name: str, req: AppendRevisionRequest, user: CurrentUser) -> CandidateHead",
+      "sha256": "9b7178fc6f03ffcf9ab4624b2b345649a1e7e306b165bb15176ea13049fcdb41"
+    },
+    {
+      "qualified_name": "server.routers.advanced_creative:get_revision",
+      "path": "server/routers/advanced_creative.py",
+      "signature": "(project_name: str, candidate_id: str, revision: int, user: CurrentUser) -> ExplorationRevision",
+      "sha256": "ab7fcc5271818a993df386f968e3f409facb43f0907684a9392801dc1376e89e"
+    },
+    {
+      "qualified_name": "server.routers.advanced_creative:list_revisions",
+      "path": "server/routers/advanced_creative.py",
+      "signature": "(project_name: str, candidate_id: str, user: CurrentUser, after_revision: int | None=Query(default=None, ge=0), limit: int=Query(default=50, ge=1, le=100)) -> list[ExplorationRevision]",
+      "sha256": "b66ddf9bf2126fa7cefdafaefb618fbbcba6f131ad217e29e59433e03993040f"
+    },
+    {
+      "qualified_name": "server.routers.advanced_creative:create_promotion_preview",
+      "path": "server/routers/advanced_creative.py",
+      "signature": "(project_name: str, req: CreatePromotionPreviewRequest, user: CurrentUser) -> PromotionPreview",
+      "sha256": "0d732e57a438108b6e2366bf6cb0bad0fd875e87e5106ee7fc07773bfc306ec5"
+    }
+  ],
+  "donors": [
+    {
+      "name": "DramaClaw",
+      "url": "https://github.com/dramaclaw/dramaclaw",
+      "commit": "b299bfd9f6fc3e4a1eacc580cc03d5868c2e6e83",
+      "files": [
+        {
+          "path": "frontend/src/stores/canvasStore.ts",
+          "sha256": "d04d3f2da71d2e1e1cd7c353f0fb35eccd171000eec14d207e4f8e9f1ff61f0c"
+        },
+        {
+          "path": "frontend/src/features/canvas/domain/storyboardGroup.ts",
+          "sha256": "c74a610edbf111c8409ebe572ec052516c4ca5e3583c6897d2e8d285d0b1cd26"
+        },
+        {
+          "path": "frontend/src/features/canvas/domain/groupSelectionDelete.ts",
+          "sha256": "356437e7f0640d0b8cb2613bad503eb0fdd92262c38e7544cfbf78d332a67e03"
+        },
+        {
+          "path": "frontend/src/features/canvas/domain/groupSelectionDuplicate.ts",
+          "sha256": "bd2dc79b6d8be75395213c1a59008da9e44821f6fbb4faf99e1a2af1468897c0"
+        },
+        {
+          "path": "frontend/src/features/canvas/domain/groupColors.ts",
+          "sha256": "a5abfdd995de7b72c1efa99ba784ebd18c08091e376cf6eb82928524d71fc4bf"
+        },
+        {
+          "path": "frontend/src/features/canvas/domain/viewportBookmarks.ts",
+          "sha256": "2a5c588a9cd55000350f7c273c14cf141fe456fd9ebc2b7d1a449e9d18a9da15"
+        },
+        {
+          "path": "frontend/src/features/canvas/application/nodeSelection.ts",
+          "sha256": "9fb66ae99effc1a6d570616b2caef32d6731ef86e9415dac6b6e6bf929f36cc7"
+        },
+        {
+          "path": "frontend/src/features/canvas/application/autoLayout.ts",
+          "sha256": "31d4c1b602f4d61b778237fc7a53620020a8b327094db319cebfc9fcc222ef7d"
+        },
+        {
+          "path": "frontend/src/features/canvas/application/bookmarkActions.ts",
+          "sha256": "c5f17d5297321f04ad2389d8de63c0c284443d3764bd7e790733719d4be934cf"
+        },
+        {
+          "path": "frontend/src/features/canvas/application/canvasLod.ts",
+          "sha256": "d2ada24cb82c15c9ca804e4bef00b0bc6309910d62e6d3764dbdf44710e8bad5"
+        },
+        {
+          "path": "frontend/src/features/canvas/Canvas.tsx",
+          "sha256": "b6ddcb00acf2f9b24c60c665d14db3cd57b8ed1c086f22706aaa22558dd9ba96"
+        },
+        {
+          "path": "frontend/src/features/freezone/canvasSaveCoordinator.ts",
+          "sha256": "4c5374a9d8fa339da0e0098a0c2c2fa532e2e085adfff568d43031fd247678b3"
+        },
+        {
+          "path": "frontend/src/features/freezone/canvasSyncCore.ts",
+          "sha256": "6d6baeca1691fb260b5cc0f9fc0ed9ade50173061ef75b841f4754bdd015deac"
+        },
+        {
+          "path": "frontend/src/features/freezone/canvasAutosaveHold.ts",
+          "sha256": "a9f25284997d9f96a13eb6fef3089ade574dd1f2f8f7491d1f779f0576f3be5f"
+        },
+        {
+          "path": "frontend/src/features/freezone/canvasDraftStorage.ts",
+          "sha256": "e5f610b0fa415dfa5efa02123b99cc05bdea41980a8f8616edab129781ddf746"
+        },
+        {
+          "path": "frontend/src/stores/save-status-store.ts",
+          "sha256": "17ee07cdd567473e8f67b06a0926e6bd53e76bf3c32764a4dfd0e15d3c10411c"
+        },
+        {
+          "path": "frontend/src/lib/localStorageQuota.ts",
+          "sha256": "8e8b9f44469af6ecadcf507c577213d965a28029de3f149a8d88fc8bedb9be9f"
+        },
+        {
+          "path": "frontend/src/features/freezone/useCanvasSync.ts",
+          "sha256": "c556f6571c1239ba8e7e7f5a144fea3721b171694106a870027ffa8cac6d8004"
+        }
+      ]
+    }
+  ],
+  "scope_allowlist": [
+    "frontend/src/features/creative-canvas/",
+    "frontend/src/app-routes.ts",
+    "frontend/src/router.tsx",
+    "frontend/src/i18n/en/",
+    "frontend/src/i18n/vi/",
+    "frontend/src/i18n/zh/",
+    "frontend/package.json",
+    "frontend/pnpm-lock.yaml",
+    "frontend/knip.json",
+    "frontend/src/components/",
+    "tools/parity/dramaclaw/",
+    "scripts/r2/m8b_parity_rows.py",
+    "scripts/r2/verify_m8_scope.py",
+    "tests/unit/scripts/r2/test_m8b_parity_rows.py",
+    "tests/unit/scripts/r2/test_verify_m8_scope.py",
+    "tests/e2e/test_m8b_canvas_benchmark.py",
+    "tests/e2e/test_m8b_canvas_a11y.py",
+    "docs/r2/evidence/R2_M8_B_DONOR_BASELINE.json",
+    "docs/r2/evidence/R2_M8_B_CANVAS_BENCHMARK_PROTOCOL.json",
+    "docs/r2/evidence/R2_M8_B_CANVAS_BENCHMARK_RESULT.json",
+    "docs/r2/evidence/R2_M8_B_CANVAS_PARITY.json",
+    "docs/r2/evidence/R2_M8_B_BASELINE.json",
+    "docs/r2/evidence/schemas/R2_M8_B_CANVAS_PARITY_EVIDENCE.schema.json",
+    "docs/superpowers/plans/2026-09-29-r2-m8b-creative-canvas-executable.md",
+    ".github/dependabot.yml",
+    "tests/unit/r2/advanced_creative/test_m8b_canonical_digest_fixture.py"
+  ],
+  "graph": {
+    "project": "r2-m8b",
+    "generation": "not indexed for this worktree",
+    "coverage": "frontend paths are new; seams verified by source hash"
+  },
+  "created_at": "2026-09-30T00:00:00Z"
+}
