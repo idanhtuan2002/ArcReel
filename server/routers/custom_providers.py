@@ -18,6 +18,7 @@ from pydantic import AfterValidator, BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.api_errors import BadRequestError
+from lib.artifact_download_guard import artifact_http_client
 from lib.config.repository import mask_secret
 from lib.custom_provider import is_custom_endpoint, make_provider_id
 from lib.custom_provider.capabilities import (
@@ -45,7 +46,6 @@ from lib.db.base import dt_to_iso
 from lib.db.repositories.custom_endpoint_repo import CustomEndpointRepository
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.http_status_errors import raise_for_status_redacted
-from lib.httpx_shared import get_http_client
 from lib.i18n import Translator
 from lib.image_backends.base import ImageCapability
 from lib.video_backends.base import ReferenceAudioMode, audio_capability_pair_is_coherent
@@ -1257,13 +1257,14 @@ async def _check_comfyui(
     """通过 ``GET {base_url}/system_stats`` 验证 ComfyUI 可达，并回显 ``comfyui_version``。
 
     ``model_count`` 不填：ComfyUI 没有可枚举的模型列表，填 0 会被读成「一个模型都没有」。
+
+    出站目的地经 ``artifact_http_client`` 校验，与该协议的提交 / 轮询 / 产物下载同一道闸：
+    链路本地与云元数据地址一律拒绝，环回与私网放行（自建 ComfyUI 合法地跑在其中）。被拒按
+    ``_run_connectivity_check`` 的失败出口回显，与上游不可达同一形态。
     """
     url = base_url.strip().rstrip("/") + _COMFYUI_SYSTEM_STATS_PATH
-    resp = await get_http_client().get(
-        url,
-        headers=_comfyui_probe_headers(api_key),
-        timeout=_CONNECTIVITY_CHECK_TIMEOUT,
-    )
+    async with artifact_http_client(timeout=_CONNECTIVITY_CHECK_TIMEOUT) as client:
+        resp = await client.get(url, headers=_comfyui_probe_headers(api_key))
     raise_for_status_redacted(resp)
     payload = resp.json()
     system = payload.get("system") if isinstance(payload, dict) else None
