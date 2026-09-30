@@ -58,6 +58,22 @@ inspection was local-only at DramaClaw commit
    clean M8-C evidence HEAD
    ([`docs/superpowers/plans/2026-09-13-r2-m8c-spatial-candidates.md:13`](../superpowers/plans/2026-09-13-r2-m8c-spatial-candidates.md#L13)-[`18`](../superpowers/plans/2026-09-13-r2-m8c-spatial-candidates.md#L18)).
 
+7. The current `ProductionBinding` body has no spatial assertion, seam, direction,
+   gap or source-span field. `SpatialCandidate` has these evidence categories but
+   only generic `relation`/`subject_refs` for each assertion. The preview request
+   carries a candidate, revision, target and command ID, not a typed binding
+   proposal ([`r2/contracts/preparation.py:20`](../../r2/contracts/preparation.py#L20),
+   [`r2/contracts/advanced_creative.py:275`](../../r2/contracts/advanced_creative.py#L275),
+   [`server/routers/advanced_creative.py:50`](../../server/routers/advanced_creative.py#L50)).
+
+8. The inspected global `AssetRepository` updates and deletes assets, while its
+   ORM row has no approval state or content digest. It cannot itself prove an
+   immutable approved reference for a binding. This is a bounded observation
+   about that repository/model, not an absence claim about every possible host
+   asset path ([`lib/db/repositories/asset_repo.py:70`](../../lib/db/repositories/asset_repo.py#L70),
+   [`lib/db/repositories/asset_repo.py:79`](../../lib/db/repositories/asset_repo.py#L79),
+   [`lib/db/models/asset.py:19`](../../lib/db/models/asset.py#L19)).
+
 ## Observed DramaClaw spatial behavior and fixture shape
 
 1. The donor prompt accepts two reference views from one camera point and
@@ -117,6 +133,11 @@ inspection was local-only at DramaClaw commit
 
 - No runtime donor execution, network/provider call, or donor test suite was
   run. The donor facts are static-source observations at the pinned commit.
+
+- A versioned binding store alone cannot specify which spatial information is
+  production data, how a spatial constraint is represented by a binding, or
+  which authority proves its referenced asset. Those choices require an
+  explicit design before M8-C promotion can be implemented.
 
 - The donor's script writes artifacts to its own filesystem paths. This note
   records that behavior as donor evidence only; it does not establish an R2
