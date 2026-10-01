@@ -1,4 +1,4 @@
-# M8-C continuation handoff — 2026-09-30
+# M8-C continuation handoff — updated 2026-10-01
 
 Status: **full binding-authority direction selected; design proposed; C1 WIP; C2 promotion stopped**. This file supersedes the earlier checkpoint at this path. It is not an implementation acceptance artifact.
 
@@ -6,7 +6,7 @@ Status: **full binding-authority direction selected; design proposed; C1 WIP; C2
 
 | Worktree | Branch and evidence point | Dirty paths and treatment |
 | --- | --- | --- |
-| `.worktrees/r2-m8c-binding-design` | `design/r2-m8c-binding-authority`, latest reviewed HEAD `8fbc8f68bfa9ae79b06036e6857c91825d015f8b`, latest author response HEAD before this handoff edit `99e9b18d0b1e22c10ddcabaf74f08691accb6846` | Recheck `git rev-parse HEAD` and `git status --short` on resume. The response to the focused review is committed but not independently re-reviewed. A further review attempt reached usage limit without a verdict. |
+| `.worktrees/r2-m8c-binding-design` | `design/r2-m8c-binding-authority`, HEAD before this final handoff edit `aacc21a2b9be7325f554f39a8aa63e731aae4387`; latest independently reviewed HEAD `8fbc8f68bfa9ae79b06036e6857c91825d015f8b` | Recheck `git rev-parse HEAD` and `git status --short` on resume. Author responses after the focused review are committed but not independently re-reviewed. A further review attempt reached usage limit without a verdict. |
 | `.worktrees/r2-m8c` | `impl/r2-m8c-spatial-candidates`, HEAD `774952b235aa899c0125ee2109d426e9bc6dc9ff` | Untracked `docs/r2/evidence/R2_M8_STOP.json` from C2 preflight; modified `r2/contracts/advanced_creative.py` and `r2/advanced_creative/exploration.py`; untracked `r2/advanced_creative/spatial.py`, `scripts/r2/check_m8c_spatial_parity.py`, `tests/unit/r2/advanced_creative/test_spatial_contract.py` and `test_spatial_normalization.py`; modified `tests/unit/r2/advanced_creative/test_exploration.py`. The code/tests are C1 WIP, not committed or reviewed. Preserve all eight. The failed offline uv-created partial environment was moved intact to `/tmp/r2-m8c-incomplete-venv-20260930`; temporary venv symlinks used for basedpyright were removed. |
 | root checkout | `design/r2-m5b-narrative-context`, observed HEAD `dbaf93a6` | Unrelated dirty M12/docs work was not touched. |
 
@@ -40,3 +40,7 @@ The codebase graph generation `2026-09-27T03:07:32Z` indexes the root checkout a
 4. Implement and independently accept target/binding authority and live consumer before C2 promotion. Then complete C2 preview/authorization/atomic promotion, C3 donor parity with zero required skips/unknowns, affected-domain tests and independent full-diff review on exact integrated HEAD. M8-D stays gated on full M8-C acceptance.
 
 Do not describe historical tests, the author design response, candidate-only work, or the C1 WIP as M8-C acceptance. No source or destination branch was pushed or merged in this checkpoint.
+
+## Session close — 2026-10-01
+
+The design worktree was clean at `aacc21a2b9be7325f554f39a8aa63e731aae4387` before this handoff-only edit. The M8-C implementation worktree remains at `774952b235aa899c0125ee2109d426e9bc6dc9ff` with exactly the eight dirty paths listed above. The root checkout remains at `dbaf93a625bd9e5499f1e50a6838355ff8c0c9e5` with unrelated dirty work preserved. No acceptance state changed. With the weekly quota nearly exhausted, resume at the first unresolved design gate rather than initiating another incomplete implementation packet.
