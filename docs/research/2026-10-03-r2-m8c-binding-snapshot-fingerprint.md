@@ -1,0 +1,17 @@
+# M8-C binding snapshot fingerprint boundary
+
+Status: proposed canonical design fixture at design HEAD `8fdf93ee`; no binding registry, spatial-set reader, readiness receipt or route consumes these bytes yet.
+
+## Source correction
+
+`ProductionBinding` contains `version` in its inherited `ContractIdentity` body (`r2/contracts/common.py:23-26`, `r2/contracts/preparation.py:20-30`). The current `compute_content_fingerprint` serializes each complete binding body (`r2/contracts/fingerprints.py:27-50`). An offline call on one real Shot fixture and two otherwise identical `LOCATION` bindings with versions `1` and `2` returned distinct hashes, `90089e33da8c5833b9dc43b5cf8797d6ac1fd90946f7c2ae14b3233` and `f5dd14e53c65977f5b9d2171e99e2e7cc9b8867bc9e4ab580c4080b7366c3302`. Thus a legitimate M8-C spatial promotion that increments the binding body version can change this existing hash **if the caller supplies the new binding**. The previous claim that the current function cannot detect any spatial-only update was too broad.
+
+The remaining gap is exact content binding. The v1 body contains no spatial-set ID or digest, and the function accepts caller-supplied bindings without resolving their current authority. It cannot attest which immutable spatial set that version owns or detect a changed set digest under the same copied body. The proposed versioned fingerprint therefore includes the verified binding-snapshot digest; its reader rehashes the binding body, envelope and spatial set, and rejects a stored mismatch rather than treating a tampered set as a valid new version.
+
+## Proposed canonical fixture
+
+`tests/fixtures/r2/m8c_binding_snapshot_vectors.json` fixes one v1 `ProductionBinding` body at version `2`, its domain-separated body digest, and two illustrative envelope/snapshot chains. Both chains have the same user, project, target, binding ID/version/body digest and spatial-set ID. The `tampered` chain changes **only** the spatial-set digest in the envelope; the envelope and snapshot digests change accordingly. The test in `tests/unit/r2/advanced_creative/test_m8c_binding_snapshot_vectors.py` checks exact UTF-8 canonical bytes, independent SHA-256 hashes, v1 body model validation and digest propagation. The first focused run in isolated SQLite passed **2 tests**.
+
+The `tampered` case is an adversarial pure-digest vector, **not** a second legal version of the same binding. A future authority reader must reject it if it appears under an existing immutable version. The spatial-set and target digests are shaped placeholders; this fixture does not prove a real source, a valid spatial set, PostgreSQL storage, readiness invalidation or M7 submission. The named domains and exact bytes remain proposed until independent design review. A later acceptance test needs a legitimate promotion to version `3` with a new set digest, followed by currentness, readiness and route-to-submit checks against the exact snapshot.
+
+Verification after the test annotation fix: focused isolated-SQLite pytest **2 passed**; targeted Ruff check/format, basedpyright (0 errors/warnings), test audit (0 violations) and relative-link check passed. This is a fixture gate, not authority or consumer acceptance.
