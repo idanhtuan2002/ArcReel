@@ -49,6 +49,7 @@ def test_snapshot_digest_binds_spatial_set_even_with_identical_binding_body() ->
     assert approved["binding_version"] == tampered["binding_version"] == 2
     assert approved["spatial_set_id"] == tampered["spatial_set_id"]
     assert approved["spatial_set_digest"] != tampered["spatial_set_digest"]
+    assert (approved["binding_id"], approved["binding_version"]) == (body["body"]["id"], body["body"]["version"])
     assert (approved["target_type"], approved["target_id"]) == (body["body"]["target_type"], body["body"]["target_id"])
     assert cases["binding_envelope_approved"]["digest"] != cases["binding_envelope_tampered"]["digest"]
 
@@ -60,7 +61,14 @@ def test_snapshot_digest_binds_spatial_set_even_with_identical_binding_body() ->
     assert approved_snapshot["target_versions"] == tampered_snapshot["target_versions"]
     assert [target["target_type"] for target in approved_snapshot["target_versions"]] == ["SCENE", "SHOT"]
     shot_target = approved_snapshot["target_versions"][1]
-    assert (approved["target_registry_version"], approved["target_digest"]) == (
+    assert (
+        approved["target_type"],
+        approved["target_id"],
+        approved["target_registry_version"],
+        approved["target_digest"],
+    ) == (
+        shot_target["target_type"],
+        shot_target["target_id"],
         shot_target["registry_version"],
         shot_target["digest"],
     )
@@ -73,4 +81,11 @@ def test_snapshot_digest_binds_spatial_set_even_with_identical_binding_body() ->
     ]
     assert approved_snapshot["ordered_bindings"][0]["envelope_digest"] == cases["binding_envelope_approved"]["digest"]
     assert tampered_snapshot["ordered_bindings"][0]["envelope_digest"] == cases["binding_envelope_tampered"]["digest"]
+    for envelope, snapshot in ((approved, approved_snapshot), (tampered, tampered_snapshot)):
+        assert len(snapshot["ordered_bindings"]) == 1
+        binding_entry = snapshot["ordered_bindings"][0]
+        assert (binding_entry["binding_id"], binding_entry["version"]) == (
+            envelope["binding_id"],
+            envelope["binding_version"],
+        )
     assert cases["binding_snapshot_approved"]["digest"] != cases["binding_snapshot_tampered"]["digest"]
