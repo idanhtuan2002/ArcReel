@@ -48,6 +48,36 @@ for screenplay in (first, second):
 This confirms the adapter body `version` cannot be a durable target version:
 the same ID and body version can have different content across screenplay
 admissions. ADR-0102's separate monotonic registry version addresses that
-collision. The probe does **not** prove registration replay, locking, or
-current-admission correctness. Those require two real admitted screenplay
-versions, a same-session registration writer, and PostgreSQL concurrency tests.
+collision. This synthetic probe alone does **not** prove registration replay,
+locking, or current-admission correctness. Those require real admitted
+screenplay versions, a same-session registration writer, and PostgreSQL
+concurrency tests.
+
+## Persisted admission follow-up — 2026-10-03
+
+`tests/integration/r2/adaptation/test_screenplay_admission.py` now has
+`test_successive_admissions_reuse_take_target_ids_and_body_versions`. It uses
+the real adaptation evidence, evaluation, admission and exact-reader services
+against the per-test database. The first approved screenplay resolves through
+`ApprovedScreenplayReader`; after a changed proposal is admitted under the same
+screenplay ID, the first admission no longer resolves. The new admission does.
+`TakeDirectorAdapter` still returns the same scene/shot IDs and body `version=1`
+for both, while their canonical body digests differ. This replaces the fake
+reader with persisted upstream admission evidence for the collision claim.
+
+Run from the design worktree using an isolated external test database URL:
+
+```bash
+DATABASE_URL=sqlite+aiosqlite:///:memory: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. \
+  /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest \
+  -p pytest_asyncio.plugin -p pytest_timeout \
+  tests/integration/r2/adaptation/test_screenplay_admission.py -q --timeout=30
+```
+
+The affected file passed **20 tests with 1 PostgreSQL-only skip**. The standard
+sandboxed invocation stalled in `aiosqlite` setup; this run required elevated
+execution to permit the connection worker to complete. The `DATABASE_URL`
+override skips the suite's session-wide migration fixture, while the test's
+`session_factory` creates and destroys its own ORM schema. This is an upstream
+admission/adapter integration probe, **not** the missing target-registry writer,
+same-session lock proof, migration test or PostgreSQL concurrency fixture.

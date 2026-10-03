@@ -38,6 +38,7 @@ from r2.adaptation.evidence import AdaptationEvidenceService
 from r2.adaptation.hashing import compute_adaptation_hash, compute_profile_evaluation_report_digest
 from r2.adaptation.profiles import _PACKS_DIR, _compute_policy_pack_digest
 from r2.adaptation.screenplay_reader import ApprovedScreenplayReader
+from r2.advanced_creative.digests import digest_canonical
 from r2.contracts.adaptation import (
     AdaptationAuthorityFamily,
     AdaptationBranchV2,
@@ -48,6 +49,7 @@ from r2.contracts.adaptation import (
     AdaptationPolicy,
     AdaptationProfileId,
     AdaptationProfileRef,
+    AdmittedScreenplayRef,
     ArtifactVersionRef,
     DecisionRef,
     MapApprovalCommand,
@@ -58,6 +60,7 @@ from r2.contracts.adaptation import (
 )
 from r2.contracts.content_basis import ContentBasis
 from r2.contracts.enums import ContentBasisType, CreativeApprovalStatus
+from r2.production_intelligence.take_director import TakeDirectionResult, TakeDirectorAdapter
 from tests.integration.r2.adaptation._fakes import FakeAuthority
 
 USER = "u1"
@@ -305,6 +308,91 @@ async def test_admit_a_clean_proposal_succeeds_and_reader_resolves_it(
     assert resolved.approval_status == CreativeApprovalStatus.APPROVED
     assert resolved.locked_for_direction is True
     assert resolved.version == proposal.version + 1
+
+
+async def test_successive_admissions_reuse_take_target_ids_and_body_versions(
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+    screenplay_reader: ApprovedScreenplayReader,
+) -> None:
+    branch, map_receipt, first_proposal, first_report = await _seed_admissible_proposal(
+        adaptation_evidence_service, authority_service, evaluation_service
+    )
+    first_command = _admit_command(
+        proposal=first_proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(first_report)],
+    )
+    first_receipt = await authority_service.admit_screenplay_for_direction(
+        first_command, authenticated_principal=_PRINCIPAL
+    )
+    first_adapter = TakeDirectorAdapter(screenplay_reader, user_id=USER, project_name=PROJECT)
+    first_result = await first_adapter.direct(
+        AdmittedScreenplayRef(
+            screenplay_ref=_screenplay_ref(first_command.admitted_screenplay),
+            admission_ref=first_receipt.decision_ref,
+            profile_ref=branch.profile_ref,
+        )
+    )
+    assert isinstance(first_result, TakeDirectionResult)
+
+    changed_scene = first_proposal.scenes[0].model_copy(update={"purpose": "show the changed location stakes"})
+    next_draft = first_proposal.model_copy(
+        update={
+            "version": first_command.admitted_screenplay.version + 1,
+            "scenes": [changed_scene],
+            "content_hash": "pending",
+        }
+    )
+    next_proposal = await adaptation_evidence_service.append_screenplay(
+        next_draft.model_copy(update={"content_hash": compute_adaptation_hash(next_draft)}),
+        user_id=USER,
+        project_name=PROJECT,
+    )
+    next_report = await evaluation_service.evaluate(
+        artifact_ref=_screenplay_ref(next_proposal),
+        profile_ref=branch.profile_ref,
+        user_id=USER,
+        project_name=PROJECT,
+    )
+    next_command = _admit_command(
+        decision_id="d-admit-next",
+        proposal=next_proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(next_report)],
+        expected_predecessor_id=first_command.decision_id,
+    )
+    next_receipt = await authority_service.admit_screenplay_for_direction(
+        next_command, authenticated_principal=_PRINCIPAL
+    )
+    next_result = await TakeDirectorAdapter(screenplay_reader, user_id=USER, project_name=PROJECT).direct(
+        AdmittedScreenplayRef(
+            screenplay_ref=_screenplay_ref(next_command.admitted_screenplay),
+            admission_ref=next_receipt.decision_ref,
+            profile_ref=branch.profile_ref,
+        )
+    )
+    assert isinstance(next_result, TakeDirectionResult)
+    with pytest.raises(AdaptationNotFoundError):
+        await screenplay_reader.get_exact_admitted(
+            user_id=USER,
+            project_name=PROJECT,
+            screenplay_ref=_screenplay_ref(first_command.admitted_screenplay),
+            admission_ref=first_receipt.decision_ref,
+        )
+
+    for first_target, next_target in (
+        (first_result.scenes[0], next_result.scenes[0]),
+        (first_result.shots[0], next_result.shots[0]),
+    ):
+        assert first_target.id == next_target.id
+        assert first_target.version == next_target.version == 1
+        assert digest_canonical(first_target.model_dump(mode="json")) != digest_canonical(
+            next_target.model_dump(mode="json")
+        )
 
 
 async def test_reader_rejects_an_admission_after_it_is_revoked(

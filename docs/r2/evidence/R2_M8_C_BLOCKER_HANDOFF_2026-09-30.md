@@ -44,3 +44,11 @@ Do not describe historical tests, the author design response, candidate-only wor
 ## Session close — 2026-10-01
 
 The design worktree was clean at `aacc21a2b9be7325f554f39a8aa63e731aae4387` before this handoff-only edit. The M8-C implementation worktree remains at `774952b235aa899c0125ee2109d426e9bc6dc9ff` with exactly the eight dirty paths listed above. The root checkout remains at `dbaf93a625bd9e5499f1e50a6838355ff8c0c9e5` with unrelated dirty work preserved. No acceptance state changed. With the weekly quota nearly exhausted, resume at the first unresolved design gate rather than initiating another incomplete implementation packet.
+
+## Continuation checkpoint — 2026-10-03
+
+The design worktree resumed at `618595cbd16554455a208c8afe4b9a493ebcc593`. The C1 implementation worktree still has the eight dirty paths listed above at `774952b235aa899c0125ee2109d426e9bc6dc9ff`; none was modified by this continuation.
+
+The first gate-1 upstream fixture is now in `tests/integration/r2/adaptation/test_screenplay_admission.py`. It admits two successive real screenplay proposals under one screenplay ID, resolves each admission through `ApprovedScreenplayReader`, and derives Take Scene/Shot targets. The target IDs and embedded body versions stay equal while their canonical bodies differ. After the second admission, the first one no longer resolves. The exact test and limits are recorded in `docs/research/2026-10-01-r2-m8c-take-target-version-probe.md`.
+
+Verification of the final test body: affected integration file **20 passed, 1 PostgreSQL-only skipped** with isolated SQLite URL and elevated execution for the `aiosqlite` worker; targeted Ruff check/format, test audit and basedpyright passed; `git diff --check` passed. This proves the upstream identity/version collision against persisted admission, but does not exercise target registration, locking, migration, pair admission or the M7 submit bridge. Gate 1 and ADR-0102 remain unaccepted. Continue with the two-master frame/pair fixture and exact registry transaction/wire contract before C2 work.
