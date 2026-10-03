@@ -71,6 +71,40 @@ async def test_gate_c_writes_the_database_head_and_its_projection(
     assert await _count(session_factory, ProjectEventModel) >= 1
 
 
+async def test_two_gate_c_video_masters_have_distinct_current_heads(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
+) -> None:
+    first = await _approve_shot(gate_export_client, project_dir, "SH01", b"front view")
+    second = await _approve_shot(gate_export_client, project_dir, "SH02", b"reverse view")
+
+    keys = {
+        shot: GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for(shot)
+        for shot in ("SH01", "SH02")
+    }
+    projected = projected_masters(project_dir)
+    assert set(projected) == set(keys.values())
+    heads = {shot: await _database_head(session_factory, key) for shot, key in keys.items()}
+    for shot, head in heads.items():
+        assert head is not None
+        assert head.master_version == 1
+        assert head.candidate_id == m7_candidate_id(keys[shot], projected[keys[shot]])
+    assert heads["SH01"].content_digest != heads["SH02"].content_digest
+    assert first != second
+    async with session_factory() as session:
+        await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
+
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"front view replaced")
+    latest_first = await _database_head(session_factory, keys["SH01"])
+    latest_second = await _database_head(session_factory, keys["SH02"])
+    assert latest_first is not None
+    assert latest_second is not None
+    assert latest_first.master_version == 2
+    assert latest_first.candidate_id != heads["SH01"].candidate_id
+    assert latest_second == heads["SH02"]
+    async with session_factory() as session:
+        await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
+
+
 async def test_a_retry_after_a_failed_projection_converges(
     gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
