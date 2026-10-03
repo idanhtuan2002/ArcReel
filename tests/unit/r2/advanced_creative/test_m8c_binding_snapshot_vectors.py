@@ -42,15 +42,35 @@ def test_snapshot_digest_binds_spatial_set_even_with_identical_binding_body() ->
 
     approved = cases["binding_envelope_approved"]["body"]
     tampered = cases["binding_envelope_tampered"]["body"]
+    assert {key: value for key, value in approved.items() if key != "spatial_set_digest"} == {
+        key: value for key, value in tampered.items() if key != "spatial_set_digest"
+    }
     assert approved["binding_body_digest"] == tampered["binding_body_digest"] == body["digest"]
     assert approved["binding_version"] == tampered["binding_version"] == 2
     assert approved["spatial_set_id"] == tampered["spatial_set_id"]
     assert approved["spatial_set_digest"] != tampered["spatial_set_digest"]
+    assert (approved["target_type"], approved["target_id"]) == (body["body"]["target_type"], body["body"]["target_id"])
     assert cases["binding_envelope_approved"]["digest"] != cases["binding_envelope_tampered"]["digest"]
 
     approved_snapshot = cases["binding_snapshot_approved"]["body"]
     tampered_snapshot = cases["binding_snapshot_tampered"]["body"]
-    assert approved_snapshot["target_digest"] == tampered_snapshot["target_digest"]
+    assert {key: value for key, value in approved_snapshot.items() if key != "ordered_bindings"} == {
+        key: value for key, value in tampered_snapshot.items() if key != "ordered_bindings"
+    }
+    assert approved_snapshot["target_versions"] == tampered_snapshot["target_versions"]
+    assert [target["target_type"] for target in approved_snapshot["target_versions"]] == ["SCENE", "SHOT"]
+    shot_target = approved_snapshot["target_versions"][1]
+    assert (approved["target_registry_version"], approved["target_digest"]) == (
+        shot_target["registry_version"],
+        shot_target["digest"],
+    )
+    assert [
+        {key: value for key, value in binding.items() if key != "envelope_digest"}
+        for binding in approved_snapshot["ordered_bindings"]
+    ] == [
+        {key: value for key, value in binding.items() if key != "envelope_digest"}
+        for binding in tampered_snapshot["ordered_bindings"]
+    ]
     assert approved_snapshot["ordered_bindings"][0]["envelope_digest"] == cases["binding_envelope_approved"]["digest"]
     assert tampered_snapshot["ordered_bindings"][0]["envelope_digest"] == cases["binding_envelope_tampered"]["digest"]
     assert cases["binding_snapshot_approved"]["digest"] != cases["binding_snapshot_tampered"]["digest"]

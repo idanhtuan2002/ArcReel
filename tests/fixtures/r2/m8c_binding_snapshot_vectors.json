@@ -34,10 +34,14 @@
         "binding_version": 2,
         "binding_body_digest": "sha256:4a48c9943c8a5cb9511ddf8f7bbf8e53ddf394fc2bcca65ef61de7cae924978f",
         "spatial_set_id": "spatial-set-room-1",
-        "spatial_set_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "spatial_set_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_type": "SHOT",
+        "target_id": "shot-room-1",
+        "target_registry_version": 3,
+        "target_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
       },
-      "canonical": "{\"body\":{\"binding_body_digest\":\"sha256:4a48c9943c8a5cb9511ddf8f7bbf8e53ddf394fc2bcca65ef61de7cae924978f\",\"binding_id\":\"binding-room-1\",\"binding_version\":2,\"project_name\":\"demo\",\"spatial_set_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"spatial_set_id\":\"spatial-set-room-1\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.envelope.v1\"}",
-      "digest": "sha256:590cca00924f7e87969ef3eabd14a4c60744fa261420a9572cb59fbc3b28cbb9"
+      "canonical": "{\"body\":{\"binding_body_digest\":\"sha256:4a48c9943c8a5cb9511ddf8f7bbf8e53ddf394fc2bcca65ef61de7cae924978f\",\"binding_id\":\"binding-room-1\",\"binding_version\":2,\"project_name\":\"demo\",\"spatial_set_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"spatial_set_id\":\"spatial-set-room-1\",\"target_digest\":\"sha256:9999999999999999999999999999999999999999999999999999999999999999\",\"target_id\":\"shot-room-1\",\"target_registry_version\":3,\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.envelope.v1\"}",
+      "digest": "sha256:4277db364ba5764f00ed46f0d6161dc8a190f798d91de4a5b00d1802d00e8d8c"
     },
     {
       "name": "binding_snapshot_approved",
@@ -45,20 +49,30 @@
       "body": {
         "user_id": "u1",
         "project_name": "demo",
-        "target_type": "SHOT",
-        "target_id": "shot-room-1",
-        "target_registry_version": 3,
-        "target_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
         "ordered_bindings": [
           {
             "binding_id": "binding-room-1",
             "version": 2,
-            "envelope_digest": "sha256:590cca00924f7e87969ef3eabd14a4c60744fa261420a9572cb59fbc3b28cbb9"
+            "envelope_digest": "sha256:4277db364ba5764f00ed46f0d6161dc8a190f798d91de4a5b00d1802d00e8d8c"
+          }
+        ],
+        "target_versions": [
+          {
+            "target_type": "SCENE",
+            "target_id": "scene-room-1",
+            "registry_version": 4,
+            "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          {
+            "target_type": "SHOT",
+            "target_id": "shot-room-1",
+            "registry_version": 3,
+            "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
           }
         ]
       },
-      "canonical": "{\"body\":{\"ordered_bindings\":[{\"binding_id\":\"binding-room-1\",\"envelope_digest\":\"sha256:590cca00924f7e87969ef3eabd14a4c60744fa261420a9572cb59fbc3b28cbb9\",\"version\":2}],\"project_name\":\"demo\",\"target_digest\":\"sha256:9999999999999999999999999999999999999999999999999999999999999999\",\"target_id\":\"shot-room-1\",\"target_registry_version\":3,\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.snapshot.v1\"}",
-      "digest": "sha256:420e7fecabbafbbe240154d6e4bfdd97602e038dfca78ab03320e3b0253a2d47"
+      "canonical": "{\"body\":{\"ordered_bindings\":[{\"binding_id\":\"binding-room-1\",\"envelope_digest\":\"sha256:4277db364ba5764f00ed46f0d6161dc8a190f798d91de4a5b00d1802d00e8d8c\",\"version\":2}],\"project_name\":\"demo\",\"target_versions\":[{\"digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\",\"registry_version\":4,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\"},{\"digest\":\"sha256:9999999999999999999999999999999999999999999999999999999999999999\",\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\"}],\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.snapshot.v1\"}",
+      "digest": "sha256:e0ec743963e6ab3b70fac3f7043d23dad1c82cefe41ca918a9844ca5cb8a11da"
     },
     {
       "name": "binding_envelope_tampered",
@@ -70,10 +84,14 @@
         "binding_version": 2,
         "binding_body_digest": "sha256:4a48c9943c8a5cb9511ddf8f7bbf8e53ddf394fc2bcca65ef61de7cae924978f",
         "spatial_set_id": "spatial-set-room-1",
-        "spatial_set_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        "spatial_set_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "target_type": "SHOT",
+        "target_id": "shot-room-1",
+        "target_registry_version": 3,
+        "target_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
       },
-      "canonical": "{\"body\":{\"binding_body_digest\":\"sha256:4a48c9943c8a5cb9511ddf8f7bbf8e53ddf394fc2bcca65ef61de7cae924978f\",\"binding_id\":\"binding-room-1\",\"binding_version\":2,\"project_name\":\"demo\",\"spatial_set_digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"spatial_set_id\":\"spatial-set-room-1\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.envelope.v1\"}",
-      "digest": "sha256:fdda0040d2124cd74731ad5fd1c868529bdf8b74681b60c9db8917d6e7c65556"
+      "canonical": "{\"body\":{\"binding_body_digest\":\"sha256:4a48c9943c8a5cb9511ddf8f7bbf8e53ddf394fc2bcca65ef61de7cae924978f\",\"binding_id\":\"binding-room-1\",\"binding_version\":2,\"project_name\":\"demo\",\"spatial_set_digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"spatial_set_id\":\"spatial-set-room-1\",\"target_digest\":\"sha256:9999999999999999999999999999999999999999999999999999999999999999\",\"target_id\":\"shot-room-1\",\"target_registry_version\":3,\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.envelope.v1\"}",
+      "digest": "sha256:76e70b75c0d9f5be752648c7f29da73cb9b090a3ab63be4b204926af5de3c214"
     },
     {
       "name": "binding_snapshot_tampered",
@@ -81,20 +99,30 @@
       "body": {
         "user_id": "u1",
         "project_name": "demo",
-        "target_type": "SHOT",
-        "target_id": "shot-room-1",
-        "target_registry_version": 3,
-        "target_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
         "ordered_bindings": [
           {
             "binding_id": "binding-room-1",
             "version": 2,
-            "envelope_digest": "sha256:fdda0040d2124cd74731ad5fd1c868529bdf8b74681b60c9db8917d6e7c65556"
+            "envelope_digest": "sha256:76e70b75c0d9f5be752648c7f29da73cb9b090a3ab63be4b204926af5de3c214"
+          }
+        ],
+        "target_versions": [
+          {
+            "target_type": "SCENE",
+            "target_id": "scene-room-1",
+            "registry_version": 4,
+            "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          {
+            "target_type": "SHOT",
+            "target_id": "shot-room-1",
+            "registry_version": 3,
+            "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
           }
         ]
       },
-      "canonical": "{\"body\":{\"ordered_bindings\":[{\"binding_id\":\"binding-room-1\",\"envelope_digest\":\"sha256:fdda0040d2124cd74731ad5fd1c868529bdf8b74681b60c9db8917d6e7c65556\",\"version\":2}],\"project_name\":\"demo\",\"target_digest\":\"sha256:9999999999999999999999999999999999999999999999999999999999999999\",\"target_id\":\"shot-room-1\",\"target_registry_version\":3,\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.snapshot.v1\"}",
-      "digest": "sha256:f5c2498518520ccd262d6b31541af34dff244535ab621ceb933ac567784d80de"
+      "canonical": "{\"body\":{\"ordered_bindings\":[{\"binding_id\":\"binding-room-1\",\"envelope_digest\":\"sha256:76e70b75c0d9f5be752648c7f29da73cb9b090a3ab63be4b204926af5de3c214\",\"version\":2}],\"project_name\":\"demo\",\"target_versions\":[{\"digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\",\"registry_version\":4,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\"},{\"digest\":\"sha256:9999999999999999999999999999999999999999999999999999999999999999\",\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\"}],\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.snapshot.v1\"}",
+      "digest": "sha256:d4c0357fd02c8405466c11bca7e4160c6e652240b9e57e8b9353eef13ca4953d"
     }
   ]
 }
