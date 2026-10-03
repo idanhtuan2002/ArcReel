@@ -56,7 +56,7 @@ def test_local_kling_multiview_route_preserves_ordered_frame_bytes(tmp_path: Pat
 
 def test_wan_reference_route_preserves_ordered_frame_bytes(tmp_path: Path) -> None:
     front, reverse = _frames(tmp_path)
-    backend = DashScopeVideoBackend(api_key="offline-fixture", model="wan2.7-r2v")
+    backend = DashScopeVideoBackend(api_key="offline-fixture", model="wan2.7-r2v-2026-06-12")
     request = VideoGenerationRequest(
         prompt="Image 1 is the front wall; Image 2 is the reverse wall of the same room",
         output_path=tmp_path / "out.mp4",
