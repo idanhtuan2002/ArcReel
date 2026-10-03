@@ -74,8 +74,8 @@ async def test_gate_c_writes_the_database_head_and_its_projection(
 async def test_two_gate_c_video_masters_have_distinct_current_heads(
     gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
 ) -> None:
-    first = await _approve_shot(gate_export_client, project_dir, "SH01", b"front view")
-    second = await _approve_shot(gate_export_client, project_dir, "SH02", b"reverse view")
+    first = await _approve_shot(gate_export_client, project_dir, "SH01", b"video parent one")
+    second = await _approve_shot(gate_export_client, project_dir, "SH02", b"video parent two")
 
     keys = {
         shot: GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for(shot)
@@ -93,7 +93,7 @@ async def test_two_gate_c_video_masters_have_distinct_current_heads(
     async with session_factory() as session:
         await verify_masters(session, user_id=USER.id, project_name=PROJECT, project_dir=project_dir)
 
-    await _approve_shot(gate_export_client, project_dir, "SH01", b"front view replaced")
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"video parent one replaced")
     latest_first = await _database_head(session_factory, keys["SH01"])
     latest_second = await _database_head(session_factory, keys["SH02"])
     assert latest_first is not None
