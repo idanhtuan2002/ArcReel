@@ -39,6 +39,7 @@ from r2.adaptation.hashing import compute_adaptation_hash, compute_profile_evalu
 from r2.adaptation.profiles import _PACKS_DIR, _compute_policy_pack_digest
 from r2.adaptation.screenplay_reader import ApprovedScreenplayReader
 from r2.advanced_creative.digests import digest_canonical
+from r2.contracts import MethodDecision, ProductionMethod, ResolvedIdentityStatus, ResolvedVisualIdentity
 from r2.contracts.adaptation import (
     AdaptationAuthorityFamily,
     AdaptationBranchV2,
@@ -60,6 +61,7 @@ from r2.contracts.adaptation import (
 )
 from r2.contracts.content_basis import ContentBasis
 from r2.contracts.enums import ContentBasisType, CreativeApprovalStatus
+from r2.production_intelligence.prompting import PromptPlanner
 from r2.production_intelligence.take_director import TakeDirectionResult, TakeDirectorAdapter
 from tests.integration.r2.adaptation._fakes import FakeAuthority
 
@@ -337,6 +339,23 @@ async def test_successive_admissions_reuse_take_target_ids_and_body_versions(
         )
     )
     assert isinstance(first_result, TakeDirectionResult)
+    admitted_shot = first_result.shots[0]
+    method_decision = MethodDecision(
+        id=f"MD:{admitted_shot.id}",
+        target_ref=admitted_shot.id,
+        method=ProductionMethod.GENERATED_VIDEO,
+        rationale="admitted Take shot",
+        cost_class="HIGH",
+        quality_tier=admitted_shot.quality_tier,
+    )
+    identity = ResolvedVisualIdentity(
+        target_ref=admitted_shot.id,
+        status=ResolvedIdentityStatus.RESOLVED,
+        resolution_policy_version="m8c-probe-v1",
+    )
+    plan = PromptPlanner().build(shot=admitted_shot, method_decision=method_decision, identity=identity)
+    assert admitted_shot.audio_intent is None
+    assert plan.required_controls == []
 
     changed_scene = first_proposal.scenes[0].model_copy(update={"purpose": "show the changed location stakes"})
     next_draft = first_proposal.model_copy(
