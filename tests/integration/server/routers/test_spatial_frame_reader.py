@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.artifact_manifest import ArtifactKey, ProjectArtifactManifestAdapter
 from lib.db.models.host_hardening import CandidateObjectModel
+from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.db.repositories.spatial_source import _receipt_digest
 from r2.m3.host_integration import GoldenAHostIntegration
 from server.services import spatial_frame_reader
@@ -187,6 +188,42 @@ async def test_reader_refuses_missing_parent_projection(
     )
     assert ProjectArtifactManifestAdapter(project_dir).delete_entry(ArtifactKey.decode(key))
     with pytest.raises(FrameSourceConflictError, match="projection"):
+        await SpatialFrameReader(session_factory=session_factory, project_dir=project_dir).read_current(
+            user_id=USER.id,
+            project_name=PROJECT,
+            receipt_id=receipt.frame_candidate_id,
+            expected_receipt_digest=_receipt_digest(receipt),
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mutation", ["missing", "escape"])
+async def test_reader_normalizes_missing_or_unsafe_parent_file(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, mutation: str
+) -> None:
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"reader-parent")
+    key = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for("SH01")
+    receipt = await FrameDerivationService(session_factory=session_factory, project_dir=project_dir).derive(
+        user_id=USER.id,
+        project_name=PROJECT,
+        parent_artifact_key=key,
+        expected_master_version=1,
+        decoded_frame_index=0,
+        command_id="reader-frame",
+    )
+    async with session_factory() as session:
+        head = await MasterAuthorityRepository(session).get_current(
+            user_id=USER.id, project_name=PROJECT, artifact_key=key
+        )
+    assert head is not None
+    parent_path = Path(head.object_ref)
+    assert await asyncio.to_thread(parent_path.is_file)
+    await asyncio.to_thread(parent_path.unlink)
+    if mutation == "escape":
+        outside = project_dir.parent / "outside-parent.mp4"
+        await asyncio.to_thread(outside.write_bytes, b"outside")
+        await asyncio.to_thread(parent_path.symlink_to, outside)
+    with pytest.raises(FrameSourceConflictError, match="parent media"):
         await SpatialFrameReader(session_factory=session_factory, project_dir=project_dir).read_current(
             user_id=USER.id,
             project_name=PROJECT,

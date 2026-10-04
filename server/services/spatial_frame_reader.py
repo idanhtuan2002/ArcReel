@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.host_hardening import CandidateObjectRepository
 from lib.db.repositories.spatial_source import SpatialFrameReceiptRepository, _receipt_digest
+from lib.path_safety import PathTraversalError
 from r2.contracts.spatial_source import FrameDerivationReceiptV1
 from r2.host_hardening.master_resolver import MasterDivergedError
 from server.services.master_authority import serialized_artifacts
@@ -64,6 +65,8 @@ class SpatialFrameReader:
             )
         except MasterDivergedError as exc:
             raise FrameSourceConflictError("frame parent master projection is incomplete") from exc
+        except (OSError, PathTraversalError) as exc:
+            raise FrameSourceConflictError("frame parent media is missing or unsafe") from exc
         if head.candidate_id != identity.parent_candidate_id or head.content_digest != identity.parent_content_digest:
             raise FrameSourceConflictError("frame parent differs from approved master")
         candidate = await CandidateObjectRepository(session).get_exact(
