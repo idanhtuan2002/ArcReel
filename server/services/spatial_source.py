@@ -243,7 +243,11 @@ def copy_frame_verified(
             raise FrameSourceConflictError("frame bytes changed during snapshot capture")
         if _probe_png(snapshot_path)[2] != expected_probe_digest:
             raise FrameSourceConflictError("frame probe differs from receipt")
-        png_bytes = snapshot_path.read_bytes()
+        snapshot_fd = os.open(snapshot_path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC)
+        with os.fdopen(snapshot_fd, "rb") as snapshot:
+            if not stat.S_ISREG(os.fstat(snapshot.fileno()).st_mode):
+                raise FrameSourceConflictError("frame snapshot is not a regular file")
+            png_bytes = snapshot.read(expected_size + 1)
         if not png_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
             raise FrameSourceConflictError("frame bytes are not PNG")
         if len(png_bytes) != expected_size or "sha256:" + hashlib.sha256(png_bytes).hexdigest() != expected_digest:
