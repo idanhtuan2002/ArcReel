@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import stat
 import tempfile
 import time
 from collections.abc import Callable
@@ -111,11 +112,13 @@ def _read_existing_candidate(
 ) -> VerifiedCandidateObject:
     _assert_parent_anchored(descriptor=descriptor, final_path=final_path, media_root=media_root)
     try:
-        file_fd = os.open(final_path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=descriptor)
+        file_fd = os.open(final_path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=descriptor)
     except OSError as exc:
         raise CandidateSymlinkEscapeError(f"{final_path} is not an anchored candidate file") from exc
     with os.fdopen(file_fd, "rb") as stream:
         file_stat = os.fstat(stream.fileno())
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise CandidateSymlinkEscapeError(f"{final_path} is not a regular candidate file")
         hasher = hashlib.sha256()
         while chunk := stream.read(_HASH_CHUNK_BYTES):
             hasher.update(chunk)

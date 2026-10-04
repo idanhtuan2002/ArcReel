@@ -307,6 +307,32 @@ def test_parent_swap_cleanup_preserves_replacement_candidate(tmp_path: Path, mon
     assert (moved_parent / final_path.name).read_bytes() == b"competitor"
 
 
+def test_prepare_candidate_rejects_fifo_competitor_without_blocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    final_path = media_root / "demo" / "videos" / "cand-1.mp4"
+    final_path.parent.mkdir(parents=True)
+    os.mkfifo(final_path)
+    real_open = os.open
+
+    def checked_open(path: str | os.PathLike[str], flags: int, *args: object, **kwargs: object) -> int:
+        if path == final_path.name:
+            assert flags & os.O_NONBLOCK
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", checked_open)
+    with pytest.raises(CandidateSymlinkEscapeError):
+        prepare_candidate(
+            identity=_identity(),
+            source_file=_source(tmp_path),
+            final_path=final_path,
+            media_root=media_root,
+            media_probe=_probe_ok,
+        )
+
+
 def test_prepare_candidate_is_idempotent_after_kill_following_publication(tmp_path: Path) -> None:
     # Models a crash after immutable publication already succeeded but before the
     # caller recorded success: a fresh call with the same identity must return the
