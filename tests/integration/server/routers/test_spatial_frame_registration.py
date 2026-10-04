@@ -28,6 +28,18 @@ from tests.integration.server.routers.test_gates_export import PROJECT, USER, _a
 type Factory = async_sessionmaker[AsyncSession]
 
 
+def test_parent_snapshot_rejects_bytes_that_differ_from_pinned_digest(tmp_path: Path) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"changed")
+    with pytest.raises(FrameSourceConflictError, match="snapshot capture"):
+        spatial_source._copy_parent_verified(
+            source,
+            tmp_path / "snapshot.mp4",
+            expected_digest="sha256:" + "0" * 64,
+            expected_size=len(b"changed"),
+        )
+
+
 async def _row_count(factory: Factory, model: type) -> int:
     async with factory() as session:
         return int((await session.execute(select(func.count()).select_from(model))).scalar_one())
@@ -203,6 +215,80 @@ async def test_parent_bytes_changed_after_decode_refuse_registration(
         )
     assert await _row_count(session_factory, SpatialFrameReceiptModel) == 0
     assert await _row_count(session_factory, CandidateObjectModel) == baseline
+
+
+@pytest.mark.asyncio
+async def test_decode_uses_digest_verified_private_parent_snapshot(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
+) -> None:
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"parent-one")
+    key = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for("SH01")
+    async with session_factory() as session:
+        head = await MasterAuthorityRepository(session).get_current(
+            user_id=USER.id, project_name=PROJECT, artifact_key=key
+        )
+    assert head is not None
+    original_path = Path(head.object_ref)
+    white_path = project_dir / "white.mp4"
+    await asyncio.to_thread(
+        subprocess.run,
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=white:s=64x36:d=1",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-y",
+            str(white_path),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
+    decoder_identity = spatial_source.ffmpeg_decoder_identity()
+    expected = await asyncio.to_thread(
+        spatial_source.decode_frame,
+        parent_path=original_path,
+        decoded_frame_index=0,
+        recipe_version=spatial_source.FRAME_RECIPE_VERSION,
+        decoder_identity=decoder_identity,
+        output_temp=project_dir / "expected.png",
+    )
+
+    def swap_during_decode(
+        *, parent_path: Path, decoded_frame_index: int, recipe_version: str, decoder_identity: str, output_temp: Path
+    ) -> FrameProbe:
+        assert parent_path != original_path
+        old_bytes = original_path.read_bytes()
+        original_path.write_bytes(white_path.read_bytes())
+        try:
+            return spatial_source.decode_frame(
+                parent_path=parent_path,
+                decoded_frame_index=decoded_frame_index,
+                recipe_version=recipe_version,
+                decoder_identity=decoder_identity,
+                output_temp=output_temp,
+            )
+        finally:
+            original_path.write_bytes(old_bytes)
+
+    receipt = await FrameDerivationService(
+        session_factory=session_factory, project_dir=project_dir, decoder=swap_during_decode
+    ).derive(
+        user_id=USER.id,
+        project_name=PROJECT,
+        parent_artifact_key=key,
+        expected_master_version=1,
+        decoded_frame_index=0,
+        command_id="snapshot-parent",
+    )
+    assert receipt.identity.frame_content_digest == expected.content_digest
 
 
 @pytest.mark.asyncio
