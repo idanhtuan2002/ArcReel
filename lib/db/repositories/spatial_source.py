@@ -55,6 +55,20 @@ class SpatialFrameReceiptRepository:
         ).scalar_one_or_none()
         return None if row is None else _from_row(row)
 
+    async def get_by_command(
+        self, *, user_id: str, project_name: str, command_id: str
+    ) -> FrameDerivationReceiptV1 | None:
+        row = (
+            await self.session.execute(
+                select(SpatialFrameReceiptModel).where(
+                    SpatialFrameReceiptModel.user_id == user_id,
+                    SpatialFrameReceiptModel.project_name == project_name,
+                    SpatialFrameReceiptModel.command_id == command_id,
+                )
+            )
+        ).scalar_one_or_none()
+        return None if row is None else _from_row(row)
+
     async def insert(self, *, command_id: str, receipt: FrameDerivationReceiptV1) -> None:
         identity = receipt.identity
         if not command_id.strip():
