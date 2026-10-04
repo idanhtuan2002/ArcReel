@@ -2,13 +2,11 @@
 
 ``prepare_candidate`` writes a temporary file on the same filesystem as its
 final destination, flushes, fsyncs, verifies size/digest/media probe, then
-performs one immutable rename. Once a candidate exists at ``final_path`` it is
-never overwritten: a later ``prepare_candidate`` call for the same identity and
-matching digest is an idempotent replay (recovering from a crash after the
-rename), and a call with a *different* expected digest against an existing
-file is a duplicate-conflict, not a silent overwrite. Any verification failure
-quarantines the temp bytes instead of deleting them, so a human/operator can
-inspect what a provider or filesystem actually produced.
+publishes a hard link without replacing an existing destination. Once a candidate
+exists at ``final_path`` it is never overwritten: a later call for the same
+identity and matching digest is an idempotent replay (recovering from a crash
+after publication), and a different digest is a duplicate conflict. Digest and
+media-probe verification failures quarantine the temp bytes for inspection.
 """
 
 from __future__ import annotations
@@ -63,8 +61,8 @@ def _device_of(path: Path) -> int:
 
 def _reject_symlink_escape(*, final_path: Path, media_root: Path) -> None:
     root = media_root.resolve()
-    # The final component itself does not exist yet; resolve its parent chain and
-    # re-attach the leaf name so a symlinked ancestor directory is still caught.
+    # Resolve the parent chain and re-attach the leaf name so a symlinked
+    # ancestor directory is caught without following the final component.
     resolved_parent = final_path.parent.resolve()
     resolved = resolved_parent / final_path.name
     if resolved != root and root not in resolved.parents:
@@ -94,6 +92,8 @@ def prepare_candidate(
     media_root = Path(media_root)
     _reject_symlink_escape(final_path=final_path, media_root=media_root)
 
+    if final_path.is_symlink():
+        raise CandidateSymlinkEscapeError(f"{final_path} is a symlink")
     if final_path.is_file():
         existing_digest = _sha256_file(final_path)
         if existing_digest != identity.expected_content_digest:
@@ -153,7 +153,26 @@ def prepare_candidate(
                 f"candidate {identity.candidate_id} failed media probe: {probe_error}"
             ) from probe_error
 
-        os.replace(tmp_path, final_path)
+        try:
+            os.link(tmp_path, final_path)
+        except FileExistsError:
+            if final_path.is_symlink():
+                raise CandidateSymlinkEscapeError(f"{final_path} is a symlink") from None
+            existing_digest = _sha256_file(final_path)
+            if existing_digest != identity.expected_content_digest:
+                raise CandidateDuplicateConflictError(
+                    f"{final_path} already holds a candidate with a different digest"
+                ) from None
+            return VerifiedCandidateObject(
+                candidate_id=identity.candidate_id,
+                project_name=identity.project_name,
+                artifact_key=identity.artifact_key,
+                object_ref=str(final_path),
+                byte_size=final_path.stat().st_size,
+                content_digest=existing_digest,
+                media_probe_digest=media_probe(final_path),
+            )
+        tmp_path.unlink()
         tmp_path = None
         _fsync_directory(final_path.parent)
 
