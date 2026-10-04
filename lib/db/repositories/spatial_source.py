@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.spatial_source import SpatialFrameReceiptModel
@@ -14,6 +15,18 @@ from r2.contracts.spatial_source import FrameDerivationReceiptV1
 
 def _receipt_digest(receipt: FrameDerivationReceiptV1) -> str:
     return digest_canonical({"domain": "r2.m8.spatial.frame.receipt.v1", "canonical_version": "1", "body": receipt})
+
+
+class SpatialFrameReceiptConflictError(ValueError):
+    """A scoped receipt or command identity already belongs to another write."""
+
+
+def _is_unique_violation(exc: IntegrityError) -> bool:
+    sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+    if sqlstate is not None:
+        return sqlstate == "23505"
+    message = str(getattr(exc, "orig", None) or exc).lower()
+    return "unique constraint failed" in message or "unique" in message
 
 
 def _from_row(row: SpatialFrameReceiptModel) -> FrameDerivationReceiptV1:
@@ -73,25 +86,31 @@ class SpatialFrameReceiptRepository:
         identity = receipt.identity
         if not command_id.strip():
             raise ValueError("command_id must be nonempty")
-        self.session.add(
-            SpatialFrameReceiptModel(
-                user_id=identity.user_id,
-                project_name=identity.project_name,
-                receipt_id=receipt.frame_candidate_id,
-                frame_candidate_id=receipt.frame_candidate_id,
-                parent_artifact_key=identity.parent_artifact_key,
-                parent_master_version=identity.parent_master_version,
-                parent_candidate_id=identity.parent_candidate_id,
-                command_id=command_id,
-                command_digest=receipt.command_digest,
-                frame_byte_size=receipt.frame_byte_size,
-                frame_probe_digest=receipt.frame_probe_digest,
-                receipt_body_json=receipt.model_dump(mode="json"),
-                receipt_digest=_receipt_digest(receipt),
-                created_at=receipt.created_at.astimezone(UTC),
-            )
-        )
-        await self.session.flush()
+        try:
+            async with self.session.begin_nested():
+                self.session.add(
+                    SpatialFrameReceiptModel(
+                        user_id=identity.user_id,
+                        project_name=identity.project_name,
+                        receipt_id=receipt.frame_candidate_id,
+                        frame_candidate_id=receipt.frame_candidate_id,
+                        parent_artifact_key=identity.parent_artifact_key,
+                        parent_master_version=identity.parent_master_version,
+                        parent_candidate_id=identity.parent_candidate_id,
+                        command_id=command_id,
+                        command_digest=receipt.command_digest,
+                        frame_byte_size=receipt.frame_byte_size,
+                        frame_probe_digest=receipt.frame_probe_digest,
+                        receipt_body_json=receipt.model_dump(mode="json"),
+                        receipt_digest=_receipt_digest(receipt),
+                        created_at=receipt.created_at.astimezone(UTC),
+                    )
+                )
+                await self.session.flush()
+        except IntegrityError as exc:
+            if not _is_unique_violation(exc):
+                raise
+            raise SpatialFrameReceiptConflictError("spatial frame receipt identity conflicts in this scope") from exc
 
 
-__all__ = ["SpatialFrameReceiptRepository"]
+__all__ = ["SpatialFrameReceiptConflictError", "SpatialFrameReceiptRepository"]

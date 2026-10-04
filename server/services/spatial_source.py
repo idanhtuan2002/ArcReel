@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.artifact_manifest import ArtifactKind, decode_artifact_key_parts
 from lib.candidate_store import prepare_candidate, verify_candidate
 from lib.db.repositories.host_hardening import CandidateObjectRepository, MasterAuthorityRepository
-from lib.db.repositories.spatial_source import SpatialFrameReceiptRepository
+from lib.db.repositories.spatial_source import SpatialFrameReceiptConflictError, SpatialFrameReceiptRepository
 from lib.path_safety import safe_join
 from r2.advanced_creative.digests import digest_canonical, digest_command
 from r2.contracts.host_hardening import CandidateIdentity, MasterHeadSnapshot, VerifiedCandidateObject
@@ -365,7 +365,11 @@ class FrameDerivationService:
                     registered = await CandidateObjectRepository(session).get_exact(
                         user_id=user_id, project_name=project_name, candidate_id=frame_id
                     )
-                    if registered != candidate:
+                    if (
+                        registered != candidate
+                        or existing.frame_byte_size != candidate.byte_size
+                        or existing.frame_probe_digest != candidate.media_probe_digest
+                    ):
                         raise FrameSourceConflictError("frame receipt candidate differs from registered bytes")
                     return existing
                 prior = await receipts.get_exact(user_id=user_id, project_name=project_name, receipt_id=frame_id)
@@ -388,7 +392,10 @@ class FrameDerivationService:
                     created_at=datetime.now(UTC),
                     command_digest=command_digest,
                 )
-                await receipts.insert(command_id=command_id, receipt=receipt)
+                try:
+                    await receipts.insert(command_id=command_id, receipt=receipt)
+                except SpatialFrameReceiptConflictError as exc:
+                    raise FrameSourceConflictError("frame command conflicts with an existing receipt") from exc
                 return receipt
 
 

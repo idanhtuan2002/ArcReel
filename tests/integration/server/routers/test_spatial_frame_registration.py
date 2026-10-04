@@ -16,7 +16,7 @@ from lib.artifact_manifest import ArtifactKey, ProjectArtifactManifestAdapter
 from lib.db.models.host_hardening import CandidateObjectModel
 from lib.db.models.spatial_source import SpatialFrameReceiptModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
-from lib.db.repositories.spatial_source import SpatialFrameReceiptRepository
+from lib.db.repositories.spatial_source import SpatialFrameReceiptRepository, _receipt_digest
 from r2.contracts.host_hardening import CandidateIdentity, VerifiedCandidateObject
 from r2.contracts.spatial_source import FrameDerivationReceiptV1
 from r2.host_hardening.master_resolver import MasterDivergedError
@@ -116,6 +116,38 @@ async def test_two_approved_video_masters_register_distinct_frame_receipts(
     )
     assert replay == master
     assert await _row_count(session_factory, SpatialFrameReceiptModel) == 2
+
+
+@pytest.mark.asyncio
+async def test_replay_rejects_receipt_probe_that_disagrees_with_registered_frame(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
+) -> None:
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"parent-one")
+    key = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for("SH01")
+    service = FrameDerivationService(session_factory=session_factory, project_dir=project_dir)
+    receipt = await service.derive(
+        user_id=USER.id,
+        project_name=PROJECT,
+        parent_artifact_key=key,
+        expected_master_version=1,
+        decoded_frame_index=0,
+        command_id="probe-replay",
+    )
+    changed = receipt.model_copy(update={"frame_probe_digest": "sha256:" + "f" * 64})
+    async with session_factory() as session, session.begin():
+        row = (await session.execute(select(SpatialFrameReceiptModel))).scalar_one()
+        row.frame_probe_digest = changed.frame_probe_digest
+        row.receipt_body_json = changed.model_dump(mode="json")
+        row.receipt_digest = _receipt_digest(changed)
+    with pytest.raises(FrameSourceConflictError, match="receipt candidate"):
+        await service.derive(
+            user_id=USER.id,
+            project_name=PROJECT,
+            parent_artifact_key=key,
+            expected_master_version=1,
+            decoded_frame_index=0,
+            command_id="probe-replay",
+        )
 
 
 @pytest.mark.asyncio
