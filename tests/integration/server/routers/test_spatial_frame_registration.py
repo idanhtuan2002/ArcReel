@@ -424,3 +424,46 @@ async def test_two_writers_same_frame_command_converge_on_one_receipt(
     first, second = await asyncio.gather(service.derive(**request), service.derive(**request))
     assert first == second
     assert await _row_count(concurrent_session_factory, SpatialFrameReceiptModel) == 1
+
+
+@pytest.mark.asyncio
+async def test_two_parents_racing_one_command_have_one_typed_conflict(
+    concurrent_gate_client: AsyncClient, project_dir: Path, concurrent_session_factory: Factory
+) -> None:
+    async with concurrent_session_factory() as probe:
+        if probe.get_bind().dialect.name != "postgresql":
+            pytest.skip("cross-parent unique-key races require PostgreSQL")
+    await _approve_shot(concurrent_gate_client, project_dir, "SH01", b"parent-one")
+    await _approve_white_shot(concurrent_gate_client, project_dir)
+    keys = [
+        GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for(shot)
+        for shot in ("SH01", "SH02")
+    ]
+    both_decoded = asyncio.Barrier(2)
+
+    async def meet_after_decode() -> None:
+        await both_decoded.wait()
+
+    service = FrameDerivationService(
+        session_factory=concurrent_session_factory, project_dir=project_dir, after_decode=meet_after_decode
+    )
+    results = await asyncio.gather(
+        *(
+            service.derive(
+                user_id=USER.id,
+                project_name=PROJECT,
+                parent_artifact_key=key,
+                expected_master_version=1,
+                decoded_frame_index=0,
+                command_id="cross-parent-race",
+            )
+            for key in keys
+        ),
+        return_exceptions=True,
+    )
+    winners = [result for result in results if isinstance(result, FrameDerivationReceiptV1)]
+    losers = [result for result in results if isinstance(result, BaseException)]
+    assert len(winners) == 1, results
+    assert len(losers) == 1, results
+    assert isinstance(losers[0], FrameSourceConflictError), results
+    assert await _row_count(concurrent_session_factory, SpatialFrameReceiptModel) == 1
