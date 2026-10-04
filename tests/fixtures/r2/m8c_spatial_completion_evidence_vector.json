@@ -1,0 +1,47 @@
+{
+  "status": "proposed",
+  "case": {
+    "name": "spatial_execution_evidence",
+    "domain": "r2.m8.spatial.execution.evidence.v1",
+    "body": {
+      "user_id": "u1",
+      "project_name": "demo",
+      "execution_id": "exec-spatial-1",
+      "task_id": "task-spatial-1",
+      "request_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "route_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "provider_job_id": "provider-job-fixture-1",
+      "terminal_state": "SUCCEEDED",
+      "terminal_state_version": 4,
+      "prompt_version": "spatial-prompt-v1",
+      "prompt_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "normalizer_version": "spatial-r2-v1",
+      "raw_response": {
+        "object_id": "raw-spatial-1",
+        "byte_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "schema_version": "r2-spatial-response-v1"
+      },
+      "overlap_response": {
+        "object_id": "raw-overlap-1",
+        "byte_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "schema_version": "r2-spatial-overlap-v1"
+      },
+      "ordered_source_frames": [
+        {
+          "role": "MASTER",
+          "frame_receipt_id": "m8f:1187691b2b21565a6fd16016cef88f4407bf48245801c6d6562ac07555e4ed06",
+          "frame_receipt_digest": "sha256:7ed4db9c07f5a42dfa42696dd21b2049d799341d2f1ebd55dcc82c9e12e0fd79",
+          "frame_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "role": "REVERSE",
+          "frame_receipt_id": "m8f:34883d1039e652be9074bdff7b29359e25afabb54de8be4d660ed00ab528b5a3",
+          "frame_receipt_digest": "sha256:6c7f9e6c6e9401c799a2d9e1f6336016d76bd5af68fa4f4a45c96b820a26db97",
+          "frame_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      ]
+    },
+    "canonical": "{\"body\":{\"execution_id\":\"exec-spatial-1\",\"normalizer_version\":\"spatial-r2-v1\",\"ordered_source_frames\":[{\"frame_digest\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\",\"frame_receipt_digest\":\"sha256:7ed4db9c07f5a42dfa42696dd21b2049d799341d2f1ebd55dcc82c9e12e0fd79\",\"frame_receipt_id\":\"m8f:1187691b2b21565a6fd16016cef88f4407bf48245801c6d6562ac07555e4ed06\",\"role\":\"MASTER\"},{\"frame_digest\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\",\"frame_receipt_digest\":\"sha256:6c7f9e6c6e9401c799a2d9e1f6336016d76bd5af68fa4f4a45c96b820a26db97\",\"frame_receipt_id\":\"m8f:34883d1039e652be9074bdff7b29359e25afabb54de8be4d660ed00ab528b5a3\",\"role\":\"REVERSE\"}],\"overlap_response\":{\"byte_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"object_id\":\"raw-overlap-1\",\"schema_version\":\"r2-spatial-overlap-v1\"},\"project_name\":\"demo\",\"prompt_digest\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\",\"prompt_version\":\"spatial-prompt-v1\",\"provider_job_id\":\"provider-job-fixture-1\",\"raw_response\":{\"byte_digest\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\",\"object_id\":\"raw-spatial-1\",\"schema_version\":\"r2-spatial-response-v1\"},\"request_digest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"route_digest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"task_id\":\"task-spatial-1\",\"terminal_state\":\"SUCCEEDED\",\"terminal_state_version\":4,\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.execution.evidence.v1\"}",
+    "digest": "sha256:9c432d8e96efd46b9fc4619977189bb423d7a2c20b97ad43066162696f2bd5bb"
+  }
+}
