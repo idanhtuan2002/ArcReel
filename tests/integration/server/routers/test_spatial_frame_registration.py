@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -37,6 +39,86 @@ def test_parent_snapshot_rejects_bytes_that_differ_from_pinned_digest(tmp_path: 
             tmp_path / "snapshot.mp4",
             expected_digest="sha256:" + "0" * 64,
             expected_size=len(b"changed"),
+        )
+
+
+def _write_rgb_png(path: Path) -> None:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=white:s=64x36:d=0.04",
+            "-frames:v",
+            "1",
+            "-vf",
+            "format=rgb24",
+            "-y",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=10,
+    )
+
+
+def test_frame_snapshot_returns_exact_verified_png_bytes(tmp_path: Path) -> None:
+    source = tmp_path / "frame.png"
+    _write_rgb_png(source)
+    original = source.read_bytes()
+    probe = spatial_source._probe_png(source)[2]
+    copied = spatial_source.copy_frame_verified(
+        source,
+        tmp_path / "snapshot.png",
+        expected_digest="sha256:" + hashlib.sha256(original).hexdigest(),
+        expected_size=len(original),
+        expected_probe_digest=probe,
+    )
+    assert copied == original
+
+
+def test_frame_snapshot_rejects_changed_bytes_with_same_size(tmp_path: Path) -> None:
+    source = tmp_path / "frame.png"
+    _write_rgb_png(source)
+    original = source.read_bytes()
+    source.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+    with pytest.raises(FrameSourceConflictError, match="frame bytes"):
+        spatial_source.copy_frame_verified(
+            source,
+            tmp_path / "snapshot.png",
+            expected_digest="sha256:" + hashlib.sha256(original).hexdigest(),
+            expected_size=len(original),
+            expected_probe_digest=spatial_source._probe_png(source)[2],
+        )
+
+
+def test_frame_snapshot_rejects_probe_mismatch(tmp_path: Path) -> None:
+    source = tmp_path / "frame.png"
+    _write_rgb_png(source)
+    original = source.read_bytes()
+    with pytest.raises(FrameSourceConflictError, match="frame probe"):
+        spatial_source.copy_frame_verified(
+            source,
+            tmp_path / "snapshot.png",
+            expected_digest="sha256:" + hashlib.sha256(original).hexdigest(),
+            expected_size=len(original),
+            expected_probe_digest="sha256:" + "0" * 64,
+        )
+
+
+def test_frame_snapshot_rejects_non_regular_source(tmp_path: Path) -> None:
+    source = tmp_path / "frame.pipe"
+    os.mkfifo(source)
+    with pytest.raises(FrameSourceConflictError, match="regular file"):
+        spatial_source.copy_frame_verified(
+            source,
+            tmp_path / "snapshot.png",
+            expected_digest="sha256:" + "0" * 64,
+            expected_size=1,
+            expected_probe_digest="sha256:" + "0" * 64,
         )
 
 
