@@ -1,6 +1,6 @@
 # M8-C frame receipt consumer seam — source-backed candidate
 
-Status: proposed interface for the next M8-C gate, **not** a pair-admission implementation or C1 acceptance. Frame-custody code checkpoint: `923bc3fc080a8bc396239ea2489b7baa6ab0d806`. C1 working tree: `impl/r2-m8c-spatial-candidates` at `774952b235aa899c0125ee2109d426e9bc6dc9ff` plus eight preserved dirty paths.
+Status: proposed interface for the next M8-C gate, **not** a pair-admission implementation or C1 acceptance. Frame-custody code checkpoint: `b75fc3ae038d6f8b72528402097a19df0b0acf13`; exact-HEAD independent review was interrupted by usage limit. C1 working tree: `impl/r2-m8c-spatial-candidates` at `774952b235aa899c0125ee2109d426e9bc6dc9ff` plus eight preserved dirty paths.
 
 ## Current source facts
 
