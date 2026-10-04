@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import tempfile
 from collections.abc import Awaitable, Callable
@@ -207,6 +208,51 @@ def _copy_parent_verified(source_path: Path, snapshot_path: Path, *, expected_di
         os.fsync(snapshot.fileno())
     if copied != expected_size or "sha256:" + hasher.hexdigest() != expected_digest:
         raise FrameSourceConflictError("parent video bytes changed during snapshot capture")
+
+
+def copy_frame_verified(
+    source_path: Path,
+    snapshot_path: Path,
+    *,
+    expected_digest: str,
+    expected_size: int,
+    expected_probe_digest: str,
+) -> bytes:
+    if not 0 < expected_size <= MAX_FRAME_BYTES:
+        raise FrameSourceConflictError("frame size is outside the allowed range")
+    try:
+        source_fd = os.open(source_path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC)
+        with os.fdopen(source_fd, "rb") as source:
+            if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+                raise FrameSourceConflictError("frame source is not a regular file")
+            snapshot_fd = os.open(
+                snapshot_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600
+            )
+            with os.fdopen(snapshot_fd, "wb") as snapshot:
+                hasher = hashlib.sha256()
+                copied = 0
+                while chunk := source.read(1024 * 1024):
+                    copied += len(chunk)
+                    if copied > expected_size:
+                        raise FrameSourceConflictError("frame bytes grew during snapshot capture")
+                    snapshot.write(chunk)
+                    hasher.update(chunk)
+                snapshot.flush()
+                os.fsync(snapshot.fileno())
+        if copied != expected_size or "sha256:" + hasher.hexdigest() != expected_digest:
+            raise FrameSourceConflictError("frame bytes changed during snapshot capture")
+        if _probe_png(snapshot_path)[2] != expected_probe_digest:
+            raise FrameSourceConflictError("frame probe differs from receipt")
+        png_bytes = snapshot_path.read_bytes()
+        if not png_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise FrameSourceConflictError("frame bytes are not PNG")
+        if len(png_bytes) != expected_size or "sha256:" + hashlib.sha256(png_bytes).hexdigest() != expected_digest:
+            raise FrameSourceConflictError("frame bytes changed after probe")
+        return png_bytes
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        if isinstance(exc, FrameSourceConflictError):
+            raise
+        raise FrameSourceConflictError("frame snapshot could not be verified") from exc
 
 
 class FrameDerivationService:
