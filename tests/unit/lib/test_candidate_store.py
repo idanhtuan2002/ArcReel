@@ -257,6 +257,56 @@ def test_prepare_candidate_rejects_existing_final_symlink(tmp_path: Path) -> Non
     assert outside.read_bytes() == _CONTENT
 
 
+def test_prepare_candidate_rejects_parent_replaced_during_link(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    final_path = media_root / "demo" / "videos" / "cand-1.mp4"
+    moved_parent = tmp_path / "moved-videos"
+    real_link = os.link
+
+    def move_parent_after_link(src: str | os.PathLike[str], dst: str | os.PathLike[str], **kwargs: object) -> None:
+        real_link(src, dst, **kwargs)
+        final_path.parent.rename(moved_parent)
+        final_path.parent.symlink_to(moved_parent, target_is_directory=True)
+
+    monkeypatch.setattr(os, "link", move_parent_after_link)
+    with pytest.raises(CandidateSymlinkEscapeError):
+        prepare_candidate(
+            identity=_identity(),
+            source_file=_source(tmp_path),
+            final_path=final_path,
+            media_root=media_root,
+            media_probe=_probe_ok,
+        )
+    assert not (moved_parent / final_path.name).exists()
+
+
+def test_parent_swap_cleanup_preserves_replacement_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    final_path = media_root / "demo" / "videos" / "cand-1.mp4"
+    moved_parent = tmp_path / "moved-videos"
+    real_link = os.link
+
+    def replace_after_link(src: str | os.PathLike[str], dst: str | os.PathLike[str], **kwargs: object) -> None:
+        real_link(src, dst, **kwargs)
+        final_path.unlink()
+        final_path.write_bytes(b"competitor")
+        final_path.parent.rename(moved_parent)
+        final_path.parent.symlink_to(moved_parent, target_is_directory=True)
+
+    monkeypatch.setattr(os, "link", replace_after_link)
+    with pytest.raises(CandidateSymlinkEscapeError):
+        prepare_candidate(
+            identity=_identity(),
+            source_file=_source(tmp_path),
+            final_path=final_path,
+            media_root=media_root,
+            media_probe=_probe_ok,
+        )
+    assert (moved_parent / final_path.name).read_bytes() == b"competitor"
+
+
 def test_prepare_candidate_is_idempotent_after_kill_following_publication(tmp_path: Path) -> None:
     # Models a crash after immutable publication already succeeded but before the
     # caller recorded success: a fresh call with the same identity must return the
