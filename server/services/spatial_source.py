@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import subprocess
 import tempfile
 from collections.abc import Awaitable, Callable
@@ -180,6 +181,34 @@ class FramePublisher(Protocol):
     ) -> VerifiedCandidateObject: ...
 
 
+class FrameDecoder(Protocol):
+    def __call__(
+        self,
+        *,
+        parent_path: Path,
+        decoded_frame_index: int,
+        recipe_version: str,
+        decoder_identity: str,
+        output_temp: Path,
+    ) -> FrameProbe: ...
+
+
+def _copy_parent_verified(source_path: Path, snapshot_path: Path, *, expected_digest: str, expected_size: int) -> None:
+    hasher = hashlib.sha256()
+    copied = 0
+    with source_path.open("rb") as source, snapshot_path.open("xb") as snapshot:
+        while chunk := source.read(1024 * 1024):
+            copied += len(chunk)
+            if copied > expected_size:
+                raise FrameSourceConflictError("parent video grew during snapshot capture")
+            snapshot.write(chunk)
+            hasher.update(chunk)
+        snapshot.flush()
+        os.fsync(snapshot.fileno())
+    if copied != expected_size or "sha256:" + hasher.hexdigest() != expected_digest:
+        raise FrameSourceConflictError("parent video bytes changed during snapshot capture")
+
+
 class FrameDerivationService:
     def __init__(
         self,
@@ -188,15 +217,17 @@ class FrameDerivationService:
         project_dir: Path,
         after_decode: Callable[[], Awaitable[None]] | None = None,
         publisher: FramePublisher = publish_frame,
+        decoder: FrameDecoder = decode_frame,
     ) -> None:
         self._sessions = session_factory
         self._project_dir = project_dir.resolve()
         self._after_decode = after_decode
         self._publisher = publisher
+        self._decoder = decoder
 
     async def _parent(
         self, session: AsyncSession, *, user_id: str, project_name: str, artifact_key: str, expected_version: int
-    ) -> tuple[MasterHeadSnapshot, Path]:
+    ) -> tuple[MasterHeadSnapshot, Path, VerifiedCandidateObject]:
         heads = await verify_masters(session, user_id=user_id, project_name=project_name, project_dir=self._project_dir)
         head = await MasterAuthorityRepository(session).get_current(
             user_id=user_id, project_name=project_name, artifact_key=artifact_key
@@ -221,7 +252,7 @@ class FrameDerivationService:
             verify_candidate, object_ref=path, expected=candidate, media_probe=stream_probe_digest
         ):
             raise FrameSourceConflictError("parent video bytes differ from approved master")
-        return head, path
+        return head, path, candidate
 
     async def derive(
         self,
@@ -253,7 +284,7 @@ class FrameDerivationService:
             },
         )
         async with self._sessions() as read_session:
-            initial, parent_path = await self._parent(
+            initial, parent_path, parent_candidate = await self._parent(
                 read_session,
                 user_id=user_id,
                 project_name=project_name,
@@ -261,10 +292,18 @@ class FrameDerivationService:
                 expected_version=expected_master_version,
             )
         with tempfile.TemporaryDirectory(prefix=".m8frame-", dir=self._project_dir) as private_dir:
+            parent_snapshot = Path(private_dir) / "parent.mp4"
+            await asyncio.to_thread(
+                _copy_parent_verified,
+                parent_path,
+                parent_snapshot,
+                expected_digest=initial.content_digest,
+                expected_size=parent_candidate.byte_size,
+            )
             temp = Path(private_dir) / "frame.png"
             probe = await asyncio.to_thread(
-                decode_frame,
-                parent_path=parent_path,
+                self._decoder,
+                parent_path=parent_snapshot,
                 decoded_frame_index=decoded_frame_index,
                 recipe_version=FRAME_RECIPE_VERSION,
                 decoder_identity=decoder_identity,
@@ -303,7 +342,7 @@ class FrameDerivationService:
             async with serialized_artifacts(
                 self._sessions, user_id=user_id, project_name=project_name, artifact_keys=(parent_artifact_key,)
             ) as session:
-                current, _ = await self._parent(
+                current, _, _ = await self._parent(
                     session,
                     user_id=user_id,
                     project_name=project_name,
