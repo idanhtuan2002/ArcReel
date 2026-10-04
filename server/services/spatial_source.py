@@ -284,6 +284,11 @@ class FrameDerivationService:
             },
         )
         async with self._sessions() as read_session:
+            prior_command = await SpatialFrameReceiptRepository(read_session).get_by_command(
+                user_id=user_id, project_name=project_name, command_id=command_id
+            )
+            if prior_command is not None and prior_command.command_digest != command_digest:
+                raise FrameSourceConflictError("frame command conflicts with an existing receipt")
             initial, parent_path, parent_candidate = await self._parent(
                 read_session,
                 user_id=user_id,

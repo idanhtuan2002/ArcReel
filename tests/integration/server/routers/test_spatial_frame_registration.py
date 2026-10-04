@@ -393,6 +393,8 @@ async def test_command_conflict_and_crash_after_file_publication(
 
     with pytest.raises(FrameSourceConflictError, match="command conflicts"):
         await service.derive(**{**request, "decoded_frame_index": 1})
+    with pytest.raises(FrameSourceConflictError, match="command conflicts"):
+        await service.derive(**{**request, "decoded_frame_index": spatial_source.MAX_DECODED_FRAME_INDEX + 1})
     assert await _row_count(session_factory, SpatialFrameReceiptModel) == 1
     assert receipt.frame_candidate_id.startswith("m8f:")
 
