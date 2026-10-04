@@ -1,6 +1,6 @@
 # M8-C frame receipt consumer seam — source-backed candidate
 
-Status: proposed interface for the next M8-C gate, **not** a pair-admission implementation or C1 acceptance. Frame-custody code/test checkpoint: `eb9bd2e60148e0014c49473131b93b35a6770091`; exact-HEAD independent review was interrupted by usage limit, while the PostgreSQL frame fixture passed separately. C1 working tree: `impl/r2-m8c-spatial-candidates` at `774952b235aa899c0125ee2109d426e9bc6dc9ff` plus eight preserved dirty paths.
+Status: proposed interface for the next M8-C gate, **not** a pair-admission implementation or C1 acceptance. Frame-custody code/test checkpoint: `eb9bd2e60148e0014c49473131b93b35a6770091`; the full integrated diff received an independent no-actionable-defect review at documentation HEAD `656a7e2475e9abaf2c10e5d6c9167f6d5f36d6c3` after PostgreSQL fixture verification. C1 working tree: `impl/r2-m8c-spatial-candidates` at `774952b235aa899c0125ee2109d426e9bc6dc9ff` plus eight preserved dirty paths.
 
 ## Current source facts
 
