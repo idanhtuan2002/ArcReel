@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.artifact_manifest import ArtifactKey, ProjectArtifactManifestAdapter
@@ -22,6 +22,27 @@ from server.services.spatial_source import FrameDerivationService, FrameSourceCo
 from tests.integration.server.routers.test_gates_export import PROJECT, USER, _approve_shot
 
 type Factory = async_sessionmaker[AsyncSession]
+
+
+async def _wait_for_blocked_master_writer(factory: Factory, approval: asyncio.Task[str]) -> None:
+    async with asyncio.timeout(10):
+        while True:
+            async with factory() as observer:
+                blocked = (
+                    await observer.execute(
+                        text(
+                            "SELECT pid FROM pg_stat_activity "
+                            "WHERE datname = current_database() AND wait_event_type = 'Lock' "
+                            "AND query ILIKE '%UPDATE master_authorities%' "
+                            "AND cardinality(pg_blocking_pids(pid)) > 0"
+                        )
+                    )
+                ).first()
+            if blocked is not None:
+                assert not approval.done()
+                return
+            if approval.done():
+                raise AssertionError("Gate C approval finished without waiting on the master row")
 
 
 @pytest.mark.asyncio
@@ -204,8 +225,7 @@ async def test_parent_approval_waits_for_locked_reader_on_postgres(
             expected_parent_artifact_key=key,
         )
         approval = asyncio.create_task(_approve_shot(concurrent_gate_client, project_dir, "SH01", b"reader-next"))
-        await asyncio.sleep(0.2)
-        assert not approval.done()
+        await _wait_for_blocked_master_writer(concurrent_session_factory, approval)
         assert verified.png_bytes.startswith(b"\x89PNG\r\n\x1a\n")
     await asyncio.wait_for(approval, timeout=10)
     with pytest.raises(FrameSourceConflictError, match="superseded"):
@@ -275,8 +295,7 @@ async def test_current_reader_holds_parent_lock_through_frame_snapshot_on_postgr
     try:
         assert await asyncio.to_thread(entered.wait, 10)
         approval = asyncio.create_task(_approve_shot(concurrent_gate_client, project_dir, "SH01", b"reader-next"))
-        await asyncio.sleep(0.2)
-        assert not approval.done()
+        await _wait_for_blocked_master_writer(concurrent_session_factory, approval)
     finally:
         release.set()
     verified = await asyncio.wait_for(reading, timeout=10)
