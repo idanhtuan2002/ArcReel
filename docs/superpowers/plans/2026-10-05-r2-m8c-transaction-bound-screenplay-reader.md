@@ -64,3 +64,7 @@
 ## Plan Self-Review
 
 This packet covers only the reusable admission reader seam. It intentionally does not create target registry schema, version/head writer, command receipts, binding authority, pair admission or promotion. Those require the proposed ADR-0102 design gate and a separate plan with real target-version digest vectors and cross-writer lock tests. The two tasks share one method signature, keep current callers intact and have distinct test gates. The five review-focus risks map to tests above.
+
+## Execution checkpoint — 2026-10-05
+
+Commit `46f9ebade788e1e56bbaa4b86a8401b5268d41b7` implements both reader interfaces without changing the public signature. The shared-function and bound-reader tests first failed on missing imports. The full affected admission, Take and M8-C vector selection passed **39 tests on disposable PostgreSQL 16** with `-n 4 --dist loadfile`, and **37 passed, 2 PostgreSQL-only skipped** on SQLite. A PostgreSQL test captures the re-admission writer's backend PID, verifies `pg_blocking_pids` names the bound reader's own PID, releases the caller transaction, and confirms the old admission is then rejected. Alembic upgraded the disposable database to `8b8c4a0e0001`; the container was stopped and auto-removed. Ruff, changed-file formatting, basedpyright (**0 errors, 0 warnings**), lint-imports (**22 kept**), deptry, test audit (**0 violations**) and `git diff --check` passed. The code remains pending independent review of this new exact diff; target registry and binding authority are still proposed.

@@ -49,6 +49,10 @@ def test_target_registry_vectors_have_fixed_preparation_bytes_and_digests() -> N
         "shot_body_v2",
         "scene_version_v2",
         "shot_version_v2",
+        "registration_command_v1",
+        "registration_result_v1",
+        "registration_command_v2",
+        "registration_result_v2",
     }
     for name, case in cases.items():
         envelope = {"domain": case["domain"], "canonical_version": "1", "body": case["body"]}
@@ -112,3 +116,32 @@ def test_target_registry_body_vectors_match_take_derivation() -> None:
         assert [shot.model_dump(mode="json") for shot in result.shots] == [
             cases[f"shot_body_{suffix}"]["body"]["target"]
         ]
+
+
+def test_registration_receipt_vectors_bind_full_admission_and_ordered_target_versions() -> None:
+    cases = _cases()
+    for suffix in ("v1", "v2"):
+        command = cases[f"registration_command_{suffix}"]
+        result = cases[f"registration_result_{suffix}"]
+        scene = cases[f"scene_version_{suffix}"]
+        shot = cases[f"shot_version_{suffix}"]
+        assert command["body"]["admitted_screenplay_ref"] == scene["body"]["admitted_screenplay_ref"]
+        assert result["body"]["command_digest"] == command["digest"]
+        assert result["body"]["scene_targets"] == [
+            {
+                "target_type": "SCENE",
+                "target_id": scene["body"]["target_id"],
+                "registry_version": scene["body"]["registry_version"],
+                "version_digest": scene["digest"],
+            }
+        ]
+        assert result["body"]["shot_targets"] == [
+            {
+                "target_type": "SHOT",
+                "target_id": shot["body"]["target_id"],
+                "registry_version": shot["body"]["registry_version"],
+                "version_digest": shot["digest"],
+            }
+        ]
+    assert cases["registration_command_v1"]["digest"] != cases["registration_command_v2"]["digest"]
+    assert cases["registration_result_v1"]["digest"] != cases["registration_result_v2"]["digest"]
