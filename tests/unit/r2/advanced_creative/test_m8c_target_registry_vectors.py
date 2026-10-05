@@ -8,10 +8,18 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from r2.contracts import canonical_json_bytes
 from r2.contracts.adaptation import AdmittedScreenplayRef, ArtifactVersionRef, DecisionRef, ScreenplayArtifactV2
 from r2.contracts.production import SceneSpec, ShotSpecV2
 from r2.production_intelligence.take_director import TakeDirectionResult, TakeDirectorAdapter
+from r2.target_registry.digests import (
+    registration_command_digest,
+    registration_result_digest,
+    target_body_digest,
+    target_version_digest,
+)
 
 FIXTURE = Path(__file__).resolve().parents[3] / "fixtures/r2/m8c_target_registry_vectors.json"
 
@@ -145,3 +153,38 @@ def test_registration_receipt_vectors_bind_full_admission_and_ordered_target_ver
         ]
     assert cases["registration_command_v1"]["digest"] != cases["registration_command_v2"]["digest"]
     assert cases["registration_result_v1"]["digest"] != cases["registration_result_v2"]["digest"]
+
+
+def test_registry_digest_helpers_match_fixed_target_and_receipt_vectors() -> None:
+    cases = _cases()
+    for suffix in ("v1", "v2"):
+        scene_body = cases[f"scene_body_{suffix}"]
+        shot_body = cases[f"shot_body_{suffix}"]
+        assert (
+            target_body_digest("SCENE", SceneSpec.model_validate(scene_body["body"]["target"])) == scene_body["digest"]
+        )
+        assert target_body_digest("SHOT", ShotSpecV2.model_validate(shot_body["body"]["target"])) == shot_body["digest"]
+        for kind in ("scene", "shot"):
+            version = cases[f"{kind}_version_{suffix}"]
+            assert target_version_digest(version["body"]) == version["digest"]
+        command = cases[f"registration_command_{suffix}"]
+        result = cases[f"registration_result_{suffix}"]
+        assert registration_command_digest(command["body"]) == command["digest"]
+        assert registration_result_digest(result["body"]) == result["digest"]
+
+
+def test_registry_digest_helpers_reject_mismatched_type_dependency_and_order() -> None:
+    cases = _cases()
+    scene = SceneSpec.model_validate(cases["scene_body_v1"]["body"]["target"])
+    with pytest.raises(ValueError, match="target type does not match"):
+        target_body_digest("SHOT", scene)
+    with pytest.raises(ValueError, match="not a valid ProductionBindingTarget"):
+        target_body_digest("FORMAT", scene)
+
+    shot_version = cases["shot_version_v1"]["body"]
+    with pytest.raises(ValueError, match="only a SHOT target version"):
+        target_version_digest(shot_version | {"scene_dependency": None})
+
+    result = cases["registration_result_v1"]["body"]
+    with pytest.raises(ValueError, match="typed, unique and sorted"):
+        registration_result_digest(result | {"scene_targets": result["scene_targets"] * 2})
