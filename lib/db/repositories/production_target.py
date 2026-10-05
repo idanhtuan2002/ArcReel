@@ -3,21 +3,37 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from pydantic import ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.db.models.production_target import ProductionTargetHeadModel, ProductionTargetVersionModel
+from lib.db.models.production_target import (
+    ProductionTargetCommandModel,
+    ProductionTargetHeadModel,
+    ProductionTargetVersionModel,
+)
 from r2.contracts.adaptation import AdmittedScreenplayRef
 from r2.contracts.enums import CreativeApprovalStatus, ProductionBindingTarget
 from r2.contracts.production import SceneSpec, ShotSpecV2
-from r2.contracts.production_target import TargetVersionBody, TargetVersionRef
-from r2.target_registry.digests import target_body_digest, target_version_digest
+from r2.contracts.production_target import (
+    TargetRegistrationResult,
+    TargetRegistrationResultBody,
+    TargetVersionBody,
+    TargetVersionRef,
+)
+from r2.target_registry.digests import registration_result_digest, target_body_digest, target_version_digest
 
 
 class ProductionTargetIntegrityError(ValueError):
     """A scoped target head, version or dependency fails authority validation."""
+
+
+class ProductionTargetCommandConflictError(ValueError):
+    """A scoped command ID has already been used for different input."""
 
 
 @dataclass(frozen=True)
@@ -31,6 +47,182 @@ class VerifiedTargetVersion:
 class ProductionTargetRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def get_command_receipt(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        principal: str,
+        command_id: str,
+        expected_command_digest: str,
+    ) -> TargetRegistrationResult | None:
+        row = await self.session.get(
+            ProductionTargetCommandModel, (user_id, project_name, principal, command_id), populate_existing=True
+        )
+        if row is None:
+            return None
+        try:
+            body = TargetRegistrationResultBody.model_validate(row.result_json)
+            if (
+                row.result_json != body.model_dump(mode="json")
+                or body.command_digest != row.command_digest
+                or registration_result_digest(body) != row.result_digest
+            ):
+                raise ValueError("receipt columns disagree with canonical result")
+        except (ValidationError, ValueError) as exc:
+            raise ProductionTargetIntegrityError("registration receipt integrity verification failed") from exc
+        if row.command_digest != expected_command_digest:
+            raise ProductionTargetCommandConflictError("registration command ID has different input")
+        return TargetRegistrationResult.model_validate(
+            body.model_dump(mode="json") | {"result_digest": row.result_digest}
+        )
+
+    async def lock_target_head(
+        self, *, user_id: str, project_name: str, target_type: ProductionBindingTarget | str, target_id: str
+    ) -> ProductionTargetHeadModel:
+        kind = ProductionBindingTarget(target_type)
+        insert = pg_insert if self.session.get_bind().dialect.name == "postgresql" else sqlite_insert
+        statement = insert(ProductionTargetHeadModel).values(
+            user_id=user_id,
+            project_name=project_name,
+            target_type=kind.value,
+            target_id=target_id,
+            current_version=None,
+            current_version_digest=None,
+        )
+        await self.session.execute(
+            statement.on_conflict_do_nothing(index_elements=["user_id", "project_name", "target_type", "target_id"])
+        )
+        head = await self._head(
+            user_id=user_id, project_name=project_name, target_type=kind, target_id=target_id, lock=True
+        )
+        if head is None:
+            raise ProductionTargetIntegrityError("target head disappeared after scoped claim")
+        if (head.current_version is None) != (head.current_version_digest is None):
+            raise ProductionTargetIntegrityError("target head has incomplete current pair")
+        return head
+
+    async def append_version(
+        self, *, head: ProductionTargetHeadModel, body: TargetVersionBody, target: SceneSpec | ShotSpecV2
+    ) -> TargetVersionRef:
+        if (
+            (head.user_id, head.project_name, head.target_type, head.target_id)
+            != (body.user_id, body.project_name, body.target_type.value, body.target_id)
+            or body.registry_version != (head.current_version or 0) + 1
+            or target.id != body.target_id
+            or target.approval_status != CreativeApprovalStatus.APPROVED
+            or (body.target_type == ProductionBindingTarget.SCENE and not isinstance(target, SceneSpec))
+            or (body.target_type == ProductionBindingTarget.SHOT and not isinstance(target, ShotSpecV2))
+            or target_body_digest(body.target_type, target) != body.target_body_digest
+        ):
+            raise ProductionTargetIntegrityError("target append disagrees with locked head or canonical body")
+        if head.current_version is not None:
+            await self._version(head)
+        dependency = body.scene_dependency
+        if dependency is not None:
+            if not isinstance(target, ShotSpecV2) or target.scene_id != dependency.target_id:
+                raise ProductionTargetIntegrityError("Shot scene dependency disagrees with target body")
+            scene_head = await self._head(
+                user_id=body.user_id,
+                project_name=body.project_name,
+                target_type=ProductionBindingTarget.SCENE,
+                target_id=dependency.target_id,
+                lock=True,
+            )
+            if scene_head is None:
+                raise ProductionTargetIntegrityError("Shot scene dependency is missing")
+            scene = self._verify_row(await self._version(scene_head), body.admitted_screenplay_ref)
+            if (scene.ref.registry_version, scene.ref.version_digest) != (
+                dependency.registry_version,
+                dependency.target_version_digest,
+            ):
+                raise ProductionTargetIntegrityError("Shot scene dependency is not current")
+        digest = target_version_digest(body)
+        self.session.add(
+            ProductionTargetVersionModel(
+                user_id=body.user_id,
+                project_name=body.project_name,
+                target_type=body.target_type.value,
+                target_id=body.target_id,
+                registry_version=body.registry_version,
+                target_body_json=target.model_dump(mode="json"),
+                target_body_digest=body.target_body_digest,
+                admitted_screenplay_ref_json=body.admitted_screenplay_ref.model_dump(mode="json"),
+                take_derivation_version=body.take_derivation_version,
+                version_digest=digest,
+                scene_target_type=None if dependency is None else dependency.target_type,
+                scene_target_id=None if dependency is None else dependency.target_id,
+                scene_registry_version=None if dependency is None else dependency.registry_version,
+                scene_version_digest=None if dependency is None else dependency.target_version_digest,
+                created_at=datetime.now(UTC),
+            )
+        )
+        await self.session.flush()
+        return TargetVersionRef(
+            target_type=body.target_type,
+            target_id=body.target_id,
+            registry_version=body.registry_version,
+            version_digest=digest,
+        )
+
+    async def advance_head(
+        self,
+        *,
+        head: ProductionTargetHeadModel,
+        expected_version: int | None,
+        expected_digest: str | None,
+        new_ref: TargetVersionRef,
+    ) -> None:
+        current = await self._head(
+            user_id=head.user_id,
+            project_name=head.project_name,
+            target_type=ProductionBindingTarget(head.target_type),
+            target_id=head.target_id,
+            lock=True,
+        )
+        if (
+            current is None
+            or (current.current_version, current.current_version_digest) != (expected_version, expected_digest)
+            or (new_ref.target_type.value, new_ref.target_id) != (head.target_type, head.target_id)
+            or new_ref.registry_version != (expected_version or 0) + 1
+        ):
+            raise ProductionTargetIntegrityError("target head predecessor or new reference disagrees")
+        row = await self.session.get(
+            ProductionTargetVersionModel,
+            (head.user_id, head.project_name, head.target_type, head.target_id, new_ref.registry_version),
+            populate_existing=True,
+        )
+        if row is None or row.version_digest != new_ref.version_digest:
+            raise ProductionTargetIntegrityError("target head successor version is missing or mismatched")
+        current.current_version = new_ref.registry_version
+        current.current_version_digest = new_ref.version_digest
+        await self.session.flush()
+
+    async def record_command(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        principal: str,
+        command_id: str,
+        result: TargetRegistrationResultBody,
+    ) -> TargetRegistrationResult:
+        digest = registration_result_digest(result)
+        self.session.add(
+            ProductionTargetCommandModel(
+                user_id=user_id,
+                project_name=project_name,
+                principal=principal,
+                command_id=command_id,
+                command_digest=result.command_digest,
+                result_json=result.model_dump(mode="json"),
+                result_digest=digest,
+                created_at=datetime.now(UTC),
+            )
+        )
+        await self.session.flush()
+        return TargetRegistrationResult.model_validate(result.model_dump(mode="json") | {"result_digest": digest})
 
     async def _head(
         self, *, user_id: str, project_name: str, target_type: ProductionBindingTarget, target_id: str, lock: bool
@@ -214,4 +406,9 @@ class ProductionTargetRepository:
         return shot
 
 
-__all__ = ["ProductionTargetIntegrityError", "ProductionTargetRepository", "VerifiedTargetVersion"]
+__all__ = [
+    "ProductionTargetCommandConflictError",
+    "ProductionTargetIntegrityError",
+    "ProductionTargetRepository",
+    "VerifiedTargetVersion",
+]
