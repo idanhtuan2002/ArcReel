@@ -16,7 +16,7 @@ import json
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import delete, update
+from sqlalchemy import delete, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.adaptation_uow import SqlAlchemyAdaptationUnitOfWork, adaptation_uow_factory
@@ -37,7 +37,11 @@ from r2.adaptation.evaluation import ProfileEvaluationService, report_ref_of
 from r2.adaptation.evidence import AdaptationEvidenceService
 from r2.adaptation.hashing import compute_adaptation_hash, compute_profile_evaluation_report_digest
 from r2.adaptation.profiles import _PACKS_DIR, _compute_policy_pack_digest
-from r2.adaptation.screenplay_reader import ApprovedScreenplayReader
+from r2.adaptation.screenplay_reader import (
+    ApprovedScreenplayReader,
+    TransactionBoundApprovedScreenplayReader,
+    resolve_exact_admitted,
+)
 from r2.advanced_creative.digests import digest_canonical
 from r2.contracts import MethodDecision, ProductionMethod, ResolvedIdentityStatus, ResolvedVisualIdentity
 from r2.contracts.adaptation import (
@@ -310,6 +314,136 @@ async def test_admit_a_clean_proposal_succeeds_and_reader_resolves_it(
     assert resolved.approval_status == CreativeApprovalStatus.APPROVED
     assert resolved.locked_for_direction is True
     assert resolved.version == proposal.version + 1
+
+
+async def test_shared_admission_resolution_matches_public_reader(
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+    screenplay_reader: ApprovedScreenplayReader,
+    session_factory: Factory,
+    corrupt_admission_head,
+) -> None:
+    branch, map_receipt, proposal, report = await _seed_admissible_proposal(
+        adaptation_evidence_service, authority_service, evaluation_service
+    )
+    command = _admit_command(
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+    )
+    receipt = await authority_service.admit_screenplay_for_direction(command, authenticated_principal=_PRINCIPAL)
+    ref = _screenplay_ref(command.admitted_screenplay)
+    public = await screenplay_reader.get_exact_admitted(
+        user_id=USER, project_name=PROJECT, screenplay_ref=ref, admission_ref=receipt.decision_ref
+    )
+    stale_ref = DecisionRef(decision_id="d-stale", decision_digest="sha256:" + "cc" * 32)
+    with pytest.raises(AdaptationNotFoundError):
+        await screenplay_reader.get_exact_admitted(
+            user_id=USER, project_name=PROJECT, screenplay_ref=ref, admission_ref=stale_ref
+        )
+    for scope in (("foreign-user", PROJECT), (USER, "foreign-project")):
+        with pytest.raises(AdaptationNotFoundError):
+            await screenplay_reader.get_exact_admitted(
+                user_id=scope[0], project_name=scope[1], screenplay_ref=ref, admission_ref=receipt.decision_ref
+            )
+
+    async with session_factory() as session:
+        shared = await resolve_exact_admitted(
+            AdaptationRepository(session),
+            user_id=USER,
+            project_name=PROJECT,
+            screenplay_ref=ref,
+            admission_ref=receipt.decision_ref,
+            expected_profile_ref=branch.profile_ref,
+        )
+        assert shared == public
+        assert session.in_transaction()
+        with pytest.raises(AdaptationNotFoundError):
+            await resolve_exact_admitted(
+                AdaptationRepository(session),
+                user_id=USER,
+                project_name=PROJECT,
+                screenplay_ref=ref,
+                admission_ref=stale_ref,
+            )
+
+        for scope in (("foreign-user", PROJECT), (USER, "foreign-project")):
+            with pytest.raises(AdaptationNotFoundError):
+                await resolve_exact_admitted(
+                    AdaptationRepository(session),
+                    user_id=scope[0],
+                    project_name=scope[1],
+                    screenplay_ref=ref,
+                    admission_ref=receipt.decision_ref,
+                )
+
+    await corrupt_admission_head(screenplay_id=ref.artifact_id, selected_artifact_id="sp-nonexistent")
+    with pytest.raises(AdaptationAuthorityIntegrityError):
+        await screenplay_reader.get_exact_admitted(
+            user_id=USER, project_name=PROJECT, screenplay_ref=ref, admission_ref=receipt.decision_ref
+        )
+    async with session_factory() as session:
+        with pytest.raises(AdaptationAuthorityIntegrityError):
+            await resolve_exact_admitted(
+                AdaptationRepository(session),
+                user_id=USER,
+                project_name=PROJECT,
+                screenplay_ref=ref,
+                admission_ref=receipt.decision_ref,
+            )
+
+
+async def test_bound_admission_reader_checks_profile_and_keeps_caller_transaction(
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+    session_factory: Factory,
+) -> None:
+    branch, map_receipt, proposal, report = await _seed_admissible_proposal(
+        adaptation_evidence_service, authority_service, evaluation_service
+    )
+    command = _admit_command(
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+    )
+    receipt = await authority_service.admit_screenplay_for_direction(command, authenticated_principal=_PRINCIPAL)
+    admitted = AdmittedScreenplayRef(
+        screenplay_ref=_screenplay_ref(command.admitted_screenplay),
+        admission_ref=receipt.decision_ref,
+        profile_ref=branch.profile_ref,
+    )
+    forged_profile = branch.profile_ref.model_copy(update={"policy_pack_digest": "sha256:" + "ff" * 32})
+    forged = admitted.model_copy(update={"profile_ref": forged_profile})
+
+    async with session_factory() as session:
+        reader = TransactionBoundApprovedScreenplayReader(AdaptationRepository(session), expected_admission=admitted)
+        result = await TakeDirectorAdapter(reader, user_id=USER, project_name=PROJECT).direct(admitted)
+        assert isinstance(result, TakeDirectionResult)
+        assert session.in_transaction()
+
+        with pytest.raises(AdaptationNotFoundError):
+            await TransactionBoundApprovedScreenplayReader(
+                AdaptationRepository(session), expected_admission=forged
+            ).get_exact_admitted(
+                user_id=USER,
+                project_name=PROJECT,
+                screenplay_ref=forged.screenplay_ref,
+                admission_ref=forged.admission_ref,
+            )
+        assert session.in_transaction()
+
+        with pytest.raises(AdaptationNotFoundError):
+            await reader.get_exact_admitted(
+                user_id=USER,
+                project_name=PROJECT,
+                screenplay_ref=admitted.screenplay_ref,
+                admission_ref=DecisionRef(decision_id="foreign-decision", decision_digest="sha256:" + "bb" * 32),
+            )
+        assert session.in_transaction()
 
 
 async def test_successive_admissions_reuse_take_target_ids_and_body_versions(
@@ -1081,6 +1215,99 @@ class _BarrierBeforeHeadLockUnitOfWork(SqlAlchemyAdaptationUnitOfWork):
         await super().__aenter__()
         self.repository = _BarrierBeforeHeadLockRepository(self.session, self._barrier)
         return self
+
+
+class _TrackedAdmissionUnitOfWork(SqlAlchemyAdaptationUnitOfWork):
+    def __init__(self, session_factory: Factory, pid_future: asyncio.Future[int]) -> None:
+        super().__init__(session_factory)
+        self._pid_future = pid_future
+
+    async def __aenter__(self) -> _TrackedAdmissionUnitOfWork:
+        await super().__aenter__()
+        pid = await self.session.scalar(text("SELECT pg_backend_pid()"))
+        assert isinstance(pid, int)
+        self._pid_future.set_result(pid)
+        return self
+
+
+async def test_bound_reader_holds_admission_head_until_caller_transaction_ends(
+    concurrent_session_factory: Factory,
+) -> None:
+    async with concurrent_session_factory() as probe:
+        if probe.bind.dialect.name == "sqlite":
+            pytest.skip("row-lock interleaving requires PostgreSQL")
+
+    evidence = AdaptationEvidenceService(adaptation_uow_factory(concurrent_session_factory))
+    authority = AdaptationAuthorityService(adaptation_uow_factory(concurrent_session_factory), FakeAuthority())
+    evaluation = ProfileEvaluationService(adaptation_uow_factory(concurrent_session_factory))
+    branch, map_receipt, proposal, report = await _seed_admissible_proposal(evidence, authority, evaluation)
+    admit = _admit_command(
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+    )
+    admitted = await authority.admit_screenplay_for_direction(admit, authenticated_principal=_PRINCIPAL)
+    ref = AdmittedScreenplayRef(
+        screenplay_ref=_screenplay_ref(admit.admitted_screenplay),
+        admission_ref=admitted.decision_ref,
+        profile_ref=branch.profile_ref,
+    )
+    revoke = _admit_command(
+        decision_id="d-admit-bound-revoke",
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+        expected_predecessor_id=admit.decision_id,
+        action=AdaptationDecisionAction.REVOKE,
+    )
+    writer_pid: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+    tracked_authority = AdaptationAuthorityService(
+        lambda: _TrackedAdmissionUnitOfWork(concurrent_session_factory, writer_pid), FakeAuthority()
+    )
+
+    async with concurrent_session_factory() as reader_session:
+        reader_pid = await reader_session.scalar(text("SELECT pg_backend_pid()"))
+        assert isinstance(reader_pid, int)
+        reader = TransactionBoundApprovedScreenplayReader(AdaptationRepository(reader_session), expected_admission=ref)
+        assert await reader.get_exact_admitted(
+            user_id=USER,
+            project_name=PROJECT,
+            screenplay_ref=ref.screenplay_ref,
+            admission_ref=ref.admission_ref,
+        )
+        writer = asyncio.create_task(
+            tracked_authority.admit_screenplay_for_direction(revoke, authenticated_principal=_PRINCIPAL)
+        )
+        try:
+            pid = await asyncio.wait_for(writer_pid, timeout=_DEADLOCK_TIMEOUT_S)
+
+            async def blocked_by_reader() -> bool:
+                async with concurrent_session_factory() as lock_probe:
+                    blockers = await lock_probe.scalar(text("SELECT pg_blocking_pids(:pid)"), {"pid": pid})
+                    return isinstance(blockers, list) and reader_pid in blockers
+
+            async with asyncio.timeout(_DEADLOCK_TIMEOUT_S):
+                while not await blocked_by_reader():
+                    assert not writer.done()
+                    await asyncio.sleep(0.02)
+        finally:
+            await reader_session.rollback()
+
+    revoked = await asyncio.wait_for(writer, timeout=_DEADLOCK_TIMEOUT_S)
+    assert revoked.current_at_return is False
+    async with concurrent_session_factory() as verify_session:
+        stale_reader = TransactionBoundApprovedScreenplayReader(
+            AdaptationRepository(verify_session), expected_admission=ref
+        )
+        with pytest.raises(AdaptationNotFoundError):
+            await stale_reader.get_exact_admitted(
+                user_id=USER,
+                project_name=PROJECT,
+                screenplay_ref=ref.screenplay_ref,
+                admission_ref=ref.admission_ref,
+            )
 
 
 async def _run_capturing(coro):
