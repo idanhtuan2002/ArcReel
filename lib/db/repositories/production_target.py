@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,9 +44,66 @@ class VerifiedTargetVersion:
     take_derivation_version: str
 
 
+@dataclass(frozen=True)
+class TargetAdmissionHint:
+    ref: TargetVersionRef
+    admitted_screenplay_ref: AdmittedScreenplayRef
+
+
 class ProductionTargetRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def peek_current_admission_hint(
+        self, *, user_id: str, project_name: str, target_type: ProductionBindingTarget | str, target_id: str
+    ) -> TargetAdmissionHint | None:
+        kind = ProductionBindingTarget(target_type)
+        head = ProductionTargetHeadModel
+        version = ProductionTargetVersionModel
+        row = (
+            await self.session.execute(
+                select(
+                    head.current_version,
+                    head.current_version_digest,
+                    version.version_digest,
+                    version.admitted_screenplay_ref_json,
+                )
+                .select_from(head)
+                .outerjoin(
+                    version,
+                    and_(
+                        version.user_id == head.user_id,
+                        version.project_name == head.project_name,
+                        version.target_type == head.target_type,
+                        version.target_id == head.target_id,
+                        version.registry_version == head.current_version,
+                    ),
+                )
+                .where(
+                    head.user_id == user_id,
+                    head.project_name == project_name,
+                    head.target_type == kind.value,
+                    head.target_id == target_id,
+                )
+            )
+        ).one_or_none()
+        if row is None:
+            return None
+        current_version, head_digest, version_digest, admission_json = row
+        if current_version is None or head_digest is None or version_digest != head_digest or admission_json is None:
+            raise ProductionTargetIntegrityError("target admission hint has no complete current version")
+        try:
+            return TargetAdmissionHint(
+                ref=TargetVersionRef(
+                    target_type=kind,
+                    target_id=target_id,
+                    registry_version=current_version,
+                    version_digest=head_digest,
+                ),
+                admitted_screenplay_ref=AdmittedScreenplayRef.model_validate(admission_json),
+            )
+        except (ValidationError, ValueError) as exc:
+            raise ProductionTargetIntegrityError("target admission hint is malformed") from exc
 
     async def get_command_receipt(
         self,
@@ -417,5 +474,6 @@ __all__ = [
     "ProductionTargetCommandConflictError",
     "ProductionTargetIntegrityError",
     "ProductionTargetRepository",
+    "TargetAdmissionHint",
     "VerifiedTargetVersion",
 ]
