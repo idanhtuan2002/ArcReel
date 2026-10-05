@@ -26,6 +26,7 @@ _DIGEST_DOMAINS = {
     "binding_identity": "r2.m8.spatial.binding.identity.v1",
     "source_group": "r2.m8.spatial.binding.source_group.v1",
     "binding_body": "r2.m8.spatial.binding.body.v1",
+    "binding_core": "r2.m8.spatial.binding.core.v1",
     "frame_claim": "r2.m8.spatial.binding.frame_claim.v1",
     "binding_envelope": "r2.m8.spatial.binding.envelope.v1",
     "binding_create_command": "r2.m8.spatial.binding.create.command.v1",
@@ -105,6 +106,38 @@ def binding_envelope_digest(body: Mapping[str, Any]) -> str:
     return _digest("binding_envelope", envelope.model_dump(mode="json"))
 
 
+def binding_core_digest(*, body: ProductionBinding, envelope: BindingEnvelopeV1) -> str:
+    if envelope.binding_body_digest != binding_body_digest(body):
+        raise ValueError("binding core body digest does not match envelope")
+    binding_envelope_digest(envelope.model_dump(mode="json"))
+    frame_ids = [claim.frame_candidate_id for claim in envelope.ordered_claims]
+    if (
+        envelope.binding_id != body.id
+        or envelope.binding_version != body.version
+        or envelope.target_ref.target_id != body.target_id
+        or frame_ids != body.asset_refs
+        or source_group_ref(user_id=envelope.user_id, project_name=envelope.project_name, frame_candidate_ids=frame_ids)
+        != body.production_ref
+        or scoped_location_binding_id(
+            user_id=envelope.user_id, project_name=envelope.project_name, target_id=body.target_id
+        )
+        != body.id
+    ):
+        raise ValueError("binding core identity differs from the verified body and envelope")
+    stable_body = body.model_dump(mode="json", exclude={"version"})
+    return _digest(
+        "binding_core",
+        {
+            "user_id": envelope.user_id,
+            "project_name": envelope.project_name,
+            "binding": stable_body,
+            "scene_ref": envelope.scene_ref.model_dump(mode="json"),
+            "target_ref": envelope.target_ref.model_dump(mode="json"),
+            "ordered_source_claim_digests": [claim.claim_digest for claim in envelope.ordered_claims],
+        },
+    )
+
+
 def binding_create_command_digest(body: Mapping[str, Any]) -> str:
     command = BindingCreateCommandV1.model_validate(body)
     return _digest("binding_create_command", command.model_dump(mode="json"))
@@ -122,6 +155,7 @@ def binding_snapshot_digest(body: Mapping[str, Any]) -> str:
 
 __all__ = [
     "binding_body_digest",
+    "binding_core_digest",
     "binding_create_command_digest",
     "binding_create_result_digest",
     "binding_envelope_digest",

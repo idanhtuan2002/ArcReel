@@ -52,6 +52,47 @@
       "digest": "sha256:1f4ffe6b4ac73edaae62754ec794d9899850f2369664c3ec227135028f9ce376"
     },
     {
+      "name": "binding_core",
+      "domain": "r2.m8.spatial.binding.core.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "demo",
+        "binding": {
+          "id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+          "schema_version": "1",
+          "target_type": "SHOT",
+          "target_id": "shot-room-1",
+          "semantic_ref": "location:room-1",
+          "production_ref": "m8g:4d7fbee57c3758c3f2c4e2c130032363f015fc383e46e1e103193a315e793b68",
+          "role": "LOCATION",
+          "asset_refs": [
+            "m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ],
+          "variant_ref": null,
+          "state_ref": null
+        },
+        "scene_ref": {
+          "target_type": "SCENE",
+          "target_id": "scene-room-1",
+          "registry_version": 2,
+          "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "target_ref": {
+          "target_type": "SHOT",
+          "target_id": "shot-room-1",
+          "registry_version": 3,
+          "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+        },
+        "ordered_source_claim_digests": [
+          "sha256:3d5cef2b6e70543d7b8e3b52dd0c62829a92430b947fe5c9fe88fca16e96f9e3",
+          "sha256:7a7641b4afb586fee95b7a1d347ab1ae19fe39b1adee032b8eff2856a641d6b0"
+        ]
+      },
+      "canonical": "{\"body\":{\"binding\":{\"asset_refs\":[\"m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"],\"id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"production_ref\":\"m8g:4d7fbee57c3758c3f2c4e2c130032363f015fc383e46e1e103193a315e793b68\",\"role\":\"LOCATION\",\"schema_version\":\"1\",\"semantic_ref\":\"location:room-1\",\"state_ref\":null,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"variant_ref\":null},\"ordered_source_claim_digests\":[\"sha256:3d5cef2b6e70543d7b8e3b52dd0c62829a92430b947fe5c9fe88fca16e96f9e3\",\"sha256:7a7641b4afb586fee95b7a1d347ab1ae19fe39b1adee032b8eff2856a641d6b0\"],\"project_name\":\"demo\",\"scene_ref\":{\"registry_version\":2,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\",\"version_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"target_ref\":{\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"version_digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.binding.core.v1\"}",
+      "digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2"
+    },
+    {
       "name": "frame_claim_a",
       "domain": "r2.m8.spatial.binding.frame_claim.v1",
       "body": {

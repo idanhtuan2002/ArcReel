@@ -20,6 +20,7 @@ from r2.contracts.production_binding_authority import (
 )
 from r2.production_binding.digests import (
     binding_body_digest,
+    binding_core_digest,
     binding_create_command_digest,
     binding_create_result_digest,
     binding_envelope_digest,
@@ -44,6 +45,10 @@ def test_fixed_location_binding_v1_bytes_and_digests() -> None:
         ),
         "source_group": lambda body: source_group_ref(**body),
         "binding_body": lambda body: binding_body_digest(ProductionBinding.model_validate(body)),
+        "binding_core": lambda body: binding_core_digest(
+            body=ProductionBinding.model_validate(cases["binding_body"]["body"]),
+            envelope=BindingEnvelopeV1.model_validate(cases["binding_envelope"]["body"]),
+        ),
         "frame_claim_a": frame_source_claim_digest,
         "frame_claim_b": frame_source_claim_digest,
         "binding_envelope": binding_envelope_digest,
@@ -84,6 +89,58 @@ def test_binding_claim_and_snapshot_change_with_source_or_target() -> None:
         "target_versions": [snapshot["target_versions"][0], {**shot, "version_digest": "sha256:" + "f" * 64}],
     }
     assert binding_snapshot_digest(changed_snapshot) != cases["binding_snapshot"]["digest"]
+
+
+def test_pair_core_digest_is_stable_across_binding_version_and_sensitive_to_sources() -> None:
+    cases = _cases()
+    body = ProductionBinding.model_validate(cases["binding_body"]["body"])
+    envelope = BindingEnvelopeV1.model_validate(cases["binding_envelope"]["body"])
+    baseline = binding_core_digest(body=body, envelope=envelope)
+    assert baseline == cases["binding_core"]["digest"]
+    assert cases["binding_core"]["body"] == {
+        "user_id": envelope.user_id,
+        "project_name": envelope.project_name,
+        "binding": body.model_dump(mode="json", exclude={"version"}),
+        "scene_ref": envelope.scene_ref.model_dump(mode="json"),
+        "target_ref": envelope.target_ref.model_dump(mode="json"),
+        "ordered_source_claim_digests": [claim.claim_digest for claim in envelope.ordered_claims],
+    }
+    advanced_body = body.model_copy(update={"version": 2})
+    advanced_envelope = envelope.model_copy(
+        update={"binding_version": 2, "binding_body_digest": binding_body_digest(advanced_body)}
+    )
+    assert binding_core_digest(body=advanced_body, envelope=advanced_envelope) == baseline
+
+    changed_claim_body = envelope.ordered_claims[0].model_dump(mode="json", exclude={"claim_digest"})
+    changed_claim_body["frame_content_digest"] = "sha256:" + "f" * 64
+    changed_claim = envelope.ordered_claims[0].model_copy(
+        update={
+            "frame_content_digest": changed_claim_body["frame_content_digest"],
+            "claim_digest": frame_source_claim_digest(changed_claim_body),
+        }
+    )
+    assert (
+        binding_core_digest(
+            body=body,
+            envelope=envelope.model_copy(update={"ordered_claims": (changed_claim, envelope.ordered_claims[1])}),
+        )
+        != baseline
+    )
+    changed_target = envelope.target_ref.model_copy(update={"version_digest": "sha256:" + "f" * 64})
+    assert (
+        binding_core_digest(body=body, envelope=envelope.model_copy(update={"target_ref": changed_target})) != baseline
+    )
+
+    altered_claim = envelope.ordered_claims[0].model_copy(update={"receipt_digest": "sha256:" + "f" * 64})
+    with pytest.raises(ValueError, match="claim digest"):
+        binding_core_digest(
+            body=body,
+            envelope=envelope.model_copy(update={"ordered_claims": (altered_claim, envelope.ordered_claims[1])}),
+        )
+    with pytest.raises(ValueError, match="body digest"):
+        binding_core_digest(
+            body=body, envelope=envelope.model_copy(update={"binding_body_digest": "sha256:" + "f" * 64})
+        )
 
 
 def test_vector_links_exact_body_claims_command_result_and_snapshot() -> None:
