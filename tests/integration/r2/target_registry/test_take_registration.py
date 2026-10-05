@@ -37,12 +37,23 @@ PROJECT = "project-a"
 PRINCIPAL = "human:anhtuan"
 
 
-async def _admit(factory: Factory):
+async def _admit(
+    factory: Factory,
+    *,
+    branch_id: str = "branch-1",
+    map_id: str = "map-1",
+    screenplay_id: str = "sp-1",
+    decision_id: str = "d-admit-1",
+):
     evidence = AdaptationEvidenceService(adaptation_uow_factory(factory))
     authority = AdaptationAuthorityService(adaptation_uow_factory(factory), FakeAuthority())
     evaluation = ProfileEvaluationService(adaptation_uow_factory(factory))
-    branch, map_receipt, proposal, report = await _seed_admissible_proposal(evidence, authority, evaluation)
+    branch, map_receipt, proposal, report = await _seed_admissible_proposal(
+        evidence, authority, evaluation, branch_id=branch_id, map_id=map_id, screenplay_id=screenplay_id
+    )
     admit = _admit_command(
+        decision_id=decision_id,
+        branch_id=branch_id,
         proposal=proposal,
         profile_ref=branch.profile_ref,
         effective_map_approval_ref=map_receipt.decision_ref,
@@ -54,7 +65,7 @@ async def _admit(factory: Factory):
         admission_ref=receipt.decision_ref,
         profile_ref=branch.profile_ref,
     )
-    return ref, branch, map_receipt, proposal, admit, evidence, authority, evaluation
+    return ref, branch, map_receipt, proposal, admit, evidence, authority, evaluation, report
 
 
 def _command(
@@ -108,7 +119,7 @@ async def test_changed_command_conflicts_and_wrong_scope_or_profile_creates_no_b
 
 
 async def test_new_admission_advances_versions_and_stale_replay_fails(session_factory: Factory) -> None:
-    ref, branch, map_receipt, proposal, first_admit, evidence, authority, evaluation = await _admit(session_factory)
+    ref, branch, map_receipt, proposal, first_admit, evidence, authority, evaluation, _ = await _admit(session_factory)
     service = TakeTargetRegistrationService(session_factory)
     first = await service.register(_command(ref))
     changed_scene = proposal.scenes[0].model_copy(update={"purpose": "changed stakes"})
