@@ -22,6 +22,8 @@ The accepted M8 design assigns `SpatialCandidate` to `PRODUCTION_BINDING`. A can
 
 For a consumer that initially knows only a target ID, a first scoped target-version read supplies an untrusted admission-ref hint. The consumer locks and verifies that upstream admission, then locks and re-reads the target head/version and requires the hint still to match before using it. A command receipt may be checked for its own canonical integrity early; replay validates referenced current targets only after the admission lock. These read paths preserve the same admission-before-target order as writes.
 
+For a Shot target, the locally verified target read first inspects its Scene dependency without locking the Shot head, then locks and verifies the Scene head before the Shot head. It compares immutable scalar values from the initial hint with the locked re-read; an ORM identity-map refresh cannot count as an unchanged hint. The current Scene version and digest must match the Shot dependency.
+
 ## Interface consequences
 
 - A public caller cannot append a `SpatialCandidate` through M8-A's generic revision endpoint. Only a server-owned completion service may append one after a verified successful M7 execution, exact raw-response/source digests and schema-first normalization. Existing user-authored Canvas/Format revision behavior is a separate arm.
