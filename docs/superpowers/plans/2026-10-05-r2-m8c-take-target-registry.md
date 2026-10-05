@@ -4,7 +4,7 @@
 
 **Goal:** Register exact Take-derived Scene and Shot target versions from one current admitted screenplay, with scoped immutable versions, one current head per target and replay-safe bundle writes.
 
-**Architecture:** A server-internal service owns one `AsyncSession` transaction. It uses the transaction-bound screenplay reader from the preceding packet, derives with the existing `TakeDirectorAdapter`, then writes scene and shot versions through one scoped repository in the common admission → scene → shot lock order. Every current read recomputes body/version digests and checks the upstream admission; no caller-supplied target body is accepted.
+**Architecture:** A server-internal service owns one `AsyncSession` transaction. It uses the transaction-bound screenplay reader from the preceding packet, derives with the existing `TakeDirectorAdapter`, then writes scene and shot versions through one scoped repository in the common admission → scene → shot lock order. The service locks and checks the full upstream admission before repository target-head verification. Repository current reads recompute body/version digests under target locks; no caller-supplied target body is accepted.
 
 **Tech Stack:** Python 3.13, SQLAlchemy 2 async, Pydantic v2, Alembic, pytest, PostgreSQL 16 and SQLite migration checks.
 
@@ -62,11 +62,12 @@
 **Interfaces:**
 - Produce `TargetVersionRef` containing `(target_type, target_id, registry_version, version_digest)` and `TargetRegistrationResult` containing ordered Scene then Shot refs and a result digest. Reject unsupported target types.
 - Produce `target_body_digest(target_type: ProductionBindingTarget, target: SceneSpec | ShotSpecV2) -> str` and `target_version_digest(version_body: TargetVersionBody) -> str` using the spec's domains and Preparation canonical bytes. `TargetVersionBody` contains the exact fields of the proposed fixture. Define `registration_command_digest(...)` and `registration_result_digest(...)` for the two command/result domains in the spec; exclude audit timestamp and command ID from target-version digest.
-- Produce repository methods `get_command_verified`, `lock_target_head`, `get_current_verified`, `append_version`, `advance_head` and `record_command`; all take or retain the caller's `AsyncSession` and never commit it. `record_command` relies on the scoped unique key; an absent command row is never considered locked.
+- Produce repository methods `get_command_receipt`, `lock_target_head`, `get_current_verified`, `append_version`, `advance_head` and `record_command`; all take or retain the caller's `AsyncSession` and never commit it. `get_command_receipt` checks receipt columns, canonical result JSON and result digest without locking target heads; the service validates referenced heads only after locking the command's full admission. `get_current_verified` accepts the expected full admission ref and verifies target rows under its lock, but does not acquire the upstream admission lock itself. `record_command` relies on the scoped unique key; an absent command row is never considered locked.
 
 - [ ] Extend the vector tests RED for typed digest functions, including the `1e-7` numeric bytes, full admission ref, Shot's SCENE dependency type/version/digest, and separate registry/body versions. Add command/result vectors with one exact replay and one changed-admission variant before implementing digest helpers.
 - [ ] Implement the smallest contracts and digest helpers that make those vectors GREEN; do not change existing M8 or Preparation canonical serializers.
 - [ ] Write repository tests that tamper each stored body/version/head/scene dependency/command result in turn and require a typed integrity conflict on read or replay. Check the head points to the maximum stored version and all stored digests are recomputed from JSON rather than trusted as columns. Exercise genesis insert-if-absent followed by immediate lock/read for every key in Scene-then-Shot order.
+- [ ] Prove a consumer that starts with only a target ID treats its first admission lookup as an untrusted hint, locks/verifies that admission, then locks/re-reads and compares the target. A changed hint or target head must fail; do not acquire a target lock before admission. Keep this orchestration with the consumer packet if no consumer is implemented in Task 2.
 - [ ] Implement the scoped repository and run the affected unit/repository selection on SQLite and PostgreSQL. Commit the contracts, vectors, repository and tests.
 
 ### Task 3: Atomic Take Bundle Registration
