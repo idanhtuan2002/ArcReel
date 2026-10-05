@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from collections.abc import Coroutine
 from pathlib import Path
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.artifact_manifest import ArtifactKey, ProjectArtifactManifestAdapter
+from lib.artifact_manifest import MANIFEST_FILENAME, ArtifactKey, ProjectArtifactManifestAdapter
 from lib.db.models.host_hardening import CandidateObjectModel, MasterHeadVersionModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.db.repositories.spatial_source import _receipt_digest
@@ -25,25 +28,42 @@ from tests.integration.server.routers.test_gates_export import PROJECT, USER, _a
 type Factory = async_sessionmaker[AsyncSession]
 
 
-async def _wait_for_blocked_master_writer(factory: Factory, approval: asyncio.Task[str]) -> None:
-    async with asyncio.timeout(10):
-        while True:
-            async with factory() as observer:
-                blocked = (
-                    await observer.execute(
-                        text(
-                            "SELECT pid FROM pg_stat_activity "
-                            "WHERE datname = current_database() AND wait_event_type = 'Lock' "
-                            "AND query ILIKE '%UPDATE master_authorities%' "
-                            "AND cardinality(pg_blocking_pids(pid)) > 0"
-                        )
-                    )
-                ).first()
-            if blocked is not None:
-                assert not approval.done()
-                return
-            if approval.done():
-                raise AssertionError("Gate C approval finished without waiting on the master row")
+async def _start_blocked_master_writer(factory: Factory, request: Coroutine[Any, Any, str]) -> asyncio.Task[str]:
+    engine = factory.kw["bind"]
+    writer_pids: list[int] = []
+
+    def capture_writer(
+        connection: Connection, _cursor: object, statement: str, _parameters: object, _context: object, _many: bool
+    ) -> None:
+        if not writer_pids and statement.lstrip().upper().startswith("UPDATE MASTER_AUTHORITIES"):
+            writer_pids.append(connection.connection.driver_connection.get_server_pid())
+
+    event.listen(engine.sync_engine, "before_cursor_execute", capture_writer)
+    try:
+        approval = asyncio.create_task(request)
+        async with asyncio.timeout(10):
+            while True:
+                if writer_pids:
+                    async with factory() as observer:
+                        blocked = (
+                            await observer.execute(
+                                text(
+                                    "SELECT pid FROM pg_stat_activity "
+                                    "WHERE pid = :writer_pid AND datname = current_database() "
+                                    "AND wait_event_type = 'Lock' "
+                                    "AND cardinality(pg_blocking_pids(pid)) > 0"
+                                ),
+                                {"writer_pid": writer_pids[0]},
+                            )
+                        ).first()
+                    if blocked is not None:
+                        assert not approval.done()
+                        return approval
+                if approval.done():
+                    raise AssertionError("Gate C approval finished without waiting on the master row")
+                await asyncio.sleep(0.01)
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", capture_writer)
 
 
 @pytest.mark.asyncio
@@ -197,6 +217,30 @@ async def test_reader_refuses_missing_parent_projection(
 
 
 @pytest.mark.asyncio
+async def test_reader_normalizes_malformed_parent_manifest(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
+) -> None:
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"reader-parent")
+    key = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for("SH01")
+    receipt = await FrameDerivationService(session_factory=session_factory, project_dir=project_dir).derive(
+        user_id=USER.id,
+        project_name=PROJECT,
+        parent_artifact_key=key,
+        expected_master_version=1,
+        decoded_frame_index=0,
+        command_id="reader-frame",
+    )
+    (project_dir / MANIFEST_FILENAME).write_text("{", encoding="utf-8")
+    with pytest.raises(FrameSourceConflictError, match="projection"):
+        await SpatialFrameReader(session_factory=session_factory, project_dir=project_dir).read_current(
+            user_id=USER.id,
+            project_name=PROJECT,
+            receipt_id=receipt.frame_candidate_id,
+            expected_receipt_digest=_receipt_digest(receipt),
+        )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("mutation", ["missing", "escape"])
 async def test_reader_normalizes_missing_or_unsafe_parent_file(
     gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, mutation: str
@@ -306,8 +350,9 @@ async def test_parent_approval_waits_for_locked_reader_on_postgres(
             expected_receipt_digest=_receipt_digest(receipt),
             expected_parent_artifact_key=key,
         )
-        approval = asyncio.create_task(_approve_shot(concurrent_gate_client, project_dir, "SH01", b"reader-next"))
-        await _wait_for_blocked_master_writer(concurrent_session_factory, approval)
+        approval = await _start_blocked_master_writer(
+            concurrent_session_factory, _approve_shot(concurrent_gate_client, project_dir, "SH01", b"reader-next")
+        )
         assert verified.png_bytes.startswith(b"\x89PNG\r\n\x1a\n")
     await asyncio.wait_for(approval, timeout=10)
     with pytest.raises(FrameSourceConflictError, match="superseded"):
@@ -376,8 +421,9 @@ async def test_current_reader_holds_parent_lock_through_frame_snapshot_on_postgr
     approval: asyncio.Task[str] | None = None
     try:
         assert await asyncio.to_thread(entered.wait, 10)
-        approval = asyncio.create_task(_approve_shot(concurrent_gate_client, project_dir, "SH01", b"reader-next"))
-        await _wait_for_blocked_master_writer(concurrent_session_factory, approval)
+        approval = await _start_blocked_master_writer(
+            concurrent_session_factory, _approve_shot(concurrent_gate_client, project_dir, "SH01", b"reader-next")
+        )
     finally:
         release.set()
     verified = await asyncio.wait_for(reading, timeout=10)
