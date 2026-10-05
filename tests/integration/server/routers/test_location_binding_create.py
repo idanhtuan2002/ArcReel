@@ -30,6 +30,7 @@ from r2.production_intelligence.take_director import TakeDirectorAdapter
 from r2.target_registry import service as target_service_module
 from r2.target_registry.service import TakeTargetRegistrationService
 from server.services.location_binding import LocationBindingCreationService
+from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
 from server.services.spatial_frame_reader import SpatialFrameReader
 from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
 from tests.integration.r2.adaptation import test_screenplay_admission as admission_helpers
@@ -132,6 +133,20 @@ async def test_create_replays_exact_two_real_frames_and_current_take_shot(
     assert first.result.binding_version == 1
     assert first.result.target_ref == registered.shot_targets[0]
     assert await service.create(command) == first
+    snapshot_reader = CurrentLocationBindingSnapshotReader(session_factory=session_factory, project_dir=project_dir)
+    snapshot = await snapshot_reader.read_current(
+        user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+    )
+    assert snapshot.body.target_versions[1] == registered.shot_targets[0]
+    assert snapshot.body.ordered_bindings[0].binding_id == first.result.binding_id
+    assert snapshot.body.ordered_bindings[0].envelope_digest == first.result.envelope_digest
+    with pytest.raises(ProductionBindingIntegrityError, match="snapshot digest is stale"):
+        await snapshot_reader.read_current(
+            user_id=USER.id,
+            project_name=PROJECT,
+            target_id=registered.shot_targets[0].target_id,
+            expected_snapshot_digest="sha256:" + "f" * 64,
+        )
 
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(ProductionBindingHeadModel)) == 1
@@ -161,6 +176,10 @@ async def test_create_replays_exact_two_real_frames_and_current_take_shot(
     frame_path.write_bytes(original_frame + b"changed")
     with pytest.raises(FrameSourceConflictError, match="frame bytes"):
         await service.create(command)
+    with pytest.raises(FrameSourceConflictError, match="frame bytes"):
+        await snapshot_reader.read_current(
+            user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+        )
     frame_path.write_bytes(original_frame)
 
     if is_postgres:
@@ -245,6 +264,10 @@ async def test_create_replays_exact_two_real_frames_and_current_take_shot(
         await _approve_shot(gate_export_client, project_dir, "SH01", b"binding-parent-a-next")
     with pytest.raises(FrameSourceConflictError, match="superseded"):
         await service.create(command)
+    with pytest.raises(FrameSourceConflictError, match="superseded"):
+        await snapshot_reader.read_current(
+            user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+        )
 
     monkeypatch.setattr(target_service_module, "TAKE_DERIVATION_VERSION", "r2-take-director-v2-test")
     advanced = await TakeTargetRegistrationService(session_factory).register(
@@ -253,3 +276,7 @@ async def test_create_replays_exact_two_real_frames_and_current_take_shot(
     assert advanced.shot_targets[0].registry_version == 2
     with pytest.raises(ProductionBindingIntegrityError, match="target or Scene location is stale"):
         await service.create(command)
+    with pytest.raises(ProductionBindingIntegrityError, match=r"binding version integrity|target"):
+        await snapshot_reader.read_current(
+            user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+        )
