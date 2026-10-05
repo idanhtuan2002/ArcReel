@@ -14,7 +14,7 @@
 
 - This packet depends on `docs/superpowers/plans/2026-10-05-r2-m8c-transaction-bound-screenplay-reader.md`; it does not duplicate admission fold logic or open a second UoW.
 - Accept only one full stored `AdmittedScreenplayRef`, including `profile_ref`, in the caller's trusted `(user_id, project_name, principal)` scope. The service is internal; no HTTP route or second human approval is created here.
-- One registration command derives one complete Take scene/shot bundle; Scene heads lock by ID before Shot heads by ID. Every attempt and replay read uses scoped keys and its own transaction. A unique-command race rolls back the losing attempt before a new transaction verifies the winner.
+- One registration command derives one complete Take scene/shot bundle; Scene heads lock by ID before Shot heads by ID. For each key in that order, an absent head is inserted as an uncommitted nullable genesis row and immediately locked/re-read before visiting the next key. Every attempt and replay read uses scoped keys and its own transaction. A unique-command race rolls back the losing attempt before a new transaction verifies the winner.
 - The proposed body/version domains and exact bytes come from the checked-in target-vector fixture and Preparation's `r2.contracts.canonical_json_bytes`; M8's float encoder is not a substitute.
 - Version body `1` from `TakeDirectorAdapter` is distinct from registry version `1, 2, ...`. The producer pins `r2-take-director-v1` as its derivation label.
 - Schema, service and tests stay internal. No binding CAS, pair decision, provider call, migration of a live database or production activation belongs to this packet.
@@ -25,6 +25,7 @@
 - Same target IDs and body version `1` after a new admission must advance registry versions and digests; Task 3 tests this.
 - Same command ID with changed admission/derivation input must conflict; same exact current command must replay the verified original result without a second version, while a stale replay fails; Task 3 tests all three.
 - A corrupt body, version digest, scene link, command result or head pointer must fail on authority read/replay; Tasks 2 and 3 test these.
+- Two writers creating the same absent head must serialize through its scoped unique key and never commit a genesis row; Tasks 2 and 4 test this.
 - Partial bundle failure and racing registrations/re-admission must leave one complete current bundle with no stale success or deadlock; Task 4 tests this on PostgreSQL.
 
 ---
@@ -36,12 +37,15 @@
 - Modify: `lib/db/models/__init__.py`
 - Create: `alembic/versions/8c8c4a0e0001_add_production_target_registry.py` (down revision `8b8c4a0e0001`; recheck live heads before writing)
 - Create: `tests/integration/lib/db/migrations/test_production_target_registry.py`
+- Modify: `tests/integration/lib/db/migrations/test_alembic_m8_exploration.py`
+- Modify: `tests/integration/lib/db/migrations/test_spatial_frame_receipts.py`
 
 **Interfaces:**
 - Produce `ProductionTargetHeadModel`, `ProductionTargetVersionModel` and `ProductionTargetCommandModel` with table names and scoped keys from the spec.
 - `production_target_heads` has a nullable genesis `(current_version, current_version_digest)` pair and a scoped FK to the populated exact version. SHOT version rows have a scoped FK on `(user_id, project_name, scene_target_type='SCENE', scene_target_id, scene_registry_version)` to a SCENE version and store its digest separately for revalidation.
 
 - [ ] Write migration tests that reject cross-user/project head and Shot→Scene links, SHOT rows with partial or non-SCENE dependency, SCENE rows with dependency columns, and a head pointing to a missing version. Confirm one valid scene+shot bundle inserts under both supported test dialects where constraints apply.
+- [ ] Update the existing M8 migration tests that assert the sole Alembic head is `8b8c4a0e0001` and the exact downgrade table delta. Keep their historical parent-revision and frame-constraint assertions; add the three new registry tables only to the expected current-head/downgrade footprint.
 - [ ] Run those tests RED before adding models/migration. Add the minimal schema and model exports; keep the nullable genesis row uncommitted by service convention.
 - [ ] Upgrade and downgrade the migration on disposable PostgreSQL 16 and run the migration test file. Record the exact migration head and observed FK/check behavior; do not apply to a live database.
 - [ ] Commit this task's schema, model and tests only.
@@ -62,7 +66,7 @@
 
 - [ ] Extend the vector tests RED for typed digest functions, including the `1e-7` numeric bytes, full admission ref, Shot's SCENE dependency type/version/digest, and separate registry/body versions. Add command/result vectors with one exact replay and one changed-admission variant before implementing digest helpers.
 - [ ] Implement the smallest contracts and digest helpers that make those vectors GREEN; do not change existing M8 or Preparation canonical serializers.
-- [ ] Write repository tests that tamper each stored body/version/head/scene dependency/command result in turn and require a typed integrity conflict on read or replay. Check the head points to the maximum stored version and all stored digests are recomputed from JSON rather than trusted as columns.
+- [ ] Write repository tests that tamper each stored body/version/head/scene dependency/command result in turn and require a typed integrity conflict on read or replay. Check the head points to the maximum stored version and all stored digests are recomputed from JSON rather than trusted as columns. Exercise genesis insert-if-absent followed by immediate lock/read for every key in Scene-then-Shot order.
 - [ ] Implement the scoped repository and run the affected unit/repository selection on SQLite and PostgreSQL. Commit the contracts, vectors, repository and tests.
 
 ### Task 3: Atomic Take Bundle Registration
@@ -90,7 +94,7 @@
 - Keep the Task 3 API and transaction ownership unchanged.
 
 - [ ] Force a re-admission writer to reach its own locked admission-head update while registration holds the head and has not committed. Identify that writer's backend PID or a test-owned SQL barrier, then release registration and prove the resulting target version is tied to the admission that was current at its commit.
-- [ ] Force two registration commands for the same target bundle to overlap after derivation; assert a single monotonic head sequence, exact replay for identical input, typed conflict for changed input, and no committed partial Scene/Shot set. Also race one command ID across different target bundles: the unique-key loser must roll back its whole attempt before reading the winner in a new transaction. Inject a flush failure after Scene append and assert rollback of all versions, heads and command receipt.
+- [ ] Force two registration commands for the same target bundle to overlap after derivation, including the first creation of absent Scene/Shot heads; assert a single monotonic head sequence, exact replay for identical input, typed conflict for changed input, and no committed genesis or partial Scene/Shot set. Also race one command ID across different target bundles: the unique-key loser must roll back its whole attempt before reading the winner in a new transaction. Inject a flush failure after Scene append and assert rollback of all versions, heads and command receipt.
 - [ ] Run these tests on disposable PostgreSQL 16 with `-n 4 --dist loadfile`, then rerun the complete affected selection and repository static gates on the final code HEAD. Obtain independent exact-HEAD review before marking target registry accepted; keep binding, pair and production gates closed.
 - [ ] Commit only verified fixes and the exact-HEAD evidence packet.
 
