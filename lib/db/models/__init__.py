@@ -62,6 +62,11 @@ from lib.db.models.narrative_lifecycle import (
     NarrativeRevisionModel,
 )
 from lib.db.models.narrative_plan import NarrativePlanModel, NarrativePlanVersionModel
+from lib.db.models.production_target import (
+    ProductionTargetCommandModel,
+    ProductionTargetHeadModel,
+    ProductionTargetVersionModel,
+)
 from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
 from lib.db.models.session_message_link import AgentSessionUserMessageLink
@@ -127,6 +132,9 @@ __all__ = [
     "NarrativePlanVersionModel",
     "NarrativeRevisionModel",
     "OperatorResolutionReceiptModel",
+    "ProductionTargetCommandModel",
+    "ProductionTargetHeadModel",
+    "ProductionTargetVersionModel",
     "ProjectEventModel",
     "PromotionReceiptModel",
     "ProviderConfig",
