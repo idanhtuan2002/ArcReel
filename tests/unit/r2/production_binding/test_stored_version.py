@@ -57,6 +57,7 @@ def _verify(row: ProductionBindingVersionModel) -> None:
         expected_scene_ref=TargetVersionRef.model_validate(envelope["scene_ref"]),
     )
     assert verified.envelope_digest == _cases()["binding_envelope"]["digest"]
+    assert verified.core_digest == _cases()["binding_core"]["digest"]
 
 
 def test_stored_binding_version_matches_exact_vector() -> None:

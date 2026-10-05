@@ -21,6 +21,7 @@ from r2.contracts.production_binding_authority import BindingCreateResultV1, Bin
 from r2.contracts.production_target import TargetVersionRef
 from r2.production_binding.digests import (
     binding_body_digest,
+    binding_core_digest,
     binding_create_result_digest,
     binding_envelope_digest,
     scoped_location_binding_id,
@@ -41,6 +42,7 @@ class VerifiedBindingVersion:
     body: ProductionBinding
     envelope: BindingEnvelopeV1
     envelope_digest: str
+    core_digest: str
 
 
 @dataclass(frozen=True)
@@ -106,7 +108,12 @@ def verify_stored_binding_version(
             or binding_envelope_digest(envelope.model_dump(mode="json")) != row.envelope_digest
         ):
             raise ValueError("binding row disagrees with its exact scope or canonical contents")
-        return VerifiedBindingVersion(body=body, envelope=envelope, envelope_digest=row.envelope_digest)
+        return VerifiedBindingVersion(
+            body=body,
+            envelope=envelope,
+            envelope_digest=row.envelope_digest,
+            core_digest=binding_core_digest(body=body, envelope=envelope),
+        )
     except (ValidationError, ValueError, TypeError) as exc:
         raise ProductionBindingIntegrityError("binding version integrity verification failed") from exc
 
