@@ -12,7 +12,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.artifact_manifest import ArtifactKey, ProjectArtifactManifestAdapter
-from lib.db.models.host_hardening import CandidateObjectModel
+from lib.db.models.host_hardening import CandidateObjectModel, MasterHeadVersionModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.db.repositories.spatial_source import _receipt_digest
 from r2.m3.host_integration import GoldenAHostIntegration
@@ -224,6 +224,51 @@ async def test_reader_normalizes_missing_or_unsafe_parent_file(
         await asyncio.to_thread(outside.write_bytes, b"outside")
         await asyncio.to_thread(parent_path.symlink_to, outside)
     with pytest.raises(FrameSourceConflictError, match="parent media"):
+        await SpatialFrameReader(session_factory=session_factory, project_dir=project_dir).read_current(
+            user_id=USER.id,
+            project_name=PROJECT,
+            receipt_id=receipt.frame_candidate_id,
+            expected_receipt_digest=_receipt_digest(receipt),
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("corruption", ["frame_candidate", "parent_candidate", "parent_head"])
+async def test_reader_normalizes_malformed_persisted_metadata(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, corruption: str
+) -> None:
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"reader-parent")
+    key = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for("SH01")
+    receipt = await FrameDerivationService(session_factory=session_factory, project_dir=project_dir).derive(
+        user_id=USER.id,
+        project_name=PROJECT,
+        parent_artifact_key=key,
+        expected_master_version=1,
+        decoded_frame_index=0,
+        command_id="reader-frame",
+    )
+    async with session_factory() as session, session.begin():
+        if corruption == "parent_head":
+            row = (
+                await session.execute(
+                    select(MasterHeadVersionModel).where(
+                        MasterHeadVersionModel.artifact_key == key,
+                        MasterHeadVersionModel.master_version == 1,
+                    )
+                )
+            ).scalar_one()
+            row.object_ref = ""
+        else:
+            candidate_id = (
+                receipt.frame_candidate_id if corruption == "frame_candidate" else receipt.identity.parent_candidate_id
+            )
+            row = (
+                await session.execute(
+                    select(CandidateObjectModel).where(CandidateObjectModel.candidate_id == candidate_id)
+                )
+            ).scalar_one()
+            row.object_ref = ""
+    with pytest.raises(FrameSourceConflictError, match="metadata"):
         await SpatialFrameReader(session_factory=session_factory, project_dir=project_dir).read_current(
             user_id=USER.id,
             project_name=PROJECT,

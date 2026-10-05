@@ -7,6 +7,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from pydantic import ValidationError
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.host_hardening import CandidateObjectRepository
@@ -65,13 +67,18 @@ class SpatialFrameReader:
             )
         except MasterDivergedError as exc:
             raise FrameSourceConflictError("frame parent master projection is incomplete") from exc
+        except (NoResultFound, ValidationError) as exc:
+            raise FrameSourceConflictError("frame parent metadata is missing or malformed") from exc
         except (OSError, PathTraversalError) as exc:
             raise FrameSourceConflictError("frame parent media is missing or unsafe") from exc
         if head.candidate_id != identity.parent_candidate_id or head.content_digest != identity.parent_content_digest:
             raise FrameSourceConflictError("frame parent differs from approved master")
-        candidate = await CandidateObjectRepository(session).get_exact(
-            user_id=user_id, project_name=project_name, candidate_id=receipt.frame_candidate_id
-        )
+        try:
+            candidate = await CandidateObjectRepository(session).get_exact(
+                user_id=user_id, project_name=project_name, candidate_id=receipt.frame_candidate_id
+            )
+        except ValidationError as exc:
+            raise FrameSourceConflictError("frame candidate metadata is malformed") from exc
         frame_path = self._project_dir / "spatial" / "frames" / f"{receipt.frame_candidate_id}.png"
         if (
             candidate is None
