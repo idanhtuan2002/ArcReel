@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
@@ -42,6 +42,7 @@ class VerifiedTargetVersion:
     target: SceneSpec | ShotSpecV2
     admitted_screenplay_ref: AdmittedScreenplayRef
     take_derivation_version: str
+    scene: VerifiedTargetVersion | None = None
 
 
 @dataclass(frozen=True)
@@ -467,7 +468,7 @@ class ProductionTargetRepository:
             or shot.admitted_screenplay_ref != scene.admitted_screenplay_ref
         ):
             raise ProductionTargetIntegrityError("Shot scene dependency integrity verification failed")
-        return shot
+        return replace(shot, scene=scene)
 
 
 __all__ = [

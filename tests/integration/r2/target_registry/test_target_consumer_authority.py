@@ -16,6 +16,7 @@ from lib.db.repositories.production_target import ProductionTargetIntegrityError
 from r2.adaptation.evaluation import report_ref_of
 from r2.adaptation.screenplay_reader import TransactionBoundApprovedScreenplayReader
 from r2.contracts.adaptation import AdaptationDecisionAction
+from r2.contracts.production import SceneSpec, ShotSpecV2
 from r2.target_registry import service as target_service_module
 from r2.target_registry.resolver import TransactionBoundTargetAuthorityResolver
 from r2.target_registry.service import TakeTargetRegistrationService
@@ -52,6 +53,22 @@ async def test_target_id_consumer_resolves_current_scene_and_shot(session_factor
             )
             is None
         )
+
+
+async def test_shot_resolution_carries_its_verified_scene_in_one_read(session_factory: Factory) -> None:
+    admission, *_ = await _admit(session_factory)
+    result = await TakeTargetRegistrationService(session_factory).register(_command(admission))
+    async with session_factory() as session:
+        current = await TransactionBoundTargetAuthorityResolver(session).resolve_current(
+            user_id="u1", project_name="project-a", target_type="SHOT", target_id=result.shot_targets[0].target_id
+        )
+        assert current is not None
+        assert isinstance(current.target, ShotSpecV2)
+        assert current.scene is not None
+        assert isinstance(current.scene.target, SceneSpec)
+        assert current.scene.ref == result.scene_targets[0]
+        assert current.scene.target.id == current.target.scene_id
+        assert current.scene.admitted_screenplay_ref == current.admitted_screenplay_ref == admission
 
 
 async def test_changed_untrusted_hint_fails_after_authority_read(
