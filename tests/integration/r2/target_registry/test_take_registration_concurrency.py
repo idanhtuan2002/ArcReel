@@ -6,6 +6,7 @@ import asyncio
 
 import pytest
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.production_target import (
@@ -13,7 +14,7 @@ from lib.db.models.production_target import (
     ProductionTargetHeadModel,
     ProductionTargetVersionModel,
 )
-from lib.db.repositories.production_target import ProductionTargetCommandConflictError
+from lib.db.repositories.production_target import ProductionTargetCommandConflictError, ProductionTargetRepository
 from r2.adaptation.authority import AdaptationAuthorityService
 from r2.adaptation.evaluation import report_ref_of
 from r2.contracts.adaptation import AdaptationDecisionAction
@@ -80,15 +81,43 @@ async def test_two_first_writers_serialize_absent_heads(
         assert all(head.current_version == 2 for head in heads)
 
 
-async def test_identical_parallel_command_replays_one_receipt(concurrent_session_factory: Factory) -> None:
+async def test_identical_parallel_command_replays_one_receipt(
+    concurrent_session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
     await _postgres_only(concurrent_session_factory)
     ref, *_ = await _admit(concurrent_session_factory)
+    barrier = asyncio.Barrier(2)
+    missing_reads = 0
+    receipt_unique_failures = 0
+    original_get = ProductionTargetRepository.get_command_receipt
+    original_record = ProductionTargetRepository.record_command
+
+    async def synchronized_get(self, **kwargs):
+        nonlocal missing_reads
+        receipt = await original_get(self, **kwargs)
+        if receipt is None and missing_reads < 2:
+            missing_reads += 1
+            await asyncio.wait_for(barrier.wait(), timeout=15)
+        return receipt
+
+    async def counted_record(self, **kwargs):
+        nonlocal receipt_unique_failures
+        try:
+            return await original_record(self, **kwargs)
+        except IntegrityError:
+            receipt_unique_failures += 1
+            raise
+
+    monkeypatch.setattr(ProductionTargetRepository, "get_command_receipt", synchronized_get)
+    monkeypatch.setattr(ProductionTargetRepository, "record_command", counted_record)
     service = TakeTargetRegistrationService(concurrent_session_factory)
     command = _command(ref)
     first, second = await asyncio.wait_for(
         asyncio.gather(service.register(command), service.register(command)), timeout=30
     )
     assert first == second
+    assert missing_reads == 2
+    assert receipt_unique_failures == 1
     async with concurrent_session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(ProductionTargetHeadModel)) == 2
         assert await session.scalar(select(func.count()).select_from(ProductionTargetVersionModel)) == 2

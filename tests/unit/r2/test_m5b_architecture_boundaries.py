@@ -111,6 +111,7 @@ def test_only_the_plan_service_calls_plan_authoritative_writes() -> None:
         "r2/narrative/canon_transaction.py",
         "lib/db/repositories/canon_repo.py",
         "r2/host_hardening/promotion.py",
+        "r2/target_registry/service.py",
     }
     offenders: set[str] = set()
     for root in ("r2", "server", "lib"):
@@ -124,7 +125,7 @@ def test_only_the_plan_service_calls_plan_authoritative_writes() -> None:
 
 
 def test_plan_write_allowlist_files_carry_no_canon_authority_symbol() -> None:
-    for rel in _PLAN_WRITE_ALLOWED:
+    for rel in _PLAN_WRITE_ALLOWED | {"r2/target_registry/service.py"}:
         text = (_ROOT / rel).read_text(encoding="utf-8")
         for symbol in _CANON_AUTHORITY_SYMBOLS:
             assert symbol not in text, (rel, symbol)

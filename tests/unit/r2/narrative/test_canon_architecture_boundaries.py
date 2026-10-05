@@ -27,6 +27,7 @@ _PLAN_AUTHORITY_FILES = {
     "lib/db/narrative_plan_uow.py",
     "r2/adaptation/evidence.py",
     "r2/host_hardening/promotion.py",
+    "r2/target_registry/service.py",
 }
 _CANON_AUTHORITY_SYMBOLS = ("CanonWriteRepositoryPort", "CanonRepository", "CanonAuthorityUnitOfWork")
 _AUTHORITY_ONLY_SYMBOLS = (
