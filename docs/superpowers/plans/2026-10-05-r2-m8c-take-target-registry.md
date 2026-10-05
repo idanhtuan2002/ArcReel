@@ -1,0 +1,99 @@
+# M8-C Take Target Registry Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. The repository's one-background-agent budget and main-agent authority rules take precedence.
+
+**Goal:** Register exact Take-derived Scene and Shot target versions from one current admitted screenplay, with scoped immutable versions, one current head per target and replay-safe bundle writes.
+
+**Architecture:** A server-internal service owns one `AsyncSession` transaction. It uses the transaction-bound screenplay reader from the preceding packet, derives with the existing `TakeDirectorAdapter`, then writes scene and shot versions through one scoped repository in the common admission → scene → shot lock order. Every current read recomputes body/version digests and checks the upstream admission; no caller-supplied target body is accepted.
+
+**Tech Stack:** Python 3.13, SQLAlchemy 2 async, Pydantic v2, Alembic, pytest, PostgreSQL 16 and SQLite migration checks.
+
+**Spec:** `docs/superpowers/specs/2026-09-30-r2-m8c-binding-authority-design.md` (proposed first target-registry packet), ADR-0102, `tests/fixtures/r2/m8c_target_registry_vectors.json`.
+
+## Global Constraints
+
+- This packet depends on `docs/superpowers/plans/2026-10-05-r2-m8c-transaction-bound-screenplay-reader.md`; it does not duplicate admission fold logic or open a second UoW.
+- Accept only one full stored `AdmittedScreenplayRef`, including `profile_ref`, in the caller's trusted `(user_id, project_name, principal)` scope. The service is internal; no HTTP route or second human approval is created here.
+- One registration command derives one complete Take scene/shot bundle; Scene heads lock by ID before Shot heads by ID. Every attempt and replay read uses scoped keys and its own transaction. A unique-command race rolls back the losing attempt before a new transaction verifies the winner.
+- The proposed body/version domains and exact bytes come from the checked-in target-vector fixture and Preparation's `r2.contracts.canonical_json_bytes`; M8's float encoder is not a substitute.
+- Version body `1` from `TakeDirectorAdapter` is distinct from registry version `1, 2, ...`. The producer pins `r2-take-director-v1` as its derivation label.
+- Schema, service and tests stay internal. No binding CAS, pair decision, provider call, migration of a live database or production activation belongs to this packet.
+
+## Review Focus
+
+- A forged profile, wrong user/project or stale screenplay admission must create no target version; Task 3 tests each.
+- Same target IDs and body version `1` after a new admission must advance registry versions and digests; Task 3 tests this.
+- Same command ID with changed admission/derivation input must conflict; same exact current command must replay the verified original result without a second version, while a stale replay fails; Task 3 tests all three.
+- A corrupt body, version digest, scene link, command result or head pointer must fail on authority read/replay; Tasks 2 and 3 test these.
+- Partial bundle failure and racing registrations/re-admission must leave one complete current bundle with no stale success or deadlock; Task 4 tests this on PostgreSQL.
+
+---
+
+### Task 1: Scoped Target Registry Schema
+
+**Files:**
+- Create: `lib/db/models/production_target.py`
+- Modify: `lib/db/models/__init__.py`
+- Create: `alembic/versions/8c8c4a0e0001_add_production_target_registry.py` (down revision `8b8c4a0e0001`; recheck live heads before writing)
+- Create: `tests/integration/lib/db/migrations/test_production_target_registry.py`
+
+**Interfaces:**
+- Produce `ProductionTargetHeadModel`, `ProductionTargetVersionModel` and `ProductionTargetCommandModel` with table names and scoped keys from the spec.
+- `production_target_heads` has a nullable genesis `(current_version, current_version_digest)` pair and a scoped FK to the populated exact version. SHOT version rows have a scoped FK on `(user_id, project_name, scene_target_type='SCENE', scene_target_id, scene_registry_version)` to a SCENE version and store its digest separately for revalidation.
+
+- [ ] Write migration tests that reject cross-user/project head and Shot→Scene links, SHOT rows with partial or non-SCENE dependency, SCENE rows with dependency columns, and a head pointing to a missing version. Confirm one valid scene+shot bundle inserts under both supported test dialects where constraints apply.
+- [ ] Run those tests RED before adding models/migration. Add the minimal schema and model exports; keep the nullable genesis row uncommitted by service convention.
+- [ ] Upgrade and downgrade the migration on disposable PostgreSQL 16 and run the migration test file. Record the exact migration head and observed FK/check behavior; do not apply to a live database.
+- [ ] Commit this task's schema, model and tests only.
+
+### Task 2: Typed Digest and Current-Read Contract
+
+**Files:**
+- Create: `r2/contracts/production_target.py`
+- Create: `r2/target_registry/digests.py`
+- Create: `lib/db/repositories/production_target.py`
+- Test: `tests/unit/r2/advanced_creative/test_m8c_target_registry_vectors.py`
+- Create: `tests/integration/lib/db/repositories/test_production_target_registry.py`
+
+**Interfaces:**
+- Produce `TargetVersionRef` containing `(target_type, target_id, registry_version, version_digest)` and `TargetRegistrationResult` containing ordered Scene then Shot refs and a result digest. Reject unsupported target types.
+- Produce `target_body_digest(target_type: ProductionBindingTarget, target: SceneSpec | ShotSpecV2) -> str` and `target_version_digest(version_body: TargetVersionBody) -> str` using the spec's domains and Preparation canonical bytes. `TargetVersionBody` contains the exact fields of the proposed fixture. Define `registration_command_digest(...)` and `registration_result_digest(...)` for the two command/result domains in the spec; exclude audit timestamp and command ID from target-version digest.
+- Produce repository methods `get_command_verified`, `lock_target_head`, `get_current_verified`, `append_version`, `advance_head` and `record_command`; all take or retain the caller's `AsyncSession` and never commit it. `record_command` relies on the scoped unique key; an absent command row is never considered locked.
+
+- [ ] Extend the vector tests RED for typed digest functions, including the `1e-7` numeric bytes, full admission ref, Shot's SCENE dependency type/version/digest, and separate registry/body versions. Add command/result vectors with one exact replay and one changed-admission variant before implementing digest helpers.
+- [ ] Implement the smallest contracts and digest helpers that make those vectors GREEN; do not change existing M8 or Preparation canonical serializers.
+- [ ] Write repository tests that tamper each stored body/version/head/scene dependency/command result in turn and require a typed integrity conflict on read or replay. Check the head points to the maximum stored version and all stored digests are recomputed from JSON rather than trusted as columns.
+- [ ] Implement the scoped repository and run the affected unit/repository selection on SQLite and PostgreSQL. Commit the contracts, vectors, repository and tests.
+
+### Task 3: Atomic Take Bundle Registration
+
+**Files:**
+- Create: `r2/target_registry/service.py`
+- Modify: `r2/production_intelligence/take_director.py` only to expose a pinned `TAKE_DERIVATION_VERSION` constant with value `r2-take-director-v1`
+- Create: `tests/integration/r2/target_registry/test_take_registration.py`
+
+**Interfaces:**
+- Produce `RegisterTakeTargetsCommand(user_id, project_name, principal, command_id, admitted_screenplay_ref)` and `TakeTargetRegistrationService.register(command: RegisterTakeTargetsCommand) -> TargetRegistrationResult` over a caller-supplied session factory. The trusted caller, not a candidate or free-form request body, supplies user/project/principal. The service owns one session/transaction and constructs `TransactionBoundApprovedScreenplayReader(AdaptationRepository(session), expected_admission=command.admitted_screenplay_ref)` from the prerequisite packet.
+- The service uses `TakeDirectorAdapter`, checks `APPROVED`, unique IDs and exact Shot→Scene membership, locks target heads SCENE IDs ascending then SHOT IDs ascending, revalidates each current row, appends only changed semantic versions and records one command receipt in the same transaction.
+
+- [ ] Write RED integration tests with real persisted admissions for exact registration, wrong scope, stale decision, forged profile, two successive admissions retaining target IDs/body version `1` but changing body and registry version, exact same-command replay, stale replay and changed-command conflict.
+- [ ] Implement only the Take path. Verify a new Shot version binds the Scene registry version selected in the same transaction, even when only the admission provenance changes. A writer must not accept a caller-provided SceneSpec/ShotSpecV2 as target authority.
+- [ ] Run the whole affected admission/Take/registry test selection on SQLite and PostgreSQL; run Ruff, basedpyright, import contracts, deptry and test audit. Commit only the service/constant/tests after GREEN.
+
+### Task 4: PostgreSQL Interleavings and Fault Rollback
+
+**Files:**
+- Create: `tests/integration/r2/target_registry/test_take_registration_concurrency.py`
+- Modify: `r2/target_registry/service.py` and `lib/db/repositories/production_target.py` only for concrete defects exposed by these tests
+
+**Interfaces:**
+- Keep the Task 3 API and transaction ownership unchanged.
+
+- [ ] Force a re-admission writer to reach its own locked admission-head update while registration holds the head and has not committed. Identify that writer's backend PID or a test-owned SQL barrier, then release registration and prove the resulting target version is tied to the admission that was current at its commit.
+- [ ] Force two registration commands for the same target bundle to overlap after derivation; assert a single monotonic head sequence, exact replay for identical input, typed conflict for changed input, and no committed partial Scene/Shot set. Also race one command ID across different target bundles: the unique-key loser must roll back its whole attempt before reading the winner in a new transaction. Inject a flush failure after Scene append and assert rollback of all versions, heads and command receipt.
+- [ ] Run these tests on disposable PostgreSQL 16 with `-n 4 --dist loadfile`, then rerun the complete affected selection and repository static gates on the final code HEAD. Obtain independent exact-HEAD review before marking target registry accepted; keep binding, pair and production gates closed.
+- [ ] Commit only verified fixes and the exact-HEAD evidence packet.
+
+## Plan Self-Review
+
+The four tasks cover the target-registry prerequisite from the proposed spec, not binding authority or M8-C acceptance. They preserve one transaction, verified upstream admission, full profile provenance, deterministic locks, canonical digest domains, scoped FKs, replay, rollback and adversarial reads. The five review-focus classes each map to a named task test. The plan depends on the transaction-bound reader packet and on design review of ADR-0102; no implementation or production authorization is implied by this document.

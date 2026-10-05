@@ -142,11 +142,12 @@
         "scene_dependency": {
           "target_id": "scene-1",
           "registry_version": 1,
-          "target_version_digest": "sha256:2aeaac964c382a179cdd1d863fae954a8804379f3997c1780bf932065ebcd941"
+          "target_version_digest": "sha256:2aeaac964c382a179cdd1d863fae954a8804379f3997c1780bf932065ebcd941",
+          "target_type": "SCENE"
         }
       },
-      "canonical": "{\"body\":{\"admitted_screenplay_ref\":{\"admission_ref\":{\"decision_digest\":\"sha256:e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7\",\"decision_id\":\"d-admit-1\"},\"profile_ref\":{\"policy_pack_digest\":\"sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"profile_id\":\"WESTERN_GENERIC\",\"profile_version\":\"v1\"},\"screenplay_ref\":{\"artifact_id\":\"sp-1\",\"content_hash\":\"sha256:c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9\",\"version\":2}},\"project_name\":\"project-a\",\"registry_version\":1,\"scene_dependency\":{\"registry_version\":1,\"target_id\":\"scene-1\",\"target_version_digest\":\"sha256:2aeaac964c382a179cdd1d863fae954a8804379f3997c1780bf932065ebcd941\"},\"take_derivation_version\":\"r2-take-director-v1\",\"target_body_digest\":\"sha256:6d917751633625e02e1a1dd0c3d274ec7024aa1783f243c5b10c24231bc785fa\",\"target_id\":\"scene-1-TAKE-1\",\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.version.v1\"}",
-      "digest": "sha256:04a23e3b2d5e012d3dc03a6aaaa1746b4304978fdd45342fa076215417e1f632"
+      "canonical": "{\"body\":{\"admitted_screenplay_ref\":{\"admission_ref\":{\"decision_digest\":\"sha256:e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7\",\"decision_id\":\"d-admit-1\"},\"profile_ref\":{\"policy_pack_digest\":\"sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"profile_id\":\"WESTERN_GENERIC\",\"profile_version\":\"v1\"},\"screenplay_ref\":{\"artifact_id\":\"sp-1\",\"content_hash\":\"sha256:c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9\",\"version\":2}},\"project_name\":\"project-a\",\"registry_version\":1,\"scene_dependency\":{\"registry_version\":1,\"target_id\":\"scene-1\",\"target_type\":\"SCENE\",\"target_version_digest\":\"sha256:2aeaac964c382a179cdd1d863fae954a8804379f3997c1780bf932065ebcd941\"},\"take_derivation_version\":\"r2-take-director-v1\",\"target_body_digest\":\"sha256:6d917751633625e02e1a1dd0c3d274ec7024aa1783f243c5b10c24231bc785fa\",\"target_id\":\"scene-1-TAKE-1\",\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.version.v1\"}",
+      "digest": "sha256:51c74052616f85baf7286f0ccb89486d8a639cf59bce1ad53a2866bd4438154b"
     },
     {
       "name": "scene_body_v2",
@@ -288,11 +289,12 @@
         "scene_dependency": {
           "target_id": "scene-1",
           "registry_version": 2,
-          "target_version_digest": "sha256:13e6b13331268e07085a50319fe80cf9f5b58be4a57640096eb47c8ae4384371"
+          "target_version_digest": "sha256:13e6b13331268e07085a50319fe80cf9f5b58be4a57640096eb47c8ae4384371",
+          "target_type": "SCENE"
         }
       },
-      "canonical": "{\"body\":{\"admitted_screenplay_ref\":{\"admission_ref\":{\"decision_digest\":\"sha256:f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8\",\"decision_id\":\"d-admit-2\"},\"profile_ref\":{\"policy_pack_digest\":\"sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"profile_id\":\"WESTERN_GENERIC\",\"profile_version\":\"v1\"},\"screenplay_ref\":{\"artifact_id\":\"sp-1\",\"content_hash\":\"sha256:d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9\",\"version\":3}},\"project_name\":\"project-a\",\"registry_version\":2,\"scene_dependency\":{\"registry_version\":2,\"target_id\":\"scene-1\",\"target_version_digest\":\"sha256:13e6b13331268e07085a50319fe80cf9f5b58be4a57640096eb47c8ae4384371\"},\"take_derivation_version\":\"r2-take-director-v1\",\"target_body_digest\":\"sha256:4b31ed4714b076f7b7f8362cba5506c912621258b1052d13018f9a2764b514f1\",\"target_id\":\"scene-1-TAKE-1\",\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.version.v1\"}",
-      "digest": "sha256:14144d5dcbc107811c03b2af1768c53472aca968fb0ddca4edcd9324622ac704"
+      "canonical": "{\"body\":{\"admitted_screenplay_ref\":{\"admission_ref\":{\"decision_digest\":\"sha256:f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8\",\"decision_id\":\"d-admit-2\"},\"profile_ref\":{\"policy_pack_digest\":\"sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"profile_id\":\"WESTERN_GENERIC\",\"profile_version\":\"v1\"},\"screenplay_ref\":{\"artifact_id\":\"sp-1\",\"content_hash\":\"sha256:d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9\",\"version\":3}},\"project_name\":\"project-a\",\"registry_version\":2,\"scene_dependency\":{\"registry_version\":2,\"target_id\":\"scene-1\",\"target_type\":\"SCENE\",\"target_version_digest\":\"sha256:13e6b13331268e07085a50319fe80cf9f5b58be4a57640096eb47c8ae4384371\"},\"take_derivation_version\":\"r2-take-director-v1\",\"target_body_digest\":\"sha256:4b31ed4714b076f7b7f8362cba5506c912621258b1052d13018f9a2764b514f1\",\"target_id\":\"scene-1-TAKE-1\",\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.version.v1\"}",
+      "digest": "sha256:acf6e150e1e7266be1cc5340727bb93189342e380b25da3b8bea416c93183436"
     }
   ],
   "screenplays": {

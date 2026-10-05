@@ -72,6 +72,7 @@ def test_target_registry_versions_bind_real_take_bodies_and_admissions() -> None
         assert shot_version["target_body_digest"] == cases[f"shot_body_{suffix}"]["digest"]
         assert scene_version["admitted_screenplay_ref"] == shot_version["admitted_screenplay_ref"]
         assert shot_version["scene_dependency"] == {
+            "target_type": "SCENE",
             "target_id": scene_version["target_id"],
             "registry_version": scene_version["registry_version"],
             "target_version_digest": cases[f"scene_version_{suffix}"]["digest"],
