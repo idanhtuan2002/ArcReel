@@ -39,6 +39,7 @@ from r2.production_intelligence.director import DirectorRouteUnavailable
 _SCENE_SPEC_SCHEMA_VERSION = "r2-take-scene-spec-v1"
 _SHOT_SPEC_SCHEMA_VERSION = "r2-shot-spec-v2"
 _TAKE_ALLOWED_METHODS = [ProductionMethod.GENERATED_VIDEO]
+TAKE_DERIVATION_VERSION = "r2-take-director-v1"
 
 
 @runtime_checkable
@@ -144,4 +145,4 @@ class TakeDirectorAdapter:
         return TakeDirectionResult(scenes=scenes, shots=shots)
 
 
-__all__ = ["ApprovedScreenplayReaderPort", "TakeDirectionResult", "TakeDirectorAdapter"]
+__all__ = ["TAKE_DERIVATION_VERSION", "ApprovedScreenplayReaderPort", "TakeDirectionResult", "TakeDirectorAdapter"]

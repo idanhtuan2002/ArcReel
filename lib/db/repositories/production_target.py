@@ -91,9 +91,13 @@ class ProductionTargetRepository:
             current_version=None,
             current_version_digest=None,
         )
-        await self.session.execute(
-            statement.on_conflict_do_nothing(index_elements=["user_id", "project_name", "target_type", "target_id"])
-        )
+        inserted = (
+            await self.session.execute(
+                statement.on_conflict_do_nothing(
+                    index_elements=["user_id", "project_name", "target_type", "target_id"]
+                ).returning(ProductionTargetHeadModel.target_id)
+            )
+        ).scalar_one_or_none()
         head = await self._head(
             user_id=user_id, project_name=project_name, target_type=kind, target_id=target_id, lock=True
         )
@@ -101,6 +105,8 @@ class ProductionTargetRepository:
             raise ProductionTargetIntegrityError("target head disappeared after scoped claim")
         if (head.current_version is None) != (head.current_version_digest is None):
             raise ProductionTargetIntegrityError("target head has incomplete current pair")
+        if inserted is None and head.current_version is None:
+            raise ProductionTargetIntegrityError("committed genesis target head has no current version")
         return head
 
     async def append_version(
@@ -271,7 +277,7 @@ class ProductionTargetRepository:
 
     @staticmethod
     def _verify_row(
-        row: ProductionTargetVersionModel, expected_admission: AdmittedScreenplayRef
+        row: ProductionTargetVersionModel, expected_admission: AdmittedScreenplayRef | None
     ) -> VerifiedTargetVersion:
         try:
             kind = ProductionBindingTarget(row.target_type)
@@ -314,7 +320,7 @@ class ProductionTargetRepository:
                     "scene_dependency": dependency,
                 }
             )
-            if body.admitted_screenplay_ref != expected_admission:
+            if expected_admission is not None and body.admitted_screenplay_ref != expected_admission:
                 raise ValueError("target admission does not match the expected full admission")
             if kind == ProductionBindingTarget.SHOT and (
                 not isinstance(target, ShotSpecV2)
@@ -346,7 +352,7 @@ class ProductionTargetRepository:
         project_name: str,
         target_type: ProductionBindingTarget | str,
         target_id: str,
-        expected_admission: AdmittedScreenplayRef,
+        expected_admission: AdmittedScreenplayRef | None,
     ) -> VerifiedTargetVersion | None:
         kind = ProductionBindingTarget(target_type)
         if kind == ProductionBindingTarget.SCENE:
@@ -401,6 +407,7 @@ class ProductionTargetRepository:
         if (
             shot_row.scene_registry_version != scene.ref.registry_version
             or shot_row.scene_version_digest != scene.ref.version_digest
+            or shot.admitted_screenplay_ref != scene.admitted_screenplay_ref
         ):
             raise ProductionTargetIntegrityError("Shot scene dependency integrity verification failed")
         return shot
