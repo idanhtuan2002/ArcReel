@@ -1,0 +1,394 @@
+{
+  "status": "proposed",
+  "canonical_version": "1",
+  "cases": [
+    {
+      "name": "scene_body_v1",
+      "domain": "r2.production.target.body.v1",
+      "body": {
+        "target_type": "SCENE",
+        "target": {
+          "id": "scene-1",
+          "schema_version": "r2-take-scene-spec-v1",
+          "version": 1,
+          "source_artifact_ref": "sp-1",
+          "source_unit_refs": [
+            "entry-1"
+          ],
+          "content_basis": {
+            "basis_type": "ADAPTATION",
+            "basis_version": "v1",
+            "refs": [
+              "src-1"
+            ]
+          },
+          "purpose": "advance the plot",
+          "duration_target": 30.0,
+          "temporal_context": null,
+          "location_ref": null,
+          "entity_refs": [
+            "char-1"
+          ],
+          "required_beats": [],
+          "continuity_requirements": [],
+          "allowed_methods": [
+            "GENERATED_VIDEO"
+          ],
+          "approval_status": "APPROVED"
+        }
+      },
+      "canonical": "{\"body\":{\"target\":{\"allowed_methods\":[\"GENERATED_VIDEO\"],\"approval_status\":\"APPROVED\",\"content_basis\":{\"basis_type\":\"ADAPTATION\",\"basis_version\":\"v1\",\"refs\":[\"src-1\"]},\"continuity_requirements\":[],\"duration_target\":30.0,\"entity_refs\":[\"char-1\"],\"id\":\"scene-1\",\"location_ref\":null,\"purpose\":\"advance the plot\",\"required_beats\":[],\"schema_version\":\"r2-take-scene-spec-v1\",\"source_artifact_ref\":\"sp-1\",\"source_unit_refs\":[\"entry-1\"],\"temporal_context\":null,\"version\":1},\"target_type\":\"SCENE\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.body.v1\"}",
+      "digest": "sha256:56aeacf525b70f1ec30852c902af76dc86ec4bf4ade58663189385ef1e9cc687"
+    },
+    {
+      "name": "shot_body_v1",
+      "domain": "r2.production.target.body.v1",
+      "body": {
+        "target_type": "SHOT",
+        "target": {
+          "id": "scene-1-TAKE-1",
+          "schema_version": "r2-shot-spec-v2",
+          "version": 1,
+          "scene_id": "scene-1",
+          "content_basis": {
+            "basis_type": "ADAPTATION",
+            "basis_version": "v1",
+            "refs": [
+              "src-1"
+            ]
+          },
+          "purpose": "advance the plot",
+          "target_duration": 30.0,
+          "framing": "medium",
+          "camera": "static",
+          "shot_size": "medium",
+          "camera_angle": "eye-level",
+          "camera_movement": "static",
+          "entity_refs": [
+            "char-1"
+          ],
+          "audio_intent": null,
+          "required_continuity": [],
+          "required_reference_roles": [],
+          "allowed_methods": [
+            "GENERATED_VIDEO"
+          ],
+          "quality_tier": 0,
+          "approval_status": "APPROVED"
+        }
+      },
+      "canonical": "{\"body\":{\"target\":{\"allowed_methods\":[\"GENERATED_VIDEO\"],\"approval_status\":\"APPROVED\",\"audio_intent\":null,\"camera\":\"static\",\"camera_angle\":\"eye-level\",\"camera_movement\":\"static\",\"content_basis\":{\"basis_type\":\"ADAPTATION\",\"basis_version\":\"v1\",\"refs\":[\"src-1\"]},\"entity_refs\":[\"char-1\"],\"framing\":\"medium\",\"id\":\"scene-1-TAKE-1\",\"purpose\":\"advance the plot\",\"quality_tier\":0,\"required_continuity\":[],\"required_reference_roles\":[],\"scene_id\":\"scene-1\",\"schema_version\":\"r2-shot-spec-v2\",\"shot_size\":\"medium\",\"target_duration\":30.0,\"version\":1},\"target_type\":\"SHOT\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.body.v1\"}",
+      "digest": "sha256:6d917751633625e02e1a1dd0c3d274ec7024aa1783f243c5b10c24231bc785fa"
+    },
+    {
+      "name": "scene_version_v1",
+      "domain": "r2.production.target.version.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "project-a",
+        "registry_version": 1,
+        "admitted_screenplay_ref": {
+          "screenplay_ref": {
+            "artifact_id": "sp-1",
+            "version": 2,
+            "content_hash": "sha256:c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9"
+          },
+          "admission_ref": {
+            "decision_id": "d-admit-1",
+            "decision_digest": "sha256:e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7"
+          },
+          "profile_ref": {
+            "profile_id": "WESTERN_GENERIC",
+            "profile_version": "v1",
+            "policy_pack_digest": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+          }
+        },
+        "take_derivation_version": "r2-take-director-v1",
+        "target_type": "SCENE",
+        "target_id": "scene-1",
+        "target_body_digest": "sha256:56aeacf525b70f1ec30852c902af76dc86ec4bf4ade58663189385ef1e9cc687",
+        "scene_dependency": null
+      },
+      "canonical": "{\"body\":{\"admitted_screenplay_ref\":{\"admission_ref\":{\"decision_digest\":\"sha256:e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7\",\"decision_id\":\"d-admit-1\"},\"profile_ref\":{\"policy_pack_digest\":\"sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"profile_id\":\"WESTERN_GENERIC\",\"profile_version\":\"v1\"},\"screenplay_ref\":{\"artifact_id\":\"sp-1\",\"content_hash\":\"sha256:c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9\",\"version\":2}},\"project_name\":\"project-a\",\"registry_version\":1,\"scene_dependency\":null,\"take_derivation_version\":\"r2-take-director-v1\",\"target_body_digest\":\"sha256:56aeacf525b70f1ec30852c902af76dc86ec4bf4ade58663189385ef1e9cc687\",\"target_id\":\"scene-1\",\"target_type\":\"SCENE\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.version.v1\"}",
+      "digest": "sha256:2aeaac964c382a179cdd1d863fae954a8804379f3997c1780bf932065ebcd941"
+    },
+    {
+      "name": "shot_version_v1",
+      "domain": "r2.production.target.version.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "project-a",
+        "registry_version": 1,
+        "admitted_screenplay_ref": {
+          "screenplay_ref": {
+            "artifact_id": "sp-1",
+            "version": 2,
+            "content_hash": "sha256:c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9"
+          },
+          "admission_ref": {
+            "decision_id": "d-admit-1",
+            "decision_digest": "sha256:e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7"
+          },
+          "profile_ref": {
+            "profile_id": "WESTERN_GENERIC",
+            "profile_version": "v1",
+            "policy_pack_digest": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+          }
+        },
+        "take_derivation_version": "r2-take-director-v1",
+        "target_type": "SHOT",
+        "target_id": "scene-1-TAKE-1",
+        "target_body_digest": "sha256:6d917751633625e02e1a1dd0c3d274ec7024aa1783f243c5b10c24231bc785fa",
+        "scene_dependency": {
+          "target_id": "scene-1",
+          "registry_version": 1,
+          "target_version_digest": "sha256:2aeaac964c382a179cdd1d863fae954a8804379f3997c1780bf932065ebcd941"
+        }
+      },
+      "canonical": "{\"body\":{\"admitted_screenplay_ref\":{\"admission_ref\":{\"decision_digest\":\"sha256:e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7\",\"decision_id\":\"d-admit-1\"},\"profile_ref\":{\"policy_pack_digest\":\"sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"profile_id\":\"WESTERN_GENERIC\",\"profile_version\":\"v1\"},\"screenplay_ref\":{\"artifact_id\":\"sp-1\",\"content_hash\":\"sha256:c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9\",\"version\":2}},\"project_name\":\"project-a\",\"registry_version\":1,\"scene_dependency\":{\"registry_version\":1,\"target_id\":\"scene-1\",\"target_version_digest\":\"sha256:2aeaac964c382a179cdd1d863fae954a8804379f3997c1780bf932065ebcd941\"},\"take_derivation_version\":\"r2-take-director-v1\",\"target_body_digest\":\"sha256:6d917751633625e02e1a1dd0c3d274ec7024aa1783f243c5b10c24231bc785fa\",\"target_id\":\"scene-1-TAKE-1\",\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.version.v1\"}",
+      "digest": "sha256:04a23e3b2d5e012d3dc03a6aaaa1746b4304978fdd45342fa076215417e1f632"
+    },
+    {
+      "name": "scene_body_v2",
+      "domain": "r2.production.target.body.v1",
+      "body": {
+        "target_type": "SCENE",
+        "target": {
+          "id": "scene-1",
+          "schema_version": "r2-take-scene-spec-v1",
+          "version": 1,
+          "source_artifact_ref": "sp-1",
+          "source_unit_refs": [
+            "entry-1"
+          ],
+          "content_basis": {
+            "basis_type": "ADAPTATION",
+            "basis_version": "v1",
+            "refs": [
+              "src-1"
+            ]
+          },
+          "purpose": "show the changed location stakes",
+          "duration_target": 1e-07,
+          "temporal_context": null,
+          "location_ref": null,
+          "entity_refs": [
+            "char-1"
+          ],
+          "required_beats": [],
+          "continuity_requirements": [],
+          "allowed_methods": [
+            "GENERATED_VIDEO"
+          ],
+          "approval_status": "APPROVED"
+        }
+      },
+      "canonical": "{\"body\":{\"target\":{\"allowed_methods\":[\"GENERATED_VIDEO\"],\"approval_status\":\"APPROVED\",\"content_basis\":{\"basis_type\":\"ADAPTATION\",\"basis_version\":\"v1\",\"refs\":[\"src-1\"]},\"continuity_requirements\":[],\"duration_target\":1e-07,\"entity_refs\":[\"char-1\"],\"id\":\"scene-1\",\"location_ref\":null,\"purpose\":\"show the changed location stakes\",\"required_beats\":[],\"schema_version\":\"r2-take-scene-spec-v1\",\"source_artifact_ref\":\"sp-1\",\"source_unit_refs\":[\"entry-1\"],\"temporal_context\":null,\"version\":1},\"target_type\":\"SCENE\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.body.v1\"}",
+      "digest": "sha256:639b62ff87f21bfe0ae5c928a78141b32732232331f35728423a0145a324e0b0"
+    },
+    {
+      "name": "shot_body_v2",
+      "domain": "r2.production.target.body.v1",
+      "body": {
+        "target_type": "SHOT",
+        "target": {
+          "id": "scene-1-TAKE-1",
+          "schema_version": "r2-shot-spec-v2",
+          "version": 1,
+          "scene_id": "scene-1",
+          "content_basis": {
+            "basis_type": "ADAPTATION",
+            "basis_version": "v1",
+            "refs": [
+              "src-1"
+            ]
+          },
+          "purpose": "show the changed location stakes",
+          "target_duration": 1e-07,
+          "framing": "medium",
+          "camera": "static",
+          "shot_size": "medium",
+          "camera_angle": "eye-level",
+          "camera_movement": "static",
+          "entity_refs": [
+            "char-1"
+          ],
+          "audio_intent": null,
+          "required_continuity": [],
+          "required_reference_roles": [],
+          "allowed_methods": [
+            "GENERATED_VIDEO"
+          ],
+          "quality_tier": 0,
+          "approval_status": "APPROVED"
+        }
+      },
+      "canonical": "{\"body\":{\"target\":{\"allowed_methods\":[\"GENERATED_VIDEO\"],\"approval_status\":\"APPROVED\",\"audio_intent\":null,\"camera\":\"static\",\"camera_angle\":\"eye-level\",\"camera_movement\":\"static\",\"content_basis\":{\"basis_type\":\"ADAPTATION\",\"basis_version\":\"v1\",\"refs\":[\"src-1\"]},\"entity_refs\":[\"char-1\"],\"framing\":\"medium\",\"id\":\"scene-1-TAKE-1\",\"purpose\":\"show the changed location stakes\",\"quality_tier\":0,\"required_continuity\":[],\"required_reference_roles\":[],\"scene_id\":\"scene-1\",\"schema_version\":\"r2-shot-spec-v2\",\"shot_size\":\"medium\",\"target_duration\":1e-07,\"version\":1},\"target_type\":\"SHOT\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.body.v1\"}",
+      "digest": "sha256:4b31ed4714b076f7b7f8362cba5506c912621258b1052d13018f9a2764b514f1"
+    },
+    {
+      "name": "scene_version_v2",
+      "domain": "r2.production.target.version.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "project-a",
+        "registry_version": 2,
+        "admitted_screenplay_ref": {
+          "screenplay_ref": {
+            "artifact_id": "sp-1",
+            "version": 3,
+            "content_hash": "sha256:d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9"
+          },
+          "admission_ref": {
+            "decision_id": "d-admit-2",
+            "decision_digest": "sha256:f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8"
+          },
+          "profile_ref": {
+            "profile_id": "WESTERN_GENERIC",
+            "profile_version": "v1",
+            "policy_pack_digest": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+          }
+        },
+        "take_derivation_version": "r2-take-director-v1",
+        "target_type": "SCENE",
+        "target_id": "scene-1",
+        "target_body_digest": "sha256:639b62ff87f21bfe0ae5c928a78141b32732232331f35728423a0145a324e0b0",
+        "scene_dependency": null
+      },
+      "canonical": "{\"body\":{\"admitted_screenplay_ref\":{\"admission_ref\":{\"decision_digest\":\"sha256:f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8\",\"decision_id\":\"d-admit-2\"},\"profile_ref\":{\"policy_pack_digest\":\"sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"profile_id\":\"WESTERN_GENERIC\",\"profile_version\":\"v1\"},\"screenplay_ref\":{\"artifact_id\":\"sp-1\",\"content_hash\":\"sha256:d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9\",\"version\":3}},\"project_name\":\"project-a\",\"registry_version\":2,\"scene_dependency\":null,\"take_derivation_version\":\"r2-take-director-v1\",\"target_body_digest\":\"sha256:639b62ff87f21bfe0ae5c928a78141b32732232331f35728423a0145a324e0b0\",\"target_id\":\"scene-1\",\"target_type\":\"SCENE\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.version.v1\"}",
+      "digest": "sha256:13e6b13331268e07085a50319fe80cf9f5b58be4a57640096eb47c8ae4384371"
+    },
+    {
+      "name": "shot_version_v2",
+      "domain": "r2.production.target.version.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "project-a",
+        "registry_version": 2,
+        "admitted_screenplay_ref": {
+          "screenplay_ref": {
+            "artifact_id": "sp-1",
+            "version": 3,
+            "content_hash": "sha256:d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9"
+          },
+          "admission_ref": {
+            "decision_id": "d-admit-2",
+            "decision_digest": "sha256:f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8"
+          },
+          "profile_ref": {
+            "profile_id": "WESTERN_GENERIC",
+            "profile_version": "v1",
+            "policy_pack_digest": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+          }
+        },
+        "take_derivation_version": "r2-take-director-v1",
+        "target_type": "SHOT",
+        "target_id": "scene-1-TAKE-1",
+        "target_body_digest": "sha256:4b31ed4714b076f7b7f8362cba5506c912621258b1052d13018f9a2764b514f1",
+        "scene_dependency": {
+          "target_id": "scene-1",
+          "registry_version": 2,
+          "target_version_digest": "sha256:13e6b13331268e07085a50319fe80cf9f5b58be4a57640096eb47c8ae4384371"
+        }
+      },
+      "canonical": "{\"body\":{\"admitted_screenplay_ref\":{\"admission_ref\":{\"decision_digest\":\"sha256:f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8\",\"decision_id\":\"d-admit-2\"},\"profile_ref\":{\"policy_pack_digest\":\"sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"profile_id\":\"WESTERN_GENERIC\",\"profile_version\":\"v1\"},\"screenplay_ref\":{\"artifact_id\":\"sp-1\",\"content_hash\":\"sha256:d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9\",\"version\":3}},\"project_name\":\"project-a\",\"registry_version\":2,\"scene_dependency\":{\"registry_version\":2,\"target_id\":\"scene-1\",\"target_version_digest\":\"sha256:13e6b13331268e07085a50319fe80cf9f5b58be4a57640096eb47c8ae4384371\"},\"take_derivation_version\":\"r2-take-director-v1\",\"target_body_digest\":\"sha256:4b31ed4714b076f7b7f8362cba5506c912621258b1052d13018f9a2764b514f1\",\"target_id\":\"scene-1-TAKE-1\",\"target_type\":\"SHOT\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.production.target.version.v1\"}",
+      "digest": "sha256:14144d5dcbc107811c03b2af1768c53472aca968fb0ddca4edcd9324622ac704"
+    }
+  ],
+  "screenplays": {
+    "v1": {
+      "screenplay_id": "sp-1",
+      "schema_version": "r2-screenplay-artifact-v2",
+      "version": 2,
+      "adaptation_branch_ref": {
+        "artifact_id": "branch-1",
+        "version": 1,
+        "content_hash": "sha256:b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0"
+      },
+      "content_basis": {
+        "basis_type": "ADAPTATION",
+        "basis_version": "v1",
+        "refs": [
+          "src-1"
+        ]
+      },
+      "scenes": [
+        {
+          "scene_id": "scene-1",
+          "purpose": "advance the plot",
+          "duration_target": 30.0,
+          "location_ref": null,
+          "character_refs": [
+            "char-1"
+          ],
+          "source_mapping_refs": [
+            "entry-1"
+          ],
+          "dramatic_text": "INT. ROOM - DAY\nSomething happens."
+        }
+      ],
+      "characters": [
+        "char-1"
+      ],
+      "source_mapping_refs": [
+        "entry-1"
+      ],
+      "approval_status": "APPROVED",
+      "locked_for_direction": true,
+      "content_hash": "sha256:c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9c9",
+      "adaptation_map_ref": {
+        "artifact_id": "map-1",
+        "version": 1,
+        "content_hash": "sha256:d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+      },
+      "profile_analysis_refs": []
+    },
+    "v2": {
+      "screenplay_id": "sp-1",
+      "schema_version": "r2-screenplay-artifact-v2",
+      "version": 3,
+      "adaptation_branch_ref": {
+        "artifact_id": "branch-1",
+        "version": 1,
+        "content_hash": "sha256:b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0"
+      },
+      "content_basis": {
+        "basis_type": "ADAPTATION",
+        "basis_version": "v1",
+        "refs": [
+          "src-1"
+        ]
+      },
+      "scenes": [
+        {
+          "scene_id": "scene-1",
+          "purpose": "show the changed location stakes",
+          "duration_target": 1e-07,
+          "location_ref": null,
+          "character_refs": [
+            "char-1"
+          ],
+          "source_mapping_refs": [
+            "entry-1"
+          ],
+          "dramatic_text": "INT. ROOM - DAY\nSomething happens."
+        }
+      ],
+      "characters": [
+        "char-1"
+      ],
+      "source_mapping_refs": [
+        "entry-1"
+      ],
+      "approval_status": "APPROVED",
+      "locked_for_direction": true,
+      "content_hash": "sha256:d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9",
+      "adaptation_map_ref": {
+        "artifact_id": "map-1",
+        "version": 1,
+        "content_hash": "sha256:d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+      },
+      "profile_analysis_refs": []
+    }
+  }
+}
