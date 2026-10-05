@@ -7,9 +7,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from r2.contracts import ProductionBinding
 from r2.contracts.fingerprints import canonical_json_bytes
+from r2.contracts.production_binding_authority import (
+    BindingCreateCommandV1,
+    BindingCreateResultV1,
+    BindingEnvelopeV1,
+    BindingSnapshotV1,
+    FrameSourceClaimV1,
+)
 from r2.production_binding.digests import (
     binding_body_digest,
     binding_create_command_digest,
@@ -121,3 +129,47 @@ def test_v1_location_body_rejects_other_roles_and_frame_counts() -> None:
     ):
         with pytest.raises(ValueError, match="outside the LOCATION"):
             binding_body_digest(ProductionBinding.model_validate({**body, **changed}))
+
+
+def test_typed_authority_bodies_match_fixed_vectors() -> None:
+    cases = _cases()
+    models = {
+        "frame_claim_a": FrameSourceClaimV1,
+        "frame_claim_b": FrameSourceClaimV1,
+        "binding_envelope": BindingEnvelopeV1,
+        "binding_create_command": BindingCreateCommandV1,
+        "binding_create_result": BindingCreateResultV1,
+        "binding_snapshot": BindingSnapshotV1,
+    }
+    for name, model in models.items():
+        assert model.model_validate(cases[name]["body"]).model_dump(mode="json") == cases[name]["body"]
+
+
+def test_typed_authority_bodies_reject_extra_and_mismatched_fields() -> None:
+    cases = _cases()
+    claim = cases["frame_claim_a"]["body"]
+    with pytest.raises(ValidationError):
+        FrameSourceClaimV1.model_validate({**claim, "object_ref": "/tmp/frame.png"})
+    with pytest.raises(ValidationError):
+        FrameSourceClaimV1.model_validate({**claim, "receipt_id": "m8f:" + "c" * 64})
+
+    envelope = cases["binding_envelope"]["body"]
+    with pytest.raises(ValidationError):
+        BindingEnvelopeV1.model_validate({**envelope, "binding_version": 0})
+    with pytest.raises(ValidationError):
+        BindingEnvelopeV1.model_validate({**envelope, "ordered_claims": list(reversed(envelope["ordered_claims"]))})
+    changed_claim = {**envelope["ordered_claims"][0], "frame_byte_size": 257}
+    with pytest.raises(ValueError, match="claim digest"):
+        binding_envelope_digest({**envelope, "ordered_claims": [changed_claim, envelope["ordered_claims"][1]]})
+
+    command = cases["binding_create_command"]["body"]
+    with pytest.raises(ValidationError):
+        BindingCreateCommandV1.model_validate(
+            {**command, "ordered_frame_receipts": command["ordered_frame_receipts"][:1]}
+        )
+    with pytest.raises(ValidationError):
+        binding_create_command_digest({**command, "body": "unexpected"})
+
+    snapshot = cases["binding_snapshot"]["body"]
+    with pytest.raises(ValidationError):
+        BindingSnapshotV1.model_validate({**snapshot, "target_versions": list(reversed(snapshot["target_versions"]))})

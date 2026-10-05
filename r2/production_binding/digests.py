@@ -11,6 +11,13 @@ from r2.contracts.common import ensure_json_value
 from r2.contracts.enums import ProductionBindingRole, ProductionBindingTarget
 from r2.contracts.fingerprints import canonical_json_bytes
 from r2.contracts.preparation import ProductionBinding
+from r2.contracts.production_binding_authority import (
+    BindingCreateCommandV1,
+    BindingCreateResultV1,
+    BindingEnvelopeV1,
+    BindingSnapshotV1,
+    FrameSourceClaimV1,
+)
 
 _FRAME_ID = re.compile(r"m8f:[0-9a-f]{64}\Z")
 _BINDING_ID = re.compile(r"m8b:[0-9a-f]{64}\Z")
@@ -85,23 +92,32 @@ def binding_body_digest(body: ProductionBinding) -> str:
 
 
 def frame_source_claim_digest(body: Mapping[str, Any]) -> str:
-    return _digest("frame_claim", body)
+    claim = FrameSourceClaimV1.model_validate(body)
+    return _digest("frame_claim", claim.model_dump(mode="json"))
 
 
 def binding_envelope_digest(body: Mapping[str, Any]) -> str:
-    return _digest("binding_envelope", body)
+    envelope = BindingEnvelopeV1.model_validate(body)
+    for claim in envelope.ordered_claims:
+        claim_body = claim.model_dump(mode="json", exclude={"claim_digest"})
+        if frame_source_claim_digest(claim_body) != claim.claim_digest:
+            raise ValueError("binding envelope frame claim digest does not match its body")
+    return _digest("binding_envelope", envelope.model_dump(mode="json"))
 
 
 def binding_create_command_digest(body: Mapping[str, Any]) -> str:
-    return _digest("binding_create_command", body)
+    command = BindingCreateCommandV1.model_validate(body)
+    return _digest("binding_create_command", command.model_dump(mode="json"))
 
 
 def binding_create_result_digest(body: Mapping[str, Any]) -> str:
-    return _digest("binding_create_result", body)
+    result = BindingCreateResultV1.model_validate(body)
+    return _digest("binding_create_result", result.model_dump(mode="json"))
 
 
 def binding_snapshot_digest(body: Mapping[str, Any]) -> str:
-    return _digest("binding_snapshot", body)
+    snapshot = BindingSnapshotV1.model_validate(body)
+    return _digest("binding_snapshot", snapshot.model_dump(mode="json"))
 
 
 __all__ = [
