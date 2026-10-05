@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.artifact_manifest import ArtifactManifestError
 from lib.db.repositories.host_hardening import CandidateObjectRepository
 from lib.db.repositories.spatial_source import SpatialFrameReceiptRepository, _receipt_digest
 from lib.path_safety import PathTraversalError
@@ -65,7 +66,7 @@ class SpatialFrameReader:
                 artifact_key=expected_parent_artifact_key,
                 expected_version=identity.parent_master_version,
             )
-        except MasterDivergedError as exc:
+        except (ArtifactManifestError, MasterDivergedError) as exc:
             raise FrameSourceConflictError("frame parent master projection is incomplete") from exc
         except (NoResultFound, ValidationError) as exc:
             raise FrameSourceConflictError("frame parent metadata is missing or malformed") from exc
