@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import Coroutine
+from collections.abc import Coroutine, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -15,12 +15,12 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.artifact_manifest import MANIFEST_FILENAME, ArtifactKey, ProjectArtifactManifestAdapter
-from lib.db.models.host_hardening import CandidateObjectModel, MasterHeadVersionModel
+from lib.db.models.host_hardening import CandidateObjectModel, MasterAuthorityModel, MasterHeadVersionModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.db.repositories.spatial_source import _receipt_digest
 from r2.m3.host_integration import GoldenAHostIntegration
-from server.services import spatial_frame_reader
-from server.services.master_authority import serialized_artifacts
+from server.services import master_authority, spatial_frame_reader
+from server.services.master_authority import MasterSupersededError, serialized_artifacts
 from server.services.spatial_frame_reader import SpatialFrameReader
 from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
 from tests.integration.server.routers.test_gates_export import PROJECT, USER, _approve_shot
@@ -322,7 +322,7 @@ async def test_reader_normalizes_malformed_persisted_metadata(
 
 
 @pytest.mark.asyncio
-async def test_parent_approval_waits_for_locked_reader_on_postgres(
+async def test_caller_session_lock_blocks_parent_approval_on_postgres(
     concurrent_gate_client: AsyncClient, project_dir: Path, concurrent_session_factory: Factory
 ) -> None:
     async with concurrent_session_factory() as probe:
@@ -339,9 +339,15 @@ async def test_parent_approval_waits_for_locked_reader_on_postgres(
         command_id="reader-frame",
     )
     reader = SpatialFrameReader(session_factory=concurrent_session_factory, project_dir=project_dir)
-    async with serialized_artifacts(
-        concurrent_session_factory, user_id=USER.id, project_name=PROJECT, artifact_keys=(key,)
-    ) as session:
+    async with concurrent_session_factory() as session, session.begin():
+        with pytest.raises(MasterSupersededError, match="current master"):
+            await master_authority.lock_current_master_rows(
+                session, user_id="foreign", project_name=PROJECT, artifact_keys=(key,)
+            )
+        locked = await master_authority.lock_current_master_rows(
+            session, user_id=USER.id, project_name=PROJECT, artifact_keys=(key,)
+        )
+        assert locked == ((key, 1),)
         verified = await reader.read_locked(
             session,
             user_id=USER.id,
@@ -362,6 +368,47 @@ async def test_parent_approval_waits_for_locked_reader_on_postgres(
             receipt_id=receipt.frame_candidate_id,
             expected_receipt_digest=_receipt_digest(receipt),
         )
+
+
+@pytest.mark.asyncio
+async def test_caller_session_lock_rejects_missing_master_without_genesis(
+    session_factory: Factory,
+) -> None:
+    async with session_factory() as session, session.begin():
+        with pytest.raises(MasterSupersededError, match="current master"):
+            await master_authority.lock_current_master_rows(
+                session, user_id=USER.id, project_name=PROJECT, artifact_keys=("missing-video",)
+            )
+        assert (await session.get(MasterAuthorityModel, (USER.id, PROJECT, "missing-video"))) is None
+
+
+@pytest.mark.asyncio
+async def test_caller_session_locks_distinct_master_keys_in_sorted_order(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
+) -> None:
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"first-parent")
+    await _approve_shot(gate_export_client, project_dir, "SH02", b"second-parent")
+    host = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1)
+    first_key = host.artifact_key_for("SH01")
+    second_key = host.artifact_key_for("SH02")
+    ordered = tuple(sorted((first_key, second_key)))
+    observed: list[str] = []
+
+    def capture(_connection, _cursor, statement, parameters, _context, _many):
+        if statement.lstrip().upper().startswith("UPDATE MASTER_AUTHORITIES"):
+            values = parameters.values() if isinstance(parameters, Mapping) else parameters
+            observed.extend(key for key in ordered if key in values)
+
+    async with session_factory() as session, session.begin():
+        event.listen(session.bind.sync_engine, "before_cursor_execute", capture)
+        try:
+            locked = await master_authority.lock_current_master_rows(
+                session, user_id=USER.id, project_name=PROJECT, artifact_keys=(second_key, first_key, second_key)
+            )
+        finally:
+            event.remove(session.bind.sync_engine, "before_cursor_execute", capture)
+    assert locked == tuple((key, 1) for key in ordered)
+    assert observed == list(ordered)
 
 
 @pytest.mark.asyncio

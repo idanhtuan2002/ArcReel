@@ -72,6 +72,35 @@ async def _ensure_authority_row(
             await asyncio.sleep(0.05 * (attempt + 1))
 
 
+async def lock_current_master_rows(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    project_name: str,
+    artifact_keys: Collection[str],
+) -> tuple[tuple[str, int], ...]:
+    """Lock existing, promoted master heads in sorted order on the caller's transaction."""
+    locked: list[tuple[str, int]] = []
+    for key in sorted(set(artifact_keys)):
+        version = (
+            await session.execute(
+                update(MasterAuthorityModel)
+                .where(
+                    MasterAuthorityModel.user_id == user_id,
+                    MasterAuthorityModel.project_name == project_name,
+                    MasterAuthorityModel.artifact_key == key,
+                    MasterAuthorityModel.current_version > 0,
+                )
+                .values(current_version=MasterAuthorityModel.current_version)
+                .returning(MasterAuthorityModel.current_version)
+            )
+        ).scalar_one_or_none()
+        if version is None:
+            raise MasterSupersededError("current master is missing in this scope")
+        locked.append((key, version))
+    return tuple(locked)
+
+
 @asynccontextmanager
 async def serialized_artifacts(
     session_factory: async_sessionmaker[AsyncSession],
