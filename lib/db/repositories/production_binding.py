@@ -32,6 +32,10 @@ class ProductionBindingIntegrityError(ValueError):
     """A stored binding version disagrees with its canonical or scoped authority."""
 
 
+class ProductionBindingAlreadyCurrentError(ProductionBindingIntegrityError):
+    """The first version of a scoped binding was already committed."""
+
+
 @dataclass(frozen=True)
 class VerifiedBindingVersion:
     body: ProductionBinding
@@ -205,7 +209,7 @@ class ProductionBindingRepository:
         if inserted is None and head.current_version is None:
             raise ProductionBindingIntegrityError("binding head integrity: committed genesis head")
         if head.current_version is not None:
-            raise ProductionBindingIntegrityError("binding head is already current")
+            raise ProductionBindingAlreadyCurrentError("binding head is already current")
         return head
 
     async def append_first_version(
@@ -354,6 +358,7 @@ class ProductionBindingRepository:
 
 
 __all__ = [
+    "ProductionBindingAlreadyCurrentError",
     "ProductionBindingIntegrityError",
     "ProductionBindingRepository",
     "VerifiedBindingCommandReceipt",
