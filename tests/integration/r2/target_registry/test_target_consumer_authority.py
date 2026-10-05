@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import replace
 
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.db.adaptation_uow import SqlAlchemyAdaptationUnitOfWork
 from lib.db.models.production_target import ProductionTargetHeadModel, ProductionTargetVersionModel
 from lib.db.repositories.production_target import ProductionTargetIntegrityError, ProductionTargetRepository
 from r2.adaptation.evaluation import report_ref_of
+from r2.adaptation.screenplay_reader import TransactionBoundApprovedScreenplayReader
 from r2.contracts.adaptation import AdaptationDecisionAction
 from r2.target_registry import service as target_service_module
 from r2.target_registry.resolver import TransactionBoundTargetAuthorityResolver
@@ -202,10 +205,10 @@ async def test_postgres_consumer_locks_admission_before_scene_and_shot(concurren
     admission, *_ = await _admit(concurrent_session_factory)
     result = await TakeTargetRegistrationService(concurrent_session_factory).register(_command(admission))
     async with concurrent_session_factory() as session:
-        statements: list[str] = []
+        statements: list[tuple[str, object]] = []
 
-        def capture(_connection, _cursor, statement, _parameters, _context, _many):
-            statements.append(statement)
+        def capture(_connection, _cursor, statement, parameters, _context, _many):
+            statements.append((statement, parameters))
 
         event.listen(session.bind.sync_engine, "before_cursor_execute", capture)
         try:
@@ -215,10 +218,99 @@ async def test_postgres_consumer_locks_admission_before_scene_and_shot(concurren
         finally:
             event.remove(session.bind.sync_engine, "before_cursor_execute", capture)
         assert current is not None
-        assert "production_target_heads" in statements[0]
-        assert "FOR UPDATE" not in statements[0].upper()
-        locks = [statement for statement in statements if "FOR UPDATE" in statement.upper()]
+        assert "production_target_heads" in statements[0][0]
+        assert "FOR UPDATE" not in statements[0][0].upper()
+        locks = [(statement, parameters) for statement, parameters in statements if "FOR UPDATE" in statement.upper()]
         assert len(locks) >= 3
-        assert "adaptation_heads" in locks[0]
-        assert "production_target_heads" in locks[1]
-        assert "production_target_heads" in locks[2]
+        assert "adaptation_heads" in locks[0][0]
+        assert "production_target_heads" in locks[1][0]
+        assert "production_target_heads" in locks[2][0]
+        scene_parameters = locks[1][1]
+        shot_parameters = locks[2][1]
+        assert isinstance(scene_parameters, Mapping | tuple | list)
+        assert isinstance(shot_parameters, Mapping | tuple | list)
+        assert "SCENE" in (scene_parameters.values() if isinstance(scene_parameters, Mapping) else scene_parameters)
+        assert "SHOT" in (shot_parameters.values() if isinstance(shot_parameters, Mapping) else shot_parameters)
+
+
+async def test_postgres_target_writer_waits_for_consumer_admission_lock(
+    concurrent_session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with concurrent_session_factory() as probe:
+        if probe.bind.dialect.name != "postgresql":
+            pytest.skip("row-lock interleaving requires PostgreSQL")
+    admission, *_ = await _admit(concurrent_session_factory)
+    first = await TakeTargetRegistrationService(concurrent_session_factory).register(_command(admission))
+    consumer_locked = asyncio.Event()
+    release_consumer = asyncio.Event()
+    consumer_pid: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+    writer_pid: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+    original_read = TransactionBoundApprovedScreenplayReader.get_exact_admitted
+    original_enter = SqlAlchemyAdaptationUnitOfWork.__aenter__
+    original_target_lock = ProductionTargetRepository.lock_target_head
+    target_lock_attempted = False
+
+    async def hold_after_admission_read(self, **kwargs):
+        artifact = await original_read(self, **kwargs)
+        if not consumer_pid.done():
+            pid = await self._repository.session.scalar(text("SELECT pg_backend_pid()"))
+            assert isinstance(pid, int)
+            consumer_pid.set_result(pid)
+            consumer_locked.set()
+            await release_consumer.wait()
+        return artifact
+
+    async def track_writer_pid(self):
+        uow = await original_enter(self)
+        pid = await self.session.scalar(text("SELECT pg_backend_pid()"))
+        assert isinstance(pid, int)
+        writer_pid.set_result(pid)
+        return uow
+
+    async def track_target_lock(self, **kwargs):
+        nonlocal target_lock_attempted
+        target_lock_attempted = True
+        return await original_target_lock(self, **kwargs)
+
+    monkeypatch.setattr(TransactionBoundApprovedScreenplayReader, "get_exact_admitted", hold_after_admission_read)
+    monkeypatch.setattr(SqlAlchemyAdaptationUnitOfWork, "__aenter__", track_writer_pid)
+    monkeypatch.setattr(ProductionTargetRepository, "lock_target_head", track_target_lock)
+
+    async def resolve():
+        async with concurrent_session_factory() as session:
+            return await TransactionBoundTargetAuthorityResolver(session).resolve_current(
+                user_id="u1", project_name="project-a", target_type="SHOT", target_id=first.shot_targets[0].target_id
+            )
+
+    consumer = asyncio.create_task(resolve())
+    writer = None
+    try:
+        await asyncio.wait_for(consumer_locked.wait(), timeout=15)
+        writer = asyncio.create_task(
+            TakeTargetRegistrationService(concurrent_session_factory).register(
+                _command(admission, command_id="take-after-consumer")
+            )
+        )
+        waiting_pid = await asyncio.wait_for(writer_pid, timeout=15)
+        holding_pid = await asyncio.wait_for(consumer_pid, timeout=15)
+
+        async def blocked_by_consumer() -> bool:
+            async with concurrent_session_factory() as probe:
+                blockers = await probe.scalar(text("SELECT pg_blocking_pids(:pid)"), {"pid": waiting_pid})
+                return isinstance(blockers, list) and holding_pid in blockers
+
+        async with asyncio.timeout(15):
+            while not await blocked_by_consumer():
+                assert not writer.done()
+                await asyncio.sleep(0.02)
+        assert not target_lock_attempted
+    finally:
+        release_consumer.set()
+    current = await asyncio.wait_for(consumer, timeout=15)
+    assert current is not None
+    assert current.ref == first.shot_targets[0]
+    assert writer is not None
+    second = await asyncio.wait_for(writer, timeout=15)
+    assert second.scene_targets == first.scene_targets
+    assert second.shot_targets == first.shot_targets
+    assert target_lock_attempted
