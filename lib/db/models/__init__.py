@@ -62,6 +62,11 @@ from lib.db.models.narrative_lifecycle import (
     NarrativeRevisionModel,
 )
 from lib.db.models.narrative_plan import NarrativePlanModel, NarrativePlanVersionModel
+from lib.db.models.production_binding import (
+    ProductionBindingCommandModel,
+    ProductionBindingHeadModel,
+    ProductionBindingVersionModel,
+)
 from lib.db.models.production_target import (
     ProductionTargetCommandModel,
     ProductionTargetHeadModel,
@@ -132,6 +137,9 @@ __all__ = [
     "NarrativePlanVersionModel",
     "NarrativeRevisionModel",
     "OperatorResolutionReceiptModel",
+    "ProductionBindingCommandModel",
+    "ProductionBindingHeadModel",
+    "ProductionBindingVersionModel",
     "ProductionTargetCommandModel",
     "ProductionTargetHeadModel",
     "ProductionTargetVersionModel",

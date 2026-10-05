@@ -84,7 +84,7 @@ def test_one_head_and_the_exact_parent(alembic_cfg: tuple[Config, Path]) -> None
     cfg, _ = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
 
-    assert script.get_heads() == ["8c8c4a0e0001"]
+    assert script.get_heads() == ["8d8c4a0e0001"]
     assert script.get_revision("8a8c4a0e0001").down_revision == "c9e1f4a2b701"
 
 
@@ -180,5 +180,8 @@ def test_downgrade_removes_only_the_m8_tables(alembic_cfg: tuple[Config, Path]) 
         "production_target_heads",
         "production_target_versions",
         "production_target_commands",
+        "production_binding_heads",
+        "production_binding_versions",
+        "production_binding_commands",
     }
     assert set(sa.inspect(_engine(db_path)).get_table_names()) >= M8_TABLES
