@@ -228,6 +228,16 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
     )
     assert approved.body.command.decision == "APPROVE"
     assert approved.decision_digest == result.decision_digest
+    async with session_factory() as session:
+        with pytest.raises(RuntimeError, match="caller-owned transaction"):
+            await pair_reader.read_current_locked(
+                session, user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+            )
+        async with session.begin():
+            locked = await pair_reader.read_current_locked(
+                session, user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+            )
+            assert locked.decision_digest == approved.decision_digest
     frame_path = project_dir / "spatial" / "frames" / f"{derived[0].frame_candidate_id}.png"
     original_bytes = frame_path.read_bytes()
     frame_path.write_bytes(original_bytes + b"changed")
