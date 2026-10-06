@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel
+from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel, SpatialPairHeadModel
 from r2.contracts.production_target import TargetVersionRef
 from r2.contracts.spatial_pair import PairDecisionResultV1, PairDecisionV1
 from r2.spatial_pair.digests import pair_decision_digest, pair_result_digest, scoped_pair_id
@@ -87,6 +88,70 @@ class SpatialPairRepository:
         )
         await self.session.flush()
         return VerifiedPairCommandReceipt(result=result, result_digest=digest)
+
+    async def get_current_verified(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        binding_id: str,
+        expected_binding_version: int,
+        expected_envelope_digest: str,
+        expected_core_digest: str,
+        expected_target_ref: TargetVersionRef,
+        expected_scene_ref: TargetVersionRef,
+    ) -> VerifiedPairDecision | None:
+        """Verify the current local pair after the caller locked target and binding authority."""
+        pair_id = scoped_pair_id(user_id=user_id, project_name=project_name, binding_id=binding_id)
+        head = (
+            await self.session.execute(
+                select(SpatialPairHeadModel)
+                .where(
+                    SpatialPairHeadModel.user_id == user_id,
+                    SpatialPairHeadModel.project_name == project_name,
+                    SpatialPairHeadModel.pair_id == pair_id,
+                )
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if head is None:
+            return None
+        if head.current_version is None or head.current_decision_digest is None:
+            raise SpatialPairIntegrityError("pair head integrity: committed genesis or incomplete current pair")
+        row = (
+            await self.session.execute(
+                select(SpatialPairDecisionModel)
+                .where(
+                    SpatialPairDecisionModel.user_id == user_id,
+                    SpatialPairDecisionModel.project_name == project_name,
+                    SpatialPairDecisionModel.pair_id == pair_id,
+                    SpatialPairDecisionModel.pair_version == head.current_version,
+                )
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        latest = await self.session.scalar(
+            select(func.max(SpatialPairDecisionModel.pair_version)).where(
+                SpatialPairDecisionModel.user_id == user_id,
+                SpatialPairDecisionModel.project_name == project_name,
+                SpatialPairDecisionModel.pair_id == pair_id,
+            )
+        )
+        if row is None or latest != head.current_version or row.decision_digest != head.current_decision_digest:
+            raise SpatialPairIntegrityError("pair head integrity: current decision is missing or not latest")
+        return verify_stored_pair_decision(
+            row,
+            user_id=user_id,
+            project_name=project_name,
+            binding_id=binding_id,
+            expected_binding_version=expected_binding_version,
+            expected_envelope_digest=expected_envelope_digest,
+            expected_core_digest=expected_core_digest,
+            expected_target_ref=expected_target_ref,
+            expected_scene_ref=expected_scene_ref,
+        )
 
 
 def verify_stored_pair_decision(
