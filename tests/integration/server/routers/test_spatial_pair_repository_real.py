@@ -166,7 +166,7 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
             expected_target_ref=target_ref,
             expected_scene_ref=scene_ref,
         )
-        await repo.advance_head(
+        await repo.advance_pair_head(
             head=head,
             decision=row,
             expected_binding_version=binding.result.binding_version,

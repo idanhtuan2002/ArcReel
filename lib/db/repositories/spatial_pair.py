@@ -180,7 +180,7 @@ class SpatialPairRepository:
         await self.session.flush()
         return row
 
-    async def advance_head(
+    async def advance_pair_head(
         self,
         *,
         head: SpatialPairHeadModel,

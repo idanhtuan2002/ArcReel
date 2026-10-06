@@ -242,7 +242,7 @@ class SpatialPairDecisionService:
                 expected_target_ref=target.ref,
                 expected_scene_ref=target.scene.ref,
             )
-            await repo.advance_head(
+            await repo.advance_pair_head(
                 head=head,
                 decision=row,
                 expected_binding_version=binding.body.version,

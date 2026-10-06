@@ -43,7 +43,7 @@ async def _append(repo: SpatialPairRepository, decision: PairDecisionV1) -> None
         expected_target_ref=target,
         expected_scene_ref=scene,
     )
-    await repo.advance_head(
+    await repo.advance_pair_head(
         head=head,
         decision=row,
         expected_binding_version=decision.command.expected_binding_version,
