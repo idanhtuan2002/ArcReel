@@ -1,0 +1,269 @@
+{
+  "status": "proposed synthetic byte contract only; no reviewer grant or geometry proof",
+  "canonical_version": "1",
+  "cases": [
+    {
+      "name": "pair_identity",
+      "domain": "r2.m8.spatial.pair.identity.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "demo",
+        "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d"
+      },
+      "canonical": "{\"body\":{\"binding_id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"project_name\":\"demo\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.identity.v1\"}",
+      "digest": "m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e"
+    },
+    {
+      "name": "pair_command_approve",
+      "domain": "r2.m8.spatial.pair.command.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "demo",
+        "principal": "human:reviewer-1",
+        "command_id": "pair-command-1",
+        "expected_scene_ref": {
+          "target_type": "SCENE",
+          "target_id": "scene-room-1",
+          "registry_version": 2,
+          "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "expected_target_ref": {
+          "target_type": "SHOT",
+          "target_id": "shot-room-1",
+          "registry_version": 3,
+          "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+        },
+        "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+        "expected_binding_version": 1,
+        "expected_envelope_digest": "sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800",
+        "expected_core_digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2",
+        "views": [
+          {
+            "role": "MASTER",
+            "receipt_id": "m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "receipt_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "role": "REVERSE",
+            "receipt_id": "m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "decision": "APPROVE",
+        "observations": {
+          "view_coverage": "Both views show the same doorway and floor edge.",
+          "camera_center": "The doorway alignment supports a common camera center.",
+          "yaw_relation": "The reverse view faces approximately opposite the master view.",
+          "rejection_reason": null
+        }
+      },
+      "canonical": "{\"body\":{\"binding_id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"command_id\":\"pair-command-1\",\"decision\":\"APPROVE\",\"expected_binding_version\":1,\"expected_core_digest\":\"sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2\",\"expected_envelope_digest\":\"sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800\",\"expected_scene_ref\":{\"registry_version\":2,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\",\"version_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"expected_target_ref\":{\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"version_digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"observations\":{\"camera_center\":\"The doorway alignment supports a common camera center.\",\"rejection_reason\":null,\"view_coverage\":\"Both views show the same doorway and floor edge.\",\"yaw_relation\":\"The reverse view faces approximately opposite the master view.\"},\"principal\":\"human:reviewer-1\",\"project_name\":\"demo\",\"user_id\":\"u1\",\"views\":[{\"receipt_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_id\":\"m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"role\":\"MASTER\"},{\"receipt_digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"receipt_id\":\"m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"role\":\"REVERSE\"}]},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.command.v1\"}",
+      "digest": "sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce"
+    },
+    {
+      "name": "pair_authorization_approve",
+      "domain": "r2.m8.spatial.pair.authorization.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "demo",
+        "authenticated_principal": "human:reviewer-1",
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "command_digest": "sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce",
+        "authorization_ref": "synthetic-grant-1",
+        "authenticated_at": "2026-10-06T01:01:00Z"
+      },
+      "canonical": "{\"body\":{\"authenticated_at\":\"2026-10-06T01:01:00Z\",\"authenticated_principal\":\"human:reviewer-1\",\"authority_role\":\"HUMAN_SHOWRUNNER\",\"authorization_ref\":\"synthetic-grant-1\",\"command_digest\":\"sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce\",\"project_name\":\"demo\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.authorization.v1\"}",
+      "digest": "sha256:39ce13f6c53118a3c1fa2c4745f0f630ad043aa9fa9bbbdc9836439ddcd91bad"
+    },
+    {
+      "name": "pair_decision_approve",
+      "domain": "r2.m8.spatial.pair.decision.v2",
+      "body": {
+        "command": {
+          "user_id": "u1",
+          "project_name": "demo",
+          "principal": "human:reviewer-1",
+          "command_id": "pair-command-1",
+          "expected_scene_ref": {
+            "target_type": "SCENE",
+            "target_id": "scene-room-1",
+            "registry_version": 2,
+            "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "expected_target_ref": {
+            "target_type": "SHOT",
+            "target_id": "shot-room-1",
+            "registry_version": 3,
+            "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+          "expected_binding_version": 1,
+          "expected_envelope_digest": "sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800",
+          "expected_core_digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2",
+          "views": [
+            {
+              "role": "MASTER",
+              "receipt_id": "m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "receipt_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            {
+              "role": "REVERSE",
+              "receipt_id": "m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "receipt_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "decision": "APPROVE",
+          "observations": {
+            "view_coverage": "Both views show the same doorway and floor edge.",
+            "camera_center": "The doorway alignment supports a common camera center.",
+            "yaw_relation": "The reverse view faces approximately opposite the master view.",
+            "rejection_reason": null
+          }
+        },
+        "command_digest": "sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce",
+        "pair_id": "m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e",
+        "pair_version": 1,
+        "reviewer_id": "human:reviewer-1",
+        "authorization": {
+          "user_id": "u1",
+          "project_name": "demo",
+          "authenticated_principal": "human:reviewer-1",
+          "authority_role": "HUMAN_SHOWRUNNER",
+          "command_digest": "sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce",
+          "authorization_ref": "synthetic-grant-1",
+          "authenticated_at": "2026-10-06T01:01:00Z"
+        },
+        "authorization_digest": "sha256:39ce13f6c53118a3c1fa2c4745f0f630ad043aa9fa9bbbdc9836439ddcd91bad",
+        "decided_at": "2026-10-06T01:03:00Z"
+      },
+      "canonical": "{\"body\":{\"authorization\":{\"authenticated_at\":\"2026-10-06T01:01:00Z\",\"authenticated_principal\":\"human:reviewer-1\",\"authority_role\":\"HUMAN_SHOWRUNNER\",\"authorization_ref\":\"synthetic-grant-1\",\"command_digest\":\"sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce\",\"project_name\":\"demo\",\"user_id\":\"u1\"},\"authorization_digest\":\"sha256:39ce13f6c53118a3c1fa2c4745f0f630ad043aa9fa9bbbdc9836439ddcd91bad\",\"command\":{\"binding_id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"command_id\":\"pair-command-1\",\"decision\":\"APPROVE\",\"expected_binding_version\":1,\"expected_core_digest\":\"sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2\",\"expected_envelope_digest\":\"sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800\",\"expected_scene_ref\":{\"registry_version\":2,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\",\"version_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"expected_target_ref\":{\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"version_digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"observations\":{\"camera_center\":\"The doorway alignment supports a common camera center.\",\"rejection_reason\":null,\"view_coverage\":\"Both views show the same doorway and floor edge.\",\"yaw_relation\":\"The reverse view faces approximately opposite the master view.\"},\"principal\":\"human:reviewer-1\",\"project_name\":\"demo\",\"user_id\":\"u1\",\"views\":[{\"receipt_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_id\":\"m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"role\":\"MASTER\"},{\"receipt_digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"receipt_id\":\"m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"role\":\"REVERSE\"}]},\"command_digest\":\"sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce\",\"decided_at\":\"2026-10-06T01:03:00Z\",\"pair_id\":\"m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e\",\"pair_version\":1,\"reviewer_id\":\"human:reviewer-1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.decision.v2\"}",
+      "digest": "sha256:1ef6f28cce42702660444d3116b9105471bd1226b70e2f8de6917231a233cd91"
+    },
+    {
+      "name": "pair_command_reject",
+      "domain": "r2.m8.spatial.pair.command.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "demo",
+        "principal": "human:reviewer-1",
+        "command_id": "pair-command-2",
+        "expected_scene_ref": {
+          "target_type": "SCENE",
+          "target_id": "scene-room-1",
+          "registry_version": 2,
+          "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "expected_target_ref": {
+          "target_type": "SHOT",
+          "target_id": "shot-room-1",
+          "registry_version": 3,
+          "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+        },
+        "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+        "expected_binding_version": 1,
+        "expected_envelope_digest": "sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800",
+        "expected_core_digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2",
+        "views": [
+          {
+            "role": "MASTER",
+            "receipt_id": "m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "receipt_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "role": "REVERSE",
+            "receipt_id": "m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "decision": "REJECT",
+        "observations": {
+          "view_coverage": null,
+          "camera_center": null,
+          "yaw_relation": "Views face the same direction.",
+          "rejection_reason": "No reverse view is present."
+        }
+      },
+      "canonical": "{\"body\":{\"binding_id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"command_id\":\"pair-command-2\",\"decision\":\"REJECT\",\"expected_binding_version\":1,\"expected_core_digest\":\"sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2\",\"expected_envelope_digest\":\"sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800\",\"expected_scene_ref\":{\"registry_version\":2,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\",\"version_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"expected_target_ref\":{\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"version_digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"observations\":{\"camera_center\":null,\"rejection_reason\":\"No reverse view is present.\",\"view_coverage\":null,\"yaw_relation\":\"Views face the same direction.\"},\"principal\":\"human:reviewer-1\",\"project_name\":\"demo\",\"user_id\":\"u1\",\"views\":[{\"receipt_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_id\":\"m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"role\":\"MASTER\"},{\"receipt_digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"receipt_id\":\"m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"role\":\"REVERSE\"}]},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.command.v1\"}",
+      "digest": "sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511"
+    },
+    {
+      "name": "pair_authorization_reject",
+      "domain": "r2.m8.spatial.pair.authorization.v1",
+      "body": {
+        "user_id": "u1",
+        "project_name": "demo",
+        "authenticated_principal": "human:reviewer-1",
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "command_digest": "sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511",
+        "authorization_ref": "synthetic-grant-2",
+        "authenticated_at": "2026-10-06T01:02:00Z"
+      },
+      "canonical": "{\"body\":{\"authenticated_at\":\"2026-10-06T01:02:00Z\",\"authenticated_principal\":\"human:reviewer-1\",\"authority_role\":\"HUMAN_SHOWRUNNER\",\"authorization_ref\":\"synthetic-grant-2\",\"command_digest\":\"sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511\",\"project_name\":\"demo\",\"user_id\":\"u1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.authorization.v1\"}",
+      "digest": "sha256:113e5a3db1757632966ada3ec7b85a3e1c1431eecd7d74a82b153cbfe341cd45"
+    },
+    {
+      "name": "pair_decision_reject",
+      "domain": "r2.m8.spatial.pair.decision.v2",
+      "body": {
+        "command": {
+          "user_id": "u1",
+          "project_name": "demo",
+          "principal": "human:reviewer-1",
+          "command_id": "pair-command-2",
+          "expected_scene_ref": {
+            "target_type": "SCENE",
+            "target_id": "scene-room-1",
+            "registry_version": 2,
+            "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "expected_target_ref": {
+            "target_type": "SHOT",
+            "target_id": "shot-room-1",
+            "registry_version": 3,
+            "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+          "expected_binding_version": 1,
+          "expected_envelope_digest": "sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800",
+          "expected_core_digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2",
+          "views": [
+            {
+              "role": "MASTER",
+              "receipt_id": "m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "receipt_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            {
+              "role": "REVERSE",
+              "receipt_id": "m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "receipt_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "decision": "REJECT",
+          "observations": {
+            "view_coverage": null,
+            "camera_center": null,
+            "yaw_relation": "Views face the same direction.",
+            "rejection_reason": "No reverse view is present."
+          }
+        },
+        "command_digest": "sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511",
+        "pair_id": "m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e",
+        "pair_version": 2,
+        "reviewer_id": "human:reviewer-1",
+        "authorization": {
+          "user_id": "u1",
+          "project_name": "demo",
+          "authenticated_principal": "human:reviewer-1",
+          "authority_role": "HUMAN_SHOWRUNNER",
+          "command_digest": "sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511",
+          "authorization_ref": "synthetic-grant-2",
+          "authenticated_at": "2026-10-06T01:02:00Z"
+        },
+        "authorization_digest": "sha256:113e5a3db1757632966ada3ec7b85a3e1c1431eecd7d74a82b153cbfe341cd45",
+        "decided_at": "2026-10-06T01:04:00Z"
+      },
+      "canonical": "{\"body\":{\"authorization\":{\"authenticated_at\":\"2026-10-06T01:02:00Z\",\"authenticated_principal\":\"human:reviewer-1\",\"authority_role\":\"HUMAN_SHOWRUNNER\",\"authorization_ref\":\"synthetic-grant-2\",\"command_digest\":\"sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511\",\"project_name\":\"demo\",\"user_id\":\"u1\"},\"authorization_digest\":\"sha256:113e5a3db1757632966ada3ec7b85a3e1c1431eecd7d74a82b153cbfe341cd45\",\"command\":{\"binding_id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"command_id\":\"pair-command-2\",\"decision\":\"REJECT\",\"expected_binding_version\":1,\"expected_core_digest\":\"sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2\",\"expected_envelope_digest\":\"sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800\",\"expected_scene_ref\":{\"registry_version\":2,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\",\"version_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"expected_target_ref\":{\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"version_digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"observations\":{\"camera_center\":null,\"rejection_reason\":\"No reverse view is present.\",\"view_coverage\":null,\"yaw_relation\":\"Views face the same direction.\"},\"principal\":\"human:reviewer-1\",\"project_name\":\"demo\",\"user_id\":\"u1\",\"views\":[{\"receipt_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_id\":\"m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"role\":\"MASTER\"},{\"receipt_digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"receipt_id\":\"m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"role\":\"REVERSE\"}]},\"command_digest\":\"sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511\",\"decided_at\":\"2026-10-06T01:04:00Z\",\"pair_id\":\"m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e\",\"pair_version\":2,\"reviewer_id\":\"human:reviewer-1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.decision.v2\"}",
+      "digest": "sha256:83e4c93b4974682517357169dcc7ac56f03ae0f6321c8d1d46a6b9b9873253c9"
+    }
+  ]
+}
