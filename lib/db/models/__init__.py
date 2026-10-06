@@ -75,6 +75,7 @@ from lib.db.models.production_target import (
 from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
 from lib.db.models.session_message_link import AgentSessionUserMessageLink
+from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel, SpatialPairHeadModel
 from lib.db.models.spatial_source import SpatialFrameReceiptModel
 from lib.db.models.task import BatchTask, GenerationBatch, Task, WorkerLease
 from lib.db.models.user import User
@@ -150,6 +151,9 @@ __all__ = [
     "ProviderObservationModel",
     "PublishApprovalDecisionModel",
     "SpatialFrameReceiptModel",
+    "SpatialPairCommandModel",
+    "SpatialPairDecisionModel",
+    "SpatialPairHeadModel",
     "SystemSetting",
     "Task",
     "User",
