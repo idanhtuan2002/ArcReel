@@ -33,6 +33,7 @@ from r2.spatial_pair.digests import (
 from r2.target_registry.service import TakeTargetRegistrationService
 from server.services.location_binding import LocationBindingCreationService
 from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
+from server.services.spatial_pair_current import CurrentApprovedSpatialPairReader, SpatialPairUnavailableError
 from server.services.spatial_pair_decision import PairAuthorizationDeniedError, SpatialPairDecisionService
 from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
 from tests.integration.r2.adaptation import test_screenplay_admission as admission_helpers
@@ -219,6 +220,23 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
         assert await session.scalar(select(func.count()).select_from(SpatialPairHeadModel)) == 1
         assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 1
 
+    pair_reader = CurrentApprovedSpatialPairReader(session_factory=session_factory, project_dir=project_dir)
+    approved = await pair_reader.read_current(
+        user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+    )
+    assert approved.body.command.decision == "APPROVE"
+    assert approved.decision_digest == result.decision_digest
+    frame_path = project_dir / "spatial" / "frames" / f"{derived[0].frame_candidate_id}.png"
+    original_bytes = frame_path.read_bytes()
+    frame_path.write_bytes(original_bytes + b"changed")
+    try:
+        with pytest.raises(FrameSourceConflictError, match="frame bytes"):
+            await pair_reader.read_current(
+                user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+            )
+    finally:
+        frame_path.write_bytes(original_bytes)
+
     class TestAuthority:
         async def authorize(self, *, session, command, command_digest, frames):
             assert all(frame.png_bytes for frame in frames)
@@ -256,6 +274,10 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
     assert rejected.result.decision == "REJECT"
     assert await service.decide(reject) == rejected
     assert await service.decide(command) == receipt
+    with pytest.raises(SpatialPairUnavailableError, match="not approved"):
+        await pair_reader.read_current(
+            user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+        )
     async with session_factory() as session:
         current = await SpatialPairRepository(session).get_current_verified(
             user_id=USER.id,
@@ -278,8 +300,6 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 2
 
-    frame_path = project_dir / "spatial" / "frames" / f"{derived[0].frame_candidate_id}.png"
-    original_bytes = frame_path.read_bytes()
     frame_path.write_bytes(original_bytes + b"changed")
     try:
         with pytest.raises(FrameSourceConflictError, match="frame bytes"):
