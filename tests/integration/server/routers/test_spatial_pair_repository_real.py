@@ -13,10 +13,13 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel, SpatialPairHeadModel
-from lib.db.repositories.production_binding import ProductionBindingRepository
+from lib.db.repositories.production_binding import ProductionBindingIntegrityError, ProductionBindingRepository
+from lib.db.repositories.production_target import ProductionTargetRepository
 from lib.db.repositories.spatial_pair import SpatialPairRepository
 from lib.db.repositories.spatial_source import _receipt_digest
+from r2.contracts.enums import ProductionBindingTarget
 from r2.contracts.production_binding_authority import BindingCreateCommandV1
+from r2.contracts.production_target import SceneVersionDependency, TargetVersionBody
 from r2.contracts.spatial_pair import (
     PairAuthorizationV1,
     PairDecisionCommandV1,
@@ -31,12 +34,17 @@ from r2.spatial_pair.digests import (
     pair_decision_digest,
     scoped_pair_id,
 )
+from r2.target_registry.digests import target_body_digest
 from r2.target_registry.service import TakeTargetRegistrationService
 from server.services.location_binding import LocationBindingCreationService
 from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
 from server.services.spatial_frame_reader import SpatialFrameReader
 from server.services.spatial_pair_current import CurrentApprovedSpatialPairReader, SpatialPairUnavailableError
-from server.services.spatial_pair_decision import PairAuthorizationDeniedError, SpatialPairDecisionService
+from server.services.spatial_pair_decision import (
+    PairAuthorizationDeniedError,
+    PairSourceConflictError,
+    SpatialPairDecisionService,
+)
 from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
 from tests.integration.r2.adaptation import test_screenplay_admission as admission_helpers
 from tests.integration.r2.target_registry import test_take_registration as target_helpers
@@ -386,7 +394,7 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
 
 
 @pytest.mark.parametrize("first_fails", [False, True], ids=["commit-then-replay", "rollback-then-retry"])
-async def test_pair_first_writer_concurrent_replay_on_postgresql(
+async def test_pair_first_writer_and_source_lock_edges_on_postgresql(
     gate_export_client: AsyncClient,
     project_dir: Path,
     session_factory: Factory,
@@ -576,3 +584,195 @@ async def test_pair_first_writer_concurrent_replay_on_postgresql(
         assert await session.scalar(select(func.count()).select_from(SpatialPairHeadModel)) == 1
         assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 1
         assert await session.scalar(select(func.count()).select_from(SpatialPairCommandModel)) == 1
+
+    async def wait_for_writer_blocked(blocker_pid: int, writer: asyncio.Task, writer_pid: list[int] | None = None):
+        blocked = []
+        try:
+            async with asyncio.timeout(5):
+                while True:
+                    async with session_factory() as observer:
+                        blocked = (
+                            await observer.execute(
+                                text(
+                                    "SELECT pid, pg_blocking_pids(pid) FROM pg_stat_activity "
+                                    "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+                                )
+                            )
+                        ).all()
+                    matching = [
+                        pid
+                        for pid, blockers in blocked
+                        if blocker_pid in blockers and (writer_pid is None or (writer_pid and pid == writer_pid[0]))
+                    ]
+                    if matching:
+                        assert not writer.done()
+                        return matching[0]
+                    if writer.done():
+                        raise AssertionError("source writer did not wait on the pair transaction")
+                    await asyncio.sleep(0.01)
+        except TimeoutError as exc:
+            raise AssertionError(
+                f"no source writer blocker: pair={blocker_pid} writer={writer_pid} locks={blocked}"
+            ) from exc
+
+    pair_locked = asyncio.Event()
+    release_pair = asyncio.Event()
+    pair_pid: list[int] = []
+
+    if first_fails:
+        original_pair_lock = SpatialPairRepository.lock_pair_head
+        target_writer_pid: list[int] = []
+        writer = None
+
+        async def pause_pair_before_parent_locks(self, **kwargs):
+            head = await original_pair_lock(self, **kwargs)
+            pid = await self.session.scalar(text("SELECT pg_backend_pid()"))
+            assert isinstance(pid, int)
+            pair_pid.append(pid)
+            pair_locked.set()
+            await asyncio.wait_for(release_pair.wait(), timeout=15)
+            return head
+
+        async def advance_scene_target():
+            async with session_factory() as session, session.begin():
+                pid = await session.scalar(text("SELECT pg_backend_pid()"))
+                assert isinstance(pid, int)
+                target_writer_pid.append(pid)
+                repo = ProductionTargetRepository(session)
+                head = await repo.lock_target_head(
+                    user_id=USER.id,
+                    project_name=PROJECT,
+                    target_type=ProductionBindingTarget.SCENE,
+                    target_id=command.expected_scene_ref.target_id,
+                )
+                current = await repo.get_current_verified(
+                    user_id=USER.id,
+                    project_name=PROJECT,
+                    target_type=ProductionBindingTarget.SCENE,
+                    target_id=command.expected_scene_ref.target_id,
+                    expected_admission=None,
+                )
+                assert current is not None
+                shot_rows = []
+                for shot_ref in sorted(registered.shot_targets, key=lambda ref: ref.target_id):
+                    shot_head = await repo.lock_target_head(
+                        user_id=USER.id,
+                        project_name=PROJECT,
+                        target_type=ProductionBindingTarget.SHOT,
+                        target_id=shot_ref.target_id,
+                    )
+                    shot = await repo.get_current_verified(
+                        user_id=USER.id,
+                        project_name=PROJECT,
+                        target_type=ProductionBindingTarget.SHOT,
+                        target_id=shot_ref.target_id,
+                        expected_admission=None,
+                    )
+                    assert shot is not None
+                    shot_rows.append((shot_head, shot))
+                updated_scene = current.target.model_copy(update={"purpose": "changed stakes"})
+                body = TargetVersionBody(
+                    user_id=USER.id,
+                    project_name=PROJECT,
+                    registry_version=(head.current_version or 0) + 1,
+                    admitted_screenplay_ref=current.admitted_screenplay_ref,
+                    take_derivation_version=current.take_derivation_version,
+                    target_type=ProductionBindingTarget.SCENE,
+                    target_id=current.ref.target_id,
+                    target_body_digest=target_body_digest(ProductionBindingTarget.SCENE, updated_scene),
+                    scene_dependency=None,
+                )
+                advanced = await repo.append_version(head=head, body=body, target=updated_scene)
+                await repo.advance_head(
+                    head=head,
+                    expected_version=head.current_version,
+                    expected_digest=head.current_version_digest,
+                    new_ref=advanced,
+                )
+                for shot_head, shot in shot_rows:
+                    shot_body = TargetVersionBody(
+                        user_id=USER.id,
+                        project_name=PROJECT,
+                        registry_version=(shot_head.current_version or 0) + 1,
+                        admitted_screenplay_ref=shot.admitted_screenplay_ref,
+                        take_derivation_version=shot.take_derivation_version,
+                        target_type=ProductionBindingTarget.SHOT,
+                        target_id=shot.ref.target_id,
+                        target_body_digest=target_body_digest(ProductionBindingTarget.SHOT, shot.target),
+                        scene_dependency=SceneVersionDependency(
+                            target_type="SCENE",
+                            target_id=advanced.target_id,
+                            registry_version=advanced.registry_version,
+                            target_version_digest=advanced.version_digest,
+                        ),
+                    )
+                    next_shot = await repo.append_version(head=shot_head, body=shot_body, target=shot.target)
+                    await repo.advance_head(
+                        head=shot_head,
+                        expected_version=shot_head.current_version,
+                        expected_digest=shot_head.current_version_digest,
+                        new_ref=next_shot,
+                    )
+                return advanced
+
+        monkeypatch.setattr(SpatialPairRepository, "lock_pair_head", pause_pair_before_parent_locks)
+        pair_read = asyncio.create_task(service.decide(command))
+        try:
+            await asyncio.wait_for(pair_locked.wait(), timeout=15)
+            writer = asyncio.create_task(advance_scene_target())
+            blocked_pid = await wait_for_writer_blocked(pair_pid[0], writer, target_writer_pid)
+        finally:
+            release_pair.set()
+            monkeypatch.setattr(SpatialPairRepository, "lock_pair_head", original_pair_lock)
+            await asyncio.wait_for(
+                asyncio.gather(pair_read, *([writer] if writer is not None else []), return_exceptions=True), timeout=15
+            )
+        assert target_writer_pid == [blocked_pid]
+        assert await pair_read == second_receipt
+        assert writer is not None
+        advanced = await writer
+        assert advanced.registry_version == 2
+        with pytest.raises(PairSourceConflictError, match="target or Scene"):
+            await service.decide(command)
+        with pytest.raises(ProductionBindingIntegrityError, match="binding version integrity"):
+            await CurrentApprovedSpatialPairReader(
+                session_factory=session_factory, project_dir=project_dir
+            ).read_current(user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id)
+    else:
+        original_frame_read = SpatialFrameReader.read_locked
+        writer = None
+
+        async def pause_pair_after_parent_lock(self, session, **kwargs):
+            frame = await original_frame_read(self, session, **kwargs)
+            if not pair_pid:
+                pid = await session.scalar(text("SELECT pg_backend_pid()"))
+                assert isinstance(pid, int)
+                pair_pid.append(pid)
+                pair_locked.set()
+                await asyncio.wait_for(release_pair.wait(), timeout=15)
+            return frame
+
+        monkeypatch.setattr(SpatialFrameReader, "read_locked", pause_pair_after_parent_lock)
+        pair_read = asyncio.create_task(service.decide(command))
+        try:
+            await asyncio.wait_for(pair_locked.wait(), timeout=15)
+            writer = asyncio.create_task(
+                _approve_shot(gate_export_client, project_dir, "SH01", b"pair-parent-advanced")
+            )
+            blocked_pid = await wait_for_writer_blocked(pair_pid[0], writer)
+        finally:
+            release_pair.set()
+            monkeypatch.setattr(SpatialFrameReader, "read_locked", original_frame_read)
+            await asyncio.wait_for(
+                asyncio.gather(pair_read, *([writer] if writer is not None else []), return_exceptions=True), timeout=15
+            )
+        assert blocked_pid != pair_pid[0]
+        assert await pair_read == second_receipt
+        assert writer is not None
+        await writer
+        with pytest.raises(FrameSourceConflictError, match="superseded"):
+            await service.decide(command)
+        with pytest.raises(FrameSourceConflictError, match="superseded"):
+            await CurrentApprovedSpatialPairReader(
+                session_factory=session_factory, project_dir=project_dir
+            ).read_current(user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id)
