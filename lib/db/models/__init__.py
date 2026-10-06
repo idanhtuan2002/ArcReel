@@ -39,6 +39,7 @@ from lib.db.models.credential import ProviderCredential
 from lib.db.models.custom_endpoint import CustomEndpoint
 from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
 from lib.db.models.gates import FinalCutReceiptModel, GreenlightDecisionModel, PublishApprovalDecisionModel
+from lib.db.models.governance_grant import ShowrunnerGrantEventModel, ShowrunnerGrantHeadModel
 from lib.db.models.host_hardening import (
     AttemptIntegrityIncidentModel,
     BackupSetMediaRefModel,
@@ -150,6 +151,8 @@ __all__ = [
     "ProviderCredential",
     "ProviderObservationModel",
     "PublishApprovalDecisionModel",
+    "ShowrunnerGrantEventModel",
+    "ShowrunnerGrantHeadModel",
     "SpatialFrameReceiptModel",
     "SpatialPairCommandModel",
     "SpatialPairDecisionModel",
