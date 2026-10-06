@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 from copy import deepcopy
+from datetime import UTC, datetime
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -14,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from lib.content_digest import canonical_json_bytes
 from r2.contracts.showrunner_grant import GrantEventInvalid, parse_grant_event
 from r2.governance.grant_signature import verify_grant_event
+from r2.governance.grant_transition import GrantScopeV1, verify_next_grant_event
 
 
 def _body(event_type: str = "ISSUE") -> dict[str, object]:
@@ -163,3 +165,89 @@ def test_signature_verifier_denies_wrong_key_scope_and_tampering() -> None:
             verify_grant_event(submitted, key_id=key_id, public_key=key_bytes)
         assert "tenant-a" not in str(exc.value)
         assert "governance-key-1" not in str(exc.value)
+
+
+def test_transition_checks_signed_predecessor_scope_and_db_time() -> None:
+    private = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+    public = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    scope = GrantScopeV1(user_id="tenant-a", project_name="show-a", principal="reviewer-a")
+    now = datetime(2026, 10, 6, 12, tzinfo=UTC)
+    issue_raw = _signed(_body(), private)
+    issue = verify_next_grant_event(issue_raw, None, scope=scope, key_id="governance-key-1", public_key=public, now=now)
+    revoke_body = _body("REVOKE") | {
+        "sequence": 2,
+        "previous_event_digest": issue.event_digest,
+        "issued_at": "2026-10-06T11:00:00Z",
+    }
+    revoke_raw = _signed(revoke_body, private)
+    revoke = verify_next_grant_event(
+        revoke_raw, issue_raw, scope=scope, key_id="governance-key-1", public_key=public, now=now
+    )
+    reissue = _body() | {
+        "sequence": 3,
+        "previous_event_digest": revoke.event_digest,
+        "issued_at": "2026-10-06T12:00:00Z",
+        "not_before": "2026-10-06T12:00:00Z",
+    }
+    assert (
+        verify_next_grant_event(
+            _signed(reissue, private), revoke_raw, scope=scope, key_id="governance-key-1", public_key=public, now=now
+        ).body.sequence
+        == 3
+    )
+
+
+def test_transition_denies_gap_wrong_predecessor_wrong_scope_and_invalid_action() -> None:
+    private = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+    public = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    scope = GrantScopeV1(user_id="tenant-a", project_name="show-a", principal="reviewer-a")
+    now = datetime(2026, 10, 6, 12, tzinfo=UTC)
+    issue_raw = _signed(_body(), private)
+    issue_digest = verify_grant_event(issue_raw, key_id="governance-key-1", public_key=public).event_digest
+    bad_events = [
+        (_body("REVOKE"), None, scope),
+        (_body() | {"sequence": 2, "previous_event_digest": "sha256:" + "a" * 64}, issue_raw, scope),
+        (
+            _body() | {"sequence": 2, "previous_event_digest": issue_digest, "issued_at": "2026-10-06T11:00:00Z"},
+            issue_raw,
+            scope,
+        ),
+        (_body() | {"sequence": 3, "previous_event_digest": "sha256:" + "a" * 64}, issue_raw, scope),
+        (_body() | {"project_name": "other-show"}, None, scope),
+        (_body() | {"issued_at": "2026-10-06T13:00:00Z", "not_before": "2026-10-06T13:00:00Z"}, None, scope),
+        (_body() | {"expires_at": "2026-10-06T11:00:00Z"}, None, scope),
+    ]
+    for body, previous_raw, expected_scope in bad_events:
+        with pytest.raises(GrantEventInvalid):
+            verify_next_grant_event(
+                _signed(body, private),
+                previous_raw,
+                scope=expected_scope,
+                key_id="governance-key-1",
+                public_key=public,
+                now=now,
+            )
+    tampered_previous = json.loads(issue_raw)
+    tampered_previous["body"]["principal"] = "other-reviewer"
+    with pytest.raises(GrantEventInvalid):
+        verify_next_grant_event(
+            _signed(
+                _body("REVOKE")
+                | {"sequence": 2, "previous_event_digest": issue_digest, "issued_at": "2026-10-06T11:00:00Z"},
+                private,
+            ),
+            canonical_json_bytes(tampered_previous, allow_nan=False),
+            scope=scope,
+            key_id="governance-key-1",
+            public_key=public,
+            now=now,
+        )
+    with pytest.raises(GrantEventInvalid):
+        verify_next_grant_event(
+            _signed(_body("REVOKE") | {"sequence": 2, "previous_event_digest": "sha256:" + "a" * 64}, private),
+            issue_raw,
+            scope=scope,
+            key_id="governance-key-1",
+            public_key=public,
+            now=now.replace(tzinfo=None),
+        )
