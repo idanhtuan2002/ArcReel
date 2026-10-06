@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -32,7 +33,8 @@ from r2.spatial_pair.digests import (
 from r2.target_registry.service import TakeTargetRegistrationService
 from server.services.location_binding import LocationBindingCreationService
 from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
-from server.services.spatial_source import FrameDerivationService
+from server.services.spatial_pair_decision import PairAuthorizationDeniedError, SpatialPairDecisionService
+from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
 from tests.integration.r2.adaptation import test_screenplay_admission as admission_helpers
 from tests.integration.r2.target_registry import test_take_registration as target_helpers
 from tests.integration.server.routers.test_gates_export import PROJECT, USER, _approve_shot
@@ -216,3 +218,71 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
         assert receipt.result == result
         assert await session.scalar(select(func.count()).select_from(SpatialPairHeadModel)) == 1
         assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 1
+
+    class TestAuthority:
+        async def authorize(self, *, session, command, command_digest, frames):
+            assert all(frame.png_bytes for frame in frames)
+            return PairAuthorizationV1(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                authenticated_principal=command.principal,
+                authority_role="HUMAN_SHOWRUNNER",
+                command_digest=command_digest,
+                authorization_ref="test-only-grant-for-reject",
+                authenticated_at=datetime.now(UTC),
+            )
+
+    reject = command.model_copy(
+        update={
+            "command_id": "pair-review-2",
+            "decision": "REJECT",
+            "observations": command.observations.model_copy(
+                update={
+                    "view_coverage": None,
+                    "camera_center": None,
+                    "yaw_relation": None,
+                    "rejection_reason": "The views do not share a camera center.",
+                }
+            ),
+        }
+    )
+    service = SpatialPairDecisionService(
+        session_factory=session_factory,
+        project_dir=project_dir,
+        authority=TestAuthority(),
+    )
+    rejected = await service.decide(reject)
+    assert rejected.result.pair_version == 2
+    assert rejected.result.decision == "REJECT"
+    assert await service.decide(reject) == rejected
+    assert await service.decide(command) == receipt
+    async with session_factory() as session:
+        current = await SpatialPairRepository(session).get_current_verified(
+            user_id=USER.id,
+            project_name=PROJECT,
+            binding_id=binding.result.binding_id,
+            expected_binding_version=binding.result.binding_version,
+            expected_envelope_digest=binding.result.envelope_digest,
+            expected_core_digest=verified_binding.core_digest,
+            expected_target_ref=target_ref,
+            expected_scene_ref=scene_ref,
+        )
+        assert current is not None
+        assert current.body.command.decision == "REJECT"
+        assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 2
+
+    new_command = reject.model_copy(update={"command_id": "pair-review-3"})
+    denied_service = SpatialPairDecisionService(session_factory=session_factory, project_dir=project_dir)
+    with pytest.raises(PairAuthorizationDeniedError, match="project-scoped grant"):
+        await denied_service.decide(new_command)
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 2
+
+    frame_path = project_dir / "spatial" / "frames" / f"{derived[0].frame_candidate_id}.png"
+    original_bytes = frame_path.read_bytes()
+    frame_path.write_bytes(original_bytes + b"changed")
+    try:
+        with pytest.raises(FrameSourceConflictError, match="frame bytes"):
+            await service.decide(reject)
+    finally:
+        frame_path.write_bytes(original_bytes)
