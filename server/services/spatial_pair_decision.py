@@ -177,6 +177,17 @@ class SpatialPairDecisionService:
                     raise PairSourceConflictError("pair frame differs from the binding's immutable claim")
                 verified_frames.append(frame)
             frames = (verified_frames[0], verified_frames[1])
+            authorization = await self._authority.authorize(
+                session=session, command=command, command_digest=digest, frames=frames
+            )
+            if (
+                authorization.user_id != command.user_id
+                or authorization.project_name != command.project_name
+                or authorization.authenticated_principal != command.principal
+                or authorization.authority_role != "HUMAN_SHOWRUNNER"
+                or authorization.command_digest != digest
+            ):
+                raise PairAuthorizationDeniedError("pair authorization does not match the exact command")
             if previous is not None:
                 row = await session.get(
                     SpatialPairDecisionModel,
@@ -212,17 +223,6 @@ class SpatialPairDecisionService:
                     raise SpatialPairIntegrityError("pair replay result differs from its decision or current source")
                 return previous
 
-            authorization = await self._authority.authorize(
-                session=session, command=command, command_digest=digest, frames=frames
-            )
-            if (
-                authorization.user_id != command.user_id
-                or authorization.project_name != command.project_name
-                or authorization.authenticated_principal != command.principal
-                or authorization.authority_role != "HUMAN_SHOWRUNNER"
-                or authorization.command_digest != digest
-            ):
-                raise PairAuthorizationDeniedError("pair authorization does not match the exact command")
             decision = PairDecisionV1(
                 command=command,
                 command_digest=digest,

@@ -1,0 +1,41 @@
+# M8-C Showrunner grant and exact-frame review custody
+
+Status: source-backed design research, 2026-10-06. Inspected clean starting HEAD `ca4281d4aabd31c83198c2bfc572ebb733c991fc`. This note selects a proposed implementation boundary; it is not an issued grant, an approved ADR, or production activation.
+
+## Current source facts
+
+- The accepted M5C design §6.2 and `NarrativeShowrunnerAuthorityPort` require an explicit project-scoped `HUMAN_SHOWRUNNER` grant from Governance. They prohibit inferring it from the host admin role, API key, user ID or single-operator mode. Governance grant issuance is currently manual/fixture-only (`docs/superpowers/specs/2026-09-09-r2-m5c-narrative-lifecycle-design.md:816-847`, `r2/narrative_lifecycle/ports.py:265-310`). M6's port has the same grant requirement (`r2/adaptation/ports.py:134-145`).
+- V1 `SessionAuthenticatedShowrunnerAuthority` intentionally authorizes every authenticated single-operator session (`r2/adaptation/session_authority.py:1-43`). `CurrentUserInfo.role` defaults to `admin`; `get_current_user` accepts API keys and can return an anonymous admin when authentication is disabled (`server/auth.py:36-65,422-464`). Neither is a V2 project grant or sufficient authentication for a human-only review route.
+- The internal pair service is deny-by-default unless an authority port is injected. Its authorization body binds `(user_id, project_name, principal, command_digest)` but currently has no production grant verifier or authenticated route (`server/services/spatial_pair_decision.py:37-94,180-255`, `r2/contracts/spatial_pair.py:80-116`). A regression test first showed exact command replay returned a receipt without calling the authority port. The service now invokes the port on both new decisions and replays; no production grant is thereby created.
+- Pair source reads can verify current admission, Scene, Shot, binding, two derived-frame receipts, parent master projections and PNG bytes in one transaction (`server/services/spatial_pair_decision.py`, `server/services/spatial_frame_reader.py`). Current `PairReviewObservationsV1` carries accountable text but no evidence that a browser fetched or decoded those exact PNGs. The public static-file route is not a project-scoped review channel (`server/routers/files.py:272-298`).
+- The pinned DramaClaw donor comparison establishes a two-view spatial assumption, not a human authorization or review-custody implementation (`docs/research/2026-09-30-r2-m8c-spatial-source-custody.md:23-27`). It supplies no grant issuer to reuse.
+
+The graph project `r2-m8c-binding-design` was indexed at `2026-10-04T09:21:10Z`; its post-index pair/target source is `not_tracked` or changed and integration tests are excluded. These conclusions use direct source fallback after the coverage check, not a negative graph result.
+
+## Primary-source constraints
+
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) recommends deny by default and permission validation on every request. The pair service's old replay bypass violated that request-level principle; a future route must enforce grant currentness for both new decisions and exact retries.
+- [PostgreSQL 16 application-level consistency guidance](https://www.postgresql.org/docs/16/applevel-consistency.html) requires locking/revalidation when another transaction may change authoritative rows. An authorization read must be serialized with grant revocation before committing a pair decision. A signed file read alone cannot supply that transaction ordering.
+
+## Options and selected boundary
+
+| Option | Result |
+| --- | --- |
+| Treat host login/admin or V1 session adapter as grant | Reject: no project scope or separate issuer; authentication-disabled mode can return anonymous admin. |
+| Add a pair-owned allowlist or let the pair route self-issue grants | Reject: duplicates Governance authority and gives Production a grant writer, contrary to M5C §6.2 and R2-DEC-002. |
+| Let a local host-admin API or API key issue grants | Reject for V2: an ordinary app credential would become its own escalation path. |
+| Import explicitly signed manual Governance issue/revoke events into a scoped versioned grant ledger; pair gets only a transaction-bound read port | Select for the first implementation packet. The offline issuer key stays outside the app runtime; the app pins a verification key through deployment configuration. No public grant-issuance route is added. |
+
+The selected path needs one Governance-owned writer that verifies the offline signature, issuer key ID, canonical event bytes, sequence, exact `(user_id, project_name, principal, HUMAN_SHOWRUNNER)` scope, validity window and event predecessor before append/head advance. Revocation is another signed event. The same scoped grant-head row is locked when a pair decision or replay authenticates; an import that revokes waits for an in-flight decision, and a decision starting after revocation denies. A missing verifier key, unknown issuer, stale sequence, expired grant, malformed event or unavailable ledger denies. Host-admin session possession does not bypass this port. Runtime key rotation and recovery need their own tested procedure before live activation. This is a design recommendation, not a claim that such issuer or ledger exists today.
+
+## Exact-frame review custody
+
+Create a short-lived server-owned review session bound to the current pair command context: user, project, principal, Scene/Shot refs, binding ID/version/envelope/core digests, ordered MASTER/REVERSE receipt IDs and digests, and both verified PNG content digests. Its frame and decision endpoints require an interactive session JWT; API keys and `AUTH_ENABLED=false` are denied even though the generic `get_current_user` accepts them. The frame endpoint serves only the two bytes rechecked from that snapshot, with `Cache-Control: no-store`, no filesystem path or bearer token in the URL, and no public static-file fallback. The browser must compute each returned Blob digest, decode each image, and submit an explicit acknowledgment for both digests before enabling the decision form. The server records the acknowledgment and observations as immutable evidence, then rechecks grant and all current sources in the pair decision transaction. A client-supplied digest or `ack=true` alone is never authority.
+
+This proves the server selected exact PNG bytes and an authenticated client acknowledged them; it cannot prove a human actually perceived or understood the images. Human accountability comes from the separate explicit APPROVE/REJECT action and observations. Do not name the receipt `proof_of_human_view`. The review session expires, cannot be transferred to another scope/principal, and cannot be reused with a different command body. A source advance or byte change before decision invalidates it. Existing V1 pair bodies and digests must remain byte-stable; add a versioned decision/evidence envelope before a production route can rely on this custody. Exact replay re-authenticates current grant but returns the original decision without minting a new review acknowledgment or replacing the original authorization evidence.
+
+## Remaining gates
+
+1. Review the proposed Governance root-of-trust and offline key custody against the actual deployment model. No sponsor key, signed grant or verifier configuration has been created.
+2. Freeze canonical event/review-session/decision-v2 vectors and database schema. Test wrong scope, forged/expired/revoked grant, API key and auth-disabled denial, key rotation, event replay/rollback, concurrent revoke versus decision, missing review acknowledgment, role swap, stale PNG and session expiration on disposable PostgreSQL.
+3. Independently review the exact implementation HEAD and run the required affected/full gates before enabling any production APPROVE route. Keep READY, promotion and generation paths closed until their separate authorities are accepted.

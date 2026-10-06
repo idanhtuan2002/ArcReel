@@ -378,6 +378,8 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
     denied_service = SpatialPairDecisionService(session_factory=session_factory, project_dir=project_dir)
     with pytest.raises(PairAuthorizationDeniedError, match="project-scoped grant"):
         await denied_service.decide(new_command)
+    with pytest.raises(PairAuthorizationDeniedError, match="project-scoped grant"):
+        await denied_service.decide(reject)
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 2
 

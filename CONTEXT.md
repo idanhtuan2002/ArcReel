@@ -629,6 +629,18 @@ _Avoid_: 与公开端点混为一谈。
 
 ### V1 发布与 V2 演进
 
+**Human Showrunner grant**：
+Governance 对某个确切项目和已认证的人类主体授予的创作决策能力；它与登录身份、Host 管理员角色及 API Key 分开。
+_Avoid_: 把已登录、管理员或单人部署直接称为拥有 Showrunner grant。
+
+**空间成对审阅会话（spatial pair review session）**：
+供人审阅一个确切目标、绑定及两张指定 MASTER/REVERSE 帧的短期上下文；它记录帧的交付与确认，不授予决策权，也不证明人实际感知了图像。
+_Avoid_: approval、Human Showrunner grant、proof of human view。
+
+**空间成对决定（spatial pair decision）**：
+人对两张确切帧是否适合作为同一地点正反视图作出的 APPROVE/REJECT 判断；只有当前有效决定能提供适用性，历史批准本身不等于当前 READY。
+_Avoid_: Gate C 视频批准、两帧绑定、空间约束集、生成就绪。
+
 **V1 制作发布版（V1 production release）**：
 供一名自托管创作者实际完成 factual/explainer 与 narrative/drama 两类短视频、经过四个人工 Gate、导出并可恢复的首个正式发布版；外部平台发布仍由人手动完成。
 _Avoid_: 完整 North Star、原型、仅测试通过但没有真实媒体的版本。
