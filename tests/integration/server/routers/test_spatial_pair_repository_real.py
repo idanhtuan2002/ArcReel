@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairHeadModel
@@ -33,6 +34,7 @@ from r2.spatial_pair.digests import (
 from r2.target_registry.service import TakeTargetRegistrationService
 from server.services.location_binding import LocationBindingCreationService
 from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
+from server.services.spatial_frame_reader import SpatialFrameReader
 from server.services.spatial_pair_current import CurrentApprovedSpatialPairReader, SpatialPairUnavailableError
 from server.services.spatial_pair_decision import PairAuthorizationDeniedError, SpatialPairDecisionService
 from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
@@ -269,7 +271,68 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
         project_dir=project_dir,
         authority=TestAuthority(),
     )
-    rejected = await service.decide(reject)
+    if session_factory.kw["bind"].dialect.name == "postgresql":
+        original_read_locked = SpatialFrameReader.read_locked
+        first_frame_checked = asyncio.Event()
+        release_reader = asyncio.Event()
+        reader_pid: list[int] = []
+
+        async def pause_approved_read(self, session, **kwargs):
+            frame = await original_read_locked(self, session, **kwargs)
+            if not reader_pid:
+                pid = await session.scalar(text("SELECT pg_backend_pid()"))
+                assert isinstance(pid, int)
+                reader_pid.append(pid)
+                first_frame_checked.set()
+                await asyncio.wait_for(release_reader.wait(), timeout=15)
+            return frame
+
+        monkeypatch.setattr(SpatialFrameReader, "read_locked", pause_approved_read)
+        reading = asyncio.create_task(
+            pair_reader.read_current(
+                user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+            )
+        )
+        rejecting = None
+        blocked_writer_pids: list[int] = []
+        try:
+            await asyncio.wait_for(first_frame_checked.wait(), timeout=15)
+            rejecting = asyncio.create_task(service.decide(reject))
+            async with asyncio.timeout(5):
+                while True:
+                    async with session_factory() as observer:
+                        blocked = (
+                            await observer.execute(
+                                text(
+                                    "SELECT pid, pg_blocking_pids(pid) FROM pg_stat_activity "
+                                    "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+                                )
+                            )
+                        ).all()
+                    if any(reader_pid[0] in blockers and pid != reader_pid[0] for pid, blockers in blocked):
+                        blocked_writer_pids.extend(
+                            pid for pid, blockers in blocked if reader_pid[0] in blockers and pid != reader_pid[0]
+                        )
+                        assert not rejecting.done()
+                        break
+                    if rejecting.done():
+                        raise AssertionError("pair REJECT did not wait for the current approved reader")
+                    await asyncio.sleep(0.01)
+        finally:
+            release_reader.set()
+            monkeypatch.setattr(SpatialFrameReader, "read_locked", original_read_locked)
+            await asyncio.wait_for(
+                asyncio.gather(reading, *([rejecting] if rejecting is not None else []), return_exceptions=True),
+                timeout=15,
+            )
+        assert reader_pid
+        assert blocked_writer_pids
+        assert reader_pid[0] not in blocked_writer_pids
+        assert (await asyncio.wait_for(reading, timeout=15)).decision_digest == result.decision_digest
+        assert rejecting is not None
+        rejected = await asyncio.wait_for(rejecting, timeout=15)
+    else:
+        rejected = await service.decide(reject)
     assert rejected.result.pair_version == 2
     assert rejected.result.decision == "REJECT"
     assert await service.decide(reject) == rejected
