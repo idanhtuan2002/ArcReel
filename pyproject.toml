@@ -20,6 +20,7 @@ dependencies = [
     "python-multipart>=0.0.22",
     "uvicorn>=0.41.0",
     "pyjwt>=2.12.1",
+    "cryptography>=50.0.0",
     "sqlalchemy[asyncio]>=2.0.48",
     "aiosqlite>=0.22.1",
     "asyncpg>=0.31.0",

@@ -9,6 +9,7 @@ Status: source-backed design research, 2026-10-06. Inspected clean starting HEAD
 - The internal pair service is deny-by-default unless an authority port is injected. Its authorization body binds `(user_id, project_name, principal, command_digest)` but currently has no production grant verifier or authenticated route (`server/services/spatial_pair_decision.py:37-94,180-255`, `r2/contracts/spatial_pair.py:80-116`). A regression test first showed exact command replay returned a receipt without calling the authority port. The service now invokes the port on both new decisions and replays; no production grant is thereby created.
 - Pair source reads can verify current admission, Scene, Shot, binding, two derived-frame receipts, parent master projections and PNG bytes in one transaction (`server/services/spatial_pair_decision.py`, `server/services/spatial_frame_reader.py`). Current `PairReviewObservationsV1` carries accountable text but no evidence that a browser fetched or decoded those exact PNGs. The public static-file route is not a project-scoped review channel (`server/routers/files.py:272-298`).
 - The pinned DramaClaw donor comparison establishes a two-view spatial assumption, not a human authorization or review-custody implementation (`docs/research/2026-09-30-r2-m8c-spatial-source-custody.md:23-27`). It supplies no grant issuer to reuse.
+- The M7 backup-fence preflight already defines a `SignatureVerifier.verify_ed25519(key_id, payload, signature)` port and verifies signatures over canonical unsigned JSON bytes (`r2/host_hardening/fence_evidence.py:63-64,175-199`). The bounded `r2/`, `lib/` and `server/` source search found no production implementation of that port. Its signature-check pattern can be reused, but it is not an existing Governance key registry or importer.
 
 The graph project `r2-m8c-binding-design` was indexed at `2026-10-04T09:21:10Z`; its post-index pair/target source is `not_tracked` or changed and integration tests are excluded. These conclusions use direct source fallback after the coverage check, not a negative graph result.
 
@@ -36,6 +37,6 @@ This proves the server selected exact PNG bytes and an authenticated client ackn
 
 ## Remaining gates
 
-1. Review the proposed Governance root-of-trust and offline key custody against the actual deployment model. No sponsor key, signed grant or verifier configuration has been created.
+1. Review the proposed Governance root-of-trust and offline key custody against the actual deployment model. No sponsor key, signed grant, verifier implementation or verifier configuration has been created.
 2. Freeze canonical event/review-session/decision-v2 vectors and database schema. Test wrong scope, forged/expired/revoked grant, API key and auth-disabled denial, key rotation, event replay/rollback, concurrent revoke versus decision, missing review acknowledgment, role swap, stale PNG and session expiration on disposable PostgreSQL.
 3. Independently review the exact implementation HEAD and run the required affected/full gates before enabling any production APPROVE route. Keep READY, promotion and generation paths closed until their separate authorities are accepted.
