@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.db.models.spatial_pair import SpatialPairDecisionModel
+from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel
 from r2.contracts.production_target import TargetVersionRef
-from r2.contracts.spatial_pair import PairDecisionV1
-from r2.spatial_pair.digests import pair_decision_digest, scoped_pair_id
+from r2.contracts.spatial_pair import PairDecisionResultV1, PairDecisionV1
+from r2.spatial_pair.digests import pair_decision_digest, pair_result_digest, scoped_pair_id
 
 
 class SpatialPairIntegrityError(ValueError):
@@ -20,6 +22,71 @@ class SpatialPairIntegrityError(ValueError):
 class VerifiedPairDecision:
     body: PairDecisionV1
     decision_digest: str
+
+
+@dataclass(frozen=True)
+class VerifiedPairCommandReceipt:
+    result: PairDecisionResultV1
+    result_digest: str
+
+
+class SpatialPairRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_command_receipt(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        principal: str,
+        command_id: str,
+        expected_command_digest: str,
+    ) -> VerifiedPairCommandReceipt | None:
+        """Check a stored receipt; the caller separately rechecks current authorities."""
+        row = await self.session.get(
+            SpatialPairCommandModel, (user_id, project_name, principal, command_id), populate_existing=True
+        )
+        if row is None:
+            return None
+        try:
+            result = PairDecisionResultV1.model_validate(row.result_json)
+            if (
+                result.model_dump(mode="json") != row.result_json
+                or result.command_digest != row.command_digest
+                or pair_result_digest(result.model_dump(mode="json")) != row.result_digest
+            ):
+                raise ValueError("stored command result differs from its columns")
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise SpatialPairIntegrityError("pair command receipt integrity verification failed") from exc
+        if row.command_digest != expected_command_digest:
+            raise SpatialPairIntegrityError("pair command ID has different input")
+        return VerifiedPairCommandReceipt(result=result, result_digest=row.result_digest)
+
+    async def record_command(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        principal: str,
+        command_id: str,
+        result: PairDecisionResultV1,
+    ) -> VerifiedPairCommandReceipt:
+        digest = pair_result_digest(result.model_dump(mode="json"))
+        self.session.add(
+            SpatialPairCommandModel(
+                user_id=user_id,
+                project_name=project_name,
+                principal=principal,
+                command_id=command_id,
+                command_digest=result.command_digest,
+                result_json=result.model_dump(mode="json"),
+                result_digest=digest,
+                created_at=datetime.now(UTC),
+            )
+        )
+        await self.session.flush()
+        return VerifiedPairCommandReceipt(result=result, result_digest=digest)
 
 
 def verify_stored_pair_decision(
@@ -82,4 +149,10 @@ def verify_stored_pair_decision(
         raise SpatialPairIntegrityError("pair decision integrity verification failed") from exc
 
 
-__all__ = ["SpatialPairIntegrityError", "VerifiedPairDecision", "verify_stored_pair_decision"]
+__all__ = [
+    "SpatialPairIntegrityError",
+    "SpatialPairRepository",
+    "VerifiedPairCommandReceipt",
+    "VerifiedPairDecision",
+    "verify_stored_pair_decision",
+]
