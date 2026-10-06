@@ -13,6 +13,7 @@ SSE 由前端以 fetch 带 header 消费，与普通受保护端点走同一依�
 
 import hashlib
 import logging
+import math
 import os
 import secrets
 import string
@@ -455,5 +456,39 @@ async def get_current_user(
     return _payload_to_user(payload)
 
 
+async def get_current_interactive_user(
+    token: Annotated[str | None, Depends(oauth2_scheme_optional)] = None,
+) -> CurrentUserInfo:
+    """Require an interactive session JWT for human-only review actions."""
+
+    if not is_auth_enabled() or not token or token.startswith(API_KEY_PREFIX):
+        raise HTTPException(status_code=401, detail="INTERACTIVE_SESSION_REQUIRED")
+    payload = verify_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="INTERACTIVE_SESSION_REQUIRED")
+    sub = payload.get("sub")
+    issued_at = payload.get("iat")
+    expires_at = payload.get("exp")
+    if (
+        not isinstance(sub, str)
+        or not sub
+        or sub != sub.strip()
+        or sub.startswith("apikey:")
+        or payload.get("via") is not None
+        or not isinstance(issued_at, (int, float))
+        or isinstance(issued_at, bool)
+        or not isinstance(expires_at, (int, float))
+        or isinstance(expires_at, bool)
+        or not math.isfinite(issued_at)
+        or not math.isfinite(expires_at)
+        or expires_at <= issued_at
+    ):
+        raise HTTPException(status_code=401, detail="INTERACTIVE_SESSION_REQUIRED")
+    from lib.db.base import DEFAULT_USER_ID
+
+    return CurrentUserInfo(id=DEFAULT_USER_ID, sub=sub, role="user")
+
+
 # Type aliases for FastAPI dependency injection
 CurrentUser = Annotated[CurrentUserInfo, Depends(get_current_user)]
+InteractiveUser = Annotated[CurrentUserInfo, Depends(get_current_interactive_user)]
