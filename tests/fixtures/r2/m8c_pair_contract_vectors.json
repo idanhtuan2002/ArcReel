@@ -140,6 +140,35 @@
       "digest": "sha256:1ef6f28cce42702660444d3116b9105471bd1226b70e2f8de6917231a233cd91"
     },
     {
+      "name": "pair_result_approve",
+      "domain": "r2.m8.spatial.pair.result.v1",
+      "body": {
+        "command_digest": "sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce",
+        "pair_id": "m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e",
+        "pair_version": 1,
+        "decision_digest": "sha256:1ef6f28cce42702660444d3116b9105471bd1226b70e2f8de6917231a233cd91",
+        "decision": "APPROVE",
+        "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+        "binding_version": 1,
+        "binding_envelope_digest": "sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800",
+        "binding_core_digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2",
+        "scene_ref": {
+          "target_type": "SCENE",
+          "target_id": "scene-room-1",
+          "registry_version": 2,
+          "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "target_ref": {
+          "target_type": "SHOT",
+          "target_id": "shot-room-1",
+          "registry_version": 3,
+          "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      },
+      "canonical": "{\"body\":{\"binding_core_digest\":\"sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2\",\"binding_envelope_digest\":\"sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800\",\"binding_id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"binding_version\":1,\"command_digest\":\"sha256:e390e36a31eb53e846a98b10eaeaa0faf3fab25f763eca011946f56d7368f6ce\",\"decision\":\"APPROVE\",\"decision_digest\":\"sha256:1ef6f28cce42702660444d3116b9105471bd1226b70e2f8de6917231a233cd91\",\"pair_id\":\"m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e\",\"pair_version\":1,\"scene_ref\":{\"registry_version\":2,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\",\"version_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"target_ref\":{\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"version_digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"}},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.result.v1\"}",
+      "digest": "sha256:a5ca490d043042a45b404750daa5e12df6d5834dd0b8a98b16c48c7c192ea2df"
+    },
+    {
       "name": "pair_command_reject",
       "domain": "r2.m8.spatial.pair.command.v1",
       "body": {
@@ -264,6 +293,35 @@
       },
       "canonical": "{\"body\":{\"authorization\":{\"authenticated_at\":\"2026-10-06T01:02:00Z\",\"authenticated_principal\":\"human:reviewer-1\",\"authority_role\":\"HUMAN_SHOWRUNNER\",\"authorization_ref\":\"synthetic-grant-2\",\"command_digest\":\"sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511\",\"project_name\":\"demo\",\"user_id\":\"u1\"},\"authorization_digest\":\"sha256:113e5a3db1757632966ada3ec7b85a3e1c1431eecd7d74a82b153cbfe341cd45\",\"command\":{\"binding_id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"command_id\":\"pair-command-2\",\"decision\":\"REJECT\",\"expected_binding_version\":1,\"expected_core_digest\":\"sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2\",\"expected_envelope_digest\":\"sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800\",\"expected_scene_ref\":{\"registry_version\":2,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\",\"version_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"expected_target_ref\":{\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"version_digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"observations\":{\"camera_center\":null,\"rejection_reason\":\"No reverse view is present.\",\"view_coverage\":null,\"yaw_relation\":\"Views face the same direction.\"},\"principal\":\"human:reviewer-1\",\"project_name\":\"demo\",\"user_id\":\"u1\",\"views\":[{\"receipt_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_id\":\"m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"role\":\"MASTER\"},{\"receipt_digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"receipt_id\":\"m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"role\":\"REVERSE\"}]},\"command_digest\":\"sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511\",\"decided_at\":\"2026-10-06T01:04:00Z\",\"pair_id\":\"m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e\",\"pair_version\":2,\"reviewer_id\":\"human:reviewer-1\"},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.decision.v2\"}",
       "digest": "sha256:83e4c93b4974682517357169dcc7ac56f03ae0f6321c8d1d46a6b9b9873253c9"
+    },
+    {
+      "name": "pair_result_reject",
+      "domain": "r2.m8.spatial.pair.result.v1",
+      "body": {
+        "command_digest": "sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511",
+        "pair_id": "m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e",
+        "pair_version": 2,
+        "decision_digest": "sha256:83e4c93b4974682517357169dcc7ac56f03ae0f6321c8d1d46a6b9b9873253c9",
+        "decision": "REJECT",
+        "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+        "binding_version": 1,
+        "binding_envelope_digest": "sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800",
+        "binding_core_digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2",
+        "scene_ref": {
+          "target_type": "SCENE",
+          "target_id": "scene-room-1",
+          "registry_version": 2,
+          "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "target_ref": {
+          "target_type": "SHOT",
+          "target_id": "shot-room-1",
+          "registry_version": 3,
+          "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      },
+      "canonical": "{\"body\":{\"binding_core_digest\":\"sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2\",\"binding_envelope_digest\":\"sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800\",\"binding_id\":\"m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d\",\"binding_version\":1,\"command_digest\":\"sha256:88be2e768a04ec8d3375bf0c39a36eb7439772e209f9899602fe9c976f9c0511\",\"decision\":\"REJECT\",\"decision_digest\":\"sha256:83e4c93b4974682517357169dcc7ac56f03ae0f6321c8d1d46a6b9b9873253c9\",\"pair_id\":\"m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e\",\"pair_version\":2,\"scene_ref\":{\"registry_version\":2,\"target_id\":\"scene-room-1\",\"target_type\":\"SCENE\",\"version_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"target_ref\":{\"registry_version\":3,\"target_id\":\"shot-room-1\",\"target_type\":\"SHOT\",\"version_digest\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"}},\"canonical_version\":\"1\",\"domain\":\"r2.m8.spatial.pair.result.v1\"}",
+      "digest": "sha256:6b7d3331afcbc505f21b63e9ce6890c073783d597316f09ee2536855744e5276"
     }
   ]
 }

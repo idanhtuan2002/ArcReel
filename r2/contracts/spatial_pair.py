@@ -112,9 +112,32 @@ class PairDecisionV1(_PairBody):
         return self
 
 
+class PairDecisionResultV1(_PairBody):
+    command_digest: Sha256Digest
+    pair_id: PairId
+    pair_version: int = Field(ge=1)
+    decision_digest: Sha256Digest
+    decision: Literal["APPROVE", "REJECT"]
+    binding_id: BindingId
+    binding_version: int = Field(ge=1)
+    binding_envelope_digest: Sha256Digest
+    binding_core_digest: Sha256Digest
+    scene_ref: TargetVersionRef
+    target_ref: TargetVersionRef
+
+    @model_validator(mode="after")
+    def require_target_types(self) -> Self:
+        if self.scene_ref.target_type != ProductionBindingTarget.SCENE:
+            raise ValueError("pair result requires a Scene dependency")
+        if self.target_ref.target_type != ProductionBindingTarget.SHOT:
+            raise ValueError("pair result requires a Shot target")
+        return self
+
+
 __all__ = [
     "PairAuthorizationV1",
     "PairDecisionCommandV1",
+    "PairDecisionResultV1",
     "PairDecisionV1",
     "PairId",
     "PairReviewObservationsV1",

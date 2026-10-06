@@ -12,8 +12,14 @@ import pytest
 from pydantic import ValidationError
 
 from r2.contracts.fingerprints import canonical_json_bytes
-from r2.contracts.spatial_pair import PairAuthorizationV1, PairDecisionCommandV1, PairDecisionV1
-from r2.spatial_pair.digests import pair_authorization_digest, pair_command_digest, pair_decision_digest, scoped_pair_id
+from r2.contracts.spatial_pair import PairAuthorizationV1, PairDecisionCommandV1, PairDecisionResultV1, PairDecisionV1
+from r2.spatial_pair.digests import (
+    pair_authorization_digest,
+    pair_command_digest,
+    pair_decision_digest,
+    pair_result_digest,
+    scoped_pair_id,
+)
 
 FIXTURE = Path(__file__).resolve().parents[3] / "fixtures/r2/m8c_location_binding_v1_vectors.json"
 PAIR_FIXTURE = Path(__file__).resolve().parents[3] / "fixtures/r2/m8c_pair_contract_vectors.json"
@@ -34,9 +40,11 @@ def test_fixed_pair_identity_command_and_decision_bytes() -> None:
         "pair_command_approve",
         "pair_authorization_approve",
         "pair_decision_approve",
+        "pair_result_approve",
         "pair_command_reject",
         "pair_authorization_reject",
         "pair_decision_reject",
+        "pair_result_reject",
     }
     for name, case in cases.items():
         canonical = canonical_json_bytes({"domain": case["domain"], "canonical_version": "1", "body": case["body"]})
@@ -49,6 +57,11 @@ def test_fixed_pair_identity_command_and_decision_bytes() -> None:
             actual = pair_command_digest(case["body"])
         elif name.startswith("pair_authorization"):
             actual = pair_authorization_digest(case["body"])
+        elif name.startswith("pair_result"):
+            actual = pair_result_digest(case["body"])
+            decision_name = name.replace("result", "decision")
+            assert case["body"]["decision_digest"] == cases[decision_name]["digest"]
+            assert case["body"]["pair_id"] == cases["pair_identity"]["digest"]
         else:
             actual = pair_decision_digest(case["body"])
             command_name = name.replace("decision", "command")
@@ -70,6 +83,28 @@ def test_pair_vector_changes_with_review_or_role_assignment() -> None:
     altered_views = [approve["views"][0] | {"receipt_id": approve["views"][1]["receipt_id"]}, approve["views"][1]]
     with pytest.raises(ValidationError):
         pair_command_digest({**approve, "views": altered_views})
+
+
+def test_pair_result_binds_exact_decision_and_target() -> None:
+    case = _pair_cases()["pair_decision_approve"]
+    decision = PairDecisionV1.model_validate(case["body"])
+    result = PairDecisionResultV1(
+        command_digest=decision.command_digest,
+        pair_id=decision.pair_id,
+        pair_version=decision.pair_version,
+        decision_digest=case["digest"],
+        decision=decision.command.decision,
+        binding_id=decision.command.binding_id,
+        binding_version=decision.command.expected_binding_version,
+        binding_envelope_digest=decision.command.expected_envelope_digest,
+        binding_core_digest=decision.command.expected_core_digest,
+        scene_ref=decision.command.expected_scene_ref,
+        target_ref=decision.command.expected_target_ref,
+    )
+    assert result.target_ref == decision.command.expected_target_ref
+    assert pair_result_digest(result.model_dump(mode="json")) == _pair_cases()["pair_result_approve"]["digest"]
+    with pytest.raises(ValidationError):
+        PairDecisionResultV1.model_validate(result.model_dump(mode="json") | {"binding_version": 0})
 
 
 def _command(*, decision: str = "APPROVE") -> dict[str, Any]:

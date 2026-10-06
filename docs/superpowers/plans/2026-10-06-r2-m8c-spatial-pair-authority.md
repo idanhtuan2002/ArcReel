@@ -1,0 +1,22 @@
+# M8-C spatial pair authority execution packet
+
+Status: proposed, 2026-10-06. Builds on pair contract commit `fca55abf` and binding authority HEAD in `impl/r2-m8c-frame-receipts`. Keep every production decision path closed until its grant and source checks pass.
+
+## Scope and invariants
+
+Persist one scoped pair head and immutable APPROVE/REJECT decisions for an existing Take-derived `LOCATION` binding. The exact command binds current Scene/Shot registry refs, binding version/envelope/core digests, and two distinct frame receipts assigned MASTER/REVERSE. A decision's inline observations and authorization are rehashed from stored bodies. The head's current decision is the only effective pair state; a newer REJECT removes suitability. No migration/backfill silently creates approvals.
+
+All readers and writers share one transaction's lock order: screenplay admission → Scene → Shot → binding → pair → sorted distinct M7 parent heads, then immutable frame receipt/candidate reads. The existing target resolver, verified binding repository and `SpatialFrameReader.read_locked` are reused. A pair current read fails if target, binding core, receipt, parent master or bytes drift. A binding version bump that preserves the core may retain pair suitability only when the later binding version's semantics are explicitly validated by its owning update authority; current first-binding envelope remains version 1 only.
+
+## Ordered implementation gates
+
+1. **Result vector and migration.** Add a typed pair result body/digest. Create `m8_spatial_pair_heads`, `m8_spatial_pair_decisions` and `m8_spatial_pair_commands` in one new revision. Use scoped composite FKs from decisions to the exact binding version, Scene and Shot target versions, and both frame receipts. The pair head points to its exact current decision. Checks require positive versions, distinct receipt IDs and complete nullable genesis/current pairs. The command table keys `(user_id, project_name, principal, command_id)`. Update only affected migration-head/table tests, then run SQLite migration tests and disposable PostgreSQL upgrade→downgrade→upgrade. Do not run a live migration.
+2. **Local repository integrity.** Reparse exact stored JSON, rehash command/authorization/decision/result, compare all duplicated FK columns, pair ID and current head digest, and reject committed genesis or nonlatest heads. Add scoped first-head claim, append/CAS, current read, and exact receipt lookup. An absent head is claimed by insert-if-absent then locked reread; insert command receipt last. Test corrupt body/digest/columns, foreign scope, stale head, changed command ID payload and rollback.
+3. **Transaction-bound decision service.** Require an injected Human Showrunner authority port with deny-by-default production adapter. Never construct `PairAuthorizationV1` from request fields. Reuse current target/binding/frame readers in one session and verify the two role assignments equal the binding's receipt set. Append APPROVE or REJECT and advance head atomically; exact replay rechecks current authorities, and a command-key loser rolls back before winner lookup. Forced PostgreSQL tests prove concurrent first writers, target/binding/parent advances and no deadlock, with exact backend PIDs/blockers.
+4. **Current approved pair reader.** Return a typed current pair snapshot only from an APPROVE head whose stored decision and all target/binding/media authorities still match. REJECT/absent/stale/corrupt is unavailable. Test approval followed by rejection and later new approval, replay of each historical command, and pair withdrawal during a competing consumer.
+
+## Decision gate before step 3
+
+The V1 `SessionAuthenticatedShowrunnerAuthority` grants all authenticated single-operator sessions and cannot prove a V2 project-scoped Human Showrunner grant. Select and independently verify a trusted grant authority before a production APPROVE writer or route is wired. Test-only fake authorization can exercise repository transaction mechanics, but cannot become a live adapter. Also verify the reviewer actually saw the exact two frame bytes and submitted inspectable observations; the typed text and synthetic vector alone do not prove that workflow.
+
+The C1 checkout remains separate and dirty. Pair authority does not read its unaccepted candidate fields. M8 promotion, readiness, generation routing and release acceptance remain later packets.
