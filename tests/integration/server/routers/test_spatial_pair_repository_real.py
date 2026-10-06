@@ -12,7 +12,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairHeadModel
+from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel, SpatialPairHeadModel
 from lib.db.repositories.production_binding import ProductionBindingRepository
 from lib.db.repositories.spatial_pair import SpatialPairRepository
 from lib.db.repositories.spatial_source import _receipt_digest
@@ -383,3 +383,196 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
     await _approve_shot(gate_export_client, project_dir, "SH01", b"pair-parent-a-next")
     with pytest.raises(FrameSourceConflictError, match="superseded"):
         await service.decide(reject)
+
+
+@pytest.mark.parametrize("first_fails", [False, True], ids=["commit-then-replay", "rollback-then-retry"])
+async def test_pair_first_writer_concurrent_replay_on_postgresql(
+    gate_export_client: AsyncClient,
+    project_dir: Path,
+    session_factory: Factory,
+    monkeypatch,
+    first_fails: bool,
+) -> None:
+    if session_factory.kw["bind"].dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL row-lock observation")
+
+    monkeypatch.setattr(admission_helpers, "USER", USER.id)
+    monkeypatch.setattr(admission_helpers, "PROJECT", PROJECT)
+    admission, *_ = await target_helpers._admit(session_factory)
+    original_direct = TakeDirectorAdapter.direct
+
+    async def direct_with_location(self, ref):
+        result = await original_direct(self, ref)
+        return replace(
+            result,
+            scenes=tuple(scene.model_copy(update={"location_ref": "location:room-1"}) for scene in result.scenes),
+        )
+
+    monkeypatch.setattr(TakeDirectorAdapter, "direct", direct_with_location)
+    registered = await TakeTargetRegistrationService(session_factory).register(
+        target_helpers._command(admission, user_id=USER.id, project_name=PROJECT)
+    )
+    derived = []
+    for shot, tag in (("SH01", b"pair-parent-a"), ("SH02", b"pair-parent-b")):
+        await _approve_shot(gate_export_client, project_dir, shot, tag)
+        key = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1).artifact_key_for(shot)
+        derived.append(
+            await FrameDerivationService(session_factory=session_factory, project_dir=project_dir).derive(
+                user_id=USER.id,
+                project_name=PROJECT,
+                parent_artifact_key=key,
+                expected_master_version=1,
+                decoded_frame_index=0,
+                command_id=f"pair-first-writer-frame-{shot}",
+            )
+        )
+    derived.sort(key=lambda receipt: receipt.frame_candidate_id)
+    binding = await LocationBindingCreationService(session_factory=session_factory, project_dir=project_dir).create(
+        BindingCreateCommandV1.model_validate(
+            {
+                "user_id": USER.id,
+                "project_name": PROJECT,
+                "principal": USER.sub,
+                "command_id": "pair-first-writer-binding",
+                "expected_target_ref": registered.shot_targets[0].model_dump(mode="json"),
+                "ordered_frame_receipts": [
+                    {"receipt_id": receipt.frame_candidate_id, "receipt_digest": _receipt_digest(receipt)}
+                    for receipt in derived
+                ],
+            }
+        )
+    )
+    snapshot = await CurrentLocationBindingSnapshotReader(
+        session_factory=session_factory, project_dir=project_dir
+    ).read_current(user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id)
+    scene_ref, target_ref = snapshot.body.target_versions
+    async with session_factory() as session:
+        verified_binding = await ProductionBindingRepository(session).get_current_verified(
+            user_id=USER.id,
+            project_name=PROJECT,
+            binding_id=binding.result.binding_id,
+            expected_target_ref=target_ref,
+            expected_scene_ref=scene_ref,
+        )
+        assert verified_binding is not None
+        core_digest = verified_binding.core_digest
+    command = PairDecisionCommandV1.model_validate(
+        {
+            "user_id": USER.id,
+            "project_name": PROJECT,
+            "principal": USER.sub,
+            "command_id": "pair-first-writer-review",
+            "expected_scene_ref": scene_ref.model_dump(mode="json"),
+            "expected_target_ref": target_ref.model_dump(mode="json"),
+            "binding_id": binding.result.binding_id,
+            "expected_binding_version": binding.result.binding_version,
+            "expected_envelope_digest": binding.result.envelope_digest,
+            "expected_core_digest": core_digest,
+            "views": [
+                {"role": role, "receipt_id": receipt.frame_candidate_id, "receipt_digest": _receipt_digest(receipt)}
+                for role, receipt in zip(("MASTER", "REVERSE"), derived, strict=True)
+            ],
+            "decision": "APPROVE",
+            "observations": {
+                "view_coverage": "Both frames show the same doorway and floor edge.",
+                "camera_center": "Doorway edges meet at one camera center.",
+                "yaw_relation": "The reverse frame faces opposite the master frame.",
+                "rejection_reason": None,
+            },
+        }
+    )
+
+    class TestAuthority:
+        async def authorize(self, *, session, command, command_digest, frames):
+            assert all(frame.png_bytes for frame in frames)
+            return PairAuthorizationV1(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                authenticated_principal=command.principal,
+                authority_role="HUMAN_SHOWRUNNER",
+                command_digest=command_digest,
+                authorization_ref="test-only-first-writer-grant",
+                authenticated_at=datetime.now(UTC),
+            )
+
+    service = SpatialPairDecisionService(
+        session_factory=session_factory, project_dir=project_dir, authority=TestAuthority()
+    )
+    original_lock = SpatialPairRepository.lock_pair_head
+    original_receipt_read = SpatialPairRepository.get_command_receipt
+    first_locked = asyncio.Event()
+    release_first = asyncio.Event()
+    first_pid: list[int] = []
+    second_pid: list[int] = []
+    second = None
+
+    async def capture_second_pid(self, **kwargs):
+        if asyncio.current_task() is second and not second_pid:
+            pid = await self.session.scalar(text("SELECT pg_backend_pid()"))
+            assert isinstance(pid, int)
+            second_pid.append(pid)
+        return await original_receipt_read(self, **kwargs)
+
+    async def pause_first_pair_claim(self, **kwargs):
+        head = await original_lock(self, **kwargs)
+        if not first_pid:
+            pid = await self.session.scalar(text("SELECT pg_backend_pid()"))
+            assert isinstance(pid, int)
+            first_pid.append(pid)
+            first_locked.set()
+            await asyncio.wait_for(release_first.wait(), timeout=15)
+            if first_fails:
+                raise RuntimeError("forced first-writer rollback")
+        return head
+
+    monkeypatch.setattr(SpatialPairRepository, "lock_pair_head", pause_first_pair_claim)
+    monkeypatch.setattr(SpatialPairRepository, "get_command_receipt", capture_second_pid)
+    first = asyncio.create_task(service.decide(command))
+    blocked_pids: list[int] = []
+    try:
+        await asyncio.wait_for(first_locked.wait(), timeout=15)
+        second = asyncio.create_task(service.decide(command))
+        async with asyncio.timeout(5):
+            while True:
+                async with session_factory() as observer:
+                    blocked = (
+                        await observer.execute(
+                            text(
+                                "SELECT pid, pg_blocking_pids(pid) FROM pg_stat_activity "
+                                "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+                            )
+                        )
+                    ).all()
+                blocked_pids = [
+                    pid for pid, blockers in blocked if second_pid and pid == second_pid[0] and first_pid[0] in blockers
+                ]
+                if blocked_pids:
+                    assert not second.done()
+                    break
+                if second.done():
+                    raise AssertionError("second first-writer request did not wait on the first transaction")
+                await asyncio.sleep(0.01)
+    finally:
+        release_first.set()
+        monkeypatch.setattr(SpatialPairRepository, "lock_pair_head", original_lock)
+        monkeypatch.setattr(SpatialPairRepository, "get_command_receipt", original_receipt_read)
+        await asyncio.wait_for(
+            asyncio.gather(first, *([second] if second is not None else []), return_exceptions=True), timeout=15
+        )
+
+    assert first_pid
+    assert second_pid
+    assert blocked_pids
+    assert second is not None
+    second_receipt = await second
+    if first_fails:
+        with pytest.raises(RuntimeError, match="forced first-writer rollback"):
+            await first
+    else:
+        assert await first == second_receipt
+    assert second_receipt.result.pair_version == 1
+    assert await service.decide(command) == second_receipt
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(SpatialPairHeadModel)) == 1
+        assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 1
+        assert await session.scalar(select(func.count()).select_from(SpatialPairCommandModel)) == 1
