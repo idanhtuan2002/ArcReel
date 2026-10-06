@@ -286,3 +286,7 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
             await service.decide(reject)
     finally:
         frame_path.write_bytes(original_bytes)
+
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"pair-parent-a-next")
+    with pytest.raises(FrameSourceConflictError, match="superseded"):
+        await service.decide(reject)
