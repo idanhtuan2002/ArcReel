@@ -6,7 +6,7 @@ Status: proposed implementation spec. This packet defines the first production-c
 
 A reviewer with an explicit Governance-issued project grant can inspect the exact MASTER and REVERSE PNGs and submit an accountable pair decision. A missing, stale, forged, expired or revoked grant, or a review of different bytes, must deny. Existing `PairDecisionCommandV1` and `PairDecisionV1` remain byte-stable historical contracts. The current internal pair writer and current APPROVE reader remain deny-by-default at a production boundary until the packet's gates pass.
 
-The accepted M5C §6.2 grant boundary, ADR-0103, and [source research](../../research/2026-10-06-r2-m8c-showrunner-grant-and-review-custody.md) supply the authority rationale. The first implementation supports one deployment-pinned Ed25519 verification key. Key rotation and disaster recovery require a separately reviewed procedure; a key mismatch or rollback uncertainty closes grant-based decisions.
+The accepted M5C §6.2 grant boundary, ADR-0103, and [source research](../../research/2026-10-06-r2-m8c-showrunner-grant-and-review-custody.md) supply the authority rationale. The first implementation supports one deployment-pinned Ed25519 verification key. The release image, verification key and separately retained grant-head checkpoint must have operator-controlled custody outside mutable application data; current production Compose and V1 backup do not provide it. Key rotation and disaster recovery require a separately reviewed procedure; a key mismatch or rollback uncertainty closes grant-based decisions.
 
 ## Signed event contract
 
