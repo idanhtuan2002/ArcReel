@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairV2CustodyModel
 from lib.db.repositories.spatial_pair import SpatialPairIntegrityError
-from lib.db.repositories.spatial_pair_v2 import verify_stored_pair_decision_v2
+from lib.db.repositories.spatial_pair_v2 import verify_stored_pair_decision_v2, verify_stored_pair_decision_versioned
 from r2.contracts.review_evidence import ReviewEvidenceV1, ReviewSnapshotV1
 from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionResultV2, PairDecisionV2
 from r2.spatial_pair.digests import (
@@ -340,8 +340,11 @@ def test_v2_decision_envelope_binds_exact_command_authorization_and_review_evide
         "expected_scene_ref": command.expected_scene_ref,
     }
     assert verify_stored_pair_decision_v2(row, custody, **expected).decision_digest == digest
+    assert verify_stored_pair_decision_versioned(row, custody, **expected).decision_digest == digest
     with pytest.raises(SpatialPairIntegrityError):
         verify_stored_pair_decision_v2(row, None, **expected)
+    with pytest.raises(SpatialPairIntegrityError):
+        verify_stored_pair_decision_versioned(row, None, **expected)
     for record, field, replacement in (
         (row, "decision_digest", "sha256:" + "0" * 64),
         (row, "master_receipt_id", "foreign-receipt"),

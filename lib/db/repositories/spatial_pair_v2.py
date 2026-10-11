@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from pydantic import ValidationError
 
 from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairV2CustodyModel
-from lib.db.repositories.spatial_pair import SpatialPairIntegrityError
+from lib.db.repositories.spatial_pair import (
+    SpatialPairIntegrityError,
+    VerifiedPairDecision,
+    verify_stored_pair_decision,
+)
 from r2.contracts.production_target import TargetVersionRef
 from r2.contracts.spatial_pair import PairDecisionV2
 from r2.spatial_pair.digests import pair_decision_digest_v2, scoped_pair_id
@@ -84,4 +89,39 @@ def verify_stored_pair_decision_v2(
         raise SpatialPairIntegrityError("pair V2 decision integrity verification failed") from exc
 
 
-__all__ = ["VerifiedPairDecisionV2", "verify_stored_pair_decision_v2"]
+def verify_stored_pair_decision_versioned(
+    row: SpatialPairDecisionModel,
+    custody: SpatialPairV2CustodyModel | None,
+    *,
+    user_id: str,
+    project_name: str,
+    binding_id: str,
+    expected_binding_version: int,
+    expected_envelope_digest: str,
+    expected_core_digest: str,
+    expected_target_ref: TargetVersionRef,
+    expected_scene_ref: TargetVersionRef,
+) -> VerifiedPairDecision | VerifiedPairDecisionV2:
+    body = cast(object, row.decision_body_json)
+    if not isinstance(body, dict):
+        raise SpatialPairIntegrityError("pair decision body is not an object")
+    expected = {
+        "user_id": user_id,
+        "project_name": project_name,
+        "binding_id": binding_id,
+        "expected_binding_version": expected_binding_version,
+        "expected_envelope_digest": expected_envelope_digest,
+        "expected_core_digest": expected_core_digest,
+        "expected_target_ref": expected_target_ref,
+        "expected_scene_ref": expected_scene_ref,
+    }
+    if "decision_schema" not in body:
+        if custody is not None:
+            raise SpatialPairIntegrityError("V1 pair decision has V2 custody")
+        return verify_stored_pair_decision(row, **expected)
+    if body["decision_schema"] == "r2.m8.spatial.pair.decision.v2":
+        return verify_stored_pair_decision_v2(row, custody, **expected)
+    raise SpatialPairIntegrityError("pair decision schema is unknown")
+
+
+__all__ = ["VerifiedPairDecisionV2", "verify_stored_pair_decision_v2", "verify_stored_pair_decision_versioned"]

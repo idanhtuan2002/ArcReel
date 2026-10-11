@@ -9,8 +9,9 @@ from typing import Any
 
 import pytest
 
-from lib.db.models.spatial_pair import SpatialPairDecisionModel
+from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairV2CustodyModel
 from lib.db.repositories.spatial_pair import SpatialPairIntegrityError, verify_stored_pair_decision
+from lib.db.repositories.spatial_pair_v2 import verify_stored_pair_decision_versioned
 from r2.contracts.production_target import TargetVersionRef
 
 FIXTURE = Path(__file__).resolve().parents[3] / "fixtures/r2/m8c_pair_contract_vectors.json"
@@ -66,6 +67,27 @@ def _verify(row: SpatialPairDecisionModel) -> None:
         expected_scene_ref=TargetVersionRef.model_validate(command["expected_scene_ref"]),
     )
     assert verified.decision_digest == _cases()["pair_decision_approve"]["digest"]
+
+
+def test_versioned_parser_keeps_v1_history_and_rejects_ambiguous_custody() -> None:
+    row = _row()
+    command = row.decision_body_json["command"]
+    expected = {
+        "user_id": command["user_id"],
+        "project_name": command["project_name"],
+        "binding_id": command["binding_id"],
+        "expected_binding_version": command["expected_binding_version"],
+        "expected_envelope_digest": command["expected_envelope_digest"],
+        "expected_core_digest": command["expected_core_digest"],
+        "expected_target_ref": TargetVersionRef.model_validate(command["expected_target_ref"]),
+        "expected_scene_ref": TargetVersionRef.model_validate(command["expected_scene_ref"]),
+    }
+    assert verify_stored_pair_decision_versioned(row, None, **expected).decision_digest == row.decision_digest
+    with pytest.raises(SpatialPairIntegrityError):
+        verify_stored_pair_decision_versioned(row, SpatialPairV2CustodyModel(), **expected)
+    row.decision_body_json = row.decision_body_json | {"decision_schema": "future"}
+    with pytest.raises(SpatialPairIntegrityError):
+        verify_stored_pair_decision_versioned(row, None, **expected)
 
 
 def test_stored_pair_decision_matches_exact_vector() -> None:
