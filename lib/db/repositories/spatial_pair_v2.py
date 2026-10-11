@@ -6,13 +6,17 @@ from dataclasses import dataclass
 from typing import cast
 
 from pydantic import ValidationError
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairV2CustodyModel
+from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairHeadModel, SpatialPairV2CustodyModel
+from lib.db.models.spatial_review import SpatialReviewSessionModel
 from lib.db.repositories.spatial_pair import (
     SpatialPairIntegrityError,
     VerifiedPairDecision,
     verify_stored_pair_decision,
 )
+from lib.db.repositories.spatial_review import SpatialReviewIntegrityError, SpatialReviewRepository
 from r2.contracts.production_target import TargetVersionRef
 from r2.contracts.spatial_pair import PairDecisionV2
 from r2.spatial_pair.digests import pair_decision_digest_v2, scoped_pair_id
@@ -22,6 +26,94 @@ from r2.spatial_pair.digests import pair_decision_digest_v2, scoped_pair_id
 class VerifiedPairDecisionV2:
     body: PairDecisionV2
     decision_digest: str
+
+
+class SpatialPairVersionedRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_current_verified(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        binding_id: str,
+        expected_binding_version: int,
+        expected_envelope_digest: str,
+        expected_core_digest: str,
+        expected_target_ref: TargetVersionRef,
+        expected_scene_ref: TargetVersionRef,
+    ) -> VerifiedPairDecision | VerifiedPairDecisionV2 | None:
+        """Read local history after the caller locks current target and binding authority."""
+        pair_id = scoped_pair_id(user_id=user_id, project_name=project_name, binding_id=binding_id)
+        head = await self.session.get(
+            SpatialPairHeadModel,
+            (user_id, project_name, pair_id),
+            with_for_update=True,
+            populate_existing=True,
+        )
+        if head is None:
+            return None
+        if head.current_version is None or head.current_decision_digest is None:
+            raise SpatialPairIntegrityError("pair head integrity: committed genesis or incomplete current pair")
+        row = await self.session.get(
+            SpatialPairDecisionModel,
+            (user_id, project_name, pair_id, head.current_version),
+            with_for_update=True,
+            populate_existing=True,
+        )
+        latest = await self.session.scalar(
+            select(func.max(SpatialPairDecisionModel.pair_version)).where(
+                SpatialPairDecisionModel.user_id == user_id,
+                SpatialPairDecisionModel.project_name == project_name,
+                SpatialPairDecisionModel.pair_id == pair_id,
+            )
+        )
+        if row is None or latest != head.current_version or row.decision_digest != head.current_decision_digest:
+            raise SpatialPairIntegrityError("pair head integrity: current decision is missing or not latest")
+        custody = await self.session.get(
+            SpatialPairV2CustodyModel,
+            (user_id, project_name, pair_id, head.current_version),
+            with_for_update=True,
+            populate_existing=True,
+        )
+        verified = verify_stored_pair_decision_versioned(
+            row,
+            custody,
+            user_id=user_id,
+            project_name=project_name,
+            binding_id=binding_id,
+            expected_binding_version=expected_binding_version,
+            expected_envelope_digest=expected_envelope_digest,
+            expected_core_digest=expected_core_digest,
+            expected_target_ref=expected_target_ref,
+            expected_scene_ref=expected_scene_ref,
+        )
+        if isinstance(verified, VerifiedPairDecisionV2):
+            command = verified.body.command
+            try:
+                evidence, evidence_digest = await SpatialReviewRepository(self.session).read_complete(
+                    user_id=user_id,
+                    project_name=project_name,
+                    principal=command.principal,
+                    session_id=command.review_session_id,
+                )
+            except SpatialReviewIntegrityError as exc:
+                raise SpatialPairIntegrityError("pair V2 stored review evidence is invalid") from exc
+            session_row = await self.session.get(
+                SpatialReviewSessionModel,
+                (user_id, project_name, command.review_session_id),
+                with_for_update=True,
+                populate_existing=True,
+            )
+            if (
+                session_row is None
+                or session_row.consumed_command_digest != verified.body.command_digest
+                or evidence != verified.body.review_evidence
+                or evidence_digest != command.review_evidence_digest
+            ):
+                raise SpatialPairIntegrityError("pair V2 decision differs from stored review consumption")
+        return verified
 
 
 def verify_stored_pair_decision_v2(
@@ -124,4 +216,9 @@ def verify_stored_pair_decision_versioned(
     raise SpatialPairIntegrityError("pair decision schema is unknown")
 
 
-__all__ = ["VerifiedPairDecisionV2", "verify_stored_pair_decision_v2", "verify_stored_pair_decision_versioned"]
+__all__ = [
+    "SpatialPairVersionedRepository",
+    "VerifiedPairDecisionV2",
+    "verify_stored_pair_decision_v2",
+    "verify_stored_pair_decision_versioned",
+]

@@ -1,0 +1,137 @@
+{
+  "body": {
+    "authorization": {
+      "authenticated_at": "2026-10-06T00:04:30Z",
+      "authenticated_principal": "human:reviewer-1",
+      "authority_role": "HUMAN_SHOWRUNNER",
+      "authorization_ref": "signed-grant-event-1",
+      "command_digest": "sha256:e31b3580aec1dd91a6b1a99f69f89a409ef8d3c37e374c6bfaa69bd3bb51e53f",
+      "project_name": "demo",
+      "user_id": "u1"
+    },
+    "authorization_digest": "sha256:0584d2ff1ca86787b69dfb4f4aba1eedb0c6e3350e6f4100e6f7b149bc820019",
+    "command": {
+      "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+      "command_id": "pair-command-1",
+      "decision": "APPROVE",
+      "expected_binding_version": 1,
+      "expected_core_digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2",
+      "expected_envelope_digest": "sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800",
+      "expected_scene_ref": {
+        "registry_version": 2,
+        "target_id": "scene-room-1",
+        "target_type": "SCENE",
+        "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "expected_target_ref": {
+        "registry_version": 3,
+        "target_id": "shot-room-1",
+        "target_type": "SHOT",
+        "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "observations": {
+        "camera_center": "The doorway alignment supports a common camera center.",
+        "rejection_reason": null,
+        "view_coverage": "Both views show the same doorway and floor edge.",
+        "yaw_relation": "The reverse view faces approximately opposite the master view."
+      },
+      "principal": "human:reviewer-1",
+      "project_name": "demo",
+      "review_evidence_digest": "sha256:1a8813804dc3aad7f5e857c3a17aaabb6f33175cb756e5ce4d48e2f86d306950",
+      "review_session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "user_id": "u1",
+      "views": [
+        {
+          "receipt_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "role": "MASTER"
+        },
+        {
+          "receipt_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "receipt_id": "m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "role": "REVERSE"
+        }
+      ]
+    },
+    "command_digest": "sha256:e31b3580aec1dd91a6b1a99f69f89a409ef8d3c37e374c6bfaa69bd3bb51e53f",
+    "decided_at": "2026-10-06T00:05:00Z",
+    "decision_schema": "r2.m8.spatial.pair.decision.v2",
+    "pair_id": "m8p:3342b30cc9a29c546d94becbbee7c15cf2659d3b9ffcd79054c2e194a7efef9e",
+    "pair_version": 1,
+    "review_evidence": {
+      "acknowledgments": [
+        {
+          "acknowledged_at": "2026-10-06T00:03:00Z",
+          "decoded": true,
+          "delivery_attempt_id": "attempt-1",
+          "png_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "principal": "human:reviewer-1",
+          "role": "MASTER"
+        },
+        {
+          "acknowledged_at": "2026-10-06T00:04:00Z",
+          "decoded": true,
+          "delivery_attempt_id": "attempt-2",
+          "png_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "principal": "human:reviewer-1",
+          "role": "REVERSE"
+        }
+      ],
+      "deliveries": [
+        {
+          "attempt_id": "attempt-1",
+          "delivered_at": "2026-10-06T00:01:00Z",
+          "png_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "role": "MASTER"
+        },
+        {
+          "attempt_id": "attempt-2",
+          "delivered_at": "2026-10-06T00:02:00Z",
+          "png_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "role": "REVERSE"
+        }
+      ],
+      "snapshot": {
+        "binding_id": "m8b:1ff22ec747a6c3da2cc23b07677c15bc1f85e76a77499545d51f7dcb2cef9d9d",
+        "binding_version": 1,
+        "core_digest": "sha256:8af826656a058f39be09f32febaed4186be69902dd37034af988fbcc5d4d5ca2",
+        "created_at": "2026-10-06T00:00:00Z",
+        "envelope_digest": "sha256:b80ca0b8fb742d7f20147cb0e3c9300591cd3c337d05f5ab657a81792529e800",
+        "expires_at": "2026-10-06T00:10:00Z",
+        "frames": [
+          {
+            "png_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "receipt_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "receipt_id": "m8f:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "role": "MASTER"
+          },
+          {
+            "png_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+            "receipt_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_id": "m8f:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "role": "REVERSE"
+          }
+        ],
+        "principal": "human:reviewer-1",
+        "project_name": "demo",
+        "scene_ref": {
+          "registry_version": 2,
+          "target_id": "scene-room-1",
+          "target_type": "SCENE",
+          "version_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "session_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_ref": {
+          "registry_version": 3,
+          "target_id": "shot-room-1",
+          "target_type": "SHOT",
+          "version_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+        },
+        "user_id": "u1"
+      },
+      "snapshot_digest": "sha256:8c3f6c5683afea41e6b8211e61eb81aa1ad6062b167054929a9e6c5ef17052b7"
+    },
+    "reviewer_id": "human:reviewer-1"
+  },
+  "digest": "sha256:8e16fad34c405ea4ae757e990194b7d2be8cb1993615ff821a4215929b353153"
+}
