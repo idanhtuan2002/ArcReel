@@ -568,9 +568,61 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         base64.urlsafe_b64encode(private.sign(canonical_json_bytes(revoke_body, allow_nan=False))).decode().rstrip("=")
     )
     revoke_raw = canonical_json_bytes({"body": revoke_body, "signature": revoke_signature}, allow_nan=False)
-    await GovernanceGrantImporter(session_factory, key_id="test-review-key", public_key=public).import_event(
-        revoke_raw, scope=scope
-    )
+    if session_factory.kw["bind"].dialect.name == "postgresql":
+        original_grant_read = CurrentShowrunnerGrantReader.require_current_locked
+        revoke_locked = asyncio.Event()
+        release_revoke = asyncio.Event()
+        revoke_pid: list[int] = []
+        decision_pid: list[int] = []
+
+        async def hold_revoke_head(session: AsyncSession) -> None:
+            pid = await session.scalar(select(func.pg_backend_pid()))
+            assert isinstance(pid, int)
+            revoke_pid.append(pid)
+            revoke_locked.set()
+            await release_revoke.wait()
+
+        async def capture_decision_grant_read(self, session: AsyncSession, *, scope: GrantScopeV1):
+            pid = await session.scalar(select(func.pg_backend_pid()))
+            assert isinstance(pid, int)
+            decision_pid.append(pid)
+            return await original_grant_read(self, session, scope=scope)
+
+        importer = GovernanceGrantImporter(
+            session_factory, key_id="test-review-key", public_key=public, on_head_locked=hold_revoke_head
+        )
+        revoke_task = asyncio.create_task(importer.import_event(revoke_raw, scope=scope))
+        decision_task = None
+        try:
+            await asyncio.wait_for(revoke_locked.wait(), timeout=10)
+            with monkeypatch.context() as grant_patch:
+                grant_patch.setattr(CurrentShowrunnerGrantReader, "require_current_locked", capture_decision_grant_read)
+                decision_task = asyncio.create_task(pair_service.decide(reject_command, authenticated_user=interactive))
+                blocked = False
+                for _ in range(500):
+                    async with session_factory() as observer:
+                        blockers = (
+                            await observer.scalar(select(func.pg_blocking_pids(decision_pid[0])))
+                            if decision_pid
+                            else []
+                        )
+                    if revoke_pid and revoke_pid[0] in blockers:
+                        blocked = True
+                        break
+                    if decision_task.done():
+                        break
+                    await asyncio.sleep(0.01)
+                assert blocked, "V2 decision must wait for the signed-grant revoke transaction"
+        finally:
+            release_revoke.set()
+            await asyncio.wait_for(revoke_task, timeout=10)
+        assert decision_task is not None
+        with pytest.raises(ShowrunnerGrantUnavailableError):
+            await asyncio.wait_for(decision_task, timeout=10)
+    else:
+        await GovernanceGrantImporter(session_factory, key_id="test-review-key", public_key=public).import_event(
+            revoke_raw, scope=scope
+        )
     with pytest.raises(ShowrunnerGrantUnavailableError):
         await service.create(**arguments)
     with pytest.raises(ShowrunnerGrantUnavailableError):
