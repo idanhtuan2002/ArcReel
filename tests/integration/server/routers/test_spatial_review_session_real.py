@@ -16,8 +16,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.content_digest import canonical_json_bytes
-from lib.db.models.spatial_review import SpatialReviewDeliveryModel, SpatialReviewSessionModel
-from lib.db.repositories.spatial_review import SpatialReviewIntegrityError
+from lib.db.models.spatial_review import (
+    SpatialReviewAcknowledgmentModel,
+    SpatialReviewDeliveryModel,
+    SpatialReviewSessionModel,
+)
+from lib.db.repositories.spatial_review import SpatialReviewIntegrityError, SpatialReviewRepository
 from lib.db.repositories.spatial_source import _receipt_digest
 from r2.contracts.production_binding_authority import BindingCreateCommandV1
 from r2.governance.grant_transition import GrantScopeV1
@@ -142,6 +146,7 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
     }
     with pytest.raises(SpatialReviewIntegrityError):
         await service.fetch_frame(**(fetch_scope | {"principal": "other-reviewer"}), role="MASTER")
+    deliveries = []
     for frame in snapshot.frames:
         frame_path = project_dir / "spatial" / "frames" / f"{frame.receipt_id}.png"
         assert frame.png_digest == "sha256:" + hashlib.sha256(frame_path.read_bytes()).hexdigest()
@@ -149,6 +154,45 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         assert served == frame_path.read_bytes()
         assert delivery.role == frame.role
         assert delivery.png_digest == frame.png_digest
+        deliveries.append(delivery)
+    with pytest.raises(SpatialReviewIntegrityError):
+        await service.acknowledge_frame(
+            **fetch_scope,
+            attempt_id=deliveries[0].attempt_id,
+            role="REVERSE",
+            png_digest=snapshot.frames[0].png_digest,
+            decoded=True,
+        )
+    with pytest.raises(SpatialReviewIntegrityError):
+        await service.acknowledge_frame(
+            **fetch_scope,
+            attempt_id=deliveries[0].attempt_id,
+            role="MASTER",
+            png_digest=snapshot.frames[0].png_digest,
+            decoded=False,
+        )
+    with pytest.raises(ShowrunnerGrantUnavailableError):
+        await service.acknowledge_frame(
+            **(fetch_scope | {"principal": "other-reviewer"}),
+            attempt_id=deliveries[0].attempt_id,
+            role="MASTER",
+            png_digest=snapshot.frames[0].png_digest,
+            decoded=True,
+        )
+    for frame, delivery in zip(snapshot.frames, deliveries, strict=True):
+        acknowledgment = await service.acknowledge_frame(
+            **fetch_scope,
+            attempt_id=delivery.attempt_id,
+            role=frame.role,
+            png_digest=frame.png_digest,
+            decoded=True,
+        )
+        assert acknowledgment.delivery_attempt_id == delivery.attempt_id
+        assert acknowledgment.principal == USER.sub
+    async with session_factory() as session, session.begin():
+        evidence, digest = await SpatialReviewRepository(session).read_complete(**fetch_scope)
+        assert evidence.snapshot == snapshot
+        assert digest.startswith("sha256:")
     frame_path = project_dir / "spatial" / "frames" / f"{snapshot.frames[0].receipt_id}.png"
     original = frame_path.read_bytes()
     frame_path.write_bytes(original + b"changed")
@@ -165,6 +209,7 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         assert row.snapshot_digest == review_snapshot_digest(snapshot.model_dump(mode="json"))
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 2
         assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 2
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 2
 
     revoke_body = {key: value for key, value in body.items() if key not in {"not_before", "expires_at"}} | {
         "event_type": "REVOKE",
@@ -183,6 +228,15 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         await service.create(**arguments)
     with pytest.raises(ShowrunnerGrantUnavailableError):
         await service.fetch_frame(**fetch_scope, role="REVERSE")
+    with pytest.raises(ShowrunnerGrantUnavailableError):
+        await service.acknowledge_frame(
+            **fetch_scope,
+            attempt_id=deliveries[0].attempt_id,
+            role="MASTER",
+            png_digest=snapshot.frames[0].png_digest,
+            decoded=True,
+        )
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 2
         assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 2
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 2

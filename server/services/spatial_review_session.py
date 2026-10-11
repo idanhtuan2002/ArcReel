@@ -16,7 +16,13 @@ from lib.db.repositories.spatial_source import SpatialFrameReceiptRepository, _r
 from r2.contracts.enums import ProductionBindingTarget
 from r2.contracts.production import SceneSpec, ShotSpecV2
 from r2.contracts.production_target import TargetVersionRef
-from r2.contracts.review_evidence import ReviewDeliveryV1, ReviewFrameV1, ReviewRole, ReviewSnapshotV1
+from r2.contracts.review_evidence import (
+    ReviewAcknowledgmentV1,
+    ReviewDeliveryV1,
+    ReviewFrameV1,
+    ReviewRole,
+    ReviewSnapshotV1,
+)
 from r2.governance.grant_transition import GrantScopeV1
 from r2.production_binding.digests import frame_source_claim_digest, scoped_location_binding_id
 from r2.target_registry.resolver import TransactionBoundTargetAuthorityResolver
@@ -125,6 +131,35 @@ class SpatialReviewSessionService:
             )
             frame_index = 0 if role == "MASTER" else 1
             return current.png_bytes[frame_index], delivery
+
+    async def acknowledge_frame(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        principal: str,
+        session_id: str,
+        attempt_id: str,
+        role: ReviewRole,
+        png_digest: str,
+        decoded: bool,
+    ) -> ReviewAcknowledgmentV1:
+        """The caller must bind the assertion to an interactive JWT principal."""
+
+        async with self._sessions() as session, session.begin():
+            await self._grants.require_current_locked(
+                session, scope=GrantScopeV1(user_id=user_id, project_name=project_name, principal=principal)
+            )
+            return await SpatialReviewRepository(session).record_acknowledgment(
+                user_id=user_id,
+                project_name=project_name,
+                principal=principal,
+                session_id=session_id,
+                attempt_id=attempt_id,
+                role=role,
+                png_digest=png_digest,
+                decoded=decoded,
+            )
 
     async def _current_sources(
         self, session: AsyncSession, *, user_id: str, project_name: str, target_id: str
