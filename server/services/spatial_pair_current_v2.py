@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -106,7 +107,8 @@ class CurrentApprovedSpatialPairReaderV2:
         if len(set(parent_keys)) != 2:
             raise SpatialPairV2UnavailableError("V2 approval receipts share one parent")
         await lock_current_master_rows(session, user_id=user_id, project_name=project_name, artifact_keys=parent_keys)
-        for view, hint in zip(views, hints, strict=True):
+        review_frames = current.body.review_evidence.snapshot.frames
+        for view, hint, review_frame in zip(views, hints, review_frames, strict=True):
             frame = await self._frames.read_locked(
                 session,
                 user_id=user_id,
@@ -121,6 +123,7 @@ class CurrentApprovedSpatialPairReaderV2:
                 frame.receipt != hint
                 or body != claim.model_dump(mode="json", exclude={"claim_digest"})
                 or frame_source_claim_digest(body) != claim.claim_digest
+                or review_frame.png_digest != "sha256:" + sha256(frame.png_bytes).hexdigest()
             ):
                 raise SpatialPairV2UnavailableError("V2 approval frame differs from its immutable claim")
         grant_scope = GrantScopeV1(user_id=user_id, project_name=project_name, principal=current.body.command.principal)

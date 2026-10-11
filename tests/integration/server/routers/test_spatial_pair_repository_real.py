@@ -36,10 +36,12 @@ from r2.spatial_pair.digests import (
 )
 from r2.target_registry.digests import target_body_digest
 from r2.target_registry.service import TakeTargetRegistrationService
+from server.services.governance_grants import CurrentShowrunnerGrantReader
 from server.services.location_binding import LocationBindingCreationService
 from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
 from server.services.spatial_frame_reader import SpatialFrameReader
 from server.services.spatial_pair_current import CurrentApprovedSpatialPairReader, SpatialPairUnavailableError
+from server.services.spatial_pair_current_v2 import CurrentApprovedSpatialPairReaderV2, SpatialPairV2UnavailableError
 from server.services.spatial_pair_decision import (
     PairAuthorizationDeniedError,
     PairSourceConflictError,
@@ -236,6 +238,15 @@ async def test_pair_repository_accepts_real_foreign_keys_and_replays_result(
     )
     assert approved.body.command.decision == "APPROVE"
     assert approved.decision_digest == result.decision_digest
+    v2_reader = CurrentApprovedSpatialPairReaderV2(
+        session_factory=session_factory,
+        project_dir=project_dir,
+        grants=CurrentShowrunnerGrantReader(key_id="unused-test-key", public_key=bytes(32)),
+    )
+    with pytest.raises(SpatialPairV2UnavailableError, match="not a V2 approval"):
+        await v2_reader.read_current(
+            user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
+        )
     async with session_factory() as session:
         with pytest.raises(RuntimeError, match="caller-owned transaction"):
             await pair_reader.read_current_locked(
