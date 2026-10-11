@@ -9,6 +9,8 @@ import pytest
 from pydantic import ValidationError
 
 from r2.contracts.review_evidence import ReviewEvidenceV1, ReviewSnapshotV1
+from r2.contracts.spatial_pair import PairDecisionCommandV2
+from r2.spatial_pair.digests import pair_command_digest, pair_command_digest_v2
 from r2.spatial_pair.review_digests import review_evidence_digest, review_snapshot_digest
 
 
@@ -143,3 +145,22 @@ def test_snapshot_digest_changes_with_png_bytes() -> None:
     frames[0]["png_digest"] = "sha256:" + "f" * 64
     changed = ReviewSnapshotV1.model_validate(snapshot.model_dump(mode="json") | {"frames": frames})
     assert review_snapshot_digest(changed.model_dump(mode="json")) != before
+
+
+def test_pair_v2_command_binds_review_reference_without_changing_v1_digest() -> None:
+    from json import loads
+
+    fixture = Path(__file__).resolve().parents[3] / "fixtures/r2/m8c_pair_contract_vectors.json"
+    cases = {case["name"]: case for case in loads(fixture.read_text())["cases"]}
+    v1 = cases["pair_command_approve"]["body"]
+    assert pair_command_digest(v1) == cases["pair_command_approve"]["digest"]
+    reviewed = PairDecisionCommandV2.model_validate(
+        v1 | {"review_session_id": "a" * 32, "review_evidence_digest": "sha256:" + "1" * 64}
+    )
+    digest = pair_command_digest_v2(reviewed.model_dump(mode="json"))
+    assert digest == "sha256:49f5c762c45b8ee2755fa01bd7a3c1de6cb2755d486a10a1a1f90508a63895fd"
+    changed = reviewed.model_dump(mode="json") | {"review_evidence_digest": "sha256:" + "2" * 64}
+    assert digest != pair_command_digest_v2(changed)
+    assert pair_command_digest(v1) == cases["pair_command_approve"]["digest"]
+    with pytest.raises(ValidationError):
+        PairDecisionCommandV2.model_validate(v1)

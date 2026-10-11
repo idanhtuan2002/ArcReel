@@ -9,12 +9,19 @@ from typing import Any
 
 from r2.contracts.common import ensure_json_value
 from r2.contracts.fingerprints import canonical_json_bytes
-from r2.contracts.spatial_pair import PairAuthorizationV1, PairDecisionCommandV1, PairDecisionResultV1, PairDecisionV1
+from r2.contracts.spatial_pair import (
+    PairAuthorizationV1,
+    PairDecisionCommandV1,
+    PairDecisionCommandV2,
+    PairDecisionResultV1,
+    PairDecisionV1,
+)
 
 _BINDING_ID = re.compile(r"m8b:[0-9a-f]{64}\Z")
 _DOMAINS = {
     "identity": "r2.m8.spatial.pair.identity.v1",
     "command": "r2.m8.spatial.pair.command.v1",
+    "command_v2": "r2.m8.spatial.pair.command.v2",
     "authorization": "r2.m8.spatial.pair.authorization.v1",
     "decision": "r2.m8.spatial.pair.decision.v2",
     "result": "r2.m8.spatial.pair.result.v1",
@@ -44,6 +51,11 @@ def pair_command_digest(body: Mapping[str, Any]) -> str:
     return _digest("command", command.model_dump(mode="json"))
 
 
+def pair_command_digest_v2(body: Mapping[str, Any]) -> str:
+    command = PairDecisionCommandV2.model_validate(body)
+    return _digest("command_v2", command.model_dump(mode="json"))
+
+
 def pair_authorization_digest(body: Mapping[str, Any]) -> str:
     authorization = PairAuthorizationV1.model_validate(body)
     return _digest("authorization", authorization.model_dump(mode="json"))
@@ -71,6 +83,7 @@ def pair_result_digest(body: Mapping[str, Any]) -> str:
 __all__ = [
     "pair_authorization_digest",
     "pair_command_digest",
+    "pair_command_digest_v2",
     "pair_decision_digest",
     "pair_result_digest",
     "scoped_pair_id",

@@ -10,6 +10,7 @@ from r2.contracts.common import R2ContractModel
 from r2.contracts.enums import ProductionBindingTarget
 from r2.contracts.production_binding_authority import BindingId, ExactName
 from r2.contracts.production_target import Sha256Digest, TargetVersionRef
+from r2.contracts.review_evidence import ReviewSessionId
 from r2.contracts.spatial_source import FrameCandidateId
 
 PairId = Annotated[str, StringConstraints(pattern=r"^m8p:[0-9a-f]{64}$")]
@@ -78,6 +79,11 @@ class PairDecisionCommandV1(_PairBody):
         return self
 
 
+class PairDecisionCommandV2(PairDecisionCommandV1):
+    review_session_id: ReviewSessionId
+    review_evidence_digest: Sha256Digest
+
+
 class PairAuthorizationV1(_PairBody):
     user_id: ExactName
     project_name: ExactName
@@ -137,6 +143,7 @@ class PairDecisionResultV1(_PairBody):
 __all__ = [
     "PairAuthorizationV1",
     "PairDecisionCommandV1",
+    "PairDecisionCommandV2",
     "PairDecisionResultV1",
     "PairDecisionV1",
     "PairId",
