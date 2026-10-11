@@ -46,21 +46,10 @@ class SpatialReviewRepository:
             raise SpatialReviewIntegrityError("database time unavailable for review custody")
         return _utc(value)
 
-    async def _locked_snapshot(
-        self, *, user_id: str, project_name: str, principal: str, session_id: str
-    ) -> tuple[SpatialReviewSessionModel, ReviewSnapshotV1]:
-        row = (
-            await self.session.execute(
-                select(SpatialReviewSessionModel)
-                .where(
-                    SpatialReviewSessionModel.user_id == user_id,
-                    SpatialReviewSessionModel.project_name == project_name,
-                    SpatialReviewSessionModel.session_id == session_id,
-                )
-                .with_for_update()
-                .execution_options(populate_existing=True)
-            )
-        ).scalar_one_or_none()
+    @staticmethod
+    def _verify_snapshot_row(
+        row: SpatialReviewSessionModel | None, *, user_id: str, project_name: str, principal: str, session_id: str
+    ) -> ReviewSnapshotV1:
         if row is None:
             raise SpatialReviewIntegrityError("review session unavailable")
         try:
@@ -79,7 +68,47 @@ class SpatialReviewRepository:
                 raise ValueError("review snapshot columns differ from body")
         except (ValidationError, ValueError, TypeError) as exc:
             raise SpatialReviewIntegrityError("stored review snapshot integrity verification failed") from exc
+        return snapshot
+
+    async def read_snapshot_hint(
+        self, *, user_id: str, project_name: str, principal: str, session_id: str
+    ) -> ReviewSnapshotV1:
+        row = await self.session.get(SpatialReviewSessionModel, (user_id, project_name, session_id))
+        return self._verify_snapshot_row(
+            row, user_id=user_id, project_name=project_name, principal=principal, session_id=session_id
+        )
+
+    async def _locked_snapshot(
+        self, *, user_id: str, project_name: str, principal: str, session_id: str
+    ) -> tuple[SpatialReviewSessionModel, ReviewSnapshotV1]:
+        row = (
+            await self.session.execute(
+                select(SpatialReviewSessionModel)
+                .where(
+                    SpatialReviewSessionModel.user_id == user_id,
+                    SpatialReviewSessionModel.project_name == project_name,
+                    SpatialReviewSessionModel.session_id == session_id,
+                )
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        snapshot = self._verify_snapshot_row(
+            row, user_id=user_id, project_name=project_name, principal=principal, session_id=session_id
+        )
+        assert row is not None
         return row, snapshot
+
+    async def read_active(
+        self, *, user_id: str, project_name: str, principal: str, session_id: str
+    ) -> ReviewSnapshotV1:
+        row, snapshot = await self._locked_snapshot(
+            user_id=user_id, project_name=project_name, principal=principal, session_id=session_id
+        )
+        now = await self._now()
+        if row.consumed_command_digest is not None or not snapshot.created_at <= now < snapshot.expires_at:
+            raise SpatialReviewIntegrityError("review session is no longer active")
+        return snapshot
 
     async def create_session(self, snapshot: ReviewSnapshotV1) -> None:
         now = await self._now()

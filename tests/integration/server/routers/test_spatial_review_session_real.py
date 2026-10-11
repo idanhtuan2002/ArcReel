@@ -16,7 +16,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.content_digest import canonical_json_bytes
-from lib.db.models.spatial_review import SpatialReviewSessionModel
+from lib.db.models.spatial_review import SpatialReviewDeliveryModel, SpatialReviewSessionModel
+from lib.db.repositories.spatial_review import SpatialReviewIntegrityError
 from lib.db.repositories.spatial_source import _receipt_digest
 from r2.contracts.production_binding_authority import BindingCreateCommandV1
 from r2.governance.grant_transition import GrantScopeV1
@@ -133,15 +134,29 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
     assert snapshot.session_id != (await service.create(**arguments)).session_id
     assert [frame.role for frame in snapshot.frames] == ["MASTER", "REVERSE"]
     assert [frame.receipt_id for frame in snapshot.frames] == [receipt.frame_candidate_id for receipt in receipts]
+    fetch_scope = {
+        "user_id": USER.id,
+        "project_name": PROJECT,
+        "principal": USER.sub,
+        "session_id": snapshot.session_id,
+    }
+    with pytest.raises(SpatialReviewIntegrityError):
+        await service.fetch_frame(**(fetch_scope | {"principal": "other-reviewer"}), role="MASTER")
     for frame in snapshot.frames:
         frame_path = project_dir / "spatial" / "frames" / f"{frame.receipt_id}.png"
         assert frame.png_digest == "sha256:" + hashlib.sha256(frame_path.read_bytes()).hexdigest()
+        served, delivery = await service.fetch_frame(**fetch_scope, role=frame.role)
+        assert served == frame_path.read_bytes()
+        assert delivery.role == frame.role
+        assert delivery.png_digest == frame.png_digest
     frame_path = project_dir / "spatial" / "frames" / f"{snapshot.frames[0].receipt_id}.png"
     original = frame_path.read_bytes()
     frame_path.write_bytes(original + b"changed")
     try:
         with pytest.raises(FrameSourceConflictError):
             await service.create(**arguments)
+        with pytest.raises(FrameSourceConflictError):
+            await service.fetch_frame(**fetch_scope, role="MASTER")
     finally:
         frame_path.write_bytes(original)
     async with session_factory() as session:
@@ -149,6 +164,7 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         assert row is not None
         assert row.snapshot_digest == review_snapshot_digest(snapshot.model_dump(mode="json"))
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 2
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 2
 
     revoke_body = {key: value for key, value in body.items() if key not in {"not_before", "expires_at"}} | {
         "event_type": "REVOKE",
@@ -165,5 +181,8 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
     )
     with pytest.raises(ShowrunnerGrantUnavailableError):
         await service.create(**arguments)
+    with pytest.raises(ShowrunnerGrantUnavailableError):
+        await service.fetch_frame(**fetch_scope, role="REVERSE")
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 2
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 2
