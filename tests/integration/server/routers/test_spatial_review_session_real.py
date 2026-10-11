@@ -62,6 +62,7 @@ from server.services.spatial_source import FrameDerivationService, FrameSourceCo
 from tests.integration.r2.adaptation import test_screenplay_admission as admission_helpers
 from tests.integration.r2.target_registry import test_take_registration as target_helpers
 from tests.integration.server.routers.test_gates_export import PROJECT, USER, _approve_shot
+from tests.integration.server.routers.test_spatial_frame_reader import _start_blocked_master_writer
 
 PAIR_V2_VECTOR = json.loads(
     (Path(__file__).resolve().parents[3] / "fixtures/r2/m8c_pair_v2_decision_vector.json").read_text()
@@ -562,7 +563,7 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         "event_type": "REVOKE",
         "sequence": 2,
         "previous_event_digest": issue.event_digest,
-        "issued_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "issued_at": (datetime.now(UTC) - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     revoke_signature = (
         base64.urlsafe_b64encode(private.sign(canonical_json_bytes(revoke_body, allow_nan=False))).decode().rstrip("=")
@@ -615,14 +616,14 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
                 assert blocked, "V2 decision must wait for the signed-grant revoke transaction"
         finally:
             release_revoke.set()
-            await asyncio.wait_for(revoke_task, timeout=10)
+            revoke = await asyncio.wait_for(revoke_task, timeout=10)
         assert decision_task is not None
         with pytest.raises(ShowrunnerGrantUnavailableError):
             await asyncio.wait_for(decision_task, timeout=10)
     else:
-        await GovernanceGrantImporter(session_factory, key_id="test-review-key", public_key=public).import_event(
-            revoke_raw, scope=scope
-        )
+        revoke = await GovernanceGrantImporter(
+            session_factory, key_id="test-review-key", public_key=public
+        ).import_event(revoke_raw, scope=scope)
     with pytest.raises(ShowrunnerGrantUnavailableError):
         await service.create(**arguments)
     with pytest.raises(ShowrunnerGrantUnavailableError):
@@ -641,3 +642,45 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 3
         assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 6
         assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 6
+
+    if session_factory.kw["bind"].dialect.name == "postgresql":
+        reissue_body = body | {
+            "sequence": 3,
+            "previous_event_digest": revoke.event_digest,
+            "issued_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "not_before": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        reissue_signature = (
+            base64.urlsafe_b64encode(private.sign(canonical_json_bytes(reissue_body, allow_nan=False)))
+            .decode()
+            .rstrip("=")
+        )
+        await GovernanceGrantImporter(session_factory, key_id="test-review-key", public_key=public).import_event(
+            canonical_json_bytes({"body": reissue_body, "signature": reissue_signature}, allow_nan=False), scope=scope
+        )
+        original_grant_read = CurrentShowrunnerGrantReader.require_current_locked
+        decision_holds_sources = asyncio.Event()
+        release_decision = asyncio.Event()
+
+        async def pause_after_source_locks(self, session: AsyncSession, *, scope: GrantScopeV1):
+            current = await original_grant_read(self, session, scope=scope)
+            decision_holds_sources.set()
+            await release_decision.wait()
+            return current
+
+        with monkeypatch.context() as source_patch:
+            source_patch.setattr(CurrentShowrunnerGrantReader, "require_current_locked", pause_after_source_locks)
+            replay_task = asyncio.create_task(pair_service.decide(reject_command, authenticated_user=interactive))
+            approval_task = None
+            try:
+                await asyncio.wait_for(decision_holds_sources.wait(), timeout=10)
+                approval_task = await _start_blocked_master_writer(
+                    session_factory, _approve_shot(gate_export_client, project_dir, "SH01", b"review-next-parent")
+                )
+            finally:
+                release_decision.set()
+            assert await asyncio.wait_for(replay_task, timeout=10) == rejected
+            assert approval_task is not None
+            await asyncio.wait_for(approval_task, timeout=10)
+        with pytest.raises(FrameSourceConflictError):
+            await pair_service.decide(reject_command, authenticated_user=interactive)
