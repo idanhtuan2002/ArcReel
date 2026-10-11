@@ -194,11 +194,18 @@ class PairDecisionResultV1(_PairBody):
         return self
 
 
+class PairDecisionResultV2(PairDecisionResultV1):
+    result_schema: Literal["r2.m8.spatial.pair.result.v2"]
+    review_session_id: ReviewSessionId
+    review_evidence_digest: Sha256Digest
+
+
 __all__ = [
     "PairAuthorizationV1",
     "PairDecisionCommandV1",
     "PairDecisionCommandV2",
     "PairDecisionResultV1",
+    "PairDecisionResultV2",
     "PairDecisionV1",
     "PairDecisionV2",
     "PairId",

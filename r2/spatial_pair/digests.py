@@ -14,6 +14,7 @@ from r2.contracts.spatial_pair import (
     PairDecisionCommandV1,
     PairDecisionCommandV2,
     PairDecisionResultV1,
+    PairDecisionResultV2,
     PairDecisionV1,
     PairDecisionV2,
 )
@@ -27,6 +28,7 @@ _DOMAINS = {
     "decision": "r2.m8.spatial.pair.decision.v2",
     "decision_v2": "r2.m8.spatial.pair.decision.v3",
     "result": "r2.m8.spatial.pair.result.v1",
+    "result_v2": "r2.m8.spatial.pair.result.v2",
 }
 
 
@@ -87,6 +89,11 @@ def pair_decision_digest_v2(body: Mapping[str, Any]) -> str:
     return _digest("decision_v2", decision.model_dump(mode="json"))
 
 
+def pair_result_digest_v2(body: Mapping[str, Any]) -> str:
+    result = PairDecisionResultV2.model_validate(body)
+    return _digest("result_v2", result.model_dump(mode="json"))
+
+
 __all__ = [
     "pair_authorization_digest",
     "pair_command_digest",
@@ -94,5 +101,6 @@ __all__ = [
     "pair_decision_digest",
     "pair_decision_digest_v2",
     "pair_result_digest",
+    "pair_result_digest_v2",
     "scoped_pair_id",
 ]

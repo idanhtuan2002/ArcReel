@@ -9,12 +9,13 @@ import pytest
 from pydantic import ValidationError
 
 from r2.contracts.review_evidence import ReviewEvidenceV1, ReviewSnapshotV1
-from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionV2
+from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionResultV2, PairDecisionV2
 from r2.spatial_pair.digests import (
     pair_authorization_digest,
     pair_command_digest,
     pair_command_digest_v2,
     pair_decision_digest_v2,
+    pair_result_digest_v2,
     scoped_pair_id,
 )
 from r2.spatial_pair.review_digests import (
@@ -271,3 +272,22 @@ def test_v2_decision_envelope_binds_exact_command_authorization_and_review_evide
     ):
         with pytest.raises((ValidationError, ValueError)):
             PairDecisionV2.model_validate(body | changed)
+    result = PairDecisionResultV2(
+        result_schema="r2.m8.spatial.pair.result.v2",
+        command_digest=decision.command_digest,
+        pair_id=decision.pair_id,
+        pair_version=decision.pair_version,
+        decision_digest=digest,
+        decision=command.decision,
+        binding_id=command.binding_id,
+        binding_version=command.expected_binding_version,
+        binding_envelope_digest=command.expected_envelope_digest,
+        binding_core_digest=command.expected_core_digest,
+        scene_ref=command.expected_scene_ref,
+        target_ref=command.expected_target_ref,
+        review_session_id=command.review_session_id,
+        review_evidence_digest=command.review_evidence_digest,
+    )
+    assert pair_result_digest_v2(result.model_dump(mode="json")) == (
+        "sha256:aaf5110d4b2041143937843d8498c2ceb666e3abc825ece6574c3524a8107d92"
+    )
