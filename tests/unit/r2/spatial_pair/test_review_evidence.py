@@ -8,6 +8,9 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairV2CustodyModel
+from lib.db.repositories.spatial_pair import SpatialPairIntegrityError
+from lib.db.repositories.spatial_pair_v2 import verify_stored_pair_decision_v2
 from r2.contracts.review_evidence import ReviewEvidenceV1, ReviewSnapshotV1
 from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionResultV2, PairDecisionV2
 from r2.spatial_pair.digests import (
@@ -291,3 +294,63 @@ def test_v2_decision_envelope_binds_exact_command_authorization_and_review_evide
     assert pair_result_digest_v2(result.model_dump(mode="json")) == (
         "sha256:aaf5110d4b2041143937843d8498c2ceb666e3abc825ece6574c3524a8107d92"
     )
+
+    row = SpatialPairDecisionModel(
+        user_id=command.user_id,
+        project_name=command.project_name,
+        pair_id=decision.pair_id,
+        pair_version=decision.pair_version,
+        decision_body_json=decision.model_dump(mode="json"),
+        decision_digest=digest,
+        command_digest=decision.command_digest,
+        authorization_digest=decision.authorization_digest,
+        binding_id=command.binding_id,
+        binding_version=command.expected_binding_version,
+        binding_envelope_digest=command.expected_envelope_digest,
+        binding_core_digest=command.expected_core_digest,
+        target_type=command.expected_target_ref.target_type.value,
+        target_id=command.expected_target_ref.target_id,
+        target_registry_version=command.expected_target_ref.registry_version,
+        target_version_digest=command.expected_target_ref.version_digest,
+        scene_type=command.expected_scene_ref.target_type.value,
+        scene_id=command.expected_scene_ref.target_id,
+        scene_registry_version=command.expected_scene_ref.registry_version,
+        scene_version_digest=command.expected_scene_ref.version_digest,
+        master_receipt_id=command.views[0].receipt_id,
+        reverse_receipt_id=command.views[1].receipt_id,
+        decision=command.decision,
+    )
+    custody = SpatialPairV2CustodyModel(
+        user_id=command.user_id,
+        project_name=command.project_name,
+        pair_id=decision.pair_id,
+        pair_version=decision.pair_version,
+        review_session_id=command.review_session_id,
+        review_evidence_digest=command.review_evidence_digest,
+        decision_digest=digest,
+    )
+    expected = {
+        "user_id": command.user_id,
+        "project_name": command.project_name,
+        "binding_id": command.binding_id,
+        "expected_binding_version": command.expected_binding_version,
+        "expected_envelope_digest": command.expected_envelope_digest,
+        "expected_core_digest": command.expected_core_digest,
+        "expected_target_ref": command.expected_target_ref,
+        "expected_scene_ref": command.expected_scene_ref,
+    }
+    assert verify_stored_pair_decision_v2(row, custody, **expected).decision_digest == digest
+    with pytest.raises(SpatialPairIntegrityError):
+        verify_stored_pair_decision_v2(row, None, **expected)
+    for record, field, replacement in (
+        (row, "decision_digest", "sha256:" + "0" * 64),
+        (row, "master_receipt_id", "foreign-receipt"),
+        (custody, "review_session_id", "b" * 32),
+        (custody, "review_evidence_digest", "sha256:" + "0" * 64),
+        (custody, "project_name", "foreign"),
+    ):
+        original = getattr(record, field)
+        setattr(record, field, replacement)
+        with pytest.raises(SpatialPairIntegrityError):
+            verify_stored_pair_decision_v2(row, custody, **expected)
+        setattr(record, field, original)
