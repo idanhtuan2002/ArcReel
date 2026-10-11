@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     PrimaryKeyConstraint,
     String,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -169,4 +170,44 @@ class SpatialPairCommandModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
-__all__ = ["SpatialPairCommandModel", "SpatialPairDecisionModel", "SpatialPairHeadModel"]
+class SpatialPairV2CustodyModel(Base):
+    __tablename__ = "m8_spatial_pair_v2_custody"
+    __table_args__ = (
+        PrimaryKeyConstraint(
+            "user_id", "project_name", "pair_id", "pair_version", name="pk_m8_spatial_pair_v2_custody"
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "pair_id", "pair_version"],
+            [
+                "m8_spatial_pair_decisions.user_id",
+                "m8_spatial_pair_decisions.project_name",
+                "m8_spatial_pair_decisions.pair_id",
+                "m8_spatial_pair_decisions.pair_version",
+            ],
+            name="fk_m8_spatial_pair_v2_custody_decision",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "review_session_id"],
+            [
+                "m8_spatial_review_sessions.user_id",
+                "m8_spatial_review_sessions.project_name",
+                "m8_spatial_review_sessions.session_id",
+            ],
+            name="fk_m8_spatial_pair_v2_custody_session",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("pair_version >= 1", name="ck_m8_spatial_pair_v2_custody_version"),
+        UniqueConstraint("user_id", "project_name", "review_session_id", name="uq_m8_spatial_pair_v2_custody_session"),
+    )
+
+    user_id: Mapped[str] = mapped_column(String)
+    project_name: Mapped[str] = mapped_column(String(255))
+    pair_id: Mapped[str] = mapped_column(String(255))
+    pair_version: Mapped[int] = mapped_column(Integer)
+    review_session_id: Mapped[str] = mapped_column(String(32))
+    review_evidence_digest: Mapped[str] = mapped_column(String(71))
+    decision_digest: Mapped[str] = mapped_column(String(71))
+
+
+__all__ = ["SpatialPairCommandModel", "SpatialPairDecisionModel", "SpatialPairHeadModel", "SpatialPairV2CustodyModel"]

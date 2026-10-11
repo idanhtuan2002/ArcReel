@@ -76,7 +76,12 @@ from lib.db.models.production_target import (
 from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
 from lib.db.models.session_message_link import AgentSessionUserMessageLink
-from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel, SpatialPairHeadModel
+from lib.db.models.spatial_pair import (
+    SpatialPairCommandModel,
+    SpatialPairDecisionModel,
+    SpatialPairHeadModel,
+    SpatialPairV2CustodyModel,
+)
 from lib.db.models.spatial_review import (
     SpatialReviewAcknowledgmentModel,
     SpatialReviewDeliveryModel,
@@ -162,6 +167,7 @@ __all__ = [
     "SpatialPairCommandModel",
     "SpatialPairDecisionModel",
     "SpatialPairHeadModel",
+    "SpatialPairV2CustodyModel",
     "SpatialReviewAcknowledgmentModel",
     "SpatialReviewDeliveryModel",
     "SpatialReviewSessionModel",
