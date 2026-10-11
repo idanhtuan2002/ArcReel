@@ -10,7 +10,7 @@ from r2.contracts.common import R2ContractModel
 from r2.contracts.enums import ProductionBindingTarget
 from r2.contracts.production_binding_authority import BindingId, ExactName
 from r2.contracts.production_target import Sha256Digest, TargetVersionRef
-from r2.contracts.review_evidence import ReviewSessionId
+from r2.contracts.review_evidence import ReviewEvidenceV1, ReviewSessionId
 from r2.contracts.spatial_source import FrameCandidateId
 
 PairId = Annotated[str, StringConstraints(pattern=r"^m8p:[0-9a-f]{64}$")]
@@ -118,6 +118,60 @@ class PairDecisionV1(_PairBody):
         return self
 
 
+class PairDecisionV2(_PairBody):
+    decision_schema: Literal["r2.m8.spatial.pair.decision.v2"]
+    command: PairDecisionCommandV2
+    command_digest: Sha256Digest
+    pair_id: PairId
+    pair_version: int = Field(ge=1)
+    reviewer_id: ExactName
+    authorization: PairAuthorizationV1
+    authorization_digest: Sha256Digest
+    review_evidence: ReviewEvidenceV1
+    decided_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def require_exact_review_authority(self) -> Self:
+        from r2.spatial_pair.digests import (
+            pair_authorization_digest,
+            pair_command_digest_v2,
+            scoped_pair_id,
+        )
+        from r2.spatial_pair.review_digests import review_evidence_digest
+
+        command = self.command
+        snapshot = self.review_evidence.snapshot
+        if (
+            self.command_digest != pair_command_digest_v2(command.model_dump(mode="json"))
+            or self.authorization_digest != pair_authorization_digest(self.authorization.model_dump(mode="json"))
+            or command.review_evidence_digest != review_evidence_digest(self.review_evidence.model_dump(mode="json"))
+            or self.pair_id
+            != scoped_pair_id(user_id=command.user_id, project_name=command.project_name, binding_id=command.binding_id)
+            or self.reviewer_id != command.principal
+            or (self.authorization.user_id, self.authorization.project_name, self.authorization.authenticated_principal)
+            != (command.user_id, command.project_name, command.principal)
+            or self.authorization.authority_role != "HUMAN_SHOWRUNNER"
+            or self.authorization.command_digest != self.command_digest
+            or self.decided_at < self.authorization.authenticated_at
+            or self.decided_at < max(ack.acknowledged_at for ack in self.review_evidence.acknowledgments)
+            or (snapshot.user_id, snapshot.project_name, snapshot.principal, snapshot.session_id)
+            != (command.user_id, command.project_name, command.principal, command.review_session_id)
+            or (snapshot.scene_ref, snapshot.target_ref, snapshot.binding_id, snapshot.binding_version)
+            != (
+                command.expected_scene_ref,
+                command.expected_target_ref,
+                command.binding_id,
+                command.expected_binding_version,
+            )
+            or (snapshot.envelope_digest, snapshot.core_digest)
+            != (command.expected_envelope_digest, command.expected_core_digest)
+            or [(frame.role, frame.receipt_id, frame.receipt_digest) for frame in snapshot.frames]
+            != [(view.role, view.receipt_id, view.receipt_digest) for view in command.views]
+        ):
+            raise ValueError("pair V2 decision differs from its exact authority or frame review")
+        return self
+
+
 class PairDecisionResultV1(_PairBody):
     command_digest: Sha256Digest
     pair_id: PairId
@@ -146,6 +200,7 @@ __all__ = [
     "PairDecisionCommandV2",
     "PairDecisionResultV1",
     "PairDecisionV1",
+    "PairDecisionV2",
     "PairId",
     "PairReviewObservationsV1",
     "PairViewV1",

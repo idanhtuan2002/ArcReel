@@ -9,8 +9,14 @@ import pytest
 from pydantic import ValidationError
 
 from r2.contracts.review_evidence import ReviewEvidenceV1, ReviewSnapshotV1
-from r2.contracts.spatial_pair import PairDecisionCommandV2
-from r2.spatial_pair.digests import pair_command_digest, pair_command_digest_v2
+from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionV2
+from r2.spatial_pair.digests import (
+    pair_authorization_digest,
+    pair_command_digest,
+    pair_command_digest_v2,
+    pair_decision_digest_v2,
+    scoped_pair_id,
+)
 from r2.spatial_pair.review_digests import (
     ReviewEvidenceIntegrityError,
     review_evidence_digest,
@@ -203,3 +209,65 @@ def test_stored_review_evidence_recomputes_digest_and_checks_scope() -> None:
         } | scope
         with pytest.raises(ReviewEvidenceIntegrityError):
             verify_stored_review_evidence(stored_body, **expected)
+
+
+def test_v2_decision_envelope_binds_exact_command_authorization_and_review_evidence() -> None:
+    from json import loads
+
+    fixture = Path(__file__).resolve().parents[3] / "fixtures/r2/m8c_pair_contract_vectors.json"
+    cases = {case["name"]: case for case in loads(fixture.read_text())["cases"]}
+    snapshot = ReviewSnapshotV1.model_validate(_snapshot())
+    evidence = ReviewEvidenceV1.model_validate(_evidence(snapshot))
+    evidence_digest = review_evidence_digest(evidence.model_dump(mode="json"))
+    command_body = cases["pair_command_approve"]["body"] | {
+        "user_id": snapshot.user_id,
+        "project_name": snapshot.project_name,
+        "principal": snapshot.principal,
+        "expected_scene_ref": snapshot.scene_ref.model_dump(mode="json"),
+        "expected_target_ref": snapshot.target_ref.model_dump(mode="json"),
+        "binding_id": snapshot.binding_id,
+        "expected_binding_version": snapshot.binding_version,
+        "expected_envelope_digest": snapshot.envelope_digest,
+        "expected_core_digest": snapshot.core_digest,
+        "views": [
+            {"role": frame.role, "receipt_id": frame.receipt_id, "receipt_digest": frame.receipt_digest}
+            for frame in snapshot.frames
+        ],
+        "review_session_id": snapshot.session_id,
+        "review_evidence_digest": evidence_digest,
+    }
+    command = PairDecisionCommandV2.model_validate(command_body)
+    authorization = {
+        "user_id": command.user_id,
+        "project_name": command.project_name,
+        "authenticated_principal": command.principal,
+        "authority_role": "HUMAN_SHOWRUNNER",
+        "command_digest": pair_command_digest_v2(command.model_dump(mode="json")),
+        "authorization_ref": "signed-grant-event-1",
+        "authenticated_at": "2026-10-06T00:04:30Z",
+    }
+    body = {
+        "decision_schema": "r2.m8.spatial.pair.decision.v2",
+        "command": command.model_dump(mode="json"),
+        "command_digest": authorization["command_digest"],
+        "pair_id": scoped_pair_id(
+            user_id=command.user_id, project_name=command.project_name, binding_id=command.binding_id
+        ),
+        "pair_version": 1,
+        "reviewer_id": command.principal,
+        "authorization": authorization,
+        "authorization_digest": pair_authorization_digest(authorization),
+        "review_evidence": evidence.model_dump(mode="json"),
+        "decided_at": "2026-10-06T00:05:00Z",
+    }
+    decision = PairDecisionV2.model_validate(body)
+    digest = pair_decision_digest_v2(decision.model_dump(mode="json"))
+    assert digest == "sha256:8e16fad34c405ea4ae757e990194b7d2be8cb1993615ff821a4215929b353153"
+    assert pair_decision_digest_v2(decision.model_dump(mode="json")) == digest
+    for changed in (
+        {"review_evidence": evidence.model_dump(mode="json") | {"snapshot_digest": "sha256:" + "f" * 64}},
+        {"command": command.model_dump(mode="json") | {"review_evidence_digest": "sha256:" + "f" * 64}},
+        {"reviewer_id": "human:other"},
+    ):
+        with pytest.raises((ValidationError, ValueError)):
+            PairDecisionV2.model_validate(body | changed)
