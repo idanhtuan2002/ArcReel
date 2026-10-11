@@ -84,6 +84,27 @@ async def test_import_issue_revoke_and_reissue_is_scoped_and_replay_safe(
     reissue = await importer.import_event(reissue_raw, scope=scope)
     async with session_factory() as session, session.begin():
         assert (await reader.require_current_locked(session, scope=scope)).event_digest == reissue.event_digest
+        old_authorization_time = datetime(2026, 1, 2, tzinfo=UTC)
+        assert (
+            await reader.require_historical_issue_locked(
+                session,
+                scope=scope,
+                event_digest=issue.event_digest,
+                authenticated_at=old_authorization_time,
+            )
+        ).event_digest == issue.event_digest
+        for event_digest, authenticated_at in (
+            ("sha256:" + "0" * 64, old_authorization_time),
+            (revoke.event_digest, datetime(2026, 2, 2, tzinfo=UTC)),
+            (issue.event_digest, datetime(2026, 2, 2, tzinfo=UTC)),
+        ):
+            with pytest.raises(ShowrunnerGrantUnavailableError):
+                await reader.require_historical_issue_locked(
+                    session,
+                    scope=scope,
+                    event_digest=event_digest,
+                    authenticated_at=authenticated_at,
+                )
         head = await session.get(ShowrunnerGrantHeadModel, ("u1", "show-a", "reviewer-a"))
         assert head is not None
         assert head.current_sequence == 3

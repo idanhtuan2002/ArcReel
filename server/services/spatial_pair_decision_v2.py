@@ -184,6 +184,16 @@ class SpatialPairDecisionServiceV2:
                 )
             if previous is not None:
                 verified = await repo.verify_historical_receipt(hint=previous, command=command)
+                await self._grants.require_historical_issue_locked(
+                    session,
+                    scope=GrantScopeV1(
+                        user_id=command.user_id,
+                        project_name=command.project_name,
+                        principal=command.principal,
+                    ),
+                    event_digest=verified.body.authorization.authorization_ref,
+                    authenticated_at=verified.body.authorization.authenticated_at,
+                )
                 self._require_same_pngs(verified.body.review_evidence.snapshot.frames, verified_frames)
                 return previous.result
             review_repo = SpatialReviewRepository(session)

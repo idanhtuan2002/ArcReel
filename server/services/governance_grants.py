@@ -243,5 +243,53 @@ class CurrentShowrunnerGrantReader(_GrantLedger):
             raise ShowrunnerGrantUnavailableError("grant is not currently active")
         return event
 
+    async def require_historical_issue_locked(
+        self,
+        session: AsyncSession,
+        *,
+        scope: GrantScopeV1,
+        event_digest: str,
+        authenticated_at: datetime,
+    ) -> VerifiedGrantEventV1:
+        """Verify a replay's signed ISSUE reference within the locked, current grant chain."""
+        if authenticated_at.tzinfo is None:
+            raise ShowrunnerGrantUnavailableError("historical authorization time is not UTC-aware")
+        await self.require_current_locked(session, scope=scope)
+        rows = (
+            (
+                await session.execute(
+                    select(ShowrunnerGrantEventModel)
+                    .where(
+                        ShowrunnerGrantEventModel.user_id == scope.user_id,
+                        ShowrunnerGrantEventModel.project_name == scope.project_name,
+                        ShowrunnerGrantEventModel.principal == scope.principal,
+                    )
+                    .order_by(ShowrunnerGrantEventModel.sequence)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        match_index = next((index for index, row in enumerate(rows) if row.event_digest == event_digest), None)
+        if match_index is None:
+            raise ShowrunnerGrantUnavailableError("historical grant event reference is missing")
+        event = self._verify_row(rows[match_index], scope)
+        at = authenticated_at.astimezone(UTC)
+        if (
+            event.body.event_type != "ISSUE"
+            or event.body.not_before is None
+            or event.body.expires_at is None
+            or not datetime.fromisoformat(event.body.issued_at) <= at
+            or not datetime.fromisoformat(event.body.not_before) <= at < datetime.fromisoformat(event.body.expires_at)
+        ):
+            raise ShowrunnerGrantUnavailableError("historical grant was not active at authorization time")
+        if match_index + 1 < len(rows):
+            successor = self._verify_row(rows[match_index + 1], scope)
+            if at >= datetime.fromisoformat(successor.body.issued_at):
+                raise ShowrunnerGrantUnavailableError("historical grant was superseded before authorization")
+        return event
+
 
 __all__ = ["CurrentShowrunnerGrantReader", "GovernanceGrantImporter", "ShowrunnerGrantUnavailableError"]
