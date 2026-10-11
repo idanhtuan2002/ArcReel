@@ -11,7 +11,12 @@ from pydantic import ValidationError
 from r2.contracts.review_evidence import ReviewEvidenceV1, ReviewSnapshotV1
 from r2.contracts.spatial_pair import PairDecisionCommandV2
 from r2.spatial_pair.digests import pair_command_digest, pair_command_digest_v2
-from r2.spatial_pair.review_digests import review_evidence_digest, review_snapshot_digest
+from r2.spatial_pair.review_digests import (
+    ReviewEvidenceIntegrityError,
+    review_evidence_digest,
+    review_snapshot_digest,
+    verify_stored_review_evidence,
+)
 
 
 def _snapshot() -> dict[str, Any]:
@@ -164,3 +169,37 @@ def test_pair_v2_command_binds_review_reference_without_changing_v1_digest() -> 
     assert pair_command_digest(v1) == cases["pair_command_approve"]["digest"]
     with pytest.raises(ValidationError):
         PairDecisionCommandV2.model_validate(v1)
+
+
+def test_stored_review_evidence_recomputes_digest_and_checks_scope() -> None:
+    snapshot = ReviewSnapshotV1.model_validate(_snapshot())
+    body = _evidence(snapshot)
+    digest = review_evidence_digest(body)
+    verified = verify_stored_review_evidence(
+        body,
+        expected_digest=digest,
+        user_id="u1",
+        project_name="demo",
+        principal="human:reviewer-1",
+        session_id="a" * 32,
+    )
+    assert verified.snapshot.session_id == "a" * 32
+
+    changed = _evidence(snapshot)
+    acknowledgments = changed["acknowledgments"]
+    assert isinstance(acknowledgments, list)
+    acknowledgments[0] = acknowledgments[0] | {"acknowledged_at": "2026-10-06T00:05:00Z"}
+    for stored_body, scope in (
+        (changed, {}),
+        (body, {"project_name": "foreign"}),
+        (body, {"session_id": "b" * 32}),
+    ):
+        expected = {
+            "expected_digest": digest,
+            "user_id": "u1",
+            "project_name": "demo",
+            "principal": "human:reviewer-1",
+            "session_id": "a" * 32,
+        } | scope
+        with pytest.raises(ReviewEvidenceIntegrityError):
+            verify_stored_review_evidence(stored_body, **expected)
