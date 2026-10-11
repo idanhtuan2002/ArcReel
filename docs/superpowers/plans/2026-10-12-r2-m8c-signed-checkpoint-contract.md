@@ -40,11 +40,11 @@
 - Produces: `CheckpointInvalid(category: str)`, `GrantHeadCheckpointBodyV1`, `ParsedGrantCheckpointV1`, and `parse_grant_checkpoint(raw: bytes) -> ParsedGrantCheckpointV1`.
 - `ParsedGrantCheckpointV1` contains `body`, 64-byte `signature`, `signed_bytes`, and `checkpoint_digest`.
 
-- [ ] **Step 1: Write failing parser tests.** Pin exact canonical genesis/two-scope bodies, sorted order, duplicate scope, excess scope count/bytes, malformed/duplicate JSON, invalid UTF-8, Boolean sequence, timestamp, identity, digest and signature encoding. Verify sanitized `CheckpointInvalid.category`.
-- [ ] **Step 2: Run RED.** Run `python -m pytest tests/unit/r2/governance/test_signed_checkpoint_contract.py -q`; expect import failure before the implementation exists.
-- [ ] **Step 3: Implement the bounded parser.** Follow `r2/contracts/showrunner_grant.py` for duplicate-key detection, canonical round trip, strict Pydantic validation and unpadded base64url. Check byte length before JSON decode and head count before Pydantic conversion; reject any order other than strict lexicographic `(user_id, project_name, principal)`.
-- [ ] **Step 4: Run GREEN and static checks.** The focused pytest selection, Ruff check/format, targeted basedpyright, lint-imports and deptry must pass.
-- [ ] **Step 5: Commit only Task 1** with its test and handoff evidence.
+- [x] **Step 1: Write failing parser tests.** Pin exact canonical genesis/two-scope bodies, sorted order, duplicate scope, excess scope count/bytes, malformed/duplicate JSON, invalid UTF-8, Boolean sequence, timestamp, identity, digest and signature encoding. Verify sanitized `CheckpointInvalid.category`.
+- [x] **Step 2: Run RED.** Run `python -m pytest tests/unit/r2/governance/test_signed_checkpoint_contract.py -q`; expect import failure before the implementation exists.
+- [x] **Step 3: Implement the bounded parser.** Follow `r2/contracts/showrunner_grant.py` for duplicate-key detection, canonical round trip, strict Pydantic validation and unpadded base64url. Check byte length before JSON decode and head count before Pydantic conversion; reject any order other than strict lexicographic `(user_id, project_name, principal)`.
+- [x] **Step 4: Run GREEN and static checks.** The focused pytest selection, Ruff check/format, targeted basedpyright, lint-imports and deptry must pass.
+- [x] **Step 5: Commit only Task 1** with its test and handoff evidence.
 
 ### Task 2: Explicit-key signature verifier
 
