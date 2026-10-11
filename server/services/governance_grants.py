@@ -14,6 +14,7 @@ from lib.db.models.governance_grant import ShowrunnerGrantEventModel, Showrunner
 from r2.contracts.showrunner_grant import GrantEventInvalid
 from r2.governance.grant_signature import VerifiedGrantEventV1, verify_grant_event
 from r2.governance.grant_transition import GrantScopeV1, verify_next_grant_event
+from server.services.governance_grant_fence import acquire_grant_import_fence
 
 
 class ShowrunnerGrantUnavailableError(PermissionError):
@@ -165,6 +166,7 @@ class GovernanceGrantImporter(_GrantLedger):
         if not _scope_matches(submitted, scope):
             raise ShowrunnerGrantUnavailableError("submitted grant scope differs")
         async with self._sessions() as session, session.begin():
+            await acquire_grant_import_fence(session)
             insert = pg_insert if session.get_bind().dialect.name == "postgresql" else sqlite_insert
             inserted = (
                 await session.execute(

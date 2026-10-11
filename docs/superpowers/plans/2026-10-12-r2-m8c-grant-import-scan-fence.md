@@ -1,6 +1,6 @@
 # M8-C Grant Import and Recovery Scan Fence Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Fence new grant scopes across processes while a future recovery scanner enumerates exact grant heads.
 
@@ -34,16 +34,21 @@
 **Files:**
 - Create: `server/services/governance_grant_fence.py`
 - Modify: `server/services/governance_grants.py`
-- Modify: `tests/integration/r2/governance/test_grant_importer.py`
+- Create: `tests/integration/r2/governance/test_grant_import_fence.py`
 
 **Interfaces:**
 - `acquire_grant_import_fence(session: AsyncSession) -> None`: PostgreSQL shared transaction lock; SQLite test path is a no-op.
 - `acquire_grant_recovery_scan_fence(session: AsyncSession) -> None`: PostgreSQL exclusive transaction lock; other dialects raise a sanitized `GrantRecoveryFenceUnavailable`.
 
-- [ ] **Step 1: Write failing forced PostgreSQL tests.** Use two backend PIDs and `pg_blocking_pids` for scanner-first and import-first schedules. Scanner-first asserts zero head rows while blocked; import-first enumerates the new scope only after the import commits. Add a concurrent different-scope shared-lock check and rollback-release check. Keep task cleanup in `finally`.
-- [ ] **Step 2: Run RED.** The tests must fail at the absent fence module or show an importer continuing past an exclusive scanner lock.
-- [ ] **Step 3: Implement the two small fence functions and insert shared acquisition as the import transaction's first DB action.** Use `pg_advisory_xact_lock_shared(:namespace, :version)` and `pg_advisory_xact_lock(:namespace, :version)` with the reserved constants. No session-level advisory lock.
-- [ ] **Step 4: Run GREEN.** Execute complete affected grant/review tests on disposable PostgreSQL, affected SQLite/unit selection, Ruff check/format, targeted basedpyright, lint-imports, deptry, test audit and diff check. Record exact outputs and skipped tests.
-- [ ] **Step 5: Update M8-C handoff and commit only this fence slice.** Keep scanner/startup and production approval closed.
+- [x] **Step 1: Write failing forced PostgreSQL tests.** Use two backend PIDs and `pg_blocking_pids` for scanner-first and import-first schedules. Scanner-first asserts zero head rows while blocked; import-first enumerates the new scope only after the import commits. Add a concurrent different-scope shared-lock check and rollback-release check. Keep task cleanup in `finally`.
+- [x] **Step 2: Run RED.** The tests must fail at the absent fence module or show an importer continuing past an exclusive scanner lock.
+- [x] **Step 3: Implement the two small fence functions and insert shared acquisition as the import transaction's first DB action.** Use `pg_advisory_xact_lock_shared(:namespace, :version)` and `pg_advisory_xact_lock(:namespace, :version)` with the reserved constants. No session-level advisory lock.
+- [x] **Step 4: Run GREEN.** Execute complete affected grant/review tests on disposable PostgreSQL, affected SQLite/unit selection, Ruff check/format, targeted basedpyright, lint-imports, deptry, test audit and diff check. Record exact outputs and skipped tests.
+- [x] **Step 5: Update M8-C handoff and commit only this fence slice.** Keep scanner/startup and production approval closed.
 
 The future recovery scanner must validate every chain and exact checkpoint scope/head equality while holding the exclusive fence. This plan does not count the fence helper alone as recovery acceptance.
+
+Ruling: place forced fence schedules in a focused new integration file rather
+than enlarging the existing importer file; its current tests remain the
+regression selection. This costs one extra fixture import but keeps lock
+schedule setup and teardown reviewable.
