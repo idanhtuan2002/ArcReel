@@ -24,6 +24,7 @@ from lib.db.models.spatial_review import (
     SpatialReviewDeliveryModel,
     SpatialReviewSessionModel,
 )
+from lib.db.repositories.spatial_pair import SpatialPairIntegrityError
 from lib.db.repositories.spatial_pair_v2 import SpatialPairVersionedRepository
 from lib.db.repositories.spatial_review import SpatialReviewIntegrityError, SpatialReviewRepository
 from lib.db.repositories.spatial_source import _receipt_digest
@@ -298,6 +299,29 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         assert receipt_row is not None
         assert receipt_row.result_json == result.model_dump(mode="json")
         assert receipt_row.result_digest == pair_result_digest_v2(result.model_dump(mode="json"))
+        hint = await pair_repo.get_command_receipt_v2(
+            user_id=USER.id,
+            project_name=PROJECT,
+            principal=USER.sub,
+            command_id=command.command_id,
+            expected_command_digest=command_digest,
+        )
+        assert hint is not None
+        assert hint.result == result
+        replay = await pair_repo.verify_historical_receipt(hint=hint, command=command)
+        assert replay.decision_digest == decision_digest
+        receipt_row.result_digest = "sha256:" + "0" * 64
+        await session.flush()
+        with pytest.raises(SpatialPairIntegrityError):
+            await pair_repo.get_command_receipt_v2(
+                user_id=USER.id,
+                project_name=PROJECT,
+                principal=USER.sub,
+                command_id=command.command_id,
+                expected_command_digest=command_digest,
+            )
+        receipt_row.result_digest = pair_result_digest_v2(result.model_dump(mode="json"))
+        await session.flush()
         session_row = await session.get(SpatialReviewSessionModel, (USER.id, PROJECT, snapshot.session_id))
         assert session_row is not None
         assert session_row.consumed_command_digest == command_digest

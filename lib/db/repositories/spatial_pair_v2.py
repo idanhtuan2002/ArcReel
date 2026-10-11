@@ -26,8 +26,13 @@ from lib.db.repositories.spatial_pair import (
 )
 from lib.db.repositories.spatial_review import SpatialReviewIntegrityError, SpatialReviewRepository
 from r2.contracts.production_target import TargetVersionRef
-from r2.contracts.spatial_pair import PairDecisionResultV2, PairDecisionV2
-from r2.spatial_pair.digests import pair_decision_digest_v2, pair_result_digest_v2, scoped_pair_id
+from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionResultV2, PairDecisionV2
+from r2.spatial_pair.digests import (
+    pair_command_digest_v2,
+    pair_decision_digest_v2,
+    pair_result_digest_v2,
+    scoped_pair_id,
+)
 
 
 @dataclass(frozen=True)
@@ -44,9 +49,127 @@ class LockedPairHeadV2:
     current_decision_digest: str | None
 
 
+@dataclass(frozen=True)
+class VerifiedPairCommandReceiptV2:
+    user_id: str
+    project_name: str
+    principal: str
+    command_id: str
+    result: PairDecisionResultV2
+    result_digest: str
+
+
 class SpatialPairVersionedRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def get_command_receipt_v2(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        principal: str,
+        command_id: str,
+        expected_command_digest: str,
+    ) -> VerifiedPairCommandReceiptV2 | None:
+        """Read a V2 receipt hint; the caller must then recheck current authorities."""
+        row = await self.session.get(
+            SpatialPairCommandModel,
+            (user_id, project_name, principal, command_id),
+            populate_existing=True,
+        )
+        if row is None:
+            return None
+        try:
+            result = PairDecisionResultV2.model_validate(row.result_json)
+            digest = pair_result_digest_v2(result.model_dump(mode="json"))
+            if (
+                result.model_dump(mode="json") != row.result_json
+                or result.command_digest != row.command_digest
+                or digest != row.result_digest
+            ):
+                raise ValueError("V2 command receipt differs from its stored columns")
+        except (ValidationError, ValueError, TypeError) as exc:
+            raise SpatialPairIntegrityError("V2 command receipt integrity verification failed") from exc
+        if row.command_digest != expected_command_digest:
+            raise SpatialPairIntegrityError("pair command ID has different V2 input")
+        return VerifiedPairCommandReceiptV2(
+            user_id=user_id,
+            project_name=project_name,
+            principal=principal,
+            command_id=command_id,
+            result=result,
+            result_digest=digest,
+        )
+
+    async def verify_historical_receipt(
+        self, *, hint: VerifiedPairCommandReceiptV2, command: PairDecisionCommandV2
+    ) -> VerifiedPairDecisionV2:
+        """Verify a replay after current source and grant rechecks under the caller's transaction."""
+        if (command.user_id, command.project_name, command.principal, command.command_id) != (
+            hint.user_id,
+            hint.project_name,
+            hint.principal,
+            hint.command_id,
+        ) or pair_command_digest_v2(command.model_dump(mode="json")) != hint.result.command_digest:
+            raise SpatialPairIntegrityError("V2 replay command differs from its receipt hint")
+        current_receipt = await self.get_command_receipt_v2(
+            user_id=command.user_id,
+            project_name=command.project_name,
+            principal=command.principal,
+            command_id=command.command_id,
+            expected_command_digest=hint.result.command_digest,
+        )
+        if current_receipt != hint:
+            raise SpatialPairIntegrityError("V2 replay receipt changed after the hint")
+        result = hint.result
+        row = await self.session.get(
+            SpatialPairDecisionModel,
+            (command.user_id, command.project_name, result.pair_id, result.pair_version),
+            with_for_update=True,
+            populate_existing=True,
+        )
+        custody = await self.session.get(
+            SpatialPairV2CustodyModel,
+            (command.user_id, command.project_name, result.pair_id, result.pair_version),
+            with_for_update=True,
+            populate_existing=True,
+        )
+        if row is None:
+            raise SpatialPairIntegrityError("V2 replay decision is missing")
+        verified = verify_stored_pair_decision_v2(
+            row,
+            custody,
+            user_id=command.user_id,
+            project_name=command.project_name,
+            binding_id=command.binding_id,
+            expected_binding_version=command.expected_binding_version,
+            expected_envelope_digest=command.expected_envelope_digest,
+            expected_core_digest=command.expected_core_digest,
+            expected_target_ref=command.expected_target_ref,
+            expected_scene_ref=command.expected_scene_ref,
+        )
+        body = verified.body
+        expected_result = PairDecisionResultV2(
+            result_schema="r2.m8.spatial.pair.result.v2",
+            command_digest=body.command_digest,
+            pair_id=body.pair_id,
+            pair_version=body.pair_version,
+            decision_digest=verified.decision_digest,
+            decision=body.command.decision,
+            binding_id=body.command.binding_id,
+            binding_version=body.command.expected_binding_version,
+            binding_envelope_digest=body.command.expected_envelope_digest,
+            binding_core_digest=body.command.expected_core_digest,
+            scene_ref=body.command.expected_scene_ref,
+            target_ref=body.command.expected_target_ref,
+            review_session_id=body.command.review_session_id,
+            review_evidence_digest=body.command.review_evidence_digest,
+        )
+        if body.command != command or result != expected_result:
+            raise SpatialPairIntegrityError("V2 replay result differs from its decision")
+        await self._verify_review_consumption(verified)
+        return verified
 
     async def claim_pair_head(self, *, user_id: str, project_name: str, pair_id: str) -> LockedPairHeadV2:
         """Claim the pair row after target/binding locks and before parent master locks."""
@@ -271,30 +394,33 @@ class SpatialPairVersionedRepository:
             expected_scene_ref=expected_scene_ref,
         )
         if isinstance(verified, VerifiedPairDecisionV2):
-            command = verified.body.command
-            try:
-                evidence, evidence_digest = await SpatialReviewRepository(self.session).read_complete(
-                    user_id=user_id,
-                    project_name=project_name,
-                    principal=command.principal,
-                    session_id=command.review_session_id,
-                )
-            except SpatialReviewIntegrityError as exc:
-                raise SpatialPairIntegrityError("pair V2 stored review evidence is invalid") from exc
-            session_row = await self.session.get(
-                SpatialReviewSessionModel,
-                (user_id, project_name, command.review_session_id),
-                with_for_update=True,
-                populate_existing=True,
-            )
-            if (
-                session_row is None
-                or session_row.consumed_command_digest != verified.body.command_digest
-                or evidence != verified.body.review_evidence
-                or evidence_digest != command.review_evidence_digest
-            ):
-                raise SpatialPairIntegrityError("pair V2 decision differs from stored review consumption")
+            await self._verify_review_consumption(verified)
         return verified
+
+    async def _verify_review_consumption(self, verified: VerifiedPairDecisionV2) -> None:
+        command = verified.body.command
+        try:
+            evidence, evidence_digest = await SpatialReviewRepository(self.session).read_complete(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                principal=command.principal,
+                session_id=command.review_session_id,
+            )
+        except SpatialReviewIntegrityError as exc:
+            raise SpatialPairIntegrityError("pair V2 stored review evidence is invalid") from exc
+        session_row = await self.session.get(
+            SpatialReviewSessionModel,
+            (command.user_id, command.project_name, command.review_session_id),
+            with_for_update=True,
+            populate_existing=True,
+        )
+        if (
+            session_row is None
+            or session_row.consumed_command_digest != verified.body.command_digest
+            or evidence != verified.body.review_evidence
+            or evidence_digest != command.review_evidence_digest
+        ):
+            raise SpatialPairIntegrityError("pair V2 decision differs from stored review consumption")
 
 
 def verify_stored_pair_decision_v2(
@@ -400,6 +526,7 @@ def verify_stored_pair_decision_versioned(
 __all__ = [
     "LockedPairHeadV2",
     "SpatialPairVersionedRepository",
+    "VerifiedPairCommandReceiptV2",
     "VerifiedPairDecisionV2",
     "verify_stored_pair_decision_v2",
     "verify_stored_pair_decision_versioned",
