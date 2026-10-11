@@ -35,7 +35,7 @@ from lib.db.repositories.spatial_pair_v2 import SpatialPairVersionedRepository
 from lib.db.repositories.spatial_review import SpatialReviewIntegrityError, SpatialReviewRepository
 from lib.db.repositories.spatial_source import _receipt_digest
 from r2.contracts.production_binding_authority import BindingCreateCommandV1
-from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionV2
+from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionResultV2, PairDecisionV2
 from r2.governance.grant_transition import GrantScopeV1
 from r2.m3.host_integration import GoldenAHostIntegration
 from r2.production_intelligence.take_director import TakeDirectorAdapter
@@ -66,6 +66,76 @@ from tests.integration.server.routers.test_gates_export import PROJECT, USER, _a
 PAIR_V2_VECTOR = json.loads(
     (Path(__file__).resolve().parents[3] / "fixtures/r2/m8c_pair_v2_decision_vector.json").read_text()
 )
+
+
+async def _run_blocked_v2_command(
+    *,
+    service: SpatialPairDecisionServiceV2,
+    command: PairDecisionCommandV2,
+    interactive: CurrentUserInfo,
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+    first_fails: bool,
+) -> PairDecisionResultV2:
+    original_claim = SpatialPairVersionedRepository.claim_pair_head
+    original_receipt = SpatialPairVersionedRepository.get_command_receipt_v2
+    first_claimed = asyncio.Event()
+    release_first = asyncio.Event()
+    first_pid: list[int] = []
+    second_pid: list[int] = []
+    second: asyncio.Task[PairDecisionResultV2] | None = None
+
+    async def capture_second_receipt(self, **kwargs):
+        if asyncio.current_task() is second and not second_pid:
+            pid = await self.session.scalar(select(func.pg_backend_pid()))
+            assert isinstance(pid, int)
+            second_pid.append(pid)
+        return await original_receipt(self, **kwargs)
+
+    async def pause_pair_claim(self, *, user_id: str, project_name: str, pair_id: str):
+        pid = await self.session.scalar(select(func.pg_backend_pid()))
+        assert isinstance(pid, int)
+        if not first_claimed.is_set():
+            locked = await original_claim(self, user_id=user_id, project_name=project_name, pair_id=pair_id)
+            first_pid.append(pid)
+            first_claimed.set()
+            await release_first.wait()
+            if first_fails:
+                raise RuntimeError("forced first V2 writer rollback")
+            return locked
+        return await original_claim(self, user_id=user_id, project_name=project_name, pair_id=pair_id)
+
+    monkeypatch.setattr(SpatialPairVersionedRepository, "claim_pair_head", pause_pair_claim)
+    monkeypatch.setattr(SpatialPairVersionedRepository, "get_command_receipt_v2", capture_second_receipt)
+    first = asyncio.create_task(service.decide(command, authenticated_user=interactive))
+    try:
+        await asyncio.wait_for(first_claimed.wait(), timeout=10)
+        second = asyncio.create_task(service.decide(command, authenticated_user=interactive))
+        blocked = False
+        for _ in range(500):
+            async with session_factory() as observer:
+                blockers = await observer.scalar(select(func.pg_blocking_pids(second_pid[0]))) if second_pid else []
+            if first_pid and first_pid[0] in blockers:
+                blocked = True
+                break
+            if second.done():
+                raise AssertionError("second V2 decision did not wait for the first transaction")
+            await asyncio.sleep(0.01)
+        assert blocked
+    finally:
+        release_first.set()
+        monkeypatch.setattr(SpatialPairVersionedRepository, "claim_pair_head", original_claim)
+        monkeypatch.setattr(SpatialPairVersionedRepository, "get_command_receipt_v2", original_receipt)
+        await asyncio.wait_for(
+            asyncio.gather(first, *([second] if second is not None else []), return_exceptions=True), 15
+        )
+    assert second is not None
+    if first_fails:
+        with pytest.raises(RuntimeError, match="forced first V2 writer rollback"):
+            first.result()
+    else:
+        assert first.result() == second.result()
+    return second.result()
 
 
 @pytest.mark.asyncio
@@ -411,60 +481,14 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
     with pytest.raises(PairAuthorizationDeniedError):
         await pair_service.decide(reject_command, authenticated_user=CurrentUserInfo(id=USER.id, sub=USER.sub))
     if session_factory.kw["bind"].dialect.name == "postgresql":
-        original_claim = SpatialPairVersionedRepository.claim_pair_head
-        original_receipt = SpatialPairVersionedRepository.get_command_receipt_v2
-        first_claimed = asyncio.Event()
-        release_first = asyncio.Event()
-        first_pid: list[int] = []
-        second_pid: list[int] = []
-        second: asyncio.Task | None = None
-
-        async def capture_second_receipt(self, **kwargs):
-            if asyncio.current_task() is second and not second_pid:
-                pid = await self.session.scalar(select(func.pg_backend_pid()))
-                assert isinstance(pid, int)
-                second_pid.append(pid)
-            return await original_receipt(self, **kwargs)
-
-        async def pause_pair_claim(self, *, user_id: str, project_name: str, pair_id: str):
-            pid = await self.session.scalar(select(func.pg_backend_pid()))
-            assert isinstance(pid, int)
-            if not first_claimed.is_set():
-                locked = await original_claim(self, user_id=user_id, project_name=project_name, pair_id=pair_id)
-                first_pid.append(pid)
-                first_claimed.set()
-                await release_first.wait()
-                return locked
-            return await original_claim(self, user_id=user_id, project_name=project_name, pair_id=pair_id)
-
-        monkeypatch.setattr(SpatialPairVersionedRepository, "claim_pair_head", pause_pair_claim)
-        monkeypatch.setattr(SpatialPairVersionedRepository, "get_command_receipt_v2", capture_second_receipt)
-        first = asyncio.create_task(pair_service.decide(reject_command, authenticated_user=interactive))
-        try:
-            await asyncio.wait_for(first_claimed.wait(), timeout=10)
-            second = asyncio.create_task(pair_service.decide(reject_command, authenticated_user=interactive))
-            blocked = False
-            for _ in range(500):
-                async with session_factory() as observer:
-                    blockers = await observer.scalar(select(func.pg_blocking_pids(second_pid[0]))) if second_pid else []
-                if first_pid and first_pid[0] in blockers:
-                    blocked = True
-                    break
-                if second.done():
-                    raise AssertionError("second V2 decision did not wait for the first transaction")
-                await asyncio.sleep(0.01)
-            assert blocked
-        finally:
-            release_first.set()
-            monkeypatch.setattr(SpatialPairVersionedRepository, "claim_pair_head", original_claim)
-            monkeypatch.setattr(SpatialPairVersionedRepository, "get_command_receipt_v2", original_receipt)
-            await asyncio.wait_for(
-                asyncio.gather(first, *([second] if second is not None else []), return_exceptions=True), 15
-            )
-        assert second is not None
-        rejected = first.result()
-        contender_result = second.result()
-        assert contender_result == rejected
+        rejected = await _run_blocked_v2_command(
+            service=pair_service,
+            command=reject_command,
+            interactive=interactive,
+            session_factory=session_factory,
+            monkeypatch=monkeypatch,
+            first_fails=False,
+        )
     else:
         rejected = await pair_service.decide(reject_command, authenticated_user=interactive)
     assert rejected.pair_version == 2
@@ -480,6 +504,40 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         pair_head = await session.get(SpatialPairHeadModel, (USER.id, PROJECT, rejected.pair_id))
         assert pair_head is not None
         pair_head.current_decision_digest = rejected.decision_digest
+    third_snapshot = await service.create(**arguments)
+    third_scope = fetch_scope | {"session_id": third_snapshot.session_id}
+    for frame in third_snapshot.frames:
+        _, delivered = await service.fetch_frame(**third_scope, role=frame.role)
+        await service.acknowledge_frame(
+            **third_scope,
+            attempt_id=delivered.attempt_id,
+            role=frame.role,
+            png_digest=frame.png_digest,
+            decoded=True,
+        )
+    async with session_factory() as session, session.begin():
+        _, third_digest = await SpatialReviewRepository(session).read_complete(**third_scope)
+    third_command = PairDecisionCommandV2.model_validate(
+        reject_command.model_dump(mode="json")
+        | {
+            "command_id": "pair-review-reject-3",
+            "review_session_id": third_snapshot.session_id,
+            "review_evidence_digest": third_digest,
+        }
+    )
+    if session_factory.kw["bind"].dialect.name == "postgresql":
+        recovered = await _run_blocked_v2_command(
+            service=pair_service,
+            command=third_command,
+            interactive=interactive,
+            session_factory=session_factory,
+            monkeypatch=monkeypatch,
+            first_fails=True,
+        )
+    else:
+        recovered = await pair_service.decide(third_command, authenticated_user=interactive)
+    assert recovered.pair_version == 3
+    assert await pair_service.decide(reject_command, authenticated_user=interactive) == rejected
     frame_path = project_dir / "spatial" / "frames" / f"{snapshot.frames[0].receipt_id}.png"
     original = frame_path.read_bytes()
     frame_path.write_bytes(original + b"changed")
@@ -496,9 +554,9 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         row = await session.get(SpatialReviewSessionModel, (USER.id, PROJECT, snapshot.session_id))
         assert row is not None
         assert row.snapshot_digest == review_snapshot_digest(snapshot.model_dump(mode="json"))
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 2
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 4
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 4
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 3
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 6
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 6
 
     revoke_body = {key: value for key, value in body.items() if key not in {"not_before", "expires_at"}} | {
         "event_type": "REVOKE",
@@ -528,6 +586,6 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
             decoded=True,
         )
     async with session_factory() as session:
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 2
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 4
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 4
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 3
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 6
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 6
