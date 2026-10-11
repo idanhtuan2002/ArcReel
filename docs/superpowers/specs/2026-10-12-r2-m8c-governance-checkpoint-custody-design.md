@@ -95,6 +95,14 @@ grant-state mutation before this comparison, or move migrations into a fenced
 offline preflight. Failure prevents workers and Governance-backed routes from
 becoming ready. It is not a health warning.
 
+The [cross-process fence research](../../research/2026-10-12-r2-m8c-grant-import-recovery-scan-fence.md)
+proposes a dedicated transaction-level PostgreSQL advisory key: importers
+acquire its shared mode before any head insert, and the scanner acquires its
+exclusive mode before scope enumeration. Per-scope readers keep their existing
+authority lock order and perform fresh checkpoint equality under their
+grant-head lock. This remains a candidate until forced PostgreSQL schedules
+prove both acquisition orders and rollback behavior.
+
 Every new pair decision, exact replay, current approved-pair read, and any
 review-session operation that relies on the current grant must verify a fresh
 complete signed checkpoint while holding the relevant grant-head row lock in
