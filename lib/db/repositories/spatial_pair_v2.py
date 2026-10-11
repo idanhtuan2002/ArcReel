@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import cast
 
 from pydantic import ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairHeadModel, SpatialPairV2CustodyModel
+from lib.db.models.spatial_pair import (
+    SpatialPairCommandModel,
+    SpatialPairDecisionModel,
+    SpatialPairHeadModel,
+    SpatialPairV2CustodyModel,
+)
 from lib.db.models.spatial_review import SpatialReviewSessionModel
 from lib.db.repositories.spatial_pair import (
     SpatialPairIntegrityError,
@@ -18,8 +26,8 @@ from lib.db.repositories.spatial_pair import (
 )
 from lib.db.repositories.spatial_review import SpatialReviewIntegrityError, SpatialReviewRepository
 from r2.contracts.production_target import TargetVersionRef
-from r2.contracts.spatial_pair import PairDecisionV2
-from r2.spatial_pair.digests import pair_decision_digest_v2, scoped_pair_id
+from r2.contracts.spatial_pair import PairDecisionResultV2, PairDecisionV2
+from r2.spatial_pair.digests import pair_decision_digest_v2, pair_result_digest_v2, scoped_pair_id
 
 
 @dataclass(frozen=True)
@@ -28,9 +36,182 @@ class VerifiedPairDecisionV2:
     decision_digest: str
 
 
+@dataclass(frozen=True)
+class LockedPairHeadV2:
+    row: SpatialPairHeadModel
+    created_here: bool
+    current_version: int | None
+    current_decision_digest: str | None
+
+
 class SpatialPairVersionedRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def claim_pair_head(self, *, user_id: str, project_name: str, pair_id: str) -> LockedPairHeadV2:
+        """Claim the pair row after target/binding locks and before parent master locks."""
+        insert = pg_insert if self.session.get_bind().dialect.name == "postgresql" else sqlite_insert
+        inserted = (
+            await self.session.execute(
+                insert(SpatialPairHeadModel)
+                .values(
+                    user_id=user_id,
+                    project_name=project_name,
+                    pair_id=pair_id,
+                    current_version=None,
+                    current_decision_digest=None,
+                )
+                .on_conflict_do_nothing(index_elements=["user_id", "project_name", "pair_id"])
+                .returning(SpatialPairHeadModel.pair_id)
+            )
+        ).scalar_one_or_none()
+        head = await self.session.get(
+            SpatialPairHeadModel, (user_id, project_name, pair_id), with_for_update=True, populate_existing=True
+        )
+        if head is None:
+            raise SpatialPairIntegrityError("pair head disappeared after scoped claim")
+        if (head.current_version is None) != (head.current_decision_digest is None):
+            raise SpatialPairIntegrityError("pair head has incomplete current decision")
+        if inserted is None and head.current_version is None:
+            raise SpatialPairIntegrityError("pair head has a committed genesis state")
+        return LockedPairHeadV2(
+            row=head,
+            created_here=inserted is not None,
+            current_version=head.current_version,
+            current_decision_digest=head.current_decision_digest,
+        )
+
+    async def append_reviewed_decision(
+        self, *, locked: LockedPairHeadV2, decision: PairDecisionV2
+    ) -> PairDecisionResultV2:
+        """Append after the caller has rechecked current sources and signed grant under its transaction."""
+        decision = PairDecisionV2.model_validate(decision.model_dump(mode="json"))
+        command = decision.command
+        head = await self.session.get(
+            SpatialPairHeadModel,
+            (command.user_id, command.project_name, decision.pair_id),
+            with_for_update=True,
+            populate_existing=True,
+        )
+        if (
+            head is None
+            or head is not locked.row
+            or head.current_version != locked.current_version
+            or head.current_decision_digest != locked.current_decision_digest
+            or decision.pair_version != (head.current_version or 0) + 1
+            or (head.current_version is None and not locked.created_here)
+        ):
+            raise SpatialPairIntegrityError("V2 pair append disagrees with locked predecessor")
+        if head.current_version is not None:
+            previous = await self.get_current_verified(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                binding_id=command.binding_id,
+                expected_binding_version=command.expected_binding_version,
+                expected_envelope_digest=command.expected_envelope_digest,
+                expected_core_digest=command.expected_core_digest,
+                expected_target_ref=command.expected_target_ref,
+                expected_scene_ref=command.expected_scene_ref,
+            )
+            if previous is None or previous.decision_digest != head.current_decision_digest:
+                raise SpatialPairIntegrityError("V2 pair predecessor is invalid")
+        evidence = await SpatialReviewRepository(self.session).consume_session(
+            user_id=command.user_id,
+            project_name=command.project_name,
+            principal=command.principal,
+            session_id=command.review_session_id,
+            expected_evidence_digest=command.review_evidence_digest,
+            command_digest=decision.command_digest,
+        )
+        if evidence != decision.review_evidence:
+            raise SpatialPairIntegrityError("V2 pair decision differs from consumed review evidence")
+        digest = pair_decision_digest_v2(decision.model_dump(mode="json"))
+        target = command.expected_target_ref
+        scene = command.expected_scene_ref
+        row = SpatialPairDecisionModel(
+            user_id=command.user_id,
+            project_name=command.project_name,
+            pair_id=decision.pair_id,
+            pair_version=decision.pair_version,
+            decision_body_json=decision.model_dump(mode="json"),
+            decision_digest=digest,
+            command_digest=decision.command_digest,
+            authorization_digest=decision.authorization_digest,
+            binding_id=command.binding_id,
+            binding_version=command.expected_binding_version,
+            binding_envelope_digest=command.expected_envelope_digest,
+            binding_core_digest=command.expected_core_digest,
+            target_type=target.target_type.value,
+            target_id=target.target_id,
+            target_registry_version=target.registry_version,
+            target_version_digest=target.version_digest,
+            scene_type=scene.target_type.value,
+            scene_id=scene.target_id,
+            scene_registry_version=scene.registry_version,
+            scene_version_digest=scene.version_digest,
+            master_receipt_id=command.views[0].receipt_id,
+            reverse_receipt_id=command.views[1].receipt_id,
+            decision=command.decision,
+            created_at=datetime.now(UTC),
+        )
+        self.session.add(row)
+        await self.session.flush()
+        custody = SpatialPairV2CustodyModel(
+            user_id=command.user_id,
+            project_name=command.project_name,
+            pair_id=decision.pair_id,
+            pair_version=decision.pair_version,
+            review_session_id=command.review_session_id,
+            review_evidence_digest=command.review_evidence_digest,
+            decision_digest=digest,
+        )
+        self.session.add(custody)
+        await self.session.flush()
+        verify_stored_pair_decision_v2(
+            row,
+            custody,
+            user_id=command.user_id,
+            project_name=command.project_name,
+            binding_id=command.binding_id,
+            expected_binding_version=command.expected_binding_version,
+            expected_envelope_digest=command.expected_envelope_digest,
+            expected_core_digest=command.expected_core_digest,
+            expected_target_ref=target,
+            expected_scene_ref=scene,
+        )
+        head.current_version = decision.pair_version
+        head.current_decision_digest = digest
+        await self.session.flush()
+        result = PairDecisionResultV2(
+            result_schema="r2.m8.spatial.pair.result.v2",
+            command_digest=decision.command_digest,
+            pair_id=decision.pair_id,
+            pair_version=decision.pair_version,
+            decision_digest=digest,
+            decision=command.decision,
+            binding_id=command.binding_id,
+            binding_version=command.expected_binding_version,
+            binding_envelope_digest=command.expected_envelope_digest,
+            binding_core_digest=command.expected_core_digest,
+            scene_ref=scene,
+            target_ref=target,
+            review_session_id=command.review_session_id,
+            review_evidence_digest=command.review_evidence_digest,
+        )
+        self.session.add(
+            SpatialPairCommandModel(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                principal=command.principal,
+                command_id=command.command_id,
+                command_digest=decision.command_digest,
+                result_json=result.model_dump(mode="json"),
+                result_digest=pair_result_digest_v2(result.model_dump(mode="json")),
+                created_at=datetime.now(UTC),
+            )
+        )
+        await self.session.flush()
+        return result
 
     async def get_current_verified(
         self,
@@ -217,6 +398,7 @@ def verify_stored_pair_decision_versioned(
 
 
 __all__ = [
+    "LockedPairHeadV2",
     "SpatialPairVersionedRepository",
     "VerifiedPairDecisionV2",
     "verify_stored_pair_decision_v2",

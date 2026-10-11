@@ -13,12 +13,12 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, insert, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.content_digest import canonical_json_bytes
-from lib.db.models.spatial_pair import SpatialPairDecisionModel, SpatialPairHeadModel, SpatialPairV2CustodyModel
+from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel, SpatialPairV2CustodyModel
 from lib.db.models.spatial_review import (
     SpatialReviewAcknowledgmentModel,
     SpatialReviewDeliveryModel,
@@ -36,6 +36,7 @@ from r2.spatial_pair.digests import (
     pair_authorization_digest,
     pair_command_digest_v2,
     pair_decision_digest_v2,
+    pair_result_digest_v2,
     scoped_pair_id,
 )
 from r2.spatial_pair.review_digests import review_evidence_digest, review_snapshot_digest
@@ -254,67 +255,57 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
             }
         )
         decision_digest = pair_decision_digest_v2(decision.model_dump(mode="json"))
-        session_row = await session.get(
-            SpatialReviewSessionModel, (USER.id, PROJECT, snapshot.session_id), with_for_update=True
-        )
-        assert session_row is not None
-        session_row.consumed_command_digest = command_digest
-        session.add(
-            SpatialPairHeadModel(
+        pair_repo = SpatialPairVersionedRepository(session)
+        locked = await pair_repo.claim_pair_head(user_id=USER.id, project_name=PROJECT, pair_id=decision.pair_id)
+        await session.execute(
+            insert(SpatialPairCommandModel).values(
                 user_id=USER.id,
                 project_name=PROJECT,
-                pair_id=decision.pair_id,
-                current_version=None,
-                current_decision_digest=None,
-            )
-        )
-        await session.flush()
-        session.add(
-            SpatialPairDecisionModel(
-                user_id=USER.id,
-                project_name=PROJECT,
-                pair_id=decision.pair_id,
-                pair_version=1,
-                decision_body_json=decision.model_dump(mode="json"),
-                decision_digest=decision_digest,
+                principal=USER.sub,
+                command_id=command.command_id,
                 command_digest=command_digest,
-                authorization_digest=decision.authorization_digest,
-                binding_id=command.binding_id,
-                binding_version=command.expected_binding_version,
-                binding_envelope_digest=command.expected_envelope_digest,
-                binding_core_digest=command.expected_core_digest,
-                target_type=command.expected_target_ref.target_type.value,
-                target_id=command.expected_target_ref.target_id,
-                target_registry_version=command.expected_target_ref.registry_version,
-                target_version_digest=command.expected_target_ref.version_digest,
-                scene_type=command.expected_scene_ref.target_type.value,
-                scene_id=command.expected_scene_ref.target_id,
-                scene_registry_version=command.expected_scene_ref.registry_version,
-                scene_version_digest=command.expected_scene_ref.version_digest,
-                master_receipt_id=command.views[0].receipt_id,
-                reverse_receipt_id=command.views[1].receipt_id,
-                decision=command.decision,
+                result_json={"invalid": True},
+                result_digest="sha256:" + "0" * 64,
                 created_at=now,
             )
         )
-        await session.flush()
-        session.add(
-            SpatialPairV2CustodyModel(
-                user_id=USER.id,
-                project_name=PROJECT,
-                pair_id=decision.pair_id,
-                pair_version=1,
-                review_session_id=snapshot.session_id,
-                review_evidence_digest=command.review_evidence_digest,
-                decision_digest=decision_digest,
+
+        async def append_with_colliding_receipt() -> None:
+            async with session.begin_nested():
+                await pair_repo.append_reviewed_decision(locked=locked, decision=decision)
+
+        with pytest.raises(IntegrityError):
+            await append_with_colliding_receipt()
+        still_open = await session.get(
+            SpatialReviewSessionModel,
+            (USER.id, PROJECT, snapshot.session_id),
+            populate_existing=True,
+        )
+        assert still_open is not None
+        assert still_open.consumed_command_digest is None
+        assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 0
+        await session.execute(
+            delete(SpatialPairCommandModel).where(
+                SpatialPairCommandModel.user_id == USER.id,
+                SpatialPairCommandModel.project_name == PROJECT,
+                SpatialPairCommandModel.principal == USER.sub,
+                SpatialPairCommandModel.command_id == command.command_id,
             )
         )
-        await session.flush()
-        head = await session.get(SpatialPairHeadModel, (USER.id, PROJECT, decision.pair_id), with_for_update=True)
-        assert head is not None
-        head.current_version = 1
-        head.current_decision_digest = decision_digest
-        await session.flush()
+        result = await pair_repo.append_reviewed_decision(locked=locked, decision=decision)
+        assert result.decision_digest == decision_digest
+        receipt_row = await session.get(SpatialPairCommandModel, (USER.id, PROJECT, USER.sub, command.command_id))
+        assert receipt_row is not None
+        assert receipt_row.result_json == result.model_dump(mode="json")
+        assert receipt_row.result_digest == pair_result_digest_v2(result.model_dump(mode="json"))
+        session_row = await session.get(SpatialReviewSessionModel, (USER.id, PROJECT, snapshot.session_id))
+        assert session_row is not None
+        assert session_row.consumed_command_digest == command_digest
+        reused = PairDecisionV2.model_validate(decision.model_dump(mode="json") | {"pair_version": 2})
+        reused_head = await pair_repo.claim_pair_head(user_id=USER.id, project_name=PROJECT, pair_id=decision.pair_id)
+        with pytest.raises(SpatialReviewIntegrityError):
+            await pair_repo.append_reviewed_decision(locked=reused_head, decision=reused)
+        assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 1
         verified_pair = await SpatialPairVersionedRepository(session).get_current_verified(
             user_id=USER.id,
             project_name=PROJECT,
