@@ -91,12 +91,14 @@ inside PostgreSQL, projects, logs, provider-key, or Claude-state storage:
    `(head_sequence, head_event_digest)`. The envelope includes the signature
    over the canonical unsigned checkpoint bytes.
 
-Compose should mount these two paths read-only at dedicated runtime locations,
-for example `/run/arcreel/governance/verifiers.json` and
-`/run/arcreel/governance/grant-checkpoint.json`; it must not derive them from
-the current `env_file` or an application-controlled path. The public key is
-not treated as a secret. Its immutable selection and the checkpoint's
-integrity are the trust properties being protected.
+The deployment candidate should mount their operator-held directory read-only
+at a dedicated runtime location and open
+`/run/arcreel/governance/verifiers.json` and
+`/run/arcreel/governance/grant-checkpoint.json` by pathname for each read. It
+must not derive the mount source from the current `env_file` or an
+application-controlled path. The public key is not treated as a secret. Its
+immutable selection and the checkpoint's integrity are the trust properties
+being protected.
 
 The checkpoint advances only in an operator ceremony after the relevant signed
 grant event has been verified and durably imported. The application process
@@ -104,10 +106,33 @@ does not write either object. A new ISSUE, REVOKE, key rotation, restore
 exception, or deployment-environment change leaves the affected Governance
 scope unavailable for approval until an operator publishes the matching,
 signed checkpoint through that separate custody path. Publication must also
-work for a running container: a read-only bind mount of a single file may keep
-referring to the old inode after the host atomically replaces that path. The
-deployment packet must choose and drill a publication/mount layout whose
-running readers observe complete new objects without exposing partial bytes.
+work for a running container. The disposable probe below found that a
+read-only bind mount of a single file kept referring to the old bytes after
+the host atomically replaced that path. The deployment packet must choose and
+drill a publication/mount layout whose running readers observe complete new
+objects without exposing partial bytes.
+
+### Disposable bind-mount visibility probe — 2026-10-12
+
+On local Docker Engine 29.1.3, kernel `7.0.0-34-generic`, using cached
+`postgres:16` image ID
+`sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54`,
+a disposable container mounted one synthetic checkpoint file read-only at
+`/run/checkpoint-file.json` and a separate synthetic directory read-only at
+`/run/checkpoint-dir`. Both initially returned `old`. The host wrote a complete
+`new` file at a sibling path and used `mv` to replace each source pathname.
+The still-running container then returned `old` through the single-file mount
+and `new` through the directory mount. The container was stopped/auto-removed
+and the temporary directory removed by the probe trap.
+
+This is a positive observation for that image/host/mount configuration, not a
+portable guarantee for every Compose deployment. The first deployment
+candidate is a read-only directory bind mount whose checkpoint is published
+by same-directory atomic rename, with each transaction opening the pathname
+again. The actual Compose image, filesystem, mount options, concurrent reads,
+partial writes, key rotation and multi-process visibility still require a
+disposable drill. The application must reject an unavailable or malformed
+read rather than reusing cached successful bytes.
 
 ### Startup and recovery gate
 

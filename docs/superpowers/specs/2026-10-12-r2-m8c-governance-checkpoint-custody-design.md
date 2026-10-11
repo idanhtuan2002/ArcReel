@@ -107,11 +107,15 @@ processes must see the same complete publication. The importer does not write
 operator custody. The existing local `CurrentShowrunnerGrantReader` remains
 internal until this verifier is integrated and reviewed.
 
-The publication layout is a separate deployment choice. A single-file bind
-mount may retain an old inode when the host replaces its source path. The
-Compose drill must prove that a running process reads complete newly
-published bytes through the selected read-only mount and rejects partial or
-missing content. Do not treat a startup-only file read as sufficient.
+The publication layout is a separate deployment choice. A disposable local
+Docker probe recorded in the [research note](../../research/2026-10-11-r2-m8c-governance-checkpoint-recovery-custody.md)
+observed `old` after atomic host replacement through a single-file read-only
+bind mount, but `new` through a read-only directory bind mount. The first
+Compose candidate therefore mounts the operator-held directory read-only,
+publishes complete checkpoint files by same-directory atomic rename and opens
+the pathname anew in every transaction. The actual Compose drill must prove
+that running processes read complete newly published bytes and reject partial
+or missing content. Do not treat a startup-only file read as sufficient.
 
 ## Ordered implementation and acceptance gates
 
