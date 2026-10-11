@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -18,7 +19,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.content_digest import canonical_json_bytes
-from lib.db.models.spatial_pair import SpatialPairCommandModel, SpatialPairDecisionModel, SpatialPairV2CustodyModel
+from lib.db.models.spatial_pair import (
+    SpatialPairCommandModel,
+    SpatialPairDecisionModel,
+    SpatialPairHeadModel,
+    SpatialPairV2CustodyModel,
+)
 from lib.db.models.spatial_review import (
     SpatialReviewAcknowledgmentModel,
     SpatialReviewDeliveryModel,
@@ -42,12 +48,15 @@ from r2.spatial_pair.digests import (
 )
 from r2.spatial_pair.review_digests import review_evidence_digest, review_snapshot_digest
 from r2.target_registry.service import TakeTargetRegistrationService
+from server.auth import CurrentUserInfo
 from server.services.governance_grants import (
     CurrentShowrunnerGrantReader,
     GovernanceGrantImporter,
     ShowrunnerGrantUnavailableError,
 )
 from server.services.location_binding import LocationBindingCreationService
+from server.services.spatial_pair_decision import PairAuthorizationDeniedError
+from server.services.spatial_pair_decision_v2 import SpatialPairDecisionServiceV2
 from server.services.spatial_review_session import SpatialReviewSessionService
 from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
 from tests.integration.r2.adaptation import test_screenplay_admission as admission_helpers
@@ -152,7 +161,8 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
     with pytest.raises(ShowrunnerGrantUnavailableError):
         await service.create(**(arguments | {"principal": "other-reviewer"}))
     snapshot = await service.create(**arguments)
-    assert snapshot.session_id != (await service.create(**arguments)).session_id
+    second_snapshot = await service.create(**arguments)
+    assert snapshot.session_id != second_snapshot.session_id
     assert [frame.role for frame in snapshot.frames] == ["MASTER", "REVERSE"]
     assert [frame.receipt_id for frame in snapshot.frames] == [receipt.frame_candidate_id for receipt in receipts]
     fetch_scope = {
@@ -369,6 +379,107 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
 
             with pytest.raises(IntegrityError):
                 await link_foreign_session()
+    second_scope = fetch_scope | {"session_id": second_snapshot.session_id}
+    for frame in second_snapshot.frames:
+        _, delivered = await service.fetch_frame(**second_scope, role=frame.role)
+        await service.acknowledge_frame(
+            **second_scope,
+            attempt_id=delivered.attempt_id,
+            role=frame.role,
+            png_digest=frame.png_digest,
+            decoded=True,
+        )
+    async with session_factory() as session, session.begin():
+        _, second_digest = await SpatialReviewRepository(session).read_complete(**second_scope)
+    reject_command = PairDecisionCommandV2.model_validate(
+        command.model_dump(mode="json")
+        | {
+            "command_id": "pair-review-reject-2",
+            "review_session_id": second_snapshot.session_id,
+            "review_evidence_digest": second_digest,
+            "decision": "REJECT",
+            "observations": {
+                "view_coverage": None,
+                "camera_center": None,
+                "yaw_relation": None,
+                "rejection_reason": "Reverse frame does not match the requested camera axis.",
+            },
+        }
+    )
+    pair_service = SpatialPairDecisionServiceV2(session_factory=session_factory, project_dir=project_dir, grants=reader)
+    interactive = CurrentUserInfo(id=USER.id, sub=USER.sub, role="user")
+    with pytest.raises(PairAuthorizationDeniedError):
+        await pair_service.decide(reject_command, authenticated_user=CurrentUserInfo(id=USER.id, sub=USER.sub))
+    if session_factory.kw["bind"].dialect.name == "postgresql":
+        original_claim = SpatialPairVersionedRepository.claim_pair_head
+        original_receipt = SpatialPairVersionedRepository.get_command_receipt_v2
+        first_claimed = asyncio.Event()
+        release_first = asyncio.Event()
+        first_pid: list[int] = []
+        second_pid: list[int] = []
+        second: asyncio.Task | None = None
+
+        async def capture_second_receipt(self, **kwargs):
+            if asyncio.current_task() is second and not second_pid:
+                pid = await self.session.scalar(select(func.pg_backend_pid()))
+                assert isinstance(pid, int)
+                second_pid.append(pid)
+            return await original_receipt(self, **kwargs)
+
+        async def pause_pair_claim(self, *, user_id: str, project_name: str, pair_id: str):
+            pid = await self.session.scalar(select(func.pg_backend_pid()))
+            assert isinstance(pid, int)
+            if not first_claimed.is_set():
+                locked = await original_claim(self, user_id=user_id, project_name=project_name, pair_id=pair_id)
+                first_pid.append(pid)
+                first_claimed.set()
+                await release_first.wait()
+                return locked
+            return await original_claim(self, user_id=user_id, project_name=project_name, pair_id=pair_id)
+
+        monkeypatch.setattr(SpatialPairVersionedRepository, "claim_pair_head", pause_pair_claim)
+        monkeypatch.setattr(SpatialPairVersionedRepository, "get_command_receipt_v2", capture_second_receipt)
+        first = asyncio.create_task(pair_service.decide(reject_command, authenticated_user=interactive))
+        try:
+            await asyncio.wait_for(first_claimed.wait(), timeout=10)
+            second = asyncio.create_task(pair_service.decide(reject_command, authenticated_user=interactive))
+            blocked = False
+            for _ in range(500):
+                async with session_factory() as observer:
+                    blockers = await observer.scalar(select(func.pg_blocking_pids(second_pid[0]))) if second_pid else []
+                if first_pid and first_pid[0] in blockers:
+                    blocked = True
+                    break
+                if second.done():
+                    raise AssertionError("second V2 decision did not wait for the first transaction")
+                await asyncio.sleep(0.01)
+            assert blocked
+        finally:
+            release_first.set()
+            monkeypatch.setattr(SpatialPairVersionedRepository, "claim_pair_head", original_claim)
+            monkeypatch.setattr(SpatialPairVersionedRepository, "get_command_receipt_v2", original_receipt)
+            await asyncio.wait_for(
+                asyncio.gather(first, *([second] if second is not None else []), return_exceptions=True), 15
+            )
+        assert second is not None
+        rejected = first.result()
+        contender_result = second.result()
+        assert contender_result == rejected
+    else:
+        rejected = await pair_service.decide(reject_command, authenticated_user=interactive)
+    assert rejected.pair_version == 2
+    assert rejected.decision == "REJECT"
+    assert await pair_service.decide(reject_command, authenticated_user=interactive) == rejected
+    async with session_factory() as session, session.begin():
+        pair_head = await session.get(SpatialPairHeadModel, (USER.id, PROJECT, rejected.pair_id))
+        assert pair_head is not None
+        pair_head.current_decision_digest = "sha256:" + "0" * 64
+    with pytest.raises(SpatialPairIntegrityError):
+        await pair_service.decide(reject_command, authenticated_user=interactive)
+    async with session_factory() as session, session.begin():
+        pair_head = await session.get(SpatialPairHeadModel, (USER.id, PROJECT, rejected.pair_id))
+        assert pair_head is not None
+        pair_head.current_decision_digest = rejected.decision_digest
     frame_path = project_dir / "spatial" / "frames" / f"{snapshot.frames[0].receipt_id}.png"
     original = frame_path.read_bytes()
     frame_path.write_bytes(original + b"changed")
@@ -377,6 +488,8 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
             await service.create(**arguments)
         with pytest.raises(FrameSourceConflictError):
             await service.fetch_frame(**fetch_scope, role="MASTER")
+        with pytest.raises(FrameSourceConflictError):
+            await pair_service.decide(reject_command, authenticated_user=interactive)
     finally:
         frame_path.write_bytes(original)
     async with session_factory() as session:
@@ -384,8 +497,8 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         assert row is not None
         assert row.snapshot_digest == review_snapshot_digest(snapshot.model_dump(mode="json"))
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 2
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 2
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 2
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 4
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 4
 
     revoke_body = {key: value for key, value in body.items() if key not in {"not_before", "expires_at"}} | {
         "event_type": "REVOKE",
@@ -403,6 +516,8 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
     with pytest.raises(ShowrunnerGrantUnavailableError):
         await service.create(**arguments)
     with pytest.raises(ShowrunnerGrantUnavailableError):
+        await pair_service.decide(reject_command, authenticated_user=interactive)
+    with pytest.raises(ShowrunnerGrantUnavailableError):
         await service.fetch_frame(**fetch_scope, role="REVERSE")
     with pytest.raises(ShowrunnerGrantUnavailableError):
         await service.acknowledge_frame(
@@ -414,5 +529,5 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         )
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 2
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 2
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 2
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 4
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 4
