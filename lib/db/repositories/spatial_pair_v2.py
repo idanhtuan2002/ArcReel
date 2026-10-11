@@ -168,7 +168,7 @@ class SpatialPairVersionedRepository:
         )
         if body.command != command or result != expected_result:
             raise SpatialPairIntegrityError("V2 replay result differs from its decision")
-        await self._verify_review_consumption(verified)
+        await self.verify_review_consumption(verified)
         return verified
 
     async def claim_pair_head(self, *, user_id: str, project_name: str, pair_id: str) -> LockedPairHeadV2:
@@ -348,7 +348,33 @@ class SpatialPairVersionedRepository:
         expected_target_ref: TargetVersionRef,
         expected_scene_ref: TargetVersionRef,
     ) -> VerifiedPairDecision | VerifiedPairDecisionV2 | None:
-        """Read local history after the caller locks current target and binding authority."""
+        current = await self.get_current_body_verified(
+            user_id=user_id,
+            project_name=project_name,
+            binding_id=binding_id,
+            expected_binding_version=expected_binding_version,
+            expected_envelope_digest=expected_envelope_digest,
+            expected_core_digest=expected_core_digest,
+            expected_target_ref=expected_target_ref,
+            expected_scene_ref=expected_scene_ref,
+        )
+        if isinstance(current, VerifiedPairDecisionV2):
+            await self.verify_review_consumption(current)
+        return current
+
+    async def get_current_body_verified(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        binding_id: str,
+        expected_binding_version: int,
+        expected_envelope_digest: str,
+        expected_core_digest: str,
+        expected_target_ref: TargetVersionRef,
+        expected_scene_ref: TargetVersionRef,
+    ) -> VerifiedPairDecision | VerifiedPairDecisionV2 | None:
+        """Verify the current body and sidecar; review-session custody remains to be checked."""
         pair_id = scoped_pair_id(user_id=user_id, project_name=project_name, binding_id=binding_id)
         head = await self.session.get(
             SpatialPairHeadModel,
@@ -381,7 +407,7 @@ class SpatialPairVersionedRepository:
             with_for_update=True,
             populate_existing=True,
         )
-        verified = verify_stored_pair_decision_versioned(
+        return verify_stored_pair_decision_versioned(
             row,
             custody,
             user_id=user_id,
@@ -393,11 +419,9 @@ class SpatialPairVersionedRepository:
             expected_target_ref=expected_target_ref,
             expected_scene_ref=expected_scene_ref,
         )
-        if isinstance(verified, VerifiedPairDecisionV2):
-            await self._verify_review_consumption(verified)
-        return verified
 
-    async def _verify_review_consumption(self, verified: VerifiedPairDecisionV2) -> None:
+    async def verify_review_consumption(self, verified: VerifiedPairDecisionV2) -> None:
+        """Finish V2 verification after the caller holds current parent and grant locks."""
         command = verified.body.command
         try:
             evidence, evidence_digest = await SpatialReviewRepository(self.session).read_complete(

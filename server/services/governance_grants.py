@@ -28,6 +28,13 @@ def _scope_matches(event: VerifiedGrantEventV1, scope: GrantScopeV1) -> bool:
     )
 
 
+def _imported_at(row: ShowrunnerGrantEventModel) -> datetime:
+    value = row.imported_at
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 async def _database_now(session: AsyncSession) -> datetime:
     if session.get_bind().dialect.name == "postgresql":
         value = await session.scalar(select(func.clock_timestamp()))
@@ -281,13 +288,13 @@ class CurrentShowrunnerGrantReader(_GrantLedger):
             event.body.event_type != "ISSUE"
             or event.body.not_before is None
             or event.body.expires_at is None
-            or not datetime.fromisoformat(event.body.issued_at) <= at
+            or not _imported_at(rows[match_index]) <= at
             or not datetime.fromisoformat(event.body.not_before) <= at < datetime.fromisoformat(event.body.expires_at)
         ):
             raise ShowrunnerGrantUnavailableError("historical grant was not active at authorization time")
         if match_index + 1 < len(rows):
-            successor = self._verify_row(rows[match_index + 1], scope)
-            if at >= datetime.fromisoformat(successor.body.issued_at):
+            self._verify_row(rows[match_index + 1], scope)
+            if at >= _imported_at(rows[match_index + 1]):
                 raise ShowrunnerGrantUnavailableError("historical grant was superseded before authorization")
         return event
 

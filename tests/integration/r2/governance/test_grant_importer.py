@@ -84,7 +84,12 @@ async def test_import_issue_revoke_and_reissue_is_scoped_and_replay_safe(
     reissue = await importer.import_event(reissue_raw, scope=scope)
     async with session_factory() as session, session.begin():
         assert (await reader.require_current_locked(session, scope=scope)).event_digest == reissue.event_digest
-        old_authorization_time = datetime(2026, 1, 2, tzinfo=UTC)
+        issue_row = await session.get(ShowrunnerGrantEventModel, ("u1", "show-a", "reviewer-a", 1))
+        revoke_row = await session.get(ShowrunnerGrantEventModel, ("u1", "show-a", "reviewer-a", 2))
+        assert issue_row is not None
+        assert revoke_row is not None
+        old_authorization_time = issue_row.imported_at.replace(tzinfo=UTC)
+        revoked_authorization_time = revoke_row.imported_at.replace(tzinfo=UTC)
         assert (
             await reader.require_historical_issue_locked(
                 session,
@@ -95,8 +100,9 @@ async def test_import_issue_revoke_and_reissue_is_scoped_and_replay_safe(
         ).event_digest == issue.event_digest
         for event_digest, authenticated_at in (
             ("sha256:" + "0" * 64, old_authorization_time),
-            (revoke.event_digest, datetime(2026, 2, 2, tzinfo=UTC)),
-            (issue.event_digest, datetime(2026, 2, 2, tzinfo=UTC)),
+            (issue.event_digest, datetime(2026, 1, 2, tzinfo=UTC)),
+            (revoke.event_digest, revoked_authorization_time),
+            (issue.event_digest, revoked_authorization_time),
         ):
             with pytest.raises(ShowrunnerGrantUnavailableError):
                 await reader.require_historical_issue_locked(

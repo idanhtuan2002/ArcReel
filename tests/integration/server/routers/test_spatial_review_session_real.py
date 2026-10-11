@@ -55,6 +55,7 @@ from server.services.governance_grants import (
     ShowrunnerGrantUnavailableError,
 )
 from server.services.location_binding import LocationBindingCreationService
+from server.services.spatial_pair_current_v2 import CurrentApprovedSpatialPairReaderV2, SpatialPairV2UnavailableError
 from server.services.spatial_pair_decision import PairAuthorizationDeniedError
 from server.services.spatial_pair_decision_v2 import SpatialPairDecisionServiceV2
 from server.services.spatial_review_session import SpatialReviewSessionService
@@ -450,7 +451,84 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
 
             with pytest.raises(IntegrityError):
                 await link_foreign_session()
+    current_v2 = CurrentApprovedSpatialPairReaderV2(
+        session_factory=session_factory, project_dir=project_dir, grants=reader
+    )
+    approved = await current_v2.read_current(
+        user_id=USER.id, project_name=PROJECT, target_id=snapshot.target_ref.target_id
+    )
+    assert approved.body == decision
+    assert approved.decision_digest == decision_digest
     second_scope = fetch_scope | {"session_id": second_snapshot.session_id}
+    if session_factory.kw["bind"].dialect.name == "postgresql":
+        original_review_check = SpatialPairVersionedRepository.verify_review_consumption
+        original_snapshot_hint = SpatialReviewRepository.read_snapshot_hint
+        reader_holds_sources = asyncio.Event()
+        release_reader = asyncio.Event()
+        reader_pid: list[int] = []
+        fetch_pid: list[int] = []
+        reader_task = None
+        fetch_task = None
+
+        async def pause_before_review_check(self, verified):
+            if asyncio.current_task() is reader_task:
+                pid = await self.session.scalar(select(func.pg_backend_pid()))
+                assert isinstance(pid, int)
+                reader_pid.append(pid)
+                reader_holds_sources.set()
+                await release_reader.wait()
+            return await original_review_check(self, verified)
+
+        async def capture_fetch_snapshot_hint(self, **kwargs):
+            if asyncio.current_task() is fetch_task:
+                pid = await self.session.scalar(select(func.pg_backend_pid()))
+                assert isinstance(pid, int)
+                fetch_pid.append(pid)
+            return await original_snapshot_hint(self, **kwargs)
+
+        with monkeypatch.context() as read_patch:
+            read_patch.setattr(SpatialPairVersionedRepository, "verify_review_consumption", pause_before_review_check)
+            read_patch.setattr(SpatialReviewRepository, "read_snapshot_hint", capture_fetch_snapshot_hint)
+            reader_task = asyncio.create_task(
+                current_v2.read_current(user_id=USER.id, project_name=PROJECT, target_id=snapshot.target_ref.target_id)
+            )
+            blocked = False
+            try:
+                await asyncio.wait_for(reader_holds_sources.wait(), timeout=10)
+                fetch_task = asyncio.create_task(service.fetch_frame(**second_scope, role="MASTER"))
+                for _ in range(500):
+                    async with session_factory() as observer:
+                        blockers = (
+                            await observer.scalar(select(func.pg_blocking_pids(fetch_pid[0]))) if fetch_pid else []
+                        )
+                    if reader_pid and reader_pid[0] in blockers:
+                        blocked = True
+                        break
+                    if fetch_task.done():
+                        break
+                    await asyncio.sleep(0.01)
+            finally:
+                release_reader.set()
+            assert (await asyncio.wait_for(reader_task, timeout=10)).decision_digest == decision_digest
+            assert fetch_task is not None
+            fetched_bytes, fetched_delivery = await asyncio.wait_for(fetch_task, timeout=10)
+            assert fetched_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+            assert fetched_delivery.role == "MASTER"
+            assert blocked, "frame fetch must wait on the current V2 reader's authority transaction"
+    with pytest.raises(SpatialPairV2UnavailableError):
+        await current_v2.read_current(
+            user_id=USER.id, project_name="foreign-project", target_id=snapshot.target_ref.target_id
+        )
+    approved_frame_path = project_dir / "spatial" / "frames" / f"{snapshot.frames[0].receipt_id}.png"
+    approved_png = approved_frame_path.read_bytes()
+    approved_frame_path.write_bytes(approved_png + b"changed")
+    try:
+        with pytest.raises(FrameSourceConflictError):
+            await current_v2.read_current(
+                user_id=USER.id, project_name=PROJECT, target_id=snapshot.target_ref.target_id
+            )
+    finally:
+        approved_frame_path.write_bytes(approved_png)
     for frame in second_snapshot.frames:
         _, delivered = await service.fetch_frame(**second_scope, role=frame.role)
         await service.acknowledge_frame(
@@ -494,6 +572,8 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         rejected = await pair_service.decide(reject_command, authenticated_user=interactive)
     assert rejected.pair_version == 2
     assert rejected.decision == "REJECT"
+    with pytest.raises(SpatialPairV2UnavailableError):
+        await current_v2.read_current(user_id=USER.id, project_name=PROJECT, target_id=snapshot.target_ref.target_id)
     assert await pair_service.decide(reject_command, authenticated_user=interactive) == rejected
     async with session_factory() as session, session.begin():
         pair_head = await session.get(SpatialPairHeadModel, (USER.id, PROJECT, rejected.pair_id))
@@ -556,14 +636,16 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         assert row is not None
         assert row.snapshot_digest == review_snapshot_digest(snapshot.model_dump(mode="json"))
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 3
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 6
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == (
+            7 if session.get_bind().dialect.name == "postgresql" else 6
+        )
         assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 6
 
     revoke_body = {key: value for key, value in body.items() if key not in {"not_before", "expires_at"}} | {
         "event_type": "REVOKE",
         "sequence": 2,
         "previous_event_digest": issue.event_digest,
-        "issued_at": (datetime.now(UTC) - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "issued_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     revoke_signature = (
         base64.urlsafe_b64encode(private.sign(canonical_json_bytes(revoke_body, allow_nan=False))).decode().rstrip("=")
@@ -640,10 +722,14 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         )
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == 3
-        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == 6
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == (
+            7 if session.get_bind().dialect.name == "postgresql" else 6
+        )
         assert await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel)) == 6
 
     if session_factory.kw["bind"].dialect.name == "postgresql":
+        revoked_second = datetime.fromisoformat(revoke_body["issued_at"])
+        await asyncio.sleep(max(0.0, ((revoked_second + timedelta(seconds=1)) - datetime.now(UTC)).total_seconds()))
         reissue_body = body | {
             "sequence": 3,
             "previous_event_digest": revoke.event_digest,
