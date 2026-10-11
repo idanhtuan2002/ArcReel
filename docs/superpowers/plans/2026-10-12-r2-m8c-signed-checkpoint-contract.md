@@ -57,10 +57,10 @@
 - Produces: `VerifiedGrantCheckpointV1` and `verify_grant_checkpoint(raw: bytes, *, deployment_id: str, key_id: str, public_key: bytes) -> VerifiedGrantCheckpointV1`.
 - A verified result must retain the canonical signed bytes/digest and an exact-scope lookup. The caller supplies the trusted deployment ID, key ID and public key; the envelope cannot choose trust material.
 
-- [ ] **Step 1: Write failing verifier tests.** Pin a deterministic Ed25519 key/vector, valid genesis and two-scope successor, wrong deployment/key ID/public key, changed body, changed signature and sanitized errors.
-- [ ] **Step 2: Run RED.** The new verifier tests must fail because the verifier is absent.
-- [ ] **Step 3: Implement only the explicit-key verification adapter.** Reuse `cryptography` and the exception handling pattern in `r2/governance/grant_signature.py`; construct the scope lookup only after signature validation.
-- [ ] **Step 4: Run GREEN and affected gates.** Run the checkpoint/grant unit directory, test audit, Ruff check/format, targeted basedpyright, lint-imports, deptry and diff check. Record exact outputs and any unavailable checks.
-- [ ] **Step 5: Update the durable M8-C handoff and commit.** State that neither the file loader nor runtime/recovery equality gate is implemented, so no production approval is enabled.
+- [x] **Step 1: Write failing verifier tests.** Pin a deterministic Ed25519 key/vector, valid genesis and two-scope successor, wrong deployment/key ID/public key, changed body, changed signature and sanitized errors.
+- [x] **Step 2: Run RED.** The new verifier tests must fail because the verifier is absent.
+- [x] **Step 3: Implement only the explicit-key verification adapter.** Reuse `cryptography` and the exception handling pattern in `r2/governance/grant_signature.py`; construct the scope lookup only after signature validation.
+- [x] **Step 4: Run GREEN and affected gates.** Run the checkpoint/grant unit directory, test audit, Ruff check/format, targeted basedpyright, lint-imports, deptry and diff check. Record exact outputs and any unavailable checks.
+- [x] **Step 5: Update the durable M8-C handoff and commit.** State that neither the file loader nor runtime/recovery equality gate is implemented, so no production approval is enabled.
 
 The later registry/publication, startup recovery and transaction-bound gates are independent plans under the same spec. They require an operator custody design, disposable PostgreSQL/Compose drill, complete affected checks and independent exact-HEAD review before activation.

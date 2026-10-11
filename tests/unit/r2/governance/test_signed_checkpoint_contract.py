@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from lib.content_digest import canonical_json_bytes
 from r2.contracts.grant_checkpoint import CheckpointInvalid, parse_grant_checkpoint
+from r2.governance.checkpoint_signature import verify_grant_checkpoint
 
 
 def _head(user: str, project: str = "show-a", principal: str = "reviewer-a") -> dict[str, object]:
@@ -35,6 +39,13 @@ def _body(*, heads: list[dict[str, object]] | None = None) -> dict[str, object]:
 
 def _raw(body: dict[str, object]) -> bytes:
     signature = base64.urlsafe_b64encode(b"\x00" * 64).decode("ascii").rstrip("=")
+    return canonical_json_bytes({"body": body, "signature": signature}, allow_nan=False)
+
+
+def _signed(body: dict[str, object], key: Ed25519PrivateKey) -> bytes:
+    signature = (
+        base64.urlsafe_b64encode(key.sign(canonical_json_bytes(body, allow_nan=False))).decode("ascii").rstrip("=")
+    )
     return canonical_json_bytes({"body": body, "signature": signature}, allow_nan=False)
 
 
@@ -112,3 +123,73 @@ def test_parser_denies_noncanonical_signature_encoding() -> None:
     envelope = _raw(_body()).decode("utf-8")
     with pytest.raises(CheckpointInvalid):
         parse_grant_checkpoint(envelope.replace('"signature":"', '"signature":"!').encode("utf-8"))
+
+
+def test_explicit_key_verifies_genesis_and_two_scope_successor() -> None:
+    private = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+    public = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    genesis = verify_grant_checkpoint(
+        _signed(_body(), private),
+        deployment_id="arcreel-prod-a",
+        key_id="checkpoint-key-1",
+        public_key=public,
+    )
+    assert genesis.body.heads == ()
+    assert genesis.head_for_scope(user_id="tenant-a", project_name="show-a", principal="reviewer-a") is None
+    assert genesis.checkpoint_digest == "sha256:2e06792ad5801dddb873d2e461343eaf245fddab7f7d32608480760c3d47c60c"
+    assert base64.urlsafe_b64encode(genesis.signature).decode("ascii").rstrip("=") == (
+        "ZrQrRHUcoyXTBVaSTi7WAmwLZYXEPTVGj0Ggr4VNOUl9GAFSsl6w23XtfpeUm_9mRabVXcpkesk5J9HpUAfdDQ"
+    )
+
+    successor_body = _body(heads=[_head("tenant-a"), _head("tenant-b")]) | {
+        "checkpoint_sequence": 2,
+        "previous_checkpoint_digest": genesis.checkpoint_digest,
+    }
+    successor = verify_grant_checkpoint(
+        _signed(successor_body, private),
+        deployment_id="arcreel-prod-a",
+        key_id="checkpoint-key-1",
+        public_key=public,
+    )
+    assert successor.checkpoint_digest == "sha256:c8b95048e02e0866dcfa8da3972713c4cb7aa16f152541f5a50cd79f4dce8976"
+    assert base64.urlsafe_b64encode(successor.signature).decode("ascii").rstrip("=") == (
+        "41e_fJ8bqrWGnrv8icbrUGGFUero2IbVqAVWKDmtKxpx1y2_Dw60Qd2BO0WxRdsYBWCD9UXZ6DeM-VeaW07bDA"
+    )
+    assert (
+        successor.head_for_scope(user_id="tenant-b", project_name="show-a", principal="reviewer-a")
+        == (successor.body.heads[1])
+    )
+    assert successor.head_for_scope(user_id="tenant-b", project_name="other-show", principal="reviewer-a") is None
+
+
+def test_verifier_denies_wrong_deployment_key_and_tampering_without_echo() -> None:
+    private = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+    public = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    other_public = (
+        Ed25519PrivateKey.generate()
+        .public_key()
+        .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    )
+    raw = _signed(_body(heads=[_head("tenant-a")]), private)
+    changed_body = json.loads(raw)
+    changed_body["body"]["heads"][0]["user_id"] = "tenant-b"
+    altered_signature = bytearray(raw)
+    altered_signature[-4] = ord("A") if altered_signature[-4] != ord("A") else ord("B")
+    cases = [
+        (raw, "other-deployment", "checkpoint-key-1", public),
+        (raw, "arcreel-prod-a", "wrong-key-id", public),
+        (raw, "arcreel-prod-a", "checkpoint-key-1", other_public),
+        (raw, "arcreel-prod-a", "checkpoint-key-1", b"short"),
+        (canonical_json_bytes(changed_body, allow_nan=False), "arcreel-prod-a", "checkpoint-key-1", public),
+        (bytes(altered_signature), "arcreel-prod-a", "checkpoint-key-1", public),
+    ]
+    for submitted, deployment_id, key_id, key_bytes in cases:
+        with pytest.raises(CheckpointInvalid) as exc:
+            verify_grant_checkpoint(
+                submitted,
+                deployment_id=deployment_id,
+                key_id=key_id,
+                public_key=key_bytes,
+            )
+        assert "tenant-a" not in str(exc.value)
+        assert "checkpoint-key-1" not in str(exc.value)
