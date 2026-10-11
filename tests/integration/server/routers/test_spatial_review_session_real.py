@@ -37,6 +37,7 @@ from lib.db.repositories.spatial_source import _receipt_digest
 from r2.contracts.production_binding_authority import BindingCreateCommandV1
 from r2.contracts.spatial_pair import PairDecisionCommandV2, PairDecisionResultV2, PairDecisionV2
 from r2.governance.grant_transition import GrantScopeV1
+from r2.host_hardening.master_authority import MasterAuthorityUnit
 from r2.m3.host_integration import GoldenAHostIntegration
 from r2.production_intelligence.take_director import TakeDirectorAdapter
 from r2.spatial_pair.digests import (
@@ -141,12 +142,16 @@ async def _run_blocked_v2_command(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("race_order", ["pair_first", "writer_first"])
 async def test_review_session_requires_current_grant_and_pins_verified_png_bytes(
     gate_export_client: AsyncClient,
     project_dir: Path,
     session_factory: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
+    race_order: str,
 ) -> None:
+    if race_order == "writer_first" and session_factory.kw["bind"].dialect.name != "postgresql":
+        pytest.skip("forced Gate C writer-first schedule requires PostgreSQL row locks")
     monkeypatch.setattr(admission_helpers, "USER", USER.id)
     monkeypatch.setattr(admission_helpers, "PROJECT", PROJECT)
     admission, *_ = await target_helpers._admit(session_factory)
@@ -744,6 +749,101 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
         await GovernanceGrantImporter(session_factory, key_id="test-review-key", public_key=public).import_event(
             canonical_json_bytes({"body": reissue_body, "signature": reissue_signature}, allow_nan=False), scope=scope
         )
+        if race_order == "writer_first":
+            fourth_snapshot = await service.create(**arguments)
+            fourth_scope = fetch_scope | {"session_id": fourth_snapshot.session_id}
+            for frame in fourth_snapshot.frames:
+                _, delivered = await service.fetch_frame(**fourth_scope, role=frame.role)
+                await service.acknowledge_frame(
+                    **fourth_scope,
+                    attempt_id=delivered.attempt_id,
+                    role=frame.role,
+                    png_digest=frame.png_digest,
+                    decoded=True,
+                )
+            async with session_factory() as session, session.begin():
+                _, fourth_digest = await SpatialReviewRepository(session).read_complete(**fourth_scope)
+            fourth_command = PairDecisionCommandV2.model_validate(
+                third_command.model_dump(mode="json")
+                | {
+                    "command_id": "pair-review-writer-first-4",
+                    "review_session_id": fourth_snapshot.session_id,
+                    "review_evidence_digest": fourth_digest,
+                }
+            )
+            original_promote = MasterAuthorityUnit.promote_staged
+            original_receipt = SpatialPairVersionedRepository.get_command_receipt_v2
+            writer_has_head = asyncio.Event()
+            release_writer = asyncio.Event()
+            writer_pid: list[int] = []
+            writer_first_decision_pid: list[int] = []
+            decision_task = None
+
+            async def hold_promoted_master(self, **kwargs):
+                result = await original_promote(self, **kwargs)
+                pid = await self._authorities.session.scalar(select(func.pg_backend_pid()))
+                assert isinstance(pid, int)
+                writer_pid.append(pid)
+                writer_has_head.set()
+                await release_writer.wait()
+                return result
+
+            async def capture_writer_first_receipt(self, **kwargs):
+                pid = await self.session.scalar(select(func.pg_backend_pid()))
+                assert isinstance(pid, int)
+                writer_first_decision_pid.append(pid)
+                return await original_receipt(self, **kwargs)
+
+            with monkeypatch.context() as writer_patch:
+                writer_patch.setattr(MasterAuthorityUnit, "promote_staged", hold_promoted_master)
+                writer_patch.setattr(
+                    SpatialPairVersionedRepository, "get_command_receipt_v2", capture_writer_first_receipt
+                )
+                approval_task = asyncio.create_task(
+                    _approve_shot(gate_export_client, project_dir, "SH01", b"review-writer-first-parent")
+                )
+                try:
+                    await asyncio.wait_for(writer_has_head.wait(), timeout=10)
+                    decision_task = asyncio.create_task(
+                        pair_service.decide(fourth_command, authenticated_user=interactive)
+                    )
+                    blocked = False
+                    for _ in range(500):
+                        async with session_factory() as observer:
+                            blockers = (
+                                await observer.scalar(select(func.pg_blocking_pids(writer_first_decision_pid[0])))
+                                if writer_first_decision_pid
+                                else []
+                            )
+                        if writer_pid and writer_pid[0] in blockers:
+                            blocked = True
+                            break
+                        if decision_task.done():
+                            break
+                        await asyncio.sleep(0.01)
+                    assert blocked, "V2 decision must wait for Gate C's master-head transaction"
+                finally:
+                    release_writer.set()
+                    if decision_task is None:
+                        await asyncio.wait_for(asyncio.gather(approval_task, return_exceptions=True), timeout=10)
+                    else:
+                        await asyncio.wait_for(
+                            asyncio.gather(approval_task, decision_task, return_exceptions=True), timeout=10
+                        )
+                approval_task.result()
+                assert decision_task is not None
+                with pytest.raises(FrameSourceConflictError):
+                    await asyncio.wait_for(decision_task, timeout=10)
+            async with session_factory() as session:
+                assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == 3
+                fourth_row = await session.get(
+                    SpatialReviewSessionModel, (USER.id, PROJECT, fourth_snapshot.session_id)
+                )
+                assert fourth_row is not None
+                assert fourth_row.consumed_command_digest is None
+
+            return
+
         original_grant_read = CurrentShowrunnerGrantReader.require_current_locked
         decision_holds_sources = asyncio.Event()
         release_decision = asyncio.Event()
