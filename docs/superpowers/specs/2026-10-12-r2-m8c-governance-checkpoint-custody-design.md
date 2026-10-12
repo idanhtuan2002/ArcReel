@@ -88,6 +88,10 @@ form an authorized monotonic successor. Removing a scope or reducing its
 sequence is a recovery exception requiring a separate signed procedure. The
 application cannot prove that an older valid checkpoint was not substituted
 if the entire host-local custody source and retained history are replaced.
+The [operator high-water manifest candidate](2026-10-12-r2-m8c-operator-high-water-manifest-design.md)
+now pins a proposed crash order: durably retain the candidate and new
+high-water entry before renaming the current checkpoint file. The archive
+medium and approval procedure remain open acceptance gates.
 
 Before startup can expose any Governance-backed action, a recovery gate
 verifies the pinned image and external key/checkpoint inputs, then scans every
