@@ -11,8 +11,8 @@ from typing import Annotated, Literal, Self
 
 from pydantic import ConfigDict, Field, StrictInt, StringConstraints, ValidationError, field_validator, model_validator
 
-from lib.content_digest import canonical_json_bytes
 from r2.contracts.common import R2ContractModel
+from r2.contracts.fingerprints import canonical_json_bytes
 
 MAX_HOST_RECORD_BYTES = 8_192
 _IDENTIFIER = r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$"
@@ -144,7 +144,7 @@ def _decode(raw: bytes) -> dict[str, object]:
         raise HostRecordInvalid
     try:
         decoded = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs, parse_constant=_nonfinite)
-        if not isinstance(decoded, dict) or canonical_json_bytes(decoded, allow_nan=False) != raw:
+        if not isinstance(decoded, dict) or canonical_json_bytes(decoded) != raw:
             raise HostRecordInvalid
         return decoded
     except HostRecordInvalid:

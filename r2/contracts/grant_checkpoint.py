@@ -13,8 +13,8 @@ from typing import Annotated, Literal, Self
 
 from pydantic import ConfigDict, Field, StrictInt, StringConstraints, ValidationError, field_validator, model_validator
 
-from lib.content_digest import canonical_json_bytes
 from r2.contracts.common import R2ContractModel
+from r2.contracts.fingerprints import canonical_json_bytes
 
 MAX_GRANT_CHECKPOINT_BYTES = 4_194_304
 MAX_GRANT_CHECKPOINT_HEADS = 10_000
@@ -114,7 +114,7 @@ def parse_grant_checkpoint(raw: bytes) -> ParsedGrantCheckpointV1:
         decoded = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs, parse_constant=_nonfinite)
         if not isinstance(decoded, dict) or set(decoded) != {"body", "signature"}:
             raise CheckpointInvalid("envelope_shape")
-        if canonical_json_bytes(decoded, allow_nan=False) != raw:
+        if canonical_json_bytes(decoded) != raw:
             raise CheckpointInvalid("noncanonical_bytes")
         body_raw = decoded["body"]
         signature_text = decoded["signature"]
@@ -130,7 +130,7 @@ def parse_grant_checkpoint(raw: bytes) -> ParsedGrantCheckpointV1:
         signature = base64.urlsafe_b64decode(signature_text + "==")
         if len(signature) != 64 or base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=") != signature_text:
             raise CheckpointInvalid("signature_encoding")
-        signed_bytes = canonical_json_bytes(body_raw, allow_nan=False)
+        signed_bytes = canonical_json_bytes(body_raw)
         body = GrantHeadCheckpointBodyV1.model_validate_json(signed_bytes)
     except CheckpointInvalid:
         raise

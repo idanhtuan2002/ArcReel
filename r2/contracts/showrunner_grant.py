@@ -13,8 +13,8 @@ from typing import Annotated, Literal, Self
 
 from pydantic import ConfigDict, Field, StrictInt, StringConstraints, ValidationError, field_validator, model_validator
 
-from lib.content_digest import canonical_json_bytes
 from r2.contracts.common import R2ContractModel
+from r2.contracts.fingerprints import canonical_json_bytes
 
 MAX_GRANT_EVENT_BYTES = 65_536
 _UTC_SECOND = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
@@ -106,7 +106,7 @@ def parse_grant_event(raw: bytes) -> ParsedGrantEventV1:
         decoded = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs, parse_constant=_nonfinite)
         if not isinstance(decoded, dict) or set(decoded) != {"body", "signature"}:
             raise GrantEventInvalid("envelope_shape")
-        if canonical_json_bytes(decoded, allow_nan=False) != raw:
+        if canonical_json_bytes(decoded) != raw:
             raise GrantEventInvalid("noncanonical_bytes")
         body_raw = decoded["body"]
         signature_text = decoded["signature"]
@@ -120,7 +120,7 @@ def parse_grant_event(raw: bytes) -> ParsedGrantEventV1:
         if len(signature) != 64 or base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=") != signature_text:
             raise GrantEventInvalid("signature_encoding")
         body = GrantEventBodyV1.model_validate(body_raw)
-        signed_bytes = canonical_json_bytes(body_raw, allow_nan=False)
+        signed_bytes = canonical_json_bytes(body_raw)
     except GrantEventInvalid:
         raise
     except (

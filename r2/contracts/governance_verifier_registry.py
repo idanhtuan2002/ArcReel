@@ -9,7 +9,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from lib.content_digest import canonical_json_bytes
+from r2.contracts.fingerprints import canonical_json_bytes
 
 MAX_VERIFIER_REGISTRY_BYTES = 4_096
 _IDENTIFIER = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:-]{0,254}\Z")
@@ -80,7 +80,7 @@ def parse_verifier_registry(raw: bytes) -> ParsedVerifierRegistryV1:
         if (
             not isinstance(decoded, dict)
             or set(decoded) != {"schema", "deployment_id", "registry_sequence", "grant_event", "grant_checkpoint"}
-            or canonical_json_bytes(decoded, allow_nan=False) != raw
+            or canonical_json_bytes(decoded) != raw
             or decoded["schema"] != _SCHEMA
         ):
             raise VerifierRegistryInvalid
