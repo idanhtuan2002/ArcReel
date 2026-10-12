@@ -247,13 +247,29 @@ class _LockedArchive:
 
     def read_orphan_checkpoint(self, candidate_raw: bytes) -> _RetainedArchiveState:
         """Verify one exact orphan envelope against a complete prior archive."""
+        return self._read_candidate_checkpoint(candidate_raw, location="orphan")
+
+    def read_staged_checkpoint(self, candidate_raw: bytes) -> _RetainedArchiveState:
+        """Verify one exact unlinked staged envelope against a complete prior archive."""
+        return self._read_candidate_checkpoint(candidate_raw, location="staged")
+
+    def _read_candidate_checkpoint(
+        self, candidate_raw: bytes, *, location: Literal["orphan", "staged"]
+    ) -> _RetainedArchiveState:
         if type(candidate_raw) is not bytes or not 0 < len(candidate_raw) <= MAX_GRANT_CHECKPOINT_BYTES:
             raise OperatorArchiveInvalid
-        state = self._scan(require_public_current=True, allow_public_temps=False, expected_orphan=candidate_raw)
         try:
             candidate = parse_grant_checkpoint(candidate_raw)
         except CheckpointInvalid:
             raise OperatorArchiveInvalid from None
+        state = self._scan(
+            require_public_current=True,
+            allow_public_temps=False,
+            expected_orphan=candidate_raw if location == "orphan" else None,
+            expected_staged=(f".checkpoint.{candidate.body.checkpoint_sequence:020d}.tmp", candidate_raw)
+            if location == "staged"
+            else None,
+        )
         if (
             candidate.body.checkpoint_sequence != state.snapshot.high_water.checkpoint_sequence + 1
             or candidate.body.deployment_id != state.snapshot.approval.deployment_id
@@ -270,7 +286,12 @@ class _LockedArchive:
         )
 
     def _scan(
-        self, *, require_public_current: bool, allow_public_temps: bool, expected_orphan: bytes | None = None
+        self,
+        *,
+        require_public_current: bool,
+        allow_public_temps: bool,
+        expected_orphan: bytes | None = None,
+        expected_staged: tuple[str, bytes] | None = None,
     ) -> _RetainedArchiveState:
         budget = _Budget(self.limits)
         uid = self.uid
@@ -278,7 +299,23 @@ class _LockedArchive:
         root_fd = self.directories[0][0]
         if _names(root_fd, budget) != {"archive", "read"} or _names(self.archive_fd, budget) != _ARCHIVE_NAMES:
             raise OperatorArchiveInvalid
-        if _names(self.staging_fd, budget) or _names(self.approved_fd, budget) != {"00000000000000000001.json"}:
+        staging_names = _names(self.staging_fd, budget)
+        if staging_names != ({expected_staged[0]} if expected_staged is not None else set()) or _names(
+            self.approved_fd, budget
+        ) != {"00000000000000000001.json"}:
+            raise OperatorArchiveInvalid
+        if expected_staged is not None and (
+            _read_file(
+                self.staging_fd,
+                expected_staged[0],
+                uid=uid,
+                mode=0o600,
+                device=device,
+                maximum=MAX_GRANT_CHECKPOINT_BYTES,
+                budget=budget,
+            )
+            != expected_staged[1]
+        ):
             raise OperatorArchiveInvalid
         approved_raw = _read_file(
             self.approved_fd,
