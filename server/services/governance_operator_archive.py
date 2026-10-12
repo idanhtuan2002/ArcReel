@@ -263,6 +263,8 @@ async def publish_candidate_archive(
             for _ in range(8):
                 location, state = _classify_candidate_archive(archive, high_water_raw, checkpoint_raw)
                 if location == "complete":
+                    os.fsync(archive.staging_fd)
+                    archive._assert_stable()
                     result = await _reconcile_locked(
                         archive, session_factory=session_factory, expected_uid=expected_uid, after_phase=after_phase
                     )

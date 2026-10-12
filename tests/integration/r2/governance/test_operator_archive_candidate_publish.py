@@ -272,6 +272,70 @@ async def test_pg_candidate_publisher_resumes_each_public_write_interruption(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("interruption", ["publication_unlinked", "linked_cleanup_unlinked"])
+async def test_pg_complete_retry_fsyncs_staging_after_interrupted_unlink(
+    session_factory: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interruption: str,
+) -> None:
+    engine = session_factory.kw["bind"]
+    if engine.dialect.name != "postgresql":
+        pytest.skip("candidate publisher requires PostgreSQL")
+    await _ready_schema(engine)
+    root, high_water_raw, checkpoint_raw = _candidate_tree(tmp_path)
+    staged = root / "archive" / ".staging" / ".high-water.00000000000000000002.tmp"
+
+    def interrupt(phase: str) -> None:
+        expected = "high_water:stage_unlinked" if interruption == "publication_unlinked" else "high_water:link_created"
+        if phase == expected:
+            raise RuntimeError("simulated interruption")
+
+    with pytest.raises(OperatorArchiveReconcileUnavailable):
+        await publish_candidate_archive(
+            root,
+            high_water_raw,
+            checkpoint_raw,
+            session_factory=session_factory,
+            expected_uid=os.getuid(),
+            after_phase=interrupt,
+        )
+    staging_info = staged.parent.stat()
+    original_fsync = os.fsync
+    if interruption == "linked_cleanup_unlinked":
+
+        def fail_after_unlink(fd: int) -> None:
+            info = os.fstat(fd)
+            if (info.st_dev, info.st_ino) == (staging_info.st_dev, staging_info.st_ino) and not staged.exists():
+                raise OSError("simulated pre-fsync crash")
+            original_fsync(fd)
+
+        with monkeypatch.context() as patcher:
+            patcher.setattr(os, "fsync", fail_after_unlink)
+            with pytest.raises(OperatorArchiveReconcileUnavailable):
+                await publish_candidate_archive(
+                    root, high_water_raw, checkpoint_raw, session_factory=session_factory, expected_uid=os.getuid()
+                )
+    assert not staged.exists()
+    observed_staging_fsync = False
+
+    def observe_fsync(fd: int) -> None:
+        nonlocal observed_staging_fsync
+        info = os.fstat(fd)
+        if (info.st_dev, info.st_ino) == (staging_info.st_dev, staging_info.st_ino):
+            observed_staging_fsync = True
+        original_fsync(fd)
+
+    with monkeypatch.context() as patcher:
+        patcher.setattr(os, "fsync", observe_fsync)
+        result = await publish_candidate_archive(
+            root, high_water_raw, checkpoint_raw, session_factory=session_factory, expected_uid=os.getuid()
+        )
+    assert result.checkpoint_raw == checkpoint_raw
+    assert observed_staging_fsync
+
+
+@pytest.mark.asyncio
 async def test_pg_two_publisher_processes_serialize_on_archive_lock(
     session_factory: async_sessionmaker[AsyncSession], tmp_path: Path
 ) -> None:
