@@ -18,6 +18,7 @@ from r2.governance.operator_archive_reader import (
     OperatorArchiveInvalid,
     OperatorArchiveReader,
     _locked_archive,
+    classify_public_copies,
 )
 
 
@@ -213,6 +214,67 @@ def test_locked_retained_scan_denies_incomplete_archive(tmp_path: Path, fault: s
         pytest.raises(OperatorArchiveInvalid),
     ):
         session.read_retained()
+
+
+@pytest.mark.parametrize(
+    ("public_state", "expected"),
+    [
+        ("current", "current"),
+        ("previous", "previous"),
+        ("new_high_water", "new_high_water"),
+    ],
+)
+def test_classify_complete_retained_archive_public_state(tmp_path: Path, public_state: str, expected: str) -> None:
+    root, paths = _tree(tmp_path)
+    old_high_water = paths["public_high_water"].read_bytes()
+    old_checkpoint = paths["public_checkpoint"].read_bytes()
+    _append_successor(root, paths)
+    if public_state == "previous":
+        _put(paths["public_high_water"], old_high_water, 0o644)
+        _put(paths["public_checkpoint"], old_checkpoint, 0o644)
+    elif public_state == "new_high_water":
+        _put(paths["public_checkpoint"], old_checkpoint, 0o644)
+    with _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session:
+        assert classify_public_copies(session.read_retained()) == expected
+
+
+@pytest.mark.parametrize("fault", ["reverse_order", "unknown_high_water", "approval_changed", "registry_changed"])
+def test_classify_public_state_denies_unexpected_bytes(tmp_path: Path, fault: str) -> None:
+    root, paths = _tree(tmp_path)
+    old_high_water = paths["public_high_water"].read_bytes()
+    _append_successor(root, paths)
+    if fault == "reverse_order":
+        _put(paths["public_high_water"], old_high_water, 0o644)
+    elif fault == "unknown_high_water":
+        _put(paths["public_high_water"], b"{}", 0o644)
+    elif fault == "approval_changed":
+        _put(paths["public_approved"], b"{}", 0o644)
+    else:
+        _put(paths["public_registry"], b"{}", 0o644)
+    with (
+        _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session,
+        pytest.raises(OperatorArchiveInvalid),
+    ):
+        classify_public_copies(session.read_retained())
+
+
+@pytest.mark.parametrize("fault", ["matching", "wrong_bytes", "wrong_name"])
+def test_locked_recovery_scan_accepts_only_exact_retained_public_temporaries(tmp_path: Path, fault: str) -> None:
+    root, paths = _tree(tmp_path)
+    _append_successor(root, paths)
+    latest_high_water = (root / "archive" / "high-water" / "00000000000000000002.json").read_bytes()
+    name = ".high-water.00000000000000000002.tmp" if fault != "wrong_name" else ".unknown.tmp"
+    temporary = root / "read" / name
+    _put(temporary, latest_high_water if fault != "wrong_bytes" else b"{}", 0o644)
+    with _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session:
+        with pytest.raises(OperatorArchiveInvalid):
+            session.read_retained()
+        if fault == "matching":
+            state = session.read_retained(allow_public_temps=True)
+            assert state.public_temps == (name,)
+        else:
+            with pytest.raises(OperatorArchiveInvalid):
+                session.read_retained(allow_public_temps=True)
 
 
 @pytest.mark.parametrize(

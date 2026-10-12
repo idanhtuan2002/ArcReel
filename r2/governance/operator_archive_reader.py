@@ -8,6 +8,7 @@ from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import portalocker
 
@@ -204,9 +205,26 @@ class _RetainedArchiveState:
     registry_raw: bytes
     history: tuple[tuple[bytes, bytes], ...]
     public: tuple[bytes, bytes, bytes, bytes]
+    public_temps: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
+def classify_public_copies(state: _RetainedArchiveState) -> Literal["current", "previous", "new_high_water"]:
+    if state.public[:2] != (state.approved_raw, state.registry_raw):
+        raise OperatorArchiveInvalid
+    current = state.history[-1]
+    if state.public[2:] == current:
+        return "current"
+    if len(state.history) < 2:
+        raise OperatorArchiveInvalid
+    previous = state.history[-2]
+    if state.public[2:] == previous:
+        return "previous"
+    if state.public[2:] == (current[0], previous[1]):
+        return "new_high_water"
+    raise OperatorArchiveInvalid
+
+
+@dataclass
 class _LockedArchive:
     root: Path
     uid: int
@@ -222,18 +240,18 @@ class _LockedArchive:
     staging_fd: int
     lock_before: os.stat_result
 
-    def read_retained(self) -> _RetainedArchiveState:
+    def read_retained(self, *, allow_public_temps: bool = False) -> _RetainedArchiveState:
         """Verify the complete retained chain while keeping the publisher lock."""
-        return self._scan(require_public_current=False)
+        return self._scan(require_public_current=False, allow_public_temps=allow_public_temps)
 
     def read_complete(self) -> VerifiedOperatorArchiveV1:
         """Require exact latest public copies as well as a valid retained chain."""
-        state = self._scan(require_public_current=True)
+        state = self._scan(require_public_current=True, allow_public_temps=False)
         return VerifiedOperatorArchiveV1(
             state.snapshot, state.approved_raw, state.registry_raw, state.history[-1][0], state.history[-1][1]
         )
 
-    def _scan(self, *, require_public_current: bool) -> _RetainedArchiveState:
+    def _scan(self, *, require_public_current: bool, allow_public_temps: bool) -> _RetainedArchiveState:
         budget = _Budget(self.limits)
         uid = self.uid
         device = self.device
@@ -296,8 +314,28 @@ class _LockedArchive:
                 budget=budget,
             )
             history.append((high_water_raw, checkpoint_raw))
-        if _names(self.checkpoint_fd, budget) != checkpoint_names or _names(self.read_fd, budget) != _PUBLIC_NAMES:
+        if _names(self.checkpoint_fd, budget) != checkpoint_names:
             raise OperatorArchiveInvalid
+        read_names = _names(self.read_fd, budget)
+        sequence = len(history)
+        temp_expected = {
+            f".high-water.{sequence:020d}.tmp": (history[-1][0], MAX_HOST_RECORD_BYTES),
+            f".checkpoint.{sequence:020d}.tmp": (history[-1][1], MAX_GRANT_CHECKPOINT_BYTES),
+        }
+        public_temps = read_names - _PUBLIC_NAMES
+        if (
+            not _PUBLIC_NAMES.issubset(read_names)
+            or (public_temps and not allow_public_temps)
+            or not public_temps <= temp_expected.keys()
+        ):
+            raise OperatorArchiveInvalid
+        for name in sorted(public_temps):
+            expected, maximum = temp_expected[name]
+            if (
+                _read_file(self.read_fd, name, uid=uid, mode=0o644, device=device, maximum=maximum, budget=budget)
+                != expected
+            ):
+                raise OperatorArchiveInvalid
         public = (
             _read_file(
                 self.read_fd,
@@ -340,10 +378,37 @@ class _LockedArchive:
         if require_public_current and public != (approved_raw, registry_raw, *history[-1]):
             raise OperatorArchiveInvalid
         self._assert_stable()
-        return _RetainedArchiveState(snapshot, approved_raw, registry_raw, tuple(history), public)
+        return _RetainedArchiveState(
+            snapshot, approved_raw, registry_raw, tuple(history), public, tuple(sorted(public_temps))
+        )
 
-    def _assert_stable(self) -> None:
-        if any(_identity(before) != _identity(os.fstat(fd)) for fd, before in self.directories):
+    def note_public_write(self) -> None:
+        """Refresh only the read-directory metadata after a completed owned write."""
+        self._assert_stable(ignore_read=True)
+        before = self.directories[2][1]
+        after = os.fstat(self.read_fd)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_uid,
+            before.st_nlink,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_uid,
+            after.st_nlink,
+        ):
+            raise OperatorArchiveInvalid
+        self.directories = (*self.directories[:2], (self.read_fd, after), *self.directories[3:])
+
+    def _assert_stable(self, *, ignore_read: bool = False) -> None:
+        if any(
+            _identity(before) != _identity(os.fstat(fd))
+            for index, (fd, before) in enumerate(self.directories)
+            if not (ignore_read and index == 2)
+        ):
             raise OperatorArchiveInvalid
         lock_after = os.stat(".publisher.lock", dir_fd=self.archive_fd, follow_symlinks=False)
         if _identity(self.lock_before) != _identity(lock_after):
@@ -422,4 +487,10 @@ class OperatorArchiveReader:
             raise OperatorArchiveInvalid from None
 
 
-__all__ = ["ArchiveReadLimits", "OperatorArchiveInvalid", "OperatorArchiveReader", "VerifiedOperatorArchiveV1"]
+__all__ = [
+    "ArchiveReadLimits",
+    "OperatorArchiveInvalid",
+    "OperatorArchiveReader",
+    "VerifiedOperatorArchiveV1",
+    "classify_public_copies",
+]

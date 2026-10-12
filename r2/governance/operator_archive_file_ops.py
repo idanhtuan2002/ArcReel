@@ -6,7 +6,7 @@ import os
 import stat
 from collections.abc import Callable
 
-from r2.governance.operator_archive_reader import OperatorArchiveInvalid, _open_regular
+from r2.governance.operator_archive_reader import OperatorArchiveInvalid, _identity, _open_regular
 
 
 class ArchivePublicationInvalid(ValueError):
@@ -175,4 +175,47 @@ def replace_public_file(
         raise ArchivePublicationInvalid from None
 
 
-__all__ = ["ArchivePublicationInvalid", "publish_retained_file", "replace_public_file"]
+def remove_public_temp_if_exact(
+    *, read_fd: int, temp_name: str, expected: bytes, maximum: int, expected_uid: int
+) -> None:
+    """Remove a previously verified public temporary after checking its current bytes and inode."""
+
+    if (
+        not _single_name(temp_name)
+        or type(expected) is not bytes
+        or type(maximum) is not int
+        or not 0 < len(expected) <= maximum <= 64 * 1024 * 1024
+        or type(expected_uid) is not int
+        or expected_uid < 0
+        or os.unlink not in os.supports_dir_fd
+    ):
+        raise ArchivePublicationInvalid
+    try:
+        info = os.fstat(read_fd)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != expected_uid or stat.S_IMODE(info.st_mode) != 0o755:
+            raise ArchivePublicationInvalid
+        fd, before = _open_regular(
+            read_fd, temp_name, uid=expected_uid, mode=0o644, device=info.st_dev, maximum=maximum
+        )
+        try:
+            data = bytearray()
+            while chunk := os.read(fd, min(65_536, maximum + 1 - len(data))):
+                data.extend(chunk)
+                if len(data) > maximum:
+                    raise ArchivePublicationInvalid
+            if bytes(data) != expected or _identity(before) != _identity(os.fstat(fd)):
+                raise ArchivePublicationInvalid
+            observed = os.stat(temp_name, dir_fd=read_fd, follow_symlinks=False)
+            if _identity(before) != _identity(observed):
+                raise ArchivePublicationInvalid
+            os.unlink(temp_name, dir_fd=read_fd)
+        finally:
+            os.close(fd)
+        os.fsync(read_fd)
+    except ArchivePublicationInvalid:
+        raise
+    except (OSError, OperatorArchiveInvalid):
+        raise ArchivePublicationInvalid from None
+
+
+__all__ = ["ArchivePublicationInvalid", "publish_retained_file", "remove_public_temp_if_exact", "replace_public_file"]
