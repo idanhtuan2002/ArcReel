@@ -1,6 +1,6 @@
 # M8-C operator custody acceptance matrix
 
-Status: research and test design at `7a986a8cad3a12fd056cc78ac844b7b95384a10b`. Archive medium and release authority are undecided. No production file, key, mount, migration or route is changed by this packet.
+Status: research and test design at `7a986a8cad3a12fd056cc78ac844b7b95384a10b`, amended after the sponsor selected an operator-managed host directory on 2026-10-12. Its exact host path, provisioning, backup and release authority remain undecided. No production file, key, mount, migration or route is changed by this packet.
 
 ## Current evidence
 
@@ -33,4 +33,4 @@ The operator release preflight must resolve the actual image digest outside the 
 | Concurrent import, scan and request | Scanner sees a stable complete scope set; request compares a transaction-locked local head to a fresh checkpoint; commit order is observed | Forced PostgreSQL backend blockers and both orderings |
 | Key rotation or rollback of approved record | No implicit acceptance. Require an explicit continuity ceremony bound to the last retained approved state | Old/new key signatures, record sequence, rollback and lost-key tests in a separately accepted packet |
 
-The existing internal restore drill proves only that an old PostgreSQL database is denied against a newer external checkpoint when scanner/reader are invoked directly. The internal service integration test proves denial when a checkpoint lacks the active scope. Neither exercises a production trust archive or application lifespan. The archive medium, failure domain, authorized operator, retention and key-rotation ceremony are pending sponsor selection.
+The existing internal restore drill proves only that an old PostgreSQL database is denied against a newer external checkpoint when scanner/reader are invoked directly. The internal service integration test proves denial when a checkpoint lacks the active scope. Neither exercises a production trust archive or application lifespan. The sponsor selected a host directory; its actual failure domain, independent backup, authorized operator, retention and key-rotation ceremony still need definition and evidence. The selected layout and reuse audit are in `docs/superpowers/specs/2026-10-12-r2-m8c-operator-high-water-manifest-design.md` and `docs/research/2026-10-12-r2-m8c-host-custody-reuse-audit.md`.

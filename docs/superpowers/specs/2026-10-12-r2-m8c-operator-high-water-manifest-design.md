@@ -1,6 +1,6 @@
 # M8-C operator high-water and release manifest candidate
 
-Status: proposed recovery/operations contract at `fa91ff4050984c646eeb8a45015882a3c9120ab0`, 2026-10-12. It does not enroll an operator, accept a key rotation, change production Compose, or authorize a restore/cutover.
+Status: sponsor selected an operator-managed host directory as the custody medium on 2026-10-12. The layout and procedure below remain a design candidate; this does not enroll an operator, accept a key rotation, change production Compose, or authorize a restore/cutover.
 
 ## Evidence and boundary
 
@@ -31,17 +31,36 @@ Each checkpoint high-water entry pins:
 
 The entry must be canonical and digest-linked. The operator archive's ownership/retention and offline approval are the trust anchor; a self-hash or sequence field in a replaced archive is not independent protection. A separate append-only service remains the stronger option if privileged host replacement is in scope.
 
+## Selected host-directory boundary
+
+Use one configurable absolute host root outside the Compose project, `pgdata`, `projects`, `logs`, any M7 backup directory and every restore target. `/srv/arcreel-governance` is an illustrative deployment path, not a path created or approved on this machine. The root has two distinct subtrees:
+
+| Host subtree | Contents and access |
+|---|---|
+| `archive/` | Operator-only approved deployment records, immutable-by-procedure high-water entries, retained exact checkpoint bytes and custody receipts. Root-owned, mode `0700` on directories and `0600` on records; never bind-mounted into the app or PostgreSQL container. |
+| `read/` | Only the current public verifier registry, current signed checkpoint and a bounded approved public deployment record. Root-owned, proposed directory mode `0755` and file mode `0644`, with no private key or operator receipt. Bind the **directory** into the app read-only; never mount a single current file, and never give the app a write mount of either subtree. |
+
+The operator's publisher is the only writer. For the proposed root-owned layout it runs outside the application container through an audited root procedure, with an exclusive host-side publication lock. The application must not create the source directory: use Compose long bind syntax with `read_only: true` and `bind.create_host_path: false`, then fail startup if any expected file is absent. Docker's [Compose bind specification](https://docs.docker.com/reference/compose-file/services/) documents both fields. The earlier disposable directory-bind drill demonstrated that separate reader processes reopen the replacement pathname, but production Compose still lacks this mount.
+
+The `read/` approved record is a public *copy* of the latest operator-approved `archive/` record. Before starting or restoring the app, the operator compares that copy byte-for-byte with the retained record and checks the resolved image digest against it. Inside the app, the copy pins the registry and checkpoint bytes it sees; it cannot prove its own image digest or detect replacement of `archive/` and `read/` together by a privileged host actor. Therefore direct Compose startup without the operator preflight is outside the activated procedure. Host-root compromise, deletion of the whole host and rollback of all copies are outside this host-local guarantee. A separately stored backup of `archive/` and a recorded restore procedure are required for host-loss recovery; the destination, schedule and operator custody of that copy still need to be selected and tested.
+
+The current application image runs as root with `NET_ADMIN` and unconfined seccomp/AppArmor for its sandbox. A read-only bind prevents writes through that mount; it does not create a security boundary against host-root control or container escape. The trust claim is limited to an uncompromised host and the operator's exclusive archive custody.
+
+A disposable local Compose probe used `postgres:16` as a no-port, no-app reader with long bind syntax. `docker compose config --quiet` returned 0. For an existing source directory, the container read `current`, could not create a file under the read-only mount, and exited 0. For a missing source with `create_host_path: false`, `compose run` exited 1 and did not create the source directory. The temporary directory and one-off containers were removed. This proves the selected Compose syntax on the local engine only; it does not test the production service, host ownership, archive durability or signer procedure.
+
+The [bounded reuse audit](../../research/2026-10-12-r2-m8c-host-custody-reuse-audit.md) identifies existing atomic-write, no-follow, fence-expectation and clean-restore primitives and fixed donor revisions. None supplies an independently retained Governance latest-checkpoint anchor as-is.
+
 ## Publication and crash ordering
 
 For a new signed ISSUE/REVOKE checkpoint, the operator first verifies the committed database head and its signed chain, checks that the new checkpoint has sequence `N+1`, predecessor equal to retained checkpoint `N`, no removed scopes and no head sequence decrease, and checks exact deployment/key purpose. A scope deletion or sequence reduction requires a separately designed signed recovery exception; no ordinary publisher path admits it.
 
-The operator writes the complete candidate to a sibling in the custody directory and fsyncs that file. It then appends and durably fsyncs the high-water entry and archive directory **before** publishing the candidate as current. Finally it renames the candidate over `grant-checkpoint.json` in the same directory and fsyncs that directory. If the archive step fails, publication stops. If the process crashes after durable high-water but before rename, the current checkpoint is old and the affected grant scope stays unavailable; recovery compares the archive to the current file and resumes publication of the retained candidate or quarantines. If rename succeeds but its directory fsync does not, the retained high-water still detects an older current file after reboot. The operator never makes the application write the archive or checkpoint.
+The operator writes the complete candidate to a sibling in `read/` and fsyncs that file. It then appends and durably fsyncs the high-water entry, retained candidate bytes and `archive/` directory **before** publishing the candidate as current. Finally it renames the candidate over `read/grant-checkpoint.json` in the same directory and fsyncs `read/`. Linux [rename(2)](https://man7.org/linux/man-pages/man2/renameat2.2.html) describes atomic replacement of the destination name, while [fsync(2)](https://man7.org/linux/man-pages/man2/fsync.2.html) notes that persisting the directory entry needs an explicit directory fsync. If the archive step fails, publication stops. If the process crashes after durable high-water but before rename, the current checkpoint is old and the affected grant scope stays unavailable; recovery compares the archive to the current file and resumes publication of the retained candidate or quarantines. If rename succeeds but its directory fsync does not, the retained high-water still detects an older current file after reboot. The operator never makes the application write the archive or checkpoint.
 
 On restore, an operator preflight compares the image and registry digests to the approved deployment record, checks the current checkpoint digest/sequence against the latest retained high-water entry, then runs the full-chain PostgreSQL scanner before the app or workers become ready. A lower, divergent or missing current file quarantines the target even when that file has a valid signature. The scanner separately rejects any database head mismatch. The M7 `VERIFIED` backup state remains a prerequisite for its own workflow but is not a substitute for this Governance preflight.
 
 ## Open acceptance work
 
-1. Select an actual archive medium and authorized operator procedure. Define file ownership/mode, backups, two-person approval if needed, and how receipt authenticity survives host loss. No local file choice is accepted by this packet.
+1. The sponsor selected an operator-managed host directory. Resolve its actual absolute path, filesystem, provisioning account, access review, independent backup destination/retention and host-loss restore drill. The ownership/mode and two-subtree layout above are proposed until verified on that host; two-person approval and receipt custody remain undecided.
 2. Define a strict high-water/deployment record wire contract and offline publisher with adversarial crash/retry tests. Do not use production private keys in repository tests.
 3. Define a key-rotation ceremony with continuity from the previous approved registry to the next; the v1 parser alone does not authorize a key switch.
 4. Choose a schema/migration preflight that cannot advance grant state before recovery comparison, and pin a production image by digest. The current production Compose still uses a mutable tag.
