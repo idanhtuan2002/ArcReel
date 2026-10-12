@@ -11,6 +11,7 @@ from r2.governance.operator_archive_file_ops import (
     ArchivePublicationInvalid,
     publish_retained_file,
     remove_linked_staging_if_exact,
+    remove_staged_file_if_exact,
     replace_public_file,
 )
 
@@ -177,6 +178,46 @@ def test_linked_staging_cleanup_completes_actual_interrupted_publication(tmp_pat
         os.close(final_fd)
     assert list(staging.iterdir()) == []
     assert (final / "00000000000000000002.json").stat().st_nlink == 1
+
+
+@pytest.mark.parametrize("fault", ["match", "wrong_bytes", "extra_link", "wrong_mode", "final_exists"])
+def test_staged_file_cleanup_requires_exact_unlinked_candidate(tmp_path: Path, fault: str) -> None:
+    staging, final, staging_fd, final_fd = _directories(tmp_path)
+    staged = staging / "candidate.tmp"
+    staged.write_bytes(b"exact candidate bytes")
+    staged.chmod(0o600)
+    if fault == "extra_link":
+        os.link(staged, staging / "unexpected")
+    elif fault == "wrong_mode":
+        staged.chmod(0o644)
+    elif fault == "final_exists":
+        (final / "candidate.json").write_bytes(b"existing")
+    try:
+        if fault == "match":
+            remove_staged_file_if_exact(
+                staging_fd=staging_fd,
+                final_fd=final_fd,
+                staging_name=staged.name,
+                final_name="candidate.json",
+                raw=b"exact candidate bytes",
+                maximum=8192,
+                expected_uid=os.getuid(),
+            )
+        else:
+            with pytest.raises(ArchivePublicationInvalid):
+                remove_staged_file_if_exact(
+                    staging_fd=staging_fd,
+                    final_fd=final_fd,
+                    staging_name=staged.name,
+                    final_name="candidate.json",
+                    raw=b"different bytes" if fault == "wrong_bytes" else b"exact candidate bytes",
+                    maximum=8192,
+                    expected_uid=os.getuid(),
+                )
+    finally:
+        os.close(staging_fd)
+        os.close(final_fd)
+    assert staged.exists() == (fault != "match")
 
 
 @pytest.mark.parametrize("old_raw", [b"prior different bytes", b"new candidate bytes"])

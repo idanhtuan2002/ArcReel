@@ -181,6 +181,76 @@ def remove_linked_staging_if_exact(
         raise ArchivePublicationInvalid from None
 
 
+def remove_staged_file_if_exact(
+    *,
+    staging_fd: int,
+    final_fd: int,
+    staging_name: str,
+    final_name: str,
+    raw: bytes,
+    maximum: int,
+    expected_uid: int,
+) -> None:
+    """Discard one exact unlinked temporary before restarting create-only publication."""
+
+    if (
+        not _single_name(staging_name)
+        or not _single_name(final_name)
+        or type(raw) is not bytes
+        or type(maximum) is not int
+        or not 0 < len(raw) <= maximum <= 64 * 1024 * 1024
+        or type(expected_uid) is not int
+        or expected_uid < 0
+        or os.unlink not in os.supports_dir_fd
+        or os.stat not in os.supports_dir_fd
+        or os.stat not in os.supports_follow_symlinks
+    ):
+        raise ArchivePublicationInvalid
+    try:
+        staging_info = _directory(staging_fd, expected_uid=expected_uid)
+        final_info = _directory(final_fd, expected_uid=expected_uid)
+        if staging_info.st_dev != final_info.st_dev or staging_info.st_ino == final_info.st_ino:
+            raise ArchivePublicationInvalid
+        try:
+            os.stat(final_name, dir_fd=final_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ArchivePublicationInvalid
+        staged_path = os.stat(staging_name, dir_fd=staging_fd, follow_symlinks=False)
+        fd, before = _open_regular(
+            staging_fd, staging_name, uid=expected_uid, mode=0o600, device=staging_info.st_dev, maximum=maximum
+        )
+        try:
+            data = bytearray()
+            while chunk := os.read(fd, min(65_536, maximum + 1 - len(data))):
+                data.extend(chunk)
+                if len(data) > maximum:
+                    raise ArchivePublicationInvalid
+            if (
+                bytes(data) != raw
+                or before.st_nlink != 1
+                or _identity(before) != _identity(staged_path)
+                or _identity(before) != _identity(os.fstat(fd))
+                or _identity(before) != _identity(os.stat(staging_name, dir_fd=staging_fd, follow_symlinks=False))
+            ):
+                raise ArchivePublicationInvalid
+            try:
+                os.stat(final_name, dir_fd=final_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise ArchivePublicationInvalid
+            os.unlink(staging_name, dir_fd=staging_fd)
+        finally:
+            os.close(fd)
+        os.fsync(staging_fd)
+    except ArchivePublicationInvalid:
+        raise
+    except (OSError, OperatorArchiveInvalid):
+        raise ArchivePublicationInvalid from None
+
+
 def replace_public_file(
     *,
     read_fd: int,
