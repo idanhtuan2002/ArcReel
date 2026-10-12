@@ -6,7 +6,7 @@ import os
 import stat
 from collections.abc import Callable
 
-from r2.governance.operator_archive_reader import OperatorArchiveInvalid, _identity, _open_regular
+from r2.governance.operator_archive_reader import _FILE_FLAGS, OperatorArchiveInvalid, _identity, _open_regular
 
 
 class ArchivePublicationInvalid(ValueError):
@@ -101,6 +101,80 @@ def publish_retained_file(
         os.fsync(staging_fd)
         if after_phase is not None:
             after_phase("unlink_fsync")
+    except ArchivePublicationInvalid:
+        raise
+    except OSError:
+        raise ArchivePublicationInvalid from None
+
+
+def remove_linked_staging_if_exact(
+    *,
+    staging_fd: int,
+    final_fd: int,
+    staging_name: str,
+    final_name: str,
+    raw: bytes,
+    maximum: int,
+    expected_uid: int,
+) -> None:
+    """Finish an interrupted create-only link after exact inode and byte checks."""
+
+    if (
+        not _single_name(staging_name)
+        or not _single_name(final_name)
+        or type(raw) is not bytes
+        or type(maximum) is not int
+        or not 0 < len(raw) <= maximum <= 64 * 1024 * 1024
+        or type(expected_uid) is not int
+        or expected_uid < 0
+        or os.unlink not in os.supports_dir_fd
+    ):
+        raise ArchivePublicationInvalid
+    try:
+        staging_info = _directory(staging_fd, expected_uid=expected_uid)
+        final_info = _directory(final_fd, expected_uid=expected_uid)
+        if staging_info.st_dev != final_info.st_dev or staging_info.st_ino == final_info.st_ino:
+            raise ArchivePublicationInvalid
+        staged_path = os.stat(staging_name, dir_fd=staging_fd, follow_symlinks=False)
+        final_path = os.stat(final_name, dir_fd=final_fd, follow_symlinks=False)
+        staged_file = os.open(staging_name, _FILE_FLAGS, dir_fd=staging_fd)
+        try:
+            final_file = os.open(final_name, _FILE_FLAGS, dir_fd=final_fd)
+            try:
+                before = os.fstat(staged_file)
+                if (
+                    not stat.S_ISREG(before.st_mode)
+                    or before.st_uid != expected_uid
+                    or stat.S_IMODE(before.st_mode) != 0o600
+                    or before.st_dev != staging_info.st_dev
+                    or before.st_nlink != 2
+                    or before.st_size != len(raw)
+                    or _identity(staged_path) != _identity(before)
+                    or _identity(final_path) != _identity(before)
+                    or _identity(os.fstat(final_file)) != _identity(before)
+                ):
+                    raise ArchivePublicationInvalid
+                data = bytearray()
+                while chunk := os.read(staged_file, min(65_536, maximum + 1 - len(data))):
+                    data.extend(chunk)
+                    if len(data) > maximum:
+                        raise ArchivePublicationInvalid
+                if (
+                    bytes(data) != raw
+                    or _identity(os.fstat(staged_file)) != _identity(before)
+                    or _identity(os.fstat(final_file)) != _identity(before)
+                    or _identity(os.stat(staging_name, dir_fd=staging_fd, follow_symlinks=False)) != _identity(before)
+                    or _identity(os.stat(final_name, dir_fd=final_fd, follow_symlinks=False)) != _identity(before)
+                ):
+                    raise ArchivePublicationInvalid
+                os.fsync(staged_file)
+                os.fsync(final_fd)
+                os.unlink(staging_name, dir_fd=staging_fd)
+            finally:
+                os.close(final_file)
+        finally:
+            os.close(staged_file)
+        os.fsync(staging_fd)
     except ArchivePublicationInvalid:
         raise
     except OSError:
@@ -218,4 +292,10 @@ def remove_public_temp_if_exact(
         raise ArchivePublicationInvalid from None
 
 
-__all__ = ["ArchivePublicationInvalid", "publish_retained_file", "remove_public_temp_if_exact", "replace_public_file"]
+__all__ = [
+    "ArchivePublicationInvalid",
+    "publish_retained_file",
+    "remove_linked_staging_if_exact",
+    "remove_public_temp_if_exact",
+    "replace_public_file",
+]

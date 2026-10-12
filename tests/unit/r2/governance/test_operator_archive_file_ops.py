@@ -10,6 +10,7 @@ import pytest
 from r2.governance.operator_archive_file_ops import (
     ArchivePublicationInvalid,
     publish_retained_file,
+    remove_linked_staging_if_exact,
     replace_public_file,
 )
 
@@ -94,6 +95,88 @@ def test_interrupted_publish_preserves_recoverable_or_quarantined_bytes(tmp_path
     else:
         assert target.read_bytes() == b"exact candidate bytes"
         assert target.stat().st_nlink == (2 if phase in {"link_created", "link_fsync"} else 1)
+
+
+@pytest.mark.parametrize("fault", ["match", "wrong_bytes", "separate_inode", "extra_link", "wrong_mode"])
+def test_linked_staging_cleanup_requires_exact_candidate_inode(tmp_path: Path, fault: str) -> None:
+    staging, final, staging_fd, final_fd = _directories(tmp_path)
+    staged = staging / "candidate.tmp"
+    target = final / "00000000000000000002.json"
+    staged.write_bytes(b"exact candidate bytes")
+    staged.chmod(0o600)
+    if fault == "separate_inode":
+        target.write_bytes(b"exact candidate bytes")
+        target.chmod(0o600)
+    else:
+        os.link(staged, target)
+    if fault == "extra_link":
+        os.link(staged, staging / "unexpected")
+    if fault == "wrong_mode":
+        staged.chmod(0o644)
+    try:
+        if fault == "match":
+            remove_linked_staging_if_exact(
+                staging_fd=staging_fd,
+                final_fd=final_fd,
+                staging_name=staged.name,
+                final_name=target.name,
+                raw=b"exact candidate bytes",
+                maximum=8192,
+                expected_uid=os.getuid(),
+            )
+        else:
+            with pytest.raises(ArchivePublicationInvalid):
+                remove_linked_staging_if_exact(
+                    staging_fd=staging_fd,
+                    final_fd=final_fd,
+                    staging_name=staged.name,
+                    final_name=target.name,
+                    raw=b"different bytes" if fault == "wrong_bytes" else b"exact candidate bytes",
+                    maximum=8192,
+                    expected_uid=os.getuid(),
+                )
+    finally:
+        os.close(staging_fd)
+        os.close(final_fd)
+    assert staged.exists() == (fault != "match")
+    assert target.read_bytes() == b"exact candidate bytes"
+    assert target.stat().st_nlink == (1 if fault in {"match", "separate_inode"} else 3 if fault == "extra_link" else 2)
+
+
+def test_linked_staging_cleanup_completes_actual_interrupted_publication(tmp_path: Path) -> None:
+    staging, final, staging_fd, final_fd = _directories(tmp_path)
+
+    def interrupt(phase: str) -> None:
+        if phase == "link_created":
+            raise RuntimeError("interrupted")
+
+    try:
+        with pytest.raises(RuntimeError, match="interrupted"):
+            publish_retained_file(
+                staging_fd=staging_fd,
+                final_fd=final_fd,
+                staging_name="candidate.tmp",
+                final_name="00000000000000000002.json",
+                raw=b"exact candidate bytes",
+                maximum=8192,
+                expected_uid=os.getuid(),
+                after_phase=interrupt,
+            )
+        assert (staging / "candidate.tmp").stat().st_nlink == 2
+        remove_linked_staging_if_exact(
+            staging_fd=staging_fd,
+            final_fd=final_fd,
+            staging_name="candidate.tmp",
+            final_name="00000000000000000002.json",
+            raw=b"exact candidate bytes",
+            maximum=8192,
+            expected_uid=os.getuid(),
+        )
+    finally:
+        os.close(staging_fd)
+        os.close(final_fd)
+    assert list(staging.iterdir()) == []
+    assert (final / "00000000000000000002.json").stat().st_nlink == 1
 
 
 @pytest.mark.parametrize("old_raw", [b"prior different bytes", b"new candidate bytes"])
