@@ -21,6 +21,7 @@ from r2.governance.operator_archive_reader import (
     _locked_archive,
     classify_public_copies,
 )
+from server.services.governance_operator_archive import _classify_candidate_archive
 
 
 def _digest(raw: bytes) -> str:
@@ -443,6 +444,50 @@ def test_locked_linked_high_water_scan_requires_exact_candidate_inode_and_prior_
         else:
             with pytest.raises(OperatorArchiveInvalid):
                 session.read_linked_high_water(candidate_high_water, candidate_checkpoint)
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "prior",
+        "staged_checkpoint",
+        "linked_checkpoint",
+        "orphan_checkpoint",
+        "staged_high_water",
+        "linked_high_water",
+        "complete",
+    ],
+)
+def test_locked_candidate_classifier_requires_exact_bytes(tmp_path: Path, location: str) -> None:
+    root, paths = _tree(tmp_path)
+    old_high_water = paths["public_high_water"].read_bytes()
+    old_checkpoint = paths["public_checkpoint"].read_bytes()
+    _append_successor(root, paths)
+    high_water_raw = paths["public_high_water"].read_bytes()
+    checkpoint_raw = paths["public_checkpoint"].read_bytes()
+    retained_high_water = root / "archive" / "high-water" / "00000000000000000002.json"
+    retained_checkpoint = root / "archive" / "checkpoints" / f"sha256-{_digest(checkpoint_raw)[7:]}.json"
+    staging = root / "archive" / ".staging"
+    if location != "complete":
+        _put(paths["public_high_water"], old_high_water, 0o644)
+        _put(paths["public_checkpoint"], old_checkpoint, 0o644)
+    if location in {"prior", "staged_checkpoint", "linked_checkpoint", "orphan_checkpoint", "staged_high_water"}:
+        retained_high_water.unlink()
+    if location in {"prior", "staged_checkpoint"}:
+        retained_checkpoint.unlink()
+    if location == "staged_checkpoint":
+        _put(staging / ".checkpoint.00000000000000000002.tmp", checkpoint_raw, 0o600)
+    elif location == "linked_checkpoint":
+        os.link(retained_checkpoint, staging / ".checkpoint.00000000000000000002.tmp")
+    elif location == "staged_high_water":
+        _put(staging / ".high-water.00000000000000000002.tmp", high_water_raw, 0o600)
+    elif location == "linked_high_water":
+        os.link(retained_high_water, staging / ".high-water.00000000000000000002.tmp")
+    with _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session:
+        found, _state = _classify_candidate_archive(session, high_water_raw, checkpoint_raw)
+        assert found == location
+        with pytest.raises(OperatorArchiveInvalid):
+            _classify_candidate_archive(session, high_water_raw, b"different candidate")
 
 
 @pytest.mark.parametrize("fault", ["owned_write", "unrelated_public_change", "wrong_final_fd"])
