@@ -560,7 +560,7 @@ class _LockedArchive:
 
     def note_public_write(self) -> None:
         """Refresh only the read-directory metadata after a completed owned write."""
-        self._assert_stable(ignore_read=True)
+        self._assert_stable(ignored_indices=frozenset({2}))
         before = self.directories[2][1]
         after = os.fstat(self.read_fd)
         if (
@@ -579,11 +579,42 @@ class _LockedArchive:
             raise OperatorArchiveInvalid
         self.directories = (*self.directories[:2], (self.read_fd, after), *self.directories[3:])
 
-    def _assert_stable(self, *, ignore_read: bool = False) -> None:
+    def note_retained_write(self, final_fd: int) -> None:
+        """Refresh only staging and the owned retained directory after publication."""
+        if final_fd == self.high_water_fd:
+            final_index = 5
+        elif final_fd == self.checkpoint_fd:
+            final_index = 6
+        else:
+            raise OperatorArchiveInvalid
+        changed = frozenset({final_index, 7})
+        self._assert_stable(ignored_indices=changed)
+        directories = list(self.directories)
+        for index in changed:
+            fd, before = directories[index]
+            after = _directory(fd, uid=self.uid, mode=0o700, device=self.device)
+            if (
+                before.st_dev,
+                before.st_ino,
+                before.st_mode,
+                before.st_uid,
+                before.st_nlink,
+            ) != (
+                after.st_dev,
+                after.st_ino,
+                after.st_mode,
+                after.st_uid,
+                after.st_nlink,
+            ):
+                raise OperatorArchiveInvalid
+            directories[index] = (fd, after)
+        self.directories = tuple(directories)
+
+    def _assert_stable(self, *, ignored_indices: frozenset[int] = frozenset()) -> None:
         if any(
             _identity(before) != _identity(os.fstat(fd))
             for index, (fd, before) in enumerate(self.directories)
-            if not (ignore_read and index == 2)
+            if index not in ignored_indices
         ):
             raise OperatorArchiveInvalid
         lock_after = os.stat(".publisher.lock", dir_fd=self.archive_fd, follow_symlinks=False)

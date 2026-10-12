@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from lib.content_digest import canonical_json_bytes
+from r2.governance.operator_archive_file_ops import publish_retained_file
 from r2.governance.operator_archive_reader import (
     ArchiveReadLimits,
     OperatorArchiveInvalid,
@@ -442,6 +443,30 @@ def test_locked_linked_high_water_scan_requires_exact_candidate_inode_and_prior_
         else:
             with pytest.raises(OperatorArchiveInvalid):
                 session.read_linked_high_water(candidate_high_water, candidate_checkpoint)
+
+
+@pytest.mark.parametrize("fault", ["owned_write", "unrelated_public_change", "wrong_final_fd"])
+def test_locked_archive_refreshes_only_owned_retained_directories(tmp_path: Path, fault: str) -> None:
+    root, paths = _tree(tmp_path)
+    with _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session:
+        publish_retained_file(
+            staging_fd=session.staging_fd,
+            final_fd=session.checkpoint_fd,
+            staging_name="candidate.tmp",
+            final_name="candidate.json",
+            raw=b"exact bytes",
+            maximum=8192,
+            expected_uid=os.getuid(),
+        )
+        if fault == "unrelated_public_change":
+            _put(paths["public_checkpoint"].with_name("unexpected"), b"extra", 0o644)
+        final_fd = session.read_fd if fault == "wrong_final_fd" else session.checkpoint_fd
+        if fault == "owned_write":
+            session.note_retained_write(final_fd)
+            session._assert_stable()
+        else:
+            with pytest.raises(OperatorArchiveInvalid):
+                session.note_retained_write(final_fd)
 
 
 @pytest.mark.parametrize(
