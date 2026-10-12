@@ -13,7 +13,12 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from lib.content_digest import canonical_json_bytes
-from r2.governance.operator_archive_reader import ArchiveReadLimits, OperatorArchiveInvalid, OperatorArchiveReader
+from r2.governance.operator_archive_reader import (
+    ArchiveReadLimits,
+    OperatorArchiveInvalid,
+    OperatorArchiveReader,
+    _locked_archive,
+)
 
 
 def _digest(raw: bytes) -> str:
@@ -177,6 +182,37 @@ def test_reader_accepts_retained_successor_and_denies_old_public_pair(tmp_path: 
     _put(paths["public_checkpoint"], old_checkpoint, 0o644)
     with pytest.raises(OperatorArchiveInvalid):
         OperatorArchiveReader(root, expected_uid=os.getuid()).read()
+
+
+def test_locked_session_verifies_retained_successor_with_old_public_pair(tmp_path: Path) -> None:
+    root, paths = _tree(tmp_path)
+    old_high_water = paths["public_high_water"].read_bytes()
+    old_checkpoint = paths["public_checkpoint"].read_bytes()
+    _append_successor(root, paths)
+    _put(paths["public_high_water"], old_high_water, 0o644)
+    _put(paths["public_checkpoint"], old_checkpoint, 0o644)
+    with _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session:
+        state = session.read_retained()
+        assert state.snapshot.high_water.checkpoint_sequence == 2
+        assert state.public[2:] == (old_high_water, old_checkpoint)
+        with pytest.raises(OperatorArchiveInvalid):
+            OperatorArchiveReader(root, expected_uid=os.getuid()).read()
+    with pytest.raises(OperatorArchiveInvalid):
+        OperatorArchiveReader(root, expected_uid=os.getuid()).read()
+
+
+@pytest.mark.parametrize("fault", ["unknown_staging", "orphan_envelope"])
+def test_locked_retained_scan_denies_incomplete_archive(tmp_path: Path, fault: str) -> None:
+    root, _paths = _tree(tmp_path)
+    if fault == "unknown_staging":
+        _put(root / "archive" / ".staging" / "unknown.tmp", b"partial", 0o600)
+    else:
+        _put(root / "archive" / "checkpoints" / ("sha256-" + "0" * 64 + ".json"), b"{}", 0o600)
+    with (
+        _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session,
+        pytest.raises(OperatorArchiveInvalid),
+    ):
+        session.read_retained()
 
 
 @pytest.mark.parametrize(

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 import stat
-from contextlib import ExitStack
+from collections.abc import Generator
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from r2.contracts.governance_host_records import (
 )
 from r2.contracts.governance_verifier_registry import MAX_VERIFIER_REGISTRY_BYTES
 from r2.contracts.grant_checkpoint import MAX_GRANT_CHECKPOINT_BYTES
-from r2.governance.archived_custody_chain import validate_archived_custody_chain
+from r2.governance.archived_custody_chain import validate_retained_custody_chain
 from r2.governance.public_custody_snapshot import VerifiedPublicCustodySnapshotV1
 
 MAX_ARCHIVE_ENTRIES = 10_000
@@ -196,6 +197,213 @@ def _names(fd: int, budget: _Budget) -> set[str]:
     return found
 
 
+@dataclass(frozen=True)
+class _RetainedArchiveState:
+    snapshot: VerifiedPublicCustodySnapshotV1
+    approved_raw: bytes
+    registry_raw: bytes
+    history: tuple[tuple[bytes, bytes], ...]
+    public: tuple[bytes, bytes, bytes, bytes]
+
+
+@dataclass(frozen=True)
+class _LockedArchive:
+    root: Path
+    uid: int
+    limits: ArchiveReadLimits
+    device: int
+    directories: tuple[tuple[int, os.stat_result], ...]
+    archive_fd: int
+    read_fd: int
+    approved_fd: int
+    registry_fd: int
+    high_water_fd: int
+    checkpoint_fd: int
+    staging_fd: int
+    lock_before: os.stat_result
+
+    def read_retained(self) -> _RetainedArchiveState:
+        """Verify the complete retained chain while keeping the publisher lock."""
+        return self._scan(require_public_current=False)
+
+    def read_complete(self) -> VerifiedOperatorArchiveV1:
+        """Require exact latest public copies as well as a valid retained chain."""
+        state = self._scan(require_public_current=True)
+        return VerifiedOperatorArchiveV1(
+            state.snapshot, state.approved_raw, state.registry_raw, state.history[-1][0], state.history[-1][1]
+        )
+
+    def _scan(self, *, require_public_current: bool) -> _RetainedArchiveState:
+        budget = _Budget(self.limits)
+        uid = self.uid
+        device = self.device
+        root_fd = self.directories[0][0]
+        if _names(root_fd, budget) != {"archive", "read"} or _names(self.archive_fd, budget) != _ARCHIVE_NAMES:
+            raise OperatorArchiveInvalid
+        if _names(self.staging_fd, budget) or _names(self.approved_fd, budget) != {"00000000000000000001.json"}:
+            raise OperatorArchiveInvalid
+        approved_raw = _read_file(
+            self.approved_fd,
+            "00000000000000000001.json",
+            uid=uid,
+            mode=0o600,
+            device=device,
+            maximum=MAX_HOST_RECORD_BYTES,
+            budget=budget,
+        )
+        approval = parse_approved_deployment(approved_raw)
+        if approval.approval_sequence != 1:
+            raise OperatorArchiveInvalid
+        registry_name = f"sha256-{approval.body.registry_file_digest[7:]}.json"
+        if _names(self.registry_fd, budget) != {registry_name}:
+            raise OperatorArchiveInvalid
+        registry_raw = _read_file(
+            self.registry_fd,
+            registry_name,
+            uid=uid,
+            mode=0o600,
+            device=device,
+            maximum=MAX_VERIFIER_REGISTRY_BYTES,
+            budget=budget,
+        )
+        high_water_names = _names(self.high_water_fd, budget)
+        if not high_water_names or high_water_names != {
+            f"{sequence:020d}.json" for sequence in range(1, len(high_water_names) + 1)
+        }:
+            raise OperatorArchiveInvalid
+        history: list[tuple[bytes, bytes]] = []
+        checkpoint_names: set[str] = set()
+        for sequence in range(1, len(high_water_names) + 1):
+            high_water_raw = _read_file(
+                self.high_water_fd,
+                f"{sequence:020d}.json",
+                uid=uid,
+                mode=0o600,
+                device=device,
+                maximum=MAX_HOST_RECORD_BYTES,
+                budget=budget,
+            )
+            parsed = parse_checkpoint_high_water(high_water_raw)
+            checkpoint_name = f"sha256-{parsed.body.checkpoint_file_digest[7:]}.json"
+            checkpoint_names.add(checkpoint_name)
+            checkpoint_raw = _read_file(
+                self.checkpoint_fd,
+                checkpoint_name,
+                uid=uid,
+                mode=0o600,
+                device=device,
+                maximum=MAX_GRANT_CHECKPOINT_BYTES,
+                budget=budget,
+            )
+            history.append((high_water_raw, checkpoint_raw))
+        if _names(self.checkpoint_fd, budget) != checkpoint_names or _names(self.read_fd, budget) != _PUBLIC_NAMES:
+            raise OperatorArchiveInvalid
+        public = (
+            _read_file(
+                self.read_fd,
+                "approved-deployment.json",
+                uid=uid,
+                mode=0o644,
+                device=device,
+                maximum=MAX_HOST_RECORD_BYTES,
+                budget=budget,
+            ),
+            _read_file(
+                self.read_fd,
+                "governance-verifiers-v1.json",
+                uid=uid,
+                mode=0o644,
+                device=device,
+                maximum=MAX_VERIFIER_REGISTRY_BYTES,
+                budget=budget,
+            ),
+            _read_file(
+                self.read_fd,
+                "high-water.json",
+                uid=uid,
+                mode=0o644,
+                device=device,
+                maximum=MAX_HOST_RECORD_BYTES,
+                budget=budget,
+            ),
+            _read_file(
+                self.read_fd,
+                "grant-checkpoint.json",
+                uid=uid,
+                mode=0o644,
+                device=device,
+                maximum=MAX_GRANT_CHECKPOINT_BYTES,
+                budget=budget,
+            ),
+        )
+        snapshot = validate_retained_custody_chain(approved_raw, registry_raw, history)
+        if require_public_current and public != (approved_raw, registry_raw, *history[-1]):
+            raise OperatorArchiveInvalid
+        self._assert_stable()
+        return _RetainedArchiveState(snapshot, approved_raw, registry_raw, tuple(history), public)
+
+    def _assert_stable(self) -> None:
+        if any(_identity(before) != _identity(os.fstat(fd)) for fd, before in self.directories):
+            raise OperatorArchiveInvalid
+        lock_after = os.stat(".publisher.lock", dir_fd=self.archive_fd, follow_symlinks=False)
+        if _identity(self.lock_before) != _identity(lock_after):
+            raise OperatorArchiveInvalid
+        with ExitStack() as check_stack:
+            _reopened, reopened_info = _open_root(self.root, check_stack, self.uid)
+            if _identity(self.directories[0][1]) != _identity(reopened_info):
+                raise OperatorArchiveInvalid
+
+
+@contextmanager
+def _locked_archive(root: Path, *, uid: int, limits: ArchiveReadLimits) -> Generator[_LockedArchive]:
+    with ExitStack() as stack:
+        root_fd, root_before = _open_root(root, stack, uid)
+        device = root_before.st_dev
+        archive_fd, archive_before = _open_child(root_fd, "archive", stack, uid=uid, mode=0o700, device=device)
+        read_fd, read_before = _open_child(root_fd, "read", stack, uid=uid, mode=0o755, device=device)
+        lock_fd, lock_before = _open_regular(
+            archive_fd, ".publisher.lock", uid=uid, mode=0o600, device=device, maximum=0
+        )
+        lock = os.fdopen(lock_fd, "rb")
+        stack.callback(lock.close)
+        portalocker.lock(lock, portalocker.LOCK_EX | portalocker.LOCK_NB)
+        stack.callback(portalocker.unlock, lock)
+        approved_fd, approved_before = _open_child(archive_fd, "approved", stack, uid=uid, mode=0o700, device=device)
+        registry_fd, registry_before = _open_child(archive_fd, "registries", stack, uid=uid, mode=0o700, device=device)
+        high_water_fd, high_water_before = _open_child(
+            archive_fd, "high-water", stack, uid=uid, mode=0o700, device=device
+        )
+        checkpoint_fd, checkpoint_before = _open_child(
+            archive_fd, "checkpoints", stack, uid=uid, mode=0o700, device=device
+        )
+        staging_fd, staging_before = _open_child(archive_fd, ".staging", stack, uid=uid, mode=0o700, device=device)
+        directories = (
+            (root_fd, root_before),
+            (archive_fd, archive_before),
+            (read_fd, read_before),
+            (approved_fd, approved_before),
+            (registry_fd, registry_before),
+            (high_water_fd, high_water_before),
+            (checkpoint_fd, checkpoint_before),
+            (staging_fd, staging_before),
+        )
+        yield _LockedArchive(
+            root,
+            uid,
+            limits,
+            device,
+            directories,
+            archive_fd,
+            read_fd,
+            approved_fd,
+            registry_fd,
+            high_water_fd,
+            checkpoint_fd,
+            staging_fd,
+            lock_before,
+        )
+
+
 class OperatorArchiveReader:
     """Read one stable operator archive under its cooperating publisher lock."""
 
@@ -206,161 +414,12 @@ class OperatorArchiveReader:
 
     def read(self) -> VerifiedOperatorArchiveV1:
         try:
-            return self._read()
+            with _locked_archive(self._root, uid=self._uid, limits=self._limits) as session:
+                return session.read_complete()
         except OperatorArchiveInvalid:
             raise
         except (OSError, ValueError, portalocker.LockException):
             raise OperatorArchiveInvalid from None
-
-    def _read(self) -> VerifiedOperatorArchiveV1:
-        budget = _Budget(self._limits)
-        uid = self._uid
-        with ExitStack() as stack:
-            root_fd, root_before = _open_root(self._root, stack, uid)
-            device = root_before.st_dev
-            archive_fd, archive_before = _open_child(root_fd, "archive", stack, uid=uid, mode=0o700, device=device)
-            read_fd, read_before = _open_child(root_fd, "read", stack, uid=uid, mode=0o755, device=device)
-            if _names(root_fd, budget) != {"archive", "read"} or _names(archive_fd, budget) != _ARCHIVE_NAMES:
-                raise OperatorArchiveInvalid
-            lock_fd, lock_before = _open_regular(
-                archive_fd, ".publisher.lock", uid=uid, mode=0o600, device=device, maximum=0
-            )
-            lock = os.fdopen(lock_fd, "rb")
-            stack.callback(lock.close)
-            portalocker.lock(lock, portalocker.LOCK_EX | portalocker.LOCK_NB)
-            stack.callback(portalocker.unlock, lock)
-
-            approved_fd, approved_before = _open_child(
-                archive_fd, "approved", stack, uid=uid, mode=0o700, device=device
-            )
-            registry_fd, registry_before = _open_child(
-                archive_fd, "registries", stack, uid=uid, mode=0o700, device=device
-            )
-            high_water_fd, high_water_before = _open_child(
-                archive_fd, "high-water", stack, uid=uid, mode=0o700, device=device
-            )
-            checkpoint_fd, checkpoint_before = _open_child(
-                archive_fd, "checkpoints", stack, uid=uid, mode=0o700, device=device
-            )
-            staging_fd, staging_before = _open_child(archive_fd, ".staging", stack, uid=uid, mode=0o700, device=device)
-            if _names(staging_fd, budget) or _names(approved_fd, budget) != {"00000000000000000001.json"}:
-                raise OperatorArchiveInvalid
-            approved_raw = _read_file(
-                approved_fd,
-                "00000000000000000001.json",
-                uid=uid,
-                mode=0o600,
-                device=device,
-                maximum=MAX_HOST_RECORD_BYTES,
-                budget=budget,
-            )
-            approval = parse_approved_deployment(approved_raw)
-            if approval.approval_sequence != 1:
-                raise OperatorArchiveInvalid
-            registry_name = f"sha256-{approval.body.registry_file_digest[7:]}.json"
-            if _names(registry_fd, budget) != {registry_name}:
-                raise OperatorArchiveInvalid
-            registry_raw = _read_file(
-                registry_fd,
-                registry_name,
-                uid=uid,
-                mode=0o600,
-                device=device,
-                maximum=MAX_VERIFIER_REGISTRY_BYTES,
-                budget=budget,
-            )
-            high_water_names = _names(high_water_fd, budget)
-            if not high_water_names or high_water_names != {
-                f"{sequence:020d}.json" for sequence in range(1, len(high_water_names) + 1)
-            }:
-                raise OperatorArchiveInvalid
-            history: list[tuple[bytes, bytes]] = []
-            checkpoint_names: set[str] = set()
-            for sequence in range(1, len(high_water_names) + 1):
-                name = f"{sequence:020d}.json"
-                high_water_raw = _read_file(
-                    high_water_fd,
-                    name,
-                    uid=uid,
-                    mode=0o600,
-                    device=device,
-                    maximum=MAX_HOST_RECORD_BYTES,
-                    budget=budget,
-                )
-                parsed = parse_checkpoint_high_water(high_water_raw)
-                checkpoint_name = f"sha256-{parsed.body.checkpoint_file_digest[7:]}.json"
-                checkpoint_names.add(checkpoint_name)
-                checkpoint_raw = _read_file(
-                    checkpoint_fd,
-                    checkpoint_name,
-                    uid=uid,
-                    mode=0o600,
-                    device=device,
-                    maximum=MAX_GRANT_CHECKPOINT_BYTES,
-                    budget=budget,
-                )
-                history.append((high_water_raw, checkpoint_raw))
-            if _names(checkpoint_fd, budget) != checkpoint_names or _names(read_fd, budget) != _PUBLIC_NAMES:
-                raise OperatorArchiveInvalid
-            public = (
-                _read_file(
-                    read_fd,
-                    "approved-deployment.json",
-                    uid=uid,
-                    mode=0o644,
-                    device=device,
-                    maximum=MAX_HOST_RECORD_BYTES,
-                    budget=budget,
-                ),
-                _read_file(
-                    read_fd,
-                    "governance-verifiers-v1.json",
-                    uid=uid,
-                    mode=0o644,
-                    device=device,
-                    maximum=MAX_VERIFIER_REGISTRY_BYTES,
-                    budget=budget,
-                ),
-                _read_file(
-                    read_fd,
-                    "high-water.json",
-                    uid=uid,
-                    mode=0o644,
-                    device=device,
-                    maximum=MAX_HOST_RECORD_BYTES,
-                    budget=budget,
-                ),
-                _read_file(
-                    read_fd,
-                    "grant-checkpoint.json",
-                    uid=uid,
-                    mode=0o644,
-                    device=device,
-                    maximum=MAX_GRANT_CHECKPOINT_BYTES,
-                    budget=budget,
-                ),
-            )
-            snapshot = validate_archived_custody_chain(approved_raw, registry_raw, history, public)
-            directories = (
-                (root_fd, root_before),
-                (archive_fd, archive_before),
-                (read_fd, read_before),
-                (approved_fd, approved_before),
-                (registry_fd, registry_before),
-                (high_water_fd, high_water_before),
-                (checkpoint_fd, checkpoint_before),
-                (staging_fd, staging_before),
-            )
-            if any(_identity(before) != _identity(os.fstat(fd)) for fd, before in directories):
-                raise OperatorArchiveInvalid
-            lock_after = os.stat(".publisher.lock", dir_fd=archive_fd, follow_symlinks=False)
-            if _identity(lock_before) != _identity(lock_after):
-                raise OperatorArchiveInvalid
-            with ExitStack() as check_stack:
-                _reopened, reopened_info = _open_root(self._root, check_stack, uid)
-                if _identity(root_before) != _identity(reopened_info):
-                    raise OperatorArchiveInvalid
-            return VerifiedOperatorArchiveV1(snapshot, approved_raw, registry_raw, history[-1][0], history[-1][1])
 
 
 __all__ = ["ArchiveReadLimits", "OperatorArchiveInvalid", "OperatorArchiveReader", "VerifiedOperatorArchiveV1"]
