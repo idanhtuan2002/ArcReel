@@ -51,6 +51,7 @@ from r2.spatial_pair.review_digests import review_evidence_digest, review_snapsh
 from r2.target_registry.service import TakeTargetRegistrationService
 from server.auth import CurrentUserInfo
 from server.services.governance_grants import (
+    CheckpointedShowrunnerGrantReader,
     CurrentShowrunnerGrantReader,
     GovernanceGrantImporter,
     ShowrunnerGrantUnavailableError,
@@ -62,6 +63,7 @@ from server.services.spatial_pair_decision_v2 import SpatialPairDecisionServiceV
 from server.services.spatial_review_session import SpatialReviewSessionService
 from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
 from tests.integration.r2.adaptation import test_screenplay_admission as admission_helpers
+from tests.integration.r2.governance.test_grant_recovery_snapshot import _checkpoint
 from tests.integration.r2.target_registry import test_take_registration as target_helpers
 from tests.integration.server.routers.test_gates_export import PROJECT, USER, _approve_shot
 from tests.integration.server.routers.test_spatial_frame_reader import _start_blocked_master_writer
@@ -464,6 +466,62 @@ async def test_review_session_requires_current_grant_and_pins_verified_png_bytes
     )
     assert approved.body == decision
     assert approved.decision_digest == decision_digest
+
+    async def load_stale_checkpoint() -> bytes:
+        return _checkpoint([], signer=private)
+
+    checkpointed = CheckpointedShowrunnerGrantReader(
+        grant_key_id="test-review-key",
+        grant_public_key=public,
+        deployment_id="deploy-a",
+        checkpoint_key_id="checkpoint-test-key",
+        checkpoint_public_key=public,
+        load_checkpoint=load_stale_checkpoint,
+    )
+    guarded_review = SpatialReviewSessionService(
+        session_factory=session_factory, project_dir=project_dir, grants=checkpointed
+    )
+    guarded_current = CurrentApprovedSpatialPairReaderV2(
+        session_factory=session_factory, project_dir=project_dir, grants=checkpointed
+    )
+    guarded_decision = SpatialPairDecisionServiceV2(
+        session_factory=session_factory, project_dir=project_dir, grants=checkpointed
+    )
+    async with session_factory() as session:
+        sessions_before = await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel))
+        deliveries_before = await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel))
+        acknowledgments_before = await session.scalar(
+            select(func.count()).select_from(SpatialReviewAcknowledgmentModel)
+        )
+        decisions_before = await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel))
+    with pytest.raises(ShowrunnerGrantUnavailableError):
+        await guarded_review.create(**arguments)
+    with pytest.raises(ShowrunnerGrantUnavailableError):
+        await guarded_review.fetch_frame(**fetch_scope, role="MASTER")
+    with pytest.raises(ShowrunnerGrantUnavailableError):
+        await guarded_review.acknowledge_frame(
+            **fetch_scope,
+            attempt_id=deliveries[0].attempt_id,
+            role="MASTER",
+            png_digest=snapshot.frames[0].png_digest,
+            decoded=True,
+        )
+    with pytest.raises(ShowrunnerGrantUnavailableError):
+        await guarded_current.read_current(
+            user_id=USER.id, project_name=PROJECT, target_id=snapshot.target_ref.target_id
+        )
+    with pytest.raises(ShowrunnerGrantUnavailableError):
+        await guarded_decision.decide(
+            command, authenticated_user=CurrentUserInfo(id=USER.id, sub=USER.sub, role="user")
+        )
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewSessionModel)) == sessions_before
+        assert await session.scalar(select(func.count()).select_from(SpatialReviewDeliveryModel)) == deliveries_before
+        assert (
+            await session.scalar(select(func.count()).select_from(SpatialReviewAcknowledgmentModel))
+            == acknowledgments_before
+        )
+        assert await session.scalar(select(func.count()).select_from(SpatialPairDecisionModel)) == decisions_before
     second_scope = fetch_scope | {"session_id": second_snapshot.session_id}
     if session_factory.kw["bind"].dialect.name == "postgresql":
         original_review_check = SpatialPairVersionedRepository.verify_review_consumption
