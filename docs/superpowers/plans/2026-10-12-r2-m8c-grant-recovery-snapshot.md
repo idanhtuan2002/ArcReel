@@ -40,10 +40,10 @@
 - `verify(load_checkpoint: Callable[[], Awaitable[bytes]]) -> VerifiedGrantCheckpointV1` loads only after the exclusive fence, then compares all DB scopes and complete chains.
 - Invalid content/DB state raises sanitized `GrantRecoveryUnavailable`; unsupported dialect remains `GrantRecoveryFenceUnavailable`.
 
-- [ ] **Step 1: Write failing source-backed tests.** Use deterministic test-only Ed25519 keys and real imported ISSUE/REVOKE chains. Pin empty/matching success, rollback and changed signed checkpoint, extra/missing scope, corrupt event, loader failure, and a forced import-first load-order schedule on disposable PostgreSQL. Assert no scanner success on SQLite.
-- [ ] **Step 2: Run RED.** The new test module must fail import at absent scanner API.
-- [ ] **Step 3: Implement the internal scanner.** Use existing `_current_locked` under sorted row locks; compare the exact `(sequence, digest)` to each checkpoint record and verify set equality. Map malformed checkpoint and chain errors to sanitized recovery-unavailable errors.
-- [ ] **Step 4: Run GREEN and affected gates.** Run complete grant/review PostgreSQL selection, affected SQLite/unit tests, Ruff check/format, targeted basedpyright, lint-imports, deptry, test audit and diff check.
-- [ ] **Step 5: Update the durable M8-C handoff and commit.** Record exact HEAD/tests and leave external key custody, startup wiring and production approval closed.
+- [x] **Step 1: Write failing source-backed tests.** Use deterministic test-only Ed25519 keys and real imported ISSUE/REVOKE chains. Pin empty/matching success, rollback and changed signed checkpoint, extra/missing scope, corrupt event, loader failure, and a forced import-first load-order schedule on disposable PostgreSQL. Assert no scanner success on SQLite.
+- [x] **Step 2: Run RED.** The new test module must fail import at absent scanner API.
+- [x] **Step 3: Implement the internal scanner.** Use existing `_current_locked` under sorted row locks; compare the exact `(sequence, digest)` to each checkpoint record and verify set equality. Map malformed checkpoint and chain errors to sanitized recovery-unavailable errors.
+- [x] **Step 4: Run GREEN and affected gates.** Run complete grant/review PostgreSQL selection, affected SQLite/unit tests, Ruff check/format, targeted basedpyright, lint-imports, deptry, test audit and diff check.
+- [x] **Step 5: Update the durable M8-C handoff and commit.** Record exact HEAD/tests and leave external key custody, startup wiring and production approval closed.
 
 This scanner is a testable building block. A future deployment packet must own operator-key registry, atomic directory loader, Alembic/startup ordering, recovery restore drill, transaction-bound runtime equality and independent exact-HEAD acceptance review.

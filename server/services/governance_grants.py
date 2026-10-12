@@ -12,13 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.governance_grant import ShowrunnerGrantEventModel, ShowrunnerGrantHeadModel
 from r2.contracts.showrunner_grant import GrantEventInvalid
+from r2.governance.checkpoint_signature import VerifiedGrantCheckpointV1, verify_grant_checkpoint
 from r2.governance.grant_signature import VerifiedGrantEventV1, verify_grant_event
 from r2.governance.grant_transition import GrantScopeV1, verify_next_grant_event
-from server.services.governance_grant_fence import acquire_grant_import_fence
+from server.services.governance_grant_fence import acquire_grant_import_fence, acquire_grant_recovery_scan_fence
 
 
 class ShowrunnerGrantUnavailableError(PermissionError):
     """A current, authentic, scoped grant cannot be established."""
+
+
+class GrantRecoveryUnavailable(RuntimeError):
+    """The signed checkpoint and local grant ledger cannot be reconciled."""
 
 
 def _scope_matches(event: VerifiedGrantEventV1, scope: GrantScopeV1) -> bool:
@@ -301,4 +306,83 @@ class CurrentShowrunnerGrantReader(_GrantLedger):
         return event
 
 
-__all__ = ["CurrentShowrunnerGrantReader", "GovernanceGrantImporter", "ShowrunnerGrantUnavailableError"]
+class GovernanceGrantRecoveryScanner(_GrantLedger):
+    """Verify every local signed grant chain against one external checkpoint."""
+
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        *,
+        grant_key_id: str,
+        grant_public_key: bytes,
+        deployment_id: str,
+        checkpoint_key_id: str,
+        checkpoint_public_key: bytes,
+    ) -> None:
+        super().__init__(key_id=grant_key_id, public_key=grant_public_key)
+        self._sessions = session_factory
+        self._deployment_id = deployment_id
+        self._checkpoint_key_id = checkpoint_key_id
+        self._checkpoint_public_key = checkpoint_public_key
+
+    async def verify(self, load_checkpoint: Callable[[], Awaitable[bytes]]) -> VerifiedGrantCheckpointV1:
+        """Fence imports before loading the checkpoint and enumerating all scopes."""
+
+        async with self._sessions() as session, session.begin():
+            await acquire_grant_recovery_scan_fence(session)
+            try:
+                raw = await load_checkpoint()
+                checkpoint = verify_grant_checkpoint(
+                    raw,
+                    deployment_id=self._deployment_id,
+                    key_id=self._checkpoint_key_id,
+                    public_key=self._checkpoint_public_key,
+                )
+            except Exception:
+                raise GrantRecoveryUnavailable("checkpoint is unavailable") from None
+            scopes = (
+                (
+                    await session.execute(
+                        select(
+                            ShowrunnerGrantHeadModel.user_id,
+                            ShowrunnerGrantHeadModel.project_name,
+                            ShowrunnerGrantHeadModel.principal,
+                        ).order_by(
+                            ShowrunnerGrantHeadModel.user_id,
+                            ShowrunnerGrantHeadModel.project_name,
+                            ShowrunnerGrantHeadModel.principal,
+                        )
+                    )
+                )
+                .tuples()
+                .all()
+            )
+            if len(scopes) != len(checkpoint.body.heads):
+                raise GrantRecoveryUnavailable("checkpoint scope set differs from grant ledger")
+            for (user_id, project_name, principal), expected in zip(scopes, checkpoint.body.heads, strict=True):
+                if (user_id, project_name, principal) != (expected.user_id, expected.project_name, expected.principal):
+                    raise GrantRecoveryUnavailable("checkpoint scope set differs from grant ledger")
+                scope = GrantScopeV1(user_id, project_name, principal)
+                head = await _locked_head(session, scope)
+                if head is None:
+                    raise GrantRecoveryUnavailable("checkpoint grant head is missing")
+                try:
+                    current = await self._current_locked(session, head, scope)
+                except ShowrunnerGrantUnavailableError:
+                    raise GrantRecoveryUnavailable("checkpoint grant chain is invalid") from None
+                if (
+                    current is None
+                    or head.current_sequence != expected.head_sequence
+                    or current[1].event_digest != expected.head_event_digest
+                ):
+                    raise GrantRecoveryUnavailable("checkpoint grant head differs")
+            return checkpoint
+
+
+__all__ = [
+    "CurrentShowrunnerGrantReader",
+    "GovernanceGrantImporter",
+    "GovernanceGrantRecoveryScanner",
+    "GrantRecoveryUnavailable",
+    "ShowrunnerGrantUnavailableError",
+]
