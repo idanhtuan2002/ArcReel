@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import stat
 from collections.abc import Generator
@@ -18,7 +19,7 @@ from r2.contracts.governance_host_records import (
     parse_checkpoint_high_water,
 )
 from r2.contracts.governance_verifier_registry import MAX_VERIFIER_REGISTRY_BYTES
-from r2.contracts.grant_checkpoint import MAX_GRANT_CHECKPOINT_BYTES
+from r2.contracts.grant_checkpoint import MAX_GRANT_CHECKPOINT_BYTES, CheckpointInvalid, parse_grant_checkpoint
 from r2.governance.archived_custody_chain import validate_retained_custody_chain
 from r2.governance.public_custody_snapshot import VerifiedPublicCustodySnapshotV1
 
@@ -244,6 +245,23 @@ class _LockedArchive:
         """Verify the complete retained chain while keeping the publisher lock."""
         return self._scan(require_public_current=False, allow_public_temps=allow_public_temps)
 
+    def read_orphan_checkpoint(self, candidate_raw: bytes) -> _RetainedArchiveState:
+        """Verify one exact orphan envelope against a complete prior archive."""
+        if type(candidate_raw) is not bytes or not 0 < len(candidate_raw) <= MAX_GRANT_CHECKPOINT_BYTES:
+            raise OperatorArchiveInvalid
+        state = self._scan(require_public_current=True, allow_public_temps=False, expected_orphan=candidate_raw)
+        try:
+            candidate = parse_grant_checkpoint(candidate_raw)
+        except CheckpointInvalid:
+            raise OperatorArchiveInvalid from None
+        if (
+            candidate.body.checkpoint_sequence != state.snapshot.high_water.checkpoint_sequence + 1
+            or candidate.body.deployment_id != state.snapshot.approval.deployment_id
+            or candidate.body.previous_checkpoint_digest != state.snapshot.checkpoint.checkpoint_digest
+        ):
+            raise OperatorArchiveInvalid
+        return state
+
     def read_complete(self) -> VerifiedOperatorArchiveV1:
         """Require exact latest public copies as well as a valid retained chain."""
         state = self._scan(require_public_current=True, allow_public_temps=False)
@@ -251,7 +269,9 @@ class _LockedArchive:
             state.snapshot, state.approved_raw, state.registry_raw, state.history[-1][0], state.history[-1][1]
         )
 
-    def _scan(self, *, require_public_current: bool, allow_public_temps: bool) -> _RetainedArchiveState:
+    def _scan(
+        self, *, require_public_current: bool, allow_public_temps: bool, expected_orphan: bytes | None = None
+    ) -> _RetainedArchiveState:
         budget = _Budget(self.limits)
         uid = self.uid
         device = self.device
@@ -314,7 +334,25 @@ class _LockedArchive:
                 budget=budget,
             )
             history.append((high_water_raw, checkpoint_raw))
-        if _names(self.checkpoint_fd, budget) != checkpoint_names:
+        orphan_name = (
+            f"sha256-{hashlib.sha256(expected_orphan).hexdigest()}.json" if expected_orphan is not None else None
+        )
+        if orphan_name in checkpoint_names or _names(self.checkpoint_fd, budget) != checkpoint_names | (
+            {orphan_name} if orphan_name is not None else set()
+        ):
+            raise OperatorArchiveInvalid
+        if orphan_name is not None and (
+            _read_file(
+                self.checkpoint_fd,
+                orphan_name,
+                uid=uid,
+                mode=0o600,
+                device=device,
+                maximum=MAX_GRANT_CHECKPOINT_BYTES,
+                budget=budget,
+            )
+            != expected_orphan
+        ):
             raise OperatorArchiveInvalid
         read_names = _names(self.read_fd, budget)
         sequence = len(history)

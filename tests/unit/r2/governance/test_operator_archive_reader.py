@@ -277,6 +277,37 @@ def test_locked_recovery_scan_accepts_only_exact_retained_public_temporaries(tmp
                 session.read_retained(allow_public_temps=True)
 
 
+@pytest.mark.parametrize("fault", ["matching", "wrong_bytes", "wrong_name", "wrong_mode", "stale_public"])
+def test_locked_orphan_checkpoint_scan_requires_exact_candidate(tmp_path: Path, fault: str) -> None:
+    root, paths = _tree(tmp_path)
+    old_high_water = paths["public_high_water"].read_bytes()
+    old_checkpoint = paths["public_checkpoint"].read_bytes()
+    _append_successor(root, paths)
+    candidate = paths["public_checkpoint"].read_bytes()
+    orphan = root / "archive" / "checkpoints" / f"sha256-{_digest(candidate)[7:]}.json"
+    (root / "archive" / "high-water" / "00000000000000000002.json").unlink()
+    _put(paths["public_high_water"], old_high_water, 0o644)
+    _put(paths["public_checkpoint"], old_checkpoint, 0o644)
+    if fault == "wrong_bytes":
+        _put(orphan, b"{}", 0o600)
+    elif fault == "wrong_name":
+        orphan.rename(orphan.with_name("sha256-" + "0" * 64 + ".json"))
+    elif fault == "wrong_mode":
+        orphan.chmod(0o644)
+    elif fault == "stale_public":
+        _put(paths["public_checkpoint"], candidate, 0o644)
+    with _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session:
+        with pytest.raises(OperatorArchiveInvalid):
+            session.read_retained()
+        if fault == "matching":
+            state = session.read_orphan_checkpoint(candidate)
+            assert state.snapshot.high_water.checkpoint_sequence == 1
+            assert state.history[-1] == (old_high_water, old_checkpoint)
+        else:
+            with pytest.raises(OperatorArchiveInvalid):
+                session.read_orphan_checkpoint(candidate)
+
+
 @pytest.mark.parametrize(
     "fault", ["old_public", "wrong_registry_name", "missing_record", "extra_record", "sequence_gap", "staging_file"]
 )
