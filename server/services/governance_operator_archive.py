@@ -3,19 +3,24 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from r2.contracts.governance_host_records import MAX_HOST_RECORD_BYTES
 from r2.contracts.grant_checkpoint import MAX_GRANT_CHECKPOINT_BYTES
+from r2.governance.archived_custody_chain import validate_retained_custody_chain
 from r2.governance.operator_archive_file_ops import remove_public_temp_if_exact, replace_public_file
 from r2.governance.operator_archive_reader import (
     ArchiveReadLimits,
     VerifiedOperatorArchiveV1,
     _locked_archive,
+    _LockedArchive,
+    _RetainedArchiveState,
     classify_public_copies,
 )
+from r2.governance.public_custody_snapshot import VerifiedPublicCustodySnapshotV1
 from server.services.governance_grants import GovernanceGrantRecoveryScanner
 from server.services.governance_schema_preflight import verify_governance_schema_ready
 
@@ -25,6 +30,49 @@ class OperatorArchiveReconcileUnavailable(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__("operator Governance archive reconciliation is unavailable")
+
+
+async def verify_candidate_preflight(
+    archive: _LockedArchive,
+    state: _RetainedArchiveState,
+    high_water_raw: bytes,
+    checkpoint_raw: bytes,
+    *,
+    session_factory: async_sessionmaker[AsyncSession],
+    reread: Callable[[], _RetainedArchiveState],
+) -> VerifiedPublicCustodySnapshotV1:
+    """Verify a successor and committed ledger while the caller keeps the archive lock."""
+
+    try:
+        engine = session_factory.kw.get("bind")
+        if not isinstance(engine, AsyncEngine) or classify_public_copies(state) != "current":
+            raise OperatorArchiveReconcileUnavailable
+        snapshot = validate_retained_custody_chain(
+            state.approved_raw, state.registry_raw, (*state.history, (high_water_raw, checkpoint_raw))
+        )
+        if snapshot.high_water.checkpoint_sequence != state.snapshot.high_water.checkpoint_sequence + 1:
+            raise OperatorArchiveReconcileUnavailable
+        await verify_governance_schema_ready(engine)
+        registry = snapshot.registry
+        scanner = GovernanceGrantRecoveryScanner(
+            session_factory,
+            grant_key_id=registry.grant_event.key_id,
+            grant_public_key=registry.grant_event.public_key,
+            deployment_id=registry.deployment_id,
+            checkpoint_key_id=registry.grant_checkpoint.key_id,
+            checkpoint_public_key=registry.grant_checkpoint.public_key,
+        )
+
+        async def load_candidate() -> bytes:
+            return checkpoint_raw
+
+        scanned = await scanner.verify(load_candidate)
+        if scanned.checkpoint_digest != snapshot.checkpoint.checkpoint_digest or reread() != state:
+            raise OperatorArchiveReconcileUnavailable
+        archive._assert_stable()
+        return snapshot
+    except Exception:
+        raise OperatorArchiveReconcileUnavailable from None
 
 
 async def reconcile_complete_archive(
@@ -107,4 +155,4 @@ async def reconcile_complete_archive(
         raise OperatorArchiveReconcileUnavailable from None
 
 
-__all__ = ["OperatorArchiveReconcileUnavailable", "reconcile_complete_archive"]
+__all__ = ["OperatorArchiveReconcileUnavailable", "reconcile_complete_archive", "verify_candidate_preflight"]
