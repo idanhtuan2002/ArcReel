@@ -1,6 +1,6 @@
 # M8-C operator archive preflight execution plan
 
-Status: proposed next gate from code HEAD `716f052557cb5b0974a550012104aaa689b21ac9`. The sponsor selected an operator-managed host directory; no actual host root, operator account, backup destination, signer ceremony or production activation has been provisioned. This packet specifies a testable offline preflight and publication sequence, not permission to use it on a host.
+Status: proposed publisher continuation after retained-chain seam HEAD `dff59a8450053dda89a068caccf178247aa38aa3`. The sponsor selected an operator-managed host directory; no actual host root, operator account, backup destination, signer ceremony or production activation has been provisioned. This packet specifies a testable offline preflight and publication sequence, not permission to use it on a host.
 
 ## Reuse boundary
 
@@ -24,7 +24,25 @@ The public names are exactly `read/approved-deployment.json`, `read/governance-v
 
 While app and workers are stopped, hold a bounded exclusive lock in `archive/`. Check the complete prior archive and public state, signed candidate successor and committed database through the full scanner. Write the exact candidate envelope and high-water record to private sibling temporaries, fsync their file contents, then publish them to create-only archive names and fsync their parent directories. A name collision with unequal bytes quarantines; a same-byte retry may continue only after the whole archive is reverified. The retained registry is create-only as well. Publish public `high-water.json` first and `grant-checkpoint.json` second using same-directory temporary files, file fsync, rename and `read/` directory fsync after each replacement. Mixed pairs deny. The app remains stopped through final operator preflight.
 
-After interruption, validate the retained chain before touching `read/`. A complete latest retained entry and exact envelope can be replayed byte-for-byte; an incomplete final record, missing envelope, unknown temporary, divergent database or archive gap quarantines until an audited recovery procedure resolves it. Never lower the retained high-water to match a restored database. A separately stored, tested archive backup is required for host-loss recovery; its location and retention are still open.
+After interruption, validate the retained chain before touching `read/`. A complete latest retained entry and exact envelope can be replayed byte-for-byte. One extra complete envelope without a high-water record may be resumed only under the candidate and database checks below. A partial final file, high-water record with missing envelope, unknown temporary, divergent database or archive gap quarantines until an audited recovery procedure resolves it. Never lower the retained high-water to match a restored database. A separately stored, tested archive backup is required for host-loss recovery; its location and retention are still open.
+
+### Publisher implementation boundary after the read-only reader
+
+The read-only `OperatorArchiveReader.read()` is a final-state gate: it rejects a nonempty staging directory or stale public copy and releases `.publisher.lock` on return. A publisher therefore cannot call it, release the lock, then write. Its proposed locked session must retain the lock and verified directory descriptors through classification, database verification, writes and final reread. It should reuse the reader's no-follow open, owner/mode/size budgets and identity checks instead of introducing path-based writes. The pure `validate_retained_custody_chain` may validate complete retained bytes while the public pair is stale, but it does not establish filesystem custody.
+
+Classify the exact on-disk state while holding that lock, with at most one proposed successor supplied as exact high-water and signed-envelope bytes:
+
+| State | Allowed action while app remains stopped |
+| --- | --- |
+| Complete prior retained chain, exact prior public copies, empty staging | Validate the candidate chain and committed database; begin publication. |
+| Complete candidate retained chain, exact candidate public copies | Verify the committed database and all final bytes; same-byte retry returns success. |
+| Complete candidate retained chain, prior or mixed public copies | Verify the retained chain and committed database, then replace public files from the exact retained bytes in the specified order. |
+| One candidate envelope retained, next high-water absent | Resume only if the retained envelope and supplied candidate are byte-identical, the candidate extends the verified prior chain and the committed database passes the full scanner. |
+| Unknown temporary, partial final file, different candidate, missing retained envelope, archive gap, changed identity or divergent database | Quarantine; no public replacement or high-water decrease. |
+
+Create-only archive publication needs a concrete crash protocol. The existing `lib/json_io.py` and `ProjectArtifactManifestAdapter._atomic_replace` use replace semantics and do not fsync a parent directory, so they cannot be used unchanged for immutable archive names. The proposed protocol writes and fsyncs a private same-filesystem temporary, fsyncs its directory, hard-links it to the absent final name, fsyncs the final directory, unlinks the temporary and fsyncs staging. A crash between link and unlink leaves two links to one inode; normal preflight correctly denies. Recovery may remove that temporary only after checking its exact candidate bytes, inode equality, ownership, mode and link count under the same lock. A collision with different bytes or an unrecognized staging name quarantines. Public copies use same-directory file-fsynced temporaries and `os.replace`, followed by `read/` fsync after each rename; only exact retained bytes may be published.
+
+The first code slice should extract a private locked archive scan from the current reader without weakening `read()`'s final-state behavior. Tests must force each file and directory fsync boundary, the link-before-unlink state, both public replacements, same-byte retry, different-byte collision and a second cooperating publisher process. The scanner must verify the exact supplied checkpoint against the committed database before any archive mutation and again before final success. This design does not establish that app/workers are stopped or that the host root survived rollback; those are operator preflight and independent backup gates.
 
 ## Test and review gates
 
