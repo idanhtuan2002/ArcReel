@@ -327,6 +327,32 @@ class _LockedArchive:
             raise OperatorArchiveInvalid from None
         return state
 
+    def read_linked_high_water(self, high_water_raw: bytes, checkpoint_raw: bytes) -> _RetainedArchiveState:
+        """Verify one exact two-link high-water file while public copies remain prior."""
+        if (
+            type(high_water_raw) is not bytes
+            or not 0 < len(high_water_raw) <= MAX_HOST_RECORD_BYTES
+            or type(checkpoint_raw) is not bytes
+            or not 0 < len(checkpoint_raw) <= MAX_GRANT_CHECKPOINT_BYTES
+        ):
+            raise OperatorArchiveInvalid
+        try:
+            high_water = parse_checkpoint_high_water(high_water_raw)
+        except HostRecordInvalid:
+            raise OperatorArchiveInvalid from None
+        state = self._scan(
+            require_public_current=False,
+            allow_public_temps=False,
+            expected_high_water_linked=(
+                f".high-water.{high_water.checkpoint_sequence:020d}.tmp",
+                high_water_raw,
+                MAX_HOST_RECORD_BYTES,
+            ),
+        )
+        if state.history[-1] != (high_water_raw, checkpoint_raw) or classify_public_copies(state) != "previous":
+            raise OperatorArchiveInvalid
+        return state
+
     def read_complete(self) -> VerifiedOperatorArchiveV1:
         """Require exact latest public copies as well as a valid retained chain."""
         state = self._scan(require_public_current=True, allow_public_temps=False)
@@ -342,6 +368,7 @@ class _LockedArchive:
         expected_orphan: bytes | None = None,
         expected_staged: tuple[str, bytes, int] | None = None,
         expected_linked: tuple[str, bytes, int] | None = None,
+        expected_high_water_linked: tuple[str, bytes, int] | None = None,
     ) -> _RetainedArchiveState:
         budget = _Budget(self.limits)
         uid = self.uid
@@ -350,7 +377,13 @@ class _LockedArchive:
         if _names(root_fd, budget) != {"archive", "read"} or _names(self.archive_fd, budget) != _ARCHIVE_NAMES:
             raise OperatorArchiveInvalid
         staging_names = _names(self.staging_fd, budget)
-        expected_stage = expected_staged if expected_staged is not None else expected_linked
+        expected_stage = (
+            expected_staged
+            if expected_staged is not None
+            else expected_linked
+            if expected_linked is not None
+            else expected_high_water_linked
+        )
         if staging_names != ({expected_stage[0]} if expected_stage is not None else set()) or _names(
             self.approved_fd, budget
         ) != {"00000000000000000001.json"}:
@@ -364,7 +397,7 @@ class _LockedArchive:
                 device=device,
                 maximum=expected_stage[2],
                 budget=budget,
-                links=2 if expected_linked is not None else 1,
+                links=2 if expected_linked is not None or expected_high_water_linked is not None else 1,
             )
             != expected_stage[1]
         ):
@@ -409,6 +442,7 @@ class _LockedArchive:
                 device=device,
                 maximum=MAX_HOST_RECORD_BYTES,
                 budget=budget,
+                links=2 if expected_high_water_linked is not None and sequence == len(high_water_names) else 1,
             )
             parsed = parse_checkpoint_high_water(high_water_raw)
             checkpoint_name = f"sha256-{parsed.body.checkpoint_file_digest[7:]}.json"
@@ -423,6 +457,14 @@ class _LockedArchive:
                 budget=budget,
             )
             history.append((high_water_raw, checkpoint_raw))
+        if expected_high_water_linked is not None and (
+            history[-1][0] != expected_high_water_linked[1]
+            or _identity(os.stat(expected_high_water_linked[0], dir_fd=self.staging_fd, follow_symlinks=False))
+            != _identity(
+                os.stat(f"{len(high_water_names):020d}.json", dir_fd=self.high_water_fd, follow_symlinks=False)
+            )
+        ):
+            raise OperatorArchiveInvalid
         orphan_name = (
             f"sha256-{hashlib.sha256(expected_orphan).hexdigest()}.json" if expected_orphan is not None else None
         )
