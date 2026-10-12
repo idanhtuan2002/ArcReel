@@ -74,6 +74,11 @@ operator-pinned verifier registry and rotation ceremony, and test any key
 transition. A signed `signer_key_id` selects only among already trusted keys;
 it cannot introduce its own trust anchor.
 
+The [verifier registry and high-water research](../../research/2026-10-12-r2-m8c-verifier-registry-high-water.md)
+now proposes distinct purpose-specific keypairs and an operator-approved
+registry/image digest in a separately retained release or restore manifest.
+That proposal does not accept a registry wire format or key-rotation ceremony.
+
 ## Recovery and running-process gates
 
 The operator publishes a new checkpoint only after the relevant signed grant
