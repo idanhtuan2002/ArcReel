@@ -17,6 +17,7 @@ RUN pnpm install --frozen-lockfile
 
 # 复制前端源码并构建
 COPY frontend/ ./
+COPY tools/parity/dramaclaw/ /build/tools/parity/dramaclaw/
 RUN pnpm build
 
 # ============================================================
@@ -54,6 +55,7 @@ RUN uv sync --no-dev --no-install-project
 
 # 复制应用代码
 COPY lib/ lib/
+COPY r2/ r2/
 COPY server/ server/
 COPY alembic/ alembic/
 COPY alembic.ini ./
