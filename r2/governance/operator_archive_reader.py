@@ -15,12 +15,13 @@ import portalocker
 
 from r2.contracts.governance_host_records import (
     MAX_HOST_RECORD_BYTES,
+    HostRecordInvalid,
     parse_approved_deployment,
     parse_checkpoint_high_water,
 )
 from r2.contracts.governance_verifier_registry import MAX_VERIFIER_REGISTRY_BYTES
 from r2.contracts.grant_checkpoint import MAX_GRANT_CHECKPOINT_BYTES, CheckpointInvalid, parse_grant_checkpoint
-from r2.governance.archived_custody_chain import validate_retained_custody_chain
+from r2.governance.archived_custody_chain import ArchivedCustodyInvalid, validate_retained_custody_chain
 from r2.governance.public_custody_snapshot import VerifiedPublicCustodySnapshotV1
 
 MAX_ARCHIVE_ENTRIES = 10_000
@@ -272,10 +273,18 @@ class _LockedArchive:
             require_public_current=True,
             allow_public_temps=False,
             expected_orphan=candidate_raw if location in {"orphan", "linked"} else None,
-            expected_staged=(f".checkpoint.{candidate.body.checkpoint_sequence:020d}.tmp", candidate_raw)
+            expected_staged=(
+                f".checkpoint.{candidate.body.checkpoint_sequence:020d}.tmp",
+                candidate_raw,
+                MAX_GRANT_CHECKPOINT_BYTES,
+            )
             if location == "staged"
             else None,
-            expected_linked=(f".checkpoint.{candidate.body.checkpoint_sequence:020d}.tmp", candidate_raw)
+            expected_linked=(
+                f".checkpoint.{candidate.body.checkpoint_sequence:020d}.tmp",
+                candidate_raw,
+                MAX_GRANT_CHECKPOINT_BYTES,
+            )
             if location == "linked"
             else None,
         )
@@ -285,6 +294,37 @@ class _LockedArchive:
             or candidate.body.previous_checkpoint_digest != state.snapshot.checkpoint.checkpoint_digest
         ):
             raise OperatorArchiveInvalid
+        return state
+
+    def read_staged_high_water(self, high_water_raw: bytes, checkpoint_raw: bytes) -> _RetainedArchiveState:
+        """Verify one staged high-water record and its exact orphan envelope."""
+        if (
+            type(high_water_raw) is not bytes
+            or not 0 < len(high_water_raw) <= MAX_HOST_RECORD_BYTES
+            or type(checkpoint_raw) is not bytes
+            or not 0 < len(checkpoint_raw) <= MAX_GRANT_CHECKPOINT_BYTES
+        ):
+            raise OperatorArchiveInvalid
+        try:
+            high_water = parse_checkpoint_high_water(high_water_raw)
+        except HostRecordInvalid:
+            raise OperatorArchiveInvalid from None
+        state = self._scan(
+            require_public_current=True,
+            allow_public_temps=False,
+            expected_orphan=checkpoint_raw,
+            expected_staged=(
+                f".high-water.{high_water.checkpoint_sequence:020d}.tmp",
+                high_water_raw,
+                MAX_HOST_RECORD_BYTES,
+            ),
+        )
+        try:
+            validate_retained_custody_chain(
+                state.approved_raw, state.registry_raw, (*state.history, (high_water_raw, checkpoint_raw))
+            )
+        except ArchivedCustodyInvalid:
+            raise OperatorArchiveInvalid from None
         return state
 
     def read_complete(self) -> VerifiedOperatorArchiveV1:
@@ -300,8 +340,8 @@ class _LockedArchive:
         require_public_current: bool,
         allow_public_temps: bool,
         expected_orphan: bytes | None = None,
-        expected_staged: tuple[str, bytes] | None = None,
-        expected_linked: tuple[str, bytes] | None = None,
+        expected_staged: tuple[str, bytes, int] | None = None,
+        expected_linked: tuple[str, bytes, int] | None = None,
     ) -> _RetainedArchiveState:
         budget = _Budget(self.limits)
         uid = self.uid
@@ -322,7 +362,7 @@ class _LockedArchive:
                 uid=uid,
                 mode=0o600,
                 device=device,
-                maximum=MAX_GRANT_CHECKPOINT_BYTES,
+                maximum=expected_stage[2],
                 budget=budget,
                 links=2 if expected_linked is not None else 1,
             )

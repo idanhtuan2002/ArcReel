@@ -375,6 +375,39 @@ def test_locked_linked_checkpoint_scan_requires_same_two_link_inode(tmp_path: Pa
                 session.read_linked_checkpoint(candidate)
 
 
+@pytest.mark.parametrize("fault", ["matching", "wrong_bytes", "wrong_name", "wrong_mode", "extra_link"])
+def test_locked_staged_high_water_scan_requires_exact_signed_pair(tmp_path: Path, fault: str) -> None:
+    root, paths = _tree(tmp_path)
+    old_high_water = paths["public_high_water"].read_bytes()
+    old_checkpoint = paths["public_checkpoint"].read_bytes()
+    _append_successor(root, paths)
+    candidate_high_water = paths["public_high_water"].read_bytes()
+    candidate_checkpoint = paths["public_checkpoint"].read_bytes()
+    retained_high_water = root / "archive" / "high-water" / "00000000000000000002.json"
+    staged = root / "archive" / ".staging" / ".high-water.00000000000000000002.tmp"
+    retained_high_water.rename(staged)
+    _put(paths["public_high_water"], old_high_water, 0o644)
+    _put(paths["public_checkpoint"], old_checkpoint, 0o644)
+    if fault == "wrong_bytes":
+        _put(staged, b"{}", 0o600)
+    elif fault == "wrong_name":
+        staged.rename(staged.with_name("unexpected.tmp"))
+    elif fault == "wrong_mode":
+        staged.chmod(0o644)
+    elif fault == "extra_link":
+        os.link(staged, root / "archive" / ".staging" / "unexpected")
+    with _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session:
+        with pytest.raises(OperatorArchiveInvalid):
+            session.read_retained()
+        if fault == "matching":
+            state = session.read_staged_high_water(candidate_high_water, candidate_checkpoint)
+            assert state.snapshot.high_water.checkpoint_sequence == 1
+            assert state.history[-1] == (old_high_water, old_checkpoint)
+        else:
+            with pytest.raises(OperatorArchiveInvalid):
+                session.read_staged_high_water(candidate_high_water, candidate_checkpoint)
+
+
 @pytest.mark.parametrize(
     "fault", ["old_public", "wrong_registry_name", "missing_record", "extra_record", "sequence_gap", "staging_file"]
 )
