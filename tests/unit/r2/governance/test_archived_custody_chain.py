@@ -11,7 +11,11 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from lib.content_digest import canonical_json_bytes
-from r2.governance.archived_custody_chain import ArchivedCustodyInvalid, validate_archived_custody_chain
+from r2.governance.archived_custody_chain import (
+    ArchivedCustodyInvalid,
+    validate_archived_custody_chain,
+    validate_retained_custody_chain,
+)
 
 
 def _digest(raw: bytes) -> str:
@@ -135,6 +139,28 @@ def test_older_public_pair_denies_against_newer_retained_chain() -> None:
     old_public = (approval, registry, *history[0])
     with pytest.raises(ArchivedCustodyInvalid):
         validate_archived_custody_chain(approval, registry, history, old_public)
+
+
+def test_retained_chain_can_be_verified_while_public_pair_is_stale() -> None:
+    approval, registry, history, _public = _chain()
+    verified = validate_retained_custody_chain(approval, registry, history)
+    assert verified.high_water.checkpoint_sequence == 2
+    assert verified.checkpoint.body.heads[0].head_sequence == 2
+
+
+@pytest.mark.parametrize("change", ["empty", "broken_link", "missing_envelope"])
+def test_retained_only_verification_denies_incomplete_history(change: str) -> None:
+    approval, registry, history, _public = _chain()
+    if change == "empty":
+        history = []
+    elif change == "broken_link":
+        changed = json.loads(history[1][0])
+        changed["previous_high_water_digest"] = "sha256:" + "0" * 64
+        history[1] = (canonical_json_bytes(changed, allow_nan=False), history[1][1])
+    else:
+        history[1] = (history[1][0], b"")
+    with pytest.raises(ArchivedCustodyInvalid):
+        validate_retained_custody_chain(approval, registry, history)
 
 
 @pytest.mark.parametrize("change", ["missing_genesis", "broken_link", "missing_envelope", "duplicate_successor"])

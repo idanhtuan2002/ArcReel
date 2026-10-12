@@ -28,6 +28,18 @@ def validate_archived_custody_chain(
 
     if not history or public[:2] != (approved_raw, registry_raw) or public[2:] != history[-1]:
         raise ArchivedCustodyInvalid
+    return validate_retained_custody_chain(approved_raw, registry_raw, history)
+
+
+def validate_retained_custody_chain(
+    approved_raw: bytes,
+    registry_raw: bytes,
+    history: Sequence[tuple[bytes, bytes]],
+) -> VerifiedPublicCustodySnapshotV1:
+    """Verify supplied retained bytes independently of possibly stale public copies."""
+
+    if not history:
+        raise ArchivedCustodyInvalid
     previous: VerifiedPublicCustodySnapshotV1 | None = None
     try:
         for sequence, (high_water_raw, checkpoint_raw) in enumerate(history, start=1):
@@ -65,4 +77,4 @@ def validate_archived_custody_chain(
     return previous
 
 
-__all__ = ["ArchivedCustodyInvalid", "validate_archived_custody_chain"]
+__all__ = ["ArchivedCustodyInvalid", "validate_archived_custody_chain", "validate_retained_custody_chain"]
