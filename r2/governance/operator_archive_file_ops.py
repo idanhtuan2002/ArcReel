@@ -6,6 +6,8 @@ import os
 import stat
 from collections.abc import Callable
 
+from r2.governance.operator_archive_reader import OperatorArchiveInvalid, _open_regular
+
 
 class ArchivePublicationInvalid(ValueError):
     """The requested archive file cannot be safely published."""
@@ -105,4 +107,72 @@ def publish_retained_file(
         raise ArchivePublicationInvalid from None
 
 
-__all__ = ["ArchivePublicationInvalid", "publish_retained_file"]
+def replace_public_file(
+    *,
+    read_fd: int,
+    temp_name: str,
+    public_name: str,
+    raw: bytes,
+    maximum: int,
+    expected_uid: int,
+    after_phase: Callable[[str], None] | None = None,
+) -> None:
+    """Replace one permitted public copy from a same-directory fsynced temporary."""
+
+    if (
+        not _single_name(temp_name)
+        or public_name not in {"high-water.json", "grant-checkpoint.json"}
+        or temp_name == public_name
+        or type(raw) is not bytes
+        or type(maximum) is not int
+        or not 0 < maximum <= 64 * 1024 * 1024
+        or not 0 < len(raw) <= maximum
+        or type(expected_uid) is not int
+        or expected_uid < 0
+        or not all(hasattr(os, flag) for flag in ("O_NOFOLLOW", "O_CLOEXEC", "O_EXCL"))
+        or os.open not in os.supports_dir_fd
+        or os.rename not in os.supports_dir_fd
+    ):
+        raise ArchivePublicationInvalid
+    try:
+        info = os.fstat(read_fd)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != expected_uid or stat.S_IMODE(info.st_mode) != 0o755:
+            raise ArchivePublicationInvalid
+        old_fd, _old_info = _open_regular(
+            read_fd, public_name, uid=expected_uid, mode=0o644, device=info.st_dev, maximum=maximum
+        )
+        os.close(old_fd)
+        temp_fd = os.open(
+            temp_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+            0o644,
+            dir_fd=read_fd,
+        )
+        try:
+            os.fchmod(temp_fd, 0o644)
+            remaining = memoryview(raw)
+            while remaining:
+                written = os.write(temp_fd, remaining)
+                if written <= 0:
+                    raise ArchivePublicationInvalid
+                remaining = remaining[written:]
+            if after_phase is not None:
+                after_phase("file_written")
+            os.fsync(temp_fd)
+            if after_phase is not None:
+                after_phase("file_fsync")
+        finally:
+            os.close(temp_fd)
+        os.replace(temp_name, public_name, src_dir_fd=read_fd, dst_dir_fd=read_fd)
+        if after_phase is not None:
+            after_phase("renamed")
+        os.fsync(read_fd)
+        if after_phase is not None:
+            after_phase("directory_fsync")
+    except ArchivePublicationInvalid:
+        raise
+    except (OSError, OperatorArchiveInvalid):
+        raise ArchivePublicationInvalid from None
+
+
+__all__ = ["ArchivePublicationInvalid", "publish_retained_file", "replace_public_file"]

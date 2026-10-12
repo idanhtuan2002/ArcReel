@@ -7,7 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from r2.governance.operator_archive_file_ops import ArchivePublicationInvalid, publish_retained_file
+from r2.governance.operator_archive_file_ops import (
+    ArchivePublicationInvalid,
+    publish_retained_file,
+    replace_public_file,
+)
 
 
 def _directories(tmp_path: Path) -> tuple[Path, Path, int, int]:
@@ -188,3 +192,88 @@ def test_existing_link_cannot_be_overwritten(tmp_path: Path, occupied: str) -> N
     assert outside.read_bytes() == b"outside bytes"
     assert (staging / "candidate.tmp").is_symlink() == (occupied == "staging_symlink")
     assert (final / "00000000000000000002.json").is_symlink() == (occupied == "final_symlink")
+
+
+def test_replace_public_file_fsyncs_exact_new_copy(tmp_path: Path) -> None:
+    read = tmp_path / "read"
+    read.mkdir(mode=0o755)
+    target = read / "high-water.json"
+    target.write_bytes(b"old")
+    target.chmod(0o644)
+    phases: list[str] = []
+    read_fd = os.open(read, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        replace_public_file(
+            read_fd=read_fd,
+            temp_name=".high-water.candidate.tmp",
+            public_name="high-water.json",
+            raw=b"new exact bytes",
+            maximum=8192,
+            expected_uid=os.getuid(),
+            after_phase=phases.append,
+        )
+    finally:
+        os.close(read_fd)
+    assert phases == ["file_written", "file_fsync", "renamed", "directory_fsync"]
+    assert target.read_bytes() == b"new exact bytes"
+    assert target.stat().st_mode & 0o777 == 0o644
+    assert {path.name for path in read.iterdir()} == {"high-water.json"}
+
+
+@pytest.mark.parametrize("phase", ["file_written", "file_fsync", "renamed", "directory_fsync"])
+def test_interrupted_public_replace_exposes_old_or_new_copy(tmp_path: Path, phase: str) -> None:
+    read = tmp_path / "read"
+    read.mkdir(mode=0o755)
+    target = read / "grant-checkpoint.json"
+    target.write_bytes(b"old")
+    target.chmod(0o644)
+
+    def interrupt(current: str) -> None:
+        if current == phase:
+            raise RuntimeError("simulated interruption")
+
+    read_fd = os.open(read, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(RuntimeError, match="simulated interruption"):
+            replace_public_file(
+                read_fd=read_fd,
+                temp_name=".checkpoint.candidate.tmp",
+                public_name="grant-checkpoint.json",
+                raw=b"new exact bytes",
+                maximum=8192,
+                expected_uid=os.getuid(),
+                after_phase=interrupt,
+            )
+    finally:
+        os.close(read_fd)
+    assert target.read_bytes() == (b"old" if phase in {"file_written", "file_fsync"} else b"new exact bytes")
+    assert (read / ".checkpoint.candidate.tmp").exists() == (phase in {"file_written", "file_fsync"})
+
+
+@pytest.mark.parametrize("fault", ["unknown_public", "symlink_target", "wrong_mode"])
+def test_public_replace_denies_unapproved_or_unsafe_target(tmp_path: Path, fault: str) -> None:
+    read = tmp_path / "read"
+    read.mkdir(mode=0o755)
+    target = read / ("other.json" if fault == "unknown_public" else "high-water.json")
+    outside = tmp_path / "outside"
+    outside.write_bytes(b"outside")
+    if fault == "symlink_target":
+        target.symlink_to(outside)
+    else:
+        target.write_bytes(b"old")
+        target.chmod(0o666 if fault == "wrong_mode" else 0o644)
+    read_fd = os.open(read, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(ArchivePublicationInvalid):
+            replace_public_file(
+                read_fd=read_fd,
+                temp_name=".candidate.tmp",
+                public_name=target.name,
+                raw=b"new",
+                maximum=8192,
+                expected_uid=os.getuid(),
+            )
+    finally:
+        os.close(read_fd)
+    assert outside.read_bytes() == b"outside"
+    assert not (read / ".candidate.tmp").exists()
