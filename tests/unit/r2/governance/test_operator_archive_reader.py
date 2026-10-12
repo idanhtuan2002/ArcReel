@@ -341,6 +341,40 @@ def test_locked_staged_checkpoint_scan_requires_exact_unlinked_candidate(tmp_pat
                 session.read_staged_checkpoint(candidate)
 
 
+@pytest.mark.parametrize("fault", ["matching", "different_inode", "wrong_bytes", "extra_link", "wrong_name"])
+def test_locked_linked_checkpoint_scan_requires_same_two_link_inode(tmp_path: Path, fault: str) -> None:
+    root, paths = _tree(tmp_path)
+    old_high_water = paths["public_high_water"].read_bytes()
+    old_checkpoint = paths["public_checkpoint"].read_bytes()
+    _append_successor(root, paths)
+    candidate = paths["public_checkpoint"].read_bytes()
+    orphan = root / "archive" / "checkpoints" / f"sha256-{_digest(candidate)[7:]}.json"
+    (root / "archive" / "high-water" / "00000000000000000002.json").unlink()
+    staged = root / "archive" / ".staging" / ".checkpoint.00000000000000000002.tmp"
+    if fault == "different_inode":
+        _put(staged, candidate, 0o600)
+    else:
+        os.link(orphan, staged)
+    _put(paths["public_high_water"], old_high_water, 0o644)
+    _put(paths["public_checkpoint"], old_checkpoint, 0o644)
+    if fault == "wrong_bytes":
+        _put(orphan, b"{}", 0o600)
+    elif fault == "extra_link":
+        os.link(orphan, root / "archive" / ".staging" / "unexpected")
+    elif fault == "wrong_name":
+        staged.rename(staged.with_name("unexpected.tmp"))
+    with _locked_archive(root, uid=os.getuid(), limits=ArchiveReadLimits()) as session:
+        with pytest.raises(OperatorArchiveInvalid):
+            session.read_retained()
+        if fault == "matching":
+            state = session.read_linked_checkpoint(candidate)
+            assert state.snapshot.high_water.checkpoint_sequence == 1
+            assert orphan.stat().st_ino == staged.stat().st_ino
+        else:
+            with pytest.raises(OperatorArchiveInvalid):
+                session.read_linked_checkpoint(candidate)
+
+
 @pytest.mark.parametrize(
     "fault", ["old_public", "wrong_registry_name", "missing_record", "extra_record", "sequence_gap", "staging_file"]
 )

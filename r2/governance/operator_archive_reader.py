@@ -140,13 +140,13 @@ def _open_child(
     return child, _directory(child, uid=uid, mode=mode, device=device)
 
 
-def _regular(fd: int, *, uid: int, mode: int, device: int, maximum: int) -> os.stat_result:
+def _regular(fd: int, *, uid: int, mode: int, device: int, maximum: int, links: int = 1) -> os.stat_result:
     info = os.fstat(fd)
     if (
         not stat.S_ISREG(info.st_mode)
         or info.st_uid != uid
         or stat.S_IMODE(info.st_mode) != mode
-        or info.st_nlink != 1
+        or info.st_nlink != links
         or info.st_dev != device
         or not 0 <= info.st_size <= maximum
     ):
@@ -155,12 +155,12 @@ def _regular(fd: int, *, uid: int, mode: int, device: int, maximum: int) -> os.s
 
 
 def _open_regular(
-    parent: int, name: str, *, uid: int, mode: int, device: int, maximum: int
+    parent: int, name: str, *, uid: int, mode: int, device: int, maximum: int, links: int = 1
 ) -> tuple[int, os.stat_result]:
     observed = os.stat(name, dir_fd=parent, follow_symlinks=False)
     fd = os.open(name, _FILE_FLAGS, dir_fd=parent)
     try:
-        before = _regular(fd, uid=uid, mode=mode, device=device, maximum=maximum)
+        before = _regular(fd, uid=uid, mode=mode, device=device, maximum=maximum, links=links)
         if _identity(observed) != _identity(before):
             raise OperatorArchiveInvalid
     except BaseException:
@@ -169,8 +169,10 @@ def _open_regular(
     return fd, before
 
 
-def _read_file(parent: int, name: str, *, uid: int, mode: int, device: int, maximum: int, budget: _Budget) -> bytes:
-    fd, before = _open_regular(parent, name, uid=uid, mode=mode, device=device, maximum=maximum)
+def _read_file(
+    parent: int, name: str, *, uid: int, mode: int, device: int, maximum: int, budget: _Budget, links: int = 1
+) -> bytes:
+    fd, before = _open_regular(parent, name, uid=uid, mode=mode, device=device, maximum=maximum, links=links)
     try:
         budget.add_bytes(before.st_size)
         chunks: list[bytes] = []
@@ -253,8 +255,12 @@ class _LockedArchive:
         """Verify one exact unlinked staged envelope against a complete prior archive."""
         return self._read_candidate_checkpoint(candidate_raw, location="staged")
 
+    def read_linked_checkpoint(self, candidate_raw: bytes) -> _RetainedArchiveState:
+        """Verify one exact two-link staged and final envelope pair."""
+        return self._read_candidate_checkpoint(candidate_raw, location="linked")
+
     def _read_candidate_checkpoint(
-        self, candidate_raw: bytes, *, location: Literal["orphan", "staged"]
+        self, candidate_raw: bytes, *, location: Literal["orphan", "staged", "linked"]
     ) -> _RetainedArchiveState:
         if type(candidate_raw) is not bytes or not 0 < len(candidate_raw) <= MAX_GRANT_CHECKPOINT_BYTES:
             raise OperatorArchiveInvalid
@@ -265,9 +271,12 @@ class _LockedArchive:
         state = self._scan(
             require_public_current=True,
             allow_public_temps=False,
-            expected_orphan=candidate_raw if location == "orphan" else None,
+            expected_orphan=candidate_raw if location in {"orphan", "linked"} else None,
             expected_staged=(f".checkpoint.{candidate.body.checkpoint_sequence:020d}.tmp", candidate_raw)
             if location == "staged"
+            else None,
+            expected_linked=(f".checkpoint.{candidate.body.checkpoint_sequence:020d}.tmp", candidate_raw)
+            if location == "linked"
             else None,
         )
         if (
@@ -292,6 +301,7 @@ class _LockedArchive:
         allow_public_temps: bool,
         expected_orphan: bytes | None = None,
         expected_staged: tuple[str, bytes] | None = None,
+        expected_linked: tuple[str, bytes] | None = None,
     ) -> _RetainedArchiveState:
         budget = _Budget(self.limits)
         uid = self.uid
@@ -300,21 +310,23 @@ class _LockedArchive:
         if _names(root_fd, budget) != {"archive", "read"} or _names(self.archive_fd, budget) != _ARCHIVE_NAMES:
             raise OperatorArchiveInvalid
         staging_names = _names(self.staging_fd, budget)
-        if staging_names != ({expected_staged[0]} if expected_staged is not None else set()) or _names(
+        expected_stage = expected_staged if expected_staged is not None else expected_linked
+        if staging_names != ({expected_stage[0]} if expected_stage is not None else set()) or _names(
             self.approved_fd, budget
         ) != {"00000000000000000001.json"}:
             raise OperatorArchiveInvalid
-        if expected_staged is not None and (
+        if expected_stage is not None and (
             _read_file(
                 self.staging_fd,
-                expected_staged[0],
+                expected_stage[0],
                 uid=uid,
                 mode=0o600,
                 device=device,
                 maximum=MAX_GRANT_CHECKPOINT_BYTES,
                 budget=budget,
+                links=2 if expected_linked is not None else 1,
             )
-            != expected_staged[1]
+            != expected_stage[1]
         ):
             raise OperatorArchiveInvalid
         approved_raw = _read_file(
@@ -387,8 +399,15 @@ class _LockedArchive:
                 device=device,
                 maximum=MAX_GRANT_CHECKPOINT_BYTES,
                 budget=budget,
+                links=2 if expected_linked is not None else 1,
             )
             != expected_orphan
+        ):
+            raise OperatorArchiveInvalid
+        if expected_linked is not None and (
+            orphan_name is None
+            or _identity(os.stat(expected_linked[0], dir_fd=self.staging_fd, follow_symlinks=False))
+            != _identity(os.stat(orphan_name, dir_fd=self.checkpoint_fd, follow_symlinks=False))
         ):
             raise OperatorArchiveInvalid
         read_names = _names(self.read_fd, budget)
