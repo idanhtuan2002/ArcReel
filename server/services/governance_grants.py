@@ -306,6 +306,49 @@ class CurrentShowrunnerGrantReader(_GrantLedger):
         return event
 
 
+class CheckpointedShowrunnerGrantReader(CurrentShowrunnerGrantReader):
+    """Require a fresh signed checkpoint for the transaction-locked grant head."""
+
+    def __init__(
+        self,
+        *,
+        grant_key_id: str,
+        grant_public_key: bytes,
+        deployment_id: str,
+        checkpoint_key_id: str,
+        checkpoint_public_key: bytes,
+        load_checkpoint: Callable[[], Awaitable[bytes]],
+    ) -> None:
+        super().__init__(key_id=grant_key_id, public_key=grant_public_key)
+        self._deployment_id = deployment_id
+        self._checkpoint_key_id = checkpoint_key_id
+        self._checkpoint_public_key = checkpoint_public_key
+        self._load_checkpoint = load_checkpoint
+
+    async def require_current_locked(self, session: AsyncSession, *, scope: GrantScopeV1) -> VerifiedGrantEventV1:
+        event = await super().require_current_locked(session, scope=scope)
+        try:
+            raw = await self._load_checkpoint()
+            checkpoint = verify_grant_checkpoint(
+                raw,
+                deployment_id=self._deployment_id,
+                key_id=self._checkpoint_key_id,
+                public_key=self._checkpoint_public_key,
+            )
+        except Exception:
+            raise ShowrunnerGrantUnavailableError("signed grant checkpoint is unavailable") from None
+        expected = checkpoint.head_for_scope(
+            user_id=scope.user_id, project_name=scope.project_name, principal=scope.principal
+        )
+        if (
+            expected is None
+            or expected.head_sequence != event.body.sequence
+            or expected.head_event_digest != event.event_digest
+        ):
+            raise ShowrunnerGrantUnavailableError("signed grant checkpoint differs from current head")
+        return event
+
+
 class GovernanceGrantRecoveryScanner(_GrantLedger):
     """Verify every local signed grant chain against one external checkpoint."""
 
@@ -380,6 +423,7 @@ class GovernanceGrantRecoveryScanner(_GrantLedger):
 
 
 __all__ = [
+    "CheckpointedShowrunnerGrantReader",
     "CurrentShowrunnerGrantReader",
     "GovernanceGrantImporter",
     "GovernanceGrantRecoveryScanner",
