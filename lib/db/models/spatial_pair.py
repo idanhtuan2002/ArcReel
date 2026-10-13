@@ -264,3 +264,83 @@ class SpatialConstraintSetModel(Base):
     reverse_receipt_id: Mapped[str] = mapped_column(String(255))
     body_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SpatialPreviewBindingModel(Base):
+    """Sidecar of one binding-target M8 preview; PostgreSQL triggers couple it to the base row."""
+
+    __tablename__ = "m8_spatial_preview_bindings"
+    __table_args__ = (
+        PrimaryKeyConstraint("preview_id", name="pk_m8_spatial_preview_bindings"),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "preview_id"],
+            ["m8_promotion_previews.user_id", "m8_promotion_previews.project_name", "m8_promotion_previews.preview_id"],
+            name="fk_m8_spatial_preview_bindings_preview",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "binding_id"],
+            [
+                "production_binding_heads.user_id",
+                "production_binding_heads.project_name",
+                "production_binding_heads.binding_id",
+            ],
+            name="fk_m8_spatial_preview_bindings_binding",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("expected_binding_version >= 1", name="ck_m8_spatial_preview_bindings_version"),
+    )
+
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    preview_id: Mapped[str] = mapped_column(String(255))
+    binding_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    expected_binding_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    binding_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    preview_v2_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+
+
+class SpatialPromotionResultModel(Base):
+    """Sidecar of one binding-target M8 receipt: the binding version and constraint set it produced."""
+
+    __tablename__ = "m8_spatial_promotion_results"
+    __table_args__ = (
+        PrimaryKeyConstraint("receipt_id", name="pk_m8_spatial_promotion_results"),
+        ForeignKeyConstraint(
+            ["receipt_id"],
+            ["m8_promotion_receipts.receipt_id"],
+            name="fk_m8_spatial_promotion_results_receipt",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "binding_id", "binding_version"],
+            [
+                "production_binding_versions.user_id",
+                "production_binding_versions.project_name",
+                "production_binding_versions.binding_id",
+                "production_binding_versions.binding_version",
+            ],
+            name="fk_m8_spatial_promotion_results_binding_version",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "set_id"],
+            [
+                "m8_spatial_constraint_sets.user_id",
+                "m8_spatial_constraint_sets.project_name",
+                "m8_spatial_constraint_sets.set_id",
+            ],
+            name="fk_m8_spatial_promotion_results_set",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("binding_version >= 2", name="ck_m8_spatial_promotion_results_version"),
+    )
+
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    project_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    receipt_id: Mapped[str] = mapped_column(String(255))
+    binding_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    binding_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    set_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    result_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    receipt_v2_digest: Mapped[str] = mapped_column(String(71), nullable=False)

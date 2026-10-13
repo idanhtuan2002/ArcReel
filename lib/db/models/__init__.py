@@ -82,6 +82,8 @@ from lib.db.models.spatial_pair import (
     SpatialPairDecisionModel,
     SpatialPairHeadModel,
     SpatialPairV2CustodyModel,
+    SpatialPreviewBindingModel,
+    SpatialPromotionResultModel,
 )
 from lib.db.models.spatial_review import (
     SpatialReviewAcknowledgmentModel,
@@ -171,6 +173,8 @@ __all__ = [
     "SpatialPairDecisionModel",
     "SpatialPairHeadModel",
     "SpatialPairV2CustodyModel",
+    "SpatialPreviewBindingModel",
+    "SpatialPromotionResultModel",
     "SpatialReviewAcknowledgmentModel",
     "SpatialReviewDeliveryModel",
     "SpatialReviewSessionModel",
