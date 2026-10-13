@@ -14,6 +14,7 @@ from r2.contracts.spatial_source import FrameCandidateId
 ExactName = Annotated[str, StringConstraints(min_length=1, pattern=r"^\S(?:.*\S)?$")]
 BindingId = Annotated[str, StringConstraints(pattern=r"^m8b:[0-9a-f]{64}$")]
 SourceGroupRef = Annotated[str, StringConstraints(pattern=r"^m8g:[0-9a-f]{64}$")]
+SpatialConstraintSetId = Annotated[str, StringConstraints(pattern=r"^m8s:[0-9a-f]{64}$")]
 
 
 class _AuthorityBody(R2ContractModel):
@@ -55,11 +56,17 @@ class BindingEnvelopeV1(_AuthorityBody):
     scene_ref: TargetVersionRef
     target_ref: TargetVersionRef
     ordered_claims: tuple[FrameSourceClaimWithDigestV1, FrameSourceClaimWithDigestV1]
-    spatial_set_id: None
-    spatial_set_digest: None
+    spatial_set_id: SpatialConstraintSetId | None
+    spatial_set_digest: Sha256Digest | None
 
     @model_validator(mode="after")
     def check_claim_and_target_order(self) -> Self:
+        if (self.spatial_set_id is None) != (self.spatial_set_digest is None):
+            raise ValueError("binding spatial set ID and digest must be both present or both absent")
+        if self.spatial_set_id is not None and self.spatial_set_id.removeprefix("m8s:") != (
+            self.spatial_set_digest or ""
+        ).removeprefix("sha256:"):
+            raise ValueError("binding spatial set ID must name its digest")
         ids = [claim.frame_candidate_id for claim in self.ordered_claims]
         if ids != sorted(set(ids)):
             raise ValueError("binding frame claims must be distinct and sorted")
@@ -143,4 +150,5 @@ __all__ = [
     "FrameSourceClaimWithDigestV1",
     "SnapshotBindingRefV1",
     "SourceGroupRef",
+    "SpatialConstraintSetId",
 ]

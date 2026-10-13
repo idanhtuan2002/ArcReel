@@ -46,6 +46,41 @@ def compute_content_fingerprint(
     return _sha256(payload)
 
 
+CONTENT_FINGERPRINT_V2_DOMAIN = "r2.content_fingerprint.v2"
+
+
+def compute_content_fingerprint_v2(
+    *,
+    shot_spec: AnyShotSpec,
+    bindings: Sequence[ProductionBinding],
+    visual_identity_refs: Sequence[str],
+    approved_source_asset_refs: Sequence[str],
+    binding_snapshot_digest: str,
+    spatial_set_digests: Sequence[str],
+) -> str:
+    """The v1 inputs plus the exact binding snapshot and the spatial sets it carries.
+
+    A spatial-only change, with every v1 input held fixed, changes this fingerprint.
+    """
+    payload = ensure_json_value(
+        {
+            "domain": CONTENT_FINGERPRINT_V2_DOMAIN,
+            "canonical_version": "1",
+            "body": {
+                "content_v1": compute_content_fingerprint(
+                    shot_spec=shot_spec,
+                    bindings=bindings,
+                    visual_identity_refs=visual_identity_refs,
+                    approved_source_asset_refs=approved_source_asset_refs,
+                ),
+                "binding_snapshot_digest": binding_snapshot_digest,
+                "spatial_set_digests": list(spatial_set_digests),
+            },
+        }
+    )
+    return _sha256(payload)
+
+
 def compute_execution_fingerprint(
     *,
     provider: str,

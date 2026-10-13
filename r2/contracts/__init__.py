@@ -49,7 +49,12 @@ from .execution import (
     RejectedMethod,
 )
 from .factual import Claim, ClaimLedger, ClaimStatus, EvidenceRecord, ResearchPack, SourceRecord
-from .fingerprints import canonical_json_bytes, compute_content_fingerprint, compute_execution_fingerprint
+from .fingerprints import (
+    canonical_json_bytes,
+    compute_content_fingerprint,
+    compute_content_fingerprint_v2,
+    compute_execution_fingerprint,
+)
 from .host_hardening import (
     COMMAND_RECEIPT_ENVELOPE_SCHEMA_VERSION,
     TERMINAL_ATTEMPT_STATES,
@@ -397,6 +402,7 @@ __all__ = [
     "canonical_json_bytes",
     "command_receipt_result_envelope",
     "compute_content_fingerprint",
+    "compute_content_fingerprint_v2",
     "compute_descriptor_ref",
     "compute_epistemic_proposition_ref",
     "compute_execution_fingerprint",

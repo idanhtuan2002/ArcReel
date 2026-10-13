@@ -7,18 +7,17 @@ are carried as coverage warnings and never as production facts.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Self
+from typing import Literal, Self
 
-from pydantic import ConfigDict, Field, StringConstraints, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from r2.contracts.advanced_creative import CanonicalJsonObject, EvidenceClass, SpatialImageSpan
 from r2.contracts.common import R2ContractModel
-from r2.contracts.production_binding_authority import BindingId, ExactName
+from r2.contracts.production_binding_authority import BindingId, ExactName, SpatialConstraintSetId
 from r2.contracts.production_target import Sha256Digest
 from r2.contracts.spatial_pair import PairId
 from r2.contracts.spatial_source import FrameCandidateId
 
-SpatialConstraintSetId = Annotated[str, StringConstraints(pattern=r"^m8s:[0-9a-f]{64}$")]
 SpatialRelationKind = Literal["PRESERVE_ON_WALL", "SHARED_SIDE_ANCHOR"]
 SpatialWall = Literal["front", "back", "left", "right"]
 SpatialView = Literal["MASTER", "REVERSE"]

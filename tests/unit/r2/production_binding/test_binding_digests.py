@@ -230,3 +230,18 @@ def test_typed_authority_bodies_reject_extra_and_mismatched_fields() -> None:
     snapshot = cases["binding_snapshot"]["body"]
     with pytest.raises(ValidationError):
         BindingSnapshotV1.model_validate({**snapshot, "target_versions": list(reversed(snapshot["target_versions"]))})
+
+
+def test_envelope_spatial_set_is_both_or_neither_and_names_its_digest() -> None:
+    envelope = _cases()["binding_envelope"]["body"]
+    digest = "sha256:" + "e" * 64
+    with_set = {**envelope, "spatial_set_id": "m8s:" + "e" * 64, "spatial_set_digest": digest}
+
+    assert binding_envelope_digest(with_set) != binding_envelope_digest(envelope)
+    for invalid in (
+        {**envelope, "spatial_set_id": "m8s:" + "e" * 64},
+        {**envelope, "spatial_set_digest": digest},
+        {**with_set, "spatial_set_id": "m8s:" + "f" * 64},
+    ):
+        with pytest.raises(ValidationError):
+            BindingEnvelopeV1.model_validate(invalid)
