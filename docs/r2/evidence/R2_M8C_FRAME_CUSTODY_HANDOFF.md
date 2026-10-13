@@ -1110,3 +1110,59 @@ The worker orphan scan already dispatches it. The task is `media_type="video"`, 
 - **Not yet done: tests and the frozen vectors.**
 
 **Resume from:** the slice 3a tests and vectors, then 3b (migration `913c4a0e0001`), 3c, 3d, 3e and 3f, as listed in the plan.
+
+## Packet 3: typed spatial promotion — 2026-10-13 (Claude session)
+
+**Plan:** `docs/superpowers/plans/2026-10-13-r2-m8c-typed-spatial-promotion-packet-3.md`.
+
+**Commits:**
+
+| Commit | Content |
+|---|---|
+| `e1947dde`, `0492a32a` | 3a: V2 wire, digests and frozen vectors (`tests/fixtures/r2/m8c_spatial_promotion_v2_vectors.json`) |
+| `a5c292be` | 3b: migration `913c4a0e0001` sidecars and PostgreSQL deferred coupling triggers |
+| `50146824` | 3c: `append_spatial_successor` |
+| `f1cf57ad` | V2 approval test support through the real grant, review and decision services |
+| `d947937a` | 3d: preview service |
+| `13cdfd05` | 3e: atomic promotion, model-level triggers, SQLite review clock fix |
+
+**Behaviour.**
+- **Preview.** It takes the command key and candidate head, then the V2 pair reader takes its locks (target, binding, pair, masters, frames, grant). It derives the set from the approved MASTER/REVERSE views. It stages the base `PRODUCTION_BINDING` preview with its sidecar, and the command receipt records the V2 digest.
+- **Promote.**
+  - Verifies the V2 preview and the authorization digest.
+  - Re-reads the approval under its locks.
+  - Rechecks the binding version and envelope.
+  - Re-derives the set, which must equal the preview's.
+  - Then, in one transaction, stages the constraint set, binding N+1 by CAS, the authorization, the receipt with its result sidecar, and the command receipt.
+- **Exact replay** returns the stored receipt; a changed body conflicts.
+- **Approval scope.** An approval binds one binding version. After a promotion, a new preview needs a fresh approval; otherwise it is refused as stale.
+
+**Deviations from the plan, recorded.**
+- **No public routes for preview or promotion.** The pair review and V2 decision services on this branch are internal, because ADR-0103 requires an interactive JWT and a current grant that only operator activation provides. The spatial promotion stays internal the same way. The generic `/m8/exploration/promotions` route keeps refusing binding targets.
+- **Extra fix outside the packet.** The SQLite review clock was whole-second `CURRENT_TIMESTAMP`, which misordered a same-second grant import and decision. It now uses the process clock, like the grant ledger's SQLite fallback.
+
+**Verification (so far).**
+
+| Check | Result |
+|---|---|
+| SQLite: \`tests/unit tests/integration/lib tests/integration/server\` + R2 target_registry/production_binding/governance | 15902 passed, 125 skipped, 1 failed |
+| Static gates | clean |
+| PostgreSQL 18: promotion, preview, approval support, constraint snapshot, review real, R2 worker, advanced creative router, \`tests/integration/lib/db\` | 455 passed, 20 skipped, 1 failed before the slot-preview test fix |
+
+The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifact_end_consistent\`. It fails 1 in 8 runs on \`r2-v2/main\` too, so it is pre-existing and flaky.
+
+**Follow-ups closed after packet 3**
+- **Admission race (packet 2, open item 5):** closed. `test_a_binding_change_after_rederivation_blocks_attempt_planning` (`a95c2248`) moves the binding to a new version after the worker's evidence was derived; `admit_and_plan_spatial_attempt` refuses it as stale and plans no attempt. Removing the in-transaction snapshot digest check turns the test RED.
+
+**Not decided — needs a product/architecture decision before work**
+- **Output custody (packet 2, open item 3).** The spec's M8-C gate ends at a traced route-to-M7-submit test; it does not define how an R2 shot output enters master custody.
+  - Gate C approves episode-video masters keyed `(episode, shot_id)` from the script.
+  - Take-derived shots are `<scene>-TAKE-1` under a `take:` target, and no mapping between the two exists.
+  - The choices are: map a Take shot to an episode-video slot, add an R2 shot artifact kind with its own Gate C route, or keep R2 outputs as candidates only. The choice is left to the sponsor or the next milestone design; nothing is implemented.
+- **Synthetic M4 decision (packet 2, open item 4).** The compiled request uses a deterministic decision and descriptor derived from the profile, not `ExecutionDecisionService`. The profile still pins one exact route.
+
+**Packet 3 PostgreSQL verification (final)**
+- **Broad PostgreSQL 18 run:** `tests/unit/r2 tests/integration/r2 tests/integration/lib/db` and the spatial, R2 and M8 router files. Result: 3069 passed, 25 skipped, 1 failed, in 1 h 32 min.
+  - The failure was `test_pg_dump_restore_denies_old_db_and_coherent_public_before_actual_lifespan`, under 4-worker load.
+  - Rerun alone it passed 3 of 3 times. It is a deadline-sensitive actual-lifespan test.
+- **Focused PostgreSQL 18 run on the final code (`a95c2248`):** the governance restore, spatial promotion (including the deferred-trigger test), preview and R2 worker files. Result: 12 passed in each of 3 runs.
