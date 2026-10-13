@@ -166,6 +166,33 @@ async def _verify_committed_state(
     return scanner
 
 
+async def verify_operator_archive_preflight(
+    root: Path,
+    *,
+    session_factory: async_sessionmaker[AsyncSession],
+    expected_uid: int = 0,
+    limits: ArchiveReadLimits | None = None,
+) -> VerifiedOperatorArchiveV1:
+    """Verify the current operator archive and committed ledger under one lock."""
+
+    try:
+        with _locked_archive(root, uid=expected_uid, limits=limits or ArchiveReadLimits()) as archive:
+            before = archive.read_complete()
+            state = archive.read_retained()
+            await _verify_committed_state(
+                archive,
+                state,
+                session_factory=session_factory,
+                reread=archive.read_retained,
+            )
+            after = archive.read_complete()
+            if before != after:
+                raise OperatorArchiveReconcileUnavailable
+            return after
+    except Exception:
+        raise OperatorArchiveReconcileUnavailable from None
+
+
 async def _reconcile_locked(
     archive: _LockedArchive,
     *,
@@ -365,4 +392,5 @@ __all__ = [
     "publish_candidate_archive",
     "reconcile_complete_archive",
     "verify_candidate_preflight",
+    "verify_operator_archive_preflight",
 ]
