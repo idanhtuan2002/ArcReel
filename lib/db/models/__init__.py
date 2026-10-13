@@ -65,7 +65,7 @@ from lib.db.models.narrative_plan import NarrativePlanModel, NarrativePlanVersio
 from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
 from lib.db.models.session_message_link import AgentSessionUserMessageLink
-from lib.db.models.spatial_source import SpatialFrameReceiptModel
+from lib.db.models.spatial_source import SpatialExecutionEvidenceModel, SpatialFrameReceiptModel
 from lib.db.models.task import BatchTask, GenerationBatch, Task, WorkerLease
 from lib.db.models.user import User
 
@@ -133,6 +133,7 @@ __all__ = [
     "ProviderCredential",
     "ProviderObservationModel",
     "PublishApprovalDecisionModel",
+    "SpatialExecutionEvidenceModel",
     "SpatialFrameReceiptModel",
     "SystemSetting",
     "Task",
