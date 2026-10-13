@@ -9,7 +9,10 @@ import pytest
 
 from lib.api_errors import ServiceUnavailableError
 from r2.host_hardening.route_inventory import HOST_SPATIAL_ADAPTER_VERSION
+from server.auth import CurrentUserInfo
 from server.routers.spatial import spatial_vision
+
+USER = CurrentUserInfo(id="default", sub="operator-1", role="admin")
 
 
 def _resolver(provider_id: str, model: str, config: dict[str, str]) -> MagicMock:
@@ -28,7 +31,7 @@ def _resolver(provider_id: str, model: str, config: dict[str, str]) -> MagicMock
 async def test_a_gemini_text_model_binds_the_registered_spatial_route() -> None:
     resolver = _resolver("gemini-aistudio", "gemini-3-flash", {"api_key": "key"})
     with patch("lib.text_backends.factory.ConfigResolver", return_value=resolver):
-        vision = await spatial_vision("demo-project")
+        vision = await spatial_vision("demo-project", USER)
 
     assert vision.route.provider_id == "gemini"
     assert vision.route.provider_model_id == "gemini-3-flash"
@@ -44,6 +47,6 @@ async def test_a_non_gemini_text_model_is_unavailable_before_any_call() -> None:
         patch("lib.text_backends.factory.ConfigResolver", return_value=resolver),
         pytest.raises(ServiceUnavailableError) as raised,
     ):
-        await spatial_vision("demo-project")
+        await spatial_vision("demo-project", USER)
 
     assert raised.value.key == "m8_spatial_unavailable"

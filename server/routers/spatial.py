@@ -57,18 +57,22 @@ class SpatialVision:
     call: SpatialVisionCall
 
 
-class _LedgerVisionModel:
-    """Sends the vision request through ``TextGenerator`` so the ledger records its usage."""
+class LedgerVisionModel:
+    """Sends the vision request through ``TextGenerator``: the ledger records its usage for the user
+    and binds it to the M7 execution."""
 
-    def __init__(self, generator: TextGenerator, project_name: str) -> None:
+    def __init__(self, generator: TextGenerator, *, project_name: str, user_id: str) -> None:
         self._generator = generator
         self._project_name = project_name
+        self._user_id = user_id
 
-    async def generate(self, request: TextGenerationRequest) -> TextGenerationResult:
-        return await self._generator.generate(request, self._project_name)
+    async def generate(self, request: TextGenerationRequest, *, execution_id: str) -> TextGenerationResult:
+        return await self._generator.generate(
+            request, self._project_name, user_id=self._user_id, execution_id=execution_id
+        )
 
 
-async def spatial_vision(project_name: str) -> SpatialVision:
+async def spatial_vision(project_name: str, user: CurrentUser) -> SpatialVision:
     """The configured Gemini vision model on the registered ``host-spatial-v1`` route."""
     try:
         generator = await TextGenerator.create(TextTaskType.SPATIAL_ANALYSIS, project_name)
@@ -88,7 +92,10 @@ async def spatial_vision(project_name: str) -> SpatialVision:
         adapter_version=HOST_SPATIAL_ADAPTER_VERSION,
         capability_profile_ref=family.capability_profile_ref,
     )
-    return SpatialVision(route=route, call=text_backend_spatial_vision(_LedgerVisionModel(generator, project_name)))
+    return SpatialVision(
+        route=route,
+        call=text_backend_spatial_vision(LedgerVisionModel(generator, project_name=project_name, user_id=user.id)),
+    )
 
 
 class DeriveFrameRequest(M8ContractModel):
@@ -213,4 +220,4 @@ async def execute_spatial(
     return await _run(operation)
 
 
-__all__ = ["router", "spatial_vision"]
+__all__ = ["LedgerVisionModel", "SpatialVision", "router", "spatial_vision"]

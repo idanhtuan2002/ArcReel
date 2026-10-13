@@ -16,10 +16,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.advanced_creative import M8CandidateRevisionModel
+from lib.db.models.api_call import ApiCall
 from lib.db.models.host_hardening import ExecutionAttemptModel
 from lib.db.models.spatial_source import SpatialExecutionEvidenceModel
 from lib.db.repositories.spatial_execution import SpatialExecutionEvidenceRepository
 from lib.db.repositories.spatial_source import _receipt_digest
+from lib.ledger import Ledger
+from lib.text_backends.base import TextGenerationRequest, TextGenerationResult
+from lib.text_generator import TextGenerator
 from lib.video_backends.base import AmbiguousSubmitError
 from r2.advanced_creative.errors import CandidateConflictError, CommandConflictError, PromotionTargetUnavailableError
 from r2.contracts.advanced_creative import (
@@ -32,6 +36,7 @@ from r2.contracts.advanced_creative import (
 from r2.contracts.host_hardening import ExecutionAttemptState, ProviderRouteSnapshot
 from r2.host_hardening.route_inventory import HOST_SPATIAL_ADAPTER_VERSION
 from r2.m3.host_integration import GoldenAHostIntegration
+from server.routers.spatial import LedgerVisionModel
 from server.services.advanced_creative import exploration_service
 from server.services.execution_attempts import build_attempt_submitter
 from server.services.spatial_execution import (
@@ -39,6 +44,7 @@ from server.services.spatial_execution import (
     SpatialExecutionService,
     SpatialExecutionUnavailableError,
     SpatialFrameRef,
+    text_backend_spatial_vision,
 )
 from server.services.spatial_source import FrameDerivationService
 from tests.integration.server.routers.test_gates_export import PROJECT, USER, _body
@@ -137,15 +143,21 @@ class _Vision:
         self.raw = json.dumps(_response()).encode() if raw is None else raw
         self.error = error
         self.calls: list[tuple[str, bytes, bytes]] = []
+        self.execution_ids: list[str] = []
         self.before_return: Any = None
 
-    async def __call__(self, *, prompt: str, master_png: bytes, reverse_png: bytes) -> bytes:
+    async def __call__(self, *, prompt: str, master_png: bytes, reverse_png: bytes, execution_id: str) -> bytes:
         self.calls.append((prompt, master_png, reverse_png))
+        self.execution_ids.append(execution_id)
         if self.before_return is not None:
             await self.before_return()
         if self.error is not None:
             raise self.error
         return self.raw
+
+
+async def _lineage(_project: str, _episode: int) -> LineageBinding:
+    return LINEAGE
 
 
 def _service(
@@ -436,17 +448,118 @@ async def test_evidence_write_failure_after_the_revision_rolls_back_both(
     assert await _attempt_states(session_factory) == [ExecutionAttemptState.ACCEPTED.value]
 
 
+def _registry_with_spatial_status(tmp_path: Path, status: str) -> Path:
+    from r2.host_hardening.provider_capabilities import DEFAULT_REGISTRY_PATH, compute_entry_digest
+
+    document = json.loads(DEFAULT_REGISTRY_PATH.read_text(encoding="utf-8"))
+    for entry in document["profiles"]:
+        if entry["ref"] == ROUTE.capability_profile_ref:
+            entry["qualification_status"] = status
+            entry["entry_digest"] = compute_entry_digest(entry)
+    path = tmp_path / "registry.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
 @pytest.mark.asyncio
-async def test_release_mode_refuses_the_unqualified_spatial_route_before_the_provider(
-    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+async def test_release_mode_refuses_an_unverified_spatial_adapter_before_the_provider(
+    gate_export_client: AsyncClient,
+    project_dir: Path,
+    session_factory: Factory,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     from r2.host_hardening.paid_routes import RELEASE_MODE_ENV
 
     master, reverse = await _frames(gate_export_client, project_dir, session_factory)
     monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
     vision = _Vision()
-    with pytest.raises(SpatialExecutionUnavailableError, match="route"):
-        await _service(session_factory, project_dir, vision).execute(_command(master, reverse))
+    service_registry = _registry_with_spatial_status(tmp_path, "UNQUALIFIED")
+    service = SpatialExecutionService(
+        session_factory=session_factory,
+        project_dir=project_dir,
+        route=ROUTE,
+        vision=vision,
+        submitter_for=lambda session, user_id, project_name: build_attempt_submitter(
+            session, user_id=user_id, project_name=project_name, usage_binder=None
+        ),
+        lineage_for=_lineage,
+        capability_registry=service_registry,
+    )
+    with pytest.raises(SpatialExecutionUnavailableError, match="offline-verified"):
+        await service.execute(_command(master, reverse))
     assert vision.calls == []
     assert await _counts(session_factory) == (0, 0)
     assert await _attempt_states(session_factory) == []
+
+
+@pytest.mark.asyncio
+async def test_release_mode_runs_an_offline_verified_spatial_adapter(
+    gate_export_client: AsyncClient,
+    project_dir: Path,
+    session_factory: Factory,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from r2.host_hardening.paid_routes import RELEASE_MODE_ENV
+
+    master, reverse = await _frames(gate_export_client, project_dir, session_factory)
+    monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+    vision = _Vision()
+    service = SpatialExecutionService(
+        session_factory=session_factory,
+        project_dir=project_dir,
+        route=ROUTE,
+        vision=vision,
+        submitter_for=lambda session, user_id, project_name: build_attempt_submitter(
+            session, user_id=user_id, project_name=project_name, usage_binder=None
+        ),
+        lineage_for=_lineage,
+        capability_registry=_registry_with_spatial_status(tmp_path, "OFFLINE_VERIFIED"),
+    )
+    head = await service.execute(_command(master, reverse))
+    assert (head.current_revision, len(vision.calls)) == (1, 1)
+
+
+class _TextModel:
+    model = "gemini-spatial-fixture"
+
+    def __init__(self) -> None:
+        self.requests: list[TextGenerationRequest] = []
+
+    async def generate(self, request: TextGenerationRequest) -> TextGenerationResult:
+        self.requests.append(request)
+        return TextGenerationResult(text=json.dumps(_response()), provider="gemini", model=self.model)
+
+
+@pytest.mark.asyncio
+async def test_the_ledger_records_the_vision_call_bound_to_its_execution(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
+) -> None:
+    master, reverse = await _frames(gate_export_client, project_dir, session_factory)
+    backend = _TextModel()
+    generator = TextGenerator(backend, Ledger(session_factory=session_factory), "gemini-aistudio")
+    vision = text_backend_spatial_vision(LedgerVisionModel(generator, project_name=PROJECT, user_id=USER.id))
+    service = SpatialExecutionService(
+        session_factory=session_factory,
+        project_dir=project_dir,
+        route=ROUTE,
+        vision=vision,
+        submitter_for=lambda session, user_id, project_name: build_attempt_submitter(
+            session, user_id=user_id, project_name=project_name, usage_binder=None
+        ),
+        lineage_for=_lineage,
+    )
+
+    await service.execute(_command(master, reverse))
+
+    async with session_factory() as session:
+        calls = list((await session.execute(select(ApiCall))).scalars())
+        stored = await SpatialExecutionEvidenceRepository(session).get_by_command(
+            user_id=USER.id, project_name=PROJECT, command_id="spatial-1"
+        )
+    assert stored is not None
+    assert len(backend.requests) == 1
+    assert [(c.project_name, c.user_id, c.call_type, c.status, c.execution_id) for c in calls] == [
+        (PROJECT, USER.id, "text", "success", stored.evidence.execution_id)
+    ]
