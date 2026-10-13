@@ -22,7 +22,7 @@ from lib.db.base import utc_now
 from lib.db.repositories.advanced_creative import APPEND_REVISION, ExplorationRepository
 from lib.db.repositories.host_hardening import ExecutionAttemptRepository
 from lib.db.repositories.spatial_execution import SpatialExecutionEvidenceRepository
-from lib.text_backends.base import ImageInput, TextBackend, TextGenerationRequest
+from lib.text_backends.base import ImageInput, TextGenerationRequest, TextGenerationResult
 from lib.video_backends.execution_adapter import accepted_submit_receipt
 from r2.advanced_creative.digests import digest_canonical, digest_payload
 from r2.advanced_creative.errors import CandidateConflictError, CommandConflictError
@@ -95,8 +95,12 @@ class SpatialExecutionCommand:
     reverse: SpatialFrameRef
 
 
-def text_backend_spatial_vision(backend: TextBackend) -> SpatialVisionCall:
-    """Bind one text backend that accepts image files as the spatial vision call."""
+class SpatialVisionModel(Protocol):
+    async def generate(self, request: TextGenerationRequest) -> TextGenerationResult: ...
+
+
+def text_backend_spatial_vision(backend: SpatialVisionModel) -> SpatialVisionCall:
+    """Bind one text model that accepts image files as the spatial vision call."""
 
     async def call(*, prompt: str, master_png: bytes, reverse_png: bytes) -> bytes:
         with tempfile.TemporaryDirectory(prefix="r2-spatial-") as directory:

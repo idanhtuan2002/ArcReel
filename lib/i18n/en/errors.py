@@ -504,4 +504,7 @@ MESSAGES = {
     "m8_candidate_conflict": "The candidate changed; reload it and try again",
     "m8_promotion_binding_stale": "The preview is out of date or expired; create a new preview",
     "m8_promotion_target_unavailable": "This promotion target is not available",
+    "m8_spatial_unavailable": "Spatial analysis is not available right now; check the Gemini text model setting and try again",
+    "m8_spatial_source_conflict": "A spatial source frame is missing, changed, or no longer matches its approved video",
+    "m8_spatial_request_invalid": "This spatial request is not valid",
 }

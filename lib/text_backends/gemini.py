@@ -141,6 +141,7 @@ class GeminiTextBackend:
                 location="global",
                 credentials=credentials,
             )
+            self._submitted_base_url = f"vertex://{project_id}/global"
             logger.info("GeminiTextBackend: 使用 Vertex AI 后端（凭证: %s）", credentials_file.name)
         else:
             if not api_key:
@@ -148,6 +149,7 @@ class GeminiTextBackend:
             effective_base_url = normalize_base_url(base_url)
             http_options = {"base_url": effective_base_url} if effective_base_url else None
             self._client = genai.Client(api_key=api_key, http_options=http_options)  # type: ignore[arg-type]
+            self._submitted_base_url = effective_base_url or "https://generativelanguage.googleapis.com"
             if base_url:
                 logger.info("GeminiTextBackend: 使用 AI Studio 后端（Base URL: %s）", base_url)
             else:
@@ -160,6 +162,11 @@ class GeminiTextBackend:
     @property
     def model(self) -> str:
         return self._model
+
+    @property
+    def submitted_base_url(self) -> str:
+        """The endpoint base the requests go to: the AI Studio URL or ``vertex://{project}/global``."""
+        return self._submitted_base_url
 
     @property
     def capabilities(self) -> set[TextCapability]:

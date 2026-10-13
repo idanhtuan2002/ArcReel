@@ -34,6 +34,7 @@ class TestTextTaskType:
         assert TextTaskType.SCRIPT == "script"
         assert TextTaskType.OVERVIEW == "overview"
         assert TextTaskType.STYLE_ANALYSIS == "style"
+        assert TextTaskType.SPATIAL_ANALYSIS == "spatial"
 
 
 class TestTextTaskTiers:
@@ -45,10 +46,12 @@ class TestTextTaskTiers:
         assert TEXT_TASK_TIERS[TextTaskType.SCRIPT] is TextTaskTier.COMPLEX
         assert TEXT_TASK_TIERS[TextTaskType.OVERVIEW] is TextTaskTier.SIMPLE
         assert TEXT_TASK_TIERS[TextTaskType.STYLE_ANALYSIS] is TextTaskTier.SIMPLE
+        assert TEXT_TASK_TIERS[TextTaskType.SPATIAL_ANALYSIS] is TextTaskTier.SIMPLE
 
     def test_vision_required_tasks_are_valid_members(self):
         assert set(TextTaskType) >= VISION_REQUIRED_TASKS
         assert TextTaskType.STYLE_ANALYSIS in VISION_REQUIRED_TASKS
+        assert TextTaskType.SPATIAL_ANALYSIS in VISION_REQUIRED_TASKS
 
 
 class TestImageInput:
