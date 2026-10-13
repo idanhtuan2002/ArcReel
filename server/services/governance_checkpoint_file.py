@@ -42,9 +42,19 @@ class GovernanceCheckpointFile:
 
     def _read(self) -> bytes:
         try:
-            directory_fd = self._open_directory()
+            directory_fd = self._open_directory(require_public_custody=True)
             try:
-                return self._read_named(directory_fd, _CHECKPOINT_NAME, MAX_GRANT_CHECKPOINT_BYTES)
+                before = os.fstat(directory_fd)
+                result = self._read_named(
+                    directory_fd,
+                    _CHECKPOINT_NAME,
+                    MAX_GRANT_CHECKPOINT_BYTES,
+                    public_custody=(self._expected_uid, self._expected_gid, before.st_dev),
+                )
+                after = os.fstat(directory_fd)
+                if (before.st_uid, before.st_gid, before.st_mode) != (after.st_uid, after.st_gid, after.st_mode):
+                    raise CheckpointFileUnavailable("checkpoint file is unavailable")
+                return result
             finally:
                 os.close(directory_fd)
         except OSError:
@@ -76,12 +86,16 @@ class GovernanceCheckpointFile:
                     before.st_dev,
                     before.st_ino,
                     before.st_mode,
+                    before.st_uid,
+                    before.st_gid,
                     before.st_mtime_ns,
                     before.st_ctime_ns,
                 ) != (
                     after.st_dev,
                     after.st_ino,
                     after.st_mode,
+                    after.st_uid,
+                    after.st_gid,
                     after.st_mtime_ns,
                     after.st_ctime_ns,
                 ):
@@ -163,6 +177,8 @@ class GovernanceCheckpointFile:
                 before.st_dev,
                 before.st_ino,
                 before.st_mode,
+                before.st_uid,
+                before.st_gid,
                 before.st_size,
                 before.st_mtime_ns,
                 before.st_ctime_ns,
@@ -171,6 +187,8 @@ class GovernanceCheckpointFile:
                 after.st_dev,
                 after.st_ino,
                 after.st_mode,
+                after.st_uid,
+                after.st_gid,
                 after.st_size,
                 after.st_mtime_ns,
                 after.st_ctime_ns,

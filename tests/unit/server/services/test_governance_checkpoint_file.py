@@ -82,21 +82,46 @@ async def test_public_loader_rejects_missing_host_custody(tmp_path: Path, state:
 
 @pytest.mark.asyncio
 async def test_loader_reopens_complete_file_after_same_directory_rename(tmp_path: Path) -> None:
+    os.chmod(tmp_path, 0o755)
     current = tmp_path / "grant-checkpoint.json"
     current.write_bytes(b"old")
-    loader = GovernanceCheckpointFile(tmp_path)
+    current.chmod(0o644)
+    loader = GovernanceCheckpointFile(tmp_path, expected_uid=os.getuid(), expected_gid=os.getgid())
     assert await loader.load() == b"old"
 
     pending = tmp_path / "checkpoint.pending"
     pending.write_bytes(b"new-complete")
+    pending.chmod(0o644)
     assert await loader.load() == b"old"
     os.replace(pending, current)
     assert await loader.load() == b"new-complete"
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["wrong_owner", "wrong_directory_mode", "wrong_file_mode", "hardlink"])
+async def test_transaction_loader_rechecks_custody_after_valid_read(tmp_path: Path, state: str) -> None:
+    os.chmod(tmp_path, 0o755)
+    current = tmp_path / "grant-checkpoint.json"
+    current.write_bytes(b"signed-checkpoint")
+    current.chmod(0o644)
+    loader = GovernanceCheckpointFile(tmp_path, expected_uid=os.getuid(), expected_gid=os.getgid())
+    assert await loader.load() == b"signed-checkpoint"
+    if state == "wrong_owner":
+        loader = GovernanceCheckpointFile(tmp_path, expected_uid=os.getuid() + 1, expected_gid=os.getgid())
+    elif state == "wrong_directory_mode":
+        os.chmod(tmp_path, 0o777)
+    elif state == "wrong_file_mode":
+        current.chmod(0o666)
+    else:
+        os.link(current, tmp_path / "checkpoint-alias")
+    with pytest.raises(CheckpointFileUnavailable):
+        await loader.load()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("state", ["missing", "empty", "oversized", "symlink", "directory", "fifo"])
 async def test_loader_rejects_unavailable_or_nonregular_checkpoint(tmp_path: Path, state: str) -> None:
+    os.chmod(tmp_path, 0o755)
     current = tmp_path / "grant-checkpoint.json"
     if state == "empty":
         current.write_bytes(b"")
@@ -111,7 +136,7 @@ async def test_loader_rejects_unavailable_or_nonregular_checkpoint(tmp_path: Pat
     elif state == "fifo":
         os.mkfifo(current)
     with pytest.raises(CheckpointFileUnavailable) as exc:
-        await GovernanceCheckpointFile(tmp_path).load()
+        await GovernanceCheckpointFile(tmp_path, expected_uid=os.getuid(), expected_gid=os.getgid()).load()
     assert str(tmp_path) not in str(exc.value)
 
 

@@ -833,3 +833,19 @@ At clean `810856367f0d39d67b3ca75ef9457559e037727d`, a bounded local inventory f
 The source-backed startup-anchor comparison is `docs/research/2026-10-13-r2-m8c-startup-freshness-anchor.md`. It reuses `verify_operator_archive_preflight()` as the host-side comparison donor. The M7 `attest_deployment_restore()` donor proves a particular recovery exercise, not the latest archive value on each restart. Current production Compose sets `restart: unless-stopped`, so a one-time host preflight barrier does not cover independent container restarts. The selected activation candidate is a host-owned Unix-socket attestor that answers a fresh startup challenge from the retained archive and database. A proven service-manager-only restart barrier remains a narrower alternative if the actual host can enforce it. Neither candidate is implemented or accepted; the application activation path continues to deny before migrations or readiness.
 
 The fastest remaining four evidence groups are: (1) actual-host Governance/archive/independent-backup/operator inventory and restore custody drill; (2) startup-visible archive freshness proof and real same-major PostgreSQL old-DB/newer-archive lifespan denial plus post-REVOKE positive path; (3) focused Governance, static, and one final stable-HEAD backend gate, without repeating the full suite for intermediate research or repairs; (4) independent exact-HEAD review and explicit READY decision. The local host probe does not close group 1, and the research decision does not close group 2.
+
+## Startup attestor implementation ledger — 2026-10-13
+
+Baseline clean HEAD: `7b3f9cab165475a8bf3fab6a7f93a1554f242001`.
+The transaction checkpoint custody tests first returned **4 failed, 18 passed**
+for wrong owner/directory mode/file mode/hardlink after a successful read.
+The repair reuses guarded directory and named-file custody checks on every load,
+and includes UID/GID in read stability comparison. Focused final file:
+**22 passed, 1 SQLite reflection warning**; changed-file Ruff/format and targeted
+basedpyright (**0 errors, 0 warnings**) passed; test audit **0 violations**.
+The attestor spec/plan records exact protocol, path/peer trust and required tests.
+Ruling: implement the sponsor-authorized startup direction inline without another
+permission question; production/host actions retain their existing separate gates.
+Ruling: authenticate the Linux pathname socket with host custody and SO_PEERCRED,
+then bind each proof to a fresh nonce; no new signer/MAC secret is needed under
+the selected uncompromised-host boundary. Incorrect credential mapping denies.
