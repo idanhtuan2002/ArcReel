@@ -1032,7 +1032,7 @@ Plan: `docs/superpowers/plans/2026-10-13-r2-m8c-consumer-gate-packet-1.md`. Comm
 | `d045c1cc` | host request builder |
 | `1b07f5c3` | admission derivation |
 | `db46fd0f` | 2d: route |
-| `5c6b0d0e`-range refactor | shared route builder, in-session snapshot read |
+| `7a275669` | refactor: shared route builder, in-session snapshot read |
 | `c18eb395` | 2e/2f: worker and integration |
 | `8d1fbb8a` | PostgreSQL test binding |
 | `e2c9b3d3` | missed capability-code registration |
