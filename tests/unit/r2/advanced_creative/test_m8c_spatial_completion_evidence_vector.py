@@ -63,3 +63,32 @@ def test_receipt_digest_changes_with_raw_response_route_prompt_and_frame_order()
     altered = deepcopy(envelope)
     altered["body"]["ordered_source_frames"][0]["frame_receipt_digest"] = "sha256:" + "f" * 64
     assert digest_canonical(altered) != original
+
+
+def test_evidence_contract_reproduces_the_pinned_vector_digest() -> None:
+    from r2.contracts.spatial_execution import SpatialExecutionEvidenceV1
+
+    case = _fixture()
+    evidence = SpatialExecutionEvidenceV1.model_validate(case["body"])
+    assert evidence.digest == case["digest"]
+
+
+def test_evidence_contract_allows_absent_overlap_and_rejects_role_misuse() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    from r2.contracts.spatial_execution import SpatialExecutionEvidenceV1
+
+    body = deepcopy(_fixture()["body"])
+    with_overlap = SpatialExecutionEvidenceV1.model_validate(body)
+    body["overlap_response"] = None
+    without_overlap = SpatialExecutionEvidenceV1.model_validate(body)
+    assert without_overlap.digest != with_overlap.digest
+
+    swapped = deepcopy(body)
+    swapped["ordered_source_frames"].reverse()
+    duplicate = deepcopy(body)
+    duplicate["ordered_source_frames"][1] = {**duplicate["ordered_source_frames"][0], "role": "REVERSE"}
+    for invalid in (swapped, duplicate):
+        with pytest.raises(ValidationError):
+            SpatialExecutionEvidenceV1.model_validate(invalid)
