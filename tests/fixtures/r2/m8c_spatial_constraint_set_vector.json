@@ -1,0 +1,140 @@
+{
+  "domain": "r2.m8.spatial.constraint_set.v1",
+  "canonical_version": "1",
+  "selected_subjects": [
+    "red fire extinguisher cabinet",
+    "blue exit door",
+    "yellow painting"
+  ],
+  "body": {
+    "schema_version": "1",
+    "user_id": "default",
+    "project_name": "demo-project",
+    "binding_id": "m8b:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "candidate_id": "spatial-candidate-1",
+    "candidate_revision": 1,
+    "candidate_payload_digest": "sha256:0d3af8a08fac9f2b03f4c7640bc9ef603685fec66976fe6f9800d99e5ef125d6",
+    "constraints": [
+      {
+        "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
+        "relation_kind": "PRESERVE_ON_WALL",
+        "subject_ref": "red fire extinguisher cabinet",
+        "wall": "front",
+        "source_spans": [
+          {
+            "source_ref": "master",
+            "source_digest": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "view": "MASTER",
+            "x0": 0.7,
+            "y0": 0.2,
+            "x1": 0.82,
+            "y1": 0.8
+          }
+        ]
+      },
+      {
+        "assertion_id": "spatial:0d1b9affc46e3caf8d86bd40",
+        "relation_kind": "PRESERVE_ON_WALL",
+        "subject_ref": "blue exit door",
+        "wall": "back",
+        "source_spans": [
+          {
+            "source_ref": "reverse",
+            "source_digest": "sha256:a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
+            "view": "REVERSE",
+            "x0": 0.65,
+            "y0": 0.2,
+            "x1": 0.79,
+            "y1": 0.8
+          }
+        ]
+      },
+      {
+        "assertion_id": "spatial:78725c87213000e914c5e38e",
+        "relation_kind": "SHARED_SIDE_ANCHOR",
+        "subject_ref": "yellow painting",
+        "wall": "left",
+        "source_spans": [
+          {
+            "source_ref": "master",
+            "source_digest": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "view": "MASTER",
+            "x0": 0.0,
+            "y0": 0.2,
+            "x1": 0.12,
+            "y1": 0.8
+          },
+          {
+            "source_ref": "reverse",
+            "source_digest": "sha256:a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
+            "view": "REVERSE",
+            "x0": 0.88,
+            "y0": 0.2,
+            "x1": 1.0,
+            "y1": 0.8
+          }
+        ]
+      }
+    ],
+    "coverage_warnings": [
+      {
+        "assertion_id": "spatial:5a8932462ab8780a6ed00f6c",
+        "evidence_class": "INFERRED",
+        "relation": "may sit under the window"
+      },
+      {
+        "assertion_id": "spatial:098c264005b7e90a43d0cbbd",
+        "evidence_class": "GAP",
+        "relation": "ceiling corners unseen"
+      }
+    ],
+    "seam_locks": [],
+    "direction_locks": [
+      {
+        "must_not_appear_in": "raw x=50% right-side join, raw x=75% reverse back center, or raw x=0%/100% safe seam",
+        "name": "red fire extinguisher cabinet",
+        "reason": "This is visible in master front center and must not migrate to side/back zones.",
+        "required_direction": "front",
+        "required_panorama_zone": "raw x=25% / corrected viewer yaw 0°"
+      },
+      {
+        "must_not_appear_in": "raw x=25% master front center, raw x=50% right-side join, or raw x=0%/100% safe seam",
+        "name": "blue exit door",
+        "reason": "This is visible in reverse back center and must not be used to fill a side join or front wall.",
+        "required_direction": "back",
+        "required_panorama_zone": "raw x=75% / corrected viewer yaw 180°"
+      }
+    ],
+    "duplicate_warnings": [],
+    "normalizer_version": "spatial-r2-v1",
+    "pair_id": "m8p:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "pair_version": 1,
+    "pair_decision_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "ordered_sources": [
+      {
+        "view": "MASTER",
+        "parent_artifact_key": "artifact-key-v1:SH01",
+        "parent_master_version": 1,
+        "parent_candidate_id": "candidate-SH01",
+        "parent_content_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "frame_derivation_receipt_id": "m8f:1111111111111111111111111111111111111111111111111111111111111111",
+        "frame_derivation_receipt_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "frame_candidate_id": "m8f:1111111111111111111111111111111111111111111111111111111111111111",
+        "frame_content_digest": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+      },
+      {
+        "view": "REVERSE",
+        "parent_artifact_key": "artifact-key-v1:SH02",
+        "parent_master_version": 1,
+        "parent_candidate_id": "candidate-SH02",
+        "parent_content_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "frame_derivation_receipt_id": "m8f:2222222222222222222222222222222222222222222222222222222222222222",
+        "frame_derivation_receipt_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "frame_candidate_id": "m8f:2222222222222222222222222222222222222222222222222222222222222222",
+        "frame_content_digest": "sha256:a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+      }
+    ]
+  },
+  "digest": "sha256:b4bf95fffba24fbaae9ac42842bbc4dfab99dea1d5080f021fece750751062fd",
+  "set_id": "m8s:b4bf95fffba24fbaae9ac42842bbc4dfab99dea1d5080f021fece750751062fd"
+}
