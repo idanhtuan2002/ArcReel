@@ -1166,3 +1166,12 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
   - The failure was `test_pg_dump_restore_denies_old_db_and_coherent_public_before_actual_lifespan`, under 4-worker load.
   - Rerun alone it passed 3 of 3 times. It is a deadline-sensitive actual-lifespan test.
 - **Focused PostgreSQL 18 run on the final code (`a95c2248`):** the governance restore, spatial promotion (including the deferred-trigger test), preview and R2 worker files. Result: 12 passed in each of 3 runs.
+
+**Packet 3 self-review: lock order**
+- **Promotion order:** M8 command key → candidate head → preview → (V2 pair reader: target → current binding version row FOR UPDATE → pair head → parent masters → frames) → binding head FOR UPDATE inside `append_spatial_successor`.
+- **Deviation:** the spec places the binding head before the pair head; here it comes last.
+- **No cycle with existing writers:**
+  - The V2 pair decision writer claims the pair head and then the masters, and never locks the binding head.
+  - The binding create command locks the head only for an absent binding and refuses an existing one.
+  - Two concurrent promotions serialize on the current version row; the second fails the head CAS as stale.
+- **Not tested:** a forced PostgreSQL interleaving of two promotions.
