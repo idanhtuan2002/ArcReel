@@ -1093,3 +1093,20 @@ The worker orphan scan already dispatches it. The task is `media_type="video"`, 
 **Process error found and fixed.** The earlier "bind the process queue" test change (`8d1fbb8a`) never applied: an unchecked string replacement matched nothing. The earlier worker tests therefore passed while the provider job ID was written through the global queue to another database. The binding is now applied (with a match assertion), and the success test now asserts the persisted `provider_job_id`.
 
 **Not covered.** The three-line routing inside `execute_resume_video_task` has no direct test; it needs a configured backend.
+
+## Packet 3 checkpoint — 2026-10-13 (usage limit reached)
+
+**Plan:** `docs/superpowers/plans/2026-10-13-r2-m8c-typed-spatial-promotion-packet-3.md` (`f7780966`). Its decisions:
+- Promotion appends binding version N+1 with the spatial set.
+- The pair approval is checked once, when promoting.
+- The new endpoint is `/m8/spatial/promotion-previews`.
+- Two sidecars, with PostgreSQL deferred coupling triggers.
+- Digest domains `r2.m8.spatial.preview.v2` and `r2.m8.spatial.receipt.v2`.
+
+**Slice 3a, partly done (this commit):**
+- `r2/contracts/spatial_promotion.py`: V2 preview/receipt and their sidecar contracts, with coupling validators.
+- `r2/production_binding/spatial_promotion.py`: the V2 digest functions.
+- Gates passed: ruff, basedpyright and lint-imports.
+- **Not yet done: tests and the frozen vectors.**
+
+**Resume from:** the slice 3a tests and vectors, then 3b (migration `913c4a0e0001`), 3c, 3d, 3e and 3f, as listed in the plan.
