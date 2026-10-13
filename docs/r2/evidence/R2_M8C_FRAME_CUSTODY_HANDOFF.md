@@ -929,3 +929,48 @@ comes from the unchanged excess-connection close path (inferred pre-existing, no
 
 Still open: actual-host custody/backup/restore/image/Compose evidence, one stable
 full backend gate, HTTP/browser review, final M8-C acceptance and READY.
+
+## Integration with r2-v2/main and ADR acceptance — 2026-10-13 (Claude session)
+
+**State**
+- M8-C (C1–C4) was accepted and merged into `r2-v2/main`. The follow-ups were merged at `c24ed8f9`; `r2-v2/main` is pushed to origin.
+- This branch merged `r2-v2/main` twice: `d87c240f` (at `15feb24a`) and `45425ff8` (at `c24ed8f9`). This branch is **not pushed** and **not merged** into `r2-v2/main`.
+- Migration collision fix: the branch's target registry migration was renumbered `8c8c4a0e0001` → `8c9c4a0e0001` and re-parented on main's spatial execution evidence revision `8c8c4a0e0001`. The chain is single-head at `911c4a0e0001`. Revision pins in the migration tests were updated to match.
+- The sponsor accepted ADR-0102 and ADR-0103 on 2026-10-13. Status is `accepted`; each ADR carries a note that acceptance does not satisfy its activation gates.
+
+**Verification**
+
+| Check | Result |
+|---|---|
+| Static: ruff, basedpyright, lint-imports, deptry, audit | clean |
+| PostgreSQL 18 affected selection at the first merge (`tests/unit/r2 tests/integration/r2 tests/integration/lib/db tests/unit/server tests/integration/server/services` plus the spatial/M8 routers) | 6005 passed, 25 skipped, 4 failed |
+| Focused selection after the second merge | 1450 passed, 3 skipped |
+
+The 4 failures:
+- Three `test_prompt_preview.py::TestPreviewMatchesExecution[drama]` cases fail identically on `r2-v2/main` with PostgreSQL ("Future attached to a different loop"). This is a latent asyncpg cross-loop test defect, not caused by this branch. The full suite normally runs on SQLite, where they pass.
+- `test_execution_recovery_scheduler.py::test_start_and_stop_run_at_least_one_scan` passed on rerun.
+
+**Remaining packets, in order (spec `2026-09-30-r2-m8c-binding-authority-design.md` §"Packet and acceptance order")**
+
+1. **Consumer gate**:
+   - an immutable typed `SpatialConstraintSet` with its digest domain and vectors;
+   - a snapshot resolver that verifies the set bytes;
+   - a versioned content and readiness fingerprint over the snapshot digest;
+   - an R2 `PromptPlanner` consumer that emits only VISIBLE constraints and turns INFERRED/GAP into warnings.
+2. **Generation entrypoint**:
+   - `POST /projects/{p}/r2/shots/{target_id}/generate`;
+   - the `r2_shot_generation_v1` queue type and task evidence;
+   - an `admit_and_plan_spatial_attempt` transaction that stages the M7 `PLANNED` attempt under the shared lock order;
+   - an R2 video adapter arm with a captured provider payload (first Wan profile pinning `prompt_extend=false`);
+   - a route-to-M7-submit integration test.
+3. **Typed spatial promotion**:
+   - `CreateSpatialPromotionPreviewRequest` and the `SpatialConstraintProposal`/`SpatialPromotionPreviewV2`/`SpatialPromotionReceiptV2` wire and digest domains;
+   - the `m8_spatial_preview_bindings` and `m8_spatial_promotion_results` sidecars with deferred PostgreSQL coupling triggers;
+   - atomic promotion under the full lock order, with forced interleavings;
+   - remove the `m8_promotion_target_unavailable` refusal for `LOCATION` bindings only after this passes.
+4. **ADR-0103 activation (operator)**: offline issuer key custody and rotation, pinned image, a retained grant-head checkpoint outside mutable data, a host backup/restore drill, and an HTTP/browser review of the frame review flow. These need a real operator and host. Software cannot self-issue them.
+5. **Branch acceptance**: one stable full backend gate, an independent review of the integrated HEAD, and then the merge into `r2-v2/main`.
+
+**Resume entry**
+- Worktree `.worktrees/r2-m8c-binding-design`, branch `impl/r2-m8c-frame-receipts`, HEAD after this commit.
+- Start packet 1 by freezing the `SpatialConstraintSet` digest vector (fixture first), following the spec's digest-envelope rule.

@@ -1,8 +1,10 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # ProductionBinding has one versioned authority and carries an exact spatial constraint reference
+
+**Sponsor acceptance (2026-10-13):** the sponsor accepted this ADR ("Chấp nhận ADR, làm luôn"). Acceptance fixes the architecture. It does not satisfy the gates in "Required acceptance sequence": `PRODUCTION_BINDING` promotion stays fail-closed until the consumer gate and the typed spatial promotion pass and are reviewed.
 
 ADR-0095 stopped M8-C promotion because R2 has a `ProductionBinding` contract but no persistent authority. This ADR chooses the full promotion path over a candidate-only amendment. It is a design candidate until the review and acceptance gates below pass. It does not release the stopped M8-C implementation.
 

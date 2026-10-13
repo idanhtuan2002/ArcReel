@@ -1,8 +1,10 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Governance issues project-scoped Showrunner grants; Production records exact-frame review evidence
+
+**Sponsor acceptance (2026-10-13):** the sponsor accepted this ADR ("Chấp nhận ADR, làm luôn"). Acceptance fixes the architecture. Production APPROVE stays denied until the activation items under "Consequences" are proven on a real host: operator-custodied verification key, pinned image, retained grant-head checkpoint, and restore drill.
 
 The M8-C pair writer currently has only a test authority. The accepted M5C authority policy forbids deriving a `HUMAN_SHOWRUNNER` grant from a host admin role, API key or single-operator session. Choose a Governance-owned, explicit project-scoped grant ledger populated only by signed manual issue/revoke events from an offline issuer. The pair service receives a transaction-bound read/verify port, never a grant writer. This is a proposed architecture decision until root-of-trust custody and implementation are reviewed; production APPROVE remains denied.
 
