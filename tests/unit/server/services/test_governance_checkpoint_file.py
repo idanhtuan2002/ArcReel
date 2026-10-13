@@ -20,17 +20,23 @@ _PUBLIC_FILES = (
 
 @pytest.mark.asyncio
 async def test_public_loader_reads_exact_four_complete_files(tmp_path: Path) -> None:
+    os.chmod(tmp_path, 0o755)
     for index, name in enumerate(_PUBLIC_FILES):
-        (tmp_path / name).write_bytes(f"copy-{index}".encode())
-    loader = GovernanceCheckpointFile(tmp_path)
+        path = tmp_path / name
+        path.write_bytes(f"copy-{index}".encode())
+        path.chmod(0o644)
+    loader = GovernanceCheckpointFile(tmp_path, expected_uid=os.getuid(), expected_gid=os.getgid())
     assert await loader.load_public_copies() == (b"copy-0", b"copy-1", b"copy-2", b"copy-3")
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("state", ["missing", "symlink", "fifo", "extra", "oversized"])
 async def test_public_loader_rejects_incomplete_or_unexpected_set(tmp_path: Path, state: str) -> None:
+    os.chmod(tmp_path, 0o755)
     for name in _PUBLIC_FILES:
-        (tmp_path / name).write_bytes(b"valid")
+        path = tmp_path / name
+        path.write_bytes(b"valid")
+        path.chmod(0o644)
     target = tmp_path / _PUBLIC_FILES[1]
     if state == "missing":
         target.unlink()
@@ -45,8 +51,33 @@ async def test_public_loader_rejects_incomplete_or_unexpected_set(tmp_path: Path
     elif state == "oversized":
         target.write_bytes(b"x" * (MAX_GRANT_CHECKPOINT_BYTES + 1))
     with pytest.raises(CheckpointFileUnavailable) as exc:
-        await GovernanceCheckpointFile(tmp_path).load_public_copies()
+        await GovernanceCheckpointFile(
+            tmp_path, expected_uid=os.getuid(), expected_gid=os.getgid()
+        ).load_public_copies()
     assert str(tmp_path) not in str(exc.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["wrong_owner", "wrong_directory_mode", "wrong_file_mode", "hardlink"])
+async def test_public_loader_rejects_missing_host_custody(tmp_path: Path, state: str) -> None:
+    os.chmod(tmp_path, 0o755)
+    for name in _PUBLIC_FILES:
+        path = tmp_path / name
+        path.write_bytes(b"valid")
+        path.chmod(0o644)
+    expected_uid = os.getuid()
+    if state == "wrong_owner":
+        expected_uid += 1
+    elif state == "wrong_directory_mode":
+        os.chmod(tmp_path, 0o777)
+    elif state == "wrong_file_mode":
+        (tmp_path / _PUBLIC_FILES[0]).chmod(0o666)
+    elif state == "hardlink":
+        os.link(tmp_path / _PUBLIC_FILES[0], tmp_path.parent / f"{tmp_path.name}-hardlink")
+    with pytest.raises(CheckpointFileUnavailable):
+        await GovernanceCheckpointFile(
+            tmp_path, expected_uid=expected_uid, expected_gid=os.getgid()
+        ).load_public_copies()
 
 
 @pytest.mark.asyncio

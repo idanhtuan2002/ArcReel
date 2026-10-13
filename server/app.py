@@ -86,7 +86,7 @@ from server.routers import (
 from server.routers import auth as auth_router
 from server.services.execution_events import DurableEventStreamService
 from server.services.execution_recovery_scheduler import ExecutionRecoveryScheduler
-from server.services.governance_startup import verify_governance_public_startup
+from server.services.governance_startup import GovernanceStartupUnavailable, verify_governance_public_startup
 from server.services.project_events import ProjectEventService
 from server.telemetry import configure_tracer_from_env
 
@@ -377,9 +377,9 @@ async def lifespan(app: FastAPI):
         # Run Alembic migrations (auto-creates tables on first start)
         await init_db()
     else:
-        app.state.governance_grant_reader = await verify_governance_public_startup(
-            Path(governance_read_dir), session_factory=async_session_factory
-        )
+        await verify_governance_public_startup(Path(governance_read_dir), session_factory=async_session_factory)
+        # The public directory cannot prove it is newer than the independently retained archive.
+        raise GovernanceStartupUnavailable
 
     projects_root = app_data_dir()
 

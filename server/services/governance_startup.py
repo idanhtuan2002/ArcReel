@@ -20,7 +20,11 @@ class GovernanceStartupUnavailable(RuntimeError):
 
 
 async def verify_governance_public_startup(
-    read_directory: Path, *, session_factory: async_sessionmaker[AsyncSession]
+    read_directory: Path,
+    *,
+    session_factory: async_sessionmaker[AsyncSession],
+    expected_uid: int = 0,
+    expected_gid: int = 0,
 ) -> CheckpointedShowrunnerGrantReader:
     """Require stable public copies, exact schema, and a complete ledger scan."""
 
@@ -28,7 +32,7 @@ async def verify_governance_public_startup(
         engine = session_factory.kw.get("bind")
         if not isinstance(engine, AsyncEngine):
             raise GovernanceStartupUnavailable
-        loader = GovernanceCheckpointFile(read_directory)
+        loader = GovernanceCheckpointFile(read_directory, expected_uid=expected_uid, expected_gid=expected_gid)
         copies = await loader.load_public_copies()
         snapshot = validate_public_custody_snapshot(*copies)
         await verify_governance_schema_ready(engine)

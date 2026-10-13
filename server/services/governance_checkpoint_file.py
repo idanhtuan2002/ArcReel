@@ -28,8 +28,10 @@ class CheckpointFileUnavailable(RuntimeError):
 class GovernanceCheckpointFile:
     """Reopen one fixed pathname for each scanner or transaction read."""
 
-    def __init__(self, directory: Path) -> None:
+    def __init__(self, directory: Path, *, expected_uid: int = 0, expected_gid: int = 0) -> None:
         self._directory = directory
+        self._expected_uid = expected_uid
+        self._expected_gid = expected_gid
 
     async def load(self) -> bytes:
         return await asyncio.to_thread(self._read)
@@ -52,7 +54,7 @@ class GovernanceCheckpointFile:
         if os.scandir not in os.supports_fd:
             raise CheckpointFileUnavailable("checkpoint file is unavailable")
         try:
-            directory_fd = self._open_directory()
+            directory_fd = self._open_directory(require_public_custody=True)
             try:
                 before = os.fstat(directory_fd)
                 expected = {name for name, _ in _PUBLIC_FILES}
@@ -60,8 +62,15 @@ class GovernanceCheckpointFile:
                     observed = {entry.name for entry in entries}
                 if observed != expected:
                     raise CheckpointFileUnavailable("checkpoint file is unavailable")
-                first = tuple(self._read_named(directory_fd, name, maximum) for name, maximum in _PUBLIC_FILES)
-                second = tuple(self._read_named(directory_fd, name, maximum) for name, maximum in _PUBLIC_FILES)
+                custody = (self._expected_uid, self._expected_gid, before.st_dev)
+                first = tuple(
+                    self._read_named(directory_fd, name, maximum, public_custody=custody)
+                    for name, maximum in _PUBLIC_FILES
+                )
+                second = tuple(
+                    self._read_named(directory_fd, name, maximum, public_custody=custody)
+                    for name, maximum in _PUBLIC_FILES
+                )
                 after = os.fstat(directory_fd)
                 if first != second or (
                     before.st_dev,
@@ -83,7 +92,7 @@ class GovernanceCheckpointFile:
         except OSError:
             raise CheckpointFileUnavailable("checkpoint file is unavailable") from None
 
-    def _open_directory(self) -> int:
+    def _open_directory(self, *, require_public_custody: bool = False) -> int:
         directory = self._directory
         if (
             not directory.is_absolute()
@@ -96,21 +105,51 @@ class GovernanceCheckpointFile:
         directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
         directory_fd = os.open("/", directory_flags)
         try:
+            if require_public_custody:
+                self._check_ancestor(os.fstat(directory_fd))
             for part in directory.parts[1:]:
                 next_fd = os.open(part, directory_flags, dir_fd=directory_fd)
                 os.close(directory_fd)
                 directory_fd = next_fd
+                if require_public_custody:
+                    self._check_ancestor(os.fstat(directory_fd))
+            if require_public_custody:
+                info = os.fstat(directory_fd)
+                if (
+                    info.st_uid != self._expected_uid
+                    or info.st_gid != self._expected_gid
+                    or stat.S_IMODE(info.st_mode) != 0o755
+                ):
+                    raise CheckpointFileUnavailable("checkpoint file is unavailable")
             return directory_fd
         except BaseException:
             os.close(directory_fd)
             raise
 
+    def _check_ancestor(self, info: os.stat_result) -> None:
+        mode = stat.S_IMODE(info.st_mode)
+        sticky_root = info.st_uid == 0 and bool(mode & stat.S_ISVTX)
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or info.st_uid not in {0, self._expected_uid}
+            or (mode & 0o022 and not sticky_root)
+        ):
+            raise CheckpointFileUnavailable("checkpoint file is unavailable")
+
     @staticmethod
-    def _read_named(directory_fd: int, name: str, maximum: int) -> bytes:
+    def _read_named(
+        directory_fd: int, name: str, maximum: int, *, public_custody: tuple[int, int, int] | None = None
+    ) -> bytes:
         file_fd = os.open(name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=directory_fd)
         try:
             before = os.fstat(file_fd)
             if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= maximum:
+                raise CheckpointFileUnavailable("checkpoint file is unavailable")
+            if public_custody is not None and (
+                (before.st_uid, before.st_gid, before.st_dev) != public_custody
+                or stat.S_IMODE(before.st_mode) != 0o644
+                or before.st_nlink != 1
+            ):
                 raise CheckpointFileUnavailable("checkpoint file is unavailable")
             chunks: list[bytes] = []
             byte_count = 0
@@ -127,6 +166,7 @@ class GovernanceCheckpointFile:
                 before.st_size,
                 before.st_mtime_ns,
                 before.st_ctime_ns,
+                before.st_nlink,
             ) != (
                 after.st_dev,
                 after.st_ino,
@@ -134,6 +174,7 @@ class GovernanceCheckpointFile:
                 after.st_size,
                 after.st_mtime_ns,
                 after.st_ctime_ns,
+                after.st_nlink,
             ):
                 raise CheckpointFileUnavailable("checkpoint file is unavailable")
             return b"".join(chunks)

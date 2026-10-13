@@ -54,12 +54,12 @@ class TestAppModule:
         assert worker.stopped
 
     @pytest.mark.asyncio
-    async def test_activated_lifespan_uses_public_preflight_without_auto_migration(self, monkeypatch):
+    async def test_activated_lifespan_quarantines_after_public_preflight_without_auto_migration(self, monkeypatch):
         worker = _FakeWorker()
-        grant_reader = object()
+        from server.services.governance_startup import GovernanceStartupUnavailable
 
         async def verify_public(*_args, **_kwargs):
-            return grant_reader
+            return object()
 
         async def forbidden_init():
             raise AssertionError("activated startup called init_db")
@@ -74,10 +74,11 @@ class TestAppModule:
 
         app = app_module.app
         app.state = SimpleNamespace()
-        async with app_module.lifespan(app):
-            assert app.state.governance_grant_reader is grant_reader
-            assert worker.started
-        assert worker.stopped
+        with pytest.raises(GovernanceStartupUnavailable):
+            async with app_module.lifespan(app):
+                raise AssertionError("activated lifespan yielded without archive freshness")
+        assert not worker.started
+        assert not worker.stopped
 
     @pytest.mark.asyncio
     async def test_lifespan_clears_callback_after_worker_stop(self, monkeypatch):

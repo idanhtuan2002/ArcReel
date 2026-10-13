@@ -137,7 +137,9 @@ async def test_pg_public_startup_verifies_copies_and_ledger_without_archive_acce
     await _ready_schema(engine)
     root, _paths = _tree(tmp_path)
 
-    reader = await verify_governance_public_startup(root / "read", session_factory=session_factory)
+    reader = await verify_governance_public_startup(
+        root / "read", session_factory=session_factory, expected_uid=os.getuid(), expected_gid=os.getgid()
+    )
 
     assert reader is not None
 
@@ -159,7 +161,9 @@ async def test_pg_public_startup_denies_committed_grant_missing_from_checkpoint(
     await importer.import_event(_signed(body, private), scope=GrantScopeV1("u1", "show-a", "reviewer-a"))
 
     with pytest.raises(GovernanceStartupUnavailable):
-        await verify_governance_public_startup(root / "read", session_factory=session_factory)
+        await verify_governance_public_startup(
+            root / "read", session_factory=session_factory, expected_uid=os.getuid(), expected_gid=os.getgid()
+        )
 
 
 @pytest.mark.asyncio
@@ -183,7 +187,9 @@ async def test_pg_public_startup_denies_public_replace_after_scan(
     monkeypatch.setattr(GovernanceGrantRecoveryScanner, "verify", replace_after_scan)
 
     with pytest.raises(GovernanceStartupUnavailable):
-        await verify_governance_public_startup(root / "read", session_factory=session_factory)
+        await verify_governance_public_startup(
+            root / "read", session_factory=session_factory, expected_uid=os.getuid(), expected_gid=os.getgid()
+        )
 
 
 @pytest.mark.asyncio
@@ -222,3 +228,47 @@ async def test_pg_activated_lifespan_denies_stale_ledger_before_db_mutation_or_r
     with pytest.raises(GovernanceStartupUnavailable):
         async with app_module.lifespan(app_module.app):
             raise AssertionError("lifespan yielded before Governance denial")
+
+
+@pytest.mark.asyncio
+async def test_pg_activated_lifespan_quarantines_coherent_old_public_and_database(
+    session_factory: async_sessionmaker[AsyncSession], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine = session_factory.kw["bind"]
+    if engine.dialect.name != "postgresql":
+        pytest.skip("activated startup requires PostgreSQL")
+    await _ready_schema(engine)
+    root, paths = _tree(tmp_path)
+    old_high_water = paths["public_high_water"].read_bytes()
+    old_checkpoint = paths["public_checkpoint"].read_bytes()
+    _append_successor(root, paths)
+    _put(paths["public_high_water"], old_high_water, 0o644)
+    _put(paths["public_checkpoint"], old_checkpoint, 0o644)
+
+    await verify_governance_public_startup(
+        root / "read", session_factory=session_factory, expected_uid=os.getuid(), expected_gid=os.getgid()
+    )
+    with pytest.raises(OperatorArchiveReconcileUnavailable):
+        await verify_operator_archive_preflight(root, session_factory=session_factory, expected_uid=os.getuid())
+
+    import server.app as app_module
+
+    async def forbidden_init() -> None:
+        raise AssertionError("activated startup called init_db")
+
+    async def forbidden_http() -> None:
+        raise AssertionError("coherent rollback reached external startup")
+
+    monkeypatch.setenv("ARCREEL_GOVERNANCE_READ_DIR", str(root / "read"))
+    monkeypatch.setattr(app_module, "async_session_factory", session_factory)
+    monkeypatch.setattr(app_module, "app_data_dir", lambda: tmp_path / "projects")
+    monkeypatch.setattr(app_module, "migrate_legacy_log_dir", lambda: None)
+    monkeypatch.setattr(app_module, "attach_file_handler", lambda: None)
+    monkeypatch.setattr(app_module, "ensure_auth_password", lambda: None)
+    monkeypatch.setattr(app_module, "init_db", forbidden_init)
+    monkeypatch.setattr(app_module, "startup_http_client", forbidden_http)
+    app_module.app.state = SimpleNamespace()
+
+    with pytest.raises(GovernanceStartupUnavailable):
+        async with app_module.lifespan(app_module.app):
+            raise AssertionError("coherent rollback reached readiness")
