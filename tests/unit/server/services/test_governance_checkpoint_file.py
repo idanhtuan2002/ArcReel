@@ -10,6 +10,44 @@ import pytest
 from r2.contracts.grant_checkpoint import MAX_GRANT_CHECKPOINT_BYTES
 from server.services.governance_checkpoint_file import CheckpointFileUnavailable, GovernanceCheckpointFile
 
+_PUBLIC_FILES = (
+    "approved-deployment.json",
+    "governance-verifiers-v1.json",
+    "high-water.json",
+    "grant-checkpoint.json",
+)
+
+
+@pytest.mark.asyncio
+async def test_public_loader_reads_exact_four_complete_files(tmp_path: Path) -> None:
+    for index, name in enumerate(_PUBLIC_FILES):
+        (tmp_path / name).write_bytes(f"copy-{index}".encode())
+    loader = GovernanceCheckpointFile(tmp_path)
+    assert await loader.load_public_copies() == (b"copy-0", b"copy-1", b"copy-2", b"copy-3")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["missing", "symlink", "fifo", "extra", "oversized"])
+async def test_public_loader_rejects_incomplete_or_unexpected_set(tmp_path: Path, state: str) -> None:
+    for name in _PUBLIC_FILES:
+        (tmp_path / name).write_bytes(b"valid")
+    target = tmp_path / _PUBLIC_FILES[1]
+    if state == "missing":
+        target.unlink()
+    elif state == "symlink":
+        target.unlink()
+        target.symlink_to(tmp_path / _PUBLIC_FILES[0])
+    elif state == "fifo":
+        target.unlink()
+        os.mkfifo(target)
+    elif state == "extra":
+        (tmp_path / "unexpected").write_bytes(b"x")
+    elif state == "oversized":
+        target.write_bytes(b"x" * (MAX_GRANT_CHECKPOINT_BYTES + 1))
+    with pytest.raises(CheckpointFileUnavailable) as exc:
+        await GovernanceCheckpointFile(tmp_path).load_public_copies()
+    assert str(tmp_path) not in str(exc.value)
+
 
 @pytest.mark.asyncio
 async def test_loader_reopens_complete_file_after_same_directory_rename(tmp_path: Path) -> None:
