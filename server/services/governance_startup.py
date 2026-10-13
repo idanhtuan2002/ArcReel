@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from r2.governance.public_custody_snapshot import validate_public_custody_snapshot
+from server.services.governance_attestation import require_governance_archive_freshness
 from server.services.governance_checkpoint_file import GovernanceCheckpointFile
 from server.services.governance_grants import CheckpointedShowrunnerGrantReader, GovernanceGrantRecoveryScanner
 from server.services.governance_schema_preflight import verify_governance_schema_ready
@@ -28,6 +29,44 @@ async def verify_governance_public_startup(
 ) -> CheckpointedShowrunnerGrantReader:
     """Require stable public copies, exact schema, and a complete ledger scan."""
 
+    return await _verify_startup(
+        read_directory,
+        session_factory=session_factory,
+        expected_uid=expected_uid,
+        expected_gid=expected_gid,
+        socket_directory=None,
+    )
+
+
+async def verify_governance_activated_startup(
+    read_directory: Path,
+    socket_directory: Path | None,
+    *,
+    session_factory: async_sessionmaker[AsyncSession],
+    expected_uid: int = 0,
+    expected_gid: int = 0,
+) -> CheckpointedShowrunnerGrantReader:
+    """Require a new independent host archive proof before returning runtime authority."""
+    if socket_directory is None:
+        raise GovernanceStartupUnavailable
+    return await _verify_startup(
+        read_directory,
+        session_factory=session_factory,
+        expected_uid=expected_uid,
+        expected_gid=expected_gid,
+        socket_directory=socket_directory,
+    )
+
+
+async def _verify_startup(
+    read_directory: Path,
+    *,
+    session_factory: async_sessionmaker[AsyncSession],
+    expected_uid: int,
+    expected_gid: int,
+    socket_directory: Path | None,
+) -> CheckpointedShowrunnerGrantReader:
+
     try:
         engine = session_factory.kw.get("bind")
         if not isinstance(engine, AsyncEngine):
@@ -48,6 +87,10 @@ async def verify_governance_public_startup(
         scanned = await scanner.verify(loader.load)
         if scanned.checkpoint_digest != snapshot.checkpoint.checkpoint_digest:
             raise GovernanceStartupUnavailable
+        if socket_directory is not None:
+            await require_governance_archive_freshness(
+                socket_directory, copies, expected_uid=expected_uid, expected_gid=expected_gid
+            )
         if await loader.load_public_copies() != copies:
             raise GovernanceStartupUnavailable
         return CheckpointedShowrunnerGrantReader(
@@ -62,4 +105,4 @@ async def verify_governance_public_startup(
         raise GovernanceStartupUnavailable from None
 
 
-__all__ = ["GovernanceStartupUnavailable", "verify_governance_public_startup"]
+__all__ = ["GovernanceStartupUnavailable", "verify_governance_activated_startup", "verify_governance_public_startup"]

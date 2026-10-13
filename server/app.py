@@ -86,7 +86,7 @@ from server.routers import (
 from server.routers import auth as auth_router
 from server.services.execution_events import DurableEventStreamService
 from server.services.execution_recovery_scheduler import ExecutionRecoveryScheduler
-from server.services.governance_startup import GovernanceStartupUnavailable, verify_governance_public_startup
+from server.services.governance_startup import GovernanceStartupUnavailable, verify_governance_activated_startup
 from server.services.project_events import ProjectEventService
 from server.telemetry import configure_tracer_from_env
 
@@ -373,15 +373,36 @@ async def lifespan(app: FastAPI):
     ensure_auth_password()
 
     governance_read_dir = os.environ.get("ARCREEL_GOVERNANCE_READ_DIR")
-    if governance_read_dir is None:
+    governance_attestor_dir = os.environ.get("ARCREEL_GOVERNANCE_ATTESTOR_DIR")
+    app.state.governance_grants = None
+    app.state.spatial_review_sessions = None
+    app.state.spatial_pair_current_v2 = None
+    app.state.spatial_pair_decisions_v2 = None
+    if governance_read_dir is None and governance_attestor_dir is None:
         # Run Alembic migrations (auto-creates tables on first start)
         await init_db()
     else:
-        await verify_governance_public_startup(Path(governance_read_dir), session_factory=async_session_factory)
-        # The public directory cannot prove it is newer than the independently retained archive.
-        raise GovernanceStartupUnavailable
+        if not governance_read_dir or not governance_attestor_dir:
+            raise GovernanceStartupUnavailable
+        app.state.governance_grants = await verify_governance_activated_startup(
+            Path(governance_read_dir), Path(governance_attestor_dir), session_factory=async_session_factory
+        )
 
     projects_root = app_data_dir()
+    if app.state.governance_grants is not None:
+        from server.services.spatial_pair_current_v2 import CurrentApprovedSpatialPairReaderV2
+        from server.services.spatial_pair_decision_v2 import SpatialPairDecisionServiceV2
+        from server.services.spatial_review_session import SpatialReviewSessionService
+
+        app.state.spatial_review_sessions = SpatialReviewSessionService(
+            session_factory=async_session_factory, project_dir=projects_root, grants=app.state.governance_grants
+        )
+        app.state.spatial_pair_current_v2 = CurrentApprovedSpatialPairReaderV2(
+            session_factory=async_session_factory, project_dir=projects_root, grants=app.state.governance_grants
+        )
+        app.state.spatial_pair_decisions_v2 = SpatialPairDecisionServiceV2(
+            session_factory=async_session_factory, project_dir=projects_root, grants=app.state.governance_grants
+        )
 
     # 源文件编码迁移（幂等；失败不阻塞启动）。先于 schema 迁移跑：源文一律先归到 UTF-8，
     # 之后所有按 UTF-8 读源文的链路（分集规划、派生文件对账）才有统一的输入。

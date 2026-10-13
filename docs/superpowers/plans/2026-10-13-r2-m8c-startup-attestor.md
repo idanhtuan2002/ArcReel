@@ -29,28 +29,47 @@
 - [x] Reproduce wrong owner/directory mode/file mode/hardlink acceptance after a successful load.
 - [x] Reuse the public-custody checks on every `load`; include UID/GID in stable read metadata.
 - [x] Run the focused file, Ruff and test audit.
-- [ ] Run affected startup/PG cases and record exact committed evidence.
+- [x] Run affected startup/PG cases and record exact committed evidence.
 
 ### Task 2: Host challenge channel and CLI
 
 **Files:** create `server/services/governance_attestation.py`, `scripts/r2/governance_preflight.py`, mirrored integration tests.
 **Interfaces:** `GovernanceArchiveAttestor.handle(reader, writer)` calls fixed-root preflight; `serve_governance_attestor(...)` yields an asyncio server; `require_governance_archive_freshness(socket_directory, copies, expected_uid=0, expected_gid=0)` authenticates peer and compares response.
-- [ ] Write and run failing real Unix-socket tests for matching archive, old public, wrong nonce, peer/custody, malformed and trailing response.
-- [ ] Implement bounded canonical request/response, anchored socket directory, per-request preflight and scoped inode cleanup.
-- [ ] Add explicit-root environment-DSN operator `preflight`/`serve` CLI; run focused tests, static checks and audit.
+- [x] Write and run failing real Unix-socket tests for matching archive, old public, wrong nonce, peer/custody, malformed and trailing response.
+- [x] Implement bounded canonical request/response, anchored socket directory, per-request preflight and scoped inode cleanup.
+- [x] Add explicit-root environment-DSN operator `preflight`/`serve` CLI; run focused tests, static checks and audit.
 
 ### Task 3: Activated startup and service composition
 
 **Files:** `server/services/governance_startup.py`, `server/app.py`, existing startup and archive integration tests.
 **Interfaces:** `verify_governance_activated_startup(...) -> CheckpointedShowrunnerGrantReader`; app state contains three existing services constructed with that reader.
-- [ ] Reproduce missing attestor and coherent-old-pair denial; test positive current archive/DB startup and revoked transaction use.
-- [ ] Share local verification code, call authenticated freshness after scan and before final public reread, require both environment inputs, skip activated auto migration.
-- [ ] Verify normal mode, lifespan quarantine ordering and cleanup with focused tests.
+- [x] Reproduce missing attestor and coherent-old-pair denial; test positive current archive/DB startup and revoked transaction use.
+- [x] Share local verification code, call authenticated freshness after scan and before final public reread, require both environment inputs, skip activated auto migration.
+- [x] Verify normal mode, lifespan quarantine ordering and cleanup with focused tests.
 
 ### Task 4: Real restore and final review
 
 **Files:** versioned `tests/integration/r2/governance/` restore drill and existing durable handoff.
-- [ ] Run a same-major PostgreSQL dump/restore of ISSUE before REVOKE, keeping newer archive independent; compare before/after schema and rows and assert actual lifespan denial.
-- [ ] Run post-REVOKE positive lifespan and existing service denial, then full affected Governance/static gates once.
+- [x] Run a same-major PostgreSQL dump/restore of ISSUE before REVOKE, keeping newer archive independent; compare before/after schema and rows and assert actual lifespan denial.
+- [x] Run post-REVOKE positive lifespan and existing service denial, then full affected Governance/static gates once.
 - [ ] Commit exact scope; obtain independent review and repair concrete findings with selected tests.
-- [ ] Record remaining host/full-suite/READY gates without treating local fixtures as host custody.
+- [x] Record remaining host/full-suite/READY gates without treating local fixtures as host custody.
+
+## Pause checkpoint: sponsor requested session handoff
+
+The affected-domain run completed with **387 passed, 4 skipped, 1 warning** in
+98.69 seconds on disposable PostgreSQL 18. Repository Ruff/format, full
+basedpyright (0 errors, 0 warnings), import contracts (22 kept), deptry and test
+audit (0 violations) passed. No full backend suite was run in this session.
+Production root/socket ownership is represented by injected disposable UID/GID
+in integration fixtures; actual-host custody and independent review remain open.
+The real socket tests cover successful peer credentials and negative pathname
+custody, not a separately forced wrong SO_PEERCRED response or connect-time
+inode replacement. Timeout/malformed request and importer/scan interleaving
+coverage should be assessed during the pending review; do not claim the entire
+spec matrix is accepted.
+
+Resume from `docs/r2/evidence/R2_M8C_STARTUP_ATTESTOR_CHECKPOINT_20261013.json`
+and the newest section of `R2_M8C_FRAME_CUSTODY_HANDOFF.md`. Review the exact
+committed diff before any activation claim. The PostgreSQL container has been
+removed; a new disposable instance is required for any additional PG test.

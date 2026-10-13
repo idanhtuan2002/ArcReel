@@ -52,7 +52,8 @@ canonical reencoding reject duplicates, unknown fields and nonfinite values.
 The request contains only schema `governance.startup_challenge.v1` and a newly
 generated 256-bit lowercase hex nonce. It supplies no path, DB URL or claimed
 archive value. The service calls archive preflight on every accepted challenge;
-there is no proof cache or persistent public receipt. Its response contains
+there is no proof cache or persistent public receipt. At most 16 connection
+handlers are admitted; excess connections close immediately. Its response contains
 schema `governance.startup_proof.v1`, that nonce, deployment ID, checkpoint
 sequence, and four SHA-256 file digests in approval/registry/high-water/checkpoint
 order, all derived from the returned verified archive. Only one preflight runs
@@ -84,7 +85,10 @@ SpatialReviewSessionService, CurrentApprovedSpatialPairReaderV2 and
 SpatialPairDecisionServiceV2 with that same reader in app state. There are no
 new public routes. Any later grant/parent mutation is rechecked by those
 transaction-bound services; startup proof is not authority to approve a pair.
-Approved image identity still belongs to host deployment preflight.
+Approved image identity still belongs to host deployment preflight. Database
+restore and offline migration require stopped application/workers under the
+existing M7/operator procedure; this startup proof does not authorize an online
+restore or keep a database connection alive through one.
 
 ## Operator entry point
 

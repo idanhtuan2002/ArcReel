@@ -54,18 +54,27 @@ class TestAppModule:
         assert worker.stopped
 
     @pytest.mark.asyncio
-    async def test_activated_lifespan_quarantines_after_public_preflight_without_auto_migration(self, monkeypatch):
+    @pytest.mark.parametrize(
+        ("read_dir", "attestor_dir"),
+        [("/run/governance", None), (None, "/run/attestor"), ("", "/run/attestor"), ("/run/governance", "")],
+    )
+    async def test_activated_lifespan_denies_missing_attestor_without_auto_migration(
+        self, monkeypatch, read_dir, attestor_dir
+    ):
         worker = _FakeWorker()
         from server.services.governance_startup import GovernanceStartupUnavailable
-
-        async def verify_public(*_args, **_kwargs):
-            return object()
 
         async def forbidden_init():
             raise AssertionError("activated startup called init_db")
 
-        monkeypatch.setenv("ARCREEL_GOVERNANCE_READ_DIR", "/run/arcreel/governance")
-        monkeypatch.setattr(app_module, "verify_governance_public_startup", verify_public)
+        for key, value in (
+            ("ARCREEL_GOVERNANCE_READ_DIR", read_dir),
+            ("ARCREEL_GOVERNANCE_ATTESTOR_DIR", attestor_dir),
+        ):
+            if value is None:
+                monkeypatch.delenv(key, raising=False)
+            else:
+                monkeypatch.setenv(key, value)
         monkeypatch.setattr(app_module, "create_generation_worker", lambda: worker)
         monkeypatch.setattr(app_module, "ensure_auth_password", lambda: "test")
         monkeypatch.setattr(app_module, "init_db", forbidden_init)
