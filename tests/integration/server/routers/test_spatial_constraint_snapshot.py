@@ -38,7 +38,12 @@ type Factory = async_sessionmaker[AsyncSession]
 
 
 async def _current_binding(
-    client: AsyncClient, project_dir: Path, factory: Factory, monkeypatch: pytest.MonkeyPatch
+    client: AsyncClient,
+    project_dir: Path,
+    factory: Factory,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    shot_duration: float | None = None,
 ) -> tuple[str, str]:
     """Register a Take Shot whose Scene has a location, then create its LOCATION binding from two frames."""
     monkeypatch.setattr(admission_helpers, "USER", USER.id)
@@ -48,9 +53,13 @@ async def _current_binding(
 
     async def direct_with_location(self, ref):
         result = await original_direct(self, ref)
+        shots = result.shots
+        if shot_duration is not None:
+            shots = tuple(shot.model_copy(update={"target_duration": shot_duration}) for shot in shots)
         return replace(
             result,
             scenes=tuple(scene.model_copy(update={"location_ref": "location:room-1"}) for scene in result.scenes),
+            shots=shots,
         )
 
     monkeypatch.setattr(TakeDirectorAdapter, "direct", direct_with_location)
