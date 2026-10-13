@@ -11,10 +11,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import Field, StringConstraints
 
 from lib.api_errors import ApiError, ConflictError, NotFoundError, ServiceUnavailableError, UnprocessableError
+from lib.artifact_manifest import ArtifactKind, decode_artifact_key_parts
 from lib.db import async_session_factory
 from lib.db.repositories.spatial_source import _receipt_digest
 from lib.project_manager import get_project_manager
@@ -25,10 +26,12 @@ from lib.text_generator import TextGenerator
 from r2.advanced_creative.errors import ExplorationNotFoundError, M8Error
 from r2.contracts.advanced_creative import CandidateHead, LineageBinding, M8ContractModel
 from r2.contracts.host_hardening import ProviderRouteSnapshot
+from r2.host_hardening.master_resolver import MasterDivergedError
 from r2.host_hardening.route_inventory import HOST_SPATIAL_ADAPTER_VERSION, SPATIAL_SUBMIT_FAMILIES
 from server.auth import CurrentUser
 from server.services.advanced_creative import episode_lineage
 from server.services.execution_attempts import build_attempt_submitter
+from server.services.master_authority import verify_masters
 from server.services.spatial_execution import (
     SpatialExecutionCommand,
     SpatialExecutionService,
@@ -113,6 +116,14 @@ class FrameReceiptResponse(M8ContractModel):
     frame_content_digest: str
 
 
+class SpatialSource(M8ContractModel):
+    """One current approved episode-video master a frame can be derived from."""
+
+    artifact_key: str
+    shot_id: str
+    master_version: int
+
+
 class FrameRef(M8ContractModel):
     receipt_id: str
     receipt_digest: str
@@ -147,6 +158,26 @@ async def _run[T](operation: Callable[[], Awaitable[T]]) -> T:
         raise _api_error(error) from error
     except ValueError as error:
         raise _api_error(error) from error
+
+
+@router.get("/projects/{project_name}/m8/spatial/sources")
+async def list_sources(project_name: str, user: CurrentUser, episode: int = Query(ge=1)) -> list[SpatialSource]:
+    """The episode's current approved video masters, verified against their projections."""
+    project_dir = get_project_manager().get_project_path(project_name)
+    try:
+        async with async_session_factory() as session:
+            heads = await verify_masters(session, user_id=user.id, project_name=project_name, project_dir=project_dir)
+    except MasterDivergedError as error:
+        raise ConflictError(SPATIAL_SOURCE_CONFLICT) from error
+    sources: list[SpatialSource] = []
+    for artifact_key, version, _candidate_id in heads:
+        parts = decode_artifact_key_parts(artifact_key)
+        if parts is None or parts.kind != ArtifactKind.EPISODE_VIDEO.value or parts.components[:1] != (episode,):
+            continue
+        sources.append(
+            SpatialSource(artifact_key=artifact_key, shot_id=str(parts.components[1]), master_version=version)
+        )
+    return sorted(sources, key=lambda source: source.shot_id)
 
 
 @router.post("/projects/{project_name}/m8/spatial/frames")
