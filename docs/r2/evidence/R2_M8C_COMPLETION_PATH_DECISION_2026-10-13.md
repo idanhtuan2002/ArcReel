@@ -65,3 +65,35 @@ Remaining before acceptance:
 No live provider call was made; Gate C does not need one.
 
 The disposable containers were removed.
+
+## C4: public route (decided 2026-10-13, after merge `dbf64003`)
+
+The sponsor asked for a public route before M8-C is closed, overriding C2 spec decision 1 ("no public route"). Research facts:
+
+- No spatial service is wired to the app. That includes `FrameDerivationService`, so a client could not create the frame receipts an execution needs. C4 therefore exposes both steps.
+- The existing M8 API is `server/routers/advanced_creative.py`, the fixed ADR-0097 exploration surface. It maps `M8Error` codes to i18n keys in `lib/i18n/{en,zh,vi}/errors.py`.
+- Text calls go through `TextGenerator.create(task_type, project)`. Its `Ledger` records usage. `VISION_REQUIRED_TASKS` fails loud when the configured model cannot see images (ADR-0051).
+- The only registered spatial route is `gemini` / `gemini-generate` / `host-spatial-v1`. `GeminiVideoBackend` records its submitted base URL as the AI Studio URL or `vertex://{project}/global`.
+
+Decisions:
+
+1. A separate router `server/routers/spatial.py`, registered like the exploration router (session user plus project-migration guard). It does not extend the fixed ADR-0097 surface. Endpoints:
+   - `POST /projects/{project}/m8/spatial/frames` derives one frame and returns the receipt id and digest.
+   - `POST /projects/{project}/m8/spatial/executions` runs one spatial execution and returns `CandidateHead`.
+2. A new `TextTaskType.SPATIAL_ANALYSIS`, in the SIMPLE tier and vision-required. The router builds a `TextGenerator` for it, so usage is recorded in the ledger. The resolved provider must be `gemini`; any other provider returns 503 `m8_spatial_unavailable` before a provider call. `GeminiTextBackend` gains a `submitted_base_url`, mirroring the video backend.
+3. The vision call is a FastAPI dependency. Tests replace it through `app.dependency_overrides`, so no provider call is made.
+4. R3 is fixed at the route: `scene_name` is trimmed and must be 1–120 characters.
+5. The episode lineage is resolved before the provider call, so a bad episode never costs a call.
+6. Error mapping:
+   - `M8Error` keeps its existing keys;
+   - `SpatialExecutionUnavailableError` returns 503 `m8_spatial_unavailable`;
+   - `FrameSourceConflictError` returns 409 `m8_spatial_source_conflict`;
+   - a frame request `ValueError` returns 422 `m8_spatial_request_invalid`.
+
+   All three new keys are added in en, zh and vi.
+
+Limits:
+- Usage is recorded but not bound to the M7 `execution_id` (`usage_binder=None`), because the ledger call opens inside the provider call.
+- No frontend UI.
+- The profile stays `UNQUALIFIED`, so release mode still refuses the route.
+- Verification: the targeted route tests, the affected selection, and static gates. Per the sponsor, there is no full suite or separate review round.
