@@ -849,3 +849,49 @@ permission question; production/host actions retain their existing separate gate
 Ruling: authenticate the Linux pathname socket with host custody and SO_PEERCRED,
 then bind each proof to a fresh nonce; no new signer/MAC secret is needed under
 the selected uncompromised-host boundary. Incorrect credential mapping denies.
+
+## Sponsor pause: persisted startup attestor checkpoint — 2026-10-13
+
+**Latest verified code HEAD:** `59c4d60ebd0c21ae1630124f309dbd4c502427a1`,
+branch `impl/r2-m8c-frame-receipts`, worktree `.worktrees/r2-m8c-binding-design`.
+Earlier unconditional-quarantine descriptions above are historical. Current code
+requires both `ARCREEL_GOVERNANCE_READ_DIR` and `ARCREEL_GOVERNANCE_ATTESTOR_DIR`;
+a live peer-authenticated, fresh archive proof plus public/schema/full-ledger
+agreement permits activated lifespan and constructs the existing review/V2
+services with the same checkpointed reader. It skips `init_db` in activated mode.
+There are no new public routes and no production environment/deployment change.
+
+The complete affected Governance/startup/consumer selection on these exact code
+bytes completed **387 passed, 4 skipped, 1 existing Pydantic settings warning**
+in **98.69 seconds**. It includes the real PostgreSQL 18 (client 18.6) dump/restore
+drill, current post-REVOKE positive actual lifespan, old DB denial, coherent old
+public/DB denial against newer retained archive, unchanged grant rows/version,
+and revoked transaction denial. Lifespan integration uses a **real worker** with
+a disposable empty database and isolated projects; only fixture host UID/GID are
+injected into the real verifier. Existing SDK startup is suppressed to avoid
+external service calls. Root-owned production/socket mapping is not established
+by those disposable fixture identities. Full repository Ruff/format (1788 files),
+full basedpyright (0 errors/0 warnings), import contracts (22 kept/0 broken),
+deptry, test audit (0 violations) and diff check passed. The prior interrupted
+full backend suite remains incomplete and was not rerun in this session.
+
+The sponsor requested saving work and stopping for the next session at 5 percent
+remaining 5h quota. No independent review of this new implementation was started.
+Its precise pending review range is
+`7b3f9cab165475a8bf3fab6a7f93a1554f242001..59c4d60ebd0c21ae1630124f309dbd4c502427a1`.
+Do not substitute selected test success or self-inspection for review acceptance.
+Review should assess the remaining forced peer-credential/socket-replacement/
+timeout/request/interleaving matrix and host stop/restore boundary. Source and
+test files are preserved in the code commit; spec/plan progress is recorded.
+
+Machine-readable commands, results, coverage limits, old full-suite state and
+resume steps: `R2_M8C_STARTUP_ATTESTOR_CHECKPOINT_20261013.json`. The focused
+actual-lifespan log is retained in `R2_M8C_ACTUAL_LIFESPAN_SELECTED_20261013.log`;
+it records the earlier 16-case subset, not the final 387-case selection. The
+disposable container `codex-m8c-attestor-20261013` on localhost port 32791 was
+removed, and the filtered container inventory returned no name. All launched
+verification processes completed. No active PG fixture or review is left for
+the next session; create a fresh disposable instance only if more PG execution
+is required. Preserve the separate dirty C1 worktree. Actual-host custody,
+independent archive backup restore, image/mount proof, HTTP/browser review,
+final full backend gate, independent review and READY remain open.

@@ -1,0 +1,114 @@
+{
+  "schema": "r2.m8c.startup_attestor_checkpoint.v1",
+  "date": "2026-10-13",
+  "status": "IMPLEMENTED_VERIFIED_SELECTED_GATES_NOT_ACCEPTED",
+  "pause_reason": "Sponsor requested saving project work and continuing in a later session at 5 percent remaining 5h quota.",
+  "worktree": "/home/anhtuan/content-production-os/.worktrees/r2-m8c-binding-design",
+  "branch": "impl/r2-m8c-frame-receipts",
+  "resume_baseline_sha": "7b3f9cab165475a8bf3fab6a7f93a1554f242001",
+  "custody_design_sha": "a50041f4a2fca663b13dd5dc5eedefe81202af3c",
+  "verified_code_sha": "59c4d60ebd0c21ae1630124f309dbd4c502427a1",
+  "verification_binding": "The selected suite and static commands ran on these exact source/test bytes before the code commit; only documentation bookkeeping changed afterwards.",
+  "implemented": [
+    "Transaction checkpoint reads repeat owner/group/mode/no-follow/device/nlink custody checks and stable UID/GID checks.",
+    "Fixed-root host attestor reruns existing archive preflight per nonce over an anchored Linux peer-credential checked Unix socket; no new key or dependency.",
+    "Canonical bounded 4096-byte messages, 30-second exchange deadline, 16 connection limit, serialized preflight, inode-scoped cleanup and pending-client shutdown.",
+    "Operator preflight/serve CLI requires root and reads DB credentials from a named environment variable.",
+    "Actual activated lifespan requires both read and attestor directories, skips automatic init_db, and composes three existing review/V2 services with the checkpointed reader.",
+    "Versioned matching-major real pg_dump/pg_restore ISSUE -> REVOKE drill covers actual lifespan denial for old DB and coherent old public/DB, then positive post-REVOKE startup with revoked transaction denied."
+  ],
+  "checks": [
+    {
+      "name": "complete affected Governance/startup/consumer selection",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:<disposable-password>@127.0.0.1:<fresh-port>/m8c_test UV_CACHE_DIR=/tmp/codex-m8c-uv-cache uv run python -m pytest tests/unit/r2/governance tests/integration/r2/governance tests/unit/server/services/test_governance_checkpoint_file.py tests/unit/server/test_app_module.py tests/unit/server/test_app_startup_migration.py tests/unit/server/test_session_store_startup_migration.py tests/unit/server/test_startup_source_migration.py tests/integration/server/services/test_governance_attestation.py tests/unit/scripts/r2/test_governance_preflight.py tests/integration/server/routers/test_spatial_review_session_real.py -q --tb=short",
+      "exit_code": 0,
+      "passed": 387,
+      "skipped": 4,
+      "warnings": 1,
+      "seconds": 98.69,
+      "warning": "Pydantic settings unresolved forward reference in existing lifespan definition"
+    },
+    {
+      "name": "repository Ruff",
+      "command": "uv run ruff check . && uv run ruff format --check .",
+      "exit_code": 0,
+      "result": "All checks passed; 1788 files already formatted"
+    },
+    {
+      "name": "full static types",
+      "command": "uv run basedpyright --warnings",
+      "exit_code": 0,
+      "result": "0 errors, 0 warnings, 0 notes"
+    },
+    {
+      "name": "import contracts",
+      "command": "uv run lint-imports",
+      "exit_code": 0,
+      "result": "22 kept, 0 broken; 522 files, 1893 dependencies"
+    },
+    {
+      "name": "dependencies",
+      "command": "uv run deptry lib server alembic scripts tests r2",
+      "exit_code": 0,
+      "result": "Success; no dependency issues"
+    },
+    {
+      "name": "test audit",
+      "command": "uv run python scripts/audit_tests.py --check",
+      "exit_code": 0,
+      "result": "0 violations"
+    },
+    {
+      "name": "diff whitespace",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "tdd_evidence": [
+    "Checkpoint custody: 4 failed, 18 passed before repair; 22 passed after repair.",
+    "Attestor and activated helper tests first failed collection on absent APIs; real channel positive and coherent-rollback denial then passed.",
+    "Actual positive lifespan first failed at the old unconditional GovernanceStartupUnavailable branch.",
+    "Incomplete-client shutdown and excess pending-client admission first failed before their respective repairs.",
+    "Operator CLI tests first failed collection on absent module."
+  ],
+  "disposable_database": {
+    "container": "codex-m8c-attestor-20261013",
+    "server_major": 18,
+    "client_version": "18.6",
+    "local_port": 32791,
+    "state": "REMOVED",
+    "cleanup_command": "docker rm -f codex-m8c-attestor-20261013",
+    "cleanup_verified": "docker ps -a --filter name=codex-m8c-attestor-20261013 returned no name",
+    "restored_source_target_databases": "created by fixture with unique names and dropped in finally"
+  },
+  "graph": {
+    "project": "r2-m8c-binding-design",
+    "generation": "2026-10-04T09:21:10Z",
+    "tier": "Tier 2; stale/not-tracked Governance symbols; integration tests and scripts excluded",
+    "fallback": "Exact worktree source reads used for all new/stale/excluded paths; no graph-wide completeness claim"
+  },
+  "pending": [
+    "Independent read-only review of 7b3f9cab165475a8bf3fab6a7f93a1554f242001..59c4d60ebd0c21ae1630124f309dbd4c502427a1; not started before sponsor pause.",
+    "Assess missing forced wrong SO_PEERCRED, connect-time socket inode replacement, timeout/malformed challenge and actual-startup importer/scan interleavings; tests do not cover the full written matrix.",
+    "Actual production host root/backup/operator custody, independent archive restore, stopped-service/liveness, image digest and Compose public/socket directory binds remain unobserved.",
+    "Stable final backend full suite remains incomplete from the earlier interrupted run; no full backend run in this session.",
+    "HTTP/browser review, final M8-C acceptance and READY/production activation remain closed."
+  ],
+  "historical_backend_full_suite": {
+    "status": "NOT_PASSED_INTERRUPTED",
+    "code_sha": "f52903c1",
+    "passed_before_interruption": 16443,
+    "skipped": 154,
+    "unfinished": 43,
+    "seconds": 862.02,
+    "reported_failures": 0,
+    "not_current_validation": true
+  },
+  "resume": [
+    "Read latest durable handoff and this checkpoint; verify live git status/HEAD and preserve the separate dirty r2-m8c worktree.",
+    "Use fixed committed review range above; no need to repeat the 387-test run for read-only review. Fix concrete findings with selected tests.",
+    "Only if PG work is needed, start a new disposable cached PostgreSQL 18 container on an auto-assigned localhost port, then migrate that disposable database to head.",
+    "Run final required gates after repairs stabilize; avoid repeated full-suite runs during intermediate work.",
+    "Keep production/READY claims closed until actual host evidence and independent acceptance exist."
+  ]
+}
