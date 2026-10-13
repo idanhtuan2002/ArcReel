@@ -1215,6 +1215,10 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 - Mutations each fail 2 tests: removing the slot-owner check, the binding currentness check, or the sealed-digest requirement.
 - Static gates: ruff, format, basedpyright `--warnings` (0/0), lint-imports (22 kept), deptry and `audit_tests --check` are all clean.
 
+**Branch full backend suite on `f3ae27a3`:** `DATABASE_URL= uv run python -m pytest -n 4 --dist loadfile -q -p no:cacheprovider -rfE` gave 16697 passed, 174 skipped, 0 failed (exit 0, 1:28:07, SQLite).
+
+**Open for the sponsor:** merge into `r2-v2/main` and push; ADR-0103 operator activation; live Gemini canary.
+
 **Known limits (not blocking):**
 - Binding currentness is checked before the slot lock, not under it. A binding change in that window approves the output against the snapshot it was generated from.
 - An exact replay after the binding changes returns 409 `r2_shot_binding_stale`, not the stored receipt.
