@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.production_binding import ProductionBindingHeadModel, ProductionBindingVersionModel
 from lib.db.models.spatial_pair import SpatialConstraintSetModel
-from lib.db.repositories.production_binding import ProductionBindingIntegrityError
+from lib.db.repositories.production_binding import ProductionBindingIntegrityError, ProductionBindingRepository
 from lib.db.repositories.spatial_constraint import SpatialConstraintSetRepository
 from lib.db.repositories.spatial_source import _receipt_digest
 from r2.contracts.production_binding_authority import BindingCreateCommandV1
@@ -238,3 +238,72 @@ async def test_a_set_whose_sources_differ_from_the_frame_claims_is_refused(
 
     with pytest.raises(BindingSourceConflictError, match="spatial set sources"):
         await reader.read_current(user_id=USER.id, project_name=PROJECT, target_id=target_id)
+
+
+async def _verified_current(factory: Factory, binding_id: str):
+    from r2.contracts.production_target import TargetVersionRef
+
+    async with factory() as session:
+        row = (
+            (
+                await session.execute(
+                    select(ProductionBindingVersionModel)
+                    .where(ProductionBindingVersionModel.binding_id == binding_id)
+                    .order_by(ProductionBindingVersionModel.binding_version.desc())
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert row is not None
+        envelope = row.envelope_json
+        target = TargetVersionRef.model_validate(envelope["target_ref"])
+        scene = TargetVersionRef.model_validate(envelope["scene_ref"])
+        current = await ProductionBindingRepository(session).get_current_verified(
+            user_id=USER.id,
+            project_name=PROJECT,
+            binding_id=binding_id,
+            expected_target_ref=target,
+            expected_scene_ref=scene,
+        )
+    assert current is not None
+    return current, target, scene
+
+
+@pytest.mark.asyncio
+async def test_a_spatial_successor_is_the_current_version_and_the_snapshot_carries_its_set(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binding_id, target_id = await _current_binding(gate_export_client, project_dir, session_factory, monkeypatch)
+    constraint_set = _set(binding_id, _sources(await _envelope(session_factory, binding_id)))
+    digest = spatial_constraint_set_digest(constraint_set.model_dump(mode="json"))
+    current, target, scene = await _verified_current(session_factory, binding_id)
+
+    async with session_factory() as session:
+        await SpatialConstraintSetRepository(session).stage(constraint_set)
+        successor = await ProductionBindingRepository(session).append_spatial_successor(
+            current=current,
+            spatial_set_id=spatial_constraint_set_id(digest),
+            spatial_set_digest=digest,
+            expected_target_ref=target,
+            expected_scene_ref=scene,
+        )
+        await session.commit()
+
+    assert successor.body.version == 2
+    assert successor.core_digest == current.core_digest
+    snapshot = await CurrentLocationBindingSnapshotReader(
+        session_factory=session_factory, project_dir=project_dir
+    ).read_current(user_id=USER.id, project_name=PROJECT, target_id=target_id)
+    assert snapshot.body.ordered_bindings[0].version == 2
+    assert snapshot.spatial_set == constraint_set
+
+    async with session_factory() as session:
+        with pytest.raises(ProductionBindingIntegrityError, match="CAS predecessor"):
+            await ProductionBindingRepository(session).append_spatial_successor(
+                current=current,
+                spatial_set_id=spatial_constraint_set_id(digest),
+                spatial_set_digest=digest,
+                expected_target_ref=target,
+                expected_scene_ref=scene,
+            )

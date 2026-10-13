@@ -316,6 +316,89 @@ class ProductionBindingRepository:
         current.current_envelope_digest = verified.envelope_digest
         await self.session.flush()
 
+    async def append_spatial_successor(
+        self,
+        *,
+        current: VerifiedBindingVersion,
+        spatial_set_id: str,
+        spatial_set_digest: str,
+        expected_target_ref: TargetVersionRef,
+        expected_scene_ref: TargetVersionRef,
+    ) -> VerifiedBindingVersion:
+        """Append version N+1 that carries a spatial set and advance the head from N by CAS.
+
+        The body changes only its version; the envelope keeps the scene, target and frame claims, so
+        the core digest stays the same. The caller holds the earlier locks and commits.
+        """
+        user_id, project_name = current.envelope.user_id, current.envelope.project_name
+        binding_id = current.body.id
+        head = (
+            await self.session.execute(
+                select(ProductionBindingHeadModel)
+                .where(
+                    ProductionBindingHeadModel.user_id == user_id,
+                    ProductionBindingHeadModel.project_name == project_name,
+                    ProductionBindingHeadModel.binding_id == binding_id,
+                )
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if (
+            head is None
+            or head.current_version != current.body.version
+            or head.current_envelope_digest != current.envelope_digest
+        ):
+            raise ProductionBindingIntegrityError("binding successor CAS predecessor disagrees")
+        successor = current.body.version + 1
+        body = ProductionBinding.model_validate({**current.body.model_dump(mode="json"), "version": successor})
+        envelope = BindingEnvelopeV1.model_validate(
+            {
+                **current.envelope.model_dump(mode="json"),
+                "binding_version": successor,
+                "binding_body_digest": binding_body_digest(body),
+                "spatial_set_id": spatial_set_id,
+                "spatial_set_digest": spatial_set_digest,
+            }
+        )
+        if binding_core_digest(body=body, envelope=envelope) != current.core_digest:
+            raise ProductionBindingIntegrityError("binding successor would change the binding core")
+        claims = envelope.ordered_claims
+        row = ProductionBindingVersionModel(
+            user_id=user_id,
+            project_name=project_name,
+            binding_id=binding_id,
+            binding_version=successor,
+            binding_body_json=body.model_dump(mode="json"),
+            binding_body_digest=binding_body_digest(body),
+            envelope_json=envelope.model_dump(mode="json"),
+            envelope_digest=binding_envelope_digest(envelope.model_dump(mode="json")),
+            target_type=expected_target_ref.target_type.value,
+            target_id=expected_target_ref.target_id,
+            target_registry_version=expected_target_ref.registry_version,
+            target_version_digest=expected_target_ref.version_digest,
+            scene_type=expected_scene_ref.target_type.value,
+            scene_id=expected_scene_ref.target_id,
+            scene_registry_version=expected_scene_ref.registry_version,
+            scene_version_digest=expected_scene_ref.version_digest,
+            receipt_a_id=claims[0].receipt_id,
+            receipt_b_id=claims[1].receipt_id,
+            created_at=datetime.now(UTC),
+        )
+        verified = verify_stored_binding_version(
+            row,
+            user_id=user_id,
+            project_name=project_name,
+            expected_target_ref=expected_target_ref,
+            expected_scene_ref=expected_scene_ref,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        head.current_version = successor
+        head.current_envelope_digest = row.envelope_digest
+        await self.session.flush()
+        return verified
+
     async def get_current_verified(
         self,
         *,
