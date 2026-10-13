@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from lib.db.base import DEFAULT_USER_ID
 from lib.ledger import Ledger
 from lib.providers import require_provider_pair
 from lib.telemetry import clears_baggage_at_provider_boundary
@@ -54,15 +55,21 @@ class TextGenerator:
         self,
         request: TextGenerationRequest,
         project_name: str | None = None,
+        *,
+        user_id: str = DEFAULT_USER_ID,
+        execution_id: str | None = None,
     ) -> TextGenerationResult:
-        """生成文本并自动记录用量。"""
+        """生成文本并自动记录用量；给出 ``execution_id`` 时，成功后把这条用量绑定到该用户的 M7 执行。"""
         async with self.ledger.record(
             project_name=project_name or "",
             call_type="text",
             model=self.backend.model,
             prompt=request.prompt[:500],
             provider=self._provider_id,
+            user_id=user_id,
         ) as call:
             result = await self.backend.generate(request)
             call.success(result)
-            return result
+        if execution_id is not None:
+            await self.ledger.bind_execution(call_id=call.call_id, execution_id=execution_id)
+        return result

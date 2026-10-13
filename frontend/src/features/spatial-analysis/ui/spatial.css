@@ -1,0 +1,45 @@
+.sp-header {
+  padding-left: 1rem;
+  /* Keeps the workspace's floating assistant button clear of the header. */
+  padding-right: 4rem;
+}
+
+.sp-btn-accent {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+.sp-btn-accent:hover:not(:disabled) {
+  background: var(--color-accent-2);
+}
+
+/* MASTER and REVERSE face each other, like a shot and its reverse shot. */
+.sp-pair {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+@media (max-width: 640px) {
+  .sp-pair {
+    grid-template-columns: 1fr;
+  }
+  .sp-pair-glyph {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+}
+
+/* The border carries the evidence class: seen, inferred, or missing. */
+.sp-finding {
+  background: var(--color-surface-2);
+}
+.sp-finding-visible {
+  border: 1px solid var(--color-accent);
+}
+.sp-finding-inferred {
+  border: 1px dashed var(--color-hairline-strong);
+}
+.sp-finding-gap {
+  background: transparent;
+  border: 1px dotted var(--color-text-3);
+}
