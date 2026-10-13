@@ -43,7 +43,7 @@ Mutation checks during implementation removed a guard and confirmed that its tes
 | Parity report | `scripts/r2/verify_donor_parity.py docs/r2/evidence/R2_M8_C_SPATIAL_PARITY.json --head 638e3152… --donor-clone ~/.cache/r2-donors/dramaclaw` | `M8_DONOR_PARITY_OK`. 12 rows: 9 measured, 3 wholly EXCLUDED with reasons. No skips, no unknowns. |
 | Gate C suites (fault, replay, authority boundary) | `pytest <Gate C selection>` on disposable PostgreSQL 18.6, migrated to head | **186 passed, 0 skipped, 0 failed** |
 | Static | ruff check/format (1692 files), basedpyright, lint-imports, deptry, test audit | 0 findings. basedpyright 0/0/0; lint-imports 22 kept. |
-| Full backend suite | `uv run python -m pytest -n 4 --dist loadfile` | Recorded in `R2_M8_C_IMPLEMENTATION_ACCEPTANCE.json` once complete. |
+| Full backend suite | `uv run python -m pytest -n 4 --dist loadfile` | **16160 passed, 67 skipped, 0 failed** at `25658f69` (code identical to `638e3152`); see `R2_M8_C_IMPLEMENTATION_ACCEPTANCE.json`. |
 
 **Parity performance limit.** No spatial benchmark was pre-registered. The PARITY threshold was set after measurement:
 - the R2 median must be within 2× the donor's and under 1 ms per case;
