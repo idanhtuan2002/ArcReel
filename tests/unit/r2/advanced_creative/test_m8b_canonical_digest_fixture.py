@@ -9,8 +9,7 @@ from r2.advanced_creative.digests import canonical_json_bytes, digest_canonical,
 from r2.contracts.advanced_creative import CanvasCandidate, LineageBinding
 
 FIXTURE = (
-    Path(__file__).resolve().parents[4]
-    / "frontend/src/features/creative-canvas/__fixtures__/canonical-digest.json"
+    Path(__file__).resolve().parents[4] / "frontend/src/features/creative-canvas/__fixtures__/canonical-digest.json"
 )
 
 
