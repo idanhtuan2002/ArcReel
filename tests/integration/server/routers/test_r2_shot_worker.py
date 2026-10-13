@@ -17,9 +17,10 @@ from lib.db.models.host_hardening import ExecutionAttemptModel
 from lib.db.models.production_binding import ProductionBindingVersionModel
 from lib.db.repositories.production_binding import ProductionBindingIntegrityError
 from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE, GenerationQueue
-from lib.video_backends.execution_adapter import provider_payload_digest
+from lib.video_backends.execution_adapter import host_video_route, provider_payload_digest
+from r2.production_intelligence.shot_profiles import WAN27_TWO_VIEW_PROFILE
 from server.services.r2_shot_generation import R2ShotAdmissionRefused, derive_shot_admission
-from server.services.r2_shot_worker import execute_r2_shot_task, resume_r2_shot_task
+from server.services.r2_shot_worker import admit_and_plan_spatial_attempt, execute_r2_shot_task, resume_r2_shot_task
 from tests.fakes import GateProjectManager, bind_safe_session_factory
 from tests.http_capture import capture_http, request_json
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
@@ -200,3 +201,35 @@ async def test_a_crash_while_polling_resumes_the_same_job_without_resubmitting(
         calls = list((await session.execute(select(ApiCall))).scalars())
     assert len(attempts) == 1
     assert [(c.status, c.execution_id) for c in calls] == [("success", attempts[0].execution_id)]
+
+
+@pytest.mark.asyncio
+async def test_a_binding_change_after_rederivation_blocks_attempt_planning(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The admission transaction rereads the snapshot, so a head change after the worker's check still stops it."""
+    bind_safe_session_factory(monkeypatch, session_factory)
+    _command, evidence = await _queued(gate_export_client, project_dir, session_factory, monkeypatch)
+    backend = await _builder(WAN27_TWO_VIEW_PROFILE)
+    route = host_video_route(
+        provider_id="dashscope",
+        provider_model_id=WAN27_TWO_VIEW_PROFILE.provider_model_id,
+        backend_model_id=WAN27_TWO_VIEW_PROFILE.backend_model_id,
+        endpoint_id=WAN27_TWO_VIEW_PROFILE.endpoint_id,
+        submitted_base_url=backend.submitted_base_url,
+    )
+    async with session_factory() as session:
+        current_binding = (await session.execute(select(ProductionBindingVersionModel))).scalar_one().binding_id
+    changed = _set(current_binding, _sources(await _envelope(session_factory, current_binding)))
+    await _attach(session_factory, current_binding, changed.model_copy(update={"normalizer_version": "spatial-r2-v2"}))
+
+    with pytest.raises(ProductionBindingIntegrityError, match="stale"):
+        await admit_and_plan_spatial_attempt(
+            session_factory=session_factory, project_dir=project_dir, evidence=evidence, route=route
+        )
+    async with session_factory() as session:
+        assert list((await session.execute(select(ExecutionAttemptModel))).scalars()) == []
+
+    async with session_factory() as session:
+        unchanged = (await session.execute(select(ProductionBindingVersionModel))).scalar_one()
+        assert unchanged.binding_id == current_binding
