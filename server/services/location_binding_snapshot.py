@@ -8,10 +8,16 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.production_binding import ProductionBindingIntegrityError, ProductionBindingRepository
+from lib.db.repositories.spatial_constraint import SpatialConstraintSetIntegrityError, SpatialConstraintSetRepository
 from lib.db.repositories.spatial_source import SpatialFrameReceiptRepository, _receipt_digest
 from r2.contracts.enums import ProductionBindingTarget
 from r2.contracts.production import SceneSpec, ShotSpecV2
-from r2.contracts.production_binding_authority import BindingSnapshotV1, SnapshotBindingRefV1
+from r2.contracts.production_binding_authority import (
+    BindingSnapshotV1,
+    FrameSourceClaimWithDigestV1,
+    SnapshotBindingRefV1,
+)
+from r2.contracts.spatial_constraint import SpatialConstraintSetV1, SpatialSourceBindingV1
 from r2.production_binding.digests import binding_snapshot_digest, frame_source_claim_digest, scoped_location_binding_id
 from r2.target_registry.resolver import TransactionBoundTargetAuthorityResolver
 from server.services.location_binding import BindingSourceConflictError, _claim_from_verified_frame
@@ -23,6 +29,31 @@ from server.services.spatial_frame_reader import SpatialFrameReader
 class VerifiedLocationBindingSnapshot:
     body: BindingSnapshotV1
     digest: str
+    spatial_set: SpatialConstraintSetV1 | None = None
+
+
+def _source_identity(source: SpatialSourceBindingV1) -> tuple[object, ...]:
+    return (
+        source.frame_derivation_receipt_id,
+        source.frame_derivation_receipt_digest,
+        source.frame_content_digest,
+        source.parent_artifact_key,
+        source.parent_master_version,
+        source.parent_candidate_id,
+        source.parent_content_digest,
+    )
+
+
+def _claim_identity(claim: FrameSourceClaimWithDigestV1) -> tuple[object, ...]:
+    return (
+        claim.receipt_id,
+        claim.receipt_digest,
+        claim.frame_content_digest,
+        claim.parent_artifact_key,
+        claim.parent_master_version,
+        claim.parent_candidate_id,
+        claim.parent_content_digest,
+    )
 
 
 class CurrentLocationBindingSnapshotReader:
@@ -104,6 +135,24 @@ class CurrentLocationBindingSnapshotReader:
                 ):
                     raise BindingSourceConflictError("binding snapshot frame differs from immutable claim")
 
+            spatial_set = None
+            envelope = current.envelope
+            if envelope.spatial_set_id is not None and envelope.spatial_set_digest is not None:
+                try:
+                    spatial_set = await SpatialConstraintSetRepository(session).get_verified(
+                        user_id=user_id,
+                        project_name=project_name,
+                        set_id=envelope.spatial_set_id,
+                        expected_digest=envelope.spatial_set_digest,
+                        expected_binding_id=binding_id,
+                    )
+                except SpatialConstraintSetIntegrityError as exc:
+                    raise ProductionBindingIntegrityError("binding snapshot spatial set failed verification") from exc
+                if sorted(map(_source_identity, spatial_set.ordered_sources)) != sorted(map(_claim_identity, claims)):
+                    raise BindingSourceConflictError(
+                        "binding snapshot spatial set sources differ from its frame claims"
+                    )
+
             snapshot = BindingSnapshotV1(
                 user_id=user_id,
                 project_name=project_name,
@@ -119,7 +168,7 @@ class CurrentLocationBindingSnapshotReader:
             digest = binding_snapshot_digest(snapshot.model_dump(mode="json"))
             if expected_snapshot_digest is not None and digest != expected_snapshot_digest:
                 raise ProductionBindingIntegrityError("binding snapshot digest is stale")
-            return VerifiedLocationBindingSnapshot(body=snapshot, digest=digest)
+            return VerifiedLocationBindingSnapshot(body=snapshot, digest=digest, spatial_set=spatial_set)
 
 
 __all__ = ["CurrentLocationBindingSnapshotReader", "VerifiedLocationBindingSnapshot"]

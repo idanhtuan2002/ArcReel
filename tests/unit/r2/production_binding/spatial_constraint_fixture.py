@@ -77,19 +77,21 @@ def raw_response() -> dict[str, Any]:
     }
 
 
-def revision() -> ExplorationRevision:
+def revision(
+    *, master_digest: str = MASTER_DIGEST, reverse_digest: str = REVERSE_DIGEST, project_name: str = PROJECT
+) -> ExplorationRevision:
     candidate = normalize_spatial_candidate(
         raw_response(),
         overlap_analysis=None,
         sources={
-            "master": SpatialSourceIdentity(source_digest=MASTER_DIGEST, view="MASTER"),
-            "reverse": SpatialSourceIdentity(source_digest=REVERSE_DIGEST, view="REVERSE"),
+            "master": SpatialSourceIdentity(source_digest=master_digest, view="MASTER"),
+            "reverse": SpatialSourceIdentity(source_digest=reverse_digest, view="REVERSE"),
         },
         execution_id="execution-1",
         normalizer_version="spatial-r2-v1",
     )
     lineage = LineageBinding(
-        project_name=PROJECT,
+        project_name=project_name,
         content_basis_digest="sha256:" + "3" * 64,
         approved_master_id=None,
         approved_master_digest=None,

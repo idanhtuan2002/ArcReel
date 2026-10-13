@@ -77,6 +77,7 @@ from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
 from lib.db.models.session_message_link import AgentSessionUserMessageLink
 from lib.db.models.spatial_pair import (
+    SpatialConstraintSetModel,
     SpatialPairCommandModel,
     SpatialPairDecisionModel,
     SpatialPairHeadModel,
@@ -163,6 +164,7 @@ __all__ = [
     "PublishApprovalDecisionModel",
     "ShowrunnerGrantEventModel",
     "ShowrunnerGrantHeadModel",
+    "SpatialConstraintSetModel",
     "SpatialExecutionEvidenceModel",
     "SpatialFrameReceiptModel",
     "SpatialPairCommandModel",

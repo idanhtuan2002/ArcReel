@@ -27,7 +27,7 @@ TABLES = {
 def test_review_custody_revision_and_scoped_child_keys(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["911c4a0e0001"]
+    assert script.get_heads() == ["912c4a0e0001"]
     assert script.get_revision("901c4a0e0001").down_revision == "8f8c4a0e0001"
 
     command.upgrade(cfg, "head")

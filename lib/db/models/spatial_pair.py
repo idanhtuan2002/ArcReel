@@ -211,3 +211,56 @@ class SpatialPairV2CustodyModel(Base):
 
 
 __all__ = ["SpatialPairCommandModel", "SpatialPairDecisionModel", "SpatialPairHeadModel", "SpatialPairV2CustodyModel"]
+
+
+class SpatialConstraintSetModel(Base):
+    """One immutable typed spatial constraint set; its ID names its body digest."""
+
+    __tablename__ = "m8_spatial_constraint_sets"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "set_id", name="pk_m8_spatial_constraint_sets"),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "binding_id"],
+            [
+                "production_binding_heads.user_id",
+                "production_binding_heads.project_name",
+                "production_binding_heads.binding_id",
+            ],
+            name="fk_m8_spatial_constraint_sets_binding",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "master_receipt_id"],
+            [
+                "m8_spatial_frame_receipts.user_id",
+                "m8_spatial_frame_receipts.project_name",
+                "m8_spatial_frame_receipts.receipt_id",
+            ],
+            name="fk_m8_spatial_constraint_sets_master",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "reverse_receipt_id"],
+            [
+                "m8_spatial_frame_receipts.user_id",
+                "m8_spatial_frame_receipts.project_name",
+                "m8_spatial_frame_receipts.receipt_id",
+            ],
+            name="fk_m8_spatial_constraint_sets_reverse",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("master_receipt_id <> reverse_receipt_id", name="ck_m8_spatial_constraint_sets_two_views"),
+        CheckConstraint("substr(set_id, 5) = substr(set_digest, 8)", name="ck_m8_spatial_constraint_sets_id_digest"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="RESTRICT"), server_default=DEFAULT_USER_ID
+    )
+    project_name: Mapped[str] = mapped_column(String(255))
+    set_id: Mapped[str] = mapped_column(String(255))
+    set_digest: Mapped[str] = mapped_column(String(71))
+    binding_id: Mapped[str] = mapped_column(String(255))
+    master_receipt_id: Mapped[str] = mapped_column(String(255))
+    reverse_receipt_id: Mapped[str] = mapped_column(String(255))
+    body_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
