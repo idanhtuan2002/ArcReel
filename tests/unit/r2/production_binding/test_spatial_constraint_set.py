@@ -133,3 +133,21 @@ def test_a_relation_kind_applies_only_to_its_walls(kind: str, wall: str) -> None
 
     with pytest.raises(ValidationError):
         SpatialConstraintSetV1.model_validate(body)
+
+
+def test_an_unrepresentable_warning_relation_is_a_constraint_error() -> None:
+    revision = fixture.revision()
+    payload = revision.payload
+    gap = next(a for a in payload.spatial.assertions if a.evidence_class.value == "GAP")
+    bad = gap.model_copy(update={"relation": "line one\nline two "})
+    assertions = tuple(bad if a is gap else a for a in payload.spatial.assertions)
+    spatial = payload.spatial.model_copy(update={"assertions": assertions})
+    tampered_payload = payload.model_copy(update={"spatial": spatial})
+    from r2.advanced_creative.digests import digest_payload
+
+    tampered = revision.model_copy(
+        update={"payload": tampered_payload, "payload_digest": digest_payload(tampered_payload, revision.lineage)}
+    )
+
+    with pytest.raises(SpatialConstraintError):
+        _derive(_selected(), revision=tampered)

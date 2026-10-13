@@ -108,16 +108,16 @@ def derive_spatial_constraint_set(
     if unknown:
         raise SpatialConstraintError(f"the selection names unknown assertions: {unknown}")
     constraints = tuple(_constraint(by_id[assertion_id]) for assertion_id in selected)
-    warnings = tuple(
-        SpatialCoverageWarningV1(
-            assertion_id=assertion.assertion_id,
-            evidence_class=assertion.evidence_class,
-            relation=assertion.relation,
-        )
-        for assertion in spatial.assertions
-        if assertion.evidence_class in (EvidenceClass.INFERRED, EvidenceClass.GAP)
-    )
     try:
+        warnings = tuple(
+            SpatialCoverageWarningV1(
+                assertion_id=assertion.assertion_id,
+                evidence_class=assertion.evidence_class,
+                relation=assertion.relation,
+            )
+            for assertion in spatial.assertions
+            if assertion.evidence_class in (EvidenceClass.INFERRED, EvidenceClass.GAP)
+        )
         return SpatialConstraintSetV1(
             schema_version="1",
             user_id=user_id,
