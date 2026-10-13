@@ -22,6 +22,7 @@ import hashlib
 import uuid
 from collections.abc import AsyncGenerator, Callable, Collection, Iterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import BinaryIO, Literal
@@ -29,7 +30,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.async_thread import run_noninterruptible_sync
@@ -87,6 +88,7 @@ from server.services.master_authority import (
     serialized_artifacts,
     verify_masters,
 )
+from server.services.r2_shot_approval import R2_SHOT_EPISODE, R2ShotApprovalRefused, prepare_r2_shot_cut
 
 router = APIRouter()
 # Token-authenticated like the project ZIP export (ADR-0071): registered without the session dependency.
@@ -297,6 +299,213 @@ async def _locked_to_heads(
         yield session
 
 
+@dataclass(frozen=True)
+class _CutApproval:
+    """One Gate C approval after its route validated the request and fixed the produced asset."""
+
+    resource_type: str
+    episode: int
+    target_ref: str
+    content_fingerprint: str
+    content_basis: ContentBasis
+    direct_dependencies: list[DependencySnapshot]
+    contract_version: int
+    contract_schema_version: str
+    approval_record: str
+    audio_decision: Literal["AUDIO", "MUTE"] | None
+    produced: RenderedCutAsset
+    request_digest: str
+
+
+async def _approve_cut(
+    *, user: CurrentUser, project_name: str, project_dir, approval: _CutApproval
+) -> dict[str, object]:
+    """Stage, promote, project and receipt one approval: the shared Gate C core of every approval route."""
+    host = GoldenAHostIntegration(project_dir, resource_type=approval.resource_type, episode=approval.episode)
+    operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"gate-c/{user.id}/{project_name}/{approval.episode}/{approval.target_ref}/{approval.approval_record}",
+        )
+    )
+    request_digest = approval.request_digest
+    produced = approval.produced
+    composite = produced.method is ProductionMethod.COMPOSITE
+    # A composite reads its source shot masters; phase 1 locks and checks them with the final.
+    source_keys = (
+        [
+            host.artifact_key_for(ref.partition(":")[0])
+            for ref in approval.produced.source_master_refs
+            if ref.partition(":")[0]
+        ]
+        if composite
+        else []
+    )
+
+    staged_dependencies: list[DependencySnapshot] = []
+
+    def _stage():
+        dependencies = (
+            composite_dependencies(host, approval.produced.source_master_refs)
+            if composite
+            else approval.direct_dependencies
+        )
+        staged_dependencies[:] = list(dependencies)
+        return host.stage_candidate(
+            target_ref=approval.target_ref,
+            content_fingerprint=approval.content_fingerprint,
+            produced=produced,
+            content_basis=approval.content_basis,
+            direct_dependencies=dependencies,
+            contract_version=approval.contract_version,
+            contract_schema_version=approval.contract_schema_version,
+            contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
+            operation_id=operation_id,
+            request_digest=request_digest,
+            keep_approved_semantic_state=True,
+        )
+
+    def _semantic_state():
+        return host.semantic_state_for(
+            target_ref=approval.target_ref,
+            content_fingerprint=approval.content_fingerprint,
+            content_basis=approval.content_basis,
+            direct_dependencies=staged_dependencies,
+            contract_version=approval.contract_version,
+            contract_schema_version=approval.contract_schema_version,
+            contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
+        )
+
+    def _project_and_export(registered):
+        # The candidate's semantic state and its approved master land in one manifest update.
+        approved = host.approve(
+            registered,
+            approval_record=approval.approval_record,
+            selected_by=user.sub,
+            selected_at=datetime.now(UTC),
+            semantic_state=_semantic_state(),
+        )
+        try:
+            export = write_export_copy(host, approval.target_ref) if composite else None
+        except Exception as exc:
+            raise PostApprovalExportError("approved final requires export reconciliation") from exc
+        return approved, export
+
+    async def _stage_and_promote(session):
+        if source_keys:
+            try:
+                await verify_masters(
+                    session,
+                    user_id=user.id,
+                    project_name=project_name,
+                    project_dir=project_dir,
+                    artifact_keys=source_keys,
+                )
+            except MasterDivergedError as exc:
+                raise HTTPException(status_code=409, detail=f"master_diverged: {exc}") from exc
+        try:
+            registered = await run_noninterruptible_sync(_stage)
+        except SourceMasterMismatchError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except StagedOperationConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        # Every check the projection makes runs first, against the staged output.
+        def _approvable_version():
+            host.check_approvable(registered, _semantic_state())
+            return host.staged_version(approval.target_ref, registered.host_version_ref)
+
+        try:
+            version_file, staged_digest = await run_noninterruptible_sync(_approvable_version)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
+        try:
+            await master_authority_unit(session, defer_commit=True).promote_staged(
+                user_id=user.id,
+                project_name=project_name,
+                project_dir=project_root,
+                artifact_key=registered.artifact_key,
+                generation_candidate_id=registered.candidate.id,
+                version_file=version_file,
+                expected_content_digest=staged_digest,
+                approval_record=approval.approval_record,
+                command_id=operation_id,
+            )
+        except _MASTER_CONFLICTS as exc:
+            raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
+        return registered
+
+    project_root = await run_noninterruptible_sync(project_dir.resolve)
+    artifact_key = host.artifact_key_for(approval.target_ref)
+    # The database master head is the authority (ADR-0096). Phase 1 stages, checks and promotes in
+    # one transaction under the artifact's row lock, and commits: files never run ahead of it.
+    async with serialized_artifacts(
+        async_session_factory,
+        user_id=user.id,
+        project_name=project_name,
+        artifact_keys=[artifact_key, *source_keys],
+    ) as session:
+        registered = await _stage_and_promote(session)
+    # Phase 2 projects and exports under the row lock again, only while this candidate is the head,
+    # so an older approval can never overwrite a newer projection or export.
+    try:
+        async with async_session_factory() as session:
+            approved_master, export = await project_if_current(
+                session,
+                user_id=user.id,
+                project_name=project_name,
+                artifact_key=artifact_key,
+                candidate_id=m7_candidate_id(artifact_key, registered.candidate.id),
+                project=lambda: run_noninterruptible_sync(lambda: _project_and_export(registered)),
+            )
+    except MasterSupersededError as exc:
+        raise HTTPException(status_code=409, detail=f"master_superseded: {exc}") from exc
+    except (PostApprovalExportError, KeyError, ValueError) as exc:
+        # The head is committed; retrying the same approval_record projects and exports it.
+        raise _gate_c_retry_error(approval.approval_record) from exc
+
+    receipt = FinalCutReceipt(
+        user_id=user.id,
+        project_name=project_name,
+        artifact_key=host.artifact_key_for(approval.target_ref),
+        selected_candidate_id=approved_master.selected_candidate_id,
+        content_fingerprint=approval.content_fingerprint,
+        approval_record=approval.approval_record,
+        selected_by=user.sub,
+        selected_at=approved_master.selected_at,
+        sequence=1,  # ignored by append(); the repository assigns the real, race-safe value
+        audio_decision=approval.audio_decision,
+    )
+    receipt_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"gate-c-receipt/{operation_id}"))
+    try:
+        async with async_session_factory() as session:
+            repository = FinalCutReceiptRepository(session)
+            stored_receipt = await repository.get_by_id(receipt_id)
+            if stored_receipt is None:
+                await repository.append(receipt, receipt_id=receipt_id)
+                await session.commit()
+                stored_receipt = await repository.get_by_id(receipt_id)
+            if stored_receipt is None:
+                raise RuntimeError("committed Final Cut receipt is not visible")
+    except GateSequenceConflictError:
+        async with async_session_factory() as session:
+            stored_receipt = await FinalCutReceiptRepository(session).get_by_id(receipt_id)
+        if stored_receipt is None:
+            raise _gate_c_retry_error(approval.approval_record) from None
+    except Exception as exc:
+        raise _gate_c_retry_error(approval.approval_record) from exc
+    if stored_receipt.model_dump(exclude={"sequence"}) != receipt.model_dump(exclude={"sequence"}):
+        raise HTTPException(status_code=409, detail="approval_record is already bound to a different receipt")
+
+    result: dict[str, object] = {
+        "approved_master": approved_master.model_dump(mode="json"),
+        "receipt": stored_receipt.model_dump(mode="json"),
+    }
+    if export is not None:
+        result["export"] = {"relative_path": export.relative_path, "sha256": "sha256:" + export.sha256}
+    return result
+
+
 @router.post("/projects/{project_name}/gates/final-cut")
 async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, user: CurrentUser) -> dict[str, object]:
     project_dir = get_project_manager().get_project_path(project_name)
@@ -326,13 +535,6 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
         source_master_refs=req.produced.source_master_refs,
     )
 
-    host = GoldenAHostIntegration(project_dir, resource_type=req.resource_type, episode=req.episode)
-    operation_id = str(
-        uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            f"gate-c/{user.id}/{project_name}/{req.episode}/{req.target_ref}/{req.approval_record}",
-        )
-    )
     # A request without an audio decision digests as it did before the field existed, so an
     # approval_record retry from before ADR-0092 still replays.
     request_digest = hashlib.sha256(
@@ -361,177 +563,78 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
                 detail=f"audio_decision {decision} does not match the final's audio track",
             )
 
-    # A composite reads its source shot masters; phase 1 locks and checks them with the final.
-    source_keys = (
-        [
-            host.artifact_key_for(ref.partition(":")[0])
-            for ref in req.produced.source_master_refs
-            if ref.partition(":")[0]
-        ]
-        if composite
-        else []
-    )
-
-    staged_dependencies: list[DependencySnapshot] = []
-
-    def _stage():
-        dependencies = (
-            composite_dependencies(host, req.produced.source_master_refs) if composite else req.direct_dependencies
-        )
-        staged_dependencies[:] = list(dependencies)
-        return host.stage_candidate(
-            target_ref=req.target_ref,
-            content_fingerprint=req.content_fingerprint,
-            produced=produced,
-            content_basis=req.content_basis,
-            direct_dependencies=dependencies,
-            contract_version=req.contract_version,
-            contract_schema_version=req.contract_schema_version,
-            contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
-            operation_id=operation_id,
-            request_digest=request_digest,
-            keep_approved_semantic_state=True,
-        )
-
-    def _semantic_state():
-        return host.semantic_state_for(
+    return await _approve_cut(
+        user=user,
+        project_name=project_name,
+        project_dir=project_dir,
+        approval=_CutApproval(
+            resource_type=req.resource_type,
+            episode=req.episode,
             target_ref=req.target_ref,
             content_fingerprint=req.content_fingerprint,
             content_basis=req.content_basis,
-            direct_dependencies=staged_dependencies,
+            direct_dependencies=req.direct_dependencies,
             contract_version=req.contract_version,
             contract_schema_version=req.contract_schema_version,
-            contract_type=COMPOSITE_CONTRACT_TYPE if composite else "ShotSpec",
-        )
-
-    def _project_and_export(registered):
-        # The candidate's semantic state and its approved master land in one manifest update.
-        approved = host.approve(
-            registered,
             approval_record=req.approval_record,
-            selected_by=user.sub,
-            selected_at=datetime.now(UTC),
-            semantic_state=_semantic_state(),
-        )
-        try:
-            export = write_export_copy(host, req.target_ref) if composite else None
-        except Exception as exc:
-            raise PostApprovalExportError("approved final requires export reconciliation") from exc
-        return approved, export
-
-    async def _stage_and_promote(session):
-        if source_keys:
-            try:
-                await verify_masters(
-                    session,
-                    user_id=user.id,
-                    project_name=project_name,
-                    project_dir=project_dir,
-                    artifact_keys=source_keys,
-                )
-            except MasterDivergedError as exc:
-                raise HTTPException(status_code=409, detail=f"master_diverged: {exc}") from exc
-        try:
-            registered = await run_noninterruptible_sync(_stage)
-        except SourceMasterMismatchError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        except StagedOperationConflictError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-        # Every check the projection makes runs first, against the staged output.
-        def _approvable_version():
-            host.check_approvable(registered, _semantic_state())
-            return host.staged_version(req.target_ref, registered.host_version_ref)
-
-        try:
-            version_file, staged_digest = await run_noninterruptible_sync(_approvable_version)
-        except (KeyError, ValueError) as exc:
-            raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
-        try:
-            await master_authority_unit(session, defer_commit=True).promote_staged(
-                user_id=user.id,
-                project_name=project_name,
-                project_dir=project_root,
-                artifact_key=registered.artifact_key,
-                generation_candidate_id=registered.candidate.id,
-                version_file=version_file,
-                expected_content_digest=staged_digest,
-                approval_record=req.approval_record,
-                command_id=operation_id,
-            )
-        except _MASTER_CONFLICTS as exc:
-            raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
-        return registered
-
-    project_root = await run_noninterruptible_sync(project_dir.resolve)
-    artifact_key = host.artifact_key_for(req.target_ref)
-    # The database master head is the authority (ADR-0096). Phase 1 stages, checks and promotes in
-    # one transaction under the artifact's row lock, and commits: files never run ahead of it.
-    async with serialized_artifacts(
-        async_session_factory,
-        user_id=user.id,
-        project_name=project_name,
-        artifact_keys=[artifact_key, *source_keys],
-    ) as session:
-        registered = await _stage_and_promote(session)
-    # Phase 2 projects and exports under the row lock again, only while this candidate is the head,
-    # so an older approval can never overwrite a newer projection or export.
-    try:
-        async with async_session_factory() as session:
-            approved_master, export = await project_if_current(
-                session,
-                user_id=user.id,
-                project_name=project_name,
-                artifact_key=artifact_key,
-                candidate_id=m7_candidate_id(artifact_key, registered.candidate.id),
-                project=lambda: run_noninterruptible_sync(lambda: _project_and_export(registered)),
-            )
-    except MasterSupersededError as exc:
-        raise HTTPException(status_code=409, detail=f"master_superseded: {exc}") from exc
-    except (PostApprovalExportError, KeyError, ValueError) as exc:
-        # The head is committed; retrying the same approval_record projects and exports it.
-        raise _gate_c_retry_error(req.approval_record) from exc
-
-    receipt = FinalCutReceipt(
-        user_id=user.id,
-        project_name=project_name,
-        artifact_key=host.artifact_key_for(req.target_ref),
-        selected_candidate_id=approved_master.selected_candidate_id,
-        content_fingerprint=req.content_fingerprint,
-        approval_record=req.approval_record,
-        selected_by=user.sub,
-        selected_at=approved_master.selected_at,
-        sequence=1,  # ignored by append(); the repository assigns the real, race-safe value
-        audio_decision=req.audio_decision,
+            audio_decision=req.audio_decision,
+            produced=produced,
+            request_digest=request_digest,
+        ),
     )
-    receipt_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"gate-c-receipt/{operation_id}"))
-    try:
-        async with async_session_factory() as session:
-            repository = FinalCutReceiptRepository(session)
-            stored_receipt = await repository.get_by_id(receipt_id)
-            if stored_receipt is None:
-                await repository.append(receipt, receipt_id=receipt_id)
-                await session.commit()
-                stored_receipt = await repository.get_by_id(receipt_id)
-            if stored_receipt is None:
-                raise RuntimeError("committed Final Cut receipt is not visible")
-    except GateSequenceConflictError:
-        async with async_session_factory() as session:
-            stored_receipt = await FinalCutReceiptRepository(session).get_by_id(receipt_id)
-        if stored_receipt is None:
-            raise _gate_c_retry_error(req.approval_record) from None
-    except Exception as exc:
-        raise _gate_c_retry_error(req.approval_record) from exc
-    if stored_receipt.model_dump(exclude={"sequence"}) != receipt.model_dump(exclude={"sequence"}):
-        raise HTTPException(status_code=409, detail="approval_record is already bound to a different receipt")
 
-    result: dict[str, object] = {
-        "approved_master": approved_master.model_dump(mode="json"),
-        "receipt": stored_receipt.model_dump(mode="json"),
-    }
-    if export is not None:
-        result["export"] = {"relative_path": export.relative_path, "sha256": "sha256:" + export.sha256}
-    return result
+
+class R2ShotApprovalRequest(BaseModel):
+    """Names the finished R2 shot task only; the server derives every staged field from it (ADR-0104)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str = Field(min_length=1)
+    approval_record: str = Field(min_length=1)
+
+
+@router.post("/projects/{project_name}/gates/r2-shots/{target_id}")
+async def r2_shot_approval(
+    project_name: str, target_id: str, req: R2ShotApprovalRequest, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        validate_m3_target_ref(target_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    project_dir = get_project_manager().get_project_path(project_name)
+    try:
+        cut = await prepare_r2_shot_cut(
+            session_factory=async_session_factory,
+            project_dir=project_dir,
+            user_id=user.id,
+            project_name=project_name,
+            target_id=target_id,
+            task_id=req.task_id,
+        )
+    except R2ShotApprovalRefused as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.code) from exc
+    request_digest = hashlib.sha256(
+        f"r2-shot/{target_id}/{req.model_dump_json()}/{cut.produced.sha256}".encode()
+    ).hexdigest()
+    return await _approve_cut(
+        user=user,
+        project_name=project_name,
+        project_dir=project_dir,
+        approval=_CutApproval(
+            resource_type="videos",
+            episode=R2_SHOT_EPISODE,
+            target_ref=cut.target_ref,
+            content_fingerprint=cut.content_fingerprint,
+            content_basis=cut.content_basis,
+            direct_dependencies=cut.direct_dependencies,
+            contract_version=cut.contract_version,
+            contract_schema_version=cut.contract_schema_version,
+            approval_record=req.approval_record,
+            audio_decision=None,
+            produced=cut.produced,
+            request_digest=request_digest,
+        ),
+    )
 
 
 @router.post("/projects/{project_name}/gates/publish-approval")

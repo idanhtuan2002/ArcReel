@@ -301,7 +301,9 @@ class GoldenAHostIntegration:
             commit = self.versions.commit_staged_paid_version(
                 self.resource_type,
                 target_ref,
-                "Golden A local candidate",
+                "Golden A local candidate"
+                if produced.provider_execution_ref is None
+                else f"R2 provider candidate {produced.provider_execution_ref}",
                 staged_file=staged,
                 current_file=self.current_file_for(target_ref),
                 select_current=False,
@@ -326,7 +328,8 @@ class GoldenAHostIntegration:
             target_ref=target_ref,
             content_fingerprint=content_fingerprint,
             execution_fingerprint=produced.execution_fingerprint,
-            provider_execution_ref=("local:ffmpeg:" + produced.execution_fingerprint),
+            provider_execution_ref=produced.provider_execution_ref
+            or ("local:ffmpeg:" + produced.execution_fingerprint),
             output_asset_ref=str(produced.path),
             lifecycle_state=GenerationLifecycleStatus.GENERATED,
             selection_state=CandidateSelectionStatus.UNREVIEWED,

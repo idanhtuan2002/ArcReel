@@ -46,11 +46,13 @@ class RenderedCutAsset:
     sha256: str
     duration_seconds: float
     execution_fingerprint: str
-    tool: Literal["remotion", "ffmpeg"]
+    tool: Literal["remotion", "ffmpeg", "provider"]
     tool_version: str
     wall_time_seconds: float
     external_provider_cost: Decimal
     source_master_refs: tuple[str, ...]
+    # A provider-generated asset names its M7 execution; a local render leaves this unset.
+    provider_execution_ref: str | None = None
 
 
 __all__ = ["RenderCut", "RenderPlan", "RenderedCutAsset"]

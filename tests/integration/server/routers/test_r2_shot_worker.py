@@ -16,11 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.db.models.api_call import ApiCall
 from lib.db.models.host_hardening import ExecutionAttemptModel
 from lib.db.models.production_binding import ProductionBindingVersionModel
+from lib.db.repositories.host_hardening import ExecutionAttemptRepository
 from lib.db.repositories.production_binding import ProductionBindingIntegrityError
 from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE, GenerationQueue
 from lib.video_backends.execution_adapter import host_video_route, provider_payload_digest
 from r2.production_intelligence.shot_profiles import WAN27_TWO_VIEW_PROFILE
-from lib.db.repositories.host_hardening import ExecutionAttemptRepository
 from server.services.execution_attempts import capability_resolver
 from server.services.r2_shot_generation import R2ShotAdmissionRefused, derive_shot_admission
 from server.services.r2_shot_output import R2ShotOutputUnavailable, seal_r2_shot_output, sealed_output_digest
