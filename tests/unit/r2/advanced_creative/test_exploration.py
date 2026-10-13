@@ -9,6 +9,7 @@ import pytest
 
 from r2.advanced_creative.digests import digest_canonical, digest_payload
 from r2.advanced_creative.errors import (
+    CandidateConflictError,
     CommandConflictError,
     ExplorationNotFoundError,
     PromotionBindingStaleError,
@@ -25,6 +26,8 @@ from r2.contracts.advanced_creative import (
     PromotionPreview,
     PromotionTarget,
     PromotionTargetKind,
+    SpatialCandidate,
+    SpatialPayload,
 )
 from r2.contracts.host_hardening import MasterHeadSnapshot
 
@@ -225,6 +228,34 @@ async def test_an_append_outside_the_callers_scope_is_not_found(field: str) -> N
     with pytest.raises(ExplorationNotFoundError):
         await _service(world).append_revision(
             user_id="u1", project_name="demo", candidate=foreign, expected_head_version=None, command_id="a1"
+        )
+    assert world.events == []
+
+
+async def test_public_append_rejects_unverified_spatial_revision_before_write() -> None:
+    spatial = SpatialCandidate(
+        kind=ExplorationKind.SPATIAL,
+        spatial=SpatialPayload(
+            assertions=(),
+            seam_locks=(),
+            direction_locks=(),
+            duplicate_warnings=(),
+            execution_id="caller-claimed-execution",
+            normalizer_version="spatial-r2-v1",
+        ),
+    )
+    base = _revision()
+    revision = ExplorationRevision(
+        **(
+            base.model_dump(mode="python")
+            | {"kind": ExplorationKind.SPATIAL, "payload": spatial, "payload_digest": digest_payload(spatial, LINEAGE)}
+        )
+    )
+    world = _World(revision)
+
+    with pytest.raises(CandidateConflictError, match="server-owned spatial execution"):
+        await _service(world).append_revision(
+            user_id="u1", project_name="demo", candidate=revision, expected_head_version=None, command_id="spatial-1"
         )
     assert world.events == []
 

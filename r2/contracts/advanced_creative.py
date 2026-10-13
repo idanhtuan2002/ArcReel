@@ -17,6 +17,7 @@ from pydantic import (
     AwareDatetime,
     ConfigDict,
     Field,
+    FiniteFloat,
     RootModel,
     SerializationInfo,
     StringConstraints,
@@ -272,14 +273,48 @@ class PromotionReceipt(M8ContractModel):
         return self
 
 
+class SpatialImageSpan(M8ContractModel):
+    source_ref: str = Field(min_length=1)
+    source_digest: Sha256Digest
+    view: Literal["MASTER", "REVERSE"]
+    x0: FiniteFloat = Field(ge=0, le=1)
+    y0: FiniteFloat = Field(ge=0, le=1)
+    x1: FiniteFloat = Field(ge=0, le=1)
+    y1: FiniteFloat = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def require_positive_area(self) -> Self:
+        if self.x0 >= self.x1 or self.y0 >= self.y1:
+            raise ValueError("spatial source span must have positive area")
+        return self
+
+
 class SpatialAssertion(M8ContractModel):
     assertion_id: str
     evidence_class: EvidenceClass
     source_refs: tuple[str, ...]
+    source_spans: tuple[SpatialImageSpan, ...] = Field(default=(), exclude_if=lambda value: not value)
+    evidence_detail: CanonicalJsonObject | None = Field(default=None, exclude_if=lambda value: value is None)
     relation: str
     subject_refs: tuple[str, ...]
     confidence: float | None
     warnings: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def require_span_source(self) -> Self:
+        if any(span.source_ref not in self.source_refs for span in self.source_spans):
+            raise ValueError("spatial source spans must name assertion sources")
+        identities: dict[str, tuple[str, str]] = {}
+        for span in self.source_spans:
+            identity = (span.source_digest, span.view)
+            previous = identities.setdefault(span.source_ref, identity)
+            if previous != identity:
+                raise ValueError("spatial source ref must have one identity")
+        if len({(span.source_ref, span.x0, span.y0, span.x1, span.y1) for span in self.source_spans}) != len(
+            self.source_spans
+        ):
+            raise ValueError("spatial source spans must be unique")
+        return self
 
 
 class SpatialPayload(M8ContractModel):
@@ -289,6 +324,13 @@ class SpatialPayload(M8ContractModel):
     duplicate_warnings: tuple[CanonicalJsonObject, ...]
     execution_id: str | None
     normalizer_version: str
+
+    @model_validator(mode="after")
+    def require_unique_assertion_ids(self) -> Self:
+        ids = [assertion.assertion_id for assertion in self.assertions]
+        if len(ids) != len(set(ids)):
+            raise ValueError("spatial payload requires unique assertion ids")
+        return self
 
 
 class SpatialCandidate(M8ContractModel):

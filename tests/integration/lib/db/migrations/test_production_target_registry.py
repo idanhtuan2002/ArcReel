@@ -20,7 +20,7 @@ def test_target_registry_revision_and_scoped_constraints(alembic_cfg: tuple[Conf
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
     assert script.get_heads() == ["911c4a0e0001"]
-    assert script.get_revision("8c8c4a0e0001").down_revision == "8b8c4a0e0001"
+    assert script.get_revision("8c9c4a0e0001").down_revision == "8c8c4a0e0001"
 
     command.upgrade(cfg, "head")
     engine = sa.create_engine(f"sqlite:///{db_path}")
@@ -87,7 +87,7 @@ def test_target_registry_revision_and_scoped_constraints(alembic_cfg: tuple[Conf
     ) in version_keys
     for table in TABLES:
         assert (("user_id",), "users", ("id",), "RESTRICT") in foreign(table)
-    command.downgrade(cfg, "8b8c4a0e0001")
+    command.downgrade(cfg, "8c8c4a0e0001")
     assert TABLES.isdisjoint(sa.inspect(engine).get_table_names())
 
 

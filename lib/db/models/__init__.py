@@ -87,7 +87,7 @@ from lib.db.models.spatial_review import (
     SpatialReviewDeliveryModel,
     SpatialReviewSessionModel,
 )
-from lib.db.models.spatial_source import SpatialFrameReceiptModel
+from lib.db.models.spatial_source import SpatialExecutionEvidenceModel, SpatialFrameReceiptModel
 from lib.db.models.task import BatchTask, GenerationBatch, Task, WorkerLease
 from lib.db.models.user import User
 
@@ -163,6 +163,7 @@ __all__ = [
     "PublishApprovalDecisionModel",
     "ShowrunnerGrantEventModel",
     "ShowrunnerGrantHeadModel",
+    "SpatialExecutionEvidenceModel",
     "SpatialFrameReceiptModel",
     "SpatialPairCommandModel",
     "SpatialPairDecisionModel",

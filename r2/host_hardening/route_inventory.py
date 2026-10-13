@@ -18,6 +18,7 @@ from r2.host_hardening.provider_capabilities import (
 )
 
 HOST_VIDEO_ADAPTER_VERSION = "host-video-v1"
+HOST_SPATIAL_ADAPTER_VERSION = "host-spatial-v1"
 CUSTOM_PROVIDER_FAMILY = "custom-*"
 
 
@@ -107,6 +108,18 @@ PAID_ASYNC_SUBMIT_FAMILIES = (
 )
 
 
+#: M8-C spatial analysis routes: one synchronous vision call per attempt. Kept apart from the
+#: frozen paid video inventory so its recorded release evidence stays unchanged.
+SPATIAL_SUBMIT_FAMILIES = (
+    PaidAsyncSubmitFamily(
+        SubmitRouteKey("gemini", "gemini-generate", HOST_SPATIAL_ADAPTER_VERSION),
+        "gemini-generate-spatial@host-spatial-v1",
+        "server.services.spatial_execution:text_backend_spatial_vision",
+    ),
+)
+
+_ALL_SUBMIT_FAMILIES = PAID_ASYNC_SUBMIT_FAMILIES + SPATIAL_SUBMIT_FAMILIES
+
 #: Built-in video provider ids (backend spec registry) -> the provider id their backend submits as.
 #: Every built-in ``(provider, "video")`` spec must appear here; a new one fails the inventory test.
 BUILTIN_VIDEO_SUBMIT_PROVIDER: dict[str, str] = {
@@ -132,16 +145,16 @@ def _normalized_provider_id(provider_id: str) -> str:
 
 
 def _family_by_key(key: SubmitRouteKey) -> PaidAsyncSubmitFamily | None:
-    return next((family for family in PAID_ASYNC_SUBMIT_FAMILIES if family.key == key), None)
+    return next((family for family in _ALL_SUBMIT_FAMILIES if family.key == key), None)
 
 
 def discovered_submit_families() -> frozenset[SubmitRouteKey]:
-    return frozenset(family.key for family in PAID_ASYNC_SUBMIT_FAMILIES)
+    return frozenset(family.key for family in _ALL_SUBMIT_FAMILIES)
 
 
 def registered_submit_families() -> frozenset[SubmitRouteKey]:
     registered: set[SubmitRouteKey] = set()
-    for family in PAID_ASYNC_SUBMIT_FAMILIES:
+    for family in _ALL_SUBMIT_FAMILIES:
         try:
             profile = load_capability_profile(family.capability_profile_ref)
         except ProviderCapabilityError:
@@ -181,7 +194,7 @@ def _resolve_symbol(symbol: str) -> object:
 def submit_route_inventory_problems() -> list[str]:
     problems: list[str] = []
     registered = registered_submit_families()
-    for family in PAID_ASYNC_SUBMIT_FAMILIES:
+    for family in _ALL_SUBMIT_FAMILIES:
         try:
             resolved = _resolve_symbol(family.submit_symbol)
         except (AttributeError, ImportError, ValueError):
@@ -190,7 +203,7 @@ def submit_route_inventory_problems() -> list[str]:
             problems.append(f"M7_SUBMIT_ROUTE_UNBOUND:{family.submit_symbol}")
 
     document = json.loads(DEFAULT_REGISTRY_PATH.read_text())
-    expected_refs = {family.capability_profile_ref for family in PAID_ASYNC_SUBMIT_FAMILIES}
+    expected_refs = {family.capability_profile_ref for family in _ALL_SUBMIT_FAMILIES}
     actual_refs = {entry["ref"] for entry in document["profiles"]}
     problems.extend(f"M7_SUBMIT_ROUTE_STALE:{ref}" for ref in sorted(actual_refs - expected_refs))
     return problems
@@ -199,8 +212,10 @@ def submit_route_inventory_problems() -> list[str]:
 __all__ = [
     "BUILTIN_VIDEO_SUBMIT_PROVIDER",
     "CUSTOM_PROVIDER_FAMILY",
+    "HOST_SPATIAL_ADAPTER_VERSION",
     "HOST_VIDEO_ADAPTER_VERSION",
     "PAID_ASYNC_SUBMIT_FAMILIES",
+    "SPATIAL_SUBMIT_FAMILIES",
     "PaidAsyncSubmitFamily",
     "SubmitRouteKey",
     "SubmitRouteUnboundError",

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "packet": "M8-C",
+  "task": "C2 promotion prerequisite preflight",
+  "stop_code": "M8_REQUIRED_EVIDENCE_MISSING",
+  "head": "774952b235aa899c0125ee2109d426e9bc6dc9ff",
+  "dirty_paths": [],
+  "failed_checks": [
+    {
+      "check": "independently accepted persistent ProductionBinding authority with an atomic CAS writer",
+      "result": "MISSING",
+      "detail": "ADR-0095 and M8 execution contract amendment 2 require this authority before SpatialCandidate promotion. At the M8-B acceptance base, ProductionBinding exists as a contract only; M8 preview and promotion reject the PRODUCTION_BINDING target before writes. The checked r2-v2/main worktree also has no ProductionBinding writer."
+    }
+  ],
+  "evidence_refs": [
+    "docs/adr/0095-m8a-defers-the-production-binding-promotion-target.md",
+    "docs/r2/evidence/R2_M8_EXECUTION_CONTRACT_AMENDMENT_2_2026-09-29.json",
+    "r2/contracts/preparation.py",
+    "r2/advanced_creative/exploration.py",
+    "r2/advanced_creative/promotion.py"
+  ],
+  "created_at": "2026-09-30"
+}

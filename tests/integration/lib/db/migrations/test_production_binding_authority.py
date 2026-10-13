@@ -20,7 +20,7 @@ def test_binding_authority_revision_and_scoped_keys(alembic_cfg: tuple[Config, P
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
     assert script.get_heads() == ["911c4a0e0001"]
-    assert script.get_revision("8d8c4a0e0001").down_revision == "8c8c4a0e0001"
+    assert script.get_revision("8d8c4a0e0001").down_revision == "8c9c4a0e0001"
 
     command.upgrade(cfg, "head")
     engine = sa.create_engine(f"sqlite:///{db_path}")
@@ -84,7 +84,7 @@ def test_binding_authority_revision_and_scoped_keys(alembic_cfg: tuple[Config, P
             ("user_id", "project_name", "receipt_id"),
         ) in links
 
-    command.downgrade(cfg, "8c8c4a0e0001")
+    command.downgrade(cfg, "8c9c4a0e0001")
     assert TABLES.isdisjoint(sa.inspect(engine).get_table_names())
     command.upgrade(cfg, "head")
     assert set(sa.inspect(engine).get_table_names()) >= TABLES

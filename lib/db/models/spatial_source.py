@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
+    LargeBinary,
     PrimaryKeyConstraint,
     String,
     UniqueConstraint,
@@ -63,4 +64,65 @@ class SpatialFrameReceiptModel(Base):
     frame_probe_digest: Mapped[str] = mapped_column(String(71), nullable=False)
     receipt_body_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     receipt_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+_FRAME_RECEIPT = ["m8_spatial_frame_receipts.user_id", "m8_spatial_frame_receipts.project_name"]
+
+
+class SpatialExecutionEvidenceModel(Base):
+    __tablename__ = "m8_spatial_execution_evidence"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "execution_id", name="pk_m8_spatial_execution_evidence"),
+        UniqueConstraint(
+            "user_id", "project_name", "candidate_id", "revision", name="uq_m8_spatial_execution_evidence_revision"
+        ),
+        UniqueConstraint("user_id", "project_name", "command_id", name="uq_m8_spatial_execution_evidence_command"),
+        CheckConstraint(
+            "master_frame_receipt_id <> reverse_frame_receipt_id", name="ck_m8_spatial_execution_evidence_two_views"
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "execution_id"],
+            ["execution_attempts.user_id", "execution_attempts.project_name", "execution_attempts.execution_id"],
+            name="fk_m8_spatial_execution_evidence_attempt",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "candidate_id", "revision"],
+            [
+                "m8_candidate_revisions.user_id",
+                "m8_candidate_revisions.project_name",
+                "m8_candidate_revisions.candidate_id",
+                "m8_candidate_revisions.revision",
+            ],
+            name="fk_m8_spatial_execution_evidence_revision",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "master_frame_receipt_id"],
+            [*_FRAME_RECEIPT, "m8_spatial_frame_receipts.receipt_id"],
+            name="fk_m8_spatial_execution_evidence_master",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "reverse_frame_receipt_id"],
+            [*_FRAME_RECEIPT, "m8_spatial_frame_receipts.receipt_id"],
+            name="fk_m8_spatial_execution_evidence_reverse",
+            ondelete="RESTRICT",
+        ),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="RESTRICT"), server_default=DEFAULT_USER_ID
+    )
+    project_name: Mapped[str] = mapped_column(String(255))
+    execution_id: Mapped[str] = mapped_column(String(255))
+    candidate_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    command_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    master_frame_receipt_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    reverse_frame_receipt_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    evidence_body_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    evidence_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    raw_response: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

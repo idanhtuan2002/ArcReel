@@ -177,6 +177,7 @@ def test_downgrade_removes_only_the_m8_tables(alembic_cfg: tuple[Config, Path]) 
 
     assert before - after == M8_TABLES | {
         "m8_spatial_frame_receipts",
+        "m8_spatial_execution_evidence",
         "production_target_heads",
         "production_target_versions",
         "production_target_commands",

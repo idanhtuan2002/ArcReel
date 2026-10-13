@@ -15,6 +15,7 @@ from typing import Protocol
 
 from r2.advanced_creative.digests import digest_canonical, digest_command
 from r2.advanced_creative.errors import (
+    CandidateConflictError,
     CommandConflictError,
     ExplorationNotFoundError,
     PromotionBindingStaleError,
@@ -186,6 +187,8 @@ class ExplorationService:
     ) -> CandidateHead:
         if candidate.lineage.project_name != project_name or candidate.created_by != user_id:
             raise ExplorationNotFoundError("the revision is not in this scope")
+        if candidate.kind is ExplorationKind.SPATIAL:
+            raise CandidateConflictError("spatial revisions require server-owned spatial execution")
         head = await self._store.append_revision(
             user_id=user_id,
             project_name=project_name,

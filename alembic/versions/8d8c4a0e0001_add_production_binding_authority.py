@@ -1,7 +1,7 @@
 """Add scoped LOCATION binding heads, versions and command receipts.
 
 Revision ID: 8d8c4a0e0001
-Revises: 8c8c4a0e0001
+Revises: 8c9c4a0e0001
 """
 
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "8d8c4a0e0001"
-down_revision: str | Sequence[str] | None = "8c8c4a0e0001"
+down_revision: str | Sequence[str] | None = "8c9c4a0e0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
