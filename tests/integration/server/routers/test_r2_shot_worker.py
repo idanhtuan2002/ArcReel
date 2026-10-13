@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -18,7 +19,7 @@ from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE, GenerationQueue
 from lib.video_backends.execution_adapter import provider_payload_digest
 from server.services.r2_shot_generation import R2ShotAdmissionRefused, derive_shot_admission
 from server.services.r2_shot_worker import execute_r2_shot_task
-from tests.fakes import GateProjectManager, bind_safe_session_factory, bounded_poll_clock
+from tests.fakes import GateProjectManager, bind_safe_session_factory
 from tests.http_capture import capture_http, request_json
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
 from tests.integration.server.routers.test_r2_shot_admission import _admissible_shot, _builder
@@ -73,7 +74,9 @@ async def test_the_worker_submits_the_exact_captured_payload_once_through_m7(
     bind_safe_session_factory(monkeypatch, session_factory)
     _command, evidence = await _queued(gate_export_client, project_dir, session_factory, monkeypatch)
 
-    with capture_http() as router, bounded_poll_clock():
+    # Only the poll wait is skipped: the real clock keeps database connect timeouts intact on PostgreSQL,
+    # and the fake provider succeeds on the first poll.
+    with capture_http() as router, patch("lib.retry.asyncio.sleep", new_callable=AsyncMock):
         submit = router.post(SUBMIT_URL).mock(
             return_value=httpx.Response(200, json={"output": {"task_id": "job-1", "task_status": "PENDING"}})
         )
