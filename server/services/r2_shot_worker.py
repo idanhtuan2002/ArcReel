@@ -47,6 +47,7 @@ from server.services.r2_shot_generation import (
     configured_payload_builder,
     derive_shot_admission,
 )
+from server.services.r2_shot_output import seal_r2_shot_output
 
 BackendFactory = Callable[[R2ExecutionProfileV1], Awaitable[DashScopeVideoBackend]]
 
@@ -184,12 +185,14 @@ async def execute_r2_shot_task(
         request.api_call_id = call.call_id
         result = await backend.generate(request)
         call.success(result)
+    output_digest = await seal_r2_shot_output(session_factory, evidence, Path(result.video_path))
     return {
         "r2_shot": {
             "task_id": evidence.task_id,
             "execution_id": request.execution_id,
             "host_request_digest": evidence.host_request_digest,
             "output_path": str(Path(result.video_path).relative_to(root)),
+            "output_digest": output_digest,
         }
     }
 
@@ -261,12 +264,14 @@ async def resume_r2_shot_task(
         raise
     if call_id is not None:
         await ledger.resume_success(call_id=call_id, result=result)
+    output_digest = await seal_r2_shot_output(session_factory, evidence, Path(result.video_path))
     return {
         "r2_shot": {
             "task_id": evidence.task_id,
             "provider_job_id": job_id,
             "host_request_digest": evidence.host_request_digest,
             "output_path": str(Path(result.video_path).relative_to(root)),
+            "output_digest": output_digest,
         }
     }
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -19,7 +20,10 @@ from lib.db.repositories.production_binding import ProductionBindingIntegrityErr
 from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE, GenerationQueue
 from lib.video_backends.execution_adapter import host_video_route, provider_payload_digest
 from r2.production_intelligence.shot_profiles import WAN27_TWO_VIEW_PROFILE
+from lib.db.repositories.host_hardening import ExecutionAttemptRepository
+from server.services.execution_attempts import capability_resolver
 from server.services.r2_shot_generation import R2ShotAdmissionRefused, derive_shot_admission
+from server.services.r2_shot_output import R2ShotOutputUnavailable, seal_r2_shot_output, sealed_output_digest
 from server.services.r2_shot_worker import admit_and_plan_spatial_attempt, execute_r2_shot_task, resume_r2_shot_task
 from tests.fakes import GateProjectManager, bind_safe_session_factory
 from tests.http_capture import capture_http, request_json
@@ -56,6 +60,19 @@ async def _queued(client, project_dir, factory, monkeypatch):
         task_id=evidence.task_id,
     )
     return command, evidence
+
+
+async def _sealed(factory, evidence) -> tuple[str, str | None]:
+    async with factory() as session:
+        attempt = await ExecutionAttemptRepository(
+            session, capability_resolver=capability_resolver()
+        ).get_for_task_attempt(user_id=USER.id, project_name=PROJECT, task_id=evidence.task_id, attempt_no=1)
+        assert attempt is not None
+        return attempt.state.value, await sealed_output_digest(session, attempt)
+
+
+def _sha(data: bytes) -> str:
+    return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
 async def _run(evidence, factory, project_dir):
@@ -112,6 +129,14 @@ async def test_the_worker_submits_the_exact_captured_payload_once_through_m7(
     task = await GenerationQueue(session_factory=session_factory).get_task(evidence.task_id)
     assert task is not None
     assert task["provider_job_id"] == "job-1"
+    assert await _sealed(session_factory, evidence) == ("SUCCEEDED", _sha(b"video-bytes"))
+    assert result["r2_shot"]["output_digest"] == _sha(b"video-bytes")
+
+    output = project_dir / result["r2_shot"]["output_path"]
+    assert await seal_r2_shot_output(session_factory, evidence, output) == _sha(b"video-bytes")
+    output.write_bytes(b"other-bytes")
+    with pytest.raises(R2ShotOutputUnavailable, match="different output"):
+        await seal_r2_shot_output(session_factory, evidence, output)
 
 
 @pytest.mark.asyncio
@@ -201,6 +226,7 @@ async def test_a_crash_while_polling_resumes_the_same_job_without_resubmitting(
         calls = list((await session.execute(select(ApiCall))).scalars())
     assert len(attempts) == 1
     assert [(c.status, c.execution_id) for c in calls] == [("success", attempts[0].execution_id)]
+    assert await _sealed(session_factory, evidence) == ("SUCCEEDED", _sha(b"resumed-bytes"))
 
 
 @pytest.mark.asyncio
