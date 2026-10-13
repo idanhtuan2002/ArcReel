@@ -52,7 +52,7 @@ def _probe_ok(_path: Path) -> str:
     return "sha256:" + "c" * 64
 
 
-def test_prepare_candidate_verifies_and_renames_into_place(tmp_path: Path) -> None:
+def test_prepare_candidate_verifies_and_publishes_into_place(tmp_path: Path) -> None:
     media_root = tmp_path / "media"
     media_root.mkdir()
     final_path = media_root / "demo" / "videos" / "cand-1.mp4"
@@ -146,7 +146,7 @@ def test_prepare_candidate_surfaces_disk_full_and_leaves_no_final_file(
     assert not final_path.parent.exists() or list(final_path.parent.iterdir()) == []
 
 
-def test_prepare_candidate_rejects_cross_mount_rename(tmp_path: Path) -> None:
+def test_prepare_candidate_rejects_cross_mount_publication(tmp_path: Path) -> None:
     media_root = tmp_path / "media"
     media_root.mkdir()
     final_path = media_root / "demo" / "videos" / "cand-1.mp4"
@@ -211,8 +211,130 @@ def test_prepare_candidate_rejects_duplicate_unequal_bytes_without_touching_exis
     assert final_path.read_bytes() == b"already-stored-different-bytes"
 
 
-def test_prepare_candidate_is_idempotent_after_kill_following_rename(tmp_path: Path) -> None:
-    # Models a crash after the immutable rename already succeeded but before the
+def test_prepare_candidate_preserves_destination_created_after_precheck(tmp_path: Path) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    final_path = media_root / "demo" / "videos" / "cand-1.mp4"
+    source = _source(tmp_path)
+
+    def competing_device_probe(path: Path) -> int:
+        if path == final_path.parent:
+            final_path.write_bytes(b"competing-writer-bytes")
+        return path.stat().st_dev
+
+    with pytest.raises(CandidateDuplicateConflictError):
+        prepare_candidate(
+            identity=_identity(),
+            source_file=source,
+            final_path=final_path,
+            media_root=media_root,
+            media_probe=_probe_ok,
+            device_of=competing_device_probe,
+        )
+
+    assert final_path.read_bytes() == b"competing-writer-bytes"
+
+
+def test_prepare_candidate_rejects_existing_final_symlink(tmp_path: Path) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    final_path = media_root / "demo" / "videos" / "cand-1.mp4"
+    final_path.parent.mkdir(parents=True)
+    outside = tmp_path / "outside.mp4"
+    outside.write_bytes(_CONTENT)
+    final_path.symlink_to(outside)
+
+    with pytest.raises(CandidateSymlinkEscapeError):
+        prepare_candidate(
+            identity=_identity(),
+            source_file=_source(tmp_path),
+            final_path=final_path,
+            media_root=media_root,
+            media_probe=_probe_ok,
+        )
+
+    assert final_path.is_symlink()
+    assert outside.read_bytes() == _CONTENT
+
+
+def test_prepare_candidate_rejects_parent_replaced_during_link(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    final_path = media_root / "demo" / "videos" / "cand-1.mp4"
+    moved_parent = tmp_path / "moved-videos"
+    real_link = os.link
+
+    def move_parent_after_link(src: str | os.PathLike[str], dst: str | os.PathLike[str], **kwargs: object) -> None:
+        real_link(src, dst, **kwargs)
+        final_path.parent.rename(moved_parent)
+        final_path.parent.symlink_to(moved_parent, target_is_directory=True)
+
+    monkeypatch.setattr(os, "link", move_parent_after_link)
+    with pytest.raises(CandidateSymlinkEscapeError):
+        prepare_candidate(
+            identity=_identity(),
+            source_file=_source(tmp_path),
+            final_path=final_path,
+            media_root=media_root,
+            media_probe=_probe_ok,
+        )
+    assert not (moved_parent / final_path.name).exists()
+
+
+def test_parent_swap_cleanup_preserves_replacement_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    final_path = media_root / "demo" / "videos" / "cand-1.mp4"
+    moved_parent = tmp_path / "moved-videos"
+    real_link = os.link
+
+    def replace_after_link(src: str | os.PathLike[str], dst: str | os.PathLike[str], **kwargs: object) -> None:
+        real_link(src, dst, **kwargs)
+        final_path.unlink()
+        final_path.write_bytes(b"competitor")
+        final_path.parent.rename(moved_parent)
+        final_path.parent.symlink_to(moved_parent, target_is_directory=True)
+
+    monkeypatch.setattr(os, "link", replace_after_link)
+    with pytest.raises(CandidateSymlinkEscapeError):
+        prepare_candidate(
+            identity=_identity(),
+            source_file=_source(tmp_path),
+            final_path=final_path,
+            media_root=media_root,
+            media_probe=_probe_ok,
+        )
+    assert (moved_parent / final_path.name).read_bytes() == b"competitor"
+
+
+def test_prepare_candidate_rejects_fifo_competitor_without_blocking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    media_root = tmp_path / "media"
+    media_root.mkdir()
+    final_path = media_root / "demo" / "videos" / "cand-1.mp4"
+    final_path.parent.mkdir(parents=True)
+    os.mkfifo(final_path)
+    real_open = os.open
+
+    def checked_open(path: str | os.PathLike[str], flags: int, *args: object, **kwargs: object) -> int:
+        if path == final_path.name:
+            assert flags & os.O_NONBLOCK
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", checked_open)
+    with pytest.raises(CandidateSymlinkEscapeError):
+        prepare_candidate(
+            identity=_identity(),
+            source_file=_source(tmp_path),
+            final_path=final_path,
+            media_root=media_root,
+            media_probe=_probe_ok,
+        )
+
+
+def test_prepare_candidate_is_idempotent_after_kill_following_publication(tmp_path: Path) -> None:
+    # Models a crash after immutable publication already succeeded but before the
     # caller recorded success: a fresh call with the same identity must return the
     # same verified object rather than re-writing or raising a duplicate conflict.
     media_root = tmp_path / "media"

@@ -264,6 +264,28 @@
       "evidence_recorded_at": "2026-09-18T00:00:00+00:00",
       "evidence_expires_at": null,
       "entry_digest": "sha256:0d5bda8a2e285d6aa3da5890a552f658f0e34a72d3917e68675e2c8d68e3289c"
+    },
+    {
+      "ref": "gemini-generate-spatial@host-spatial-v1",
+      "provider_id": "gemini",
+      "api_version": "sdk-generate-content",
+      "adapter_version": "host-spatial-v1",
+      "idempotency_mode": "NONE",
+      "token_scope": null,
+      "token_scope_value": null,
+      "token_ttl_seconds": null,
+      "not_found_semantics": "NON_AUTHORITATIVE",
+      "lookup_settling_window_seconds": null,
+      "supports_poll": false,
+      "supports_cancel": false,
+      "supports_webhook": false,
+      "supports_lookup": false,
+      "provider_sequence_is_monotonic": false,
+      "evidence_digest": "sha256:bfd67af30c0235ea0f78914db870f235c45b7fdf1f3d590e43a37536c49f3912",
+      "qualification_status": "UNQUALIFIED",
+      "evidence_recorded_at": "2026-10-13T00:00:00+00:00",
+      "evidence_expires_at": null,
+      "entry_digest": "sha256:0cadac1ce43bc8bdc22aed4f3cac58bdc389b1f94df75a5405b9bde7a83db629"
     }
   ]
 }
