@@ -1017,3 +1017,59 @@ Plan: `docs/superpowers/plans/2026-10-13-r2-m8c-consumer-gate-packet-1.md`. Comm
 - `r2_shot_generation_v1`;
 - `admit_and_plan_spatial_attempt`;
 - an R2 video adapter arm with a captured payload.
+
+## Packet 2: shot generation entrypoint — 2026-10-13 (Claude session)
+
+**Plan:** `docs/superpowers/plans/2026-10-13-r2-m8c-shot-generation-packet-2.md`.
+
+**Commits:**
+
+| Commit | Content |
+|---|---|
+| `be8cd908` | 2a: profile, admission and prompt |
+| `cb9cef51` | 2b: prompt_extend, captured payload and M7 envelope |
+| `e512bde0` | 2c: task evidence, task ID and submit fingerprint |
+| `d045c1cc` | host request builder |
+| `1b07f5c3` | admission derivation |
+| `db46fd0f` | 2d: route |
+| `5c6b0d0e`-range refactor | shared route builder, in-session snapshot read |
+| `c18eb395` | 2e/2f: worker and integration |
+| `8d1fbb8a` | PostgreSQL test binding |
+| `e2c9b3d3` | missed capability-code registration |
+
+**Delivered**
+
+- **Profile `r2-wan27-r2v-two-view@1`** (DashScope `wan2.7-r2v-2026-06-12`, `video-synthesis`):
+  - 720P, 5 s, 16:9, watermark off, no seed, `prompt_extend=false`;
+  - exactly two reference images, `Image 1` = MASTER and `Image 2` = REVERSE.
+
+  The official Wan reference-to-video page was checked on 2026-10-13: `prompt_extend` defaults to `true`, 720P is valid, and `reference_image` order is `Image 1`/`Image 2`.
+- **Admission** refuses audio controls, identity references, a duration mismatch, a missing spatial set or an overlong prompt before queueing. The Take fixture's 30 s shot is refused.
+- **Route `POST /api/v1/projects/{p}/r2/shots/{target_id}/generate`:**
+  - It derives the prompt plan with VISIBLE constraints, the compiled M4 request, the provider prompt, the DashScope payload captured from pinned frame bytes (`r2/shot_tasks/<task>/image{1,2}.png`), the M7 host request with the R2 envelope, and the task evidence with `r2.m8.spatial.submit.v1`.
+  - It enqueues `r2_shot_generation_v1` under the command-scoped task ID with command replay.
+  - An exact replay returns the stored evidence; a changed request conflicts.
+- **Worker `execute_r2_shot_task`:**
+  - It derives the admission again and requires identical evidence.
+  - `admit_and_plan_spatial_attempt` rereads and locks the snapshot (target, binding, both source masters and frames) and stages the M7 `PLANNED` attempt with the evidence host-request digest and the exact route in one commit.
+  - The submit continues that attempt through `AttemptSubmitter` with the captured payload, and the ledger call is bound to the execution.
+
+**Verification**
+
+| Check | Result |
+|---|---|
+| Static: ruff (1834 files), basedpyright, lint-imports, deptry, audit | clean |
+| SQLite: `tests/unit tests/integration/lib tests/integration/server` + target_registry + production_binding | 15862 passed, 35 skipped, 0 failed |
+| PostgreSQL 18: the R2 shot admission, route and worker tests | 9 passed |
+| PostgreSQL 18: `tests/integration/lib` | 30 failures that are identical by name on `r2-v2/main` (pre-existing asyncpg cross-loop); the one extra failure was a real missed registration, now fixed |
+
+**Open items, in priority order**
+
+1. **No crash resume for `r2_shot_generation_v1`.** Worker recovery and `AttemptReplayRequiresResume` handling are keyed to the `video`/`reference_video` task types. A crash after the provider accepted the job leaves a paid job without a resume path for this type. **Wire this before any live use.**
+2. **Pair currentness is not locked.** The admission transaction does not lock or re-verify the spatial pair head. The set carries the pair ID, version and decision digest, but current APPROVE is not rechecked. That belongs with packet 3's typed promotion.
+3. **No output custody.** The shot output stays at `r2/shot_tasks/<task>/output.mp4`. It is not registered as a candidate or master and not routed through Gate C.
+4. **M4 decision is synthetic.** The compiled request uses a deterministic decision and descriptor derived from the profile, not `ExecutionDecisionService`.
+5. **Untested race window.** A head change between the worker's re-derivation and the admission commit is enforced by the in-session reread but has no forced interleaving test.
+6. **Self-review only.** No live DashScope call was made.
+
+**Next:** item 1, then packet 3 (typed spatial promotion V2 with sidecars and coupling triggers).
