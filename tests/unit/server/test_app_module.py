@@ -54,6 +54,32 @@ class TestAppModule:
         assert worker.stopped
 
     @pytest.mark.asyncio
+    async def test_activated_lifespan_uses_public_preflight_without_auto_migration(self, monkeypatch):
+        worker = _FakeWorker()
+        grant_reader = object()
+
+        async def verify_public(*_args, **_kwargs):
+            return grant_reader
+
+        async def forbidden_init():
+            raise AssertionError("activated startup called init_db")
+
+        monkeypatch.setenv("ARCREEL_GOVERNANCE_READ_DIR", "/run/arcreel/governance")
+        monkeypatch.setattr(app_module, "verify_governance_public_startup", verify_public)
+        monkeypatch.setattr(app_module, "create_generation_worker", lambda: worker)
+        monkeypatch.setattr(app_module, "ensure_auth_password", lambda: "test")
+        monkeypatch.setattr(app_module, "init_db", forbidden_init)
+        monkeypatch.setattr(assistant_router.assistant_service, "startup", _noop_async)
+        monkeypatch.setattr(assistant_router.assistant_service, "shutdown", _noop_async)
+
+        app = app_module.app
+        app.state = SimpleNamespace()
+        async with app_module.lifespan(app):
+            assert app.state.governance_grant_reader is grant_reader
+            assert worker.started
+        assert worker.stopped
+
+    @pytest.mark.asyncio
     async def test_lifespan_clears_callback_after_worker_stop(self, monkeypatch):
         """lifespan 应先 worker.stop()（drain inflight + callback 仍可用），
         再清掉 set_worker_cancel_callback(None)。
