@@ -101,6 +101,24 @@ async def _semantic_video_payload(request: VideoGenerationRequest) -> dict[str, 
     }
 
 
+async def build_host_video_request(
+    request: VideoGenerationRequest, *, provider_id: str, provider_model_id: str, endpoint_id: str
+) -> ProviderRequest:
+    """The exact M7 host request a worker video submit records; R2 computes its digest before enqueue."""
+    if request.task_id is None:
+        raise RuntimeError("M7_SUBMIT_ROUTE_UNBOUND: a host video request needs its task id")
+    return ProviderRequest(
+        id=f"{request.task_id}:video-submit",
+        host_task_ref=request.task_id,
+        provider=provider_id,
+        model=provider_model_id,
+        endpoint=endpoint_id,
+        payload=await _semantic_video_payload(request),
+        execution_options=_r2_execution_options(request),
+        adapter_version=HOST_VIDEO_ADAPTER_VERSION,
+    )
+
+
 def provider_payload_digest(payload: dict[str, Any]) -> str:
     """Digest of one exact provider payload (canonical JSON), as R2 task evidence records it."""
     return "sha256:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()
@@ -183,15 +201,8 @@ async def submit_video_attempt[T](
         adapter_version=HOST_VIDEO_ADAPTER_VERSION,
         capability_profile_ref=capability.ref,
     )
-    provider_request = ProviderRequest(
-        id=f"{request.task_id}:video-submit",
-        host_task_ref=request.task_id,
-        provider=provider_id,
-        model=provider_model_id,
-        endpoint=endpoint_id,
-        payload=await _semantic_video_payload(request),
-        execution_options=_r2_execution_options(request),
-        adapter_version=HOST_VIDEO_ADAPTER_VERSION,
+    provider_request = await build_host_video_request(
+        request, provider_id=provider_id, provider_model_id=provider_model_id, endpoint_id=endpoint_id
     )
 
     async def submit_observation(_attempt: AttemptSnapshot) -> ProviderSubmitReceipt[T]:
@@ -253,6 +264,8 @@ __all__ = [
     "ReconcileFn",
     "SubmitFn",
     "accepted_submit_receipt",
+    "build_host_video_request",
+    "provider_payload_digest",
     "submit_video_attempt",
     "terminal_submit_receipt",
 ]
