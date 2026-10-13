@@ -13,8 +13,8 @@ M8-C packet 2 generates a Take-derived shot through `r2_shot_generation_v1` and 
 1. **Slot.** The output of an R2 shot task for registry target `target_id` (a Take shot such as `scene-1-TAKE-1`) is a candidate of `ArtifactKey.episode_video(1, target_id)`. Episode `1` is the fixed episode of a single-screenplay R2 project, as in the V1 operator path; Take derivation carries no episode.
 2. **Approval stays Gate C.** Only the existing human Gate C approval makes the candidate an approved master, through the same `serialized_artifacts` lock, `promote_staged` database head (ADR-0096), projection and receipt. Generation success never selects a master, and nothing auto-approves.
 3. **Server-derived candidate, no client provenance.** A new server-internal staging step takes only the R2 task identity. Under the slot lock it:
-   - re-verifies the stored task evidence, the succeeded M7 attempt and the output bytes;
-   - copies the output under `production/`;
+   - re-verifies the stored task evidence, the succeeded M7 attempt and the output bytes against the digest the worker sealed on that attempt;
+   - stages those bytes through the host version store, which re-checks the digest after copying (no copy under `production/` is needed);
    - registers a version with `method=GENERATED_VIDEO`, execution fingerprint = the task's `host_request_digest`, provider execution ref = the M7 execution/provider job, and cost from the ledger.
 
    The Gate C request for this candidate names the staged R2 candidate; it does not send `produced` file metadata, a content fingerprint or dependencies. The server derives them from the task's target registry version and binding snapshot.

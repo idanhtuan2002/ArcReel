@@ -1183,3 +1183,42 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 - Result: `16690 passed, 174 skipped, 156 warnings in 5331.36s (1:28:51)`, exit 0. The known flaky Gate C overlap test passed in this run.
 - Coverage limit: the PostgreSQL arm was covered by the earlier broad selection (3069 passed, one known flaky restore test) and the focused promotion runs, not by a full PostgreSQL suite.
 - Open for the sponsor: branch push/merge into `r2-v2/main`, independent vs self review for acceptance, R2 shot output custody (Gate C slot mapping), ADR-0103 operator activation, live Gemini canary (`~/arcreel-v2-staging/spatial_live.sh`).
+
+## Packet 4: R2 shot output custody — 2026-10-13 (Claude session)
+
+**Branch:** `design/r2-m8c-shot-output-custody` (worktree `.worktrees/r2-m8c-output-custody`), based on `r2-v2/main` `0be0726f`.
+
+**Decision:** [ADR-0104](../../adr/0104-r2-shot-output-enters-gate-c-episode-video-slot.md) and the [research note](../../research/2026-10-13-r2-m8c-shot-output-custody.md). The agent chose the decision under sponsor delegation. An R2 Take shot output becomes a Gate C shot candidate of `episode_video(1, target_id)`, and only the human Gate C approval makes it a master.
+
+**Plan:** [packet 4 plan](../../superpowers/plans/2026-10-13-r2-m8c-shot-output-custody-packet-4.md).
+
+**Implemented:**
+- **4a (`911bb14f`).** `server/services/r2_shot_output.py`: the worker (generate and resume) seals the output.
+  - It applies the M7 `SUCCEEDED` observation `<execution_id>:output`, whose `evidence_digest` is the output byte digest.
+  - The queue's legacy mirror then finds a terminal attempt and does nothing.
+  - A re-seal with different bytes refuses.
+- **4b and 4c (`083caae3`).**
+  - `RenderedCutAsset` gains `tool="provider"` and `provider_execution_ref`. The public `FinalCutRenderedAssetRequest` is unchanged.
+  - The Gate C core moved into `_approve_cut`, with no behaviour change.
+  - New route `POST /projects/{p}/gates/r2-shots/{target_id}`, body `{task_id, approval_record}`, with extra fields forbidden. `server/services/r2_shot_approval.py` derives everything else from:
+    - the task evidence;
+    - the sealed digest, re-hashed against the file;
+    - the current binding snapshot and target version;
+    - the slot ownership;
+    - the ledger call.
+
+    The version records `GENERATED_VIDEO`, `execution_fingerprint = host_request_digest` and the description `R2 provider candidate m7:<execution_id>`.
+
+**Verification on `083caae3`:**
+- SQLite: the new route file (6) and the worker file (5) pass, and the Gate C router files plus `tests/unit/r2/m3` (81) pass unchanged.
+- PostgreSQL 18 (disposable container): route, worker and every `test_gate*.py` file give 55 passed.
+- Mutations each fail 2 tests: removing the slot-owner check, the binding currentness check, or the sealed-digest requirement.
+- Static gates: ruff, format, basedpyright `--warnings` (0/0), lint-imports (22 kept), deptry and `audit_tests --check` are all clean.
+
+**Known limits (not blocking):**
+- Binding currentness is checked before the slot lock, not under it. A binding change in that window approves the output against the snapshot it was generated from.
+- An exact replay after the binding changes returns 409 `r2_shot_binding_stale`, not the stored receipt.
+- Outputs generated before 4a have no sealed digest and are refused (`r2_shot_output_unsealed`); regenerate them.
+- `duration_seconds` is the profile's duration, not probed. Gate C's readable-media check still runs on the staged bytes.
+- There is no frontend UI. Multi-episode R2 projects are out of scope.
+- Self-review only, as the sponsor chose for M8-C.
