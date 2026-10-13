@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -18,7 +19,7 @@ from lib.db.repositories.production_binding import ProductionBindingIntegrityErr
 from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE, GenerationQueue
 from lib.video_backends.execution_adapter import provider_payload_digest
 from server.services.r2_shot_generation import R2ShotAdmissionRefused, derive_shot_admission
-from server.services.r2_shot_worker import execute_r2_shot_task
+from server.services.r2_shot_worker import execute_r2_shot_task, resume_r2_shot_task
 from tests.fakes import GateProjectManager, bind_safe_session_factory
 from tests.http_capture import capture_http, request_json
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
@@ -36,6 +37,8 @@ async def _queued(client, project_dir, factory, monkeypatch):
         command, session_factory=factory, project_dir=project_dir, payload_builder_for=_builder
     )
     queue = GenerationQueue(session_factory=factory, project_manager=GateProjectManager(project_dir.parent))
+    # The backend persists the provider job ID through the process queue; bind it to this test database.
+    monkeypatch.setattr("lib.generation_queue.get_generation_queue", lambda: queue)
     evidence = admission.evidence
     await queue.enqueue_task(
         project_name=PROJECT,
@@ -105,6 +108,9 @@ async def test_the_worker_submits_the_exact_captured_payload_once_through_m7(
     assert result["r2_shot"]["execution_id"] == attempts[0].execution_id
     assert [(c.call_type, c.execution_id) for c in calls] == [("video", attempts[0].execution_id)]
     assert (project_dir / result["r2_shot"]["output_path"]).read_bytes() == b"video-bytes"
+    task = await GenerationQueue(session_factory=session_factory).get_task(evidence.task_id)
+    assert task is not None
+    assert task["provider_job_id"] == "job-1"
 
 
 @pytest.mark.asyncio
@@ -146,3 +152,51 @@ async def test_changed_pinned_bytes_stop_before_any_attempt_or_call(
     assert submit.call_count == 0
     async with session_factory() as session:
         assert list((await session.execute(select(ExecutionAttemptModel))).scalars()) == []
+
+
+def _process_dies(_request: httpx.Request) -> httpx.Response:
+    """A worker killed mid-poll: cancellation leaves the ledger call pending, as a dead process would."""
+    raise asyncio.CancelledError
+
+
+@pytest.mark.asyncio
+async def test_a_crash_while_polling_resumes_the_same_job_without_resubmitting(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bind_safe_session_factory(monkeypatch, session_factory)
+    _command, evidence = await _queued(gate_export_client, project_dir, session_factory, monkeypatch)
+
+    with capture_http() as router, patch("lib.retry.asyncio.sleep", new_callable=AsyncMock):
+        router.post(SUBMIT_URL).mock(
+            return_value=httpx.Response(200, json={"output": {"task_id": "job-1", "task_status": "PENDING"}})
+        )
+        router.get("https://dashscope.aliyuncs.com/api/v1/tasks/job-1").mock(side_effect=_process_dies)
+        with pytest.raises(asyncio.CancelledError):
+            await _run(evidence, session_factory, project_dir)
+
+    task = await GenerationQueue(session_factory=session_factory).get_task(evidence.task_id)
+    assert task is not None
+    assert task["provider_job_id"] == "job-1"
+    with capture_http() as router, patch("lib.retry.asyncio.sleep", new_callable=AsyncMock):
+        resubmit = router.post(SUBMIT_URL).mock(return_value=httpx.Response(500))
+        router.get("https://dashscope.aliyuncs.com/api/v1/tasks/job-1").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "output": {"task_status": "SUCCEEDED", "video_url": "https://x/resumed.mp4"},
+                    "usage": {"duration": 5, "output_video_duration": 5},
+                },
+            )
+        )
+        router.get("https://x/resumed.mp4").mock(return_value=httpx.Response(200, content=b"resumed-bytes"))
+        result = await resume_r2_shot_task(
+            task, job_id="job-1", session_factory=session_factory, project_dir=project_dir, backend_for=_builder
+        )
+
+    assert resubmit.call_count == 0
+    assert (project_dir / result["r2_shot"]["output_path"]).read_bytes() == b"resumed-bytes"
+    async with session_factory() as session:
+        attempts = list((await session.execute(select(ExecutionAttemptModel))).scalars())
+        calls = list((await session.execute(select(ApiCall))).scalars())
+    assert len(attempts) == 1
+    assert [(c.status, c.execution_id) for c in calls] == [("success", attempts[0].execution_id)]

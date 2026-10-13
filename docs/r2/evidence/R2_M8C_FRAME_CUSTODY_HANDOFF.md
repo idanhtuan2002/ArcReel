@@ -1065,7 +1065,7 @@ Plan: `docs/superpowers/plans/2026-10-13-r2-m8c-consumer-gate-packet-1.md`. Comm
 
 **Open items, in priority order**
 
-1. **No crash resume for `r2_shot_generation_v1`.** Worker recovery and `AttemptReplayRequiresResume` handling are keyed to the `video`/`reference_video` task types. A crash after the provider accepted the job leaves a paid job without a resume path for this type. **Wire this before any live use.**
+1. **Crash resume: resolved in the follow-up below.**
 2. **Pair currentness is not locked.** The admission transaction does not lock or re-verify the spatial pair head. The set carries the pair ID, version and decision digest, but current APPROVE is not rechecked. That belongs with packet 3's typed promotion.
 3. **No output custody.** The shot output stays at `r2/shot_tasks/<task>/output.mp4`. It is not registered as a candidate or master and not routed through Gate C.
 4. **M4 decision is synthetic.** The compiled request uses a deterministic decision and descriptor derived from the profile, not `ExecutionDecisionService`.
@@ -1073,3 +1073,23 @@ Plan: `docs/superpowers/plans/2026-10-13-r2-m8c-consumer-gate-packet-1.md`. Comm
 6. **Self-review only.** No live DashScope call was made.
 
 **Next:** item 1, then packet 3 (typed spatial promotion V2 with sidecars and coupling triggers).
+
+### Crash resume for R2 shots — 2026-10-13
+
+**Behaviour.** `execute_resume_video_task` routes `r2_shot_generation_v1` to `resume_r2_shot_task`. That function:
+- verifies the evidence;
+- refuses a changed submit endpoint (`ResumeEndpointChangedError`);
+- polls and downloads the existing job through `backend.resume_video` and never posts again;
+- settles the pending ledger call, found through the M7 execution, with `resume_success`/`resume_failed`.
+
+The worker orphan scan already dispatches it. The task is `media_type="video"`, `provider_id="dashscope"` is resumable, and the backend persists `provider_job_id` with the submitted base URL.
+
+**Test.** `test_a_crash_while_polling_resumes_the_same_job_without_resubmitting`:
+- A cancellation in the first poll leaves the call pending, as a dead process would.
+- Resume then downloads the result with zero further POSTs, one attempt, and a successful call bound to the execution.
+
+**Results.** 10 R2 shot tests pass on PostgreSQL 18; 4 worker tests pass on SQLite.
+
+**Process error found and fixed.** The earlier "bind the process queue" test change (`8d1fbb8a`) never applied: an unchecked string replacement matched nothing. The earlier worker tests therefore passed while the provider job ID was written through the global queue to another database. The binding is now applied (with a match assertion), and the success test now asserts the persisted `provider_job_id`.
+
+**Not covered.** The three-line routing inside `execute_resume_video_task` has no direct test; it needs a configured backend.

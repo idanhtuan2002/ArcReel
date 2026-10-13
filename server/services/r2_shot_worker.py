@@ -16,13 +16,16 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db import async_session_factory
 from lib.db.base import utc_now
+from lib.db.models.api_call import ApiCall
 from lib.db.repositories.host_hardening import ExecutionAttemptRepository
 from lib.ledger import Ledger
 from lib.project_manager import get_project_manager
+from lib.video_backends.base import ResumeEndpointChangedError, VideoGenerationRequest
 from lib.video_backends.dashscope import DashScopeVideoBackend
 from lib.video_backends.execution_adapter import host_video_route
 from r2.contracts.host_hardening import (
@@ -38,6 +41,7 @@ from r2.production_intelligence.shot_profiles import PROFILES
 from server.services.execution_attempts import build_attempt_submitter, capability_resolver
 from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
 from server.services.r2_shot_generation import (
+    R2_SHOT_EVIDENCE_DIR,
     R2ShotAdmissionRefused,
     R2ShotCommand,
     configured_payload_builder,
@@ -190,4 +194,81 @@ async def execute_r2_shot_task(
     }
 
 
-__all__ = ["admit_and_plan_spatial_attempt", "execute_r2_shot_task"]
+async def _pending_call_id(
+    session_factory: async_sessionmaker[AsyncSession], evidence: R2ShotGenerationTaskV1
+) -> int | None:
+    """The ledger call bound to this task's M7 execution, if the submit got that far."""
+    async with session_factory() as session:
+        attempt = await ExecutionAttemptRepository(
+            session, capability_resolver=capability_resolver()
+        ).get_for_task_attempt(
+            user_id=evidence.user_id, project_name=evidence.project_name, task_id=evidence.task_id, attempt_no=1
+        )
+        if attempt is None:
+            return None
+        return await session.scalar(
+            select(ApiCall.id).where(
+                ApiCall.user_id == evidence.user_id,
+                ApiCall.project_name == evidence.project_name,
+                ApiCall.execution_id == attempt.execution_id,
+            )
+        )
+
+
+async def resume_r2_shot_task(
+    task: dict[str, Any],
+    *,
+    job_id: str,
+    session_factory: async_sessionmaker[AsyncSession] = async_session_factory,
+    project_dir: Path | None = None,
+    backend_for: BackendFactory = configured_payload_builder,
+) -> dict[str, Any]:
+    """Collect an already-submitted R2 shot job after a restart: poll and download only, never resubmit."""
+    evidence = R2ShotGenerationTaskV1.model_validate(task.get("payload") or {})
+    if (evidence.task_id, evidence.project_name) != (task.get("task_id"), task.get("project_name")):
+        raise R2ShotAdmissionRefused("r2_shot_task_scope_mismatch")
+    profile = PROFILES.get(evidence.execution_profile_ref)
+    if profile is None:
+        raise R2ShotAdmissionRefused("r2_shot_profile_unknown")
+    verify_task_evidence(evidence, profile)
+    root = project_dir or get_project_manager().get_project_path(evidence.project_name)
+    backend = await backend_for(profile)
+    submitted = task.get("submitted_base_url")
+    if isinstance(submitted, str) and submitted and submitted != backend.submitted_base_url:
+        raise ResumeEndpointChangedError(
+            job_id=job_id,
+            provider=profile.provider_id,
+            submitted_endpoint=submitted,
+            current_endpoint=backend.submitted_base_url,
+        )
+    request = VideoGenerationRequest(
+        prompt="",
+        output_path=root / R2_SHOT_EVIDENCE_DIR / evidence.task_id / "output.mp4",
+        aspect_ratio=profile.aspect_ratio,
+        duration_seconds=profile.duration_seconds,
+        resolution=profile.resolution,
+        project_name=evidence.project_name,
+        task_id=evidence.task_id,
+        submitted_base_url=submitted if isinstance(submitted, str) and submitted else None,
+    )
+    ledger = Ledger(session_factory=session_factory)
+    call_id = await _pending_call_id(session_factory, evidence)
+    try:
+        result = await backend.resume_video(job_id, request)
+    except Exception:
+        if call_id is not None:
+            await ledger.resume_failed(call_id=call_id)
+        raise
+    if call_id is not None:
+        await ledger.resume_success(call_id=call_id, result=result)
+    return {
+        "r2_shot": {
+            "task_id": evidence.task_id,
+            "provider_job_id": job_id,
+            "host_request_digest": evidence.host_request_digest,
+            "output_path": str(Path(result.video_path).relative_to(root)),
+        }
+    }
+
+
+__all__ = ["admit_and_plan_spatial_attempt", "execute_r2_shot_task", "resume_r2_shot_task"]

@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from lib.config.service import DEFAULT_VIDEO_POLL_TIMEOUT_SECONDS
+from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE
 from lib.project_change_hints import project_change_source
 from lib.reference_video.execution_checkpoint import (
     ReferenceExecutionIdentityError,
@@ -112,6 +113,10 @@ async def execute_resume_video_task(
     poll_timeout_seconds = int(task.get("video_poll_timeout_seconds", DEFAULT_VIDEO_POLL_TIMEOUT_SECONDS))
     user_id = task.get("user_id", DEFAULT_USER_ID)
 
+    if task_type == R2_SHOT_GENERATION_TASK_TYPE:
+        from server.services.r2_shot_worker import resume_r2_shot_task
+
+        return await resume_r2_shot_task(task, job_id=job_id)
     if task_type not in ("video", "reference_video"):
         raise NotImplementedError(f"resume not supported for task_type={task_type}")
 
