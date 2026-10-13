@@ -1175,3 +1175,11 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
   - The binding create command locks the head only for an absent binding and refuses an existing one.
   - Two concurrent promotions serialize on the current version row; the second fails the head CAS as stale.
 - **Not tested:** a forced PostgreSQL interleaving of two promotions.
+
+## Branch full backend suite — 2026-10-13 (Claude session)
+
+- Code HEAD tested: `00b1cb06` (later commits through `981fc653` change only this handoff file).
+- Command: `DATABASE_URL= uv run python -m pytest -n 4 --dist loadfile -q -p no:cacheprovider -rfE` (SQLite).
+- Result: `16690 passed, 174 skipped, 156 warnings in 5331.36s (1:28:51)`, exit 0. The known flaky Gate C overlap test passed in this run.
+- Coverage limit: the PostgreSQL arm was covered by the earlier broad selection (3069 passed, one known flaky restore test) and the focused promotion runs, not by a full PostgreSQL suite.
+- Open for the sponsor: branch push/merge into `r2-v2/main`, independent vs self review for acceptance, R2 shot output custody (Gate C slot mapping), ADR-0103 operator activation, live Gemini canary (`~/arcreel-v2-staging/spatial_live.sh`).
