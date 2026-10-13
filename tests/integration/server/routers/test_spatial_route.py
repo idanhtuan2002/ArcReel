@@ -199,3 +199,18 @@ async def test_frame_requests_refuse_a_non_video_parent_and_a_superseded_master(
 
     assert superseded.status_code == 409
     assert not_video.status_code == 422
+
+
+async def test_sources_list_the_episodes_approved_video_masters(spatial_client: AsyncClient, project_dir: Path) -> None:
+    await _approve_shot(spatial_client, project_dir, "SH02", "blue")
+    await _approve_shot(spatial_client, project_dir, "SH01", "red")
+    host = GoldenAHostIntegration(project_dir, resource_type="videos", episode=1)
+
+    listed = await spatial_client.get(f"{BASE}/sources?episode=1")
+    other = await spatial_client.get(f"{BASE}/sources?episode=2")
+
+    assert listed.status_code == 200, listed.text
+    assert listed.json() == [
+        {"artifact_key": host.artifact_key_for(shot), "shot_id": shot, "master_version": 1} for shot in ("SH01", "SH02")
+    ]
+    assert other.json() == []

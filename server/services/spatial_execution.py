@@ -48,6 +48,7 @@ from r2.contracts.host_hardening import (
     ExecutionAttemptState,
     ProviderObservation,
     ProviderObservationKind,
+    ProviderQualificationStatus,
     ProviderRouteSnapshot,
 )
 from r2.contracts.spatial_execution import (
@@ -57,7 +58,12 @@ from r2.contracts.spatial_execution import (
 )
 from r2.host_hardening.host_submit import AttemptSubmitter
 from r2.host_hardening.paid_routes import current_release_mode
-from r2.host_hardening.provider_capabilities import ProviderCapabilityError
+from r2.host_hardening.provider_capabilities import (
+    DEFAULT_REGISTRY_PATH,
+    ProviderCapabilityError,
+    ReleaseMode,
+    capability_qualification_status,
+)
 from r2.host_hardening.route_inventory import HOST_SPATIAL_ADAPTER_VERSION, require_submit_route
 from server.services.execution_attempts import capability_resolver
 from server.services.master_authority import serialized_artifacts
@@ -66,6 +72,13 @@ from server.services.spatial_source import FrameSourceConflictError
 
 SPATIAL_NORMALIZER_VERSION = "spatial-r2-v1"
 SPATIAL_REQUEST_SCHEMA = "r2.m8.spatial.request.v1"
+_ADAPTER_VERIFIED = frozenset(
+    {
+        ProviderQualificationStatus.OFFLINE_VERIFIED,
+        ProviderQualificationStatus.SANDBOX_VERIFIED,
+        ProviderQualificationStatus.QUALIFIED,
+    }
+)
 
 
 class SpatialExecutionUnavailableError(RuntimeError):
@@ -73,7 +86,7 @@ class SpatialExecutionUnavailableError(RuntimeError):
 
 
 class SpatialVisionCall(Protocol):
-    async def __call__(self, *, prompt: str, master_png: bytes, reverse_png: bytes) -> bytes: ...
+    async def __call__(self, *, prompt: str, master_png: bytes, reverse_png: bytes, execution_id: str) -> bytes: ...
 
 
 @dataclass(frozen=True)
@@ -96,13 +109,13 @@ class SpatialExecutionCommand:
 
 
 class SpatialVisionModel(Protocol):
-    async def generate(self, request: TextGenerationRequest) -> TextGenerationResult: ...
+    async def generate(self, request: TextGenerationRequest, *, execution_id: str) -> TextGenerationResult: ...
 
 
 def text_backend_spatial_vision(backend: SpatialVisionModel) -> SpatialVisionCall:
     """Bind one text model that accepts image files as the spatial vision call."""
 
-    async def call(*, prompt: str, master_png: bytes, reverse_png: bytes) -> bytes:
+    async def call(*, prompt: str, master_png: bytes, reverse_png: bytes, execution_id: str) -> bytes:
         with tempfile.TemporaryDirectory(prefix="r2-spatial-") as directory:
             master_path = Path(directory) / "master.png"
             reverse_path = Path(directory) / "reverse.png"
@@ -111,7 +124,8 @@ def text_backend_spatial_vision(backend: SpatialVisionModel) -> SpatialVisionCal
             result = await backend.generate(
                 TextGenerationRequest(
                     prompt=prompt, images=[ImageInput(path=master_path), ImageInput(path=reverse_path)]
-                )
+                ),
+                execution_id=execution_id,
             )
         return result.text.encode("utf-8")
 
@@ -154,6 +168,7 @@ class SpatialExecutionService:
         evidence_store: Callable[
             [AsyncSession], SpatialExecutionEvidenceRepository
         ] = SpatialExecutionEvidenceRepository,
+        capability_registry: Path = DEFAULT_REGISTRY_PATH,
     ) -> None:
         if route.adapter_version != HOST_SPATIAL_ADAPTER_VERSION or route.endpoint_id is None:
             raise ValueError("spatial execution requires the host-spatial adapter route")
@@ -166,6 +181,7 @@ class SpatialExecutionService:
         self._lineage_for = lineage_for
         self._clock = clock
         self._evidence_store = evidence_store
+        self._capability_registry = capability_registry
 
     def _request(
         self, command: SpatialExecutionCommand, prompt: str, frames: tuple[SpatialSourceFrameV1, SpatialSourceFrameV1]
@@ -205,8 +221,13 @@ class SpatialExecutionService:
         prompt = build_spatial_prompt(command.scene_name)
         request = self._request(command, prompt, frames)
 
-        async def submit(_attempt: object):
-            raw = await self._vision(prompt=prompt, master_png=master.png_bytes, reverse_png=reverse.png_bytes)
+        async def submit(attempt: AttemptSnapshot):
+            raw = await self._vision(
+                prompt=prompt,
+                master_png=master.png_bytes,
+                reverse_png=reverse.png_bytes,
+                execution_id=attempt.execution_id,
+            )
             return accepted_submit_receipt(raw, provider_job_id=_byte_digest(raw))
 
         async with self._sessions() as attempt_session:
@@ -241,17 +262,25 @@ class SpatialExecutionService:
         )
 
     def _require_enabled_route(self) -> None:
+        """The route is registered with unexpired evidence; a release deployment also needs the adapter level.
+
+        ADR-0091's route level (an operator canary for the exact Gemini text route, model and
+        configuration) is enforced where the vision backend is assembled.
+        """
         try:
-            capability = require_submit_route(
-                self._route.provider_id,
-                self._endpoint,
-                self._route.adapter_version,
-                release_mode=current_release_mode(),
-            )
+            capability = require_submit_route(self._route.provider_id, self._endpoint, self._route.adapter_version)
         except (LookupError, ValueError, ProviderCapabilityError) as exc:
             raise SpatialExecutionUnavailableError(f"spatial submit route is not enabled: {exc}") from exc
         if capability.ref != self._route.capability_profile_ref:
             raise SpatialExecutionUnavailableError("spatial submit route capability differs from the route snapshot")
+        if (
+            current_release_mode() is not ReleaseMode.DEV
+            and capability_qualification_status(
+                capability.ref, now=self._clock(), registry_path=self._capability_registry
+            )
+            not in _ADAPTER_VERIFIED
+        ):
+            raise SpatialExecutionUnavailableError("spatial adapter is not offline-verified for a release deployment")
 
     async def _replay(self, command: SpatialExecutionCommand) -> CandidateHead | None:
         async with self._sessions() as session:

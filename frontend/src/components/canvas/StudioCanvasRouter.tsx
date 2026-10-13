@@ -59,6 +59,7 @@ import type { EpisodeScript } from "@/types/script";
 
 // React Flow and the Canvas stay out of the initial bundle.
 const CreativeCanvasPage = lazy(() => import("@/features/creative-canvas/ui/CreativeCanvasPage"));
+const SpatialAnalysisPage = lazy(() => import("@/features/spatial-analysis/ui/SpatialAnalysisPage"));
 
 /** 集级路由 path，与渲染该集的 `<Route>` 共用一份。 */
 const EPISODE_ROUTE_PATH = `/${WORKSPACE_ROUTE_EPISODES}/:episodeId`;
@@ -697,6 +698,22 @@ export function StudioCanvasRouter() {
         }
       </Route>
 
+      <Route path={`${EPISODE_ROUTE_PATH}/spatial`}>
+        {(params) =>
+          demoMode ? (
+            <Redirect to="/" />
+          ) : (
+            <Suspense fallback={null}>
+              <SpatialAnalysisPage
+                key={`${currentProjectName}::${params.episodeId}`}
+                projectName={currentProjectName}
+                episode={parseInt(params.episodeId, 10)}
+              />
+            </Suspense>
+          )
+        }
+      </Route>
+
       <Route path={EPISODE_ROUTE_PATH}>
         {(params) => {
           const epNum = parseInt(params.episodeId, 10);
@@ -730,7 +747,13 @@ export function StudioCanvasRouter() {
           return (
             <div className="flex h-full flex-col">
               {!demoMode && episode ? (
-                <div className="flex justify-end border-b border-hairline-soft px-4 py-1">
+                <div className="flex justify-end gap-1 border-b border-hairline-soft px-4 py-1">
+                  <Link
+                    href={`${EPISODE_ROUTE_PATH.replace(":episodeId", String(epNum))}/spatial`}
+                    className="rounded-md px-2 py-1 font-mono text-[11px] tracking-[0.12em] text-text-3 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  >
+                    {t("spatial_open")} →
+                  </Link>
                   <Link
                     href={`${EPISODE_ROUTE_PATH.replace(":episodeId", String(epNum))}/canvas`}
                     className="rounded-md px-2 py-1 font-mono text-[11px] tracking-[0.12em] text-text-3 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
