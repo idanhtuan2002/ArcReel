@@ -62,6 +62,7 @@ from lib.config.resolver import constrain_durations, video_bucket_for_generation
 from lib.config.service import DEFAULT_VIDEO_POLL_TIMEOUT_SECONDS
 from lib.db.base import DEFAULT_USER_ID
 from lib.generation_queue import (
+    R2_SHOT_GENERATION_TASK_TYPE,
     CompensableGenerationResult,
     DispatchProviderChanged,
     get_generation_queue,
@@ -3559,6 +3560,15 @@ async def _execute_image_edit_task_proxy(
     return await execute_image_edit_task(project_name, resource_id, payload, user_id=user_id, task_id=task_id)
 
 
+async def _execute_r2_shot_task_proxy(
+    project_name: str, resource_id: str, payload: dict[str, Any], *, user_id: str, task_id: str | None
+) -> dict[str, Any]:
+    """Lazy proxy: the R2 shot worker imports the binding and frame services."""
+    from server.services.r2_shot_worker import execute_r2_shot_task
+
+    return await execute_r2_shot_task(project_name, resource_id, payload, user_id=user_id, task_id=task_id)
+
+
 _TASK_EXECUTORS = {
     "storyboard": execute_storyboard_task,
     "video": execute_video_task,
@@ -3572,6 +3582,7 @@ _TASK_EXECUTORS = {
     "reference_video": _execute_reference_video_task_proxy,
     "image_edit": _execute_image_edit_task_proxy,
     DERIVATIVE_TASK_TYPE: _execute_character_derivative_task_proxy,
+    R2_SHOT_GENERATION_TASK_TYPE: _execute_r2_shot_task_proxy,
 }
 
 

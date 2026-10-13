@@ -15,9 +15,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends
 from pydantic import Field, StringConstraints
 
-from lib.api_errors import ConflictError, ServiceUnavailableError
-from lib.backend_assembly import assemble_backend
-from lib.config.resolver import ConfigResolver
+from lib.api_errors import ConflictError
 from lib.db import async_session_factory
 from lib.db.repositories.production_binding import ProductionBindingIntegrityError
 from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE, get_generation_queue
@@ -29,14 +27,18 @@ from r2.contracts.shot_generation import R2ExecutionProfileV1, R2ShotGenerationT
 from r2.production_intelligence.shot_identity import shot_task_id
 from server.auth import CurrentUser
 from server.services.location_binding import BindingSourceConflictError
-from server.services.r2_shot_generation import R2ShotAdmissionRefused, R2ShotCommand, derive_shot_admission
+from server.services.r2_shot_generation import (
+    R2ShotAdmissionRefused,
+    R2ShotCommand,
+    configured_payload_builder,
+    derive_shot_admission,
+)
 
 router = APIRouter()
 
 ADMISSION_REFUSED = "r2_shot_admission_refused"
 AUTHORITY_STALE = "r2_shot_authority_stale"
 COMMAND_CONFLICT = "r2_shot_command_conflict"
-BACKEND_UNAVAILABLE = "r2_shot_backend_unavailable"
 
 CommandId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
@@ -53,22 +55,6 @@ class GenerateShotResponse(R2ContractModel):
     target_registry_version: int
     binding_snapshot_digest: str
     host_request_digest: str
-
-
-async def configured_payload_builder(profile: R2ExecutionProfileV1) -> DashScopeVideoBackend:
-    """The configured backend for the profile route; release mode refuses an unqualified route here."""
-    try:
-        backend = await assemble_backend(
-            provider_id=profile.provider_id,
-            media_type="video",
-            model_id=profile.backend_model_id,
-            resolver=ConfigResolver(async_session_factory),
-        )
-    except (ValueError, LookupError, RuntimeError) as error:
-        raise ServiceUnavailableError(BACKEND_UNAVAILABLE) from error
-    if not isinstance(backend, DashScopeVideoBackend):
-        raise ServiceUnavailableError(BACKEND_UNAVAILABLE)
-    return backend
 
 
 PayloadBuilderFactory = Callable[[R2ExecutionProfileV1], Awaitable[DashScopeVideoBackend]]
@@ -163,4 +149,4 @@ async def generate_shot(
     return _response(evidence)
 
 
-__all__ = ["configured_payload_builder", "payload_builder", "router"]
+__all__ = ["payload_builder", "router"]

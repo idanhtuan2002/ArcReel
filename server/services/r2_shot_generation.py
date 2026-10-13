@@ -17,7 +17,12 @@ from typing import Any, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.api_errors import ServiceUnavailableError
+from lib.backend_assembly import assemble_backend
+from lib.config.resolver import ConfigResolver
+from lib.db import async_session_factory
 from lib.video_backends.base import VideoGenerationRequest
+from lib.video_backends.dashscope import DashScopeVideoBackend
 from lib.video_backends.execution_adapter import build_host_video_request, provider_payload_digest
 from r2.contracts import (
     CapabilityDescriptor,
@@ -58,6 +63,7 @@ from server.services.location_binding_snapshot import CurrentLocationBindingSnap
 from server.services.spatial_frame_reader import SpatialFrameReader
 
 R2_SHOT_EVIDENCE_DIR = Path("r2") / "shot_tasks"
+BACKEND_UNAVAILABLE = "r2_shot_backend_unavailable"
 _FIXED_PROVENANCE = Provenance(created_by=ProvenanceActor.SYSTEM, created_at=datetime(2026, 10, 13, tzinfo=UTC))
 
 
@@ -94,6 +100,22 @@ class R2ShotAdmission:
     profile: R2ExecutionProfileV1
     video_request: VideoGenerationRequest
     host_request: ProviderRequest
+
+
+async def configured_payload_builder(profile: R2ExecutionProfileV1) -> DashScopeVideoBackend:
+    """The configured backend for the profile route; release mode refuses an unqualified route here."""
+    try:
+        backend = await assemble_backend(
+            provider_id=profile.provider_id,
+            media_type="video",
+            model_id=profile.backend_model_id,
+            resolver=ConfigResolver(async_session_factory),
+        )
+    except (ValueError, LookupError, RuntimeError) as error:
+        raise ServiceUnavailableError(BACKEND_UNAVAILABLE) from error
+    if not isinstance(backend, DashScopeVideoBackend):
+        raise ServiceUnavailableError(BACKEND_UNAVAILABLE)
+    return backend
 
 
 def _descriptor(profile: R2ExecutionProfileV1) -> CapabilityDescriptor:
@@ -304,10 +326,12 @@ async def derive_shot_admission(
 
 
 __all__ = [
+    "BACKEND_UNAVAILABLE",
     "R2_SHOT_EVIDENCE_DIR",
     "R2ShotAdmission",
     "R2ShotAdmissionRefused",
     "R2ShotCommand",
     "ShotPayloadBuilder",
+    "configured_payload_builder",
     "derive_shot_admission",
 ]
