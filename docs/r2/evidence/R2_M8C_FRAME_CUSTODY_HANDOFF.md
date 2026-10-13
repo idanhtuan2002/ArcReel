@@ -974,3 +974,46 @@ The 4 failures:
 **Resume entry**
 - Worktree `.worktrees/r2-m8c-binding-design`, branch `impl/r2-m8c-frame-receipts`, HEAD after this commit.
 - Start packet 1 by freezing the `SpatialConstraintSet` digest vector (fixture first), following the spec's digest-envelope rule.
+
+## Consumer gate packet 1 — 2026-10-13 (Claude session)
+
+Plan: `docs/superpowers/plans/2026-10-13-r2-m8c-consumer-gate-packet-1.md`. Commits:
+- `322d44c3`: contract, digest and frozen vector.
+- `ee0ffd40`: envelope widening, fingerprint v2 and prompt consumer.
+- `1b8af791`: storage and snapshot verification.
+- `af411163`: the warning-error fix.
+
+**Delivered**
+- **`SpatialConstraintSetV1`.** VISIBLE assertions only:
+  - `PRESERVE_ON_WALL` for front/back;
+  - `SHARED_SIDE_ANCHOR` for left/right, with spans from both views.
+
+  INFERRED and GAP rows become coverage warnings. The digest domain is `r2.m8.spatial.constraint_set.v1`, the ID is `m8s:` plus the digest, and the vector is `tests/fixtures/r2/m8c_spatial_constraint_set_vector.json`.
+- **Derivation.** It recomputes the revision payload digest and resolves every span to the MASTER or REVERSE frame. It refuses empty, unknown, duplicate or non-VISIBLE selections.
+- **`BindingEnvelopeV1.spatial_set_id/digest`.** Both are present or both absent, and the ID names the digest. The existing envelope vector is unchanged.
+- **`compute_content_fingerprint_v2`.** It binds the snapshot digest and the spatial set digests. v1 is unchanged.
+- **`apply_spatial_constraints`.** It adds deterministic environment lines and records the set identity and coverage warnings. The compiled request changes with a set and is identical without one.
+- **Migration `912c4a0e0001` (`m8_spatial_constraint_sets`).**
+  - The repository stages idempotently and rehashes on read.
+  - `CurrentLocationBindingSnapshotReader` verifies the named set (digest, scope, binding) and requires its sources to equal the envelope's frame claims.
+
+**Verification**
+
+| Check | Result |
+|---|---|
+| Static: ruff (1821 files), basedpyright, lint-imports, deptry, audit | clean |
+| PostgreSQL 18 (`tests/unit/r2 tests/integration/lib/db`, the binding/pair/review/constraint-snapshot routers, `tests/integration/r2/target_registry`, `tests/integration/r2/production_binding`) | 2308 passed, 21 skipped, 0 failed |
+| Mutation: remove the snapshot source comparison | its test RED |
+| Mutation: remove the warning wrap | its test RED |
+
+**Limits**
+- The binding write that attaches a set does not exist yet; that is packet 3. The snapshot tests attach a set by updating the stored envelope and head digest directly, standing in for that writer.
+- No consumer reads the set during generation yet; that is packet 2.
+- Self-reviewed only. The spec asks for an independent review per packet.
+- A full disk (100%) crashed the first PostgreSQL run. With sponsor approval, 439 anonymous dangling Docker volumes (37.8 GB) were pruned; named volumes were untouched and staging was verified healthy afterwards. Test containers are now removed with `docker rm -f -v`.
+
+**Next:** packet 2, the shot generation entrypoint, per the spec's "Read and consumer protocol":
+- `POST /projects/{p}/r2/shots/{target_id}/generate`;
+- `r2_shot_generation_v1`;
+- `admit_and_plan_spatial_attempt`;
+- an R2 video adapter arm with a captured payload.
