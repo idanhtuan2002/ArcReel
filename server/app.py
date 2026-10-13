@@ -77,6 +77,7 @@ from server.routers import (
     scenes,
     script_review,
     shot_uploads,
+    spatial,
     system,
     system_config,
     tasks,
@@ -652,6 +653,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M8 exploration"],
+)
+app.include_router(
+    spatial.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["M8 spatial"],
 )
 app.include_router(
     shot_uploads.router,

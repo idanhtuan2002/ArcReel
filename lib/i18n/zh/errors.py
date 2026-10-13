@@ -446,4 +446,7 @@ MESSAGES = {
     "m8_candidate_conflict": "候选已变更，请重新加载后重试",
     "m8_promotion_binding_stale": "预览已过期或失效，请重新生成预览",
     "m8_promotion_target_unavailable": "该提升目标暂不可用",
+    "m8_spatial_unavailable": "空间分析暂不可用，请检查 Gemini 文本模型配置后重试",
+    "m8_spatial_source_conflict": "空间源帧缺失、已变更或与已审批的视频不一致",
+    "m8_spatial_request_invalid": "该空间分析请求无效",
 }

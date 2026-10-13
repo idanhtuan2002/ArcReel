@@ -53,3 +53,24 @@ Mutation checks during implementation removed a guard and confirmed that its tes
 **No live provider call.** Gate C uses an offline vision fake at the provider boundary. The `gemini-generate-spatial@host-spatial-v1` profile is `UNQUALIFIED`.
 
 **Paused frame-receipts suite.** The full suite that was running on the paused frame-receipts branch (`227d6824`) was stopped at 99% to free CPU. It has no verdict. That packet's open full-suite gate is unchanged.
+
+## C4: public route at `c5267c64`
+
+Added after the first merge (`dbf64003`), at the sponsor's request. The decision is in `R2_M8C_COMPLETION_PATH_DECISION_2026-10-13.md` §C4.
+
+- `POST /api/v1/projects/{project}/m8/spatial/frames` and `.../m8/spatial/executions`, in `server/routers/spatial.py`. Both sit behind the session user and the project-migration guard.
+- The vision call is a Gemini text model for the new `TextTaskType.SPATIAL_ANALYSIS`, which is vision-required. It runs through `TextGenerator`, so usage is recorded in the ledger. A non-Gemini model is refused with 503 `m8_spatial_unavailable` before any call.
+- **R3 fixed:** `scene_name` is trimmed and must be 1–120 characters (422).
+- The episode lineage is resolved before the provider call; an unknown episode returns 404 and makes no call.
+
+| Gate | Result |
+|---|---|
+| Route and dependency tests (`test_spatial_route.py`, `test_spatial_vision_dependency.py`) | 10 passed on SQLite. With `test_spatial_execution.py`, 23 passed on disposable PostgreSQL 18. |
+| Affected selection: i18n, app module, text backends, config resolver, server router units, M8 routers, host hardening | 1611 passed, 1 skipped, 1 failed. The failure was `test_endpoint_tests_api.py::test_a_second_concurrent_run_is_refused`, a concurrency test unrelated to C4, under `-n 4`. Run alone it passed 3 of 3 times (49 passed each run). |
+| Static | ruff check/format (1695 files), basedpyright 0/0/0, lint-imports 22 kept, deptry, audit 0 |
+
+Following the sponsor's instruction, C4 ran no full backend suite and no separate review round. Limits:
+- Usage is not bound to the M7 `execution_id`.
+- There is no frontend UI.
+- The spatial profile is still `UNQUALIFIED`, so release mode refuses the route.
+- A replay goes through the vision dependency, so it returns 503 when no Gemini text model is configured.

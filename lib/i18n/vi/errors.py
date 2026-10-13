@@ -503,4 +503,7 @@ MESSAGES = {
     "m8_candidate_conflict": "Candidate đã thay đổi; hãy tải lại rồi thử lại",
     "m8_promotion_binding_stale": "Bản xem trước đã cũ hoặc hết hạn; hãy tạo bản xem trước mới",
     "m8_promotion_target_unavailable": "Đích promote này hiện không khả dụng",
+    "m8_spatial_unavailable": "Phân tích không gian hiện không khả dụng; hãy kiểm tra cấu hình model văn bản Gemini rồi thử lại",
+    "m8_spatial_source_conflict": "Frame nguồn không gian bị thiếu, đã thay đổi hoặc không còn khớp với video đã duyệt",
+    "m8_spatial_request_invalid": "Yêu cầu phân tích không gian này không hợp lệ",
 }
