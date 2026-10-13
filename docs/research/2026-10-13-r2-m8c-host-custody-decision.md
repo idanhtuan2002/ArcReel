@@ -26,6 +26,15 @@ an enrolled operator account. A local, read-only check found no child under
 this sandbox's `/srv`; its interactive user is `anhtuan` (UID/GID 1000). That
 is development-environment data and is not evidence about the operator host.
 
+A further local inventory on 2026-10-13 found no `ARCREEL`, `GOVERNANCE`,
+`DEPLOY`, or `PROD` environment key, no readable user SSH or Kubernetes
+configuration, and only the Docker `default` context at
+`unix:///var/run/docker.sock`. The only matching environment key was
+`SSH_AUTH_SOCK`, which does not identify a host. The relevant deployment,
+runbook and research files contain no production-host alias. These are
+bounded observations about this workspace, not a claim that no operator host
+exists elsewhere.
+
 The publisher identity is therefore specified as an auditable host principal,
 not guessed from this checkout: `root` owns the tree and an explicitly named
 operator principal invokes the publisher through the audited root procedure.
