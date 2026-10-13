@@ -101,6 +101,23 @@ async def _semantic_video_payload(request: VideoGenerationRequest) -> dict[str, 
     }
 
 
+def host_video_route(
+    *, provider_id: str, provider_model_id: str, backend_model_id: str, endpoint_id: str, submitted_base_url: str
+) -> ProviderRouteSnapshot:
+    """The M7 route a worker video submit records; a preplanned attempt must carry exactly this route."""
+    capability = require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION)
+    return ProviderRouteSnapshot(
+        provider_id=provider_id,
+        provider_account_ref="default",
+        provider_model_id=provider_model_id,
+        backend_model_id=backend_model_id,
+        endpoint_id=endpoint_id,
+        submitted_base_url=submitted_base_url,
+        adapter_version=HOST_VIDEO_ADAPTER_VERSION,
+        capability_profile_ref=capability.ref,
+    )
+
+
 async def build_host_video_request(
     request: VideoGenerationRequest, *, provider_id: str, provider_model_id: str, endpoint_id: str
 ) -> ProviderRequest:
@@ -190,16 +207,12 @@ async def submit_video_attempt[T](
     if request.attempt_submitter is None:
         raise RuntimeError("M7_SUBMIT_ROUTE_UNBOUND: worker video request requires an attempt submitter")
 
-    capability = require_submit_route(provider_id, endpoint_id, HOST_VIDEO_ADAPTER_VERSION)
-    route = ProviderRouteSnapshot(
+    route = host_video_route(
         provider_id=provider_id,
-        provider_account_ref="default",
         provider_model_id=provider_model_id,
         backend_model_id=backend_model_id,
         endpoint_id=endpoint_id,
         submitted_base_url=submitted_base_url,
-        adapter_version=HOST_VIDEO_ADAPTER_VERSION,
-        capability_profile_ref=capability.ref,
     )
     provider_request = await build_host_video_request(
         request, provider_id=provider_id, provider_model_id=provider_model_id, endpoint_id=endpoint_id
@@ -265,6 +278,7 @@ __all__ = [
     "SubmitFn",
     "accepted_submit_receipt",
     "build_host_video_request",
+    "host_video_route",
     "provider_payload_digest",
     "submit_video_attempt",
     "terminal_submit_receipt",

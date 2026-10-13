@@ -70,105 +70,119 @@ class CurrentLocationBindingSnapshotReader:
         expected_snapshot_digest: str | None = None,
     ) -> VerifiedLocationBindingSnapshot:
         async with self._sessions() as session, session.begin():
-            target = await TransactionBoundTargetAuthorityResolver(session).resolve_current(
+            return await self.read_in_session(
+                session,
                 user_id=user_id,
                 project_name=project_name,
-                target_type=ProductionBindingTarget.SHOT,
                 target_id=target_id,
+                expected_snapshot_digest=expected_snapshot_digest,
             )
+
+    async def read_in_session(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: str,
+        project_name: str,
+        target_id: str,
+        expected_snapshot_digest: str | None = None,
+    ) -> VerifiedLocationBindingSnapshot:
+        """Lock and verify the snapshot inside the caller's transaction; the caller commits."""
+        target = await TransactionBoundTargetAuthorityResolver(session).resolve_current(
+            user_id=user_id,
+            project_name=project_name,
+            target_type=ProductionBindingTarget.SHOT,
+            target_id=target_id,
+        )
+        if (
+            target is None
+            or not isinstance(target.target, ShotSpecV2)
+            or target.scene is None
+            or not isinstance(target.scene.target, SceneSpec)
+            or not target.scene.target.location_ref
+        ):
+            raise ProductionBindingIntegrityError("binding snapshot target or Scene location is unavailable")
+        binding_id = scoped_location_binding_id(user_id=user_id, project_name=project_name, target_id=target_id)
+        current = await ProductionBindingRepository(session).get_current_verified(
+            user_id=user_id,
+            project_name=project_name,
+            binding_id=binding_id,
+            expected_target_ref=target.ref,
+            expected_scene_ref=target.scene.ref,
+        )
+        if current is None or current.body.semantic_ref != target.scene.target.location_ref:
+            raise ProductionBindingIntegrityError("binding snapshot has no current Scene-bound LOCATION binding")
+
+        claims = current.envelope.ordered_claims
+        receipt_repository = SpatialFrameReceiptRepository(session)
+        parent_keys: list[str] = []
+        for claim in claims:
+            try:
+                hint = await receipt_repository.get_exact(
+                    user_id=user_id, project_name=project_name, receipt_id=claim.receipt_id
+                )
+            except ValueError as exc:
+                raise BindingSourceConflictError("binding snapshot receipt hint failed integrity verification") from exc
             if (
-                target is None
-                or not isinstance(target.target, ShotSpecV2)
-                or target.scene is None
-                or not isinstance(target.scene.target, SceneSpec)
-                or not target.scene.target.location_ref
+                hint is None
+                or _receipt_digest(hint) != claim.receipt_digest
+                or hint.identity.parent_artifact_key != claim.parent_artifact_key
             ):
-                raise ProductionBindingIntegrityError("binding snapshot target or Scene location is unavailable")
-            binding_id = scoped_location_binding_id(user_id=user_id, project_name=project_name, target_id=target_id)
-            current = await ProductionBindingRepository(session).get_current_verified(
+                raise BindingSourceConflictError("binding snapshot receipt hint differs from immutable claim")
+            parent_keys.append(hint.identity.parent_artifact_key)
+        if len(set(parent_keys)) != 2:
+            raise BindingSourceConflictError("binding snapshot receipts share one parent")
+        await lock_current_master_rows(
+            session, user_id=user_id, project_name=project_name, artifact_keys=tuple(parent_keys)
+        )
+        for claim in claims:
+            frame = await self._frames.read_locked(
+                session,
                 user_id=user_id,
                 project_name=project_name,
-                binding_id=binding_id,
-                expected_target_ref=target.ref,
-                expected_scene_ref=target.scene.ref,
+                receipt_id=claim.receipt_id,
+                expected_receipt_digest=claim.receipt_digest,
+                expected_parent_artifact_key=claim.parent_artifact_key,
             )
-            if current is None or current.body.semantic_ref != target.scene.target.location_ref:
-                raise ProductionBindingIntegrityError("binding snapshot has no current Scene-bound LOCATION binding")
+            body = _claim_from_verified_frame(frame).model_dump(mode="json")
+            if (
+                body != claim.model_dump(mode="json", exclude={"claim_digest"})
+                or frame_source_claim_digest(body) != claim.claim_digest
+            ):
+                raise BindingSourceConflictError("binding snapshot frame differs from immutable claim")
 
-            claims = current.envelope.ordered_claims
-            receipt_repository = SpatialFrameReceiptRepository(session)
-            parent_keys: list[str] = []
-            for claim in claims:
-                try:
-                    hint = await receipt_repository.get_exact(
-                        user_id=user_id, project_name=project_name, receipt_id=claim.receipt_id
-                    )
-                except ValueError as exc:
-                    raise BindingSourceConflictError(
-                        "binding snapshot receipt hint failed integrity verification"
-                    ) from exc
-                if (
-                    hint is None
-                    or _receipt_digest(hint) != claim.receipt_digest
-                    or hint.identity.parent_artifact_key != claim.parent_artifact_key
-                ):
-                    raise BindingSourceConflictError("binding snapshot receipt hint differs from immutable claim")
-                parent_keys.append(hint.identity.parent_artifact_key)
-            if len(set(parent_keys)) != 2:
-                raise BindingSourceConflictError("binding snapshot receipts share one parent")
-            await lock_current_master_rows(
-                session, user_id=user_id, project_name=project_name, artifact_keys=tuple(parent_keys)
-            )
-            for claim in claims:
-                frame = await self._frames.read_locked(
-                    session,
+        spatial_set = None
+        envelope = current.envelope
+        if envelope.spatial_set_id is not None and envelope.spatial_set_digest is not None:
+            try:
+                spatial_set = await SpatialConstraintSetRepository(session).get_verified(
                     user_id=user_id,
                     project_name=project_name,
-                    receipt_id=claim.receipt_id,
-                    expected_receipt_digest=claim.receipt_digest,
-                    expected_parent_artifact_key=claim.parent_artifact_key,
+                    set_id=envelope.spatial_set_id,
+                    expected_digest=envelope.spatial_set_digest,
+                    expected_binding_id=binding_id,
                 )
-                body = _claim_from_verified_frame(frame).model_dump(mode="json")
-                if (
-                    body != claim.model_dump(mode="json", exclude={"claim_digest"})
-                    or frame_source_claim_digest(body) != claim.claim_digest
-                ):
-                    raise BindingSourceConflictError("binding snapshot frame differs from immutable claim")
+            except SpatialConstraintSetIntegrityError as exc:
+                raise ProductionBindingIntegrityError("binding snapshot spatial set failed verification") from exc
+            if sorted(map(_source_identity, spatial_set.ordered_sources)) != sorted(map(_claim_identity, claims)):
+                raise BindingSourceConflictError("binding snapshot spatial set sources differ from its frame claims")
 
-            spatial_set = None
-            envelope = current.envelope
-            if envelope.spatial_set_id is not None and envelope.spatial_set_digest is not None:
-                try:
-                    spatial_set = await SpatialConstraintSetRepository(session).get_verified(
-                        user_id=user_id,
-                        project_name=project_name,
-                        set_id=envelope.spatial_set_id,
-                        expected_digest=envelope.spatial_set_digest,
-                        expected_binding_id=binding_id,
-                    )
-                except SpatialConstraintSetIntegrityError as exc:
-                    raise ProductionBindingIntegrityError("binding snapshot spatial set failed verification") from exc
-                if sorted(map(_source_identity, spatial_set.ordered_sources)) != sorted(map(_claim_identity, claims)):
-                    raise BindingSourceConflictError(
-                        "binding snapshot spatial set sources differ from its frame claims"
-                    )
-
-            snapshot = BindingSnapshotV1(
-                user_id=user_id,
-                project_name=project_name,
-                ordered_bindings=(
-                    SnapshotBindingRefV1(
-                        binding_id=binding_id,
-                        version=current.body.version,
-                        envelope_digest=current.envelope_digest,
-                    ),
+        snapshot = BindingSnapshotV1(
+            user_id=user_id,
+            project_name=project_name,
+            ordered_bindings=(
+                SnapshotBindingRefV1(
+                    binding_id=binding_id,
+                    version=current.body.version,
+                    envelope_digest=current.envelope_digest,
                 ),
-                target_versions=(target.scene.ref, target.ref),
-            )
-            digest = binding_snapshot_digest(snapshot.model_dump(mode="json"))
-            if expected_snapshot_digest is not None and digest != expected_snapshot_digest:
-                raise ProductionBindingIntegrityError("binding snapshot digest is stale")
-            return VerifiedLocationBindingSnapshot(body=snapshot, digest=digest, spatial_set=spatial_set)
+            ),
+            target_versions=(target.scene.ref, target.ref),
+        )
+        digest = binding_snapshot_digest(snapshot.model_dump(mode="json"))
+        if expected_snapshot_digest is not None and digest != expected_snapshot_digest:
+            raise ProductionBindingIntegrityError("binding snapshot digest is stale")
+        return VerifiedLocationBindingSnapshot(body=snapshot, digest=digest, spatial_set=spatial_set)
 
 
 __all__ = ["CurrentLocationBindingSnapshotReader", "VerifiedLocationBindingSnapshot"]

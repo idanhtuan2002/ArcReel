@@ -515,6 +515,11 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
 
     # ── request building ────────────────────────────────────────────────
 
+    @property
+    def submitted_base_url(self) -> str:
+        """The base URL this backend submits to; an M7 route snapshot records it."""
+        return self._request_base_url
+
     def build_submit_payload(self, request: VideoGenerationRequest) -> dict:
         """The exact payload this backend would submit for ``request``; R2 captures it once."""
         return self._build_payload(request)
