@@ -56,6 +56,7 @@ CAPABILITY_FAILURE_CODES: frozenset[str] = frozenset(
         "video_reference_audio_unsupported",
         "video_resolution_duration_unsupported",
         "video_start_image_unreadable",
+        "video_captured_payload_model_mismatch",
     }
 )
 

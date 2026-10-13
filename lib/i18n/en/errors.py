@@ -446,6 +446,7 @@ MESSAGES = {
     "video_reference_images_exceeded": "Model {model} supports at most {limit} reference images but received {count}; reduce the number of reference images",
     "video_reference_images_with_frames_unsupported": "Model {model} cannot combine reference images/audio with a first/last frame; use one or the other",
     "video_start_image_unreadable": "The first-frame image for model {model} is unreadable; generation aborted: {name}; check the first-frame image path",
+    "video_captured_payload_model_mismatch": "The captured request was built for another model than the configured {model}; check the video model setting",
     "video_end_image_unreadable": "The last-frame image for model {model} is unreadable; generation aborted: {name}; check the last-frame image path",
     "video_end_image_requires_start_image": "Model {model} does not support a standalone last frame; also provide a first frame (first+last keyframes) or remove the last frame",
     "video_last_frame_requires_pro": "{provider}/{model} only supports first+last frame at the pro tier; switch to the pro tier or remove the last frame",
