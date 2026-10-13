@@ -56,7 +56,9 @@ from r2.contracts.spatial_execution import (
     SpatialSourceFrameV1,
 )
 from r2.host_hardening.host_submit import AttemptSubmitter
-from r2.host_hardening.route_inventory import HOST_SPATIAL_ADAPTER_VERSION
+from r2.host_hardening.paid_routes import current_release_mode
+from r2.host_hardening.provider_capabilities import ProviderCapabilityError
+from r2.host_hardening.route_inventory import HOST_SPATIAL_ADAPTER_VERSION, require_submit_route
 from server.services.execution_attempts import capability_resolver
 from server.services.master_authority import serialized_artifacts
 from server.services.spatial_frame_reader import SpatialFrameReader, VerifiedSpatialFrame
@@ -195,6 +197,7 @@ class SpatialExecutionService:
         frames = (_source_frame("MASTER", master), _source_frame("REVERSE", reverse))
         if frames[0].frame_digest == frames[1].frame_digest:
             raise CandidateConflictError("MASTER and REVERSE must be distinct frame bytes")
+        self._require_enabled_route()
         prompt = build_spatial_prompt(command.scene_name)
         request = self._request(command, prompt, frames)
 
@@ -233,6 +236,19 @@ class SpatialExecutionService:
             command, request, frames, raw, result.execution_id, candidate, lineage, spatial_prompt_digest(prompt)
         )
 
+    def _require_enabled_route(self) -> None:
+        try:
+            capability = require_submit_route(
+                self._route.provider_id,
+                self._endpoint,
+                self._route.adapter_version,
+                release_mode=current_release_mode(),
+            )
+        except (LookupError, ValueError, ProviderCapabilityError) as exc:
+            raise SpatialExecutionUnavailableError(f"spatial submit route is not enabled: {exc}") from exc
+        if capability.ref != self._route.capability_profile_ref:
+            raise SpatialExecutionUnavailableError("spatial submit route capability differs from the route snapshot")
+
     async def _replay(self, command: SpatialExecutionCommand) -> CandidateHead | None:
         async with self._sessions() as session:
             stored = await SpatialExecutionEvidenceRepository(session).get_by_command(
@@ -248,6 +264,7 @@ class SpatialExecutionService:
                 command_id=command.command_id,
             )
         master, reverse = stored.evidence.ordered_source_frames
+        replayed_request = self._request(command, build_spatial_prompt(command.scene_name), (master, reverse))
         head = CandidateHead(
             candidate_id=command.candidate_id,
             current_revision=stored.revision,
@@ -261,7 +278,8 @@ class SpatialExecutionService:
             != (command.master.receipt_id, command.master.receipt_digest)
             or (reverse.frame_receipt_id, reverse.frame_receipt_digest)
             != (command.reverse.receipt_id, command.reverse.receipt_digest)
-            or stored.evidence.prompt_digest != spatial_prompt_digest(build_spatial_prompt(command.scene_name))
+            or stored.evidence.request_digest
+            != "sha256:" + hashlib.sha256(_canonical_request(replayed_request)).hexdigest()
         ):
             raise CommandConflictError("command_id was already used for a different spatial execution")
         return head

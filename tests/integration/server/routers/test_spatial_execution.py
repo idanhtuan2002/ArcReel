@@ -286,6 +286,7 @@ async def test_exact_replay_returns_head_without_a_second_call_and_changed_body_
         _command(master, reverse, scene_name="Hall"),
         _command(reverse, master),
         _command(master, reverse, candidate_id="other-candidate"),
+        _command(master, reverse, episode=2),
     ):
         with pytest.raises(CommandConflictError):
             await service.execute(changed)
@@ -433,3 +434,19 @@ async def test_evidence_write_failure_after_the_revision_rolls_back_both(
         await _service(session_factory, project_dir, _Vision(), _FailingEvidence).execute(_command(master, reverse))
     assert await _counts(session_factory) == (0, 0)
     assert await _attempt_states(session_factory) == [ExecutionAttemptState.ACCEPTED.value]
+
+
+@pytest.mark.asyncio
+async def test_release_mode_refuses_the_unqualified_spatial_route_before_the_provider(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from r2.host_hardening.paid_routes import RELEASE_MODE_ENV
+
+    master, reverse = await _frames(gate_export_client, project_dir, session_factory)
+    monkeypatch.setenv(RELEASE_MODE_ENV, "PRODUCTION_CANDIDATE")
+    vision = _Vision()
+    with pytest.raises(SpatialExecutionUnavailableError, match="route"):
+        await _service(session_factory, project_dir, vision).execute(_command(master, reverse))
+    assert vision.calls == []
+    assert await _counts(session_factory) == (0, 0)
+    assert await _attempt_states(session_factory) == []
