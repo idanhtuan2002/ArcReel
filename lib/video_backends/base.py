@@ -1239,6 +1239,13 @@ class VideoGenerationRequest:
     reference_audio_targets: list[int] | None = None
     generate_audio: bool = True
     poll_timeout_seconds: int = DEFAULT_VIDEO_POLL_TIMEOUT_SECONDS
+    # 供应商侧提示词改写开关。None 时不下发（保持各 backend 既有 payload 字节不变）；
+    # 仅读取该字段的 backend（DashScope）才下发。R2 镜头生成须显式置 False。
+    prompt_extend: bool | None = None
+    # R2 镜头生成：路由处由固定输入一次构造的供应商 payload，worker 原样提交，backend 不再重建。
+    captured_payload: dict[str, Any] | None = None
+    # R2 身份信封，进入 M7 ProviderRequest.execution_options，故 M7 request_digest 绑定之。
+    r2_execution_options: dict[str, Any] | None = None
 
     # 项目上下文（用于构建文件服务 URL 等）
     project_name: str | None = None

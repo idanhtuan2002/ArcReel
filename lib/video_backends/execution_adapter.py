@@ -19,11 +19,11 @@ import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from lib.db.base import utc_now
 from lib.telemetry import record_correlation_span
-from r2.contracts.common import JSONValue
+from r2.contracts.common import JSONValue, ensure_json_value
 from r2.contracts.execution import ProviderRequest
 from r2.contracts.fingerprints import canonical_json_bytes
 from r2.contracts.host_hardening import (
@@ -101,6 +101,26 @@ async def _semantic_video_payload(request: VideoGenerationRequest) -> dict[str, 
     }
 
 
+def provider_payload_digest(payload: dict[str, Any]) -> str:
+    """Digest of one exact provider payload (canonical JSON), as R2 task evidence records it."""
+    return "sha256:" + hashlib.sha256(canonical_json_bytes(ensure_json_value(payload))).hexdigest()
+
+
+def _r2_execution_options(request: VideoGenerationRequest) -> dict[str, JSONValue]:
+    """The R2 identity envelope; a captured payload is refused without one that names its digest."""
+    if request.captured_payload is None:
+        if request.r2_execution_options is not None:
+            raise RuntimeError("M7_R2_IDENTITY_WITHOUT_CAPTURED_PAYLOAD")
+        return {}
+    options = request.r2_execution_options
+    if options is None or options.get("provider_payload_digest") != provider_payload_digest(request.captured_payload):
+        raise RuntimeError("M7_R2_IDENTITY_MISSING: captured payload is not bound by its R2 identity envelope")
+    normalized = ensure_json_value(dict(options))
+    if not isinstance(normalized, dict):
+        raise RuntimeError("M7_R2_IDENTITY_MISSING: the R2 identity envelope is not a JSON object")
+    return normalized
+
+
 def accepted_submit_receipt[T](value: T, *, provider_job_id: str) -> ProviderSubmitReceipt[T]:
     from r2.host_hardening.host_submit import ProviderSubmitReceipt
 
@@ -170,6 +190,7 @@ async def submit_video_attempt[T](
         model=provider_model_id,
         endpoint=endpoint_id,
         payload=await _semantic_video_payload(request),
+        execution_options=_r2_execution_options(request),
         adapter_version=HOST_VIDEO_ADAPTER_VERSION,
     )
 

@@ -490,7 +490,7 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
         return self._base_url
 
     async def generate(self, request: VideoGenerationRequest) -> VideoGenerationResult:
-        payload = self._build_payload(request)
+        payload = self._submit_payload(request)
         logger.info(
             "调用 %s 视频 API model=%s body=%s",
             self.name,
@@ -515,6 +515,17 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
 
     # ── request building ────────────────────────────────────────────────
 
+    def build_submit_payload(self, request: VideoGenerationRequest) -> dict:
+        """The exact payload this backend would submit for ``request``; R2 captures it once."""
+        return self._build_payload(request)
+
+    def _submit_payload(self, request: VideoGenerationRequest) -> dict:
+        if request.captured_payload is None:
+            return self._build_payload(request)
+        if request.captured_payload.get("model") != self._model:
+            raise VideoCapabilityError("video_captured_payload_model_mismatch", model=self._model)
+        return request.captured_payload
+
     def _build_payload(self, request: VideoGenerationRequest) -> dict:
         media = self._build_media(request)
         input_block: dict = {"prompt": request.prompt}
@@ -535,6 +546,8 @@ class DashScopeVideoBackend(ProviderJobIdPersistenceMixin):
             parameters["ratio"] = request.aspect_ratio
         if request.seed is not None:
             parameters["seed"] = request.seed
+        if request.prompt_extend is not None:
+            parameters["prompt_extend"] = request.prompt_extend
         # 音轨开关只对 wan3.0 下发：其余型号恒有声，下发该参数会被上游当非法参数拒绝。本行就是
         # `_MODEL_PROFILES` 里 audio_track 声明的执行侧对应物（恒有声型号声明 ALWAYS_ON，wan3.0
         # 取默认的 CONTROLLABLE），改一侧须同改另一侧。
