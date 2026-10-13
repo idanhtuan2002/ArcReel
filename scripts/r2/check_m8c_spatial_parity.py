@@ -7,6 +7,9 @@ import ast
 import hashlib
 import json
 import re
+import statistics
+import time
+import tracemalloc
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -216,11 +219,46 @@ def compare(donor_source: Path) -> dict[str, Any]:
     return {"donor_source_sha256": DONOR_SHA256, "cases": rows, "correction": correction}
 
 
+def _measure(run: Any, repeats: int) -> dict[str, float]:
+    durations: list[float] = []
+    for _ in range(repeats):
+        started = time.perf_counter()
+        run()
+        durations.append(time.perf_counter() - started)
+    tracemalloc.start()
+    run()
+    _current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    return {"median_us": round(statistics.median(durations) * 1e6, 1), "peak_kib": round(peak / 1024, 1)}
+
+
+def measure(donor_source: Path, repeats: int = 200) -> list[dict[str, Any]]:
+    """Median wall time and peak traced allocation per case for the donor and R2 normalizers."""
+    donor = _donor_functions(donor_source)
+    rows: list[dict[str, Any]] = []
+    for name, contract, overlap in _cases():
+
+        def run_donor(contract: dict[str, Any] = contract, overlap: dict[str, Any] | None = overlap) -> None:
+            result = deepcopy(contract)
+            if overlap is not None:
+                donor["apply_overlap_analysis"](result, deepcopy(overlap))
+            donor["add_direction_exclusion_locks"](result)
+
+        def run_r2(contract: dict[str, Any] = contract, overlap: dict[str, Any] | None = overlap) -> None:
+            normalize_spatial_topology(deepcopy(contract), deepcopy(overlap) if overlap is not None else None)
+
+        rows.append({"case": name, "donor": _measure(run_donor, repeats), "r2": _measure(run_r2, repeats)})
+    return rows
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("donor_source", type=Path)
+    parser.add_argument("--measure", action="store_true", help="also report per-case time and peak allocation")
     args = parser.parse_args()
     result = compare(args.donor_source)
+    if args.measure:
+        result["measurements"] = measure(args.donor_source)
     print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
     return (
         0
