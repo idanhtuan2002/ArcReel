@@ -212,7 +212,11 @@ class TaskRepository(BaseRepository):
         actor_scope: str | None = None,
         command_digest: str | None = None,
         request_id: str | None = None,
+        task_id: str | None = None,
     ) -> dict[str, Any]:
+        """``task_id`` lets a caller that binds the ID into its own evidence choose it; it requires a command."""
+        if task_id is not None and command_id is None:
+            raise ValueError("a caller-chosen task_id requires command replay")
         # Actor-scoped command replay is opt-in and independent of resource-based
         # active-task deduplication. All three or none -- a partial set
         # would silently disable the exact-replay guarantee instead of failing loudly.
@@ -241,7 +245,7 @@ class TaskRepository(BaseRepository):
             )
         now = utc_now()
 
-        task_id = uuid.uuid4().hex
+        task_id = task_id or uuid.uuid4().hex
         task = Task(
             task_id=task_id,
             batch_id=batch_id,

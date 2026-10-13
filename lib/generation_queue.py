@@ -67,6 +67,16 @@ def _text_request_facts(task_type: str, payload: dict[str, Any] | None) -> dict[
     return {key: value for key, value in (payload or {}).items() if key != "projects_root"}
 
 
+R2_SHOT_GENERATION_TASK_TYPE = "r2_shot_generation_v1"
+
+
+def _r2_shot_request_facts(task_type: str, payload: dict[str, Any] | None) -> str | None:
+    """An active R2 shot task is reusable only for the same submit fingerprint (snapshot and request)."""
+    if task_type != R2_SHOT_GENERATION_TASK_TYPE:
+        return None
+    return str((payload or {}).get("submit_fingerprint") or "")
+
+
 class ActiveTaskRequestConflict(RuntimeError):
     """An active video task owns the resource with different request facts."""
 
@@ -422,6 +432,7 @@ class GenerationQueue:
         command_id: str | None = None,
         actor_scope: str | None = None,
         command_digest: str | None = None,
+        task_id: str | None = None,
     ) -> dict[str, Any]:
         # Every Web, Agent and batch generation entry reaches the queue through this
         # method, so a project whose migration failed is refused here once instead of
@@ -450,6 +461,7 @@ class GenerationQueue:
 
         requested_facts = _narration_request_facts(task_type, payload)
         text_request_facts = _text_request_facts(task_type, payload)
+        r2_request_facts = _r2_shot_request_facts(task_type, payload)
 
         def _guard_deduped(existing_payload: dict[str, Any], existing_task_id: str) -> None:
             if requested_facts is not None and _narration_request_facts(task_type, existing_payload) != requested_facts:
@@ -458,6 +470,8 @@ class GenerationQueue:
                 text_request_facts is not None
                 and _text_request_facts(task_type, existing_payload) != text_request_facts
             ):
+                raise ActiveTaskRequestConflict(resource_id=resource_id, existing_task_id=existing_task_id)
+            if r2_request_facts is not None and _r2_shot_request_facts(task_type, existing_payload) != r2_request_facts:
                 raise ActiveTaskRequestConflict(resource_id=resource_id, existing_task_id=existing_task_id)
 
         async def _enqueue() -> dict[str, Any]:
@@ -484,6 +498,7 @@ class GenerationQueue:
                     actor_scope=actor_scope,
                     command_digest=command_digest,
                     request_id=current_request_id(),
+                    task_id=task_id,
                 )
 
         # Audio restoration observes active TTS/video consumers while holding the

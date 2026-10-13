@@ -8,6 +8,8 @@ from pydantic import ConfigDict, Field
 
 from r2.contracts.common import R2ContractModel
 from r2.contracts.production_binding_authority import ExactName
+from r2.contracts.production_target import Sha256Digest
+from r2.contracts.spatial_source import FrameCandidateId
 
 
 class R2ExecutionProfileV1(R2ContractModel):
@@ -38,4 +40,40 @@ class R2ExecutionProfileV1(R2ContractModel):
     max_prompt_chars: int = Field(ge=1)
 
 
-__all__ = ["R2ExecutionProfileV1"]
+class R2ShotSourceFrameV1(R2ContractModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    image_index: Literal[1, 2]
+    view: Literal["MASTER", "REVERSE"]
+    receipt_id: FrameCandidateId
+    receipt_digest: Sha256Digest
+    frame_content_digest: Sha256Digest
+
+
+class R2ShotGenerationTaskV1(R2ContractModel):
+    """Immutable task evidence for one admitted spatial shot; the worker re-derives and compares it."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    schema_version: Literal["r2_shot_generation_v1"]
+    user_id: ExactName
+    project_name: ExactName
+    task_id: ExactName
+    command_id: ExactName
+    target_type: Literal["SHOT"]
+    target_id: ExactName
+    target_registry_version: int = Field(ge=1)
+    target_digest: Sha256Digest
+    binding_snapshot_digest: Sha256Digest
+    spatial_set_digests: tuple[Sha256Digest, ...] = Field(min_length=1)
+    ordered_source_frames: tuple[R2ShotSourceFrameV1, R2ShotSourceFrameV1]
+    execution_profile_ref: ExactName
+    prompt_plan_digest: Sha256Digest
+    compiled_request_digest: Sha256Digest
+    provider_prompt_digest: Sha256Digest
+    provider_payload_digest: Sha256Digest
+    host_request_digest: Sha256Digest
+    submit_fingerprint: Sha256Digest
+
+
+__all__ = ["R2ExecutionProfileV1", "R2ShotGenerationTaskV1", "R2ShotSourceFrameV1"]
