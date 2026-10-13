@@ -37,3 +37,31 @@
 - Whether the frame-receipt slice cherry-picks cleanly without the target registry or the M7 caller-session lock changes made later.
 - The vision provider and model for the first spatial execution, and whether the existing M7 request/route digests fit a text/vision request without schema changes.
 - Effort: C2 is expected to take several sessions.
+
+## Progress checkpoint — 2026-10-13 (same session)
+
+Branch `impl/r2-m8c-spatial-candidates` was rebased onto `r2-v2/main` `0ac1a565`; the pre-rebase head is kept at `backup/r2-m8c-c1-pre-rebase-20261013`. Commits, oldest first:
+
+| Step | Commit(s) | What | Evidence |
+|---|---|---|---|
+| C1 | `75ef822c` → rebased | Spatial normalization port | 4 PARITY, 1 IMPROVED, plus the IMPROVED span correction |
+| 1 | 17 commits cherry-picked with `-x` from `229a22ba..fab08ab5`; then `9dbf73af`, `fe5da851` | Frame receipt slice, C2 research and vectors, the M8B fixture format fix | 157 passed on PostgreSQL 18; 154 passed and 3 skipped on SQLite |
+| 2 | `1f7f7684` | C2 design `docs/superpowers/specs/2026-10-13-r2-m8c-c2-spatial-execution-design.md` | — |
+| 3 | `0aef0dee`, `a0e5d1ae` | Prompt and parse, evidence contract, migration `8c8c4a0e0001`, `SpatialExecutionService`, `host-spatial-v1` route | 819 passed on PostgreSQL 18 (affected selection, before the rollback test); the C2 file and the evidence migration then 15 passed on PostgreSQL; repository static gates pass |
+
+Design corrections found while implementing step 3:
+
+- The donor prompt forbids image coordinates, but C1 requires spans. The R2 prompt keeps the donor's coordinate contract and rules and asks for the R2 schema.
+- M7 forbids `SUBMITTING → SUCCEEDED`. The submit records `ACCEPTED`; the `SUCCEEDED` observation commits in the same transaction as the evidence and the revision.
+- The spatial route stays out of the frozen `PAID_ASYNC_SUBMIT_FAMILIES`, whose ADR-0091 evidence is recorded. It lives in a separate `SPATIAL_SUBMIT_FAMILIES` tuple.
+
+Remaining before acceptance:
+
+- **C3:** the parity seal `R2_M8_C_SPATIAL_PARITY.json`, run against the donor at `~/.cache/r2-donors/dramaclaw`.
+- **Review:** the exact-HEAD self-review recorded in the acceptance file.
+- **Integration:** merge into `r2-v2/main`.
+- **Full gate:** one full backend suite on the final HEAD.
+
+No live provider call was made; Gate C does not need one.
+
+The disposable containers were removed.
