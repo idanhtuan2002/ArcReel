@@ -12,7 +12,7 @@ import secrets
 import socket
 import stat
 import struct
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import cast
@@ -20,6 +20,7 @@ from typing import cast
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.content_digest import canonical_json_bytes
+from r2.governance.operator_archive_reader import VerifiedOperatorArchiveV1
 from r2.governance.public_custody_snapshot import validate_public_custody_snapshot
 from server.services.governance_operator_archive import verify_operator_archive_preflight
 
@@ -81,6 +82,12 @@ def _socket_identity(fd: int, uid: int, gid: int) -> tuple[int, int]:
     return info.st_dev, info.st_ino
 
 
+def read_peer_credentials(peer: socket.socket) -> tuple[int, int]:
+    """Return the connected Linux peer UID/GID from ``SO_PEERCRED``."""
+    _pid, uid, gid = struct.unpack("i2I", peer.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+    return uid, gid
+
+
 async def _read_message(reader: asyncio.StreamReader) -> dict[str, object]:
     raw = await reader.readuntil(b"\n")
     if not 1 < len(raw) <= _MAX_MESSAGE_BYTES + 1 or await reader.read(1):
@@ -100,8 +107,16 @@ async def _close(writer: asyncio.StreamWriter) -> None:
 class GovernanceArchiveAttestor:
     """One fixed root and database; every challenge performs a new preflight."""
 
-    def __init__(self, root: Path, *, session_factory: async_sessionmaker[AsyncSession], expected_uid: int = 0) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        session_factory: async_sessionmaker[AsyncSession],
+        expected_uid: int = 0,
+        preflight: Callable[..., Awaitable[VerifiedOperatorArchiveV1]] = verify_operator_archive_preflight,
+    ) -> None:
         self._root = root
+        self._preflight = preflight
         self._sessions = session_factory
         self._uid = expected_uid
         self._busy = asyncio.Lock()
@@ -138,9 +153,7 @@ class GovernanceArchiveAttestor:
                 ):
                     raise GovernanceAttestationUnavailable
                 async with self._busy:
-                    current = await verify_operator_archive_preflight(
-                        self._root, session_factory=self._sessions, expected_uid=self._uid
-                    )
+                    current = await self._preflight(self._root, session_factory=self._sessions, expected_uid=self._uid)
                     proof = {
                         "schema": "governance.startup_proof.v1",
                         "nonce": nonce,
@@ -167,6 +180,7 @@ async def serve_governance_attestor(
     session_factory: async_sessionmaker[AsyncSession],
     expected_uid: int = 0,
     expected_gid: int = 0,
+    preflight: Callable[..., Awaitable[VerifiedOperatorArchiveV1]] = verify_operator_archive_preflight,
 ) -> AsyncGenerator[asyncio.Server]:
     """Bind in a provisioned directory; never replace an existing pathname."""
     try:
@@ -175,7 +189,9 @@ async def serve_governance_attestor(
             listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             identity: tuple[int, int] | None = None
             server: asyncio.Server | None = None
-            attestor = GovernanceArchiveAttestor(root, session_factory=session_factory, expected_uid=expected_uid)
+            attestor = GovernanceArchiveAttestor(
+                root, session_factory=session_factory, expected_uid=expected_uid, preflight=preflight
+            )
             try:
                 listener.bind(anchored)
                 created = os.stat(_SOCKET_NAME, dir_fd=fd, follow_symlinks=False)
@@ -209,25 +225,26 @@ async def require_governance_archive_freshness(
     *,
     expected_uid: int = 0,
     expected_gid: int = 0,
+    exchange_seconds: float = _EXCHANGE_SECONDS,
+    connect: Callable[..., Awaitable[tuple[asyncio.StreamReader, asyncio.StreamWriter]]] = asyncio.open_unix_connection,
+    peer_credentials: Callable[[socket.socket], tuple[int, int]] = read_peer_credentials,
 ) -> None:
     """Require a fresh host response for these exact public copies."""
     writer: asyncio.StreamWriter | None = None
     try:
         snapshot = validate_public_custody_snapshot(*copies)
         nonce = secrets.token_hex(32)
-        async with asyncio.timeout(_EXCHANGE_SECONDS):
+        async with asyncio.timeout(exchange_seconds):
             with _socket_directory(socket_directory, expected_uid, expected_gid) as fd:
                 before = _socket_identity(fd, expected_uid, expected_gid)
-                reader, writer = await asyncio.open_unix_connection(
-                    path=f"/proc/self/fd/{fd}/{_SOCKET_NAME}", limit=_MAX_MESSAGE_BYTES
-                )
+                reader, writer = await connect(path=f"/proc/self/fd/{fd}/{_SOCKET_NAME}", limit=_MAX_MESSAGE_BYTES)
                 peer = writer.get_extra_info("socket")
                 if peer is None:
                     raise GovernanceAttestationUnavailable
-                _pid, uid, gid = struct.unpack("3i", peer.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
-                if (uid, gid) != (expected_uid, expected_gid) or _socket_identity(
-                    fd, expected_uid, expected_gid
-                ) != before:
+                if (
+                    peer_credentials(peer) != (expected_uid, expected_gid)
+                    or _socket_identity(fd, expected_uid, expected_gid) != before
+                ):
                     raise GovernanceAttestationUnavailable
                 writer.write(
                     canonical_json_bytes({"schema": "governance.startup_challenge.v1", "nonce": nonce}) + b"\n"
@@ -255,6 +272,7 @@ async def require_governance_archive_freshness(
 __all__ = [
     "GovernanceArchiveAttestor",
     "GovernanceAttestationUnavailable",
+    "read_peer_credentials",
     "require_governance_archive_freshness",
     "serve_governance_attestor",
 ]

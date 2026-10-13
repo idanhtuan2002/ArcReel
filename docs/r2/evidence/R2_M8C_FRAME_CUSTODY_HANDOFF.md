@@ -895,3 +895,37 @@ the next session; create a fresh disposable instance only if more PG execution
 is required. Preserve the separate dirty C1 worktree. Actual-host custody,
 independent archive backup restore, image/mount proof, HTTP/browser review,
 final full backend gate, independent review and READY remain open.
+
+## Attestor review and matrix repair — 2026-10-13 (Claude session)
+
+Read-only review of `7b3f9cab..59c4d60e` found no Critical/Important defect:
+coherent old-DB/old-public/newer-archive is denied (nonce-bound proof over
+deployment, sequence and four public digests plus the app's own ledger scan);
+partial activation env denies; activated mode skips `init_db`; the archive lock
+is `LOCK_NB`, so no blocking call outlives the deadline. Findings were evidence
+gaps: the `wrong_owner` case failed at the directory owner check and never reached
+`SO_PEERCRED`; connect-time inode replacement, deadline, busy preflight, malformed
+challenge and publisher-lock interleaving were untested; stale-socket recovery
+was undocumented; `SO_PEERCRED` was unpacked as signed `3i`.
+
+Repair: public `read_peer_credentials()` (unsigned `i2I`) and keyword seams with
+production defaults (`exchange_seconds`, `connect`, `peer_credentials` on the
+client; `preflight` on the attestor). New tests: wrong peer, replaced socket,
+zero deadline, competing challenge while preflight runs, six malformed
+challenges without preflight, real PostgreSQL publisher-lock denial followed by a
+passing post-unlock challenge, real `socketpair` peer credentials. Removing each
+guard (peer check, inode recheck, busy check, field-set check) turned its test
+RED; restoring it returned GREEN. The spec now records the stale-socket operator
+recovery and fail-closed contention/replica behavior.
+
+Fresh disposable PostgreSQL 18.6 migrated to head (the real-worker lifespan tests
+need the public schema; an unmigrated DB fails them with `worker_lease` missing).
+Complete affected selection (same command as the checkpoint JSON) on final bytes:
+**399 passed, 4 skipped, 2 warnings** in 99.05 s. Repository Ruff check/format
+(1788 files), basedpyright (0/0/0), lint-imports (22 kept), deptry, test audit
+(0 violations) and diff check passed. Containers removed; none remain. The
+`PytestUnraisableExceptionWarning` in `test_attestor_bounds_incomplete_connections`
+comes from the unchanged excess-connection close path (inferred pre-existing, not rerun at the old HEAD).
+
+Still open: actual-host custody/backup/restore/image/Compose evidence, one stable
+full backend gate, HTTP/browser review, final M8-C acceptance and READY.

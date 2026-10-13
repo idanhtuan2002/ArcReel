@@ -99,6 +99,18 @@ operation. It runs no migration, imports no grant, publishes no record and
 prints only sanitized success/failure metadata. Existing provisioning/deployment
 must supply the directories and image pins; this change touches no live host.
 
+Operator recovery boundaries:
+
+- A killed `serve` process (SIGKILL, host crash) leaves `attestor.sock` in place;
+  the next `serve` refuses the existing pathname and every application start
+  denies. With no `serve` process running (`ss -xlp` shows no listener on that
+  path), the operator removes only that socket inode and restarts `serve`. The
+  service never unlinks a pathname it did not create.
+- Publisher lock contention, a busy preflight or a competing start returns no
+  proof; the application denies before migrations and its restart policy retries.
+  Concurrent replicas therefore start one at a time.
+- `SO_PEERCRED` UID/GID are parsed as unsigned `uid_t`/`gid_t`.
+
 ## Verification and acceptance limits
 
 TDD covers transaction custody, real Unix socket positive/replay/wrong owner/
