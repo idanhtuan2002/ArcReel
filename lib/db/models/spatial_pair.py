@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    DDL,
     JSON,
     CheckConstraint,
     DateTime,
@@ -14,7 +15,9 @@ from sqlalchemy import (
     Integer,
     PrimaryKeyConstraint,
     String,
+    Table,
     UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -344,3 +347,58 @@ class SpatialPromotionResultModel(Base):
     set_id: Mapped[str] = mapped_column(String(255), nullable=False)
     result_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     receipt_v2_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+
+
+_COUPLING_FUNCTION = """
+CREATE FUNCTION {name}() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    key text;
+    kind text;
+    sidecars integer;
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        key := OLD.{key};
+    ELSE
+        key := NEW.{key};
+    END IF;
+    SELECT target_kind INTO kind FROM {base} WHERE {key} = key;
+    IF kind IS NULL THEN
+        RETURN NULL;
+    END IF;
+    SELECT count(*) INTO sidecars FROM {sidecar} WHERE {key} = key;
+    IF (kind = 'PRODUCTION_BINDING' AND sidecars <> 1) OR (kind <> 'PRODUCTION_BINDING' AND sidecars <> 0) THEN
+        RAISE EXCEPTION '{name}: % % has % spatial sidecars', kind, key, sidecars USING ERRCODE = '23514';
+    END IF;
+    RETURN NULL;
+END $$
+"""
+_COUPLING_TRIGGER = (
+    "CREATE CONSTRAINT TRIGGER {name}_{suffix} AFTER {events} ON {table} "
+    "DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION {name}()"
+)
+
+
+def _install_coupling(sidecar: Table, *, name: str, base: str, key: str) -> None:
+    """Schemas built from the models (tests) get the same PostgreSQL coupling triggers as migration 913c4a0e0001."""
+    statements = (
+        _COUPLING_FUNCTION.format(name=name, base=base, sidecar=sidecar.name, key=key),
+        _COUPLING_TRIGGER.format(name=name, suffix="base", events="INSERT OR UPDATE", table=base),
+        _COUPLING_TRIGGER.format(name=name, suffix="sidecar", events="INSERT OR UPDATE OR DELETE", table=sidecar.name),
+    )
+    for statement in statements:
+        # DDL applies %-style substitution, so the RAISE placeholders are escaped.
+        event.listen(sidecar, "after_create", DDL(statement.replace("%", "%%")).execute_if(dialect="postgresql"))
+
+
+_install_coupling(
+    SpatialPreviewBindingModel.__table__,  # type: ignore[arg-type]
+    name="m8_spatial_preview_coupling",
+    base="m8_promotion_previews",
+    key="preview_id",
+)
+_install_coupling(
+    SpatialPromotionResultModel.__table__,  # type: ignore[arg-type]
+    name="m8_spatial_receipt_coupling",
+    base="m8_promotion_receipts",
+    key="receipt_id",
+)

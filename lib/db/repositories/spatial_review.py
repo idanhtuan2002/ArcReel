@@ -38,10 +38,11 @@ class SpatialReviewRepository:
         self.session = session
 
     async def _now(self) -> datetime:
-        clock = (
-            func.clock_timestamp() if self.session.get_bind().dialect.name == "postgresql" else func.current_timestamp()
-        )
-        value = await self.session.scalar(select(clock))
+        # SQLite's CURRENT_TIMESTAMP has whole-second precision; the grant ledger's SQLite clock is the
+        # microsecond process clock, so review times must use the same one to order against imports.
+        if self.session.get_bind().dialect.name != "postgresql":
+            return datetime.now(UTC)
+        value = await self.session.scalar(select(func.clock_timestamp()))
         if not isinstance(value, (datetime, str)):
             raise SpatialReviewIntegrityError("database time unavailable for review custody")
         return _utc(value)
