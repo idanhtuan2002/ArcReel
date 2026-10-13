@@ -506,4 +506,8 @@ MESSAGES = {
     "m8_spatial_unavailable": "Phân tích không gian hiện không khả dụng; hãy kiểm tra cấu hình model văn bản Gemini rồi thử lại",
     "m8_spatial_source_conflict": "Frame nguồn không gian bị thiếu, đã thay đổi hoặc không còn khớp với video đã duyệt",
     "m8_spatial_request_invalid": "Yêu cầu phân tích không gian này không hợp lệ",
+    "r2_shot_admission_refused": "Không thể tạo shot này với profile đã chọn",
+    "r2_shot_authority_stale": "Shot, binding bối cảnh hoặc frame nguồn đã thay đổi; hãy tải lại rồi thử lại",
+    "r2_shot_command_conflict": "Mã lệnh này đã được dùng cho một yêu cầu shot khác",
+    "r2_shot_backend_unavailable": "Nhà cung cấp video cho profile này không khả dụng; hãy kiểm tra cấu hình",
 }

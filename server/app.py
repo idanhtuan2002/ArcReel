@@ -73,6 +73,7 @@ from server.routers import (
     projects,
     props,
     providers,
+    r2_shots,
     reference_videos,
     scenes,
     script_review,
@@ -687,6 +688,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M8 spatial"],
+)
+app.include_router(
+    r2_shots.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["R2 shots"],
 )
 app.include_router(
     shot_uploads.router,

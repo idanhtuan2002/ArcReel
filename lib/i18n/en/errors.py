@@ -507,4 +507,8 @@ MESSAGES = {
     "m8_spatial_unavailable": "Spatial analysis is not available right now; check the Gemini text model setting and try again",
     "m8_spatial_source_conflict": "A spatial source frame is missing, changed, or no longer matches its approved video",
     "m8_spatial_request_invalid": "This spatial request is not valid",
+    "r2_shot_admission_refused": "This shot cannot be generated with the selected profile",
+    "r2_shot_authority_stale": "The shot, its location binding or its source frames changed; reload and try again",
+    "r2_shot_command_conflict": "This command ID was already used for a different shot request",
+    "r2_shot_backend_unavailable": "The video provider for this profile is not available; check its configuration",
 }

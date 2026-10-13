@@ -449,4 +449,8 @@ MESSAGES = {
     "m8_spatial_unavailable": "空间分析暂不可用，请检查 Gemini 文本模型配置后重试",
     "m8_spatial_source_conflict": "空间源帧缺失、已变更或与已审批的视频不一致",
     "m8_spatial_request_invalid": "该空间分析请求无效",
+    "r2_shot_admission_refused": "该镜头无法使用所选配置生成",
+    "r2_shot_authority_stale": "镜头、场景绑定或源帧已变更，请重新加载后重试",
+    "r2_shot_command_conflict": "该命令 ID 已用于其他镜头请求",
+    "r2_shot_backend_unavailable": "该配置的视频供应商不可用，请检查配置",
 }
