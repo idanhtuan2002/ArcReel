@@ -508,6 +508,7 @@ MESSAGES = {
     "m8_spatial_unavailable": "Spatial analysis is not available right now; check the Gemini text model setting and try again",
     "m8_spatial_source_conflict": "A spatial source frame is missing, changed, or no longer matches its approved video",
     "m8_spatial_request_invalid": "This spatial request is not valid",
+    "m8_target_registration_stale": "The admitted screenplay changed or no longer resolves; admit it again, then register its shots",
     "m8_spatial_review_unavailable": "Spatial review is not available until showrunner grants are activated on this server",
     "m8_spatial_review_forbidden": "You do not have a current showrunner grant for this project",
     "m8_spatial_review_session_unavailable": "This review session has expired, is incomplete or no longer matches; open a new review",

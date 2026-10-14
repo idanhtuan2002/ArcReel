@@ -507,6 +507,7 @@ MESSAGES = {
     "m8_spatial_unavailable": "Phân tích không gian hiện không khả dụng; hãy kiểm tra cấu hình model văn bản Gemini rồi thử lại",
     "m8_spatial_source_conflict": "Frame nguồn không gian bị thiếu, đã thay đổi hoặc không còn khớp với video đã duyệt",
     "m8_spatial_request_invalid": "Yêu cầu phân tích không gian này không hợp lệ",
+    "m8_target_registration_stale": "Kịch bản đã duyệt đã thay đổi hoặc không còn hợp lệ; hãy duyệt lại rồi đăng ký shot",
     "m8_spatial_review_unavailable": "Duyệt không gian chưa khả dụng cho đến khi server kích hoạt quyền showrunner",
     "m8_spatial_review_forbidden": "Bạn không có quyền showrunner còn hiệu lực cho dự án này",
     "m8_spatial_review_session_unavailable": "Phiên duyệt đã hết hạn, chưa hoàn tất hoặc không còn khớp; hãy mở phiên duyệt mới",

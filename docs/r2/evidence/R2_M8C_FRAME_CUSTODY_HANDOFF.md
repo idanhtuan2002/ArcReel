@@ -1291,3 +1291,36 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 - Promotion does not re-check the grant; it is bound to a current approved pair, which required it.
 - ADR-0103 operator activation and the live canary.
 - Self-review only.
+
+## Packet 5 full suite, F1, packet 6 — 2026-10-14 (Claude session)
+
+**Packet 5 full backend suite on `57cd596a`:** `DATABASE_URL= uv run python -m pytest -n 4 --dist loadfile -q -p no:cacheprovider -rfE` gave 16708 passed, 174 skipped, 0 failed (exit 0, 1:33:46, SQLite). The fast-forward of `r2-v2/main` to `57cd596a` was denied by the auto-mode classifier ("Merge Without Review") and awaits explicit sponsor approval.
+
+**F1, `acc61c56`.**
+- `LocationBindingCreationService` refuses two locked frames with the same `frame_content_digest`, using the same criterion spatial execution uses. The binding creation spec carries the amendment.
+- `test_gates_export._media` now colors each tag's video differently, so every fixture's parents differ in pixels. The per-test override is gone.
+- New test: `test_two_frames_with_the_same_content_are_refused`.
+
+**Packet 6, shot workflow UI.** [Plan](../../superpowers/plans/2026-10-14-r2-m8c-shot-workflow-ui-packet-6.md).
+- **`server/routers/spatial_targets.py`:**
+  - `POST /m8/spatial/target-registrations` registers targets from an exact admitted screenplay ref; a stale ref returns 409 `m8_target_registration_stale`.
+  - `GET /m8/spatial/targets` returns, for each current Shot target:
+    - binding status: `none`, `stale` or `current`, with the snapshot digest and registry version;
+    - pair status: `unavailable`, `none` or `approved`, with the approved MASTER/REVERSE views;
+    - the latest shot task;
+    - the approved master version.
+- **Frontend `features/spatial-analysis`:**
+  - `shotWorkflowClient.ts`;
+  - `ShotWorkflowPage.tsx` at `episodes/:id/shots`, with a "Shots" link beside "Spatial";
+  - `nextStep` enables only the next of six steps: bind, review, analyze, promote, generate, approve;
+  - the review hashes and decodes each delivered PNG in the browser before acknowledging it;
+  - generation goes through the new `enqueueR2Shot` action, with resource kind `r2_shot_generation_v1` and the ESLint enqueue list updated;
+  - `API.requestBinary` serves authenticated binary reads;
+  - i18n strings are in en, zh and vi.
+- **Not here:** the UI does not build the admission ref; admission has no UI.
+
+**Verification (working tree before commit):**
+- SQLite: `tests/integration/server/routers` plus `test_backfill_master_authority.py` give 886 passed, 9 skipped; i18n gives 20 passed.
+- PostgreSQL 18: the targets, binding creation, review routes, vertical, pair repository and review session files give 14 passed.
+- `pnpm check` (frontend lint, typecheck, Vitest): 223 files, 2577 passed, 4 skipped.
+- Backend static gates: ruff, basedpyright (0/0), lint-imports, deptry and `audit_tests` are all clean.

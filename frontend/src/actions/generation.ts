@@ -398,3 +398,18 @@ export async function enqueueReferenceVideoBatch(
   }
   return res;
 }
+
+/** The one R2 shot generation entry: marks the Shot target busy before the request, like every other enqueue. */
+export async function enqueueR2Shot(
+  projectName: string,
+  targetId: string,
+  body: Parameters<typeof API.generateR2Shot>[2],
+): Promise<EnqueueResult> {
+  const res = await submit(
+    [markResource(projectName, "r2_shot_generation_v1", targetId, "r2_shot_generation_v1")],
+    () => API.generateR2Shot(projectName, targetId, body),
+    oneTaskId,
+  );
+  notifyEnqueued(false, i18n.t("dashboard:shot_workflow_generate_queued", { id: targetId }));
+  return { taskIds: [res.task_id], deduped: false };
+}

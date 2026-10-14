@@ -450,6 +450,7 @@ MESSAGES = {
     "m8_spatial_unavailable": "空间分析暂不可用，请检查 Gemini 文本模型配置后重试",
     "m8_spatial_source_conflict": "空间源帧缺失、已变更或与已审批的视频不一致",
     "m8_spatial_request_invalid": "该空间分析请求无效",
+    "m8_target_registration_stale": "已准入的剧本已变更或不再有效，请重新准入后再登记镜头",
     "m8_spatial_review_unavailable": "服务器尚未激活 showrunner 授权，空间审阅暂不可用",
     "m8_spatial_review_forbidden": "你在此项目中没有有效的 showrunner 授权",
     "m8_spatial_review_session_unavailable": "审阅会话已过期、未完成或不再一致，请重新开始审阅",

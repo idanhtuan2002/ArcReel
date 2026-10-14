@@ -80,6 +80,7 @@ from server.routers import (
     shot_uploads,
     spatial,
     spatial_review,
+    spatial_targets,
     system,
     system_config,
     tasks,
@@ -677,6 +678,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M8 spatial review"],
+)
+app.include_router(
+    spatial_targets.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["M8 spatial targets"],
 )
 app.include_router(
     r2_shots.router,

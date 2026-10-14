@@ -1007,6 +1007,13 @@ class API {
     return this.request("/onboarding/seen", { method: "POST" });
   }
 
+  /** An authenticated request whose body is binary; a non-2xx response rejects with `ApiRequestError`. */
+  static async requestBinary(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const response = await fetch(`${API_BASE}${endpoint}`, withAuth(endpoint, options));
+    await throwIfNotOk(response, `HTTP ${response.status}`);
+    return response;
+  }
+
   static async downloadDiagnostics(): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(
       `${API_BASE}/system/logs/download`,
@@ -2143,6 +2150,23 @@ class API {
    * @param scriptFile - 剧本文件名
    * @param durationSeconds - 时长（秒）
    */
+  /** Queue one R2 shot for a Take Shot target, bound to its current binding snapshot (`r2_shot_generation_v1`). */
+  static async generateR2Shot(
+    projectName: string,
+    targetId: string,
+    body: {
+      command_id: string;
+      expected_target_registry_version: number;
+      expected_binding_snapshot_digest: string;
+      execution_profile_ref: string;
+    },
+  ): Promise<{ task_id: string; target_registry_version: number; binding_snapshot_digest: string; host_request_digest: string }> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/r2/shots/${encodeURIComponent(targetId)}/generate`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  }
+
   static async generateVideo(
     projectName: string,
     segmentId: string,
