@@ -92,3 +92,29 @@
 - **D3c, frontend:** the page, the API, i18n and Vitest. Then `pnpm check` and a browser check.
 
 Each packet runs only its related tests, the static gates and an independent Codex review.
+
+## Changes after review
+
+The independent Codex review of `be7d4611` and `cb609cd2` raised five findings. All five are fixed in `7621f367`, each with a regression test.
+
+- **Evaluate replay** (decision 10). Every evaluate command is recorded in `m8_learning_evaluations` with its request digest and its full outcome, whether the rule fired or not.
+  - A retry replays the recorded outcome.
+  - The same command id with a changed request is a conflict.
+- **Decision identity** (decision 6). A decision id derives from its scoped command id, so identical non-final decisions sent under two commands are two decisions. Before the fix, the second one hit the primary key and the API answered 500.
+- **Pre-registration** (decision 5).
+  - It counts a result that existed before registration, by `observed_at` or `ingested_at`.
+  - It checks the whole evaluation universe inside the protocol window, before exclusions apply, so an exclusion chosen after seeing results cannot hide them.
+  - Consequence: for YouTube day rows, `observed_at` is the end of the Pacific day. A protocol must therefore be registered before the evaluation days end. This is the conservative direction.
+- **Causal surface** (decision 4).
+  - A causal claim needs one non-blank `exposure_ref`. Observation admission refuses a blank surface, and refuses a randomized or platform-managed observation that has none.
+  - The applicability records `language` and `surface`, and `propose` checks both against the evidence.
+  - The checker catches past tense and ignores arm labels.
+  - The API's `language` field reads the recorded value.
+
+**Browser check** (`5764fbfc`). The flow ran headless in Chromium on isolated dev servers against the real routes, with observations seeded through the ingest API: evaluate fired, then Defer, then Accept with a governed proposal reference. Fixes made during the check:
+- the arm numbers are now locale-formatted;
+- the lead sentence is localized, with the recorded hypothesis kept below it;
+- the arm cards are aligned;
+- the form grid and the ledger follow container queries.
+
+At 390 px the workspace sidebar still leaves about 130 px of content width. That is the known app-shell limit and is out of scope.
