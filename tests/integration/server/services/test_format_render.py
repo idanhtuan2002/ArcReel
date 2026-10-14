@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -183,3 +185,88 @@ async def test_cancellation_kills_ffmpeg_and_leaves_no_output(session_factory: F
     assert await _attempts(session_factory) == ["SUBMITTING"]
     assert await _evidence(session_factory) == []
     assert not list((tmp_path / "formats").glob("*"))
+
+
+class _Crash(BaseException):
+    """The process dies: nothing after this point runs."""
+
+
+class _CrashOnOpen:
+    """A session factory that dies when its ``crash_at``-th session is opened."""
+
+    def __init__(self, factory: Factory, crash_at: int) -> None:
+        self._factory = factory
+        self._crash_at = crash_at
+        self.opened = 0
+
+    def __call__(self) -> AsyncSession:
+        self.opened += 1
+        if self.opened == self._crash_at:
+            raise _Crash
+        return self._factory()
+
+
+async def test_a_crash_after_acceptance_is_completed_by_resending_the_command(
+    session_factory: Factory, tmp_path: Path
+) -> None:
+    source = make_source(tmp_path / "master.mp4")
+    plan_id = await _store_plan(session_factory, source)
+    # Sessions: 1 reads the plan, 2 runs the M7 attempt to ACCEPTED, 3 would record the success.
+    crashing = _CrashOnOpen(session_factory, crash_at=3)
+    with pytest.raises(_Crash):
+        await render_service(crashing).render(
+            user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source, command_id="r-1"
+        )
+    assert await _attempts(session_factory) == ["ACCEPTED"]
+    assert await _evidence(session_factory) == []
+
+    service = render_service(session_factory)
+    recovered = await service.render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source, command_id="r-1"
+    )
+    assert await _attempts(session_factory) == ["SUCCEEDED"]
+    [row] = await _evidence(session_factory)
+    assert (row.execution_id, row.artifact_digest) == (recovered.execution_id, recovered.artifact_digest)
+    assert file_digest(recovered.artifact_path) == recovered.artifact_digest
+    again = await service.render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source, command_id="r-1"
+    )
+    assert (again.execution_id, again.replayed) == (recovered.execution_id, True)
+
+
+async def test_the_api_render_lease_outlives_the_bounded_ffmpeg_run(
+    monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
+) -> None:
+    from datetime import UTC, datetime
+
+    from server.routers import formats
+    from server.services.format_render import RENDER_TIMEOUT_SECONDS
+
+    monkeypatch.setattr(formats, "async_session_factory", session_factory)
+    source = make_source(tmp_path / "master.mp4")
+    plan_id = await _store_plan(session_factory, source)
+    # An ffmpeg on PATH that takes a moment before rendering, so the running attempt can be observed.
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    slow = bin_dir / "ffmpeg"
+    slow.write_text(f"#!/bin/sh\nsleep 1\nexec '{shutil.which('ffmpeg')}' \"$@\"\n", encoding="utf-8")
+    slow.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+    render = asyncio.create_task(
+        formats._render_service().render(
+            user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source, command_id="r-1"
+        )
+    )
+    lease = None
+    async with asyncio.timeout(30):
+        while lease is None:
+            async with session_factory() as session:
+                row = await session.scalar(select(ExecutionAttemptModel))
+            if row is not None and row.state == "SUBMITTING" and row.lease_expires_at is not None:
+                expires = row.lease_expires_at
+                expires = expires if expires.tzinfo else expires.replace(tzinfo=UTC)
+                lease = (expires - datetime.now(UTC)).total_seconds()
+            await asyncio.sleep(0.02)
+    await render
+    assert lease > RENDER_TIMEOUT_SECONDS

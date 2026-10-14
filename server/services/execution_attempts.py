@@ -23,7 +23,7 @@ from r2.contracts.host_hardening import (
     ProviderObservation,
     ProviderRouteSnapshot,
 )
-from r2.host_hardening.execution import ExecutionAttemptServiceImpl
+from r2.host_hardening.execution import DEFAULT_LEASE_TTL_SECONDS, ExecutionAttemptServiceImpl
 from r2.host_hardening.host_submit import AttemptSubmitter, UsageExecutionBinder
 from r2.host_hardening.ports import ProviderExecutionAdapter
 from r2.host_hardening.provider_capabilities import DEFAULT_REGISTRY_PATH, load_capability_profile
@@ -122,6 +122,7 @@ def build_attempt_submitter(
     project_name: str,
     usage_binder: UsageExecutionBinder | None,
     registry_path: Path = DEFAULT_REGISTRY_PATH,
+    lease_ttl_seconds: int = DEFAULT_LEASE_TTL_SECONDS,
 ) -> AttemptSubmitter:
     resolver = capability_resolver(registry_path)
     repository = ExecutionAttemptRepository(session, capability_resolver=resolver)
@@ -129,6 +130,7 @@ def build_attempt_submitter(
         repository,
         capability_resolver=resolver,
         adapter_resolver=build_adapter_resolver({}),
+        lease_ttl_seconds=lease_ttl_seconds,
         commit=session.commit,
     )
     return AttemptSubmitter(

@@ -41,8 +41,10 @@ class ApprovedLocation:
     approval: PairDecisionResultV2
 
 
-async def showrunner_grants(factory: Factory) -> CurrentShowrunnerGrantReader:
-    """Import one signed, current HUMAN_SHOWRUNNER grant for the test user and return its reader."""
+async def showrunner_grants(
+    factory: Factory, *, user_id: str = USER.id, project_name: str = PROJECT, principal: str = USER.sub
+) -> CurrentShowrunnerGrantReader:
+    """Import one signed, current HUMAN_SHOWRUNNER grant for a principal (the test user by default)."""
     private = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
     public = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     grants = CurrentShowrunnerGrantReader(key_id=KEY_ID, public_key=public)
@@ -50,9 +52,9 @@ async def showrunner_grants(factory: Factory) -> CurrentShowrunnerGrantReader:
     body = {
         "schema": "governance.showrunner_grant_event.v1",
         "event_type": "ISSUE",
-        "user_id": USER.id,
-        "project_name": PROJECT,
-        "principal": USER.sub,
+        "user_id": user_id,
+        "project_name": project_name,
+        "principal": principal,
         "role": "HUMAN_SHOWRUNNER",
         "sequence": 1,
         "previous_event_digest": None,
@@ -64,7 +66,7 @@ async def showrunner_grants(factory: Factory) -> CurrentShowrunnerGrantReader:
     signature = base64.urlsafe_b64encode(private.sign(canonical_json_bytes(body, allow_nan=False))).decode().rstrip("=")
     await GovernanceGrantImporter(factory, key_id=KEY_ID, public_key=public).import_event(
         canonical_json_bytes({"body": body, "signature": signature}, allow_nan=False),
-        scope=GrantScopeV1(USER.id, PROJECT, USER.sub),
+        scope=GrantScopeV1(user_id, project_name, principal),
     )
     return grants
 

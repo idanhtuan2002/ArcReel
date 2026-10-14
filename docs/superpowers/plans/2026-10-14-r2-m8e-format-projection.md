@@ -120,3 +120,39 @@ The service still accepts two or more reviewers whenever they are assigned.
     - The reviewer opens a review packet holding the two clips, labelled A and B in an order the server draws and records. The packet shows no plan, profile or reframe detail.
     - The reviewer gives PASS or FAIL for each rubric item, plus a note.
     - Reviews come only from an interactive session. With a single reviewer, the report carries `SINGLE_REVIEWER_DEVIATION`.
+
+## Decisions taken while fixing the fourth Codex review (at `4acbe8dd`)
+
+12. **Reviewers are showrunner grant holders.** The reviewer principal (the JWT `sub`) must hold a current, checkpointed `HUMAN_SHOWRUNNER` grant for the project. Opening a packet, fetching a clip and submitting a review all require it.
+    - Precedent: M8-B spatial review sessions gate review on the same grant reader. The grant is the signed, stored authority for the sponsor, issued in M8-C.
+    - A self-assigned assignment table would add an authority that nothing signs, so it was rejected.
+    - The packet and every review record the grant event digest. `validate_semantic_report` refuses a review without one, so the single-reviewer deviation is bound to that authorized principal.
+    - Until grants are activated on a server, review returns 503. A reviewer without a grant gets 403.
+13. **Neutral review copies.** At packet open, both clips are stream-copied from verified snapshots into per-packet copies:
+    - container metadata and chapters are stripped;
+    - each copy gets a random tag and a random name;
+    - clips are served from a verified snapshot without ETag, Last-Modified or a file name.
+
+    So no clip matches a recorded digest or name. What blindness cannot hide is that the projection has the target's shape; the evidence states this limit.
+14. **Evidence and reviews are serialized per plan.** One PostgreSQL advisory lock per plan covers both report streams.
+    - It is taken by report writers, by review submission (before the duplicate check and the aggregation) and by the format evidence gate.
+    - The gate also locks the source artifact's authority row.
+    - So a promotion commits only with the reports and source head that are current at its commit.
+15. **Renders: lease and recovery.**
+    - The M7 lease of a render attempt is `RENDER_TIMEOUT_SECONDS + 300`, so the recovery scanner never reclaims an attempt whose bounded FFmpeg run may still be going.
+    - An attempt that is `ACCEPTED` without recorded success evidence (the process died in between) is completed when the same command is sent again. Its digest comes from the job id `<execution>:<digest>`, and the content-addressed file must still hold those bytes.
+    - A fence lost to another writer is reported as a render failure.
+16. **Media I/O stays outside transactions and reads snapshots.**
+    - Plan creation, validation, review packets, clip delivery and candidate preparation measure, serve or register private snapshots whose bytes were hashed as they were copied.
+    - Database work runs in short transactions that re-read the inputs.
+    - A missing media file is `m8_format_media_missing` (409).
+17. **Overlay analysis uses pixel geometry.** Collisions are computed on the even-pixel crop and placement that FFmpeg applies, not on the ideal spans.
+18. **Parity row F07 (missing source) is measured per dimension.** Each of the eight dimensions has its own measurement, taken over `RUNS` refusals on each side:
+    - refusal;
+    - no success;
+    - stable reasons;
+    - no outputs left;
+    - an unchanged work directory;
+    - a reason that names the missing file;
+    - refusal time at most 2 s;
+    - zero bytes written.

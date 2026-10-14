@@ -64,6 +64,8 @@ PSNR_MIN = 30.0
 TIME_FACTOR = 3.0
 SIZE_FACTOR = 2.0
 RUNS = 3
+# A refusal of a missing source must not take longer than this on either side.
+REFUSAL_SECONDS_MAX = 2.0
 
 _DONOR_RUNNER = """
 import json, sys
@@ -251,6 +253,38 @@ def disposition(ok: bool, improved: bool = False) -> str:
     return "IMPROVED" if improved and ok else ("PARITY" if ok else "EXCLUDED")
 
 
+def measure_refusals(clone: Path, work: Path, missing: Path, plan) -> dict:
+    """Run both sides RUNS times on a source that does not exist and measure every refusal."""
+    before = {path.name: path.stat().st_size for path in work.iterdir() if path.is_file()}
+    donor_out, r2_out = work / "donor-missing.mp4", work / "r2-missing.mp4"
+    donor_runs, r2_runs = [], []
+    for _attempt in range(RUNS):
+        donor_runs.append(donor_render(clone, missing, donor_out, 1080, 1080, "pad"))
+        r2_runs.append(r2_render(plan, missing, r2_out))
+    after = {path.name: path.stat().st_size for path in work.iterdir() if path.is_file()}
+    new_files = {name: size for name, size in after.items() if name not in before}
+    donor_reasons = [error.replace(str(work), "<work>").strip()[-160:] for _ok, _t, error in donor_runs]
+    r2_reasons = [error.replace(str(work), "<work>").strip()[-160:] for _ok, _t, error in r2_runs]
+    return {
+        "runs": RUNS,
+        "donor_refused": not any(ok for ok, _t, _e in donor_runs),
+        "r2_refused": not any(ok for ok, _t, _e in r2_runs),
+        "donor_succeeded": any(ok for ok, _t, _e in donor_runs) or donor_out.exists(),
+        "r2_succeeded": any(ok for ok, _t, _e in r2_runs) or r2_out.exists(),
+        "donor_reasons_stable": len(set(donor_reasons)) == 1,
+        "r2_reasons_stable": len(set(r2_reasons)) == 1,
+        "outputs_left": donor_out.exists() or r2_out.exists() or any(name.endswith(".partial.mp4") for name in after),
+        "work_changed": before != after,
+        "bytes_written": sum(new_files.values()),
+        "donor_max_s": round(max(t for _ok, t, _e in donor_runs), 3),
+        "r2_max_s": round(max(t for _ok, t, _e in r2_runs), 3),
+        "donor_reason_given": all(reason for reason in donor_reasons),
+        "donor_reason": donor_reasons[0],
+        "donor_reasons": donor_reasons,
+        "r2_reason_names_missing_file": all("No such file" in reason for reason in r2_reasons),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--donor-clone", type=Path, required=True)
@@ -293,12 +327,9 @@ def main() -> int:
     source_digest = sha256_file(source)
     # Failure safety and observability: both sides refuse a missing source, produce no output, and say why.
     missing = work / "missing.mp4"
-    missing_donor_ok, _t, donor_error = donor_render(clone, missing, work / "donor-missing.mp4", 1080, 1080, "pad")
-    missing_r2_ok, _t, r2_error = r2_render(
-        r2_plan(1080, 1080, ReframeKind.PAD, source_digest), missing, work / "r2-missing.mp4"
-    )
-    failure_safe = not missing_donor_ok and not missing_r2_ok and not (work / "r2-missing.mp4").exists()
-    observable = bool(donor_error.strip()) and "No such file" in r2_error
+    refusals = measure_refusals(clone, work, missing, r2_plan(1080, 1080, ReframeKind.PAD, source_digest))
+    failure_safe = refusals["donor_refused"] and refusals["r2_refused"] and not refusals["outputs_left"]
+    observable = refusals["donor_reason_given"] and refusals["r2_reason_names_missing_file"]
     rows: list[dict] = []
     measures: dict[str, dict] = {}
     unknowns: list[str] = []
@@ -376,36 +407,38 @@ def main() -> int:
                 }
             )
 
+    missing_dimensions = {
+        # Both sides refuse every time.
+        "functionality": refusals["donor_refused"] and refusals["r2_refused"],
+        # Neither side reports success or writes an output for a source that does not exist.
+        "correctness": not refusals["donor_succeeded"] and not refusals["r2_succeeded"],
+        # Every repetition gives the same outcome and the same reason on each side.
+        "determinism": refusals["donor_reasons_stable"] and refusals["r2_reasons_stable"],
+        # No output or partial file remains at either output path.
+        "failure_safety": not refusals["outputs_left"],
+        # The work directory holds exactly the files it held before the refusals.
+        "data_integrity": not refusals["work_changed"],
+        # The donor gives a reason, and R2's reason names the missing file.
+        "observability": observable,
+        # Each refusal returns within the pre-set bound.
+        "performance": refusals["donor_max_s"] <= REFUSAL_SECONDS_MAX and refusals["r2_max_s"] <= REFUSAL_SECONDS_MAX,
+        # No bytes are written.
+        "resources": refusals["bytes_written"] == 0,
+    }
     rows.append(
         {
             "behavior_id": "F07",
             "donor_test_refs": [],
             "fixture_refs": ["case:missing-source"],
             "intentional_difference": None,
-            **dict.fromkeys(
-                (
-                    "functionality",
-                    "correctness",
-                    "determinism",
-                    "failure_safety",
-                    "data_integrity",
-                    "observability",
-                    "performance",
-                    "resources",
-                ),
-                disposition(failure_safe and observable),
-            ),
+            **{name: disposition(ok) for name, ok in missing_dimensions.items()},
             "evidence_refs": ["measure:missing-source"],
         }
     )
-    if not (failure_safe and observable):
-        unknowns.append("missing-source: a side did not refuse cleanly with a reason")
-    measures["missing-source"] = {
-        "donor_refused": not missing_donor_ok,
-        "r2_refused": not missing_r2_ok,
-        "donor_reason": donor_error.replace(str(work), "<work>").strip()[:160],
-        "r2_reason_names_missing_file": "No such file" in r2_error,
-    }
+    failed = sorted(name for name, ok in missing_dimensions.items() if not ok)
+    if failed:
+        unknowns.append(f"missing-source: {', '.join(failed)} not met")
+    measures["missing-source"] = {key: value for key, value in refusals.items() if key != "donor_reasons"}
 
     file_hashes = clone_file_hashes(clone, DONOR_COMMIT, SELECTED)
     if donor_tests.returncode != 0:

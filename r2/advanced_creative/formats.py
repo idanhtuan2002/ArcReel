@@ -356,6 +356,64 @@ def verify_plan_digest(plan: FormatProjectionPlan) -> None:
         raise FormatInvalidError("plan digest does not match its contents")
 
 
+def _even(value: Fraction) -> int:
+    """Round to the nearest even pixel count (ties go down), never below 2."""
+    pixels = int(value) // 2 * 2
+    if value - pixels > 1:
+        pixels += 2
+    return max(pixels, 2)
+
+
+@dataclass(frozen=True)
+class PixelGeometry:
+    crop_width: int
+    crop_height: int
+    crop_x: int
+    crop_y: int
+    scaled_width: int
+    scaled_height: int
+    pad_x: int
+    pad_y: int
+    target_width: int
+    target_height: int
+
+
+def pixel_geometry(plan: FormatProjectionPlan, *, source_width: int, source_height: int) -> PixelGeometry:
+    """The exact even-pixel crop, scale and pad the plan's single reframe decision describes."""
+    decision = plan.reframe_decisions[0]
+    source = decision.source_span.model_dump(mode="python")
+    target = decision.target_span.model_dump(mode="python")
+    if (source.get("width"), source.get("height")) != (source_width, source_height):
+        raise FormatInvalidError("the plan was built for another source size")
+    window = Box.parse(source)
+    placed = Box.parse(target)
+    out_w, out_h = plan.output_profile.width, plan.output_profile.height
+    crop_w = _even((window.x1 - window.x0) * source_width)
+    crop_h = _even((window.y1 - window.y0) * source_height)
+    crop_x = min(_even(window.x0 * source_width) if window.x0 else 0, source_width - crop_w)
+    crop_y = min(_even(window.y0 * source_height) if window.y0 else 0, source_height - crop_h)
+    scaled_w = _even((placed.x1 - placed.x0) * out_w)
+    scaled_h = _even((placed.y1 - placed.y0) * out_h)
+    pad_x = (out_w - scaled_w) // 2 // 2 * 2 if ReframeKind(decision.kind) is ReframeKind.PAD else 0
+    pad_y = (out_h - scaled_h) // 2 // 2 * 2 if ReframeKind(decision.kind) is ReframeKind.PAD else 0
+    # Even-pixel rounding may stretch the picture slightly; more than 1% is refused.
+    drift = abs(Fraction(crop_w, crop_h) - Fraction(scaled_w, scaled_h)) / Fraction(scaled_w, scaled_h)
+    if drift > Fraction(1, 100):
+        raise FormatInvalidError("pixel rounding distorts the aspect beyond 1%")
+    focal_value = source.get("focal")
+    if isinstance(focal_value, dict):
+        focal = Box.parse(focal_value)
+        inside = (
+            crop_x <= focal.x0 * source_width
+            and focal.x1 * source_width <= crop_x + crop_w
+            and crop_y <= focal.y0 * source_height
+            and focal.y1 * source_height <= crop_y + crop_h
+        )
+        if not inside:
+            raise FormatInvalidError("the focal span does not fit inside the pixel crop")
+    return PixelGeometry(crop_w, crop_h, crop_x, crop_y, scaled_w, scaled_h, pad_x, pad_y, out_w, out_h)
+
+
 def _project(box: Box, window: Box, target: Box) -> Box | None:
     """``box`` (source coordinates) after cropping to ``window`` and placing in ``target``; None if cut away."""
     x0, y0 = max(box.x0, window.x0), max(box.y0, window.y0)
@@ -382,8 +440,23 @@ def overlay_collisions(plan: FormatProjectionPlan) -> tuple[str, ...]:
     """
     decision = plan.reframe_decisions[0]
     source = decision.source_span.model_dump(mode="python")
-    window = Box.parse(source)
-    target = Box.parse(decision.target_span.model_dump(mode="python"))
+    width, height = source.get("width"), source.get("height")
+    if not isinstance(width, int) or not isinstance(height, int):
+        raise FormatInvalidError("the plan's source span records the source size")
+    # The analysis uses the even-pixel crop and placement FFmpeg actually applies, not the ideal spans.
+    g = pixel_geometry(plan, source_width=width, source_height=height)
+    window = Box(
+        Fraction(g.crop_x, width),
+        Fraction(g.crop_y, height),
+        Fraction(g.crop_x + g.crop_width, width),
+        Fraction(g.crop_y + g.crop_height, height),
+    )
+    target = Box(
+        Fraction(g.pad_x, g.target_width),
+        Fraction(g.pad_y, g.target_height),
+        Fraction(g.pad_x + g.scaled_width, g.target_width),
+        Fraction(g.pad_y + g.scaled_height, g.target_height),
+    )
     ui = [
         (index, box) for index, (kind, box) in enumerate(validate_overlay_set(plan.overlay_constraints)) if kind == "ui"
     ]
@@ -478,7 +551,8 @@ def validate_technical_report(report: TechnicalValidationReport, plan: FormatPro
 def validate_semantic_report(report: SemanticParityReport, plan: FormatProjectionPlan, *, deviation: str | None) -> int:
     """Reviews against the fixed rubric; returns the reviewer count.
 
-    A review names its reviewer and gives PASS/FAIL for every rubric item. Reviewers disagree
+    A review names its reviewer and the showrunner grant event that authorized them, and gives
+    PASS/FAIL for every rubric item. Reviewers disagree
     materially when any item's verdicts differ. The report passes only when every item of every
     review passes and nobody disagrees. Fewer than two reviewers needs the recorded deviation.
     """
@@ -494,6 +568,9 @@ def validate_semantic_report(report: SemanticParityReport, plan: FormatProjectio
         if not isinstance(reviewer, str) or not reviewer or reviewer in reviewers:
             raise FormatInvalidError("each review names one distinct reviewer")
         reviewers.add(reviewer)
+        grant = body.get("grant_event_digest")
+        if not isinstance(grant, str) or not grant.startswith("sha256:") or len(grant) != 71:
+            raise FormatInvalidError("each review names the showrunner grant that authorized its reviewer")
         items = body.get("items")
         if not isinstance(items, dict) or set(items) != set(SEMANTIC_ITEMS):
             raise FormatInvalidError("a review gives a verdict for every rubric item")
@@ -524,12 +601,14 @@ __all__ = [
     "Box",
     "FormatInvalidError",
     "Geometry",
+    "PixelGeometry",
     "ReframeKind",
     "build_plan",
     "format_slot_key",
     "overlay_collisions",
     "overlay_digest",
     "parse_source_master_id",
+    "pixel_geometry",
     "profile_digest",
     "reduced_ratio",
     "reframe_decision",

@@ -16,7 +16,7 @@ TABLE = "m8_learning_observations"
 def test_observation_migration_has_scoped_chain_keys_and_downgrades_alone(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["917c4a0e0001"]
+    assert script.get_heads() == ["918c4a0e0001"]
     assert script.get_revision("914c4a0e0001").down_revision == "913c4a0e0001"
     assert script.get_revision("915c4a0e0001").down_revision == "914c4a0e0001"
 

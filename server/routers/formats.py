@@ -2,22 +2,27 @@
 
 The user comes from the session and the project from the path. Plans are built against the
 server-resolved current master; renders run as M7 attempts; review packets, clips and reviews need
-an interactive session, and a review packet serves its clips only to the reviewer it was opened for.
+an interactive session whose principal holds a current showrunner grant (unavailable until grants
+are activated), and a review packet serves its clips only to the reviewer it was opened for, from a
+verified snapshot of its review copy without file metadata.
 Preview and promotion of a prepared candidate use the M8 exploration routes.
 """
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+import asyncio
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Literal
+from pathlib import Path
+from typing import Annotated, Literal
 
-from fastapi import APIRouter
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 from pydantic import Field
 from sqlalchemy import select
+from starlette.background import BackgroundTask
 
-from lib.api_errors import ApiError, ConflictError, NotFoundError, UnprocessableError
+from lib.api_errors import ApiError, ConflictError, NotFoundError, ServiceUnavailableError, UnprocessableError
 from lib.artifact_manifest import decode_artifact_key_parts
 from lib.db import async_session_factory
 from lib.db.models.formats import (
@@ -31,7 +36,7 @@ from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.project_manager import get_project_manager
 from r2.advanced_creative.digests import digest_canonical
 from r2.advanced_creative.errors import ExplorationNotFoundError, FormatNotFoundError, M8Error
-from r2.advanced_creative.formats import SEMANTIC_ITEMS, SEMANTIC_RUBRIC, Box, ReframeKind
+from r2.advanced_creative.formats import SEMANTIC_ITEMS, SEMANTIC_RUBRIC, Box, ReframeKind, parse_source_master_id
 from r2.contracts.advanced_creative import (
     FormatProjectionPlan,
     M8ContractModel,
@@ -49,17 +54,33 @@ from server.auth import CurrentUser, InteractiveUser
 from server.services.advanced_creative import exploration_promotion, exploration_service
 from server.services.execution_attempts import build_attempt_submitter
 from server.services.format_candidate import PreparedFormatCandidate, prepare_format_candidate
-from server.services.format_plans import master_source, plan_from_master
-from server.services.format_render import FormatRenderService
+from server.services.format_plans import current_master, master_path, plan_from_master
+from server.services.format_render import RENDER_LEASE_SECONDS, FormatRenderService, snapshot_dir, verified_snapshot
 from server.services.format_review import FormatReviewService
 from server.services.format_validation import FormatValidationService
+from server.services.governance_grants import CurrentShowrunnerGrantReader
 
 router = APIRouter()
 
 FORMAT_REQUEST_INVALID = "m8_format_request_invalid"
+REVIEW_UNAVAILABLE = "m8_format_review_unavailable"
+REVIEW_FORBIDDEN = "m8_format_review_forbidden"
+
+
+def governance_grants(request: Request) -> CurrentShowrunnerGrantReader:
+    """The activated grant reader; blind review is unavailable without it."""
+    grants = getattr(request.app.state, "governance_grants", None)
+    if grants is None:
+        raise ServiceUnavailableError(REVIEW_UNAVAILABLE)
+    return grants
+
+
+Grants = Annotated[CurrentShowrunnerGrantReader, Depends(governance_grants)]
 
 
 def _api_error(error: Exception) -> ApiError:
+    if isinstance(error, PermissionError):
+        return ApiError(REVIEW_FORBIDDEN, status_code=403)
     if isinstance(error, (FormatNotFoundError, ExplorationNotFoundError)):
         return NotFoundError(error.code)
     if isinstance(error, M8Error):
@@ -70,7 +91,7 @@ def _api_error(error: Exception) -> ApiError:
 async def _run[T](operation: Callable[[], Awaitable[T]]) -> T:
     try:
         return await operation()
-    except (M8Error, ValueError) as error:
+    except (M8Error, ValueError, PermissionError) as error:
         raise _api_error(error) from error
 
 
@@ -82,7 +103,11 @@ def _render_service() -> FormatRenderService:
     return FormatRenderService(
         async_session_factory,
         submitter_for=lambda session, user_id, project_name: build_attempt_submitter(
-            session, user_id=user_id, project_name=project_name, usage_binder=None
+            session,
+            user_id=user_id,
+            project_name=project_name,
+            usage_binder=None,
+            lease_ttl_seconds=RENDER_LEASE_SECONDS,
         ),
     )
 
@@ -235,24 +260,21 @@ async def put_overlay(project_name: str, overlay: OverlayConstraintSet, user: Cu
 @router.post("/projects/{project_name}/m8/formats/plans")
 async def create_plan(project_name: str, req: CreatePlanRequest, user: CurrentUser) -> FormatProjectionPlan:
     async def operation() -> FormatProjectionPlan:
-        async with async_session_factory() as session:
-            plan = await plan_from_master(
-                session,
-                user_id=user.id,
-                project_name=project_name,
-                project_dir=_project_dir(project_name),
-                plan_id=req.plan_id,
-                source_artifact_key=req.source_artifact_key,
-                profile_ref=req.profile_ref,
-                constraint_ref=req.constraint_ref,
-                kind=req.kind,
-                focal=None if req.focal is None else req.focal.box(),
-                subject=req.subject.box(),
-                captions=tuple(caption.box() for caption in req.captions),
-                rationale=req.rationale,
-            )
-            await session.commit()
-            return plan
+        return await plan_from_master(
+            async_session_factory,
+            user_id=user.id,
+            project_name=project_name,
+            project_dir=_project_dir(project_name),
+            plan_id=req.plan_id,
+            source_artifact_key=req.source_artifact_key,
+            profile_ref=req.profile_ref,
+            constraint_ref=req.constraint_ref,
+            kind=req.kind,
+            focal=None if req.focal is None else req.focal.box(),
+            subject=req.subject.box(),
+            captions=tuple(caption.box() for caption in req.captions),
+            rationale=req.rationale,
+        )
 
     return await _run(operation)
 
@@ -313,20 +335,19 @@ async def list_plans(project_name: str, user: CurrentUser) -> list[PlanSummary]:
     return await _run(operation)
 
 
-async def _source_of(user_id: str, project_name: str, plan_id: str):
+async def _source_of(user_id: str, project_name: str, plan_id: str) -> Path:
+    """The current master file of the plan's source artifact; consumers verify its bytes on a snapshot."""
     async with async_session_factory() as session:
         plan = await FormatRepository(session).get_plan(user_id=user_id, project_name=project_name, plan_id=plan_id)
-        if plan is None:
-            raise FormatNotFoundError("unknown format plan")
-        artifact_key = plan.source_master_id.rpartition("@v")[0]
-        _master, path = await master_source(
-            session,
-            user_id=user_id,
-            project_name=project_name,
-            project_dir=_project_dir(project_name),
-            artifact_key=artifact_key,
-        )
-    return path
+    if plan is None:
+        raise FormatNotFoundError("unknown format plan")
+    master = await current_master(
+        async_session_factory,
+        user_id=user_id,
+        project_name=project_name,
+        artifact_key=parse_source_master_id(plan.source_master_id)[0],
+    )
+    return await asyncio.to_thread(master_path, master, _project_dir(project_name))
 
 
 @router.post("/projects/{project_name}/m8/formats/plans/{plan_id}/renders")
@@ -376,12 +397,12 @@ async def validate(project_name: str, execution_id: str, user: CurrentUser) -> T
 
 
 @router.post("/projects/{project_name}/m8/formats/renders/{execution_id}/review-packets")
-async def open_review(project_name: str, execution_id: str, user: InteractiveUser) -> ReviewPacketView:
+async def open_review(project_name: str, execution_id: str, user: InteractiveUser, grants: Grants) -> ReviewPacketView:
     async def operation() -> ReviewPacketView:
         row = await _render_row(user.id, project_name, execution_id)
         source = await _source_of(user.id, project_name, row.plan_id)
         project_dir = _project_dir(project_name)
-        packet = await FormatReviewService(async_session_factory).open_packet(
+        packet = await FormatReviewService(async_session_factory, grants=grants).open_packet(
             user_id=user.id,
             project_name=project_name,
             project_dir=project_dir,
@@ -394,28 +415,56 @@ async def open_review(project_name: str, execution_id: str, user: InteractiveUse
     return await _run(operation)
 
 
+async def _snapshot_response(path: Path, digest: str, project_dir: Path) -> StreamingResponse:
+    """Stream a verified private snapshot of ``path``; no name, ETag or modification time is sent."""
+    manager = verified_snapshot(path, digest, snapshot_dir(project_dir))
+    snapshot = await manager.__aenter__()
+
+    async def cleanup() -> None:
+        await manager.__aexit__(None, None, None)
+
+    async def body() -> AsyncIterator[bytes]:
+        handle = await asyncio.to_thread(snapshot.open, "rb")
+        try:
+            while chunk := await asyncio.to_thread(handle.read, 1 << 20):
+                yield chunk
+        finally:
+            await asyncio.to_thread(handle.close)
+
+    size = (await asyncio.to_thread(snapshot.stat)).st_size
+    return StreamingResponse(
+        body(),
+        media_type="video/mp4",
+        headers={"Cache-Control": "no-store", "Content-Length": str(size)},
+        background=BackgroundTask(cleanup),
+    )
+
+
 @router.get("/projects/{project_name}/m8/formats/review-packets/{packet_id}/clips/{label}")
-async def review_clip(project_name: str, packet_id: str, label: str, user: InteractiveUser) -> FileResponse:
-    async def operation() -> FileResponse:
-        path = await FormatReviewService(async_session_factory).clip(
+async def review_clip(
+    project_name: str, packet_id: str, label: str, user: InteractiveUser, grants: Grants
+) -> StreamingResponse:
+    async def operation() -> StreamingResponse:
+        project_dir = _project_dir(project_name)
+        path, digest = await FormatReviewService(async_session_factory, grants=grants).clip(
             user_id=user.id,
             project_name=project_name,
-            project_dir=_project_dir(project_name),
+            project_dir=project_dir,
             packet_id=packet_id,
             label=label,
             reviewer_id=user.sub,
         )
-        return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "no-store"})
+        return await _snapshot_response(path, digest, project_dir)
 
     return await _run(operation)
 
 
 @router.post("/projects/{project_name}/m8/formats/review-packets/{packet_id}/reviews")
 async def submit_review(
-    project_name: str, packet_id: str, req: SubmitReviewRequest, user: InteractiveUser
+    project_name: str, packet_id: str, req: SubmitReviewRequest, user: InteractiveUser, grants: Grants
 ) -> SemanticParityReport:
     async def operation() -> SemanticParityReport:
-        return await FormatReviewService(async_session_factory).submit(
+        return await FormatReviewService(async_session_factory, grants=grants).submit(
             user_id=user.id,
             project_name=project_name,
             packet_id=packet_id,
@@ -430,16 +479,14 @@ async def submit_review(
 @router.post("/projects/{project_name}/m8/formats/renders/{execution_id}/candidate")
 async def prepare_candidate(project_name: str, execution_id: str, user: CurrentUser) -> CandidateView:
     async def operation() -> CandidateView:
-        async with async_session_factory() as session:
-            prepared: PreparedFormatCandidate = await prepare_format_candidate(
-                session,
-                user_id=user.id,
-                project_name=project_name,
-                project_dir=_project_dir(project_name),
-                execution_id=execution_id,
-                author=user.id,
-            )
-            await session.commit()
+        prepared: PreparedFormatCandidate = await prepare_format_candidate(
+            async_session_factory,
+            user_id=user.id,
+            project_name=project_name,
+            project_dir=_project_dir(project_name),
+            execution_id=execution_id,
+            author=user.id,
+        )
         return CandidateView(**prepared.__dict__)
 
     return await _run(operation)

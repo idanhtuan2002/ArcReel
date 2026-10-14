@@ -52,11 +52,19 @@ class FormatRepository:
         self.session = session
         self._clock = clock or (lambda: datetime.now(UTC))
 
-    async def _next_sequence(self, model: type, *, user_id: str, project_name: str, plan_id: str) -> int:
-        """The next append position of one plan's report stream, serialized per plan (PostgreSQL)."""
+    async def lock_plan_reports(self, *, user_id: str, project_name: str, plan_id: str) -> None:
+        """Hold one plan's report streams until the transaction ends (PostgreSQL advisory lock).
+
+        Report writers take it before appending and evidence readers before reading, so a promotion
+        that verified the latest reports commits before any later report of that plan is appended.
+        """
         if self.session.get_bind().dialect.name == "postgresql":
-            key = f"m8-format-reports:{model.__tablename__}:{user_id}:{project_name}:{plan_id}"
+            key = f"m8-format-reports:{user_id}:{project_name}:{plan_id}"
             await self.session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": key})
+
+    async def _next_sequence(self, model: type, *, user_id: str, project_name: str, plan_id: str) -> int:
+        """The next append position of one plan's report stream, serialized per plan."""
+        await self.lock_plan_reports(user_id=user_id, project_name=project_name, plan_id=plan_id)
         current = await self.session.scalar(
             select(func.max(model.sequence)).where(
                 model.user_id == user_id, model.project_name == project_name, model.plan_id == plan_id

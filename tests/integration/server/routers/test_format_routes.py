@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from server.services.format_render import ffmpeg_available, file_digest
 from tests.auth_deps import AUTH_DEPENDENCIES
 from tests.integration.r2.advanced_creative.test_format_render import make_source
 from tests.integration.server.services.test_format_projection_flow import SOURCE_KEY, _seed_master
+from tests.integration.server.services.test_format_review import granted
 from tests.unit.r2.advanced_creative.test_formats import overlay, profile
 
 type Factory = async_sessionmaker[AsyncSession]
@@ -27,17 +29,21 @@ pytestmark = pytest.mark.skipif(not ffmpeg_available(), reason="needs ffmpeg and
 
 USER = CurrentUserInfo(id="default", sub="sponsor", role="admin")
 OTHER = CurrentUserInfo(id="default", sub="someone-else", role="admin")
+UNGRANTED = CurrentUserInfo(id="default", sub="self-assigned", role="admin")
 PROJECT = "demo"
 BASE = f"/api/v1/projects/{PROJECT}/m8/formats"
 
 
-def _app(monkeypatch: pytest.MonkeyPatch, factory: Factory, root: Path, *, reviewer: CurrentUserInfo | None) -> FastAPI:
+def _app(
+    monkeypatch: pytest.MonkeyPatch, factory: Factory, root: Path, *, reviewer: CurrentUserInfo | None, grants=None
+) -> FastAPI:
     project_dir = root / PROJECT
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "project.json").write_text(json.dumps({"title": PROJECT, "episodes": []}), encoding="utf-8")
     monkeypatch.setattr(formats, "async_session_factory", factory)
     monkeypatch.setattr(formats, "get_project_manager", lambda: ProjectManager(root))
     app = FastAPI()
+    app.state.governance_grants = grants
     app.dependency_overrides[get_current_user] = lambda: USER
     if reviewer is not None:
         app.dependency_overrides[get_current_interactive_user] = lambda: reviewer
@@ -65,7 +71,8 @@ async def _setup(http: AsyncClient, factory: Factory, root: Path) -> None:
 async def test_the_api_takes_a_projection_from_plan_to_candidate(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
 ) -> None:
-    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=USER)) as http:
+    grants = await granted(session_factory, USER.sub)
+    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=USER, grants=grants)) as http:
         await _setup(http, session_factory, tmp_path)
         planned = await http.post(
             f"{BASE}/plans",
@@ -93,6 +100,10 @@ async def test_the_api_takes_a_projection_from_plan_to_candidate(
         clips = [await http.get(f"{BASE}/review-packets/{packet['packet_id']}/clips/{label}") for label in ("A", "B")]
         assert [clip.status_code for clip in clips] == [200, 200]
         assert {clip.headers["content-type"] for clip in clips} == {"video/mp4"}
+        # Clips carry no validator or modification time, and their bytes are not a recorded file's.
+        assert not any({"etag", "last-modified", "content-disposition"} & set(clip.headers) for clip in clips)
+        recorded = {source_digest, rendered["artifact_digest"]}
+        assert not {"sha256:" + hashlib.sha256(clip.content).hexdigest() for clip in clips} & recorded
         reviewed = await http.post(
             f"{BASE}/review-packets/{packet['packet_id']}/reviews",
             json={"items": dict.fromkeys(SEMANTIC_ITEMS, "PASS"), "note": "same meaning"},
@@ -143,7 +154,8 @@ async def test_the_api_takes_a_projection_from_plan_to_candidate(
 async def test_review_needs_an_interactive_session_and_clips_belong_to_their_reviewer(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
 ) -> None:
-    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=USER)) as http:
+    grants = await granted(session_factory, USER.sub, OTHER.sub)
+    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=USER, grants=grants)) as http:
         await _setup(http, session_factory, tmp_path)
         await http.post(
             f"{BASE}/plans",
@@ -160,9 +172,15 @@ async def test_review_needs_an_interactive_session_and_clips_belong_to_their_rev
         execution_id = (await http.post(f"{BASE}/plans/p/renders", json={"command_id": "r-1"})).json()["execution_id"]
         packet = (await http.post(f"{BASE}/renders/{execution_id}/review-packets")).json()
 
-    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=OTHER)) as http:
+    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=OTHER, grants=grants)) as http:
         assert (await http.get(f"{BASE}/review-packets/{packet['packet_id']}/clips/A")).status_code == 404
-    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=None)) as http:
+    # A reviewer without a showrunner grant is refused; without activated grants review is unavailable.
+    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=UNGRANTED, grants=grants)) as http:
+        refused = await http.post(f"{BASE}/renders/{execution_id}/review-packets")
+        assert refused.status_code == 403, refused.text
+    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=USER, grants=None)) as http:
+        assert (await http.post(f"{BASE}/renders/{execution_id}/review-packets")).status_code == 503
+    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=None, grants=grants)) as http:
         assert (await http.post(f"{BASE}/renders/{execution_id}/review-packets")).status_code == 401
         approval = {
             "preview_id": "x",
@@ -192,3 +210,35 @@ async def test_a_plan_needs_an_approved_master_and_a_well_formed_box(
         assert (await http.post(f"{BASE}/plans", json=bad)).status_code == 422
         wrong_ratio = profile(1080, 1350, profile_ref="portrait-45@1").model_dump(mode="json")
         assert (await http.post(f"{BASE}/profiles", json=wrong_ratio)).status_code == 422
+
+
+async def test_a_missing_media_file_is_a_conflict_not_a_server_error(
+    monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
+) -> None:
+    grants = await granted(session_factory, USER.sub)
+    async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=USER, grants=grants)) as http:
+        await _setup(http, session_factory, tmp_path)
+        await http.post(
+            f"{BASE}/plans",
+            json={
+                "plan_id": "p",
+                "source_artifact_key": SOURCE_KEY,
+                "profile_ref": "square@1",
+                "constraint_ref": "tiktok-feed-ui@1",
+                "kind": "PAD",
+                "subject": _box("2/5", "1/4", "3/5", "3/4"),
+                "rationale": "keep all",
+            },
+        )
+        rendered = (await http.post(f"{BASE}/plans/p/renders", json={"command_id": "r-1"})).json()
+        artifact = tmp_path / PROJECT / "formats" / (rendered["artifact_digest"].removeprefix("sha256:") + ".mp4")
+        artifact.unlink()
+        for response in (
+            await http.post(f"{BASE}/renders/{rendered['execution_id']}/validation"),
+            await http.post(f"{BASE}/renders/{rendered['execution_id']}/review-packets"),
+            await http.post(f"{BASE}/plans/p/renders", json={"command_id": "r-1"}),
+        ):
+            assert response.status_code == 409, response.text
+        (tmp_path / PROJECT / "masters" / "episode.mp4").unlink()
+        missing_source = await http.post(f"{BASE}/plans/p/renders", json={"command_id": "r-2"})
+        assert missing_source.status_code == 409, missing_source.text

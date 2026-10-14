@@ -4,19 +4,21 @@ The source must be the exact master bytes the plan binds (its digest equals the 
 ``source_master_digest``). The render execution id is the deterministic identity of source, plan,
 argv, FFmpeg version and adapter, so a succeeded execution only replays and the output is stored
 content-addressed under the project's ``formats`` directory. The subprocess runs outside any database
-transaction with a timeout; cancellation or failure is recorded and the execution may run again.
-A RUNNING execution older than ``stale_after`` is treated as abandoned (the process crashed).
+transaction with a timeout, inside an M7 attempt whose lease outlives that timeout. An attempt that was
+accepted but whose success was never recorded (the process died in between) is completed when the
+same command is sent again, from the output its job id names.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import os
 import shutil
 import uuid
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,10 +28,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.formats import FormatRenderModel
 from lib.db.repositories.formats import FormatRepository
-from lib.db.repositories.host_hardening import ExecutionAttemptRepository
+from lib.db.repositories.host_hardening import ExecutionAttemptFencingError, ExecutionAttemptRepository
 from lib.video_backends.execution_adapter import accepted_submit_receipt
 from r2.advanced_creative.digests import digest_canonical
-from r2.advanced_creative.errors import FormatConflictError, FormatNotFoundError, M8Error
+from r2.advanced_creative.errors import FormatConflictError, FormatMediaMissingError, FormatNotFoundError, M8Error
 from r2.advanced_creative.format_render import execution_identity, materialize, render_argv
 from r2.advanced_creative.formats import FormatInvalidError, validate_plan
 from r2.contracts.execution import ProviderRequest
@@ -90,6 +92,31 @@ def _copy_hashing(source: Path, destination: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+@contextlib.asynccontextmanager
+async def verified_snapshot(path: Path, expected_digest: str, directory: Path) -> AsyncGenerator[Path]:
+    """A private copy of ``path`` whose bytes were hashed as they were copied and equal ``expected_digest``.
+
+    Every later read uses the copy, so a file replaced or rewritten after the check is never measured,
+    served or registered under the recorded digest. The copy is removed when the context exits.
+    """
+    await asyncio.to_thread(directory.mkdir, parents=True, exist_ok=True)
+    snapshot = directory / f".snapshot-{uuid.uuid4().hex}{path.suffix}"
+    try:
+        try:
+            digest = await asyncio.to_thread(_copy_hashing, path, snapshot)
+        except (FileNotFoundError, IsADirectoryError, NotADirectoryError) as error:
+            raise FormatMediaMissingError("a media file is missing") from error
+        if digest != expected_digest:
+            raise FormatConflictError("a media file changed since it was recorded")
+        yield snapshot
+    finally:
+        snapshot.unlink(missing_ok=True)
+
+
+def snapshot_dir(project_dir: Path) -> Path:
+    return project_dir / "formats" / ".snapshots"
+
+
 def _redacted(output: bytes, secrets_: tuple[str, ...]) -> str:
     """The last diagnostic lines with every local path replaced; at most 400 characters."""
     text = output.decode("utf-8", "replace")
@@ -138,6 +165,10 @@ async def ffmpeg_version(ffmpeg: str = "ffmpeg") -> str:
 
 
 FORMAT_REQUEST_SCHEMA = "r2.m8.format.render.v1"
+RENDER_TIMEOUT_SECONDS = 1800
+# The M7 lease of a render attempt outlives the bounded FFmpeg run, so the recovery scanner never
+# reclaims an attempt whose process may still be running.
+RENDER_LEASE_SECONDS = RENDER_TIMEOUT_SECONDS + 300
 _FAMILY = FORMAT_RENDER_SUBMIT_FAMILIES[0]
 
 
@@ -175,7 +206,7 @@ class FormatRenderService:
         submitter_for: Callable[[AsyncSession, str, str], AttemptSubmitter],
         ffmpeg: str = "ffmpeg",
         ffprobe: str = "ffprobe",
-        timeout: float = 1800,
+        timeout: float = RENDER_TIMEOUT_SECONDS,
         clock: Clock | None = None,
     ) -> None:
         self._sessions = sessions
@@ -206,8 +237,10 @@ class FormatRenderService:
             if recorded.plan_id != plan_id:
                 raise FormatConflictError("this render command already rendered another plan")
             path = project_dir / recorded.artifact_ref
-            if not path.exists() or await asyncio.to_thread(file_digest, path) != recorded.artifact_digest:
-                raise FormatConflictError("the recorded output is missing or changed; render with a new command")
+            if not path.is_file():
+                raise FormatMediaMissingError("the recorded output is missing; render with a new command")
+            if await asyncio.to_thread(file_digest, path) != recorded.artifact_digest:
+                raise FormatConflictError("the recorded output changed; render with a new command")
             return RenderResult(recorded.execution_id, recorded.artifact_digest, path, replayed=True)
 
         require_submit_route(
@@ -223,7 +256,10 @@ class FormatRenderService:
         # replaced after the check can never be rendered under the master's identity.
         snapshot = store / f".source-{uuid.uuid4().hex}.mp4"
         try:
-            source_digest = await asyncio.to_thread(_copy_hashing, source, snapshot)
+            try:
+                source_digest = await asyncio.to_thread(_copy_hashing, source, snapshot)
+            except FileNotFoundError as error:
+                raise FormatMediaMissingError("the source master file is missing") from error
             if source_digest != plan.source_master_digest:
                 raise FormatConflictError("the source bytes are not the master the plan binds")
             facts = await probe_source(snapshot, ffprobe=self._ffprobe)
@@ -256,51 +292,125 @@ class FormatRenderService:
                 # Job ids are unique per scope; identical bytes from two executions stay distinct.
                 return accepted_submit_receipt(digest, provider_job_id=f"{attempt.execution_id}:{digest}")
 
-            async with self._sessions() as session:
-                result = await self._submitter_for(session, user_id, project_name).submit(
-                    task_id=task_id, api_call_id=None, route=render_route(version), request=request, submit=submit
-                )
-            if result.snapshot.state is not ExecutionAttemptState.ACCEPTED or result.value is None:
+            try:
+                async with self._sessions() as session:
+                    result = await self._submitter_for(session, user_id, project_name).submit(
+                        task_id=task_id, api_call_id=None, route=render_route(version), request=request, submit=submit
+                    )
+            except ExecutionAttemptFencingError as error:
+                # Another writer (a cancel, or recovery after a lost lease) moved the attempt first.
+                raise FormatRenderFailedError("the render attempt was moved by another writer") from error
+            if result.snapshot.state is ExecutionAttemptState.SUCCEEDED:
+                # The success evidence was committed by an earlier call of this command.
+                return await self._recorded(user_id, project_name, project_dir, result.execution_id, command_id)
+            if result.snapshot.state is not ExecutionAttemptState.ACCEPTED:
                 raise FormatRenderFailedError(
                     f"render {result.execution_id} ended {result.snapshot.state.value} without an output"
                 )
-            digest = result.value
+            digest = result.value if result.value is not None else self._accepted_digest(result.snapshot, store)
             artifact_ref = f"formats/{digest.removeprefix('sha256:')}.mp4"
-            async with self._sessions() as session, session.begin():
-                repository = ExecutionAttemptRepository(session, capability_resolver=capability_resolver())
-                succeeded = await repository.apply_provider_observation(
+            try:
+                await self._record_success(
                     user_id=user_id,
                     project_name=project_name,
-                    execution_id=result.execution_id,
-                    expected_version=result.snapshot.state_version,
-                    observation=ProviderObservation(
-                        observation_id=f"{result.execution_id}:succeeded",
-                        kind=ProviderObservationKind.SUCCEEDED,
-                        observed_at=self._clock(),
-                        provider_job_id=f"{result.execution_id}:{digest}",
-                        evidence_digest=digest,
-                    ),
+                    accepted=result.snapshot,
+                    command_id=command_id,
+                    plan_id=plan_id,
+                    source_digest=source_digest,
+                    argv=argv,
+                    version=version,
+                    digest=digest,
+                    artifact_ref=artifact_ref,
                 )
-                if succeeded.state is not ExecutionAttemptState.SUCCEEDED:
-                    raise FormatRenderFailedError("the render attempt could not reach SUCCEEDED")
-                session.add(
-                    FormatRenderModel(
-                        user_id=user_id,
-                        project_name=project_name,
-                        execution_id=result.execution_id,
-                        command_id=command_id,
-                        plan_id=plan_id,
-                        source_digest=source_digest,
-                        argv_json=list(argv),
-                        ffmpeg_version=version,
-                        artifact_digest=digest,
-                        artifact_ref=artifact_ref,
-                        created_at=self._clock(),
-                    )
-                )
-            return RenderResult(result.execution_id, digest, project_dir / artifact_ref, replayed=False)
+            except M8Error:
+                raise
+            except Exception as error:
+                # A concurrent call of this command may have committed the same evidence first.
+                async with self._sessions() as session:
+                    winner = await session.get(FormatRenderModel, (user_id, project_name, result.execution_id))
+                if winner is None or winner.artifact_digest != digest:
+                    raise FormatRenderFailedError("the render's success could not be recorded") from error
+            return RenderResult(result.execution_id, digest, project_dir / artifact_ref, replayed=result.value is None)
         finally:
             snapshot.unlink(missing_ok=True)
+
+    async def _recorded(
+        self, user_id: str, project_name: str, project_dir: Path, execution_id: str, command_id: str
+    ) -> RenderResult:
+        async with self._sessions() as session:
+            row = await session.get(FormatRenderModel, (user_id, project_name, execution_id))
+        if row is None or row.command_id != command_id:
+            raise FormatRenderFailedError(f"render {execution_id} succeeded without its recorded evidence")
+        return RenderResult(execution_id, row.artifact_digest, project_dir / row.artifact_ref, replayed=True)
+
+    @staticmethod
+    def _accepted_digest(accepted: AttemptSnapshot, store: Path) -> str:
+        """The output of an attempt accepted by an earlier, interrupted call, read back from its job id.
+
+        The job id is ``<execution id>:<digest>``; the content-addressed file must still hold exactly
+        those bytes, otherwise the output is lost and the command cannot complete.
+        """
+        prefix = f"{accepted.execution_id}:"
+        job_id = accepted.provider_job_id or ""
+        digest = job_id.removeprefix(prefix)
+        if not job_id.startswith(prefix) or not digest.startswith("sha256:"):
+            raise FormatRenderFailedError(f"render {accepted.execution_id} was accepted without a known output")
+        path = store / f"{digest.removeprefix('sha256:')}.mp4"
+        try:
+            on_disk = file_digest(path)
+        except FileNotFoundError as error:
+            raise FormatMediaMissingError("the accepted output is missing; render with a new command") from error
+        if on_disk != digest:
+            raise FormatConflictError("the accepted output changed; render with a new command")
+        return digest
+
+    async def _record_success(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        accepted: AttemptSnapshot,
+        command_id: str,
+        plan_id: str,
+        source_digest: str,
+        argv: tuple[str, ...],
+        version: str,
+        digest: str,
+        artifact_ref: str,
+    ) -> None:
+        execution_id = accepted.execution_id
+        async with self._sessions() as session, session.begin():
+            repository = ExecutionAttemptRepository(session, capability_resolver=capability_resolver())
+            succeeded = await repository.apply_provider_observation(
+                user_id=user_id,
+                project_name=project_name,
+                execution_id=execution_id,
+                expected_version=accepted.state_version,
+                observation=ProviderObservation(
+                    observation_id=f"{execution_id}:succeeded",
+                    kind=ProviderObservationKind.SUCCEEDED,
+                    observed_at=self._clock(),
+                    provider_job_id=f"{execution_id}:{digest}",
+                    evidence_digest=digest,
+                ),
+            )
+            if succeeded.state is not ExecutionAttemptState.SUCCEEDED:
+                raise FormatRenderFailedError("the render attempt could not reach SUCCEEDED")
+            session.add(
+                FormatRenderModel(
+                    user_id=user_id,
+                    project_name=project_name,
+                    execution_id=execution_id,
+                    command_id=command_id,
+                    plan_id=plan_id,
+                    source_digest=source_digest,
+                    argv_json=list(argv),
+                    ffmpeg_version=version,
+                    artifact_digest=digest,
+                    artifact_ref=artifact_ref,
+                    created_at=self._clock(),
+                )
+            )
 
     async def _run_ffmpeg(self, *, argv: tuple[str, ...], snapshot: Path, store: Path, redact: tuple[str, ...]) -> str:
         """Run FFmpeg into a unique temporary file and publish it content-addressed; returns its digest."""
@@ -332,6 +442,8 @@ def ffmpeg_available() -> bool:
 
 __all__ = [
     "FORMAT_REQUEST_SCHEMA",
+    "RENDER_LEASE_SECONDS",
+    "RENDER_TIMEOUT_SECONDS",
     "FormatRenderFailedError",
     "FormatRenderService",
     "RenderResult",
@@ -343,4 +455,6 @@ __all__ = [
     "render_route",
     "render_task_id",
     "run_process",
+    "snapshot_dir",
+    "verified_snapshot",
 ]

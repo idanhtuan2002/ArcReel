@@ -5,13 +5,19 @@ slot is the format slot of the plan's source artifact and profile; the render ex
 for that plan and produced exactly the candidate's artifact; the latest technical and semantic
 reports for that plan and artifact both pass and are the ones the candidate names; and the plan's
 source master is still the current head of its artifact key.
+
+Renders and plans are immutable; the mutable inputs are read under locks held until the caller's
+transaction ends: the source artifact's authority row (so the source master cannot move) and the
+plan's report streams (so no later report can supersede the verified ones before the commit).
 """
 
 from __future__ import annotations
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.formats import FormatRenderModel
+from lib.db.models.host_hardening import MasterAuthorityModel
 from lib.db.repositories.formats import FormatRepository, report_digest
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from r2.advanced_creative.errors import PromotionBindingStaleError
@@ -38,6 +44,16 @@ class HostFormatEvidence:
             raise PromotionBindingStaleError("the candidate's plan is not valid") from exc
         if target_ref != format_slot_key(artifact_key, plan.output_profile.profile_ref):
             raise PromotionBindingStaleError("the target is not this projection's format slot")
+        await self._session.execute(
+            update(MasterAuthorityModel)
+            .where(
+                MasterAuthorityModel.user_id == user_id,
+                MasterAuthorityModel.project_name == project_name,
+                MasterAuthorityModel.artifact_key == artifact_key,
+            )
+            .values(current_version=MasterAuthorityModel.current_version)
+        )
+        await repository.lock_plan_reports(user_id=user_id, project_name=project_name, plan_id=plan.plan_id)
         reports = await repository.passing_reports(
             user_id=user_id,
             project_name=project_name,

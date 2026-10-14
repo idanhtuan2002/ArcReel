@@ -1,6 +1,7 @@
 """Technical validation of one rendered format projection (M8-E E3, spec §10).
 
-Every check is measured on the rendered bytes: ffprobe facts for dimensions, ratio, codec, fps,
+Every check is measured on private snapshots of the rendered and source bytes, hashed as they were
+copied and compared with the render's recorded digests: ffprobe facts for dimensions, ratio, codec, fps,
 duration and audio; a full decode for errors; and the plan's overlay collision analysis. Expected
 values come from the plan's profile and the source master. The report is deterministic for one
 render execution and is appended through the format repository, which re-validates it.
@@ -19,10 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.formats import FormatRenderModel
 from lib.db.repositories.formats import FormatRepository
-from r2.advanced_creative.errors import FormatConflictError, FormatNotFoundError
+from r2.advanced_creative.errors import FormatNotFoundError
 from r2.advanced_creative.formats import overlay_collisions, reduced_ratio
 from r2.contracts.advanced_creative import CanonicalJsonObject, TechnicalValidationReport
-from server.services.format_render import FormatRenderFailedError, file_digest, run_process
+from server.services.format_render import FormatRenderFailedError, run_process, snapshot_dir, verified_snapshot
 
 
 @dataclass(frozen=True)
@@ -95,22 +96,22 @@ class FormatValidationService:
             )
         if render is None or plan is None:
             raise FormatNotFoundError("no succeeded render with this execution id")
-        artifact = project_dir / render.artifact_ref
-        if await asyncio.to_thread(file_digest, artifact) != render.artifact_digest:
-            raise FormatConflictError("the rendered artifact changed since it was rendered")
-        if await asyncio.to_thread(file_digest, source) != render.source_digest:
-            raise FormatConflictError("the source is not the master this render used")
+        work = snapshot_dir(project_dir)
+        async with (
+            verified_snapshot(project_dir / render.artifact_ref, render.artifact_digest, work) as artifact,
+            verified_snapshot(source, render.source_digest, work) as source_copy,
+        ):
+            observed = await media_facts(artifact, ffprobe=self._ffprobe)
+            source_facts = await media_facts(source_copy, ffprobe=self._ffprobe)
+            errors = await decode_errors(artifact, ffmpeg=self._ffmpeg)
 
         profile = plan.output_profile
-        observed = await media_facts(artifact, ffprobe=self._ffprobe)
-        source_facts = await media_facts(source, ffprobe=self._ffprobe)
         expected_duration = source_facts.duration
         if profile.duration_limit_seconds is not None:
             expected_duration = min(expected_duration, Fraction(str(profile.duration_limit_seconds)))
         tolerance = 1 / profile.fps + Fraction(1, 20)
         expected_audio = ["aac"] if source_facts.audio else []
         collisions = list(overlay_collisions(plan))
-        errors = await decode_errors(artifact, ffmpeg=self._ffmpeg)
         ratio = reduced_ratio(observed.width, observed.height)
         target_ratio = reduced_ratio(profile.width, profile.height)
         checks = (

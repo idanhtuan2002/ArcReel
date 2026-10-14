@@ -81,11 +81,18 @@ class FormatConflictError(M8Error):
     code = "m8_format_conflict"
 
 
+class FormatMediaMissingError(M8Error):
+    """A media file a format operation needs is no longer on disk."""
+
+    code = "m8_format_media_missing"
+
+
 __all__ = [
     "CandidateConflictError",
     "CommandConflictError",
     "ExplorationNotFoundError",
     "FormatConflictError",
+    "FormatMediaMissingError",
     "FormatNotFoundError",
     "M8Error",
     "ObservationConflictError",

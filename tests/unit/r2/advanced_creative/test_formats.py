@@ -373,7 +373,11 @@ def _technical(plan, checks, passed):
 def _review(reviewer: str, failing: tuple[str, ...] = ()) -> dict:
     from r2.advanced_creative.formats import SEMANTIC_ITEMS
 
-    return {"reviewer_id": reviewer, "items": {item: "FAIL" if item in failing else "PASS" for item in SEMANTIC_ITEMS}}
+    return {
+        "reviewer_id": reviewer,
+        "grant_event_digest": "sha256:" + "a" * 64,
+        "items": {item: "FAIL" if item in failing else "PASS" for item in SEMANTIC_ITEMS},
+    }
 
 
 def _semantic(plan, reviews, *, disagreement=False, passed=True):
@@ -460,3 +464,38 @@ def test_semantic_reports_need_two_reviewers_or_the_recorded_deviation() -> None
         )
     with pytest.raises(FormatInvalidError, match="distinct reviewer"):
         validate_semantic_report(_semantic(plan, (_review("a"), _review("a"))), plan, deviation=None)
+    # A review that names no authorizing showrunner grant is refused, also under the deviation.
+    ungranted = {key: value for key, value in _review("a").items() if key != "grant_event_digest"}
+    with pytest.raises(FormatInvalidError, match="showrunner grant"):
+        validate_semantic_report(_semantic(plan, (ungranted,)), plan, deviation=SINGLE_REVIEWER_DEVIATION)
+
+
+def test_overlay_analysis_uses_the_even_pixel_crop_not_the_ideal_window() -> None:
+    from r2.advanced_creative.formats import overlay_collisions, pixel_geometry
+
+    target = profile(1080, 1080, profile_ref="square@1")
+    # Centre-cropping 1282x720 to a square keeps source pixels 281..1001 ideally; the even crop keeps 280..1000.
+    edge = F(1001, 1282)
+    decision = reframe_decision(
+        decision_id="r1",
+        kind=ReframeKind.COVER_CENTER,
+        source_size=(1282, 720),
+        profile=target,
+        focal=None,
+        subject=Box(F(2, 5), F(1, 4), F(3, 5), F(3, 4)),
+        captions=(Box(F(1, 2), F(4, 5), edge, F(9, 10)),),
+        rationale="centre crop",
+    )
+    plan = build_plan(
+        plan_id="p1",
+        source_master_id="episode_video:1@v3",
+        source_master_digest=DIGEST,
+        profile=target,
+        overlay=overlay(),
+        decisions=(decision,),
+    )
+    window = decision.source_span.model_dump(mode="python")
+    assert Box.parse(window).x1 == edge
+    geometry = pixel_geometry(plan, source_width=1282, source_height=720)
+    assert (geometry.crop_x, geometry.crop_x + geometry.crop_width) == (280, 1000)
+    assert overlay_collisions(plan) == ("caption 0 partly cropped",)

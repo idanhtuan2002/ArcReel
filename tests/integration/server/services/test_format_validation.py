@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from fractions import Fraction
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.formats import FormatRepository
-from r2.advanced_creative.errors import FormatConflictError
+from r2.advanced_creative.errors import FormatConflictError, FormatMediaMissingError
 from r2.advanced_creative.formats import Box, ReframeKind, build_plan, reframe_decision
 from server.services.format_render import ffmpeg_available, file_digest
 from server.services.format_validation import FormatValidationService
@@ -106,12 +107,39 @@ async def test_a_changed_artifact_or_another_source_is_refused(session_factory: 
     source, result = await _render(session_factory, tmp_path, audio=False)
     other = make_source(tmp_path / "other.mp4", seconds=1)
     service = FormatValidationService(session_factory)
-    with pytest.raises(FormatConflictError, match="not the master"):
+    with pytest.raises(FormatConflictError, match="changed"):
         await service.validate(
             user_id=USER, project_name=PROJECT, project_dir=tmp_path, execution_id=result.execution_id, source=other
+        )
+    with pytest.raises(FormatMediaMissingError):
+        await service.validate(
+            user_id=USER,
+            project_name=PROJECT,
+            project_dir=tmp_path,
+            execution_id=result.execution_id,
+            source=tmp_path / "gone.mp4",
         )
     result.artifact_path.write_bytes(b"tampered")
     with pytest.raises(FormatConflictError, match="changed"):
         await service.validate(
             user_id=USER, project_name=PROJECT, project_dir=tmp_path, execution_id=result.execution_id, source=source
         )
+
+
+async def test_checks_measure_the_verified_snapshot_even_if_the_file_is_replaced_meanwhile(
+    session_factory: Factory, tmp_path: Path
+) -> None:
+    source, result = await _render(session_factory, tmp_path)
+    # An ffprobe that first overwrites the recorded file, as a concurrent writer would after the check.
+    probe = tmp_path / "replacing-ffprobe"
+    probe.write_text(
+        f"#!/bin/sh\nprintf replaced > '{result.artifact_path}'\nexec '{shutil.which('ffprobe')}' \"$@\"\n",
+        encoding="utf-8",
+    )
+    probe.chmod(0o755)
+    report = await FormatValidationService(session_factory, ffprobe=str(probe)).validate(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, execution_id=result.execution_id, source=source
+    )
+    assert report.passed
+    assert report.artifact_digest == result.artifact_digest
+    assert result.artifact_path.read_bytes() == b"replaced"
