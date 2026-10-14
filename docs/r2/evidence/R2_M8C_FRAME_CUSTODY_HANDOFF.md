@@ -1378,3 +1378,13 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 - Static gates are clean.
 
 No new review round was opened: these repairs are narrow, and each has a failing-if-removed test (review loop stopping rule).
+
+## Fast gate and merge — 2026-10-14 (Claude session)
+
+**Gate policy (sponsor decision, 2026-10-14):** run only the relevant tests. The render-heavy suite runs only when a change touches its dependency surface: `r2/m3`, `r2/adaptation`, host integration, the version store, or Remotion/ffmpeg. That suite is `tests/integration/r2/test_m6_dual_profile_acceptance.py` plus `tests/integration/r2/m3`, about 90 minutes.
+
+**Fast gate on `8e9f3052`:** `DATABASE_URL= uv run python -m pytest -n 4 --dist loadfile -q -p no:cacheprovider -rfE --ignore=tests/integration/r2/test_m6_dual_profile_acceptance.py --ignore=tests/integration/r2/m3` gave 16688 passed, 174 skipped, 0 failed (exit 0, 4:03, SQLite).
+- The render-heavy suite last passed in full on `57cd596a`.
+- From `57cd596a` to `8e9f3052` nothing changed under `r2/m3` or `r2/adaptation`, and those tests do not reach gates, spatial, binding or R2 shot code.
+
+**Merge:** sponsor-approved fast-forward of `r2-v2/main` to this branch.
