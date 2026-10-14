@@ -293,11 +293,11 @@ def main() -> int:
     source_digest = sha256_file(source)
     # Failure safety and observability: both sides refuse a missing source, produce no output, and say why.
     missing = work / "missing.mp4"
-    donor_ok, _t, donor_error = donor_render(clone, missing, work / "donor-missing.mp4", 1080, 1080, "pad")
-    r2_ok, _t, r2_error = r2_render(
+    missing_donor_ok, _t, donor_error = donor_render(clone, missing, work / "donor-missing.mp4", 1080, 1080, "pad")
+    missing_r2_ok, _t, r2_error = r2_render(
         r2_plan(1080, 1080, ReframeKind.PAD, source_digest), missing, work / "r2-missing.mp4"
     )
-    failure_safe = not donor_ok and not r2_ok and not (work / "r2-missing.mp4").exists()
+    failure_safe = not missing_donor_ok and not missing_r2_ok and not (work / "r2-missing.mp4").exists()
     observable = bool(donor_error.strip()) and "No such file" in r2_error
     rows: list[dict] = []
     measures: dict[str, dict] = {}
@@ -401,9 +401,9 @@ def main() -> int:
     if not (failure_safe and observable):
         unknowns.append("missing-source: a side did not refuse cleanly with a reason")
     measures["missing-source"] = {
-        "donor_refused": not donor_ok,
-        "r2_refused": not r2_ok,
-        "donor_reason": donor_error.strip()[:160],
+        "donor_refused": not missing_donor_ok,
+        "r2_refused": not missing_r2_ok,
+        "donor_reason": donor_error.replace(str(work), "<work>").strip()[:160],
         "r2_reason_names_missing_file": "No such file" in r2_error,
     }
 
