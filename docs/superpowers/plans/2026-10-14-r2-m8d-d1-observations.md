@@ -34,15 +34,20 @@
    - A correction names the current tip of its identity (`correction_of`) and carries the same identity.
    - The tip is locked, and the repository enforces one direct successor per record (a unique `correction_of`). Two concurrent corrections of the same tip therefore produce one winner. The loser is refused, and the caller re-reads before retrying.
    - A correction never rewrites its predecessor.
-4. **Missing outcomes form a closed set**: `MISSING`, `PRIVATE`, `DELETED`, `NOT_YET_AVAILABLE`.
+4. **Values and missing outcomes.** Values keep at most 28 significant digits, which is the precision the canonical digest normalizes at; a longer value could collide with another and is refused. Missing outcomes form a closed set: `MISSING`, `PRIVATE`, `DELETED`, `NOT_YET_AVAILABLE`.
    - When `metric_value` is null, a reason from this set is required.
    - When there is a value, the reason must be null.
    - This check sits in a pure validator in `r2/learning`; the accepted A0 contract is unchanged.
-5. **Command idempotency.** The observation row is its own command receipt, with a `command_id` that is unique in its scope and the command digest stored alongside.
+5. **Command idempotency.** Every successful `ingest` reserves its scoped `command_id` in `m8_learning_observation_commands` with the command digest and the resulting observation id. This includes a request that replays an existing observation.
    - Replaying the same command with the same digest returns the stored result before any other check.
    - The same `command_id` with different content is a conflict (`CommandConflictError`).
    - `m8_command_receipts` is not reused: its `operation` check constraint belongs to the accepted M8-A schema, and changing it would need a separately designed revision (`M8_ACCEPTED_SCHEMA_CHANGE_REQUIRED`).
-6. **Cutoff fold.** A pure function `current_as_of(records, cutoff)` resolves each identity to the latest record in its chain with `ingested_at <= cutoff`, so a late correction after the cutoff is invisible. Recommendation evidence (D3) pins this cutoff.
+6. **Cutoff fold.**
+   - Admissions in one scope are serialized: a PostgreSQL advisory lock, while SQLite already has a single writer.
+   - Admission time strictly increases within the scope, even if the clock steps back.
+   - A pure function `current_as_of(records, cutoff)` resolves each identity to the latest record in its chain with `ingested_at <= cutoff`.
+   - The repository refuses a cutoff past the scope watermark (the latest admission time). Every later admission is stamped after the watermark, so a read at an admissible cutoff never changes.
+   - Recommendation evidence (D3) pins a watermark cutoff and also stores the resolved observation ids.
 7. **Scope.** Every read and write takes `(user_id, project_name)`, and `lineage.project_name` must equal the project. A foreign or unknown observation id reads as not found.
 8. **No route in D1.** Internal adapters (D2) and a route (D3) come later.
 
@@ -74,3 +79,12 @@
 ## Out of scope
 
 D2 adapters, the D3 recommendation lifecycle and UI, D4 evidence sealing, any live platform call.
+
+## Review record
+
+The independent Codex review of `eee1706b` raised five findings. All five are fixed in `af20f11a`, and each has a regression test:
+- **Replay command ids were not reserved.** They now are, and a mutation of this fix turns the test RED.
+- **A clock regression could move pinned evidence.** Admissions are now monotonic per scope and cutoffs are bounded by the watermark; a mutation of this fix turns the test RED.
+- **Decimal precision could collide** two values into one digest. Values are now limited to 28 significant digits.
+- **Identical concurrent corrections conflicted.** Admissions are now serialized per scope, and the race test on PostgreSQL shows both requests replay.
+- **DST fold identity.** Identity windows now compare as UTC instants.
