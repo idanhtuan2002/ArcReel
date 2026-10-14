@@ -23,6 +23,7 @@ from sqlalchemy import (
     Index,
     PrimaryKeyConstraint,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -125,4 +126,21 @@ class LearningObservationCommandModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-__all__ = ["LearningObservationCommandModel", "LearningObservationModel"]
+class LearningRawRecordModel(Base):
+    """A source record exactly as retrieved, keyed by the digest of its canonical JSON bytes."""
+
+    __tablename__ = "m8_learning_raw_records"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "raw_payload_digest", name="pk_m8_learning_raw_records"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, server_default=DEFAULT_USER_ID
+    )
+    project_name: Mapped[str] = mapped_column(_ID)
+    raw_payload_digest: Mapped[str] = mapped_column(_DIGEST)
+    canonical_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+__all__ = ["LearningObservationCommandModel", "LearningObservationModel", "LearningRawRecordModel"]

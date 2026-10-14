@@ -9,13 +9,16 @@ included, reserves its command id. Database uniqueness backs every rule.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import hashlib
+import json
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import ColumnElement, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.db.models.learning import LearningObservationCommandModel, LearningObservationModel
+from lib.db.models.learning import LearningObservationCommandModel, LearningObservationModel, LearningRawRecordModel
+from r2.advanced_creative.digests import canonical_json_bytes
 from r2.advanced_creative.errors import CommandConflictError, ObservationConflictError, ObservationNotFoundError
 from r2.contracts.advanced_creative import LearningObservation
 from r2.learning.observations import (
@@ -129,14 +132,52 @@ class LearningObservationRepository:
             raise ObservationConflictError("correction must name the current tip")
         return None
 
+    async def _store_raw(
+        self, *, user_id: str, project_name: str, raw_payload: Mapping[str, object], expected_digest: str
+    ) -> None:
+        canonical = canonical_json_bytes(dict(raw_payload))
+        if "sha256:" + hashlib.sha256(canonical).hexdigest() != expected_digest:
+            raise ObservationInvalidError("raw payload does not match raw_payload_digest")
+        key = (user_id, project_name, expected_digest)
+        if await self.session.get(LearningRawRecordModel, key) is None:
+            self.session.add(
+                LearningRawRecordModel(
+                    user_id=user_id,
+                    project_name=project_name,
+                    raw_payload_digest=expected_digest,
+                    canonical_json=canonical.decode("utf-8"),
+                    created_at=_utc(self._clock()),
+                )
+            )
+            await self.session.flush()
+
+    async def get_raw(self, *, user_id: str, project_name: str, raw_payload_digest: str) -> dict[str, object] | None:
+        """The source record as retrieved, decoded from its canonical JSON; ``None`` when unknown or foreign."""
+        row = await self.session.get(LearningRawRecordModel, (user_id, project_name, raw_payload_digest))
+        return None if row is None else json.loads(row.canonical_json)
+
     async def ingest(
-        self, *, user_id: str, project_name: str, observation: LearningObservation, command_id: str
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        observation: LearningObservation,
+        command_id: str,
+        raw_payload: Mapping[str, object] | None = None,
     ) -> LearningObservation:
+        """Admit one observation; with ``raw_payload`` the source record is verified and kept too."""
         if not command_id:
             raise ValueError("command_id is required")
         validate_observation(observation, project_name=project_name)
         command_digest = ingest_command_digest(user_id=user_id, project_name=project_name, observation=observation)
         await self._lock_scope(user_id=user_id, project_name=project_name)
+        if raw_payload is not None:
+            await self._store_raw(
+                user_id=user_id,
+                project_name=project_name,
+                raw_payload=raw_payload,
+                expected_digest=observation.raw_payload_digest,
+            )
 
         command = await self.session.get(LearningObservationCommandModel, (user_id, project_name, command_id))
         if command is not None:

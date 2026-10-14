@@ -56,5 +56,5 @@ def test_observation_migration_has_scoped_chain_keys_and_downgrades_alone(alembi
     before = set(inspector.get_table_names())
     command.downgrade(cfg, "913c4a0e0001")
     after = set(sa.inspect(sa.create_engine(f"sqlite:///{db_path}")).get_table_names())
-    assert {TABLE, "m8_learning_observation_commands"} <= before - after
+    assert {TABLE, "m8_learning_observation_commands", "m8_learning_raw_records"} <= before - after
     assert "m8_promotion_receipts" in after

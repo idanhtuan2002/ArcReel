@@ -38,10 +38,11 @@ async def _ingest(
     *,
     clock: _Clock | None = None,
     project_name: str = PROJECT,
+    raw: dict | None = None,
 ) -> LearningObservation:
     async with factory() as session:
         stored = await LearningObservationRepository(session, clock=clock).ingest(
-            user_id=USER, project_name=project_name, observation=observation, command_id=command
+            user_id=USER, project_name=project_name, observation=observation, command_id=command, raw_payload=raw
         )
         await session.commit()
         return stored
@@ -205,33 +206,37 @@ async def test_adapted_platform_rows_ingest_and_correct_through_the_repository(s
 
     from r2.learning.adapters import observe_youtube_days
 
-    day = date(2026, 11, 3)
+    nov2, nov3 = date(2026, 11, 2), date(2026, 11, 3)
     clock = _Clock(T0 + timedelta(days=40))
+    query = {"ids": "channel==MINE", "dimensions": "day", "filters": "video==abc"}
 
-    def views(rows, retrieved_at):
-        observed = observe_youtube_days(
-            video_id="abc",
-            requested_days=(day,),
-            rows=rows,
-            status="PUBLIC",
-            lineage=obs().lineage,
-            retrieved_at=retrieved_at,
+    def views(rows):
+        records = observe_youtube_days(
+            video_id="abc", query=query, requested_days=(nov2, nov3), rows=rows, status="PUBLIC", lineage=obs().lineage
         )
-        return next(item for item in observed if item.metric_name == "views")
+        record = records[1]
+        return next(item for item in record.observations if item.metric_name == "views"), dict(record.raw_payload)
 
-    pending = views((), clock.now)
-    stored = await _ingest(session_factory, pending, "yt-1", clock=clock)
+    nov2_row = {"day": "2026-11-02", "views": 80, "estimatedMinutesWatched": 190, "averageViewDuration": 142}
+    pending, raw = views((nov2_row,))
+    stored = await _ingest(session_factory, pending, "yt-1", clock=clock, raw=raw)
     assert stored.missing_reason == "NOT_YET_AVAILABLE"
-    assert await _ingest(session_factory, views((), clock.now), "yt-1b", clock=clock) == stored
+    # Re-reading the unchanged report later replays.
+    clock.now = T0 + timedelta(days=41)
+    assert await _ingest(session_factory, views((nov2_row,))[0], "yt-1b", clock=clock, raw=raw) == stored
 
     clock.now = T0 + timedelta(days=42)
-    arrived = views(
-        ({"day": "2026-11-03", "views": 40, "estimatedMinutesWatched": 70, "averageViewDuration": 120},), clock.now
+    arrived, arrived_raw = views(
+        (nov2_row, {"day": "2026-11-03", "views": 40, "estimatedMinutesWatched": 70, "averageViewDuration": 120})
     )
     with pytest.raises(ObservationConflictError, match="correction"):
-        await _ingest(session_factory, arrived, "yt-2", clock=clock)
+        await _ingest(session_factory, arrived, "yt-2", clock=clock, raw=arrived_raw)
     corrected = await _ingest(
-        session_factory, arrived.model_copy(update={"correction_of": stored.observation_id}), "yt-3", clock=clock
+        session_factory,
+        arrived.model_copy(update={"correction_of": stored.observation_id}),
+        "yt-3",
+        clock=clock,
+        raw=arrived_raw,
     )
 
     def as_of(days: int):
@@ -240,6 +245,24 @@ async def test_adapted_platform_rows_ingest_and_correct_through_the_repository(s
     assert await as_of(41) == (stored,)
     assert await as_of(42) == (corrected,)
     assert corrected.metric_value == Decimal(40)
+    kept = await _repo_call(
+        session_factory, "get_raw", project_name=PROJECT, raw_payload_digest=corrected.raw_payload_digest
+    )
+    assert kept is not None
+    assert kept["row"]["views"] == 40
+    assert kept["query"] == query
+    assert (
+        await _repo_call(
+            session_factory, "get_raw", project_name="other", raw_payload_digest=corrected.raw_payload_digest
+        )
+        is None
+    )
+
+
+async def test_a_raw_payload_must_match_its_digest(session_factory: Factory) -> None:
+    with pytest.raises(ObservationInvalidError, match="raw payload"):
+        await _ingest(session_factory, obs(), "cmd-1", raw={"anything": 1})
+    assert await _count(session_factory) == 0
 
 
 async def test_a_replayed_command_id_is_reserved_for_its_request(session_factory: Factory) -> None:

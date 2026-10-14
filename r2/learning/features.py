@@ -109,12 +109,15 @@ def mean_daily(inputs: Sequence[LearningObservation], *, metric: str, as_of: dat
 
 def ratio(numerator: LearningObservation, denominator: LearningObservation, *, as_of: datetime) -> DerivedFeature:
     """``numerator / denominator`` read from the same record and window (for example likes per view)."""
-    if (numerator.source_family, numerator.source_record_id, numerator.window) != (
+    if (numerator.source_family, numerator.source_record_id, numerator.window, numerator.raw_payload_digest) != (
         denominator.source_family,
         denominator.source_record_id,
         denominator.window,
+        denominator.raw_payload_digest,
     ):
-        raise FeatureInputError("a ratio reads one record over one window")
+        raise FeatureInputError("a ratio reads one retrieved record over one window")
+    if numerator.lineage != denominator.lineage:
+        raise FeatureInputError("a ratio reads one lineage")
     if numerator.metric_name == denominator.metric_name:
         raise FeatureInputError("a ratio needs two metrics")
     value = (
