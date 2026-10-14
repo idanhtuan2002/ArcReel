@@ -38,12 +38,16 @@ def test_observation_migration_has_scoped_chain_keys_and_downgrades_alone(alembi
         "RESTRICT",
     ) in foreign
     assert {
-        "uq_m8_learning_observations_command",
         "uq_m8_learning_observations_successor",
         "ck_m8_learning_not_self",
         "ck_m8_learning_window",
         "ck_m8_learning_value_or_reason",
     } <= {item["name"] for item in inspector.get_unique_constraints(TABLE) + inspector.get_check_constraints(TABLE)}
+    commands = {
+        (tuple(fk["constrained_columns"]), fk["referred_table"], (fk.get("options") or {}).get("ondelete"))
+        for fk in inspector.get_foreign_keys("m8_learning_observation_commands")
+    }
+    assert (("user_id", "project_name", "observation_id"), TABLE, "RESTRICT") in commands
     original = next(
         index for index in inspector.get_indexes(TABLE) if index["name"] == "uq_m8_learning_observations_original"
     )
@@ -52,5 +56,5 @@ def test_observation_migration_has_scoped_chain_keys_and_downgrades_alone(alembi
     before = set(inspector.get_table_names())
     command.downgrade(cfg, "913c4a0e0001")
     after = set(sa.inspect(sa.create_engine(f"sqlite:///{db_path}")).get_table_names())
-    assert TABLE in before - after
+    assert {TABLE, "m8_learning_observation_commands"} <= before - after
     assert "m8_promotion_receipts" in after

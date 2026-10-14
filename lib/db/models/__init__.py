@@ -54,7 +54,7 @@ from lib.db.models.host_hardening import (
     PromotionReceiptModel,
     ProviderObservationModel,
 )
-from lib.db.models.learning import LearningObservationModel
+from lib.db.models.learning import LearningObservationCommandModel, LearningObservationModel
 from lib.db.models.narrative_lifecycle import (
     NarrativeChangeSetModel,
     NarrativeDraftCandidateModel,
@@ -136,6 +136,7 @@ __all__ = [
     "FinalCutReceiptModel",
     "GenerationBatch",
     "GreenlightDecisionModel",
+    "LearningObservationCommandModel",
     "LearningObservationModel",
     "M8CandidateHeadModel",
     "M8CandidateRevisionModel",

@@ -10,13 +10,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from r2.advanced_creative.digests import digest_canonical, digest_command
 from r2.contracts.advanced_creative import LearningObservation
 
 INGEST_OBSERVATION = "INGEST_OBSERVATION"
+MAX_SIGNIFICANT_DIGITS = 28
 LEARNING_ACTOR_SCOPE = "learning"
 
 
@@ -33,6 +34,8 @@ class ObservationInvalidError(ValueError):
 
 @dataclass(frozen=True, order=True)
 class ObservationIdentity:
+    """Window instants are UTC, so a fold-ambiguous local time compares by instant."""
+
     source_family: str
     source_record_id: str
     metric_name: str
@@ -50,8 +53,8 @@ def identity_of(observation: LearningObservation) -> ObservationIdentity:
         source_record_id=observation.source_record_id,
         metric_name=observation.metric_name,
         metric_definition_version=observation.metric_definition_version,
-        window_starts_at=window.starts_at,
-        window_ends_at=window.ends_at,
+        window_starts_at=window.starts_at.astimezone(UTC),
+        window_ends_at=window.ends_at.astimezone(UTC),
         window_timezone_name=window.timezone_name,
         window_aggregation=window.aggregation,
     )
@@ -86,6 +89,9 @@ def validate_observation(observation: LearningObservation, *, project_name: str)
             raise ObservationInvalidError("a missing value needs a closed missing_reason")
     elif observation.missing_reason is not None:
         raise ObservationInvalidError("a present value takes no missing_reason")
+    elif len(observation.metric_value.as_tuple().digits) > MAX_SIGNIFICANT_DIGITS:
+        # Canonical digests normalize decimals at this precision; more digits would collide.
+        raise ObservationInvalidError("metric_value has more significant digits than a digest keeps")
 
 
 def validate_correction(correction: LearningObservation, predecessor: LearningObservation) -> None:

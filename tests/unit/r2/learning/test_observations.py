@@ -131,3 +131,19 @@ def test_the_fold_refuses_branched_or_duplicated_chains() -> None:
         current_as_of([obs("o1"), obs("o2")], T0 + timedelta(days=9))
     with pytest.raises(ObservationInvalidError, match="duplicate"):
         current_as_of([obs("o1"), obs("o1")], T0 + timedelta(days=9))
+
+
+def test_identity_compares_window_instants_across_a_dst_fold() -> None:
+    from zoneinfo import ZoneInfo
+
+    zone = ZoneInfo("America/New_York")
+    # 2026-11-01 01:30 happens twice in New York; fold=1 is the second, EST instant.
+    later = datetime(2026, 11, 1, 1, 30, fold=1, tzinfo=zone)
+    window = MetricWindow(
+        starts_at=later, ends_at=later + timedelta(hours=1), timezone_name="America/New_York", aggregation="sum"
+    )
+    stored = LearningObservation.model_validate(obs(window=window).model_dump(mode="json"))
+
+    assert stored.window.starts_at.utcoffset() == timedelta(hours=-5)
+    assert identity_of(stored) == identity_of(obs(window=window))
+    validate_correction(obs("o2", correction_of="o1", window=window), stored)

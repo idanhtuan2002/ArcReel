@@ -137,8 +137,18 @@ async def test_reads_as_of_a_cutoff_ignore_later_corrections(session_factory: Fa
 
     assert await as_of(1) == ()
     assert await as_of(3) == (original,)
-    assert sorted(await as_of(6), key=lambda item: item.observation_id) == [corrected, other]
-    assert await as_of(6, source_family="internal.usage") == (other,)
+    assert await as_of(5) == (corrected,)
+    latest = await _repo_call(session_factory, "watermark", project_name=PROJECT)
+    assert latest == other.ingested_at > corrected.ingested_at
+    full = await _repo_call(session_factory, "list_as_of", project_name=PROJECT, cutoff=latest)
+    assert sorted(full, key=lambda item: item.observation_id) == [corrected, other]
+    usage = await _repo_call(
+        session_factory, "list_as_of", project_name=PROJECT, cutoff=latest, source_family="internal.usage"
+    )
+    assert usage == (other,)
+    # A cutoff past the latest admission could still gain records, so it is refused.
+    with pytest.raises(ObservationInvalidError, match="watermark"):
+        await as_of(6)
 
 
 async def test_scope_isolates_projects_and_lineage_must_match(session_factory: Factory) -> None:
@@ -188,3 +198,93 @@ async def test_concurrent_originals_of_one_identity_have_one_winner(session_fact
 
     assert sum(isinstance(result, ObservationConflictError) for result in results) == 1
     assert await _count(session_factory) == 1
+
+
+async def test_adapted_platform_rows_ingest_and_correct_through_the_repository(session_factory: Factory) -> None:
+    from datetime import date
+
+    from r2.learning.adapters import observe_youtube_days
+
+    day = date(2026, 11, 3)
+    clock = _Clock(T0 + timedelta(days=40))
+
+    def views(rows, retrieved_at):
+        observed = observe_youtube_days(
+            video_id="abc",
+            requested_days=(day,),
+            rows=rows,
+            status="PUBLIC",
+            lineage=obs().lineage,
+            retrieved_at=retrieved_at,
+        )
+        return next(item for item in observed if item.metric_name == "views")
+
+    pending = views((), clock.now)
+    stored = await _ingest(session_factory, pending, "yt-1", clock=clock)
+    assert stored.missing_reason == "NOT_YET_AVAILABLE"
+    assert await _ingest(session_factory, views((), clock.now), "yt-1b", clock=clock) == stored
+
+    clock.now = T0 + timedelta(days=42)
+    arrived = views(
+        ({"day": "2026-11-03", "views": 40, "estimatedMinutesWatched": 70, "averageViewDuration": 120},), clock.now
+    )
+    with pytest.raises(ObservationConflictError, match="correction"):
+        await _ingest(session_factory, arrived, "yt-2", clock=clock)
+    corrected = await _ingest(
+        session_factory, arrived.model_copy(update={"correction_of": stored.observation_id}), "yt-3", clock=clock
+    )
+
+    def as_of(days: int):
+        return _repo_call(session_factory, "list_as_of", project_name=PROJECT, cutoff=T0 + timedelta(days=days))
+
+    assert await as_of(41) == (stored,)
+    assert await as_of(42) == (corrected,)
+    assert corrected.metric_value == Decimal(40)
+
+
+async def test_a_replayed_command_id_is_reserved_for_its_request(session_factory: Factory) -> None:
+    await _ingest(session_factory, obs(), "cmd-1")
+    assert (await _ingest(session_factory, obs(), "cmd-2")).observation_id == "o1"
+
+    with pytest.raises(CommandConflictError):
+        await _ingest(session_factory, obs("o9", source_record_id="video-9"), "cmd-2")
+    assert await _count(session_factory) == 1
+
+
+async def test_admission_time_increases_within_a_scope_when_the_clock_steps_back(session_factory: Factory) -> None:
+    clock = _Clock(T0 + timedelta(days=10))
+    original = await _ingest(session_factory, obs(), "cmd-1", clock=clock)
+    pinned = await _repo_call(session_factory, "list_as_of", project_name=PROJECT, cutoff=original.ingested_at)
+
+    clock.now = T0 + timedelta(days=9)
+    corrected = await _ingest(
+        session_factory, obs("o2", correction_of="o1", metric_value=Decimal("5")), "cmd-2", clock=clock
+    )
+    other = await _ingest(session_factory, obs("y1", source_record_id="video-2"), "cmd-3", clock=clock)
+
+    assert original.ingested_at < corrected.ingested_at < other.ingested_at
+    # Evidence read at the earlier watermark does not move.
+    assert await _repo_call(session_factory, "list_as_of", project_name=PROJECT, cutoff=original.ingested_at) == pinned
+    assert await _repo_call(session_factory, "watermark", project_name=PROJECT) == other.ingested_at
+
+
+async def test_values_beyond_digest_precision_are_refused(session_factory: Factory) -> None:
+    with pytest.raises(ObservationInvalidError, match="significant digits"):
+        await _ingest(session_factory, obs(metric_value=Decimal("1.00000000000000000000000000001")), "cmd-1")
+    assert await _count(session_factory) == 0
+
+
+async def test_identical_concurrent_corrections_replay_instead_of_conflicting(session_factory: Factory) -> None:
+    await _skip_unless_postgres(session_factory)
+    await _ingest(session_factory, obs(), "cmd-1")
+    correction = obs("o2", correction_of="o1", metric_value=Decimal("7"))
+
+    results = await asyncio.gather(
+        _ingest(session_factory, correction, "cmd-a"),
+        _ingest(session_factory, correction, "cmd-b"),
+        return_exceptions=True,
+    )
+
+    assert all(isinstance(result, LearningObservation) for result in results), results
+    assert results[0] == results[1]
+    assert await _count(session_factory) == 2

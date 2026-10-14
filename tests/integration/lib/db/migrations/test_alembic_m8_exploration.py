@@ -197,5 +197,6 @@ def test_downgrade_removes_only_the_m8_tables(alembic_cfg: tuple[Config, Path]) 
         "m8_spatial_preview_bindings",
         "m8_spatial_promotion_results",
         "m8_learning_observations",
+        "m8_learning_observation_commands",
     }
     assert set(sa.inspect(_engine(db_path)).get_table_names()) >= M8_TABLES

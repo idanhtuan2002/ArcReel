@@ -1,25 +1,26 @@
 """Persistence for M8-D learning observations (plan 2026-10-14 D1).
 
-The repository writes inside the caller's transaction and never updates or deletes a row. Admission
-order: an exact command replay returns its stored result first; then an identical observation id or
-identity replays; then a correction must name the current tip of its identity, which is locked for the
-rest of the transaction. Database uniqueness settles any race the locks do not cover.
+The repository writes inside the caller's transaction and never updates or deletes a row. Admissions
+in one scope are serialized (a PostgreSQL advisory lock; SQLite has a single writer). Order: an exact
+command replay returns its stored result first; then an identical observation id or identity replays;
+then a correction must name the current tip of its identity. Every successful command, a replay
+included, reserves its command id. Database uniqueness backs every rule.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import ColumnElement, select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import ColumnElement, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lib.db.models.learning import LearningObservationModel
+from lib.db.models.learning import LearningObservationCommandModel, LearningObservationModel
 from r2.advanced_creative.errors import CommandConflictError, ObservationConflictError, ObservationNotFoundError
 from r2.contracts.advanced_creative import LearningObservation
 from r2.learning.observations import (
     ObservationIdentity,
+    ObservationInvalidError,
     current_as_of,
     identity_of,
     ingest_command_digest,
@@ -29,6 +30,7 @@ from r2.learning.observations import (
 )
 
 Clock = Callable[[], datetime]
+_TICK = timedelta(microseconds=1)
 
 
 def _utc(value: datetime) -> datetime:
@@ -60,22 +62,15 @@ class LearningObservationRepository:
         self.session = session
         self._clock = clock or (lambda: datetime.now(UTC))
 
-    async def _lock_command(self, *, user_id: str, project_name: str, command_id: str) -> None:
+    async def _lock_scope(self, *, user_id: str, project_name: str) -> None:
+        """Serialize every admission in one scope (PostgreSQL); SQLite already has one writer."""
         if self.session.get_bind().dialect.name != "postgresql":
             return
-        key = f"m8-learning-command:{user_id}:{project_name}:{command_id}"
+        key = f"m8-learning-scope:{user_id}:{project_name}"
         await self.session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": key})
 
     async def _row(self, *, user_id: str, project_name: str, observation_id: str) -> LearningObservationModel | None:
         return await self.session.get(LearningObservationModel, (user_id, project_name, observation_id))
-
-    async def _by_command(self, *, user_id: str, project_name: str, command_id: str) -> LearningObservationModel | None:
-        model = LearningObservationModel
-        return await self.session.scalar(
-            select(model).where(
-                model.user_id == user_id, model.project_name == project_name, model.command_id == command_id
-            )
-        )
 
     async def _original(
         self, *, user_id: str, project_name: str, identity: ObservationIdentity
@@ -98,21 +93,23 @@ class LearningObservationRepository:
             )
         )
 
-    async def _replay(
-        self, *, user_id: str, project_name: str, observation: LearningObservation, command_id: str, command_digest: str
-    ) -> LearningObservation | None:
-        """The stored result this request replays, ``None`` for a new admission, or a conflict."""
-        by_command = await self._by_command(user_id=user_id, project_name=project_name, command_id=command_id)
-        if by_command is not None:
-            if by_command.command_digest != command_digest:
-                raise CommandConflictError("command id reused with different content")
-            return _observation(by_command)
+    async def _watermark(self, *, user_id: str, project_name: str) -> datetime | None:
+        model = LearningObservationModel
+        latest = await self.session.scalar(
+            select(func.max(model.ingested_at)).where(model.user_id == user_id, model.project_name == project_name)
+        )
+        return None if latest is None else _utc(latest)
+
+    async def _existing(
+        self, *, user_id: str, project_name: str, observation: LearningObservation
+    ) -> LearningObservationModel | None:
+        """The stored observation this one replays, ``None`` when it is new, or a conflict."""
         digest = observation_digest(observation)
         same_id = await self._row(user_id=user_id, project_name=project_name, observation_id=observation.observation_id)
         if same_id is not None:
             if same_id.observation_digest != digest:
                 raise ObservationConflictError("observation id holds different content")
-            return _observation(same_id)
+            return same_id
         if observation.correction_of is None:
             original = await self._original(
                 user_id=user_id, project_name=project_name, identity=identity_of(observation)
@@ -120,7 +117,16 @@ class LearningObservationRepository:
             if original is not None:
                 if original.observation_digest != digest:
                     raise ObservationConflictError("identity already observed; send a correction")
-                return _observation(original)
+                return original
+            return None
+        predecessor = await self._row(
+            user_id=user_id, project_name=project_name, observation_id=observation.correction_of
+        )
+        if predecessor is None:
+            raise ObservationNotFoundError("correction names an unknown observation")
+        validate_correction(observation, _observation(predecessor))
+        if await self._successor(user_id=user_id, project_name=project_name, observation_id=predecessor.observation_id):
+            raise ObservationConflictError("correction must name the current tip")
         return None
 
     async def ingest(
@@ -130,77 +136,63 @@ class LearningObservationRepository:
             raise ValueError("command_id is required")
         validate_observation(observation, project_name=project_name)
         command_digest = ingest_command_digest(user_id=user_id, project_name=project_name, observation=observation)
-        await self._lock_command(user_id=user_id, project_name=project_name, command_id=command_id)
-        replayed = await self._replay(
-            user_id=user_id,
-            project_name=project_name,
-            observation=observation,
-            command_id=command_id,
-            command_digest=command_digest,
-        )
-        if replayed is not None:
-            return replayed
+        await self._lock_scope(user_id=user_id, project_name=project_name)
 
-        ingested_at = _utc(self._clock())
-        if observation.correction_of is not None:
-            predecessor_row = await self.session.scalar(
-                select(LearningObservationModel)
-                .where(
-                    LearningObservationModel.user_id == user_id,
-                    LearningObservationModel.project_name == project_name,
-                    LearningObservationModel.observation_id == observation.correction_of,
-                )
-                .with_for_update()
+        command = await self.session.get(LearningObservationCommandModel, (user_id, project_name, command_id))
+        if command is not None:
+            if command.command_digest != command_digest:
+                raise CommandConflictError("command id reused with different content")
+            stored_row = await self._row(
+                user_id=user_id, project_name=project_name, observation_id=command.observation_id
             )
-            if predecessor_row is None:
-                raise ObservationNotFoundError("correction names an unknown observation")
-            validate_correction(observation, _observation(predecessor_row))
-            if await self._successor(
-                user_id=user_id, project_name=project_name, observation_id=predecessor_row.observation_id
-            ):
-                raise ObservationConflictError("correction must name the current tip")
-            ingested_at = max(ingested_at, _utc(predecessor_row.ingested_at))
+            assert stored_row is not None  # restrict-keyed, never deleted
+            return _observation(stored_row)
 
-        stored = observation.model_copy(update={"ingested_at": ingested_at})
-        window = stored.window
-        row = LearningObservationModel(
-            user_id=user_id,
-            project_name=project_name,
-            observation_id=stored.observation_id,
-            source_family=stored.source_family,
-            source_record_id=stored.source_record_id,
-            metric_name=stored.metric_name,
-            metric_definition_version=stored.metric_definition_version,
-            window_starts_at=_utc(window.starts_at),
-            window_ends_at=_utc(window.ends_at),
-            window_timezone_name=window.timezone_name,
-            window_aggregation=window.aggregation,
-            has_value=stored.metric_value is not None,
-            missing_reason=stored.missing_reason,
-            correction_of=stored.correction_of,
-            observation_json=stored.model_dump(mode="json"),
-            observation_digest=observation_digest(stored),
-            command_id=command_id,
-            command_digest=command_digest,
-            observed_at=_utc(stored.observed_at),
-            ingested_at=ingested_at,
-        )
-        try:
-            async with self.session.begin_nested():
-                self.session.add(row)
-        except IntegrityError:
-            # A concurrent writer won the identity, successor or command slot; re-resolve against it.
-            replayed = await self._replay(
+        now = _utc(self._clock())
+        existing = await self._existing(user_id=user_id, project_name=project_name, observation=observation)
+        if existing is not None:
+            result = _observation(existing)
+        else:
+            # Admission time strictly increases within a scope, even when the clock steps back.
+            watermark = await self._watermark(user_id=user_id, project_name=project_name)
+            ingested_at = now if watermark is None or now > watermark else watermark + _TICK
+            result = observation.model_copy(update={"ingested_at": ingested_at})
+            window = result.window
+            self.session.add(
+                LearningObservationModel(
+                    user_id=user_id,
+                    project_name=project_name,
+                    observation_id=result.observation_id,
+                    source_family=result.source_family,
+                    source_record_id=result.source_record_id,
+                    metric_name=result.metric_name,
+                    metric_definition_version=result.metric_definition_version,
+                    window_starts_at=_utc(window.starts_at),
+                    window_ends_at=_utc(window.ends_at),
+                    window_timezone_name=window.timezone_name,
+                    window_aggregation=window.aggregation,
+                    has_value=result.metric_value is not None,
+                    missing_reason=result.missing_reason,
+                    correction_of=result.correction_of,
+                    observation_json=result.model_dump(mode="json"),
+                    observation_digest=observation_digest(result),
+                    observed_at=_utc(result.observed_at),
+                    ingested_at=ingested_at,
+                )
+            )
+            await self.session.flush()
+        self.session.add(
+            LearningObservationCommandModel(
                 user_id=user_id,
                 project_name=project_name,
-                observation=observation,
                 command_id=command_id,
                 command_digest=command_digest,
+                observation_id=result.observation_id,
+                created_at=now,
             )
-            if replayed is not None:
-                return replayed
-            raise ObservationConflictError("observation lost a concurrent admission") from None
-        return stored
+        )
+        await self.session.flush()
+        return result
 
     async def get(self, *, user_id: str, project_name: str, observation_id: str) -> LearningObservation | None:
         row = await self._row(user_id=user_id, project_name=project_name, observation_id=observation_id)
@@ -229,18 +221,31 @@ class LearningObservationRepository:
             node = successor.get(node.observation_id)
         return tuple(ordered)
 
+    async def watermark(self, *, user_id: str, project_name: str) -> datetime | None:
+        """The latest admission time in the scope; every later admission is stamped after it."""
+        return await self._watermark(user_id=user_id, project_name=project_name)
+
     async def list_as_of(
         self, *, user_id: str, project_name: str, cutoff: datetime, source_family: str | None = None
     ) -> tuple[LearningObservation, ...]:
-        """Each identity's current record as of ``cutoff`` (see ``current_as_of``)."""
+        """Each identity's current record as of ``cutoff`` (see ``current_as_of``).
+
+        The cutoff must not pass the scope watermark. Admission times only increase past the
+        watermark, so a result read at an admissible cutoff never changes; a later cutoff could still
+        gain records and is refused.
+        """
+        cutoff = _utc(cutoff)
+        watermark = await self._watermark(user_id=user_id, project_name=project_name)
+        if watermark is None or cutoff > watermark:
+            raise ObservationInvalidError("cutoff is after the latest admission; pin it at the watermark")
         model = LearningObservationModel
         query = select(model).where(
-            model.user_id == user_id, model.project_name == project_name, model.ingested_at <= _utc(cutoff)
+            model.user_id == user_id, model.project_name == project_name, model.ingested_at <= cutoff
         )
         if source_family is not None:
             query = query.where(model.source_family == source_family)
         rows = (await self.session.scalars(query)).all()
-        return current_as_of((_observation(row) for row in rows), _utc(cutoff))
+        return current_as_of((_observation(row) for row in rows), cutoff)
 
 
 __all__ = ["LearningObservationRepository"]

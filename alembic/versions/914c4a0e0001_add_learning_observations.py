@@ -37,12 +37,9 @@ def upgrade() -> None:
         sa.Column("correction_of", sa.String(length=255), nullable=True),
         sa.Column("observation_json", sa.JSON(), nullable=False),
         sa.Column("observation_digest", sa.String(length=71), nullable=False),
-        sa.Column("command_id", sa.String(length=255), nullable=False),
-        sa.Column("command_digest", sa.String(length=71), nullable=False),
         sa.Column("observed_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("ingested_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("user_id", "project_name", "observation_id", name="pk_m8_learning_observations"),
-        sa.UniqueConstraint("user_id", "project_name", "command_id", name="uq_m8_learning_observations_command"),
         sa.UniqueConstraint("user_id", "project_name", "correction_of", name="uq_m8_learning_observations_successor"),
         sa.CheckConstraint("correction_of IS NULL OR correction_of <> observation_id", name="ck_m8_learning_not_self"),
         sa.CheckConstraint("window_starts_at < window_ends_at", name="ck_m8_learning_window"),
@@ -82,12 +79,34 @@ def upgrade() -> None:
         postgresql_where=_ORIGINAL,
         sqlite_where=_ORIGINAL,
     )
+    op.create_table(
+        "m8_learning_observation_commands",
+        sa.Column("user_id", sa.String(), server_default="default", nullable=False),
+        sa.Column("project_name", sa.String(length=255), nullable=False),
+        sa.Column("command_id", sa.String(length=255), nullable=False),
+        sa.Column("command_digest", sa.String(length=71), nullable=False),
+        sa.Column("observation_id", sa.String(length=255), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("user_id", "project_name", "command_id", name="pk_m8_learning_observation_commands"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["user_id", "project_name", "observation_id"],
+            [
+                "m8_learning_observations.user_id",
+                "m8_learning_observations.project_name",
+                "m8_learning_observations.observation_id",
+            ],
+            name="fk_m8_learning_observation_commands_result",
+            ondelete="RESTRICT",
+        ),
+    )
     op.create_index(
         "ix_m8_learning_observations_ingested", "m8_learning_observations", ["user_id", "project_name", "ingested_at"]
     )
 
 
 def downgrade() -> None:
+    op.drop_table("m8_learning_observation_commands")
     op.drop_index("ix_m8_learning_observations_ingested", table_name="m8_learning_observations")
     op.drop_index("uq_m8_learning_observations_original", table_name="m8_learning_observations")
     op.drop_table("m8_learning_observations")
