@@ -1,6 +1,6 @@
 # M8-E handoff (2026-10-14)
 
-**Branch:** `impl/r2-m8e-format`. **HEAD:** `c0e7029b`, pushed (updated after the review fixes). Not merged into `r2-v2/main` (`52183f4b`).
+**Branch:** `impl/r2-m8e-format`. **HEAD:** `c9d28aee`, pushed. Not merged into `r2-v2/main` (`52183f4b`).
 **Plan:** `docs/superpowers/plans/2026-10-14-r2-m8e-format-projection.md`, decisions 1–11 plus the reviewer decision.
 
 ## Done
@@ -23,11 +23,29 @@ All 11 findings are fixed, each with a regression test; the decisions are plan i
 - Format tests passed on SQLite (113 passed, 2 skipped as PostgreSQL-only) and on PostgreSQL 18 (115 passed, 0 skipped).
 - A browser check on dev servers ran the whole flow (plan, render, checks) and showed the 503 grant message for review.
 
+## Codex verification rounds after `c0e7029b`
+
+- **Verification round** (`5d7a4715`, `0b54b5ad`). Codex reported 7/11 fixed, 4 partial, and 3 new findings. The fixes:
+  - candidate preparation locks the candidate head before the plan reports (a PostgreSQL deadlock, reproduced by mutation);
+  - a stored semantic pass is revalidated, and ungranted reviews are ignored;
+  - review copies are re-encoded;
+  - a media race returns 409;
+  - F07 is measured per side, with directory mtimes and hashes;
+  - the page reuses the render command after an unknown outcome.
+- **Confirmation round** (`c9d28aee`). Codex left 2 Medium findings, both fixed:
+  - semantic report ids cover grants;
+  - an unrecorded success is `m8_format_render_incomplete` (503), which can be retried with the same command.
+- Parity resealed at `0b54b5ad`: PASS, `verify_donor_parity` OK, registry digests updated (`59e7b785`). The commits after it change neither `IMPLEMENTATION` file.
+- Tests at `c9d28aee`:
+  - SQLite: 116 passed, 3 skipped (PostgreSQL-only);
+  - PostgreSQL 18: 119 passed, 0 skipped;
+  - `pnpm check` at `5d7a4715`: 2594 passed. The frontend is unchanged since.
+
 ## Still open
 
-- A Codex verification round on `4acbe8dd..c0e7029b`.
-- The real blind review by the sponsor. It needs a server with activated showrunner grants (staging); dev returns 503.
-- The final evidence seal, then merge after the user approves.
+- The real blind review by the sponsor. It needs this branch on a server with activated showrunner grants: deploy to V2 staging, which needs migrations `914`–`918` after a database backup, with user approval.
+- The final evidence seal: rerun the parity harness at the final HEAD and record the blind review.
+- A final Codex review, then merge after the user approves.
 
 ## Environment
 
