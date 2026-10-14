@@ -4,6 +4,7 @@ import { Link, Route, Switch, Redirect } from "wouter";
 import {
   WORKSPACE_ROUTE_LOREBOOK,
   WORKSPACE_ROUTE_CLUES,
+  WORKSPACE_ROUTE_LEARNING,
   WORKSPACE_ROUTE_SOURCE,
   WORKSPACE_ROUTE_CHARACTERS,
   WORKSPACE_ROUTE_SCENES,
@@ -61,6 +62,7 @@ import type { EpisodeScript } from "@/types/script";
 const CreativeCanvasPage = lazy(() => import("@/features/creative-canvas/ui/CreativeCanvasPage"));
 const SpatialAnalysisPage = lazy(() => import("@/features/spatial-analysis/ui/SpatialAnalysisPage"));
 const ShotWorkflowPage = lazy(() => import("@/features/spatial-analysis/ui/ShotWorkflowPage"));
+const LearningPage = lazy(() => import("@/features/learning/ui/LearningPage"));
 
 /** 集级路由 path，与渲染该集的 `<Route>` 共用一份。 */
 const EPISODE_ROUTE_PATH = `/${WORKSPACE_ROUTE_EPISODES}/:episodeId`;
@@ -602,6 +604,17 @@ export function StudioCanvasRouter() {
 
       <Route path={`/${WORKSPACE_ROUTE_CLUES}`}>
         <Redirect to={`/${WORKSPACE_ROUTE_SCENES}`} />
+      </Route>
+
+      <Route path={`/${WORKSPACE_ROUTE_LEARNING}`}>
+        {/* 演示项目在后端不存在，没有可学习的观测；直接输入 URL 时回到概览 */}
+        {demoMode ? (
+          <Redirect to="/" />
+        ) : (
+          <Suspense fallback={null}>
+            <LearningPage key={currentProjectName} projectName={currentProjectName} />
+          </Suspense>
+        )}
       </Route>
 
       <Route path={`/${WORKSPACE_ROUTE_SOURCE}`}>

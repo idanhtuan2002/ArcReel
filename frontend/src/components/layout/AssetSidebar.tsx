@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clapperboard,
   LayoutDashboard,
+  ChartLine,
   BookOpen,
   Users,
   Landmark,
@@ -125,6 +126,10 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
       icon: Package,
       meta: propCount,
     },
+    // 演示项目没有可学习的观测记录，同样隐藏入口
+    ...(demoMode
+      ? []
+      : [{ key: "learning", path: "/learning", label: t("dashboard:workspace_nav_learning"), icon: ChartLine }]),
     // 商品资产仅广告/短片项目使用（v1 单商品设定），其余模式隐藏入口
     ...(isAd
       ? [

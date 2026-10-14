@@ -24,6 +24,7 @@ export const WORKSPACE_ROUTE_CHARACTERS = "characters";
 export const WORKSPACE_ROUTE_SCENES = "scenes";
 export const WORKSPACE_ROUTE_PROPS = "props";
 export const WORKSPACE_ROUTE_PRODUCTS = "products";
+export const WORKSPACE_ROUTE_LEARNING = "learning";
 export const WORKSPACE_ROUTE_EPISODES = "episodes";
 
 /** 无子路径、直接匹配的工作区叶子路由段。`source` 除了列表页本身还接受 `/:filename`，
@@ -37,6 +38,7 @@ const WORKSPACE_STATIC_LEAF_ROUTES = [
   WORKSPACE_ROUTE_SCENES,
   WORKSPACE_ROUTE_PROPS,
   WORKSPACE_ROUTE_PRODUCTS,
+  WORKSPACE_ROUTE_LEARNING,
 ] as const;
 
 /**

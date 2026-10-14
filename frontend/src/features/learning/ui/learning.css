@@ -1,0 +1,159 @@
+.lr-header {
+  padding-left: 1rem;
+  /* Keeps the workspace's floating assistant button clear of the header. */
+  padding-right: 4rem;
+}
+
+/* The comparison form beside the recommendations; one column on narrow screens. */
+.lr-layout {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .lr-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 0.75rem;
+}
+.lr-field {
+  min-width: 0;
+}
+
+.lr-input {
+  display: block;
+  width: 100%;
+  margin-top: 0.125rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-hairline-strong);
+  background: var(--color-surface-2);
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text);
+}
+
+.lr-btn {
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-hairline-strong);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-text-2);
+}
+.lr-btn:hover:not(:disabled) {
+  color: var(--color-text);
+}
+.lr-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.lr-btn-accent {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+.lr-btn-accent:hover:not(:disabled) {
+  background: var(--color-accent-2);
+  color: var(--color-bg);
+}
+
+.lr-btn:focus-visible,
+.lr-input:focus-visible,
+.lr-choice:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Arm A and arm B face each other, with the signed lift of B over A between them. */
+.lr-ledger {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+.lr-ledger .lr-arm:first-child {
+  order: 1;
+}
+.lr-ledger .lr-lift {
+  order: 2;
+  color: var(--color-accent);
+}
+.lr-ledger .lr-arm-b {
+  order: 3;
+}
+@media (max-width: 640px) {
+  .lr-ledger {
+    grid-template-columns: 1fr;
+  }
+  .lr-ledger .lr-lift {
+    justify-self: center;
+  }
+}
+
+.lr-arm {
+  min-width: 0;
+  border-radius: 0.375rem;
+  background: var(--color-surface-2);
+  padding: 0.625rem 0.75rem;
+}
+.lr-bar {
+  margin-top: 0.375rem;
+  height: 0.25rem;
+  border-radius: 9999px;
+  background: var(--color-hairline);
+}
+.lr-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--color-text-3);
+}
+.lr-arm-b .lr-bar span {
+  background: var(--color-accent);
+}
+
+.lr-stats,
+.lr-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.125rem 0.75rem;
+}
+.lr-stats dd,
+.lr-meta dd {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The border carries what the evidence supports: dashed for association, solid for a cause. */
+.lr-badge {
+  border-radius: 0.25rem;
+  border: 1px dashed var(--color-hairline-strong);
+  padding: 0.0625rem 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--color-text-2);
+}
+.lr-badge-causal {
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+
+.lr-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-hairline-strong);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-2);
+}
+.lr-choice:has(input:checked) {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
