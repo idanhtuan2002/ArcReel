@@ -202,6 +202,8 @@ class LearningRecommendationRepository:
         if scope.get("language") != ("causal" if surface else "associative") or scope.get("surface") != surface:
             raise CausalLanguageError("the recorded language must match what the evidence supports")
         arms = scope.get("arms")
+        if not isinstance(arms, list) or set(map(str, arms)) != {item.format_profile_ref for item in evidence}:
+            raise CohortLeakError("the recorded arms must be exactly the evidence formats")
         check_hypothesis_language(
             recommendation.hypothesis,
             causal_allowed=surface is not None,

@@ -232,7 +232,9 @@ def test_causal_language_needs_a_named_surface_and_catches_past_tense() -> None:
     for text in ("Vertical framing increased views", "It improved retention", "Views rose due to framing"):
         with pytest.raises(CausalLanguageError):
             check_hypothesis_language(text, causal_allowed=False)
-    # Arm labels are names, not claims.
+    # Arm labels are names, not claims; a label inside a longer word is still read.
+    with pytest.raises(CausalLanguageError):
+        check_hypothesis_language("Format drive drives views", causal_allowed=False, neutral_terms=("drive",))
     check_hypothesis_language(
         "Format drive is associated with 5.0% higher views", causal_allowed=False, neutral_terms=("drive",)
     )

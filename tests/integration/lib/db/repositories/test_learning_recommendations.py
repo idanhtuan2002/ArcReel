@@ -277,3 +277,20 @@ async def test_concurrent_final_decisions_have_one_winner(session_factory: Facto
 
     assert sum(isinstance(item, RecommendationConflictError) for item in results) == 1
     assert sum(not isinstance(item, BaseException) for item in results) == 1
+
+
+async def test_the_recorded_arms_must_be_the_evidence_formats(session_factory: Factory) -> None:
+    clock = _Clock()
+    evidence = _evidence()
+    cutoff = await _ingest_all(session_factory, clock, evidence)
+    rec = _recommend(evidence)
+    renamed = rec.model_copy(
+        update={
+            "applicability": rec.applicability.model_validate(
+                {**rec.applicability.model_dump(), "arms": ["16x9", "drive"]}
+            )
+        }
+    )
+
+    with pytest.raises(CohortLeakError, match="arms"):
+        await _propose(session_factory, clock, renamed, cutoff)

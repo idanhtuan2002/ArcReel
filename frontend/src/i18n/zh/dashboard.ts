@@ -2421,4 +2421,6 @@ export default {
   'learning_lead_higher': '{{b}} 画幅的平均 {{metric}} 比 {{a}} 高 {{lift}}。',
   'learning_lead_lower': '{{b}} 画幅的平均 {{metric}} 比 {{a}} 低 {{lift}}。',
   'learning_recorded_hypothesis': '记录的假设',
+  'learning_badge_associative': '相关',
+  'learning_badge_causal': '因果',
 } satisfies Record<keyof typeof enDashboard, string>;

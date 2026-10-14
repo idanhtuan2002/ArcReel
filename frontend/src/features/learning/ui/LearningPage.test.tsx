@@ -68,7 +68,7 @@ describe("Learning page", () => {
     render(<LearningPage projectName="demo" />);
 
     const card = await screen.findByRole("article");
-    expect(within(card).getByText("ASSOCIATIVE")).toBeInTheDocument();
+    expect(within(card).getByText(/^(Associative|相关|Tương quan)$/)).toBeInTheDocument();
     expect(within(card).getByText(VIEW.recommendation.hypothesis)).toBeInTheDocument();
     expect(within(card).getByText("−20.0%")).toBeInTheDocument();
     expect(within(card).getByText("3 / 4")).toBeInTheDocument();
@@ -132,5 +132,9 @@ describe("Learning page", () => {
     const sent = requests.find((item) => item.url.endsWith("/recommendations/evaluate"))?.body as Record<string, unknown>;
     expect(sent).toMatchObject({ arm_a: "16x9", arm_b: "9x16", min_per_arm: 3, min_relative_lift: "0.10" });
     expect(typeof sent.command_id).toBe("string");
+
+    // A result belongs to the inputs that produced it: editing an input clears it.
+    fireEvent.change(screen.getByDisplayValue("9x16"), { target: { value: "1x1" } });
+    await waitFor(() => expect(screen.queryByText(/below the minimum|低于最小值|thấp hơn mức tối thiểu/)).not.toBeInTheDocument());
   });
 });

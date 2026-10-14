@@ -6,7 +6,7 @@
  */
 import "./learning.css";
 
-import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -64,6 +64,17 @@ function amount(value: string | null, locale: string): string {
 
 function when(value: string, locale: string): string {
   return new Date(value).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/** One abortable operation at a time; leaving the component aborts it, so no state is written after. */
+function useOperation(): () => AbortSignal {
+  const current = useRef<AbortController | null>(null);
+  useEffect(() => () => current.current?.abort(), []);
+  return useCallback(() => {
+    current.current?.abort();
+    current.current = new AbortController();
+    return current.current.signal;
+  }, []);
 }
 
 interface LearningPageProps {
@@ -191,25 +202,36 @@ function EvaluatePanel({ projectName, onProposed }: { projectName: string; onPro
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<EvaluateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const begin = useOperation();
+  // A result belongs to the inputs that produced it; any edit clears it.
+  const edit = (next: typeof form) => {
+    setForm(next);
+    setResult(null);
+    setError(null);
+  };
 
   type TextKey = Exclude<keyof typeof form, "min_per_arm" | "expires_in_days">;
   const text = (key: TextKey, label: string) => (
-    <TextField label={label} value={form[key]} onChange={(value) => setForm({ ...form, [key]: value })} />
+    <TextField label={label} value={form[key]} onChange={(value) => edit({ ...form, [key]: value })} />
   );
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
+    const signal = begin();
     setBusy(true);
     setError(null);
+    setResult(null);
     try {
-      const response = await evaluateRule(projectName, { ...form, command_id: crypto.randomUUID() });
+      const response = await evaluateRule(projectName, { ...form, command_id: crypto.randomUUID() }, { signal });
+      if (signal.aborted) return;
       setResult(response);
       if (response.recommendation) onProposed();
     } catch (failure: unknown) {
+      if (signal.aborted) return;
       setError(errorMessage(failure) ?? t("learning_evaluate_failed"));
     } finally {
-      setBusy(false);
+      if (!signal.aborted) setBusy(false);
     }
   }
 
@@ -238,7 +260,7 @@ function EvaluatePanel({ projectName, onProposed }: { projectName: string; onPro
             value={form.min_per_arm}
             min={2}
             max={100000}
-            onChange={(value) => setForm({ ...form, min_per_arm: value })}
+            onChange={(value) => edit({ ...form, min_per_arm: value })}
           />
           {text("min_relative_lift", t("learning_field_min_lift"))}
           <NumberField
@@ -246,7 +268,7 @@ function EvaluatePanel({ projectName, onProposed }: { projectName: string; onPro
             value={form.expires_in_days}
             min={1}
             max={365}
-            onChange={(value) => setForm({ ...form, expires_in_days: value })}
+            onChange={(value) => edit({ ...form, expires_in_days: value })}
           />
         </fieldset>
         <button type="submit" disabled={busy} className="lr-btn lr-btn-accent">
@@ -347,7 +369,7 @@ function RecommendationCard({
     <article className="lr-card rounded-md border border-hairline p-4" aria-labelledby={`lr-${recommendation.recommendation_id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={view.language === "causal" ? "lr-badge lr-badge-causal" : "lr-badge"}>
-          {view.language === "causal" ? "CAUSAL" : "ASSOCIATIVE"}
+          {view.language === "causal" ? t("learning_badge_causal") : t("learning_badge_associative")}
         </span>
         <span className="font-mono text-[10px] tracking-[0.12em] text-text-3">{view.rule}</span>
         {view.final ? (
@@ -420,21 +442,25 @@ function DecisionForm({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const begin = useOperation();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy || disposition === null || !reason.trim()) return;
+    const signal = begin();
     setBusy(true);
     setError(null);
     try {
-      await decideRecommendation(projectName, view, disposition, reason.trim(), crypto.randomUUID());
+      await decideRecommendation(projectName, view, disposition, reason.trim(), crypto.randomUUID(), { signal });
+      if (signal.aborted) return;
       setReason("");
       setDisposition(null);
       onDecided();
     } catch (failure: unknown) {
+      if (signal.aborted) return;
       setError(errorMessage(failure) ?? t("learning_decide_failed"));
     } finally {
-      setBusy(false);
+      if (!signal.aborted) setBusy(false);
     }
   }
 

@@ -151,7 +151,8 @@ def check_hypothesis_language(hypothesis: str, *, causal_allowed: bool, neutral_
     """Refuse causal wording for associative evidence; ``neutral_terms`` (arm labels) are not read as words."""
     text = hypothesis
     for term in sorted((term for term in neutral_terms if term), key=len, reverse=True):
-        text = text.replace(term, " ")
+        # Only whole-label occurrences are names; "drive" inside "drives" is still a word.
+        text = re.sub(rf"(?<!\w){re.escape(term)}(?!\w)", " ", text)
     if not causal_allowed and _CAUSAL_WORDS.search(text):
         raise CausalLanguageError("associative evidence cannot support causal language")
 

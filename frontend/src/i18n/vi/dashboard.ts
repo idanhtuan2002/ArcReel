@@ -2420,4 +2420,6 @@ export default {
   'learning_lead_higher': 'Định dạng {{b}} có {{metric}} trung bình cao hơn {{a}} {{lift}}.',
   'learning_lead_lower': 'Định dạng {{b}} có {{metric}} trung bình thấp hơn {{a}} {{lift}}.',
   'learning_recorded_hypothesis': 'Giả thuyết đã ghi',
+  'learning_badge_associative': 'Tương quan',
+  'learning_badge_causal': 'Nhân quả',
 } satisfies Record<keyof typeof enDashboard, string>;

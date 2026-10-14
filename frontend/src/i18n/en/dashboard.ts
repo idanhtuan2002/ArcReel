@@ -2422,4 +2422,6 @@ export default {
   'learning_lead_higher': 'Format {{b}} averages {{lift}} more {{metric}} than {{a}}.',
   'learning_lead_lower': 'Format {{b}} averages {{lift}} less {{metric}} than {{a}}.',
   'learning_recorded_hypothesis': 'Recorded hypothesis',
+  'learning_badge_associative': 'Associative',
+  'learning_badge_causal': 'Causal',
 };
