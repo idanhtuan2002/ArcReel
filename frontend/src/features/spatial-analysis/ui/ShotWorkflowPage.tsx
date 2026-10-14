@@ -135,7 +135,7 @@ export default function ShotWorkflowPage({ projectName, episode }: ShotWorkflowP
         </div>
       </header>
 
-      <main className="sw-layout mx-auto w-full max-w-6xl px-4 py-6">
+      <div className="sw-layout mx-auto w-full max-w-6xl px-4 py-6">
         {listError ? (
           <div role="alert" className="rounded-md border border-hairline-strong p-4 text-sm text-text-2">
             {listError}
@@ -187,7 +187,7 @@ export default function ShotWorkflowPage({ projectName, episode }: ShotWorkflowP
             ) : null}
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }
@@ -287,6 +287,7 @@ function BindStep({ projectName, episode, target, onChanged }: PanelProps) {
   const { t } = useTranslation("dashboard");
   const { busy, error, run } = useStepAction(onChanged);
   const [sources, setSources] = useState<SpatialSource[] | null>(null);
+  const [sourcesError, setSourcesError] = useState<string | null>(null);
   const [keys, setKeys] = useState<[string, string]>(["", ""]);
   const [frameIndex, setFrameIndex] = useState(0);
 
@@ -298,13 +299,21 @@ function BindStep({ projectName, episode, target, onChanged }: PanelProps) {
         setSources(listed);
         setKeys([listed[0]?.artifact_key ?? "", listed[1]?.artifact_key ?? ""]);
       },
-      () => {
-        if (!controller.signal.aborted) setSources([]);
+      (caught: unknown) => {
+        // A failed read is not "no approved shots": show why, so the operator can fix it.
+        if (!controller.signal.aborted) setSourcesError(errorMessage(caught) ?? t("spatial_sources_failed"));
       },
     );
     return () => controller.abort();
-  }, [projectName, episode]);
+  }, [projectName, episode, t]);
 
+  if (sourcesError) {
+    return (
+      <p role="alert" className="text-sm text-danger">
+        {sourcesError}
+      </p>
+    );
+  }
   if (sources === null) return <p className="text-xs text-text-3">{t("spatial_sources_loading")}</p>;
   if (sources.length < 2) return <p className="text-sm text-text-2">{t("spatial_sources_empty")}</p>;
   const chosen = keys.map((key) => sources.find((source) => source.artifact_key === key));

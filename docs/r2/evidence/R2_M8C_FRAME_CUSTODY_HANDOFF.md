@@ -1425,3 +1425,22 @@ No new review round was opened: these repairs are narrow, and each has a failing
 - Static gates: basedpyright (0/0), lint-imports, deptry and `audit_tests` are all clean.
 
 **Still external (runbook "What this runbook does not prove"):** real key custody, host filesystem and backup topology, the production image digest, and the restore drill on the real host. Approval sequence > 1 (key rotation, new image) is refused by the tools and needs its own ceremony.
+
+## Shots page browser check — 2026-10-14 (Claude session)
+
+**Setup:** an isolated dev backend (uvicorn, `ARCREEL_DATA_DIR` in the session scratchpad, SQLite, authentication on, test password) and the Vite dev server. The project was created through the API, then seeded with the test helpers: an admitted screenplay, Take target registration and two approved masters. A headless Chromium session (Python Playwright) drove the page, because the Chrome extension was not connected.
+
+**Observed:**
+- **Desktop, 1280 px:** the target list and the slate render.
+  - Step 1/6, bind, offers SH01 and SH02. Binding through the real routes advanced the page to step 2/6.
+  - Without activated governance, the review step says "pair review needs showrunner grants, which are not active on this server".
+  - The only console error was a 422 from `video-capabilities`: no video model is configured in the dev environment, unrelated to this page.
+- **Phone, 390 px:** the page stacks, but the workspace sidebar does not collapse, so the page gets about 130 px. This is the app shell, which applies to every workspace page.
+
+**Fixed:**
+- A failed source read showed "this episode needs at least two approved shots". It now shows the server's reason, with a new page test.
+- The page rendered a `<main>` inside the app's `<main>`; the inner one is now a `<div>`.
+
+**Not exercised in the browser:**
+- review, analyze, promote, generate and approve, which need activated governance and providers;
+- frame derivation with a `command_id` other than the page's own formula, which conflicts by design (a frame keeps one receipt).

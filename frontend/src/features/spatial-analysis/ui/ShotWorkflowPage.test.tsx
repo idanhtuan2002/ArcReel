@@ -113,6 +113,7 @@ beforeEach(() => {
         }),
       );
     }
+    if (url.includes("/spatial/sources")) return Promise.resolve(json({ detail: "sources diverged" }, 409));
     if (url.endsWith("/promotion-previews")) return Promise.resolve(json({ detail: "m8_promotion_binding_stale" }, 409));
     return Promise.resolve(json({}, 404));
   });
@@ -203,5 +204,15 @@ describe("Shot workflow promotion", () => {
       .filter((request) => request.url.endsWith("/promotion-previews"))
       .map((request) => (request.body as { command_id: string }).command_id);
     expect(new Set(ids).size).toBe(2);
+  });
+});
+
+describe("Shot workflow binding", () => {
+  it("reports a failed source read instead of claiming there are no approved shots", async () => {
+    state = BASE;
+    render(<ShotWorkflowPage projectName="demo" episode={1} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("sources diverged");
+    expect(screen.queryByRole("button", { name: "绑定帧" })).not.toBeInTheDocument();
   });
 });
