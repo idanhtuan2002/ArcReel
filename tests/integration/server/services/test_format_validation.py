@@ -24,7 +24,12 @@ USER = "default"
 PROJECT = "demo"
 
 
-async def _render(factory: Factory, tmp_path: Path, *, regions=(), subject: Box | None = None, audio: bool = True):
+DEFAULT_SUBJECT = Box(Fraction(2, 5), Fraction(1, 4), Fraction(3, 5), Fraction(3, 4))
+
+
+async def _render(
+    factory: Factory, tmp_path: Path, *, regions=(), subject: Box | None = DEFAULT_SUBJECT, audio: bool = True
+):
     source = make_source(tmp_path / "master.mp4", audio=audio)
     target = profile(1080, 1080, profile_ref="square@1")
     decision = reframe_decision(

@@ -388,10 +388,13 @@ def overlay_collisions(plan: FormatProjectionPlan) -> tuple[str, ...]:
         (index, box) for index, (kind, box) in enumerate(validate_overlay_set(plan.overlay_constraints)) if kind == "ui"
     ]
     evidence: list[tuple[str, Box]] = []
+    problems: list[str] = []
     if isinstance(source.get("subject"), dict):
         evidence.append(("subject", Box.parse(source["subject"])))
+    else:
+        # Unknown coverage is not "no collision": the subject span is required evidence.
+        problems.append("subject evidence missing")
     evidence += [(f"caption {index}", box) for index, box in enumerate(_boxes(source.get("captions", [])))]
-    problems: list[str] = []
     for name, box in evidence:
         projected = _project(box, window, target)
         if projected is None:
@@ -409,14 +412,22 @@ SINGLE_REVIEWER_DEVIATION = "single_reviewer_by_sponsor_decision_2026-10-14"
 
 
 TECHNICAL_CHECKS = ("dimensions", "ratio", "video_codec", "fps", "duration", "audio", "decode", "overlay")
-_EXACT_CHECKS = frozenset({"dimensions", "ratio", "video_codec", "fps", "audio"})
+
+
+def _number(value: object) -> Fraction:
+    try:
+        return Fraction(str(value))
+    except (ValueError, ZeroDivisionError) as exc:
+        raise FormatInvalidError("a duration is a number") from exc
 
 
 def validate_technical_report(report: TechnicalValidationReport, plan: FormatProjectionPlan) -> None:
-    """The complete versioned check set, each with observed and expected values and a verdict.
+    """The complete versioned check set; expectations and every verdict are recomputed from the plan.
 
-    Exact checks pass exactly when observed equals expected; the others carry the measuring rule's
-    verdict. The report passes exactly when every check passes.
+    A report cannot claim another target, fps, codec or overlay outcome than its plan implies, and a
+    verdict is never taken from the report: dimensions, ratio, codec, fps and audio pass on equality;
+    duration within one frame plus 50 ms; decode with zero errors; overlay with exactly the collisions
+    the plan's own analysis finds being none.
     """
     if report.plan_digest != plan.plan_digest:
         raise FormatInvalidError("technical report names another plan")
@@ -431,11 +442,36 @@ def validate_technical_report(report: TechnicalValidationReport, plan: FormatPro
         rows[name] = body
     if tuple(sorted(rows)) != tuple(sorted(TECHNICAL_CHECKS)):
         raise FormatInvalidError("a technical report has exactly the versioned check set")
-    for name in _EXACT_CHECKS:
-        row = rows[name]
-        if (row["verdict"] == "PASS") != (row["observed"] == row["expected"]):
+    profile = plan.output_profile
+    ratio = reduced_ratio(profile.width, profile.height)
+    fixed = {
+        "dimensions": f"{profile.width}x{profile.height}",
+        "ratio": f"{ratio[0]}:{ratio[1]}",
+        "video_codec": profile.video_codec,
+        "fps": str(profile.fps),
+        "decode": 0,
+        "overlay": [],
+    }
+    for name, expected in fixed.items():
+        if rows[name]["expected"] != expected:
+            raise FormatInvalidError(f"the {name} expectation is not the plan's")
+    audio_expected = rows["audio"]["expected"]
+    if audio_expected not in ([], ["aac"]) or (profile.audio_codec is None and audio_expected != []):
+        raise FormatInvalidError("the audio expectation is not admissible for the plan")
+    if rows["overlay"]["observed"] != list(overlay_collisions(plan)):
+        raise FormatInvalidError("the overlay observation is not the plan's collision analysis")
+    tolerance = 1 / profile.fps + Fraction(1, 20)
+    verdicts = {
+        name: rows[name]["observed"] == rows[name]["expected"]
+        for name in ("dimensions", "ratio", "video_codec", "fps", "audio", "decode", "overlay")
+    }
+    verdicts["duration"] = (
+        abs(_number(rows["duration"]["observed"]) - _number(rows["duration"]["expected"])) <= tolerance
+    )
+    for name, passed in verdicts.items():
+        if (rows[name]["verdict"] == "PASS") != passed:
             raise FormatInvalidError(f"the {name} verdict contradicts its observation")
-    if report.passed != all(row["verdict"] == "PASS" for row in rows.values()):
+    if report.passed != all(verdicts.values()):
         raise FormatInvalidError("a technical report passes exactly when every check passes")
 
 

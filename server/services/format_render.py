@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import shutil
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -64,6 +65,23 @@ def file_digest(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
     return "sha256:" + digest.hexdigest()
+
+
+def _copy_hashing(source: Path, destination: Path) -> str:
+    digest = hashlib.sha256()
+    with source.open("rb") as reader, destination.open("xb") as writer:
+        for chunk in iter(lambda: reader.read(1 << 20), b""):
+            digest.update(chunk)
+            writer.write(chunk)
+    return "sha256:" + digest.hexdigest()
+
+
+def _redacted(output: bytes, secrets_: tuple[str, ...]) -> str:
+    """The last diagnostic lines with every local path replaced; at most 400 characters."""
+    text = output.decode("utf-8", "replace")
+    for value in sorted(secrets_, key=len, reverse=True):
+        text = text.replace(value, "<path>")
+    return text[-400:]
 
 
 async def run_process(argv: list[str]) -> tuple[int, bytes]:
@@ -131,71 +149,91 @@ class FormatRenderService:
         if plan is None:
             raise FormatNotFoundError("unknown format plan")
         validate_plan(plan)
-        source_digest = await asyncio.to_thread(file_digest, source)
-        if source_digest != plan.source_master_digest:
-            raise FormatConflictError("the source bytes are not the master the plan binds")
-        facts = await probe_source(source, ffprobe=self._ffprobe)
-        argv = render_argv(plan, source_width=facts.width, source_height=facts.height, has_audio=facts.has_audio)
-        version = await ffmpeg_version(self._ffmpeg)
-        execution_id = execution_identity(plan, source_digest=source_digest, argv=argv, ffmpeg_version=version)
         store = project_dir / "formats"
-
-        replay = await self._begin(
-            user_id=user_id,
-            project_name=project_name,
-            plan_id=plan_id,
-            execution_id=execution_id,
-            source_digest=source_digest,
-            argv=list(argv),
-            version=version,
-            store=store,
-        )
-        if replay is not None:
-            return replay
-
         store.mkdir(parents=True, exist_ok=True)
-        temporary = store / f".{execution_id}.{os.getpid()}.partial.mp4"
+        # Render from a private snapshot whose bytes were hashed as they were copied, so a source
+        # replaced after the check can never be rendered under the master's identity.
+        snapshot = store / f".source-{uuid.uuid4().hex}.mp4"
         try:
-            command = materialize(argv, source=str(source), output=str(temporary))
+            source_digest = await asyncio.to_thread(_copy_hashing, source, snapshot)
+            if source_digest != plan.source_master_digest:
+                raise FormatConflictError("the source bytes are not the master the plan binds")
+            facts = await probe_source(snapshot, ffprobe=self._ffprobe)
+            argv = render_argv(plan, source_width=facts.width, source_height=facts.height, has_audio=facts.has_audio)
+            version = await ffmpeg_version(self._ffmpeg)
+            execution_id = execution_identity(plan, source_digest=source_digest, argv=argv, ffmpeg_version=version)
+            replay, attempt = await self._begin(
+                user_id=user_id,
+                project_name=project_name,
+                plan_id=plan_id,
+                execution_id=execution_id,
+                source_digest=source_digest,
+                argv=list(argv),
+                version=version,
+                store=store,
+            )
+            if replay is not None:
+                return replay
+            return await self._execute(
+                user_id=user_id,
+                project_name=project_name,
+                execution_id=execution_id,
+                attempt=attempt,
+                argv=argv,
+                snapshot=snapshot,
+                store=store,
+                redact=(str(source), str(snapshot), str(project_dir)),
+            )
+        finally:
+            snapshot.unlink(missing_ok=True)
+
+    async def _execute(
+        self,
+        *,
+        user_id: str,
+        project_name: str,
+        execution_id: str,
+        attempt: int,
+        argv: tuple[str, ...],
+        snapshot: Path,
+        store: Path,
+        redact: tuple[str, ...],
+    ) -> RenderResult:
+        temporary = store / f".{execution_id}.{uuid.uuid4().hex}.partial.mp4"
+
+        async def finish(state: str, **fields: str | None) -> None:
+            await asyncio.shield(
+                self._finish(user_id, project_name, execution_id, attempt=attempt, state=state, **fields)
+            )
+
+        try:
+            command = materialize(argv, source=str(snapshot), output=str(temporary))
             command[0] = self._ffmpeg
             async with asyncio.timeout(self._timeout):
                 code, output = await run_process(command)
             if code != 0:
-                tail = output.decode("utf-8", "replace")[-800:]
-                await self._finish(
-                    user_id, project_name, execution_id, state="FAILED", error=f"ffmpeg exit {code}: {tail}"
-                )
+                await finish("FAILED", error=f"ffmpeg exit {code}: {_redacted(output, redact)}")
                 raise FormatRenderFailedError(f"ffmpeg exited {code}")
             digest = await asyncio.to_thread(file_digest, temporary)
             final = store / f"{digest.removeprefix('sha256:')}.mp4"
-            if final.exists():
-                temporary.unlink()
-            else:
+            # Content-addressed: an existing file must hold exactly these bytes, or it is replaced.
+            if not final.exists() or await asyncio.to_thread(file_digest, final) != digest:
                 os.replace(temporary, final)
-            await self._finish(
-                user_id,
-                project_name,
-                execution_id,
-                state="SUCCEEDED",
-                artifact_digest=digest,
-                artifact_ref=f"formats/{final.name}",
-            )
+            await finish("SUCCEEDED", artifact_digest=digest, artifact_ref=f"formats/{final.name}")
             return RenderResult(execution_id=execution_id, artifact_digest=digest, artifact_path=final, replayed=False)
-        except (asyncio.CancelledError, TimeoutError) as exc:
-            state = "CANCELLED" if isinstance(exc, asyncio.CancelledError) else "FAILED"
-            await asyncio.shield(
-                self._finish(
-                    user_id,
-                    project_name,
-                    execution_id,
-                    state=state,
-                    error="cancelled" if state == "CANCELLED" else "timed out",
-                )
-            )
+        except asyncio.CancelledError:
+            await finish("CANCELLED", error="cancelled")
+            raise
+        except TimeoutError:
+            await finish("FAILED", error="timed out")
+            raise
+        except FormatRenderFailedError:
+            raise
+        except Exception as exc:
+            await finish("FAILED", error=f"render error: {type(exc).__name__}")
             raise
         finally:
-            if temporary.exists():
-                temporary.unlink()
+            temporary.unlink(missing_ok=True)
 
     async def _begin(
         self,
@@ -208,7 +246,8 @@ class FormatRenderService:
         argv: list[str],
         version: str,
         store: Path,
-    ) -> RenderResult | None:
+    ) -> tuple[RenderResult | None, int]:
+        """A replay of a succeeded execution, or the attempt number this caller now owns."""
         now = self._clock()
         async with self._sessions() as session, session.begin():
             row = await session.get(FormatRenderModel, (user_id, project_name, execution_id), with_for_update=True)
@@ -216,13 +255,8 @@ class FormatRenderService:
                 digest, ref = row.artifact_digest, row.artifact_ref
                 path = None if ref is None else store.parent / ref
                 if digest and path and path.exists() and await asyncio.to_thread(file_digest, path) == digest:
-                    return RenderResult(execution_id, digest, path, replayed=True)
-                # The stored output is gone or changed; the deterministic render may run again.
-                row.state, row.artifact_digest, row.artifact_ref = "RUNNING", None, None
-                row.attempt += 1
-                row.started_at, row.finished_at, row.error = now, None, None
-                return None
-            if row is not None and row.state == "RUNNING":
+                    return RenderResult(execution_id, digest, path, replayed=True), row.attempt
+            elif row is not None and row.state == "RUNNING":
                 started = row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)
                 if now - started < self._stale_after:
                     raise FormatRenderBusyError("this render is already running")
@@ -241,11 +275,13 @@ class FormatRenderService:
                         started_at=now,
                     )
                 )
-            else:
-                row.state, row.error, row.finished_at = "RUNNING", None, None
-                row.attempt += 1
-                row.started_at = now
-        return None
+                return None, 1
+            # A failed, cancelled, abandoned or lost-output execution runs again as a new attempt.
+            row.state, row.error, row.finished_at = "RUNNING", None, None
+            row.artifact_digest, row.artifact_ref = None, None
+            row.attempt += 1
+            row.started_at = now
+            return None, row.attempt
 
     async def _finish(
         self,
@@ -253,14 +289,16 @@ class FormatRenderService:
         project_name: str,
         execution_id: str,
         *,
+        attempt: int,
         state: str,
         error: str | None = None,
         artifact_digest: str | None = None,
         artifact_ref: str | None = None,
     ) -> None:
+        """Record the outcome only for the attempt that still owns the RUNNING row."""
         async with self._sessions() as session, session.begin():
             row = await session.get(FormatRenderModel, (user_id, project_name, execution_id), with_for_update=True)
-            if row is None or row.state != "RUNNING":
+            if row is None or row.state != "RUNNING" or row.attempt != attempt:
                 return
             row.state, row.error = state, error
             row.artifact_digest, row.artifact_ref = artifact_digest, artifact_ref

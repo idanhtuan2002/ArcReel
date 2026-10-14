@@ -62,6 +62,21 @@ def pixel_geometry(plan: FormatProjectionPlan, *, source_width: int, source_heig
     scaled_h = _even((placed.y1 - placed.y0) * out_h)
     pad_x = (out_w - scaled_w) // 2 // 2 * 2 if ReframeKind(decision.kind) is ReframeKind.PAD else 0
     pad_y = (out_h - scaled_h) // 2 // 2 * 2 if ReframeKind(decision.kind) is ReframeKind.PAD else 0
+    # Even-pixel rounding may stretch the picture slightly; more than 1% is refused.
+    drift = abs(Fraction(crop_w, crop_h) - Fraction(scaled_w, scaled_h)) / Fraction(scaled_w, scaled_h)
+    if drift > Fraction(1, 100):
+        raise FormatInvalidError("pixel rounding distorts the aspect beyond 1%")
+    focal_value = source.get("focal")
+    if isinstance(focal_value, dict):
+        focal = Box.parse(focal_value)
+        inside = (
+            crop_x <= focal.x0 * source_width
+            and focal.x1 * source_width <= crop_x + crop_w
+            and crop_y <= focal.y0 * source_height
+            and focal.y1 * source_height <= crop_y + crop_h
+        )
+        if not inside:
+            raise FormatInvalidError("the focal span does not fit inside the pixel crop")
     return PixelGeometry(crop_w, crop_h, crop_x, crop_y, scaled_w, scaled_h, pad_x, pad_y, out_w, out_h)
 
 

@@ -74,9 +74,9 @@ def _technical(plan, report_id: str, passed: bool = True) -> TechnicalValidation
         report_id=report_id,
         plan_digest=plan.plan_digest,
         artifact_digest=ARTIFACT,
-        checks=full_checks()
+        checks=full_checks(plan)
         if passed
-        else full_checks(decode={"name": "decode", "observed": 2, "expected": 0, "verdict": "FAIL"}),
+        else full_checks(plan, decode={"name": "decode", "observed": 2, "expected": 0, "verdict": "FAIL"}),
         passed=passed,
     )
 

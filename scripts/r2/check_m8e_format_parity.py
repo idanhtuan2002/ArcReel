@@ -24,7 +24,7 @@ from fractions import Fraction
 from pathlib import Path
 
 from r2.advanced_creative.digests import digest_canonical
-from r2.advanced_creative.format_render import ADAPTER_VERSION, materialize, render_argv
+from r2.advanced_creative.format_render import ADAPTER_VERSION, materialize, pixel_geometry, render_argv
 from r2.advanced_creative.formats import ReframeKind, build_plan, reframe_decision
 from r2.contracts.advanced_creative import OutputProfile, OverlayConstraintSet
 from scripts.r2.verify_donor_parity import clone_file_hashes
@@ -58,6 +58,8 @@ DONOR_ENV = [
     "requests",
     "--",
 ]
+IMPLEMENTATION = ("r2/advanced_creative/format_render.py", "r2/advanced_creative/formats.py")
+HARNESS = "scripts/r2/check_m8e_format_parity.py"
 PSNR_MIN = 30.0
 TIME_FACTOR = 3.0
 SIZE_FACTOR = 2.0
@@ -126,12 +128,26 @@ def mid_frame_psnr(a: Path, b: Path) -> float:
             "-",
         ]
     )
+    if result.returncode != 0:
+        raise RuntimeError(f"psnr exited {result.returncode}")
     marker = "average:"
     line = next((part for part in result.stderr.split() if part.startswith(marker)), None)
     if line is None:
         raise RuntimeError("psnr not reported: " + result.stderr[-400:])
     value = line.removeprefix(marker)
     return 99.0 if value == "inf" else float(value)
+
+
+def decode_errors(path: Path) -> int:
+    result = run(["ffmpeg", "-nostdin", "-v", "error", "-i", str(path), "-f", "null", "-"])
+    return len([line for line in result.stderr.splitlines() if line.strip()]) + (0 if result.returncode == 0 else 1)
+
+
+def donor_crop_x(width: int, height: int) -> int:
+    """The donor's cover crop of a 1280x720 source: scale to fill, then centre-crop (in source pixels)."""
+    scale = max(Fraction(width, 1280), Fraction(height, 720))
+    kept = Fraction(width) / scale
+    return int((1280 - kept) / 2)
 
 
 def make_fixture(path: Path) -> None:
@@ -242,8 +258,23 @@ def main() -> int:
     head = run(["git", "rev-parse", "HEAD"], cwd=clone).stdout.strip()
     if head != DONOR_COMMIT:
         raise SystemExit(f"donor clone is at {head}, not the pinned {DONOR_COMMIT}")
+    if run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=clone).stdout.strip():
+        raise SystemExit("the donor clone has modified tracked files; the run would not be the pinned donor")
+    repo = Path(__file__).resolve().parents[2]
+    r2_head = run(["git", "rev-parse", "HEAD"], cwd=repo).stdout.strip()
+    if r2_head != args.head:
+        raise SystemExit(f"R2 HEAD is {r2_head}, not --head {args.head}")
+    dirty = run(["git", "status", "--porcelain", "--", *IMPLEMENTATION, HARNESS], cwd=repo).stdout.strip()
+    if dirty:
+        raise SystemExit("the executed R2 implementation or harness differs from HEAD")
 
-    commands: list[dict] = []
+    commands: list[dict] = [
+        {
+            "command": "executed R2 files at HEAD",
+            "head": args.head,
+            "digests": {path: sha256_file(repo / path) for path in (*IMPLEMENTATION, HARNESS)},
+        }
+    ]
     donor_tests = run([*DONOR_ENV, "python", "-m", "pytest", *DONOR_TESTS, "-q", "-p", "no:cacheprovider"], cwd=clone)
     donor_tests_tail = (
         donor_tests.stdout.strip().splitlines()[-1] if donor_tests.stdout.strip() else donor_tests.stderr[-200:]
@@ -255,6 +286,14 @@ def main() -> int:
     source = work / "fixture.mp4"
     make_fixture(source)
     source_digest = sha256_file(source)
+    # Failure safety and observability: both sides refuse a missing source, produce no output, and say why.
+    missing = work / "missing.mp4"
+    donor_ok, _t, donor_error = donor_render(clone, missing, work / "donor-missing.mp4", 1080, 1080, "pad")
+    r2_ok, _t, r2_error = r2_render(
+        r2_plan(1080, 1080, ReframeKind.PAD, source_digest), missing, work / "r2-missing.mp4"
+    )
+    failure_safe = not donor_ok and not r2_ok and not (work / "r2-missing.mp4").exists()
+    observable = bool(donor_error.strip()) and "No such file" in r2_error
     rows: list[dict] = []
     measures: dict[str, dict] = {}
     unknowns: list[str] = []
@@ -269,10 +308,10 @@ def main() -> int:
                 donor_out, r2_out = work / f"donor-{case}-{attempt}.mp4", work / f"r2-{case}-{attempt}.mp4"
                 for stale in (donor_out, r2_out):
                     stale.unlink(missing_ok=True)
-                ok, elapsed = donor_render(clone, source, donor_out, width, height, fit)
+                ok, elapsed, _error = donor_render(clone, source, donor_out, width, height, fit)
                 donor_ok &= ok
                 donor_times.append(elapsed)
-                ok, elapsed = r2_render(plan, source, r2_out)
+                ok, elapsed, _error = r2_render(plan, source, r2_out)
                 r2_ok &= ok
                 r2_times.append(elapsed)
                 if donor_out.exists():
@@ -291,6 +330,10 @@ def main() -> int:
                 == (width, height, "h264")
             )
             duration_ok = abs(donor_facts["duration"] - r2_facts["duration"]) <= 1 / 30 + 1e-6
+            fps_ok = donor_facts["fps"] == r2_facts["fps"] == "30"
+            decode_ok = decode_errors(work / f"donor-{case}-0.mp4") == 0 == decode_errors(work / f"r2-{case}-0.mp4")
+            geometry = pixel_geometry(plan, source_width=1280, source_height=720)
+            geometry_ok = kind is ReframeKind.PAD or abs(geometry.crop_x - donor_crop_x(width, height)) <= 2
             r2_deterministic = len(set(r2_hashes)) == 1
             donor_deterministic = len(set(donor_hashes)) == 1
             audio_kept = r2_facts["audio"] == ["aac"]
@@ -305,6 +348,10 @@ def main() -> int:
                 "donor_deterministic": donor_deterministic,
                 "r2_deterministic": r2_deterministic,
                 "r2_sha256": r2_hashes[0],
+                "fps_ok": fps_ok,
+                "decode_ok": decode_ok,
+                "r2_crop_x": geometry.crop_x,
+                "donor_crop_x": donor_crop_x(width, height) if kind is ReframeKind.COVER_CENTER else None,
             }
             rows.append(
                 {
@@ -312,21 +359,18 @@ def main() -> int:
                     "donor_test_refs": list(DONOR_TESTS) if fit == "cover" or width < height else [],
                     "fixture_refs": [f"fixture:{source_digest}", f"case:{case}"],
                     "intentional_difference": None,
-                    "functionality": disposition(same_shape),
-                    "correctness": disposition(psnr >= PSNR_MIN and duration_ok),
+                    "functionality": disposition(same_shape and fps_ok),
+                    "correctness": disposition(psnr >= PSNR_MIN and duration_ok and decode_ok and geometry_ok),
                     "determinism": disposition(r2_deterministic, improved=not donor_deterministic),
-                    "failure_safety": "PARITY",
+                    "failure_safety": disposition(failure_safe),
                     "data_integrity": disposition(audio_kept, improved=donor_facts["audio"] != ["aac"]),
-                    "observability": "IMPROVED",
+                    "observability": disposition(observable),
                     "performance": disposition(time_ok),
                     "resources": disposition(size_ok),
                     "evidence_refs": [f"measure:{case}"],
                 }
             )
 
-    missing = work / "missing.mp4"
-    donor_failed = not donor_render(clone, missing, work / "donor-missing.mp4", 1080, 1080, "pad")[0]
-    r2_failed = not r2_render(r2_plan(1080, 1080, ReframeKind.PAD, source_digest), missing, work / "r2-missing.mp4")[0]
     rows.append(
         {
             "behavior_id": "F07",
@@ -344,12 +388,19 @@ def main() -> int:
                     "performance",
                     "resources",
                 ),
-                "PARITY" if donor_failed and r2_failed else "BLOCKED",
+                disposition(failure_safe and observable),
             ),
             "evidence_refs": ["measure:missing-source"],
         }
     )
-    measures["missing-source"] = {"donor_failed": donor_failed, "r2_failed": r2_failed}
+    if not (failure_safe and observable):
+        unknowns.append("missing-source: a side did not refuse cleanly with a reason")
+    measures["missing-source"] = {
+        "donor_refused": not donor_ok,
+        "r2_refused": not r2_ok,
+        "donor_reason": donor_error.strip()[:160],
+        "r2_reason_names_missing_file": "No such file" in r2_error,
+    }
 
     file_hashes = clone_file_hashes(clone, DONOR_COMMIT, SELECTED)
     if donor_tests.returncode != 0:

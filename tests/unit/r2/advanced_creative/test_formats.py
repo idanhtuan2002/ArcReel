@@ -337,10 +337,27 @@ def test_more_profile_and_geometry_guards() -> None:
     assert same.removed_fraction == 0
 
 
-def full_checks(**overrides) -> tuple[dict, ...]:
-    from r2.advanced_creative.formats import TECHNICAL_CHECKS
+def full_checks(plan=None, **overrides) -> tuple[dict, ...]:
+    """A complete, consistent technical check set for ``plan`` (every check passing)."""
+    from r2.advanced_creative.formats import overlay_collisions, reduced_ratio
 
-    rows = {name: {"name": name, "observed": "x", "expected": "x", "verdict": "PASS"} for name in TECHNICAL_CHECKS}
+    plan = plan or _plan(kind=ReframeKind.PAD)
+    target = plan.output_profile
+    ratio = "{}:{}".format(*reduced_ratio(target.width, target.height))
+    collisions = list(overlay_collisions(plan))
+    rows = {
+        "dimensions": {"observed": f"{target.width}x{target.height}", "expected": f"{target.width}x{target.height}"},
+        "ratio": {"observed": ratio, "expected": ratio},
+        "video_codec": {"observed": "h264", "expected": "h264"},
+        "fps": {"observed": str(target.fps), "expected": str(target.fps)},
+        "duration": {"observed": "2.000", "expected": "2.000"},
+        "audio": {"observed": ["aac"], "expected": ["aac"]},
+        "decode": {"observed": 0, "expected": 0},
+        "overlay": {"observed": collisions, "expected": []},
+    }
+    for name, row in rows.items():
+        row["name"] = name
+        row["verdict"] = "PASS" if name != "overlay" or not collisions else "FAIL"
     rows.update(overrides)
     return tuple(rows.values())
 
@@ -377,10 +394,10 @@ def _semantic(plan, reviews, *, disagreement=False, passed=True):
 def test_a_technical_report_passes_exactly_when_every_check_passes() -> None:
     from r2.advanced_creative.formats import validate_technical_report
 
-    plan = _plan(kind=ReframeKind.PAD)
-    good = full_checks()
+    plan = _subject_plan()
+    good = full_checks(plan)
     validate_technical_report(_technical(plan, good, True), plan)
-    failing = full_checks(decode={"name": "decode", "observed": 3, "expected": 0, "verdict": "FAIL"})
+    failing = full_checks(plan, decode={"name": "decode", "observed": 3, "expected": 0, "verdict": "FAIL"})
     validate_technical_report(_technical(plan, failing, False), plan)
     with pytest.raises(FormatInvalidError, match="exactly when"):
         validate_technical_report(_technical(plan, failing, True), plan)
@@ -388,9 +405,40 @@ def test_a_technical_report_passes_exactly_when_every_check_passes() -> None:
         validate_technical_report(_technical(plan, good + good[:1], True), plan)
     with pytest.raises(FormatInvalidError, match="versioned check set"):
         validate_technical_report(_technical(plan, good[:1], True), plan)
-    lying = full_checks(fps={"name": "fps", "observed": "25/1", "expected": "30/1", "verdict": "PASS"})
-    with pytest.raises(FormatInvalidError, match="contradicts"):
-        validate_technical_report(_technical(plan, lying, True), plan)
+    # A report cannot agree with itself on another fps than its plan's.
+    other_fps = full_checks(plan, fps={"name": "fps", "observed": "25", "expected": "25", "verdict": "PASS"})
+    with pytest.raises(FormatInvalidError, match="fps expectation"):
+        validate_technical_report(_technical(plan, other_fps, True), plan)
+    hidden_errors = full_checks(plan, decode={"name": "decode", "observed": 2, "expected": 0, "verdict": "PASS"})
+    with pytest.raises(FormatInvalidError, match="decode verdict"):
+        validate_technical_report(_technical(plan, hidden_errors, True), plan)
+    no_subject = _plan(kind=ReframeKind.PAD)
+    with pytest.raises(FormatInvalidError, match="collision analysis"):
+        validate_technical_report(_technical(no_subject, full_checks(plan), True), no_subject)
+    slow = full_checks(plan, duration={"name": "duration", "observed": "2.200", "expected": "2.000", "verdict": "PASS"})
+    with pytest.raises(FormatInvalidError, match="duration verdict"):
+        validate_technical_report(_technical(plan, slow, True), plan)
+
+
+def _subject_plan():
+    target = profile()
+    decision = reframe_decision(
+        decision_id="r1",
+        kind=ReframeKind.PAD,
+        source_size=(1920, 1080),
+        profile=target,
+        focal=None,
+        subject=Box(F(2, 5), F(1, 4), F(3, 5), F(3, 4)),
+        rationale="keep all",
+    )
+    return build_plan(
+        plan_id="p1",
+        source_master_id="m@v1",
+        source_master_digest=DIGEST,
+        profile=target,
+        overlay=overlay(),
+        decisions=(decision,),
+    )
 
 
 def test_semantic_reports_need_two_reviewers_or_the_recorded_deviation() -> None:

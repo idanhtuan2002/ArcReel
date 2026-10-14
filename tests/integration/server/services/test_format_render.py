@@ -104,7 +104,9 @@ async def test_a_failed_render_is_recorded_and_may_run_again(session_factory: Fa
     source = make_source(tmp_path / "master.mp4")
     plan_id = await _store_plan(session_factory, source)
     failing = tmp_path / "failing-ffmpeg"
-    failing.write_text('#!/bin/sh\nif [ "$1" = "-version" ]; then exec ffmpeg -version; fi\necho boom >&2\nexit 3\n')
+    failing.write_text(
+        '#!/bin/sh\nif [ "$1" = "-version" ]; then exec ffmpeg -version; fi\necho "$* boom" >&2\nexit 3\n'
+    )
     failing.chmod(0o755)
 
     with pytest.raises(FormatRenderFailedError, match="exited 3"):
@@ -115,6 +117,8 @@ async def test_a_failed_render_is_recorded_and_may_run_again(session_factory: Fa
         rows = (await session.execute(FormatRenderModel.__table__.select())).all()
     assert [(row.state, row.attempt) for row in rows] == [("FAILED", 1)]
     assert "boom" in rows[0].error
+    # Local paths never reach the stored diagnostics.
+    assert str(tmp_path) not in rows[0].error
 
     result = await FormatRenderService(session_factory).render(
         user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source
@@ -181,3 +185,60 @@ async def test_cancellation_kills_ffmpeg_and_records_it(session_factory: Factory
         states = [row.state for row in (await session.execute(FormatRenderModel.__table__.select())).all()]
     assert states == ["CANCELLED"]
     assert not list((tmp_path / "formats").glob(".*partial*"))
+
+
+async def test_a_corrupted_store_file_is_repaired_by_the_rerender(session_factory: Factory, tmp_path: Path) -> None:
+    source = make_source(tmp_path / "master.mp4")
+    plan_id = await _store_plan(session_factory, source)
+    service = FormatRenderService(session_factory)
+    first = await service.render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source
+    )
+    first.artifact_path.write_bytes(b"corrupted")
+
+    again = await service.render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source
+    )
+    assert (again.replayed, again.artifact_digest) == (False, first.artifact_digest)
+    assert file_digest(again.artifact_path) == first.artifact_digest
+
+
+async def test_a_late_attempt_cannot_finish_the_current_attempt(session_factory: Factory, tmp_path: Path) -> None:
+    source = make_source(tmp_path / "master.mp4")
+    plan_id = await _store_plan(session_factory, source)
+    service = FormatRenderService(session_factory)
+    result = await service.render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source
+    )
+    async with session_factory() as session, session.begin():
+        row = await session.get(FormatRenderModel, (USER, PROJECT, result.execution_id))
+        assert row is not None
+        row.state, row.artifact_digest, row.artifact_ref, row.attempt = "RUNNING", None, None, 5
+
+    # Attempt 4 outlived its lease; its completion must not touch attempt 5's row.
+    await service._finish(USER, PROJECT, result.execution_id, attempt=4, state="FAILED", error="late")
+    record = await service.execution(user_id=USER, project_name=PROJECT, execution_id=result.execution_id)
+    assert record is not None
+    assert (record.state, record.attempt, record.error) == ("RUNNING", 5, None)
+
+
+async def test_a_setup_failure_after_the_attempt_starts_is_recorded(
+    session_factory: Factory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from server.services import format_render
+
+    source = make_source(tmp_path / "master.mp4")
+    plan_id = await _store_plan(session_factory, source)
+
+    def broken(*_args: object, **_kwargs: object) -> list[str]:
+        raise OSError("disk gone")
+
+    monkeypatch.setattr(format_render, "materialize", broken)
+    with pytest.raises(OSError, match="disk gone"):
+        await FormatRenderService(session_factory).render(
+            user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source
+        )
+    async with session_factory() as session:
+        rows = (await session.execute(FormatRenderModel.__table__.select())).all()
+    assert [(row.state, row.error) for row in rows] == [("FAILED", "render error: OSError")]
+    assert not list((tmp_path / "formats").glob(".*"))
