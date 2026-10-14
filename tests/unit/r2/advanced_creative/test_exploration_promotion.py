@@ -41,6 +41,13 @@ class _Receipt:
     result_digest: str
 
 
+class _AcceptFormatEvidence:
+    """Tests of the M8-A flow itself; the format evidence gate has its own tests."""
+
+    async def verify(self, **_kwargs: object) -> None:
+        return None
+
+
 def _revision() -> ExplorationRevision:
     lineage = LineageBinding(
         project_name="demo",
@@ -181,7 +188,14 @@ def _service(world: _World, now: datetime = NOW) -> ExplorationPromotion:
     async def commit() -> None:
         world.events.append("commit")
 
-    return ExplorationPromotion(store=world, slots=world, commit=commit, clock=lambda: now, new_id=lambda: "r1")
+    return ExplorationPromotion(
+        store=world,
+        slots=world,
+        commit=commit,
+        clock=lambda: now,
+        new_id=lambda: "r1",
+        format_evidence=_AcceptFormatEvidence(),
+    )
 
 
 def _authorization(preview: PromotionPreview, **overrides: object) -> PromotionAuthorization:

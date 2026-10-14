@@ -231,7 +231,12 @@ class PromotionPreview(M8ContractModel):
         if not 0 < ttl_seconds <= 3600:
             raise ValueError("preview TTL must be in (0, 3600] seconds")
         has_master = self.expected_master_id is not None and self.expected_master_digest is not None
-        if self.target.kind is PromotionTargetKind.ARTIFACT_SLOT and not has_master:
+        no_master = self.expected_master_id is None and self.expected_master_digest is None
+        # M8-E amendment: only a format slot's first promotion binds "no master yet" at version 0.
+        format_genesis = (
+            self.target.target_ref.startswith("m8-format:") and self.target.expected_target_version == 0 and no_master
+        )
+        if self.target.kind is PromotionTargetKind.ARTIFACT_SLOT and not (has_master or format_genesis):
             raise ValueError("artifact preview requires exact master identity")
         if self.target.kind is PromotionTargetKind.PRODUCTION_BINDING and (
             self.expected_master_id is not None or self.expected_master_digest is not None

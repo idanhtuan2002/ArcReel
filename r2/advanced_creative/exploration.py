@@ -153,6 +153,29 @@ class SlotAuthority(Protocol):
     ) -> MasterHeadSnapshot: ...
 
 
+def is_format_slot(target_ref: str) -> bool:
+    """An M8 format projection slot (``m8-format:<source key digest>:<profile ref>``)."""
+    return target_ref.startswith("m8-format:")
+
+
+class FormatEvidence(Protocol):
+    """Re-verifies a FORMAT candidate's evidence for a slot; raises ``PromotionBindingStaleError`` if stale."""
+
+    async def verify(self, *, user_id: str, project_name: str, target_ref: str, payload: FormatCandidate) -> None: ...
+
+
+class RefuseFormatEvidence:
+    """The fail-closed default: without wired evidence no FORMAT candidate is previewed or promoted."""
+
+    async def verify(self, *, user_id: str, project_name: str, target_ref: str, payload: FormatCandidate) -> None:
+        raise PromotionBindingStaleError("format evidence is not available")
+
+
+def genesis_allowed(target: PromotionTarget) -> bool:
+    """Only a format slot's first promotion may run against no master, at expected version 0."""
+    return is_format_slot(target.target_ref) and target.expected_target_version == 0
+
+
 def promotable_format(revision: ExplorationRevision) -> FormatCandidate:
     """The FormatCandidate payload an ARTIFACT_SLOT promotion needs, or the unavailable-target error."""
     if revision.kind is not ExplorationKind.FORMAT or not isinstance(revision.payload, FormatCandidate):
@@ -169,12 +192,14 @@ class ExplorationService:
         commit: Callable[[], Awaitable[None]],
         clock: Callable[[], datetime],
         new_id: Callable[[], str] = uuid7,
+        format_evidence: FormatEvidence | None = None,
     ) -> None:
         self._store = store
         self._slots = slots
         self._commit = commit
         self._clock = clock
         self._new_id = new_id
+        self._format_evidence = format_evidence or RefuseFormatEvidence()
 
     async def append_revision(
         self,
@@ -271,17 +296,22 @@ class ExplorationService:
         if self._slots.is_manifest_key(target.target_ref):
             raise PromotionTargetUnavailableError("manifest artifacts are promoted by the host flows (ADR-0097)")
         payload = promotable_format(stored)
+        await self._format_evidence.verify(
+            user_id=user_id, project_name=project_name, target_ref=target.target_ref, payload=payload
+        )
         master = await self._slots.current_head(
             user_id=user_id, project_name=project_name, target_ref=target.target_ref
         )
-        if master is None:
+        if master is None and not genesis_allowed(target):
             raise PromotionTargetUnavailableError("the slot has no master to replace")
-        if master.master_version != target.expected_target_version:
+        if (0 if master is None else master.master_version) != target.expected_target_version:
             raise PromotionBindingStaleError("the slot's master version moved")
         issued_at = self._clock()
         impact = CanonicalJsonObject.model_validate(
             {
-                "from": {
+                "from": None
+                if master is None
+                else {
                     "master_id": master.candidate_id,
                     "master_digest": master.content_digest,
                     "master_version": master.master_version,
@@ -300,8 +330,8 @@ class ExplorationService:
             candidate_revision=revision,
             candidate_payload_digest=stored.payload_digest,
             target=target,
-            expected_master_id=master.candidate_id,
-            expected_master_digest=master.content_digest,
+            expected_master_id=None if master is None else master.candidate_id,
+            expected_master_digest=None if master is None else master.content_digest,
             impact=impact,
             impact_digest=digest_canonical(impact),
             authorization_scope=user_id,
@@ -340,7 +370,11 @@ __all__ = [
     "CommandReceiptView",
     "ExplorationService",
     "ExplorationStore",
+    "FormatEvidence",
+    "RefuseFormatEvidence",
     "SlotAuthority",
+    "genesis_allowed",
+    "is_format_slot",
     "promotable_format",
     "uuid7",
 ]

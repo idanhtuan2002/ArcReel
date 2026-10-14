@@ -24,7 +24,7 @@ from lib.db.repositories.host_hardening import (
 from lib.path_safety import PathTraversalError, safe_join
 from lib.project_manager import ProjectManager, find_episode
 from r2.advanced_creative.errors import CommandConflictError, ExplorationNotFoundError, PromotionBindingStaleError
-from r2.advanced_creative.exploration import ExplorationService
+from r2.advanced_creative.exploration import ExplorationService, FormatEvidence
 from r2.advanced_creative.lineage import resolve_episode_lineage
 from r2.advanced_creative.promotion import ExplorationPromotion
 from r2.contracts.advanced_creative import LineageBinding
@@ -36,6 +36,7 @@ from r2.host_hardening.promotion import (
     PromotionExpectedVersionConflictError,
     PromotionReceiptReplayMismatchError,
 )
+from server.services.format_evidence import HostFormatEvidence
 
 _STALE_M7_BINDINGS = (
     CandidateArtifactMismatchError,
@@ -118,21 +119,25 @@ class HostSlotAuthority:
             raise PromotionBindingStaleError("the M7 authority refused the bound candidate or head") from error
 
 
-def exploration_service(session: AsyncSession) -> ExplorationService:
+def exploration_service(session: AsyncSession, *, format_evidence: FormatEvidence | None = None) -> ExplorationService:
     return ExplorationService(
         store=ExplorationRepository(session),
         slots=HostSlotAuthority(session),
         commit=session.commit,
         clock=_utc_now,
+        format_evidence=format_evidence or HostFormatEvidence(session),
     )
 
 
-def exploration_promotion(session: AsyncSession) -> ExplorationPromotion:
+def exploration_promotion(
+    session: AsyncSession, *, format_evidence: FormatEvidence | None = None
+) -> ExplorationPromotion:
     return ExplorationPromotion(
         store=ExplorationRepository(session),
         slots=HostSlotAuthority(session),
         commit=session.commit,
         clock=_utc_now,
+        format_evidence=format_evidence or HostFormatEvidence(session),
     )
 
 

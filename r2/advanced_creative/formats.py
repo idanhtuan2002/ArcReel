@@ -10,6 +10,7 @@ a semantic risk derived from how much of the source it removes.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -44,6 +45,25 @@ class ReframeKind(StrEnum):
     PAD = "PAD"
     COVER_CENTER = "COVER_CENTER"
     COVER_FOCAL = "COVER_FOCAL"
+
+
+FORMAT_SLOT_PREFIX = "m8-format:"
+
+
+def source_master_id(artifact_key: str, master_version: int) -> str:
+    return f"{artifact_key}@v{master_version}"
+
+
+def parse_source_master_id(value: str) -> tuple[str, int]:
+    artifact_key, separator, version = value.rpartition("@v")
+    if not separator or not artifact_key or not version.isdigit() or int(version) < 1:
+        raise FormatInvalidError("a source master id is <artifact key>@v<version>")
+    return artifact_key, int(version)
+
+
+def format_slot_key(source_artifact_key: str, profile_ref: str) -> str:
+    """The M8 slot a projection of ``source_artifact_key`` to ``profile_ref`` is promoted into."""
+    return f"{FORMAT_SLOT_PREFIX}{hashlib.sha256(source_artifact_key.encode()).hexdigest()[:16]}:{profile_ref}"
 
 
 def reduced_ratio(width: int, height: int) -> tuple[int, int]:
@@ -459,6 +479,7 @@ def validate_semantic_report(report: SemanticParityReport, plan: FormatProjectio
 
 
 __all__ = [
+    "FORMAT_SLOT_PREFIX",
     "SEMANTIC_ITEMS",
     "SEMANTIC_RUBRIC",
     "SINGLE_REVIEWER_DEVIATION",
@@ -469,13 +490,16 @@ __all__ = [
     "Geometry",
     "ReframeKind",
     "build_plan",
+    "format_slot_key",
     "overlay_collisions",
     "overlay_digest",
+    "parse_source_master_id",
     "profile_digest",
     "reduced_ratio",
     "reframe_decision",
     "reframe_geometry",
     "semantic_risk",
+    "source_master_id",
     "validate_output_profile",
     "validate_overlay_set",
     "validate_plan",

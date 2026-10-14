@@ -55,6 +55,13 @@ SLOT = "m8-slot:demo:vertical-1"
 DIGEST = "sha256:" + "a" * 64
 
 
+class _AcceptFormatEvidence:
+    """Tests of the M8-A flow itself; the format evidence gate has its own tests."""
+
+    async def verify(self, **_kwargs: object) -> None:
+        return None
+
+
 def _video(path: Path, tag: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
@@ -162,7 +169,7 @@ def _format_revision(object_id: str, object_digest: str, *, candidate_id: str = 
 
 async def _append(factory: Factory, revision: ExplorationRevision, command: str = "append-1") -> None:
     async with factory() as session:
-        await composition.exploration_service(session).append_revision(
+        await composition.exploration_service(session, format_evidence=_AcceptFormatEvidence()).append_revision(
             user_id=USER, project_name=PROJECT, candidate=revision, expected_head_version=None, command_id=command
         )
 
@@ -177,7 +184,7 @@ async def _preview(
     command: str = "preview-1",
 ) -> PromotionPreview:
     async with factory() as session:
-        return await composition.exploration_service(session).create_preview(
+        return await composition.exploration_service(session, format_evidence=_AcceptFormatEvidence()).create_preview(
             user_id=USER,
             project_name=PROJECT,
             candidate_id=candidate_id,
@@ -206,13 +213,14 @@ def _authorization(
 async def _promote(factory: Factory, authorization: PromotionAuthorization, head_version: int = 1, *, clock=None):
     async with factory() as session:
         service = (
-            composition.exploration_promotion(session)
+            composition.exploration_promotion(session, format_evidence=_AcceptFormatEvidence())
             if clock is None
             else ExplorationPromotion(
                 store=ExplorationRepository(session),
                 slots=composition.HostSlotAuthority(session),
                 commit=session.commit,
                 clock=clock,
+                format_evidence=_AcceptFormatEvidence(),
             )
         )
         return await service.promote(

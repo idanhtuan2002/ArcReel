@@ -51,6 +51,13 @@ class _Receipt:
     result_digest: str
 
 
+class _AcceptFormatEvidence:
+    """Tests of the M8-A flow itself; the format evidence gate has its own tests."""
+
+    async def verify(self, **_kwargs: object) -> None:
+        return None
+
+
 def _revision(kind: ExplorationKind = ExplorationKind.FORMAT) -> ExplorationRevision:
     payload = (
         FormatCandidate(
@@ -146,7 +153,14 @@ def _service(world: _World) -> ExplorationService:
     async def commit() -> None:
         world.events.append("commit")
 
-    return ExplorationService(store=world, slots=world, commit=commit, clock=lambda: NOW, new_id=lambda: "pv1")
+    return ExplorationService(
+        store=world,
+        slots=world,
+        commit=commit,
+        clock=lambda: NOW,
+        new_id=lambda: "pv1",
+        format_evidence=_AcceptFormatEvidence(),
+    )
 
 
 def _target(**overrides: object) -> PromotionTarget:
@@ -266,3 +280,76 @@ def test_uuid7_ids_are_version_7_and_time_ordered() -> None:
     assert first[14] == "7"
     assert first[19] in "89ab"
     assert first[:8] <= second[:8]
+
+
+async def test_format_previews_fail_closed_without_wired_evidence() -> None:
+    world = _World(_revision())
+    service = ExplorationService(
+        store=world, slots=world, commit=lambda: _noop(), clock=lambda: NOW, new_id=lambda: "pv1"
+    )
+
+    with pytest.raises(PromotionBindingStaleError, match="format evidence"):
+        await service.create_preview(
+            user_id="u1", project_name="demo", candidate_id="c1", revision=1, target=_target(), command_id="pc1"
+        )
+    assert world.previews == {}
+
+
+async def _noop() -> None:
+    return None
+
+
+async def test_only_a_format_slot_at_version_zero_may_start_without_a_master() -> None:
+    world = _World(_revision())
+    world.master = None  # type: ignore[assignment]
+
+    genesis = await _preview(world, _target(target_ref="m8-format:abc:square@1", expected_target_version=0))
+    assert (genesis.expected_master_id, genesis.expected_master_digest) == (None, None)
+    assert genesis.impact.model_dump()["from"] is None
+
+    with pytest.raises(PromotionTargetUnavailableError, match="no master"):
+        await _preview(_World_without_master(), _target(expected_target_version=0), command="pc2")
+    with pytest.raises(PromotionTargetUnavailableError, match="no master"):
+        await _preview(
+            _World_without_master(),
+            _target(target_ref="m8-format:abc:square@1", expected_target_version=1),
+            command="pc3",
+        )
+
+
+def _World_without_master() -> _World:
+    world = _World(_revision())
+    world.master = None  # type: ignore[assignment]
+    return world
+
+
+@pytest.mark.parametrize(
+    ("target_ref", "version", "allowed"),
+    [("m8-format:abc:square@1", 0, True), ("m8-slot:x", 0, False), ("m8-format:abc:square@1", 1, False)],
+)
+def test_the_preview_contract_admits_no_master_only_for_format_genesis(
+    target_ref: str, version: int, allowed: bool
+) -> None:
+    from pydantic import ValidationError
+
+    fields = {
+        "preview_id": "p",
+        "preview_command_id": "c",
+        "project_name": "demo",
+        "candidate_id": "c1",
+        "candidate_revision": 1,
+        "candidate_payload_digest": DIGEST,
+        "target": _target(target_ref=target_ref, expected_target_version=version),
+        "expected_master_id": None,
+        "expected_master_digest": None,
+        "impact": {},
+        "impact_digest": DIGEST,
+        "authorization_scope": "u1",
+        "issued_at": NOW,
+        "expires_at": NOW + PREVIEW_TTL,
+    }
+    if allowed:
+        PromotionPreview(**fields)
+    else:
+        with pytest.raises(ValidationError, match="exact master identity"):
+            PromotionPreview(**fields)

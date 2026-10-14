@@ -25,7 +25,15 @@ from r2.advanced_creative.errors import (
     PromotionBindingStaleError,
     PromotionTargetUnavailableError,
 )
-from r2.advanced_creative.exploration import ExplorationStore, SlotAuthority, promotable_format, uuid7
+from r2.advanced_creative.exploration import (
+    ExplorationStore,
+    FormatEvidence,
+    RefuseFormatEvidence,
+    SlotAuthority,
+    genesis_allowed,
+    promotable_format,
+    uuid7,
+)
 from r2.contracts.advanced_creative import PromotionAuthorization, PromotionReceipt, PromotionTargetKind
 
 PROMOTE_OPERATION = "PROMOTE"
@@ -40,12 +48,14 @@ class ExplorationPromotion:
         commit: Callable[[], Awaitable[None]],
         clock: Callable[[], datetime],
         new_id: Callable[[], str] = uuid7,
+        format_evidence: FormatEvidence | None = None,
     ) -> None:
         self._store = store
         self._slots = slots
         self._commit = commit
         self._clock = clock
         self._new_id = new_id
+        self._format_evidence = format_evidence or RefuseFormatEvidence()
 
     async def promote(
         self,
@@ -121,11 +131,21 @@ class ExplorationPromotion:
             raise PromotionBindingStaleError("the previewed revision no longer matches")
         payload = promotable_format(revision)
         target_ref = preview.target.target_ref
+        await self._format_evidence.verify(
+            user_id=user_id, project_name=project_name, target_ref=target_ref, payload=payload
+        )
         await self._slots.lock_slot(user_id=user_id, project_name=project_name, target_ref=target_ref)
         master = await self._slots.current_head(user_id=user_id, project_name=project_name, target_ref=target_ref)
-        if (
-            master is None
-            or master.master_version != preview.target.expected_target_version
+        if master is None:
+            # A format slot's first promotion: the preview bound "no master" at version 0.
+            if not (
+                genesis_allowed(preview.target)
+                and preview.expected_master_id is None
+                and preview.expected_master_digest is None
+            ):
+                raise PromotionBindingStaleError("the slot's master moved since the preview")
+        elif (
+            master.master_version != preview.target.expected_target_version
             or master.candidate_id != preview.expected_master_id
             or master.content_digest != preview.expected_master_digest
         ):
@@ -146,7 +166,7 @@ class ExplorationPromotion:
             project_name=project_name,
             target_ref=target_ref,
             candidate_id=payload.rendered_artifact_ref,
-            expected_master_version=master.master_version,
+            expected_master_version=0 if master is None else master.master_version,
             approval_record=f"m8:{authorization.command_id}",
             command_id=f"m8-promote:{authorization.command_id}",
         )
