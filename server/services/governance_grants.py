@@ -11,6 +11,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.governance_grant import ShowrunnerGrantEventModel, ShowrunnerGrantHeadModel
+from r2.contracts.grant_checkpoint import GrantHeadRecordV1
 from r2.contracts.showrunner_grant import GrantEventInvalid
 from r2.governance.checkpoint_signature import VerifiedGrantCheckpointV1, verify_grant_checkpoint
 from r2.governance.grant_signature import VerifiedGrantEventV1, verify_grant_event
@@ -349,6 +350,60 @@ class CheckpointedShowrunnerGrantReader(CurrentShowrunnerGrantReader):
         return event
 
 
+class GovernanceGrantHeadExporter(_GrantLedger):
+    """Read every committed grant head, each chain verified, for the operator's next checkpoint body."""
+
+    def __init__(
+        self, session_factory: async_sessionmaker[AsyncSession], *, grant_key_id: str, grant_public_key: bytes
+    ) -> None:
+        super().__init__(key_id=grant_key_id, public_key=grant_public_key)
+        self._sessions = session_factory
+
+    async def heads(self) -> tuple[GrantHeadRecordV1, ...]:
+        """Ordered by scope, under the same scan fence the recovery scanner takes."""
+        async with self._sessions() as session, session.begin():
+            await acquire_grant_recovery_scan_fence(session)
+            scopes = (
+                (
+                    await session.execute(
+                        select(
+                            ShowrunnerGrantHeadModel.user_id,
+                            ShowrunnerGrantHeadModel.project_name,
+                            ShowrunnerGrantHeadModel.principal,
+                        ).order_by(
+                            ShowrunnerGrantHeadModel.user_id,
+                            ShowrunnerGrantHeadModel.project_name,
+                            ShowrunnerGrantHeadModel.principal,
+                        )
+                    )
+                )
+                .tuples()
+                .all()
+            )
+            records: list[GrantHeadRecordV1] = []
+            for user_id, project_name, principal in scopes:
+                scope = GrantScopeV1(user_id, project_name, principal)
+                head = await _locked_head(session, scope)
+                if head is None:
+                    raise GrantRecoveryUnavailable("grant head is missing")
+                try:
+                    current = await self._current_locked(session, head, scope)
+                except ShowrunnerGrantUnavailableError:
+                    raise GrantRecoveryUnavailable("grant chain is invalid") from None
+                if current is None or head.current_sequence is None:
+                    raise GrantRecoveryUnavailable("grant head has no current event")
+                records.append(
+                    GrantHeadRecordV1(
+                        user_id=user_id,
+                        project_name=project_name,
+                        principal=principal,
+                        head_sequence=head.current_sequence,
+                        head_event_digest=current[1].event_digest,
+                    )
+                )
+            return tuple(records)
+
+
 class GovernanceGrantRecoveryScanner(_GrantLedger):
     """Verify every local signed grant chain against one external checkpoint."""
 
@@ -425,6 +480,7 @@ class GovernanceGrantRecoveryScanner(_GrantLedger):
 __all__ = [
     "CheckpointedShowrunnerGrantReader",
     "CurrentShowrunnerGrantReader",
+    "GovernanceGrantHeadExporter",
     "GovernanceGrantImporter",
     "GovernanceGrantRecoveryScanner",
     "GrantRecoveryUnavailable",

@@ -1388,3 +1388,40 @@ No new review round was opened: these repairs are narrow, and each has a failing
 - From `57cd596a` to `8e9f3052` nothing changed under `r2/m3` or `r2/adaptation`, and those tests do not reach gates, spatial, binding or R2 shot code.
 
 **Merge:** sponsor-approved fast-forward of `r2-v2/main` to this branch.
+
+## Packet 7: ADR-0103 activation tooling and runbook — 2026-10-14 (Claude session)
+
+**Plan:** [packet 7 plan](../../superpowers/plans/2026-10-14-r2-m8c-governance-ceremony-packet-7.md). **Runbook:** [governance-activation.md](../runbooks/governance-activation.md).
+
+**Gap found:** the verification side existed (parsers, archive reader, candidate publisher, preflight, attestor, activated startup), but nothing produced the records outside test fixtures. No command generated keys, built or signed the registry, approval, genesis checkpoint or grant events, enrolled a genesis archive, imported an event, or derived the next checkpoint body.
+
+**Implemented:**
+- **`r2/governance/ceremony.py`:** pure builders. Each re-parses its output with the existing verifier: registry, approved deployment, checkpoint body, signed checkpoint, signed ISSUE/REVOKE, high-water record, Ed25519 key pair.
+- **`GovernanceGrantHeadExporter`** in `server/services/governance_grants.py`: reads every committed head under the recovery scan fence and verifies each chain.
+- **`server/services/governance_ceremony.py`:**
+  - `enroll_genesis`: a new tree only, over an empty ledger; create-once retained and public files, then the operator preflight.
+  - `import_grant_event`: verifies under the registry's grant key.
+  - `next_checkpoint_body`.
+  - `publish_signed_checkpoint`: through `publish_candidate_archive`.
+- **`scripts/r2/governance_ceremony.py`:**
+  - Offline commands: `keygen`, `registry`, `approve`, `genesis-body`, `sign-checkpoint`, `sign-event`.
+  - Host commands (root, URL from env): `enroll`, `import-event`, `next-body`, `publish`.
+  - Outputs are exclusive-create, and private keys get mode 0600. A group- or world-readable key is refused, and errors are sanitized.
+
+**Tests:**
+- `tests/integration/r2/governance/test_governance_ceremony.py`, PostgreSQL:
+  1. enroll;
+  2. import ISSUE, after which the preflight denies;
+  3. next body, sign, publish, after which the preflight accepts;
+  4. `verify_governance_public_startup` accepts the copies and the ISSUE is current.
+
+  It also refuses re-enrollment, enrollment over a used ledger, and a checkpoint signed by a foreign key; a refused publication leaves the archive unmoved.
+- `tests/unit/scripts/r2/test_governance_ceremony_cli.py` covers the offline command chain verifying under the real verifiers, existing-output refusal, a readable private key refused, and the root requirement.
+
+**Verification:**
+- PostgreSQL 18: `tests/integration/r2/governance`, `tests/unit/r2/governance` and the CLI tests give 336 passed, 4 skipped, 2 failed.
+  - The 2 failures are the actual-lifespan tests `test_pg_actual_activated_lifespan_starts_only_with_live_attestor` and `test_pg_dump_restore_denies_old_db_and_coherent_public_before_actual_lifespan`.
+  - Both fail with `relation "worker_lease"` / `"execution_attempts" does not exist` from the lifespan's global session factory in this local setup. The first was shown to fail identically on base `bad83b80`. Neither touches packet 7 code.
+- Static gates: basedpyright (0/0), lint-imports, deptry and `audit_tests` are all clean.
+
+**Still external (runbook "What this runbook does not prove"):** real key custody, host filesystem and backup topology, the production image digest, and the restore drill on the real host. Approval sequence > 1 (key rotation, new image) is refused by the tools and needs its own ceremony.
