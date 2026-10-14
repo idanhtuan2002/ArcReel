@@ -1356,3 +1356,25 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 - SQLite: `tests/integration/server/routers`, `tests/integration/scripts/r2` and i18n give 929 passed, 9 skipped. The one failure, `test_verify_m7_scope_git`, is dirty-tree only.
 - `pnpm check`: 2579 passed.
 - Static gates are clean.
+
+**Codex verification of the repairs (`bb3a71e3`).** The pair-head lock position, the Gate C guards, the preview retry and the confirmation flow were verified by source trace. Four further defects were reported, each verified by the main agent and repaired:
+- **High:** the historical binding version a pair decision names was trusted by its digest column alone.
+  - **Repair:** `get_current_body_verified` loads the full row, runs `verify_stored_binding_version`, and requires its envelope digest to equal the decision's and its core digest to equal the current core.
+- **High:** generation admission did not verify the approval's persisted review custody.
+  - **Repair:** after the source masters are locked, `CurrentLocationBindingSnapshotReader` runs `verify_review_consumption` for the approved pair.
+- **Medium:** the legacy route refused a registered Shot ID in every episode.
+  - **Repair:** it now refuses only the `videos` slot of the fixed R2 episode 1.
+- **Medium:** overlapping review opens could mark another session's frame as acknowledged.
+  - **Repair:** opens are serialized, and an acknowledgment updates only the frame with the same session and delivery attempt.
+
+**Tests:**
+- `test_generation_refuses_a_tampered_historical_binding_or_review_custody`. Mutations: removing the full historical verification or the custody check each fail it.
+- The legacy test also approves the same ID in episode 2.
+
+**Verification:**
+- SQLite routers plus i18n: 892 passed.
+- PostgreSQL 18, repaired areas: 26 passed.
+- `pnpm check`: 2579 passed.
+- Static gates are clean.
+
+No new review round was opened: these repairs are narrow, and each has a failing-if-removed test (review loop stopping rule).

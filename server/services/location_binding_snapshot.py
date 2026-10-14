@@ -121,6 +121,7 @@ class CurrentLocationBindingSnapshotReader:
         )
         if current is None or current.body.semantic_ref != target.scene.target.location_ref:
             raise ProductionBindingIntegrityError("binding snapshot has no current Scene-bound LOCATION binding")
+        approved_pair: VerifiedPairDecisionV2 | None = None
         if require_approved_pair:
             try:
                 pair = await SpatialPairVersionedRepository(session).get_current_body_verified(
@@ -137,6 +138,7 @@ class CurrentLocationBindingSnapshotReader:
                 raise ProductionBindingIntegrityError("binding pair decision failed verification") from exc
             if not isinstance(pair, VerifiedPairDecisionV2) or pair.body.command.decision != "APPROVE":
                 raise ProductionBindingIntegrityError("binding has no current approved MASTER/REVERSE pair")
+            approved_pair = pair
 
         claims = current.envelope.ordered_claims
         receipt_repository = SpatialFrameReceiptRepository(session)
@@ -175,6 +177,13 @@ class CurrentLocationBindingSnapshotReader:
                 or frame_source_claim_digest(body) != claim.claim_digest
             ):
                 raise BindingSourceConflictError("binding snapshot frame differs from immutable claim")
+        if approved_pair is not None:
+            # With the source masters locked, the approval's persisted review evidence must still be the
+            # evidence its review session consumed.
+            try:
+                await SpatialPairVersionedRepository(session).verify_review_consumption(approved_pair)
+            except (SpatialPairIntegrityError, ValueError) as exc:
+                raise ProductionBindingIntegrityError("binding pair review custody failed verification") from exc
 
         spatial_set = None
         envelope = current.envelope

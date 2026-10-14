@@ -20,6 +20,7 @@ from lib.db.models.spatial_pair import (
     SpatialPairV2CustodyModel,
 )
 from lib.db.models.spatial_review import SpatialReviewSessionModel
+from lib.db.repositories.production_binding import ProductionBindingIntegrityError, verify_stored_binding_version
 from lib.db.repositories.spatial_pair import (
     SpatialPairIntegrityError,
     VerifiedPairDecision,
@@ -413,16 +414,32 @@ class SpatialPairVersionedRepository:
             # A spatial promotion advances the binding version without changing its stable core, so the
             # decision stays the current suitability judgment. It is verified against the exact historical
             # binding version it named; the stable core and refs must still equal the current binding.
-            historical = await self.session.scalar(
-                select(ProductionBindingVersionModel.envelope_digest).where(
+            historical_row = await self.session.scalar(
+                select(ProductionBindingVersionModel).where(
                     ProductionBindingVersionModel.user_id == user_id,
                     ProductionBindingVersionModel.project_name == project_name,
                     ProductionBindingVersionModel.binding_id == binding_id,
                     ProductionBindingVersionModel.binding_version == row.binding_version,
                 )
             )
-            if row.binding_version > expected_binding_version or historical != row.binding_envelope_digest:
+            if row.binding_version > expected_binding_version or historical_row is None:
                 raise SpatialPairIntegrityError("pair decision names no earlier version of the current binding")
+            try:
+                # The historical version is verified in full, not trusted by its digest column.
+                historical = verify_stored_binding_version(
+                    historical_row,
+                    user_id=user_id,
+                    project_name=project_name,
+                    expected_target_ref=expected_target_ref,
+                    expected_scene_ref=expected_scene_ref,
+                )
+            except ProductionBindingIntegrityError as exc:
+                raise SpatialPairIntegrityError("pair decision's historical binding failed verification") from exc
+            if (historical.envelope_digest, historical.core_digest) != (
+                row.binding_envelope_digest,
+                expected_core_digest,
+            ):
+                raise SpatialPairIntegrityError("pair decision's historical binding differs from its stable core")
             decided_version, decided_envelope = row.binding_version, row.binding_envelope_digest
         return verify_stored_pair_decision_versioned(
             row,

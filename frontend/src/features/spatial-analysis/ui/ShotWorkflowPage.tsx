@@ -377,6 +377,7 @@ function BindStep({ projectName, episode, target, onChanged }: PanelProps) {
 }
 
 interface ReviewedFrame {
+  sessionId: string;
   role: ReviewRole;
   url: string;
   verified: boolean;
@@ -394,6 +395,7 @@ function ReviewStep({ projectName, target, onChanged }: PanelProps) {
   const [frames, setFrames] = useState<ReviewedFrame[]>([]);
   const [notes, setNotes] = useState(EMPTY_OBSERVATIONS);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
   const urls = useRef<string[]>([]);
   useEffect(() => () => urls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
@@ -402,6 +404,8 @@ function ReviewStep({ projectName, target, onChanged }: PanelProps) {
   }
 
   async function open() {
+    if (opening) return;
+    setOpening(true);
     setLoadError(null);
     try {
       const opened = await openReview(projectName, target.target_ref.target_id);
@@ -417,6 +421,7 @@ function ReviewStep({ projectName, target, onChanged }: PanelProps) {
         await createImageBitmap(blob);
         const verified = digest === frame.png_digest && digest === delivered.pngDigest;
         reviewed.push({
+          sessionId: opened.session_id,
           role: frame.role,
           url,
           verified,
@@ -429,13 +434,15 @@ function ReviewStep({ projectName, target, onChanged }: PanelProps) {
       setFrames(reviewed);
     } catch (caught) {
       setLoadError(errorMessage(caught) ?? t("shot_workflow_action_failed"));
+    } finally {
+      setOpening(false);
     }
   }
 
   if (!snapshot) {
     return (
       <div>
-        <button type="button" onClick={() => void open()} className="sp-btn-accent sw-primary">
+        <button type="button" disabled={opening} onClick={() => void open()} className="sp-btn-accent sw-primary">
           {t("shot_workflow_review_open")}
         </button>
         <StepError error={loadError} />
@@ -454,7 +461,14 @@ function ReviewStep({ projectName, target, onChanged }: PanelProps) {
         { attemptId: frame.attemptId, role, pngDigest: frame.pngDigest },
         { signal },
       );
-      setFrames((current) => current.map((item) => (item.role === role ? { ...item, acknowledged: true } : item)));
+      // Mark only the exact delivered frame of this session, never a frame a later review replaced it with.
+      setFrames((current) =>
+        current.map((item) =>
+          item.sessionId === frame.sessionId && item.attemptId === frame.attemptId
+            ? { ...item, acknowledged: true }
+            : item,
+        ),
+      );
     }, false);
   }
   const approveReady = allVerified && [notes.view_coverage, notes.camera_center, notes.yaw_relation].every((v) => v.trim());

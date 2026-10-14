@@ -231,3 +231,9 @@ async def test_the_legacy_gate_c_route_refuses_a_registered_r2_shot(
 
     assert (response.status_code, response.json()["detail"]) == (409, "r2_shot_requires_task_custody")
     assert _versions(project_dir, evidence.target_id) == []
+
+    # Only the R2 episode's slot is reserved: the same ID in another episode is an ordinary approval.
+    other_episode = await gate_export_client.post(
+        f"/api/v1/projects/{PROJECT}/gates/final-cut", json=_body(evidence.target_id, data) | {"episode": 2}
+    )
+    assert other_episode.status_code == 200, other_episode.text

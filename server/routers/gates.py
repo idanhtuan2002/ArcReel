@@ -574,6 +574,9 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             )
 
     async def legacy_slot_guard(session: AsyncSession) -> None:
+        # ADR-0104 reserves only a registered Shot's episode-video slot of the fixed R2 episode.
+        if (req.resource_type, req.episode) != ("videos", R2_SHOT_EPISODE):
+            return
         try:
             await refuse_registered_r2_target(
                 session, user_id=user.id, project_name=project_name, target_ref=req.target_ref

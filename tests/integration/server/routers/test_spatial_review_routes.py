@@ -9,8 +9,11 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.db.models.production_binding import ProductionBindingVersionModel
+from lib.db.models.spatial_review import SpatialReviewSessionModel
 from lib.db.repositories.production_binding import ProductionBindingIntegrityError
 from server.auth import CurrentUserInfo, get_current_interactive_user, get_current_user
 from server.error_handlers import register_error_handlers
@@ -22,6 +25,7 @@ from tests.auth_deps import AUTH_DEPENDENCIES
 from tests.fakes import GateProjectManager
 from tests.integration.server.routers.spatial_approval_support import (
     PAIR_V2_VECTOR,
+    promoted_target,
     showrunner_grants,
 )
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
@@ -262,3 +266,45 @@ async def test_review_routes_need_an_interactive_session_and_activated_governanc
     assert binding.status_code == 401
     assert unavailable.status_code == 503
     assert promotions.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_generation_refuses_a_tampered_historical_binding_or_review_custody(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target_id = await promoted_target(gate_export_client, project_dir, session_factory, monkeypatch, shot_duration=5.0)
+    reader = CurrentLocationBindingSnapshotReader(session_factory=session_factory, project_dir=project_dir)
+
+    async def admissible() -> None:
+        await reader.read_current(
+            user_id=USER.id, project_name=PROJECT, target_id=target_id, require_approved_pair=True
+        )
+
+    await admissible()
+
+    # The approval names binding version 1; its row is corrupted while its digest column is kept.
+    async with session_factory() as session:
+        historical = await session.scalar(
+            select(ProductionBindingVersionModel).where(ProductionBindingVersionModel.binding_version == 1)
+        )
+        assert historical is not None
+        original_body = dict(historical.binding_body_json)
+        historical.binding_body_json = {**original_body, "semantic_ref": "location:elsewhere"}
+        await session.commit()
+    with pytest.raises(ProductionBindingIntegrityError, match="pair decision"):
+        await admissible()
+    async with session_factory() as session:
+        historical = await session.scalar(
+            select(ProductionBindingVersionModel).where(ProductionBindingVersionModel.binding_version == 1)
+        )
+        assert historical is not None
+        historical.binding_body_json = original_body
+        await session.commit()
+    await admissible()
+
+    # The review session no longer records that this approval consumed it.
+    async with session_factory() as session:
+        await session.execute(update(SpatialReviewSessionModel).values(consumed_command_digest="sha256:" + "0" * 64))
+        await session.commit()
+    with pytest.raises(ProductionBindingIntegrityError, match="review custody"):
+        await admissible()
