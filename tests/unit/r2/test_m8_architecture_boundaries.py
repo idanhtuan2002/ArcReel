@@ -78,7 +78,7 @@ def test_only_the_promotion_module_invokes_the_authority_adapter() -> None:
 
 
 def test_the_m8_repositories_never_commit() -> None:
-    for name in ("advanced_creative.py", "learning.py", "learning_recommendations.py"):
+    for name in ("advanced_creative.py", "learning.py", "learning_recommendations.py", "formats.py"):
         source = (_ROOT / "lib" / "db" / "repositories" / name).read_text(encoding="utf-8")
 
         assert ".commit(" not in source, name

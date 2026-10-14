@@ -19,7 +19,7 @@ TABLES = {"m8_spatial_pair_heads", "m8_spatial_pair_decisions", "m8_spatial_pair
 def test_pair_revision_scoped_keys_and_round_trip(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["915c4a0e0001"]
+    assert script.get_heads() == ["916c4a0e0001"]
     assert script.get_revision("8e8c4a0e0001").down_revision == "8d8c4a0e0001"
 
     command.upgrade(cfg, "head")

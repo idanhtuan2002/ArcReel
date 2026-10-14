@@ -38,6 +38,13 @@ from lib.db.models.config import ProviderConfig, SystemSetting
 from lib.db.models.credential import ProviderCredential
 from lib.db.models.custom_endpoint import CustomEndpoint
 from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
+from lib.db.models.formats import (
+    FormatPlanModel,
+    FormatProfileModel,
+    FormatSemanticReportModel,
+    FormatTechnicalReportModel,
+    OverlayConstraintSetModel,
+)
 from lib.db.models.gates import FinalCutReceiptModel, GreenlightDecisionModel, PublishApprovalDecisionModel
 from lib.db.models.governance_grant import ShowrunnerGrantEventModel, ShowrunnerGrantHeadModel
 from lib.db.models.host_hardening import (
@@ -142,6 +149,10 @@ __all__ = [
     "CustomProviderModel",
     "ExecutionAttemptModel",
     "FinalCutReceiptModel",
+    "FormatPlanModel",
+    "FormatProfileModel",
+    "FormatSemanticReportModel",
+    "FormatTechnicalReportModel",
     "GenerationBatch",
     "GreenlightDecisionModel",
     "LearningEvaluationModel",
@@ -168,6 +179,7 @@ __all__ = [
     "NarrativePlanVersionModel",
     "NarrativeRevisionModel",
     "OperatorResolutionReceiptModel",
+    "OverlayConstraintSetModel",
     "ProductionBindingCommandModel",
     "ProductionBindingHeadModel",
     "ProductionBindingVersionModel",

@@ -69,10 +69,24 @@ class RecommendationStaleError(M8Error):
     code = "m8_recommendation_stale"
 
 
+class FormatNotFoundError(M8Error):
+    """An unknown or foreign format profile, overlay set or plan."""
+
+    code = "m8_format_not_found"
+
+
+class FormatConflictError(M8Error):
+    """The format ref or report id already holds different content."""
+
+    code = "m8_format_conflict"
+
+
 __all__ = [
     "CandidateConflictError",
     "CommandConflictError",
     "ExplorationNotFoundError",
+    "FormatConflictError",
+    "FormatNotFoundError",
     "M8Error",
     "ObservationConflictError",
     "ObservationNotFoundError",

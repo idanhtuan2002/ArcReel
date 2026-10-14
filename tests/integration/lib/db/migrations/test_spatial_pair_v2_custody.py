@@ -17,7 +17,7 @@ from lib.db.models.spatial_pair import SpatialPairV2CustodyModel
 def test_v2_custody_migration_and_scoped_foreign_keys(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["915c4a0e0001"]
+    assert script.get_heads() == ["916c4a0e0001"]
     assert script.get_revision("911c4a0e0001").down_revision == "901c4a0e0001"
 
     command.upgrade(cfg, "head")
