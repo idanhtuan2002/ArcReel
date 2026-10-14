@@ -297,9 +297,17 @@ def measure_refusals(clone: Path, work: Path, missing: Path, plan) -> dict:
         "donor_reasons_stable": len(set(donor_reasons)) == 1,
         "r2_reasons_stable": len(set(r2_reasons)) == 1,
         "outputs_left": any(donor_dir.iterdir()) or any(r2_dir.iterdir()),
+        "donor_outputs_left": any(donor_dir.iterdir()),
+        "r2_outputs_left": any(r2_dir.iterdir()),
         "work_changed": bool(changed),
         "changed_paths": changed,
+        # A change outside both output directories counts against both sides.
+        "donor_touched_work": any(not key.startswith("refusal-r2/") for key in changed),
+        "r2_touched_work": any(not key.startswith("refusal-donor/") for key in changed),
         "bytes_written": sum(path.stat().st_size for path in new_files if path.is_file()),
+        "r2_bytes_written": sum(
+            path.stat().st_size for path in new_files if path.is_file() and not path.is_relative_to(donor_dir)
+        ),
         "donor_max_s": round(max(t for _ok, t, _e in donor_runs), 3),
         "r2_max_s": round(max(t for _ok, t, _e in r2_runs), 3),
         "donor_reason_given": all(reason for reason in donor_reasons),
@@ -431,23 +439,27 @@ def main() -> int:
                 }
             )
 
+    # Each dimension is R2's own measurement; IMPROVED where the donor does not meet it.
     missing_dimensions = {
         # Both sides refuse every time.
-        "functionality": refusals["donor_refused"] and refusals["r2_refused"],
+        "functionality": (refusals["r2_refused"], refusals["donor_refused"]),
         # Neither side reports success or writes an output for a source that does not exist.
-        "correctness": not refusals["donor_succeeded"] and not refusals["r2_succeeded"],
+        "correctness": (not refusals["r2_succeeded"], not refusals["donor_succeeded"]),
         # Every repetition gives the same outcome and the same reason on each side.
-        "determinism": refusals["donor_reasons_stable"] and refusals["r2_reasons_stable"],
+        "determinism": (refusals["r2_reasons_stable"], refusals["donor_reasons_stable"]),
         # No output or partial file remains at either output path.
-        "failure_safety": not refusals["outputs_left"],
-        # No file or directory in the work tree was created, removed, rewritten or touched.
-        "data_integrity": not refusals["work_changed"],
+        "failure_safety": (not refusals["r2_outputs_left"], not refusals["donor_outputs_left"]),
+        # No file or directory in the work tree was created, removed, rewritten or touched by the side.
+        "data_integrity": (not refusals["r2_touched_work"], not refusals["donor_touched_work"]),
         # The donor gives a reason, and R2's reason names the missing file.
-        "observability": observable,
+        "observability": (refusals["r2_reason_names_missing_file"], refusals["donor_reason_given"]),
         # Each refusal returns within the pre-set bound.
-        "performance": refusals["donor_max_s"] <= REFUSAL_SECONDS_MAX and refusals["r2_max_s"] <= REFUSAL_SECONDS_MAX,
-        # No bytes are written, not even transiently: the fresh output directories were never touched.
-        "resources": refusals["bytes_written"] == 0 and not refusals["work_changed"],
+        "performance": (refusals["r2_max_s"] <= REFUSAL_SECONDS_MAX, refusals["donor_max_s"] <= REFUSAL_SECONDS_MAX),
+        # No bytes are written, not even transiently in the side's fresh output directory.
+        "resources": (
+            refusals["r2_bytes_written"] == 0 and not refusals["r2_touched_work"],
+            refusals["bytes_written"] == 0 and not refusals["donor_touched_work"],
+        ),
     }
     rows.append(
         {
@@ -455,11 +467,14 @@ def main() -> int:
             "donor_test_refs": [],
             "fixture_refs": ["case:missing-source"],
             "intentional_difference": None,
-            **{name: disposition(ok) for name, ok in missing_dimensions.items()},
+            **{
+                name: disposition(r2_ok, improved=not donor_ok)
+                for name, (r2_ok, donor_ok) in missing_dimensions.items()
+            },
             "evidence_refs": ["measure:missing-source"],
         }
     )
-    failed = sorted(name for name, ok in missing_dimensions.items() if not ok)
+    failed = sorted(name for name, (r2_ok, _donor_ok) in missing_dimensions.items() if not r2_ok)
     if failed:
         unknowns.append(f"missing-source: {', '.join(failed)} not met")
     measures["missing-source"] = {key: value for key, value in refusals.items() if key != "donor_reasons"}
