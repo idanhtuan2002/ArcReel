@@ -182,14 +182,19 @@ def make_fixture(path: Path) -> None:
     ).check_returncode()
 
 
-def donor_render(clone: Path, source: Path, out: Path, width: int, height: int, fit: str) -> tuple[bool, float]:
+def donor_render(clone: Path, source: Path, out: Path, width: int, height: int, fit: str) -> tuple[bool, float, str]:
     started = time.perf_counter()
     result = run(
         [*DONOR_ENV, "python", "-c", _DONOR_RUNNER, str(source), str(out), str(width), str(height), fit], cwd=clone
     )
     elapsed = time.perf_counter() - started
-    ok = result.returncode == 0 and json.loads(result.stdout.strip().splitlines()[-1]).get("success") is True
-    return ok and out.exists(), elapsed
+    last = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else "{}"
+    try:
+        verdict = json.loads(last)
+    except ValueError:
+        verdict = {}
+    ok = result.returncode == 0 and verdict.get("success") is True
+    return ok and out.exists(), elapsed, str(verdict.get("error") or result.stderr[-200:])
 
 
 def r2_plan(width: int, height: int, kind: ReframeKind, source_digest: str):
@@ -232,13 +237,13 @@ def r2_plan(width: int, height: int, kind: ReframeKind, source_digest: str):
     )
 
 
-def r2_render(plan, source: Path, out: Path) -> tuple[bool, float]:
+def r2_render(plan, source: Path, out: Path) -> tuple[bool, float, str]:
     argv = materialize(
         render_argv(plan, source_width=1280, source_height=720, has_audio=True), source=str(source), output=str(out)
     )
     started = time.perf_counter()
     result = run(argv)
-    return result.returncode == 0 and out.exists(), time.perf_counter() - started
+    return result.returncode == 0 and out.exists(), time.perf_counter() - started, result.stderr[-200:]
 
 
 def disposition(ok: bool, improved: bool = False) -> str:
