@@ -74,7 +74,7 @@ All six checks matched.
 
 **Finding.** The archive backup contained only `archive/`. `reconcile` refused to rebuild an empty `read/` (`OperatorArchiveReconcileUnavailable`), so the drill copied the live public copies instead.
 - The runbook (step 9) now requires backing up both `archive/` and `read/`.
-- The next staging custody backup must include `read/`.
+- Staging now has a full custody backup with both trees: `backups/custody-20261014T083514Z.tar.gz` (`archive/` + `read/`, 18 entries).
 
 ## Not yet proven
 
