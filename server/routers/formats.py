@@ -35,7 +35,13 @@ from lib.db.repositories.formats import FormatRepository
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.project_manager import get_project_manager
 from r2.advanced_creative.digests import digest_canonical
-from r2.advanced_creative.errors import ExplorationNotFoundError, FormatMediaMissingError, FormatNotFoundError, M8Error
+from r2.advanced_creative.errors import (
+    ExplorationNotFoundError,
+    FormatMediaMissingError,
+    FormatNotFoundError,
+    FormatRenderIncompleteError,
+    M8Error,
+)
 from r2.advanced_creative.formats import SEMANTIC_ITEMS, SEMANTIC_RUBRIC, Box, ReframeKind, parse_source_master_id
 from r2.contracts.advanced_creative import (
     FormatProjectionPlan,
@@ -81,6 +87,9 @@ Grants = Annotated[CurrentShowrunnerGrantReader, Depends(governance_grants)]
 def _api_error(error: Exception) -> ApiError:
     if isinstance(error, PermissionError):
         return ApiError(REVIEW_FORBIDDEN, status_code=403)
+    if isinstance(error, FormatRenderIncompleteError):
+        # Retryable with the same command, which completes the accepted render.
+        return ServiceUnavailableError(error.code)
     if isinstance(error, (FormatNotFoundError, ExplorationNotFoundError)):
         return NotFoundError(error.code)
     if isinstance(error, M8Error):

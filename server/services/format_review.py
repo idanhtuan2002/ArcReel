@@ -305,7 +305,9 @@ class FormatReviewService:
             per_item = {item: {review["items"][item] for review in reviews} for item in SEMANTIC_ITEMS}
             disagreement = any(len(verdicts) > 1 for verdicts in per_item.values())
             passed = not disagreement and all(verdicts == {"PASS"} for verdicts in per_item.values())
-            reviewers = "\x1f".join(review["reviewer_id"] for review in reviews)
+            # The id covers each reviewer's grant, so an authorized review never reuses the id of a
+            # report aggregated from earlier, ungranted reviews.
+            reviewers = "\x1f".join(f"{review['reviewer_id']}\x1e{review['grant_event_digest']}" for review in reviews)
             report = SemanticParityReport(
                 report_id="sem-"
                 + hashlib.sha256(f"{packet.plan_id}\x1f{packet.artifact_digest}\x1f{reviewers}".encode()).hexdigest()[

@@ -522,6 +522,7 @@ MESSAGES = {
     "m8_format_conflict": "Bản ghi định dạng này đã có nội dung khác, hoặc nguồn đã thay đổi",
     "m8_format_render_failed": "Không render được bản chiếu định dạng",
     "m8_format_media_missing": "Thiếu một tệp media mà bản chiếu cần; hãy render lại",
+    "m8_format_render_incomplete": "Render đã xong nhưng chưa được ghi nhận; hãy thử lại để hoàn tất",
     "m8_format_review_unavailable": "Chưa thể review mù cho đến khi grant showrunner được kích hoạt trên máy chủ này",
     "m8_format_review_forbidden": "Chỉ reviewer có grant showrunner còn hiệu lực cho dự án này mới được review bản chiếu",
     "m8_format_request_invalid": "Yêu cầu định dạng này không hợp lệ",

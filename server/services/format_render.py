@@ -31,7 +31,13 @@ from lib.db.repositories.formats import FormatRepository
 from lib.db.repositories.host_hardening import ExecutionAttemptFencingError, ExecutionAttemptRepository
 from lib.video_backends.execution_adapter import accepted_submit_receipt
 from r2.advanced_creative.digests import digest_canonical
-from r2.advanced_creative.errors import FormatConflictError, FormatMediaMissingError, FormatNotFoundError, M8Error
+from r2.advanced_creative.errors import (
+    FormatConflictError,
+    FormatMediaMissingError,
+    FormatNotFoundError,
+    FormatRenderIncompleteError,
+    M8Error,
+)
 from r2.advanced_creative.format_render import execution_identity, materialize, render_argv
 from r2.advanced_creative.formats import FormatInvalidError, validate_plan
 from r2.contracts.execution import ProviderRequest
@@ -331,7 +337,7 @@ class FormatRenderService:
                 async with self._sessions() as session:
                     winner = await session.get(FormatRenderModel, (user_id, project_name, result.execution_id))
                 if winner is None or winner.artifact_digest != digest:
-                    raise FormatRenderFailedError("the render's success could not be recorded") from error
+                    raise FormatRenderIncompleteError("the render's success could not be recorded") from error
             return RenderResult(result.execution_id, digest, project_dir / artifact_ref, replayed=result.value is None)
         finally:
             snapshot.unlink(missing_ok=True)

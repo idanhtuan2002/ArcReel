@@ -465,6 +465,7 @@ MESSAGES = {
     "m8_format_conflict": "该画幅记录已有不同内容，或其源文件已变更",
     "m8_format_render_failed": "无法渲染该画幅投影",
     "m8_format_media_missing": "该投影所需的媒体文件已缺失，请重新渲染",
+    "m8_format_render_incomplete": "渲染已完成但尚未记录，请重试以完成",
     "m8_format_review_unavailable": "本服务器激活 showrunner 授权后才能进行盲审",
     "m8_format_review_forbidden": "只有持有本项目有效 showrunner 授权的审阅者才能审阅画幅投影",
     "m8_format_request_invalid": "该画幅请求无效",

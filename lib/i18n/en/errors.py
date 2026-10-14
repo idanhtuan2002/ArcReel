@@ -523,6 +523,7 @@ MESSAGES = {
     "m8_format_conflict": "This format record already holds different content, or its source changed",
     "m8_format_render_failed": "The projection could not be rendered",
     "m8_format_media_missing": "A media file this projection needs is missing; render it again",
+    "m8_format_render_incomplete": "The render finished but was not recorded yet; try again to complete it",
     "m8_format_review_unavailable": "Blind review is not available until showrunner grants are activated on this server",
     "m8_format_review_forbidden": "Only a reviewer with a current showrunner grant for this project can review projections",
     "m8_format_request_invalid": "This format request is not valid",

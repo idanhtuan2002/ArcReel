@@ -81,6 +81,12 @@ class FormatConflictError(M8Error):
     code = "m8_format_conflict"
 
 
+class FormatRenderIncompleteError(M8Error):
+    """The render was accepted but its success could not be recorded; resend the same command."""
+
+    code = "m8_format_render_incomplete"
+
+
 class FormatMediaMissingError(M8Error):
     """A media file a format operation needs is no longer on disk."""
 
@@ -94,6 +100,7 @@ __all__ = [
     "FormatConflictError",
     "FormatMediaMissingError",
     "FormatNotFoundError",
+    "FormatRenderIncompleteError",
     "M8Error",
     "ObservationConflictError",
     "ObservationNotFoundError",

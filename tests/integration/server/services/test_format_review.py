@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -296,10 +297,10 @@ async def test_a_review_recorded_without_a_grant_is_neither_evidence_nor_aggrega
     session_factory: Factory, tmp_path: Path
 ) -> None:
     _source, result = await _render(session_factory, tmp_path)
-    service = FormatReviewService(session_factory, grants=await granted(session_factory, "sponsor", "legacy"))
-    legacy = await _open(service, tmp_path, result.execution_id, reviewer="legacy")
+    service = FormatReviewService(session_factory, grants=await granted(session_factory, "sponsor"))
+    legacy = await _open(service, tmp_path, result.execution_id)
     # A review and a passing report as stored before reviews named their grant.
-    legacy_review = {"reviewer_id": "legacy", "items": {**ALL_PASS, "audio": "FAIL"}, "note": ""}
+    legacy_review = {"reviewer_id": "sponsor", "items": {**ALL_PASS, "audio": "FAIL"}, "note": ""}
     async with session_factory() as session, session.begin():
         row = await session.get(FormatReviewPacketModel, (USER, PROJECT, legacy.packet_id))
         assert row is not None
@@ -307,12 +308,14 @@ async def test_a_review_recorded_without_a_grant_is_neither_evidence_nor_aggrega
         plan = await FormatRepository(session).get_plan(user_id=USER, project_name=PROJECT, plan_id="plan-1")
         assert plan is not None
         report = SemanticParityReport(
-            report_id="sem-legacy",
+            # The id an aggregation of the same reviewer had before ids covered grants.
+            report_id="sem-"
+            + hashlib.sha256(f"plan-1\x1f{result.artifact_digest}\x1fsponsor".encode()).hexdigest()[:32],
             plan_digest=plan.plan_digest,
             source_master_digest=plan.source_master_digest,
             artifact_digest=result.artifact_digest,
             rubric_version="format-semantic@1",
-            reviews=(CanonicalJsonObject.model_validate({"reviewer_id": "legacy", "items": ALL_PASS}),),
+            reviews=(CanonicalJsonObject.model_validate({"reviewer_id": "sponsor", "items": ALL_PASS}),),
             material_disagreement=False,
             passed=True,
         )

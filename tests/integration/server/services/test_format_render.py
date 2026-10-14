@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
-import shutil
 from pathlib import Path
 
 import pytest
@@ -14,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.db.models.formats import FormatRenderModel
 from lib.db.models.host_hardening import ExecutionAttemptModel
 from lib.db.repositories.formats import FormatRepository
-from r2.advanced_creative.errors import FormatConflictError
+from r2.advanced_creative.errors import FormatConflictError, FormatRenderIncompleteError
 from r2.advanced_creative.formats import ReframeKind, build_plan
 from server.services.execution_attempts import build_attempt_submitter
 from server.services.format_render import FormatRenderFailedError, FormatRenderService, ffmpeg_available, file_digest
@@ -237,7 +235,7 @@ async def test_a_crash_after_acceptance_is_completed_by_resending_the_command(
 async def test_the_api_render_lease_outlives_the_bounded_ffmpeg_run(
     monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
 ) -> None:
-    from datetime import UTC, datetime
+    from datetime import UTC
 
     from server.routers import formats
     from server.services.format_render import RENDER_TIMEOUT_SECONDS
@@ -245,28 +243,40 @@ async def test_the_api_render_lease_outlives_the_bounded_ffmpeg_run(
     monkeypatch.setattr(formats, "async_session_factory", session_factory)
     source = make_source(tmp_path / "master.mp4")
     plan_id = await _store_plan(session_factory, source)
-    # An ffmpeg on PATH that takes a moment before rendering, so the running attempt can be observed.
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    slow = bin_dir / "ffmpeg"
-    slow.write_text(f"#!/bin/sh\nsleep 1\nexec '{shutil.which('ffmpeg')}' \"$@\"\n", encoding="utf-8")
-    slow.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    await formats._render_service().render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source, command_id="r-1"
+    )
+    # The lease taken for the submit stays recorded on the attempt.
+    async with session_factory() as session:
+        row = (await session.scalars(select(ExecutionAttemptModel))).one()
+    assert row.lease_expires_at is not None
 
-    render = asyncio.create_task(
-        formats._render_service().render(
+    def utc(value):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+    assert (utc(row.lease_expires_at) - utc(row.created_at)).total_seconds() > RENDER_TIMEOUT_SECONDS
+
+
+class _FailOnOpen(_CrashOnOpen):
+    """A session factory whose ``crash_at``-th open fails like a lost database connection."""
+
+    def __call__(self) -> AsyncSession:
+        self.opened += 1
+        if self.opened == self._crash_at:
+            raise ConnectionError("database unavailable")
+        return self._factory()
+
+
+async def test_an_unrecorded_success_is_a_retryable_incomplete_render(session_factory: Factory, tmp_path: Path) -> None:
+    source = make_source(tmp_path / "master.mp4")
+    plan_id = await _store_plan(session_factory, source)
+    # Session 3 records the success; it fails, so the accepted render is reported incomplete.
+    with pytest.raises(FormatRenderIncompleteError):
+        await render_service(_FailOnOpen(session_factory, crash_at=3)).render(
             user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source, command_id="r-1"
         )
+    completed = await render_service(session_factory).render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan_id, source=source, command_id="r-1"
     )
-    lease = None
-    async with asyncio.timeout(30):
-        while lease is None:
-            async with session_factory() as session:
-                row = await session.scalar(select(ExecutionAttemptModel))
-            if row is not None and row.state == "SUBMITTING" and row.lease_expires_at is not None:
-                expires = row.lease_expires_at
-                expires = expires if expires.tzinfo else expires.replace(tzinfo=UTC)
-                lease = (expires - datetime.now(UTC)).total_seconds()
-            await asyncio.sleep(0.02)
-    await render
-    assert lease > RENDER_TIMEOUT_SECONDS
+    assert await _attempts(session_factory) == ["SUCCEEDED"]
+    assert file_digest(completed.artifact_path) == completed.artifact_digest
