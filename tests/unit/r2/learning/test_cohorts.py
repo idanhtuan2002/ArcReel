@@ -19,7 +19,7 @@ from r2.learning.cohorts import (
     recommendation_from,
     summarize,
 )
-from r2.learning.replay import EvaluationNotPreregisteredError, Protocol, replay, split_holdout
+from r2.learning.replay import EvaluationNotPreregisteredError, Holdout, Protocol, replay, split_holdout
 from tests.unit.r2.learning.test_observations import T0, obs
 
 PARAMS = RuleParams(arm_a="16x9", arm_b="9x16", min_per_arm=3, min_relative_lift=Decimal("0.10"))
@@ -170,8 +170,9 @@ def _replay_data(registered: datetime) -> tuple[Protocol, list[LearningObservati
     for index in range(16):
         project, day = f"p{index}", (0 if index % 2 else 10)
         late = registered + timedelta(hours=1) if day == 10 else None
-        data += arm("16x9", ["100", "100"], project=project, day=day, ingested=late)
-        data += arm("9x16", ["125", "125"], project=project, day=day, ingested=late)
+        seen = {"observed_at": late} if late else {}
+        data += arm("16x9", ["100", "100"], project=project, day=day, ingested=late, **seen)
+        data += arm("9x16", ["125", "125"], project=project, day=day, ingested=late, **seen)
     protocol = Protocol(
         cohort=cohort_key(data[0]),
         params=RuleParams(arm_a="16x9", arm_b="9x16", min_per_arm=2, min_relative_lift=Decimal("0.10")),
@@ -203,3 +204,41 @@ def test_replay_refuses_an_evaluation_that_existed_before_registration() -> None
 
     with pytest.raises(EvaluationNotPreregisteredError):
         replay(shifted, holdout)
+
+
+def test_registration_counts_results_that_existed_before_ingestion_and_before_exclusions() -> None:
+    protocol, data = _replay_data(T0 + timedelta(days=8))
+    holdout = split_holdout(data, evaluation_share=Decimal("0.5"), train_cutoff=T0 + timedelta(days=5), salt="s2")
+    # A result observed before registration but ingested afterwards was still known first.
+    seen_early = [item.model_copy(update={"observed_at": T0 + timedelta(days=7)}) for item in holdout.evaluation]
+    with pytest.raises(EvaluationNotPreregisteredError):
+        replay(protocol, Holdout(holdout.train, tuple(seen_early), holdout.train_projects, holdout.evaluation_projects))
+    # An exclusion added after seeing an early result cannot hide it.
+    early = holdout.evaluation[0].model_copy(update={"ingested_at": T0 + timedelta(days=7)})
+    excluded = Protocol(**{**protocol.__dict__, "exclusions": (early.source_record_id,)})
+    with pytest.raises(EvaluationNotPreregisteredError):
+        replay(
+            excluded,
+            Holdout(
+                holdout.train, (early, *holdout.evaluation[1:]), holdout.train_projects, holdout.evaluation_projects
+            ),
+        )
+
+
+def test_causal_language_needs_a_named_surface_and_catches_past_tense() -> None:
+    blank = {"experiment_design": "CONCURRENT_RANDOMIZED", "exposure_ref": "  "}
+    evidence = [*arm("16x9", ["100"] * 3, **blank), *arm("9x16", ["130"] * 3, **blank)]
+    assert compare_cohorts(evidence, PARAMS).causal is False
+    for text in ("Vertical framing increased views", "It improved retention", "Views rose due to framing"):
+        with pytest.raises(CausalLanguageError):
+            check_hypothesis_language(text, causal_allowed=False)
+    # Arm labels are names, not claims.
+    check_hypothesis_language(
+        "Format drive is associated with 5.0% higher views", causal_allowed=False, neutral_terms=("drive",)
+    )
+
+    randomized = {"experiment_design": "PLATFORM_MANAGED", "exposure_ref": "yt-experiment-7"}
+    causal = [*arm("16x9", ["100"] * 3, **randomized), *arm("9x16", ["130"] * 3, **randomized)]
+    rec = recommendation_from(compare_cohorts(causal, PARAMS), causal, recommendation_id="r", expires_at=EXPIRES)
+    scope = rec.applicability.model_dump()
+    assert (scope["language"], scope["surface"]) == ("causal", "yt-experiment-7")

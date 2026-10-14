@@ -108,21 +108,31 @@ class ReplayReport:
     evaluation_ids: tuple[str, ...]
 
 
-def _admit(protocol: Protocol, observations: Sequence[LearningObservation]) -> tuple[LearningObservation, ...]:
+def _in_window(protocol: Protocol, observations: Sequence[LearningObservation]) -> tuple[LearningObservation, ...]:
     return tuple(
         item
         for item in observations
-        if item.source_record_id not in protocol.exclusions
-        and protocol.window_starts_at <= item.window.starts_at
-        and item.window.ends_at <= protocol.window_ends_at
+        if protocol.window_starts_at <= item.window.starts_at and item.window.ends_at <= protocol.window_ends_at
+    )
+
+
+def _admit(protocol: Protocol, observations: Sequence[LearningObservation]) -> tuple[LearningObservation, ...]:
+    return tuple(
+        item for item in _in_window(protocol, observations) if item.source_record_id not in protocol.exclusions
     )
 
 
 def replay(protocol: Protocol, holdout: Holdout) -> ReplayReport:
-    """Fit on train, check the same direction on evaluation; refuses an unregistered evaluation."""
+    """Fit on train, check the same direction on evaluation; refuses an unregistered evaluation.
+
+    Registration is checked on the whole evaluation universe inside the protocol window, before any
+    exclusion: a result that existed (observed or ingested) before ``registered_at`` refuses replay,
+    so an exclusion chosen after seeing results cannot hide it.
+    """
+    universe = _in_window(protocol, holdout.evaluation)
+    if any(min(item.observed_at, item.ingested_at) < protocol.registered_at for item in universe):
+        raise EvaluationNotPreregisteredError("evaluation results existed before the protocol was registered")
     evaluation = _admit(protocol, holdout.evaluation)
-    if any(item.ingested_at < protocol.registered_at for item in evaluation):
-        raise EvaluationNotPreregisteredError("evaluation data existed before the protocol was registered")
     train = _admit(protocol, holdout.train)
     if {item.lineage.project_name for item in train} & {item.lineage.project_name for item in evaluation}:
         raise ValueError("train and evaluation share a project")

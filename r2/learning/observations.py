@@ -14,10 +14,11 @@ from datetime import UTC, datetime
 from enum import StrEnum
 
 from r2.advanced_creative.digests import digest_canonical, digest_command
-from r2.contracts.advanced_creative import LearningObservation
+from r2.contracts.advanced_creative import ExperimentDesign, LearningObservation
 
 INGEST_OBSERVATION = "INGEST_OBSERVATION"
 MAX_SIGNIFICANT_DIGITS = 28
+_EXPERIMENTS = frozenset({ExperimentDesign.CONCURRENT_RANDOMIZED, ExperimentDesign.PLATFORM_MANAGED})
 LEARNING_ACTOR_SCOPE = "learning"
 
 
@@ -84,6 +85,10 @@ def validate_observation(observation: LearningObservation, *, project_name: str)
     for field in ("observation_id", "source_family", "source_record_id", "metric_name", "metric_definition_version"):
         if not getattr(observation, field):
             raise ObservationInvalidError(f"{field} is required")
+    if observation.exposure_ref is not None and not observation.exposure_ref.strip():
+        raise ObservationInvalidError("exposure_ref is blank")
+    if observation.experiment_design in _EXPERIMENTS and observation.exposure_ref is None:
+        raise ObservationInvalidError("a randomized or platform-managed observation names its exposure surface")
     if observation.metric_value is None:
         if observation.missing_reason not in set(MissingReason):
             raise ObservationInvalidError("a missing value needs a closed missing_reason")

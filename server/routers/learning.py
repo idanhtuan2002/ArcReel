@@ -28,7 +28,7 @@ from r2.contracts.advanced_creative import (
     RecommendationDecision,
     RecommendationDisposition,
 )
-from r2.learning.cohorts import CohortLeakError, CohortSummary, RuleParams
+from r2.learning.cohorts import CohortLeakError, RuleParams
 from server.auth import CurrentUser, InteractiveUser
 from server.services import learning as service
 
@@ -117,16 +117,14 @@ class DecideRequest(M8ContractModel):
     command_id: str = Field(min_length=1, max_length=255)
 
 
-def _arm(summary: CohortSummary) -> ArmSummary:
-    return ArmSummary.model_validate(summary.as_json())
-
-
 def _view(stored: StoredRecommendation) -> RecommendationView:
     terminal = {RecommendationDisposition.ACCEPT, RecommendationDisposition.REJECT}
     return RecommendationView(
         recommendation=stored.recommendation,
         recommendation_digest=stored.recommendation_digest,
-        language="causal" if " caused " in stored.recommendation.hypothesis else "associative",
+        language="causal"
+        if stored.recommendation.applicability.model_dump().get("language") == "causal"
+        else "associative",
         rule=stored.rule,
         evidence_cutoff=stored.evidence_cutoff,
         created_at=stored.created_at,
@@ -182,9 +180,9 @@ async def evaluate(project_name: str, req: EvaluateRequest, user: CurrentUser) -
         return EvaluateResponse(
             fired=result.fired,
             reason=result.reason,
-            relative_lift=None if result.relative_lift is None else format(result.relative_lift.normalize(), "f"),
+            relative_lift=result.relative_lift,
             evidence_cutoff=result.evidence_cutoff,
-            arms=tuple(_arm(item) for item in result.arms),
+            arms=tuple(ArmSummary.model_validate(item) for item in result.arms),
             recommendation=None if result.recommendation is None else _view(result.recommendation),
         )
 

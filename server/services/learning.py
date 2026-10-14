@@ -11,22 +11,23 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from lib.db.models.learning import LearningEvaluationModel
 from lib.db.repositories.learning import LearningObservationRepository
 from lib.db.repositories.learning_recommendations import LearningRecommendationRepository, StoredRecommendation
 from lib.project_manager import ProjectManager
 from r2.advanced_creative.digests import digest_command
+from r2.advanced_creative.errors import CommandConflictError
 from r2.contracts.advanced_creative import (
     LearningObservation,
     RecommendationDecision,
     RecommendationDisposition,
 )
-from r2.learning.cohorts import CohortSummary, RuleParams, compare_cohorts, recommendation_from
+from r2.learning.cohorts import RuleParams, compare_cohorts, recommendation_from
 from r2.learning.observations import ObservationInvalidError
 from server.services.advanced_creative import episode_lineage
 
@@ -43,12 +44,13 @@ class CohortSelection:
 
 @dataclass(frozen=True)
 class Evaluation:
+    """One evaluate command's outcome as recorded; ``arms`` are the transparent summaries as JSON."""
+
     fired: bool
     reason: str
-    relative_lift: Decimal | None
-    causal: bool
+    relative_lift: str | None
     evidence_cutoff: datetime | None
-    arms: tuple[CohortSummary, ...]
+    arms: tuple[dict[str, object], ...]
     recommendation: StoredRecommendation | None
 
 
@@ -89,6 +91,17 @@ def _in_cohort(item: LearningObservation, selection: CohortSelection, arms: tupl
     )
 
 
+def _evaluation_digest(
+    *, user_id: str, project_name: str, selection: CohortSelection, params: RuleParams, expires_in: timedelta
+) -> str:
+    request = {
+        "selection": asdict(selection),
+        "params": asdict(params),
+        "expires_in_seconds": int(expires_in.total_seconds()),
+    }
+    return digest_command("EVALUATE", user_id, project_name, "learning", request)
+
+
 async def evaluate(
     session: AsyncSession,
     *,
@@ -100,48 +113,94 @@ async def evaluate(
     command_id: str,
     now: datetime | None = None,
 ) -> Evaluation:
-    """Run the rule at the scope watermark; a fired rule proposes one recommendation."""
+    """Run the rule at the scope watermark; a fired rule proposes one recommendation.
+
+    Every outcome is recorded under its command: a retry with the same request replays it exactly,
+    and the same command id with a different request is a conflict.
+    """
+    if not command_id:
+        raise ValueError("command_id is required")
     if not timedelta(0) < expires_in <= timedelta(days=365):
         raise ValueError("expiry must be within a year")
-    repository = LearningRecommendationRepository(session)
-    await LearningObservationRepository(session).lock_scope(user_id=user_id, project_name=project_name)
-    replayed = await repository.by_command(user_id=user_id, project_name=project_name, command_id=command_id)
-    if replayed is not None:
-        # The command already proposed; its stored result is the answer, whatever is current now.
-        return Evaluation(True, "replayed", None, False, replayed.evidence_cutoff, (), replayed)
+    request_digest = _evaluation_digest(
+        user_id=user_id, project_name=project_name, selection=selection, params=params, expires_in=expires_in
+    )
     observations = LearningObservationRepository(session)
+    repository = LearningRecommendationRepository(session)
+    await observations.lock_scope(user_id=user_id, project_name=project_name)
+    recorded = await session.get(LearningEvaluationModel, (user_id, project_name, command_id))
+    if recorded is not None:
+        if recorded.request_digest != request_digest:
+            raise CommandConflictError("command id reused with a different evaluation")
+        return await _evaluation(repository, recorded, user_id=user_id, project_name=project_name)
+
     cutoff = await observations.watermark(user_id=user_id, project_name=project_name)
-    if cutoff is None:
-        return Evaluation(False, "no observations", None, False, None, (), None)
-    current = await observations.list_as_of(user_id=user_id, project_name=project_name, cutoff=cutoff)
-    selected = [item for item in current if _in_cohort(item, selection, (params.arm_a, params.arm_b))]
-    if not {item.format_profile_ref for item in selected} >= {params.arm_a, params.arm_b}:
-        return Evaluation(False, "both arms need observations", None, False, cutoff, (), None)
-    result = compare_cohorts(selected, params)
-    if not result.fired:
-        return Evaluation(False, result.reason, result.relative_lift, result.causal, cutoff, result.arms, None)
-    recommendation_id = (
-        "rec-"
-        + hashlib.sha256(
-            digest_command("EVALUATE", user_id, project_name, "learning", command_id).encode()
-        ).hexdigest()[:32]
-    )
-    proposed = recommendation_from(
-        result,
-        selected,
-        recommendation_id=recommendation_id,
-        expires_at=(now or datetime.now(UTC)) + expires_in,
-    )
-    await repository.propose(
+    reason, lift, arms, recommendation_id = "no observations", None, (), None
+    if cutoff is not None:
+        current = await observations.list_as_of(user_id=user_id, project_name=project_name, cutoff=cutoff)
+        selected = [item for item in current if _in_cohort(item, selection, (params.arm_a, params.arm_b))]
+        if not {item.format_profile_ref for item in selected} >= {params.arm_a, params.arm_b}:
+            reason = "both arms need observations"
+        else:
+            result = compare_cohorts(selected, params)
+            reason, lift, arms = result.reason, result.relative_lift, tuple(arm.as_json() for arm in result.arms)
+            if result.fired:
+                recommendation_id = (
+                    "rec-" + hashlib.sha256(f"{user_id}\x1f{project_name}\x1f{command_id}".encode()).hexdigest()[:32]
+                )
+                proposed = recommendation_from(
+                    result,
+                    selected,
+                    recommendation_id=recommendation_id,
+                    expires_at=(now or datetime.now(UTC)) + expires_in,
+                )
+                await repository.propose(
+                    user_id=user_id,
+                    project_name=project_name,
+                    recommendation=proposed,
+                    evidence_cutoff=cutoff,
+                    command_id=command_id,
+                )
+    row = LearningEvaluationModel(
         user_id=user_id,
         project_name=project_name,
-        recommendation=proposed,
-        evidence_cutoff=cutoff,
         command_id=command_id,
+        request_digest=request_digest,
+        result_json={
+            "fired": recommendation_id is not None,
+            "reason": reason,
+            "relative_lift": None if lift is None else format(lift.normalize(), "f"),
+            "evidence_cutoff": None if cutoff is None else cutoff.isoformat(),
+            "arms": list(arms),
+        },
+        recommendation_id=recommendation_id,
+        created_at=now or datetime.now(UTC),
     )
-    stored = await repository.get(user_id=user_id, project_name=project_name, recommendation_id=recommendation_id)
+    session.add(row)
+    await session.flush()
+    evaluation = await _evaluation(repository, row, user_id=user_id, project_name=project_name)
     await session.commit()
-    return Evaluation(True, result.reason, result.relative_lift, result.causal, cutoff, result.arms, stored)
+    return evaluation
+
+
+async def _evaluation(
+    repository: LearningRecommendationRepository, row: LearningEvaluationModel, *, user_id: str, project_name: str
+) -> Evaluation:
+    result = row.result_json
+    cutoff = result.get("evidence_cutoff")
+    recommendation = (
+        None
+        if row.recommendation_id is None
+        else await repository.get(user_id=user_id, project_name=project_name, recommendation_id=row.recommendation_id)
+    )
+    return Evaluation(
+        fired=bool(result["fired"]),
+        reason=str(result["reason"]),
+        relative_lift=result.get("relative_lift"),
+        evidence_cutoff=None if cutoff is None else datetime.fromisoformat(cutoff),
+        arms=tuple(result.get("arms", [])),
+        recommendation=recommendation,
+    )
 
 
 async def decide(

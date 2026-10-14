@@ -114,6 +114,18 @@ def upgrade() -> None:
             ondelete="RESTRICT",
         ),
     )
+    op.create_table(
+        "m8_learning_evaluations",
+        sa.Column("user_id", sa.String(), server_default="default", nullable=False),
+        sa.Column("project_name", sa.String(length=255), nullable=False),
+        sa.Column("command_id", sa.String(length=255), nullable=False),
+        sa.Column("request_digest", sa.String(length=71), nullable=False),
+        sa.Column("result_json", sa.JSON(), nullable=False),
+        sa.Column("recommendation_id", sa.String(length=255), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("user_id", "project_name", "command_id", name="pk_m8_learning_evaluations"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
+    )
     op.create_index(
         "uq_m8_learning_recommendation_decisions_terminal",
         "m8_learning_recommendation_decisions",
@@ -125,6 +137,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_table("m8_learning_evaluations")
     op.drop_index("uq_m8_learning_recommendation_decisions_terminal", table_name="m8_learning_recommendation_decisions")
     op.drop_table("m8_learning_recommendation_decisions")
     op.drop_table("m8_learning_recommendation_evidence")

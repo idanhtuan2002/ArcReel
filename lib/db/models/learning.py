@@ -266,7 +266,25 @@ class LearningRecommendationDecisionModel(Base):
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class LearningEvaluationModel(Base):
+    """One evaluate command and its full outcome, fired or not; a retry replays it exactly."""
+
+    __tablename__ = "m8_learning_evaluations"
+    __table_args__ = (PrimaryKeyConstraint("user_id", "project_name", "command_id", name="pk_m8_learning_evaluations"),)
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, server_default=DEFAULT_USER_ID
+    )
+    project_name: Mapped[str] = mapped_column(_ID)
+    command_id: Mapped[str] = mapped_column(_ID)
+    request_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    result_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    recommendation_id: Mapped[str | None] = mapped_column(_ID, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 __all__ = [
+    "LearningEvaluationModel",
     "LearningObservationCommandModel",
     "LearningObservationModel",
     "LearningRawRecordModel",

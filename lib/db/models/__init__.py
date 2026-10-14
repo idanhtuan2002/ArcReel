@@ -55,6 +55,7 @@ from lib.db.models.host_hardening import (
     ProviderObservationModel,
 )
 from lib.db.models.learning import (
+    LearningEvaluationModel,
     LearningObservationCommandModel,
     LearningObservationModel,
     LearningRawRecordModel,
@@ -143,6 +144,7 @@ __all__ = [
     "FinalCutReceiptModel",
     "GenerationBatch",
     "GreenlightDecisionModel",
+    "LearningEvaluationModel",
     "LearningObservationCommandModel",
     "LearningObservationModel",
     "LearningRawRecordModel",

@@ -187,6 +187,35 @@ async def test_decisions_are_human_append_only_and_final_once(session_factory: F
     assert [item.disposition for item in stored.decisions] == ["DEFER", "ACCEPT"]
 
 
+async def test_identical_nonfinal_decisions_under_two_commands_are_two_decisions(session_factory: Factory) -> None:
+    clock = _Clock()
+    evidence = _evidence()
+    rec = _recommend(evidence)
+    await _propose(session_factory, clock, rec, await _ingest_all(session_factory, clock, evidence))
+
+    first = await _decide(session_factory, clock, rec, RecommendationDisposition.DEFER, "d1")
+    second = await _decide(session_factory, clock, rec, RecommendationDisposition.DEFER, "d2")
+
+    assert first.decision_id != second.decision_id
+    stored = await _call(session_factory, clock, "get", recommendation_id=rec.recommendation_id)
+    assert len(stored.decisions) == 2
+
+
+async def test_the_recorded_language_must_match_the_evidence(session_factory: Factory) -> None:
+    clock = _Clock()
+    evidence = _evidence()
+    cutoff = await _ingest_all(session_factory, clock, evidence)
+    rec = _recommend(evidence)
+    claimed = rec.model_copy(
+        update={
+            "applicability": rec.applicability.model_validate({**rec.applicability.model_dump(), "language": "causal"})
+        }
+    )
+
+    with pytest.raises(CausalLanguageError, match="recorded language"):
+        await _propose(session_factory, clock, claimed, cutoff)
+
+
 async def test_expired_or_corrected_evidence_cannot_be_decided(session_factory: Factory) -> None:
     clock = _Clock()
     evidence = _evidence()

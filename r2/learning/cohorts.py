@@ -33,9 +33,10 @@ RULE_ID = "compare_cohorts"
 RULE_VERSION = "1"
 CAUSAL_DESIGNS = frozenset({ExperimentDesign.CONCURRENT_RANDOMIZED, ExperimentDesign.PLATFORM_MANAGED})
 _CAUSAL_WORDS = re.compile(
-    r"\b(caus\w*|because|leads? to|led to|drives?|drove|results? in|increases?|decreases?|boosts?|improves?|reduces?)\b"
-    r"|导致|因为|提升|提高|降低|引起|促使"
-    r"|gây ra|vì vậy|làm tăng|làm giảm|dẫn đến",
+    r"\b(caus\w*|because|due to|leads? to|led to|leading to|driv(e|es|en|ing)|drove|results? in|resulted in"
+    r"|(increas|decreas|improv|reduc|boost|rais|lift|cut)(e|es|ed|ing|s)?\b|effect of)\b"
+    r"|导致|因为|由于|提升|提高|降低|引起|促使|带来"
+    r"|gây ra|vì vậy|do đó|nhờ|làm tăng|làm giảm|dẫn đến|khiến",
     re.IGNORECASE,
 )
 
@@ -130,16 +131,28 @@ def summarize(observations: Sequence[LearningObservation], *, arm: str | None = 
     )
 
 
+def causal_surface(observations: Sequence[LearningObservation]) -> str | None:
+    """The one measured exposure surface when every observation comes from one causal design, else None."""
+    if not observations or any(item.experiment_design not in CAUSAL_DESIGNS for item in observations):
+        return None
+    surfaces = {(item.exposure_ref or "").strip() for item in observations}
+    if len(surfaces) != 1:
+        return None
+    surface = next(iter(surfaces))
+    return surface or None
+
+
 def is_causal_evidence(observations: Sequence[LearningObservation]) -> bool:
     """Causal language is allowed only for one concurrent randomized or platform-managed surface."""
-    if not observations or any(item.experiment_design not in CAUSAL_DESIGNS for item in observations):
-        return False
-    surfaces = {item.exposure_ref for item in observations}
-    return len(surfaces) == 1 and None not in surfaces
+    return causal_surface(observations) is not None
 
 
-def check_hypothesis_language(hypothesis: str, *, causal_allowed: bool) -> None:
-    if not causal_allowed and _CAUSAL_WORDS.search(hypothesis):
+def check_hypothesis_language(hypothesis: str, *, causal_allowed: bool, neutral_terms: Sequence[str] = ()) -> None:
+    """Refuse causal wording for associative evidence; ``neutral_terms`` (arm labels) are not read as words."""
+    text = hypothesis
+    for term in sorted((term for term in neutral_terms if term), key=len, reverse=True):
+        text = text.replace(term, " ")
+    if not causal_allowed and _CAUSAL_WORDS.search(text):
         raise CausalLanguageError("associative evidence cannot support causal language")
 
 
@@ -166,7 +179,11 @@ class RuleResult:
     key: CohortKey
     arms: tuple[CohortSummary, CohortSummary]
     relative_lift: Decimal | None
-    causal: bool
+    surface: str | None
+
+    @property
+    def causal(self) -> bool:
+        return self.surface is not None
 
 
 def compare_cohorts(observations: Sequence[LearningObservation], params: RuleParams) -> RuleResult:
@@ -180,17 +197,17 @@ def compare_cohorts(observations: Sequence[LearningObservation], params: RulePar
         raise ValueError("both arms need observations")
     a, b = summarize(arms[params.arm_a], arm=params.arm_a), summarize(arms[params.arm_b], arm=params.arm_b)
     evidence = [*arms[params.arm_a], *arms[params.arm_b]]
-    causal = is_causal_evidence(evidence)
+    surface = causal_surface(evidence)
     if min(a.present, b.present) < params.min_per_arm:
-        return RuleResult(False, "insufficient present values", key, (a, b), None, causal)
+        return RuleResult(False, "insufficient present values", key, (a, b), None, surface)
     if a.mean is None or b.mean is None:
-        return RuleResult(False, "insufficient present values", key, (a, b), None, causal)
+        return RuleResult(False, "insufficient present values", key, (a, b), None, surface)
     if a.mean == 0:
-        return RuleResult(False, "baseline mean is zero", key, (a, b), None, causal)
+        return RuleResult(False, "baseline mean is zero", key, (a, b), None, surface)
     lift = (b.mean - a.mean) / abs(a.mean)
     if abs(lift) < params.min_relative_lift:
-        return RuleResult(False, "lift below threshold", key, (a, b), lift, causal)
-    return RuleResult(True, "lift at or above threshold", key, (a, b), lift, causal)
+        return RuleResult(False, "lift below threshold", key, (a, b), lift, surface)
+    return RuleResult(True, "lift at or above threshold", key, (a, b), lift, surface)
 
 
 def hypothesis_text(result: RuleResult) -> str:
@@ -208,6 +225,8 @@ def hypothesis_text(result: RuleResult) -> str:
 def applicability(result: RuleResult) -> dict[str, object]:
     key = result.key
     return {
+        "language": "causal" if result.causal else "associative",
+        "surface": result.surface,
         "rule": f"{RULE_ID}@{RULE_VERSION}",
         "creative_profile_id": key.creative_profile_id,
         "creative_profile_version": key.creative_profile_version,
@@ -265,7 +284,7 @@ def recommendation_from(
         policy_digest=policy_digest,
     )
     hypothesis = hypothesis_text(result)
-    check_hypothesis_language(hypothesis, causal_allowed=result.causal)
+    check_hypothesis_language(hypothesis, causal_allowed=result.causal, neutral_terms=(a.arm or "", b.arm or ""))
     exclusions = tuple(
         f"{summary.arm}: {count} {reason}" for summary in (a, b) for reason, count in summary.missing if count
     )
@@ -298,6 +317,7 @@ __all__ = [
     "RuleParams",
     "RuleResult",
     "applicability",
+    "causal_surface",
     "check_hypothesis_language",
     "cohort_key",
     "compare_cohorts",

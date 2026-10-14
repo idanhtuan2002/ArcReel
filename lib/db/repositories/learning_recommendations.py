@@ -36,9 +36,10 @@ from r2.contracts.advanced_creative import LearningRecommendation, Recommendatio
 from r2.learning.cohorts import (
     RULE_ID,
     RULE_VERSION,
+    CausalLanguageError,
     CohortLeakError,
+    causal_surface,
     check_hypothesis_language,
-    is_causal_evidence,
     proposal_key,
     single_cohort,
 )
@@ -196,7 +197,16 @@ class LearningRecommendationRepository:
             (lineage.project_name, lineage.creative_profile_id, lineage.creative_profile_version, lineage.policy_digest)
         }:
             raise CohortLeakError("evidence and recommendation lineage differ")
-        check_hypothesis_language(recommendation.hypothesis, causal_allowed=is_causal_evidence(evidence))
+        surface = causal_surface(evidence)
+        scope = recommendation.applicability.model_dump(mode="python")
+        if scope.get("language") != ("causal" if surface else "associative") or scope.get("surface") != surface:
+            raise CausalLanguageError("the recorded language must match what the evidence supports")
+        arms = scope.get("arms")
+        check_hypothesis_language(
+            recommendation.hypothesis,
+            causal_allowed=surface is not None,
+            neutral_terms=[str(arm) for arm in arms] if isinstance(arms, list) else (),
+        )
 
         key = proposal_key(recommendation)
         for rejected in await self._rejected_evidence(user_id=user_id, project_name=project_name, key=key):
@@ -298,7 +308,8 @@ class LearningRecommendationRepository:
         if corrected is not None:
             raise RecommendationStaleError("evidence was corrected after the proposal")
 
-        decision_id = "dec-" + hashlib.sha256(command_digest.encode()).hexdigest()[:32]
+        # One decision per scoped command; identical requests under two commands are two decisions.
+        decision_id = "dec-" + hashlib.sha256(f"{user_id}\x1f{project_name}\x1f{command_id}".encode()).hexdigest()[:32]
         decision = RecommendationDecision(
             decision_id=decision_id,
             recommendation_id=recommendation_id,

@@ -110,8 +110,8 @@ async def test_evaluate_list_and_decide_a_recommendation(
         assert "is associated with" in view["recommendation"]["hypothesis"]
         assert len(view["recommendation"]["evidence_observation_ids"]) == 6
 
-        again = await http.post(f"{BASE}/recommendations/evaluate", json=EVALUATE)
-        assert again.json()["recommendation"]["recommendation"] == view["recommendation"]
+        again = (await http.post(f"{BASE}/recommendations/evaluate", json=EVALUATE)).json()
+        assert again == body
 
         listed = (await http.get(f"{BASE}/recommendations")).json()
         assert [item["recommendation"]["recommendation_id"] for item in listed] == [
@@ -164,7 +164,13 @@ async def test_ingest_needs_the_server_resolved_lineage_and_a_rule_below_thresho
         ] == "no observations"
 
         await _seed(http, b_value="105")
-        quiet = (await http.post(f"{BASE}/recommendations/evaluate", json=EVALUATE)).json()
+        # The first command already recorded "no observations"; a retry replays that outcome.
+        assert (await http.post(f"{BASE}/recommendations/evaluate", json=EVALUATE)).json()[
+            "reason"
+        ] == "no observations"
+        conflict = await http.post(f"{BASE}/recommendations/evaluate", json={**EVALUATE, "arm_b": "1x1"})
+        assert conflict.status_code == 409
+        quiet = (await http.post(f"{BASE}/recommendations/evaluate", json={**EVALUATE, "command_id": "eval-2"})).json()
         assert (quiet["fired"], quiet["reason"], quiet["recommendation"]) == (False, "lift below threshold", None)
         assert (await http.get(f"{BASE}/recommendations")).json() == []
         unknown = await http.post(

@@ -84,6 +84,8 @@ def test_identity_is_source_metric_definition_and_exact_window() -> None:
         ({"missing_reason": "PRIVATE"}, "no missing_reason"),
         ({"correction_of": "o1"}, "itself"),
         ({"source_record_id": ""}, "source_record_id"),
+        ({"exposure_ref": " "}, "blank"),
+        ({"experiment_design": "CONCURRENT_RANDOMIZED"}, "exposure surface"),
     ],
 )
 def test_admission_refuses_inadmissible_observations(changes: dict, message: str) -> None:
