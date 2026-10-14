@@ -14,7 +14,7 @@
     },
     "donor_crop_x": 280,
     "donor_deterministic": true,
-    "donor_median_s": 0.61,
+    "donor_median_s": 0.642,
     "fps_ok": true,
     "psnr_db": 42.48,
     "r2": {
@@ -30,7 +30,7 @@
     },
     "r2_crop_x": 280,
     "r2_deterministic": true,
-    "r2_median_s": 1.489,
+    "r2_median_s": 1.513,
     "r2_sha256": "sha256:52991c13667fc7e260d577bc29480d6664ae6cd60986412e391a63341c7c7652"
   },
   "cover-1080x1920": {
@@ -48,7 +48,7 @@
     },
     "donor_crop_x": 437,
     "donor_deterministic": true,
-    "donor_median_s": 0.817,
+    "donor_median_s": 0.859,
     "fps_ok": true,
     "psnr_db": 39.63,
     "r2": {
@@ -64,7 +64,7 @@
     },
     "r2_crop_x": 438,
     "r2_deterministic": true,
-    "r2_median_s": 1.659,
+    "r2_median_s": 1.682,
     "r2_sha256": "sha256:3b1a50337d1eafd868d3dd179b0dbe3ec5a1e667c8c410b0b703b18cfa22004b"
   },
   "cover-1920x1080": {
@@ -82,7 +82,7 @@
     },
     "donor_crop_x": 0,
     "donor_deterministic": true,
-    "donor_median_s": 0.825,
+    "donor_median_s": 0.854,
     "fps_ok": true,
     "psnr_db": 43.47,
     "r2": {
@@ -98,25 +98,33 @@
     },
     "r2_crop_x": 0,
     "r2_deterministic": true,
-    "r2_median_s": 2.348,
+    "r2_median_s": 2.383,
     "r2_sha256": "sha256:80fff71201cb13755c695338870765a43a913bcb7323812067dd43e743cf0f14"
   },
   "missing-source": {
     "bytes_written": 0,
+    "changed_paths": [
+      "refusal-donor/"
+    ],
     "donor_max_s": 0.071,
+    "donor_outputs_left": false,
     "donor_reason": "Cut source not found: <work>/missing.mp4",
     "donor_reason_given": true,
     "donor_reasons_stable": true,
     "donor_refused": true,
     "donor_succeeded": false,
+    "donor_touched_work": true,
     "outputs_left": false,
-    "r2_max_s": 0.033,
+    "r2_bytes_written": 0,
+    "r2_max_s": 0.032,
+    "r2_outputs_left": false,
     "r2_reason_names_missing_file": true,
     "r2_reasons_stable": true,
     "r2_refused": true,
     "r2_succeeded": false,
+    "r2_touched_work": false,
     "runs": 3,
-    "work_changed": false
+    "work_changed": true
   },
   "pad-1080x1080": {
     "decode_ok": true,
@@ -133,7 +141,7 @@
     },
     "donor_crop_x": null,
     "donor_deterministic": true,
-    "donor_median_s": 0.546,
+    "donor_median_s": 0.56,
     "fps_ok": true,
     "psnr_db": 44.19,
     "r2": {
@@ -149,7 +157,7 @@
     },
     "r2_crop_x": 0,
     "r2_deterministic": true,
-    "r2_median_s": 1.053,
+    "r2_median_s": 1.075,
     "r2_sha256": "sha256:2fc019691310043862fa5e44709bb61d3d4056372dd5fc25a59a2e18fd09b17d"
   },
   "pad-1080x1920": {
@@ -167,7 +175,7 @@
     },
     "donor_crop_x": null,
     "donor_deterministic": true,
-    "donor_median_s": 0.671,
+    "donor_median_s": 0.713,
     "fps_ok": true,
     "psnr_db": 47.22,
     "r2": {
@@ -183,7 +191,7 @@
     },
     "r2_crop_x": 0,
     "r2_deterministic": true,
-    "r2_median_s": 1.34,
+    "r2_median_s": 1.356,
     "r2_sha256": "sha256:e540400b683100c3737f564ec418d9232d8ca3ef12347154bea3a0ca7d20d046"
   },
   "pad-1920x1080": {
@@ -201,7 +209,7 @@
     },
     "donor_crop_x": null,
     "donor_deterministic": true,
-    "donor_median_s": 0.813,
+    "donor_median_s": 0.862,
     "fps_ok": true,
     "psnr_db": 43.8,
     "r2": {
@@ -217,7 +225,7 @@
     },
     "r2_crop_x": 0,
     "r2_deterministic": true,
-    "r2_median_s": 2.355,
+    "r2_median_s": 2.364,
     "r2_sha256": "sha256:80fff71201cb13755c695338870765a43a913bcb7323812067dd43e743cf0f14"
   }
 }
