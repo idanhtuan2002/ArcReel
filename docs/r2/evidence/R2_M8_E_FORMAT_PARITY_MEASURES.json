@@ -1,0 +1,186 @@
+{
+  "cover-1080x1080": {
+    "donor": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 776160,
+      "codec": "h264",
+      "duration": 2.021333,
+      "fps": "30",
+      "height": 1080,
+      "width": 1080
+    },
+    "donor_deterministic": true,
+    "donor_median_s": 0.598,
+    "psnr_db": 42.48,
+    "r2": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 1089167,
+      "codec": "h264",
+      "duration": 2.02,
+      "fps": "30",
+      "height": 1080,
+      "width": 1080
+    },
+    "r2_deterministic": true,
+    "r2_median_s": 1.488,
+    "r2_sha256": "sha256:52991c13667fc7e260d577bc29480d6664ae6cd60986412e391a63341c7c7652"
+  },
+  "cover-1080x1920": {
+    "donor": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 531387,
+      "codec": "h264",
+      "duration": 2.021333,
+      "fps": "30",
+      "height": 1920,
+      "width": 1080
+    },
+    "donor_deterministic": true,
+    "donor_median_s": 0.802,
+    "psnr_db": 39.6,
+    "r2": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 699139,
+      "codec": "h264",
+      "duration": 2.02,
+      "fps": "30",
+      "height": 1920,
+      "width": 1080
+    },
+    "r2_deterministic": true,
+    "r2_median_s": 1.635,
+    "r2_sha256": "sha256:3b1a50337d1eafd868d3dd179b0dbe3ec5a1e667c8c410b0b703b18cfa22004b"
+  },
+  "cover-1920x1080": {
+    "donor": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 1038898,
+      "codec": "h264",
+      "duration": 2.021333,
+      "fps": "30",
+      "height": 1080,
+      "width": 1920
+    },
+    "donor_deterministic": true,
+    "donor_median_s": 0.821,
+    "psnr_db": 43.8,
+    "r2": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 1494187,
+      "codec": "h264",
+      "duration": 2.02,
+      "fps": "30",
+      "height": 1080,
+      "width": 1920
+    },
+    "r2_deterministic": true,
+    "r2_median_s": 2.299,
+    "r2_sha256": "sha256:80fff71201cb13755c695338870765a43a913bcb7323812067dd43e743cf0f14"
+  },
+  "missing-source": {
+    "donor_failed": true,
+    "r2_failed": true
+  },
+  "pad-1080x1080": {
+    "donor": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 415460,
+      "codec": "h264",
+      "duration": 2.021333,
+      "fps": "30",
+      "height": 1080,
+      "width": 1080
+    },
+    "donor_deterministic": true,
+    "donor_median_s": 0.528,
+    "psnr_db": 44.19,
+    "r2": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 641987,
+      "codec": "h264",
+      "duration": 2.02,
+      "fps": "30",
+      "height": 1080,
+      "width": 1080
+    },
+    "r2_deterministic": true,
+    "r2_median_s": 1.05,
+    "r2_sha256": "sha256:2fc019691310043862fa5e44709bb61d3d4056372dd5fc25a59a2e18fd09b17d"
+  },
+  "pad-1080x1920": {
+    "donor": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 415232,
+      "codec": "h264",
+      "duration": 2.021333,
+      "fps": "30",
+      "height": 1920,
+      "width": 1080
+    },
+    "donor_deterministic": true,
+    "donor_median_s": 0.646,
+    "psnr_db": 47.22,
+    "r2": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 637587,
+      "codec": "h264",
+      "duration": 2.02,
+      "fps": "30",
+      "height": 1920,
+      "width": 1080
+    },
+    "r2_deterministic": true,
+    "r2_median_s": 1.317,
+    "r2_sha256": "sha256:e540400b683100c3737f564ec418d9232d8ca3ef12347154bea3a0ca7d20d046"
+  },
+  "pad-1920x1080": {
+    "donor": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 1038898,
+      "codec": "h264",
+      "duration": 2.021333,
+      "fps": "30",
+      "height": 1080,
+      "width": 1920
+    },
+    "donor_deterministic": true,
+    "donor_median_s": 0.794,
+    "psnr_db": 43.47,
+    "r2": {
+      "audio": [
+        "aac"
+      ],
+      "bytes": 1494187,
+      "codec": "h264",
+      "duration": 2.02,
+      "fps": "30",
+      "height": 1080,
+      "width": 1920
+    },
+    "r2_deterministic": true,
+    "r2_median_s": 2.319,
+    "r2_sha256": "sha256:80fff71201cb13755c695338870765a43a913bcb7323812067dd43e743cf0f14"
+  }
+}
