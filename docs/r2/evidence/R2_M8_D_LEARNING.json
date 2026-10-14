@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "packet": "M8-D",
+  "status": "M8_D_IMPLEMENTED_REVIEWED",
+  "evidence_head": "2e794c815f057e311f7e7247de17cea0d7f95e56",
+  "branch": "impl/r2-m8d-learning",
+  "base": "5dc0eec1 (r2-v2/main, M8-C closed)",
+  "plans": [
+    "docs/superpowers/plans/2026-09-13-r2-m8d-learning-recommendations.md",
+    "docs/superpowers/plans/2026-10-14-r2-m8d-d1-observations.md",
+    "docs/superpowers/plans/2026-10-14-r2-m8d-d3-recommendations.md"
+  ],
+  "spec": "docs/superpowers/specs/2026-09-13-r2-m8-canvas-learning-multiformat-design.md (§3.6-7, §5, §6, §9, §12 Gate D)",
+  "migrations": ["914c4a0e0001 (observations, commands, raw records)", "915c4a0e0001 (recommendations, evidence, decisions, evaluations)"],
+  "packets": {
+    "D1": {"commits": ["eee1706b", "af20f11a"], "scope": "append-only scoped observations; one original per identity; linear correction chain; per-scope serialized admission with strictly increasing admission time; cutoff reads bounded by the scope watermark; every command reserved; raw records kept by digest"},
+    "D2": {"commits": ["9d16c92d", "03e73137"], "scope": "pure adapters for usage, QA, publish approval and M7 attempts (event windows) and fixture-only YouTube Analytics day rows (Pacific days, DST-aware, query scope in identity) and TikTok video snapshots; derived features linking every raw input and transformation version"},
+    "D3": {"commits": ["be7d4611", "cb609cd2", "7621f367", "311abbe6", "5764fbfc", "4348d15b", "2e794c81"], "scope": "transparent cohort summaries; compare_cohorts@1; causal language only for one named randomized/platform-managed surface; project-disjoint then future-time holdout; pre-registered replay; scoped recommendation and Human decision lifecycle with currentness, repeat-rejection and governed proposal reference only; learning API and project Learning page (zh/en/vi)"}
+  },
+  "reviews": [
+    {"reviewer": "Codex (codex:codex-rescue), source review", "range": "fce1855f..eee1706b", "findings": 5, "fixed_in": "af20f11a"},
+    {"reviewer": "Codex, source review", "range": "9d16c92d", "findings": 6, "fixed_in": "03e73137"},
+    {"reviewer": "Codex, source review", "range": "03e73137..cb609cd2 (+ be7d4611)", "findings": 5, "fixed_in": "7621f367"},
+    {"reviewer": "Codex, verification review", "range": "cb609cd2..5764fbfc", "findings": {"important": 1, "medium": 3, "low": 2}, "fixed_in": "4348d15b", "recorded_not_fixed": ["M4 (Medium): YouTube observed_at is the Pacific day end, so a protocol registered after a day ends but before its data is available is refused (conservative direction)", "L6 (Low): no focus handoff or live announcement after a final decision"]}
+  ],
+  "review_limits": "Codex reviewed by reading source; its sandbox could not run uv/pnpm. All test evidence below was run by the main agent.",
+  "verification": {
+    "sqlite_selection": {
+      "command": "uv run python -m pytest tests/unit/r2/learning tests/unit/r2/test_m8_architecture_boundaries.py tests/integration/lib/db/migrations/test_learning_observations.py tests/integration/lib/db/migrations/test_alembic_m8_exploration.py tests/unit/lib/i18n/test_i18n_consistency.py -q -rs -p no:randomly",
+      "result": "65 passed, 0 skipped, 0 failed"
+    },
+    "postgresql_selection": {
+      "database": "disposable PostgreSQL 18.6 container",
+      "command": "DATABASE_URL=postgresql+asyncpg://... uv run python -m pytest tests/integration/lib/db/repositories/test_learning.py tests/integration/lib/db/repositories/test_learning_recommendations.py tests/integration/server/routers/test_learning_routes.py -q -rs -p no:randomly",
+      "result": "25 passed, 0 skipped, 0 failed"
+    },
+    "gate_d_coverage": {
+      "correction_and_idempotency": "test_learning.py (replay, divergent duplicate, chain, branch refusal, concurrent corrections and originals, command reservation, clock regression)",
+      "leakage": "test_cohorts.py (profile/metric pooling refused, holdout project-disjoint then future-time), recommendation lineage/arms checks",
+      "offline_replay": "test_cohorts.py (direction check, pre-registration before results and before exclusions)",
+      "causal_language": "test_cohorts.py and test_learning_recommendations.py (associative template, named surface, past tense, arm-label masking, recorded language)",
+      "authority_boundary": "test_m8_architecture_boundaries.py (no authority write port, router behind auth and migration gate), ACCEPT records only learning-proposal:<decision_id>",
+      "browser": "headless Chromium on isolated dev servers, real routes, observations seeded through the ingest API: evaluate fired, Defer, Accept with governed proposal reference; desktop and 390px"
+    },
+    "static": "ruff check/format, basedpyright 0/0/0 on changed files, lint-imports 23 kept, deptry clean, audit_tests --check 0",
+    "frontend": "pnpm check: typecheck, eslint, knip, vitest 224 files / 2586 passed / 4 skipped (pre-existing, unrelated)",
+    "mutation_checks": ["watermark stamping removed -> clock-regression test RED", "replay command reservation removed -> reserved-command test RED"],
+    "full_backend_suite": "not run, per the 2026-10-14 sponsor policy (related tests only)"
+  },
+  "coverage_limits": [
+    "No live platform or provider call; YouTube and TikTok are fixture-shaped from primary documentation.",
+    "Internal adapters are pure; no scheduled job yet reads api_calls, QA reports, approvals or M7 attempts into observations.",
+    "Holdout split and replay are offline functions with no route or UI.",
+    "Pilot/confirmatory blind-review protocol and reviewer qualification records (spec §9) are not implemented.",
+    "At 390px the app-shell sidebar leaves about 130px of content width (pre-existing, out of scope)."
+  ],
+  "created_at": "2026-10-14"
+}
