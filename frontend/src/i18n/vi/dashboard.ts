@@ -2482,6 +2482,7 @@ export default {
   'formats_review_title': 'Review mù',
   'formats_review_hint': 'Một clip là bản gốc, clip kia là bản chiếu, thứ tự không được cho biết. Hãy đánh giá hai clip có cùng ý nghĩa không.',
   'formats_review_loading': 'Đang mở hai clip…',
+  'formats_review_open_failed': 'Không mở được review',
   'formats_clip_label': 'Clip {{label}}',
   'formats_rubric_legend': 'Từng khía cạnh có giống nhau ở cả hai clip không?',
   'formats_item_focal_subject': 'Chủ thể chính',

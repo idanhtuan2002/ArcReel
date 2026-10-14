@@ -2484,6 +2484,7 @@ export default {
   'formats_review_title': 'Blind review',
   'formats_review_hint': 'One clip is the original, the other the projection, in an order you are not told. Judge whether they mean the same.',
   'formats_review_loading': 'Opening the two clips…',
+  'formats_review_open_failed': 'The review could not be opened',
   'formats_clip_label': 'Clip {{label}}',
   'formats_rubric_legend': 'For each aspect, is it the same in both clips?',
   'formats_item_focal_subject': 'Main subject',

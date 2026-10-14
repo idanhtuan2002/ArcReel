@@ -506,6 +506,7 @@ function BlindReview({
   const [clips, setClips] = useState<{ A: string; B: string } | null>(null);
   const [verdicts, setVerdicts] = useState<Record<string, Verdict>>({});
   const [note, setNote] = useState("");
+  const [openError, setOpenError] = useState<string | null>(null);
   const noteId = useId();
   const { busy, error, run } = useStep();
 
@@ -522,15 +523,15 @@ function BlindReview({
         if (controller.signal.aborted) return;
         setPacket(found);
         setClips({ A: a, B: b });
-      } catch {
-        // The submit step below reports the server's reason if the packet never opened.
+      } catch (failure: unknown) {
+        if (!controller.signal.aborted) setOpenError(errorMessage(failure) ?? t("formats_review_open_failed"));
       }
     })();
     return () => {
       controller.abort();
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [projectName, executionId]);
+  }, [projectName, executionId, t]);
 
   const complete = packet !== null && packet.items.every((item) => verdicts[item]);
 
@@ -550,7 +551,11 @@ function BlindReview({
         </button>
       </div>
       <p className="mt-1 text-xs text-text-2">{t("formats_review_hint")}</p>
-      {clips ? (
+      {openError ? (
+        <p role="alert" className="mt-3 text-sm text-text-2">
+          {openError}
+        </p>
+      ) : clips ? (
         <div className="fm-lighttable mt-3">
           {(["A", "B"] as const).map((label) => (
             <figure key={label}>

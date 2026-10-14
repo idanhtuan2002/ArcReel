@@ -2483,6 +2483,7 @@ export default {
   'formats_review_title': '盲审',
   'formats_review_hint': '其中一个是原片，另一个是投影，顺序不告诉你。请判断两者含义是否相同。',
   'formats_review_loading': '正在打开两个片段…',
+  'formats_review_open_failed': '无法打开审阅',
   'formats_clip_label': '片段 {{label}}',
   'formats_rubric_legend': '每一项在两个片段中是否相同？',
   'formats_item_focal_subject': '主体',
