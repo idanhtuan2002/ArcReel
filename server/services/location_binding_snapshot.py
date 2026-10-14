@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.production_binding import ProductionBindingIntegrityError, ProductionBindingRepository
 from lib.db.repositories.spatial_constraint import SpatialConstraintSetIntegrityError, SpatialConstraintSetRepository
+from lib.db.repositories.spatial_pair import SpatialPairIntegrityError
+from lib.db.repositories.spatial_pair_v2 import SpatialPairVersionedRepository, VerifiedPairDecisionV2
 from lib.db.repositories.spatial_source import SpatialFrameReceiptRepository, _receipt_digest
 from r2.contracts.enums import ProductionBindingTarget
 from r2.contracts.production import SceneSpec, ShotSpecV2
@@ -68,6 +70,7 @@ class CurrentLocationBindingSnapshotReader:
         project_name: str,
         target_id: str,
         expected_snapshot_digest: str | None = None,
+        require_approved_pair: bool = False,
     ) -> VerifiedLocationBindingSnapshot:
         async with self._sessions() as session, session.begin():
             return await self.read_in_session(
@@ -76,6 +79,7 @@ class CurrentLocationBindingSnapshotReader:
                 project_name=project_name,
                 target_id=target_id,
                 expected_snapshot_digest=expected_snapshot_digest,
+                require_approved_pair=require_approved_pair,
             )
 
     async def read_in_session(
@@ -86,8 +90,13 @@ class CurrentLocationBindingSnapshotReader:
         project_name: str,
         target_id: str,
         expected_snapshot_digest: str | None = None,
+        require_approved_pair: bool = False,
     ) -> VerifiedLocationBindingSnapshot:
-        """Lock and verify the snapshot inside the caller's transaction; the caller commits."""
+        """Lock and verify the snapshot inside the caller's transaction; the caller commits.
+
+        ``require_approved_pair`` also locks the binding's pair head, after the binding and before the
+        source masters, and refuses unless the current decision is an APPROVE over this binding's stable core.
+        """
         target = await TransactionBoundTargetAuthorityResolver(session).resolve_current(
             user_id=user_id,
             project_name=project_name,
@@ -112,6 +121,22 @@ class CurrentLocationBindingSnapshotReader:
         )
         if current is None or current.body.semantic_ref != target.scene.target.location_ref:
             raise ProductionBindingIntegrityError("binding snapshot has no current Scene-bound LOCATION binding")
+        if require_approved_pair:
+            try:
+                pair = await SpatialPairVersionedRepository(session).get_current_body_verified(
+                    user_id=user_id,
+                    project_name=project_name,
+                    binding_id=binding_id,
+                    expected_binding_version=current.body.version,
+                    expected_envelope_digest=current.envelope_digest,
+                    expected_core_digest=current.core_digest,
+                    expected_target_ref=target.ref,
+                    expected_scene_ref=target.scene.ref,
+                )
+            except (SpatialPairIntegrityError, ValueError) as exc:
+                raise ProductionBindingIntegrityError("binding pair decision failed verification") from exc
+            if not isinstance(pair, VerifiedPairDecisionV2) or pair.body.command.decision != "APPROVE":
+                raise ProductionBindingIntegrityError("binding has no current approved MASTER/REVERSE pair")
 
         claims = current.envelope.ordered_claims
         receipt_repository = SpatialFrameReceiptRepository(session)

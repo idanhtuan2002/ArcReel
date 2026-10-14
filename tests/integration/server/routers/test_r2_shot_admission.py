@@ -15,14 +15,8 @@ from r2.production_intelligence.shot_identity import host_request_digest, verify
 from r2.production_intelligence.shot_profiles import IMAGE_ROLE_LINE, WAN27_TWO_VIEW_PROFILE
 from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
 from server.services.r2_shot_generation import R2ShotAdmissionRefused, R2ShotCommand, derive_shot_admission
+from tests.integration.server.routers.spatial_approval_support import promoted_target
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
-from tests.integration.server.routers.test_spatial_constraint_snapshot import (
-    _attach,
-    _current_binding,
-    _envelope,
-    _set,
-    _sources,
-)
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -34,8 +28,7 @@ async def _builder(profile: R2ExecutionProfileV1) -> DashScopeVideoBackend:
 async def _admissible_shot(
     client: AsyncClient, project_dir: Path, factory: Factory, monkeypatch: pytest.MonkeyPatch, *, duration: float = 5.0
 ) -> R2ShotCommand:
-    binding_id, target_id = await _current_binding(client, project_dir, factory, monkeypatch, shot_duration=duration)
-    await _attach(factory, binding_id, _set(binding_id, _sources(await _envelope(factory, binding_id))))
+    target_id = await promoted_target(client, project_dir, factory, monkeypatch, shot_duration=duration)
     snapshot = await CurrentLocationBindingSnapshotReader(
         session_factory=factory, project_dir=project_dir
     ).read_current(user_id=USER.id, project_name=PROJECT, target_id=target_id)

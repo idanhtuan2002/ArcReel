@@ -120,10 +120,14 @@ def attached_id(constraint_set: SpatialConstraintSetV1) -> str:
 
 
 async def _envelope(factory: Factory, binding_id: str) -> dict:
+    """The envelope of the binding's current version."""
     async with factory() as session:
         row = (
             await session.execute(
-                select(ProductionBindingVersionModel).where(ProductionBindingVersionModel.binding_id == binding_id)
+                select(ProductionBindingVersionModel)
+                .where(ProductionBindingVersionModel.binding_id == binding_id)
+                .order_by(ProductionBindingVersionModel.binding_version.desc())
+                .limit(1)
             )
         ).scalar_one()
         return dict(row.envelope_json)
@@ -177,9 +181,14 @@ async def _attach(
     digest = spatial_constraint_set_digest(constraint_set.model_dump(mode="json"))
     async with factory() as session:
         await SpatialConstraintSetRepository(session).stage(constraint_set)
+        head = await session.get(ProductionBindingHeadModel, (USER.id, PROJECT, binding_id))
+        assert head is not None
         row = (
             await session.execute(
-                select(ProductionBindingVersionModel).where(ProductionBindingVersionModel.binding_id == binding_id)
+                select(ProductionBindingVersionModel).where(
+                    ProductionBindingVersionModel.binding_id == binding_id,
+                    ProductionBindingVersionModel.binding_version == head.current_version,
+                )
             )
         ).scalar_one()
         envelope = {

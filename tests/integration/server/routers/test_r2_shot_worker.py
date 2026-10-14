@@ -146,7 +146,7 @@ async def test_a_snapshot_change_after_queueing_stops_before_any_attempt_or_call
     bind_safe_session_factory(monkeypatch, session_factory)
     _command, evidence = await _queued(gate_export_client, project_dir, session_factory, monkeypatch)
     async with session_factory() as session:
-        current_binding = (await session.execute(select(ProductionBindingVersionModel))).scalar_one().binding_id
+        current_binding = (await session.execute(select(ProductionBindingVersionModel.binding_id))).scalars().first()
     changed = _set(current_binding, _sources(await _envelope(session_factory, current_binding)))
     changed = changed.model_copy(update={"normalizer_version": "spatial-r2-v2"})
     await _attach(session_factory, current_binding, changed)
@@ -245,7 +245,7 @@ async def test_a_binding_change_after_rederivation_blocks_attempt_planning(
         submitted_base_url=backend.submitted_base_url,
     )
     async with session_factory() as session:
-        current_binding = (await session.execute(select(ProductionBindingVersionModel))).scalar_one().binding_id
+        current_binding = (await session.execute(select(ProductionBindingVersionModel.binding_id))).scalars().first()
     changed = _set(current_binding, _sources(await _envelope(session_factory, current_binding)))
     await _attach(session_factory, current_binding, changed.model_copy(update={"normalizer_version": "spatial-r2-v2"}))
 
@@ -257,5 +257,5 @@ async def test_a_binding_change_after_rederivation_blocks_attempt_planning(
         assert list((await session.execute(select(ExecutionAttemptModel))).scalars()) == []
 
     async with session_factory() as session:
-        unchanged = (await session.execute(select(ProductionBindingVersionModel))).scalar_one()
+        unchanged = (await session.execute(select(ProductionBindingVersionModel))).scalars().first()
         assert unchanged.binding_id == current_binding

@@ -16,9 +16,10 @@ from lib.artifact_manifest import ArtifactKey, ArtifactManifestEntry, ProjectArt
 from lib.db.models.production_binding import ProductionBindingVersionModel
 from lib.generation_queue import GenerationQueue
 from lib.version_manager import VersionManager
+from server.routers import gates
 from tests.fakes import bind_safe_session_factory
 from tests.http_capture import capture_http
-from tests.integration.server.routers.test_gates_export import PROJECT, _media
+from tests.integration.server.routers.test_gates_export import PROJECT, _body, _media
 from tests.integration.server.routers.test_r2_shot_worker import SUBMIT_URL, _queued, _run
 from tests.integration.server.routers.test_spatial_constraint_snapshot import _attach, _envelope, _set, _sources
 
@@ -158,7 +159,7 @@ async def test_a_binding_change_after_generation_is_refused_as_stale(
 ) -> None:
     evidence = await _generated(gate_export_client, project_dir, session_factory, monkeypatch)
     async with session_factory() as session:
-        current_binding = (await session.execute(select(ProductionBindingVersionModel))).scalar_one().binding_id
+        current_binding = (await session.execute(select(ProductionBindingVersionModel.binding_id))).scalars().first()
     changed = _set(current_binding, _sources(await _envelope(session_factory, current_binding)))
     await _attach(session_factory, current_binding, changed.model_copy(update={"normalizer_version": "spatial-r2-v2"}))
 
@@ -185,4 +186,48 @@ async def test_a_slot_owned_by_a_non_r2_artifact_is_refused(
     )
 
     assert (response.status_code, response.json()["detail"]) == (409, "r2_shot_slot_owned")
+    assert _versions(project_dir, evidence.target_id) == []
+
+
+@pytest.mark.asyncio
+async def test_a_slot_taken_after_the_unlocked_check_is_refused_under_the_lock(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence = await _generated(gate_export_client, project_dir, session_factory, monkeypatch)
+    prepare = gates.prepare_r2_shot_cut
+
+    async def prepare_then_lose_the_slot(**kwargs):
+        cut = await prepare(**kwargs)
+        # Another approval establishes a non-R2 contract between the unlocked check and the slot lock.
+        ProjectArtifactManifestAdapter(project_dir).put_entry(
+            ArtifactKey.episode_video(1, evidence.target_id),
+            ArtifactManifestEntry(
+                artifact_path=f"videos/{evidence.target_id}.mp4", basis_digest="sha256-v1:" + "0" * 64
+            ),
+        )
+        return cut
+
+    monkeypatch.setattr(gates, "prepare_r2_shot_cut", prepare_then_lose_the_slot)
+
+    response = await gate_export_client.post(
+        _url(evidence.target_id), json={"task_id": evidence.task_id, "approval_record": "APR-1"}
+    )
+
+    assert (response.status_code, response.json()["detail"]) == (409, "r2_shot_slot_owned")
+    assert _versions(project_dir, evidence.target_id) == []
+
+
+@pytest.mark.asyncio
+async def test_the_legacy_gate_c_route_refuses_a_registered_r2_shot(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    evidence = await _generated(gate_export_client, project_dir, session_factory, monkeypatch)
+    data = _media(b"client-chosen-bytes")
+    (project_dir / "production" / f"{evidence.target_id}.mp4").write_bytes(data)
+
+    response = await gate_export_client.post(
+        f"/api/v1/projects/{PROJECT}/gates/final-cut", json=_body(evidence.target_id, data)
+    )
+
+    assert (response.status_code, response.json()["detail"]) == (409, "r2_shot_requires_task_custody")
     assert _versions(project_dir, evidence.target_id) == []

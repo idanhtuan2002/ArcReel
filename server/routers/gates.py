@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import AsyncGenerator, Callable, Collection, Iterator
+from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -88,7 +88,13 @@ from server.services.master_authority import (
     serialized_artifacts,
     verify_masters,
 )
-from server.services.r2_shot_approval import R2_SHOT_EPISODE, R2ShotApprovalRefused, prepare_r2_shot_cut
+from server.services.r2_shot_approval import (
+    R2_SHOT_EPISODE,
+    R2ShotApprovalRefused,
+    prepare_r2_shot_cut,
+    refuse_registered_r2_target,
+    require_slot_owner,
+)
 
 router = APIRouter()
 # Token-authenticated like the project ZIP export (ADR-0071): registered without the session dependency.
@@ -315,6 +321,8 @@ class _CutApproval:
     audio_decision: Literal["AUDIO", "MUTE"] | None
     produced: RenderedCutAsset
     request_digest: str
+    # Runs first inside the slot lock, before any staging; it raises HTTPException to refuse.
+    slot_guard: Callable[[AsyncSession], Awaitable[None]] | None = None
 
 
 async def _approve_cut(
@@ -392,6 +400,8 @@ async def _approve_cut(
         return approved, export
 
     async def _stage_and_promote(session):
+        if approval.slot_guard is not None:
+            await approval.slot_guard(session)
         if source_keys:
             try:
                 await verify_masters(
@@ -563,6 +573,14 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
                 detail=f"audio_decision {decision} does not match the final's audio track",
             )
 
+    async def legacy_slot_guard(session: AsyncSession) -> None:
+        try:
+            await refuse_registered_r2_target(
+                session, user_id=user.id, project_name=project_name, target_ref=req.target_ref
+            )
+        except R2ShotApprovalRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.code) from exc
+
     return await _approve_cut(
         user=user,
         project_name=project_name,
@@ -580,6 +598,7 @@ async def final_cut_approval(project_name: str, req: FinalCutApprovalRequest, us
             audio_decision=req.audio_decision,
             produced=produced,
             request_digest=request_digest,
+            slot_guard=legacy_slot_guard,
         ),
     )
 
@@ -616,6 +635,14 @@ async def r2_shot_approval(
     request_digest = hashlib.sha256(
         f"r2-shot/{target_id}/{req.model_dump_json()}/{cut.produced.sha256}".encode()
     ).hexdigest()
+
+    async def r2_slot_guard(_session: AsyncSession) -> None:
+        # Another approval may have taken the slot since the unlocked check; recheck under the lock.
+        try:
+            await run_noninterruptible_sync(lambda: require_slot_owner(project_dir, target_id))
+        except R2ShotApprovalRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.code) from exc
+
     return await _approve_cut(
         user=user,
         project_name=project_name,
@@ -633,6 +660,7 @@ async def r2_shot_approval(
             audio_decision=None,
             produced=cut.produced,
             request_digest=request_digest,
+            slot_guard=r2_slot_guard,
         ),
     )
 

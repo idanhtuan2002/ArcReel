@@ -1170,6 +1170,7 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 **Packet 3 self-review: lock order**
 - **Promotion order:** M8 command key → candidate head → preview → (V2 pair reader: target → current binding version row FOR UPDATE → pair head → parent masters → frames) → binding head FOR UPDATE inside `append_spatial_successor`.
 - **Deviation:** the spec places the binding head before the pair head; here it comes last.
+  - **Correction (2026-10-14, independent review):** this claim is inaccurate. `ProductionBindingRepository.get_current_verified` already locks the binding head before the pair head, so the order matches the spec.
 - **No cycle with existing writers:**
   - The V2 pair decision writer claims the pair head and then the masters, and never locks the binding head.
   - The binding create command locks the head only for an absent binding and refuses an existing one.
@@ -1324,3 +1325,34 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 - PostgreSQL 18: the targets, binding creation, review routes, vertical, pair repository and review session files give 14 passed.
 - `pnpm check` (frontend lint, typecheck, Vitest): 223 files, 2577 passed, 4 skipped.
 - Backend static gates: ruff, basedpyright (0/0), lint-imports, deptry and `audit_tests` are all clean.
+
+## Independent review by Codex and repairs — 2026-10-14 (Claude session)
+
+**Review:** a Codex agent reviewed clean HEAD `44b9763c` read-only. It ran no tests because the checkout was read-only for `uv`. It reported 5 findings, all source-traced. The main agent verified each one against the code before repairing it.
+
+1. **High: promotion blocked any later pair decision.** The current-pair read required the decision's binding version to equal the current one. A spatial promotion (N→N+1) therefore made every fresh APPROVE or REJECT fail, and generation never checked the pair at all. This violated the pair spec (suitability is bound to the stable core; REJECT withdraws it) and the binding spec, which requires a pair check at planning.
+   - **Repair:** `SpatialPairVersionedRepository.get_current_body_verified` accepts a decision naming an earlier binding version only when that historical version row exists with the decision's envelope digest. The stable core and refs must still equal the current binding.
+   - **Repair:** `CurrentLocationBindingSnapshotReader` gains `require_approved_pair`. It locks the pair head after the binding and before the masters, the spec order, and refuses unless the current decision is a V2 APPROVE. Both the shot route admission and the worker's `admit_and_plan_spatial_attempt` use it.
+   - **Tests:**
+     - `test_spatial_promotion` now asserts a preview at version 2 succeeds.
+     - `test_spatial_review_routes` reviews version 2 again, REJECTs, and asserts generation admission is refused.
+     - `_admissible_shot` builds its shot through real pair approval and promotion (`promoted_target`) instead of the `_attach` stand-in.
+     - Mutation: removing the historical-version branch fails 2 tests.
+2. **High: the legacy `/gates/final-cut` could approve client-built provenance into a registered R2 Shot's slot.**
+   - **Repair:** `_CutApproval.slot_guard` runs first under the slot lock. The legacy route refuses a registered R2 Shot target with 409 `r2_shot_requires_task_custody`.
+3. **High: slot ownership was checked before the slot lock.**
+   - **Repair:** the R2 route's `slot_guard` re-runs `require_slot_owner` under the lock.
+   - **Tests:** `test_a_slot_taken_after_the_unlocked_check_is_refused_under_the_lock` and `test_the_legacy_gate_c_route_refuses_a_registered_r2_shot`. Mutation: removing the guard call fails both.
+4. **Medium: an expired preview could never be retried.**
+   - **Repair:** each preview attempt gets a fresh command ID; the page test asserts two attempts send two IDs.
+5. **Medium: the review page acknowledged frames without a reviewer action.**
+   - **Repair:** the page shows the verified frames first. Each frame then needs an explicit "I have viewed" confirmation, which sends that frame's acknowledgment. APPROVE and REJECT stay disabled until both frames are confirmed. A page test covers it.
+
+**Review notes accepted:**
+- A new promotion re-checks the reviewer's current grant through the current pair reader. Only an exact replay skips currentness, as the binding spec allows. The packet 5 plan is corrected.
+- The lock-order note above is corrected.
+
+**Verification (working tree before commit):**
+- SQLite: `tests/integration/server/routers`, `tests/integration/scripts/r2` and i18n give 929 passed, 9 skipped. The one failure, `test_verify_m7_scope_git`, is dirty-tree only.
+- `pnpm check`: 2579 passed.
+- Static gates are clean.

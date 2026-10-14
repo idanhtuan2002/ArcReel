@@ -82,6 +82,7 @@ async def admit_and_plan_spatial_attempt(
             project_name=evidence.project_name,
             target_id=evidence.target_id,
             expected_snapshot_digest=evidence.binding_snapshot_digest,
+            require_approved_pair=True,
         )
         target = snapshot.body.target_versions[1]
         if (target.registry_version, target.version_digest) != (

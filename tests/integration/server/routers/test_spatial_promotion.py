@@ -93,8 +93,9 @@ async def test_promotion_appends_the_spatial_binding_version_and_replays(
             authorization=authorization,
             expected_candidate_head_version=2,
         )
-    with pytest.raises(PromotionBindingStaleError, match="pair approval"):
-        await service.create_preview(command(approved, ids, expected_binding_version=2, command_id="preview-after"))
+    # A spatial promotion keeps the binding's stable core, so the pair approval stays current for version 2.
+    after = await service.create_preview(command(approved, ids, expected_binding_version=2, command_id="preview-after"))
+    assert after.binding.expected_binding_version == 2
     assert await _counts(session_factory) == (2, 1, 1)
 
 

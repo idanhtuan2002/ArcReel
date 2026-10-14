@@ -118,3 +118,43 @@ async def approved_location(
         session_factory=factory, project_dir=project_dir, grants=grants
     ).decide(command, authenticated_user=CurrentUserInfo(id=USER.id, sub=USER.sub, role="user"))
     return ApprovedLocation(binding_id=binding_id, target_id=target_id, grants=grants, approval=approval)
+
+
+async def promoted_target(
+    client: AsyncClient,
+    project_dir: Path,
+    factory: Factory,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    shot_duration: float | None = None,
+) -> str:
+    """A Shot whose LOCATION binding was approved as a pair and promoted with every VISIBLE fixture assertion."""
+    from server.services.advanced_creative import exploration_service
+    from server.services.spatial_promotion import SpatialPreviewCommand, SpatialPromotionService
+    from tests.integration.server.routers.test_spatial_promotion import _authorization
+    from tests.integration.server.routers.test_spatial_promotion_preview import spatial_candidate
+
+    approved = await approved_location(client, project_dir, factory, monkeypatch, shot_duration=shot_duration)
+    await spatial_candidate(factory, project_dir, approved)
+    async with factory() as session:
+        revision = await exploration_service(session).get_exact(
+            user_id=USER.id, project_name=PROJECT, candidate_id="spatial-candidate-1", revision=1
+        )
+    visible = tuple(a.assertion_id for a in revision.payload.spatial.assertions if a.evidence_class.value == "VISIBLE")
+    service = SpatialPromotionService(session_factory=factory, project_dir=project_dir, grants=approved.grants)
+    preview = await service.create_preview(
+        SpatialPreviewCommand(
+            user_id=USER.id,
+            project_name=PROJECT,
+            candidate_id="spatial-candidate-1",
+            candidate_revision=1,
+            target_id=approved.target_id,
+            expected_binding_version=1,
+            selected_assertion_ids=visible,
+            command_id="spatial-preview-1",
+        )
+    )
+    await service.promote(
+        user_id=USER.id, project_name=PROJECT, authorization=_authorization(preview), expected_candidate_head_version=1
+    )
+    return approved.target_id

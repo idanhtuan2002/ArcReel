@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.db.repositories.production_binding import ProductionBindingIntegrityError
 from server.auth import CurrentUserInfo, get_current_interactive_user, get_current_user
 from server.error_handlers import register_error_handlers
 from server.routers import spatial_review
@@ -179,6 +180,34 @@ async def test_the_human_steps_run_through_the_routes_to_a_promoted_binding(
         session_factory=session_factory, project_dir=project_dir
     ).read_current(user_id=USER.id, project_name=PROJECT, target_id=bound["target_id"])
     assert current.spatial_set is not None
+
+    # The approval stays current across the spatial-only version change, so generation is admissible...
+    reader = CurrentLocationBindingSnapshotReader(session_factory=session_factory, project_dir=project_dir)
+    await reader.read_current(
+        user_id=USER.id, project_name=PROJECT, target_id=bound["target_id"], require_approved_pair=True
+    )
+    # ...and a fresh review of version 2 can still REJECT the pair, which withdraws that suitability.
+    second = await _reviewed(review_client, bound["target_id"])
+    assert second["binding_version"] == 2
+    rejected = await review_client.post(
+        f"{BASE}/pair-decisions",
+        json=_decision_body(
+            second,
+            command_id="pair-reject-1",
+            decision="REJECT",
+            observations={
+                "view_coverage": None,
+                "camera_center": None,
+                "yaw_relation": None,
+                "rejection_reason": "the reverse view shows another room",
+            },
+        ),
+    )
+    assert rejected.status_code == 200, rejected.text
+    with pytest.raises(ProductionBindingIntegrityError, match="approved"):
+        await reader.read_current(
+            user_id=USER.id, project_name=PROJECT, target_id=bound["target_id"], require_approved_pair=True
+        )
 
 
 @pytest.mark.asyncio

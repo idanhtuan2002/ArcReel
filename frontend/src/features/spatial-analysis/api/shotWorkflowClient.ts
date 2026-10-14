@@ -184,13 +184,21 @@ export function decidePair(
 
 export function previewPromotion(
   projectName: string,
-  input: { candidateId: string; revision: number; targetId: string; bindingVersion: number; assertionIds: string[] },
+  input: {
+    /** One per preview attempt: a replay of an expired preview would never become promotable again. */
+    commandId: string;
+    candidateId: string;
+    revision: number;
+    targetId: string;
+    bindingVersion: number;
+    assertionIds: string[];
+  },
   options: CallOptions = {},
 ): Promise<SpatialPreview> {
   return post(
     `${base(projectName)}/promotion-previews`,
     {
-      command_id: `preview:${input.candidateId}:${input.revision}:${input.bindingVersion}:${input.assertionIds.join("+")}`,
+      command_id: input.commandId,
       candidate_id: input.candidateId,
       candidate_revision: input.revision,
       target_id: input.targetId,

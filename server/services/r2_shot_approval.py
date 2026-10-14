@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.artifact_manifest import ArtifactKey, ProjectArtifactManifestAdapter
 from lib.async_thread import run_noninterruptible_sync
 from lib.db.models.api_call import ApiCall
+from lib.db.models.production_target import ProductionTargetHeadModel
 from lib.db.repositories.host_hardening import ExecutionAttemptRepository
 from lib.db.repositories.production_binding import ProductionBindingIntegrityError
 from lib.db.repositories.task_repo import TaskRepository
@@ -151,7 +152,7 @@ async def _current_shot(
     return target.target
 
 
-def _require_slot_owner(project_dir: Path, target_id: str) -> None:
+def require_slot_owner(project_dir: Path, target_id: str) -> None:
     """The slot must be empty or already hold this target's ShotSpec metadata."""
     entry = ProjectArtifactManifestAdapter(project_dir).get_entry(ArtifactKey.episode_video(R2_SHOT_EPISODE, target_id))
     if entry is None:
@@ -183,7 +184,7 @@ async def prepare_r2_shot_cut(
     if await run_noninterruptible_sync(lambda: file_digest(output)) != sealed:
         raise R2ShotApprovalRefused("r2_shot_output_changed")
     shot = await _current_shot(session_factory, project_dir, evidence)
-    await run_noninterruptible_sync(lambda: _require_slot_owner(project_dir, target_id))
+    await run_noninterruptible_sync(lambda: require_slot_owner(project_dir, target_id))
 
     dependencies = [binding_dependency(evidence)]
     profile = PROFILES[evidence.execution_profile_ref]
@@ -211,4 +212,28 @@ async def prepare_r2_shot_cut(
     )
 
 
-__all__ = ["R2_SHOT_EPISODE", "R2ShotApprovalRefused", "R2ShotCut", "binding_dependency", "prepare_r2_shot_cut"]
+async def refuse_registered_r2_target(
+    session: AsyncSession, *, user_id: str, project_name: str, target_ref: str
+) -> None:
+    """A registered R2 Shot's slot takes only task-derived custody (ADR-0104), never client-built provenance."""
+    registered = await session.scalar(
+        select(ProductionTargetHeadModel.target_id).where(
+            ProductionTargetHeadModel.user_id == user_id,
+            ProductionTargetHeadModel.project_name == project_name,
+            ProductionTargetHeadModel.target_type == ProductionBindingTarget.SHOT.value,
+            ProductionTargetHeadModel.target_id == target_ref,
+        )
+    )
+    if registered is not None:
+        raise R2ShotApprovalRefused("r2_shot_requires_task_custody")
+
+
+__all__ = [
+    "R2_SHOT_EPISODE",
+    "R2ShotApprovalRefused",
+    "R2ShotCut",
+    "binding_dependency",
+    "prepare_r2_shot_cut",
+    "refuse_registered_r2_target",
+    "require_slot_owner",
+]

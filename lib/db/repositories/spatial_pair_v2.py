@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from lib.db.models.production_binding import ProductionBindingVersionModel
 from lib.db.models.spatial_pair import (
     SpatialPairCommandModel,
     SpatialPairDecisionModel,
@@ -407,14 +408,30 @@ class SpatialPairVersionedRepository:
             with_for_update=True,
             populate_existing=True,
         )
+        decided_version, decided_envelope = expected_binding_version, expected_envelope_digest
+        if row.binding_version != expected_binding_version:
+            # A spatial promotion advances the binding version without changing its stable core, so the
+            # decision stays the current suitability judgment. It is verified against the exact historical
+            # binding version it named; the stable core and refs must still equal the current binding.
+            historical = await self.session.scalar(
+                select(ProductionBindingVersionModel.envelope_digest).where(
+                    ProductionBindingVersionModel.user_id == user_id,
+                    ProductionBindingVersionModel.project_name == project_name,
+                    ProductionBindingVersionModel.binding_id == binding_id,
+                    ProductionBindingVersionModel.binding_version == row.binding_version,
+                )
+            )
+            if row.binding_version > expected_binding_version or historical != row.binding_envelope_digest:
+                raise SpatialPairIntegrityError("pair decision names no earlier version of the current binding")
+            decided_version, decided_envelope = row.binding_version, row.binding_envelope_digest
         return verify_stored_pair_decision_versioned(
             row,
             custody,
             user_id=user_id,
             project_name=project_name,
             binding_id=binding_id,
-            expected_binding_version=expected_binding_version,
-            expected_envelope_digest=expected_envelope_digest,
+            expected_binding_version=decided_version,
+            expected_envelope_digest=decided_envelope,
             expected_core_digest=expected_core_digest,
             expected_target_ref=expected_target_ref,
             expected_scene_ref=expected_scene_ref,

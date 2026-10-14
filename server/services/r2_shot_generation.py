@@ -192,6 +192,7 @@ async def derive_shot_admission(
         project_name=command.project_name,
         target_id=command.target_id,
         expected_snapshot_digest=command.expected_binding_snapshot_digest,
+        require_approved_pair=True,
     )
     if snapshot.spatial_set is None:
         raise R2ShotAdmissionRefused("r2_shot_requires_spatial_set")

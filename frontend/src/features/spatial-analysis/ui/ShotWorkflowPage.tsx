@@ -255,7 +255,7 @@ function useStepAction(onChanged: () => void) {
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
   const run = useCallback(
-    async (operation: (signal: AbortSignal) => Promise<void>) => {
+    async (operation: (signal: AbortSignal) => Promise<void>, reload = true) => {
       controller.current?.abort();
       const current = new AbortController();
       controller.current = current;
@@ -263,7 +263,7 @@ function useStepAction(onChanged: () => void) {
       setError(null);
       try {
         await operation(current.signal);
-        if (!current.signal.aborted) onChanged();
+        if (!current.signal.aborted && reload) onChanged();
       } catch (caught) {
         if (!current.signal.aborted) setError(errorMessage(caught) ?? t("shot_workflow_action_failed"));
       } finally {
@@ -380,6 +380,9 @@ interface ReviewedFrame {
   role: ReviewRole;
   url: string;
   verified: boolean;
+  attemptId: string;
+  pngDigest: string;
+  acknowledged: boolean;
 }
 
 const EMPTY_OBSERVATIONS = { view_coverage: "", camera_center: "", yaw_relation: "", rejection_reason: "" };
@@ -409,17 +412,18 @@ function ReviewStep({ projectName, target, onChanged }: PanelProps) {
         const blob = new Blob([delivered.bytes], { type: "image/png" });
         const url = URL.createObjectURL(blob);
         urls.current.push(url);
-        // The reviewer acknowledges only bytes that hash to the reviewed frame and decode as an image.
+        // Only bytes that hash to the reviewed frame and decode as an image can be acknowledged, and only
+        // after the reviewer has seen them and confirms it.
         await createImageBitmap(blob);
         const verified = digest === frame.png_digest && digest === delivered.pngDigest;
-        if (verified) {
-          await acknowledgeFrame(projectName, opened.session_id, {
-            attemptId: delivered.attemptId,
-            role: frame.role,
-            pngDigest: digest,
-          });
-        }
-        reviewed.push({ role: frame.role, url, verified });
+        reviewed.push({
+          role: frame.role,
+          url,
+          verified,
+          attemptId: delivered.attemptId,
+          pngDigest: digest,
+          acknowledged: false,
+        });
       }
       setSnapshot(opened);
       setFrames(reviewed);
@@ -439,7 +443,20 @@ function ReviewStep({ projectName, target, onChanged }: PanelProps) {
     );
   }
 
-  const allVerified = frames.length === 2 && frames.every((frame) => frame.verified);
+  const allVerified = frames.length === 2 && frames.every((frame) => frame.verified && frame.acknowledged);
+  function confirm(role: ReviewRole) {
+    const frame = frames.find((item) => item.role === role);
+    if (!snapshot || !frame?.verified || frame.acknowledged) return;
+    void run(async (signal) => {
+      await acknowledgeFrame(
+        projectName,
+        snapshot.session_id,
+        { attemptId: frame.attemptId, role, pngDigest: frame.pngDigest },
+        { signal },
+      );
+      setFrames((current) => current.map((item) => (item.role === role ? { ...item, acknowledged: true } : item)));
+    }, false);
+  }
   const approveReady = allVerified && [notes.view_coverage, notes.camera_center, notes.yaw_relation].every((v) => v.trim());
   function decide(decision: "APPROVE" | "REJECT") {
     const observations: PairObservations =
@@ -465,6 +482,19 @@ function ReviewStep({ projectName, target, onChanged }: PanelProps) {
               {frame.role} · {frame.verified ? t("shot_workflow_review_verified") : t("shot_workflow_review_mismatch")}
             </figcaption>
             <img src={frame.url} alt={t("shot_workflow_review_frame_alt", { role: frame.role })} className="mt-2 w-full rounded" />
+            {frame.verified ? (
+              <button
+                type="button"
+                disabled={busy || frame.acknowledged}
+                aria-pressed={frame.acknowledged}
+                onClick={() => confirm(frame.role)}
+                className="sw-btn mt-2"
+              >
+                {frame.acknowledged
+                  ? t("shot_workflow_review_confirmed", { role: frame.role })
+                  : t("shot_workflow_review_confirm", { role: frame.role })}
+              </button>
+            ) : null}
           </figure>
         ))}
       </div>
@@ -607,6 +637,7 @@ function PromoteStep({ projectName, target, head, onChanged }: PanelProps) {
             const preview = await previewPromotion(
               projectName,
               {
+                commandId: `preview:${crypto.randomUUID()}`,
                 candidateId: head.candidate_id,
                 revision: head.current_revision,
                 targetId: target.target_ref.target_id,

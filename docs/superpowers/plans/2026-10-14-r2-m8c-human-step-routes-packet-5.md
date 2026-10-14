@@ -45,7 +45,7 @@
 6. **Not here:**
    - The frontend UI.
    - F1 (pairs whose two frames have identical content).
-   - Re-checking the grant at promotion. Promotion is bound to a current approved pair, which required the grant, and the service is unchanged.
+   - A separate grant check in the promotion route. A new promotion already re-checks the reviewer's current grant through the current pair reader; only an exact replay skips currentness, as the binding spec's replay rule allows (corrected 2026-10-14 after independent review).
    - Live activation of ADR-0103.
 
 ## Tests (`tests/integration/server/routers/test_spatial_review_routes.py`)
