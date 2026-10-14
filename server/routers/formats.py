@@ -18,6 +18,7 @@ from pydantic import Field
 from sqlalchemy import select
 
 from lib.api_errors import ApiError, ConflictError, NotFoundError, UnprocessableError
+from lib.artifact_manifest import decode_artifact_key_parts
 from lib.db import async_session_factory
 from lib.db.models.formats import (
     FormatPlanModel,
@@ -26,6 +27,7 @@ from lib.db.models.formats import (
     FormatTechnicalReportModel,
 )
 from lib.db.repositories.formats import FormatRepository
+from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.project_manager import get_project_manager
 from r2.advanced_creative.digests import digest_canonical
 from r2.advanced_creative.errors import ExplorationNotFoundError, FormatNotFoundError, M8Error
@@ -157,11 +159,51 @@ class ApproveFormatPromotionRequest(M8ContractModel):
     command_id: str = Field(min_length=1, max_length=255)
 
 
+class FormatSourceView(M8ContractModel):
+    artifact_key: str
+    label: str
+    master_version: int
+    content_digest: str
+
+
 class PlanSummary(M8ContractModel):
     plan: FormatProjectionPlan
     renders: tuple[RenderView, ...]
     technical: TechnicalValidationReport | None
     semantic: SemanticParityReport | None
+
+
+_VIDEO_SUFFIXES = (".mp4", ".mov", ".m4v", ".webm", ".mkv")
+
+
+@router.get("/projects/{project_name}/m8/formats/sources")
+async def list_sources(project_name: str, user: CurrentUser) -> list[FormatSourceView]:
+    """Current video masters a projection can start from; format slots themselves are excluded."""
+
+    async def operation() -> list[FormatSourceView]:
+        async with async_session_factory() as session:
+            authorities = MasterAuthorityRepository(session)
+            keys = await authorities.list_current_keys(user_id=user.id, project_name=project_name)
+            views = []
+            for key in sorted(keys):
+                if key.startswith("m8-format:"):
+                    continue
+                head = await authorities.get_current(user_id=user.id, project_name=project_name, artifact_key=key)
+                if head is None or not head.object_ref.lower().endswith(_VIDEO_SUFFIXES):
+                    continue
+                parts = decode_artifact_key_parts(key)
+                label = key if parts is None else " · ".join([parts.kind, *map(str, parts.components)])
+                views.append(
+                    FormatSourceView(
+                        artifact_key=key,
+                        label=label,
+                        master_version=head.master_version,
+                        content_digest=head.content_digest,
+                    )
+                )
+            return views
+
+    return await _run(operation)
 
 
 @router.post("/projects/{project_name}/m8/formats/profiles")

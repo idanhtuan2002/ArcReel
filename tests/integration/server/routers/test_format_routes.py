@@ -129,6 +129,10 @@ async def test_the_api_takes_a_projection_from_plan_to_candidate(
         assert receipt.status_code == 200, receipt.text
         assert receipt.json()["result_digest"] == rendered["artifact_digest"]
 
+        # The promoted format slot is a master too, but never a projection source.
+        sources = (await http.get(f"{BASE}/sources")).json()
+        assert [(item["artifact_key"], item["master_version"]) for item in sources] == [(SOURCE_KEY, 1)]
+
         listed = (await http.get(f"{BASE}/plans")).json()
         assert [item["plan"]["plan_id"] for item in listed] == ["square-pad"]
         assert listed[0]["technical"]["passed"] is True
