@@ -1,6 +1,6 @@
 # M8-E handoff (2026-10-14)
 
-**Branch:** `impl/r2-m8e-format`. **HEAD:** `4ecd883a`, pushed. Not merged into `r2-v2/main` (`52183f4b`).
+**Branch:** `impl/r2-m8e-format`. **HEAD:** `c0e7029b`, pushed (updated after the review fixes). Not merged into `r2-v2/main` (`52183f4b`).
 **Plan:** `docs/superpowers/plans/2026-10-14-r2-m8e-format-projection.md`, decisions 1–11 plus the reviewer decision.
 
 ## Done
@@ -15,26 +15,19 @@
 | E3 evidence gate and genesis | `546bdcdc`, `6c0e59a3` (`917c4a0e0001`) | A fail-closed `HostFormatEvidence` gates FORMAT preview and promotion. A format slot's first promotion may run at version 0, through a narrow contract amendment and an additive migration. |
 | E3 API and UI | `4acbe8dd`, `fc6d1285`, `9e2bfdd4`, `4ecd883a` | The routes are tested over HTTP on SQLite and PostgreSQL 18. The formats page passes typecheck and lint but has no page tests yet. |
 
-## Open: the fourth Codex review (at `4acbe8dd`) is blocking
+## The fourth Codex review (at `4acbe8dd`): fixed in `eb672993`
 
-Each finding below is still to be fixed, with a regression test:
-1. Promotion reads reports and the source head without locks before taking the slot lock. Evidence must be serialized with report writers and source-head changes until the promotion commits.
-2. Concurrent reviews can hide disagreement. The plan and artifact must be locked before duplicate checks and aggregation.
-3. The A/B order is reversible: the reviewer can see the plan and render digests and hash the clips. Review assets need a neutral, access-bounded path, and identifying data must be withheld from reviewers.
-4. A crash after ACCEPTED but before the success-evidence transaction is not recoverable. Recovery must rebuild the result from the durable attempt (job id `<execution>:<digest>`) and complete idempotently.
-5. Long renders (up to 1800 s) outlive the 300 s M7 lease. The lease must be renewed during the render, and a lost fence must be handled before publication.
-6. Reviewer assignment is self-service. It needs a stored assignment, and the deviation must be bound to the authorized reviewer (sponsor decision: a single reviewer, the sponsor).
-7. Validation and review delivery hash a file and then reopen it. They must work from snapshots.
-8. Overlay evidence is checked against ideal geometry. It must use the actual pixel geometry.
-9. The missing-source parity row derives every dimension from booleans. It must measure each dimension or mark it explicitly.
-10. Plan creation and candidate preparation hold transactions open across media I/O. Media must be prepared outside the transaction, then revalidated briefly.
-11. Missing media returns HTTP 500. It must map to 404 or 409.
+All 11 findings are fixed, each with a regression test; the decisions are plan items 12–18.
+- `76696b6b` adds page tests and shows a refused review packet. `pnpm check`: 2593 passed.
+- `c0e7029b` reseals parity at `76696b6b`: PASS, with F07 measured per dimension. `verify_donor_parity` reports OK, and the registry digests are updated.
+- Format tests passed on SQLite (113 passed, 2 skipped as PostgreSQL-only) and on PostgreSQL 18 (115 passed, 0 skipped).
+- A browser check on dev servers ran the whole flow (plan, render, checks) and showed the 503 grant message for review.
 
-## Then
+## Still open
 
-- The page tests, `pnpm check`, and a browser check with a real blind review by the sponsor (a human step).
-- The E4 seal `R2_M8_E_FORMAT_PARITY.json`. Rerunning the harness changes its digest, so the registry `evidence_digest` and `test_provider_capabilities` must be updated together.
-- A Codex verification round, then merge.
+- A Codex verification round on `4acbe8dd..c0e7029b`.
+- The real blind review by the sponsor. It needs a server with activated showrunner grants (staging); dev returns 503.
+- The final evidence seal, then merge after the user approves.
 
 ## Environment
 
