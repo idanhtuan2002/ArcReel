@@ -4,17 +4,19 @@ AI 视频创作平台，将小说、剧本或创作构想转化为短视频。�
 
 ## 工具链与校验
 
-后端使用 `uv`，前端与文档站使用 `pnpm`。修改代码或测试时，先按 `CONTRIBUTING.md`「测试选择」运行相关测试；任务完成和 push 前执行受影响域的全量闸门：
+后端使用 `uv`，前端与文档站使用 `pnpm`。修改代码或测试时，先按 `CONTRIBUTING.md`「测试选择」运行相关测试；任务完成和 push 前执行受影响域的静态闸门（pytest 只跑相关测试，见下文）：
 
 ```bash
-uv run ruff check . && uv run ruff format . && uv run basedpyright --warnings && uv run lint-imports && uv run deptry lib server alembic scripts tests r2 && uv run python -m pytest -n 4 --dist loadfile
+uv run ruff check . && uv run ruff format . && uv run basedpyright --warnings && uv run lint-imports && uv run deptry lib server alembic scripts tests r2
 uv run python scripts/audit_tests.py --check   # 改动测试文件时；同时扫后端 tests/ 与前端 *.test.*
 uv run pre-commit run --all-files actionlint && uv run pre-commit run --all-files zizmor   # 改动 .github/ 时
 (cd frontend && pnpm check)
 (cd website && pnpm check)
 ```
 
-相关测试必须实际运行且通过；若选择结果为 0 个测试，须扩大范围。启动开发服务器、数据库迁移、测试选择与规范（分层/替身/判据/闸门）、分支与提交规范、依赖管理、注释规范、静态工具的豁免规范见 `CONTRIBUTING.md`。
+相关测试必须实际运行且通过；若选择结果为 0 个测试，须扩大范围。
+
+**只跑相关测试（sponsor 决定，2026-10-14）：**pytest 一律显式列出与改动相关的测试路径，任务完成、push 与 merge 前也不例外；不得以全量 `pytest -n 4 --dist loadfile` 作为默认闸门（约 90 分钟，几乎全部耗在真实 Remotion 渲染）。渲染重型测试（`tests/integration/r2/test_m6_dual_profile_acceptance.py`、`tests/integration/r2/m3`）仅在改动触及其依赖面（`r2/m3`、`r2/adaptation`、host integration、version store、Remotion/ffmpeg）时运行。全量只在用户明确要求时运行，命令须加 `ARCREEL_FULL_SUITE=1` 前缀；`.claude/hooks/guard_full_pytest.py`（PreToolUse）会拒绝未列测试路径的 pytest 调用。汇报时写明实际运行了哪些测试。启动开发服务器、数据库迁移、测试选择与规范（分层/替身/判据/闸门）、分支与提交规范、依赖管理、注释规范、静态工具的豁免规范见 `CONTRIBUTING.md`。
 
 ## 通用规范
 
