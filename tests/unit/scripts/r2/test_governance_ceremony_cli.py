@@ -88,3 +88,29 @@ def test_host_commands_require_root(tmp_path: Path) -> None:
     if os.geteuid() == 0:
         pytest.skip("the root check is exercised by a non-root run")
     assert _run("next-body", "--root", tmp_path, "--out", tmp_path / "next.body") == 1
+
+
+def test_a_revoke_with_an_expiry_is_refused(tmp_path: Path) -> None:
+    assert _run("keygen", "--private", tmp_path / "g.key", "--public", tmp_path / "g.pub") == 0
+    assert _run(
+        "sign-event", "--key", tmp_path / "g.key", "--key-id", "grant-key-a", "--type", "REVOKE",
+        "--user-id", "default", "--project", "show-a", "--principal", "reviewer-a", "--sequence", "2",
+        "--previous-event-digest", "sha256:" + "0" * 64, "--expires-at", "2099-01-01T00:00:00Z",
+        "--out", tmp_path / "revoke.json",
+    ) == 1  # fmt: skip
+    assert not (tmp_path / "revoke.json").exists()
+
+
+def test_unexpected_failures_print_only_a_category(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts.r2 import governance_ceremony as cli
+
+    def database_failure(_args: object) -> str:
+        raise RuntimeError("INSERT INTO showrunner_grant_events ... secret-dsn")
+
+    monkeypatch.setattr(cli, "run_offline", database_failure)
+
+    assert _run("keygen", "--private", tmp_path / "a.key", "--public", tmp_path / "a.pub") == 1
+    error = capsys.readouterr().err
+    assert error.strip() == "Governance ceremony refused: RuntimeError"

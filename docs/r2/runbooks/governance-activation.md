@@ -112,7 +112,7 @@ sudo -E uv run python -m scripts.r2.governance_ceremony enroll \
 
 - **Check:** the output says `enrolled; checkpoint sequence 1`.
 - **Stop if:**
-  - `CUSTODY_ROOT` already exists. Enrollment never reuses a tree.
+  - `CUSTODY_ROOT` already exists. Enrollment never reuses a tree. If an earlier `enroll` was interrupted, it left a partial tree while the ledger was still empty. Move that tree aside (`mv "$CUSTODY_ROOT" "$CUSTODY_ROOT.failed-$(date -u +%Y%m%dT%H%M%SZ)"`), keep it for investigation, and run `enroll` again.
   - The ledger is not empty, because a nonempty ledger needs a separately reviewed import ceremony.
   - Any refusal appears. The command prints only a category; investigate before retrying.
 
@@ -127,7 +127,7 @@ sudo -E uv run python -m scripts.r2.governance_ceremony enroll \
      --sequence 1 --expires-at 2027-01-01T00:00:00Z --out issue-1.json
    ```
 
-   Record the printed event digest. The next event for this scope (a REVOKE) names it with `--previous-event-digest`.
+   Record the printed event digest. The next event for this scope (a REVOKE) names it with `--previous-event-digest`. Keep every signed event file with the independent archive copy; a database restore re-imports them in order (step 9).
 
 2. **Host, application stopped:**
 
@@ -152,7 +152,10 @@ sudo -E uv run python -m scripts.r2.governance_ceremony enroll \
    ```
 
 - **Check:** `published; checkpoint sequence 2`, then `sudo -E uv run python -m scripts.r2.governance_preflight preflight --root "$CUSTODY_ROOT"` prints `Governance preflight passed`.
-- **If a step was interrupted:** rerun the same `publish` with the same file. The publisher reconciles a half-finished publication from the retained archive and never lowers the high-water.
+- **If a step was interrupted:** rerun the same `publish` with the same signed file. The high-water record is rebuilt with identical bytes, so the publisher resumes a staged attempt or confirms a complete one.
+- **If only the public copies are behind** (for example, the host stopped after retention), `sudo -E uv run python -m scripts.r2.governance_ceremony reconcile --root "$CUSTODY_ROOT"` republishes them from the retained archive.
+
+  Neither path ever lowers the high-water.
 
 ## 7. Run the startup attestor (host)
 
@@ -174,10 +177,21 @@ Add to the `arcreel` service in `docker-compose.yml`:
       ARCREEL_GOVERNANCE_READ_DIR: /governance/read
       ARCREEL_GOVERNANCE_ATTESTOR_DIR: /governance/attestor
     volumes:
-      - /srv/arcreel-governance/read:/governance/read:ro
-      - /run/arcreel-attestor:/governance/attestor:ro
+      - type: bind
+        source: /srv/arcreel-governance/read
+        target: /governance/read
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /run/arcreel-attestor
+        target: /governance/attestor
+        read_only: true
+        bind:
+          create_host_path: false
 ```
 
+- The long bind syntax with `create_host_path: false` makes a missing host path fail instead of being created empty.
 - Never mount `archive/` or any key.
 - Setting only one of the two variables refuses startup; setting neither keeps normal mode.
 - In activated mode the application does **not** run automatic database migrations. Migrate offline before starting.
@@ -188,12 +202,16 @@ Add to the `arcreel` service in `docker-compose.yml`:
 
 ## 9. Backup and restore drill
 
-The archive is part of the system of record. Back up `CUSTODY_ROOT` with the database, in the same offline window as the M7 backup ([m7-backup-restore.md](m7-backup-restore.md)).
+The archive is the anti-rollback witness, not ordinary application data. Keep it with an **independent** custodian from the database backup: a separate backup target, written append-only after every `enroll` and `publish`.
+
+**Never restore an older archive together with an older database.** A coherent old pair (say, from before a REVOKE) passes the preflight and brings the revoked grant back to life.
+
+On a database restore, always keep the **newest** independently retained archive. If the restored database lacks grants that archive records, the application refuses to start. Recover by re-importing the newer signed events in order, or treat it as an incident; never by restoring the archive to match the database.
 
 **Drill, on a scratch host:**
-1. Restore the database and the archive from the same set. Run `governance_preflight preflight`; it passes.
-2. Restore an **older** database with the **current** archive. The preflight and an activated application start must both refuse (the database lacks grants the archive records).
-3. Restore the archive alone to an older copy than the database. This also refuses. Recover with the newest retained archive; never hand-edit the high-water.
+1. Restore the database from its latest backup and the archive from its independent copy, both at their newest state. `governance_preflight preflight` passes.
+2. Restore an **older** database with the **newest** archive. The preflight and an activated application start must both refuse.
+3. Re-import the newer signed events in order (`import-event`), then run the preflight again. It passes without a new checkpoint, because the database now matches the newest one.
 
 Record the commands and outcomes as deployment evidence. ADR-0103 activation is not proven until this drill has passed on the real host.
 

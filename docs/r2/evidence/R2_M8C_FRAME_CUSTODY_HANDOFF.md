@@ -1444,3 +1444,35 @@ No new review round was opened: these repairs are narrow, and each has a failing
 **Not exercised in the browser:**
 - review, analyze, promote, generate and approve, which need activated governance and providers;
 - frame derivation with a `command_id` other than the page's own formula, which conflicts by design (a frame keeps one receipt).
+
+## Packet 7 independent review by Codex and repairs — 2026-10-14 (Claude session)
+
+A Codex agent reviewed `387dd190` read-only by source trace and reported 9 findings. Each was verified by the main agent and repaired.
+
+1. **High: the runbook restored the database and the archive "from the same set".** A coherent pre-REVOKE pair passes the preflight and revives the revoked grant.
+   - **Repair:** the archive is an independently custodied, append-only witness. A database restore always keeps the newest archive and re-imports the retained signed events. The drill now tests exactly that.
+2. **High (plausible): Windows key files had no ACL enforcement.**
+   - **Repair:** `keygen` and every private-key use refuse on non-POSIX platforms.
+3. **Medium: the `publish` retry could not resume.** It read through the strict reader, and a rebuilt high-water carried a new timestamp.
+   - **Repair:** the high-water `recorded_at` is the checkpoint issue time, so a retry rebuilds identical bytes. The predecessors are read directly under the publisher lock, and `publish_candidate_archive` resumes or confirms the attempt. A `reconcile` command republishes stale public copies.
+4. **Medium: genesis was retained before full verification, with an unfenced empty-ledger check.**
+   - **Repair:** the approval↔registry↔genesis binding and `verify_governance_schema_ready` run before any write. The exclusive grant fence is held from the ledger check until the genesis files are durable.
+5. **Medium: tree creation followed ancestor symlinks, the parent was not fsynced, and there was no recovery path.**
+   - **Repair:** the tree is created through no-follow directory descriptors, and the parent is fsynced. The runbook moves an interrupted partial tree aside and re-enrolls (the ledger is still empty).
+6. **Medium: import trusted the public registry file.**
+   - **Repair:** import takes the registry from the locked, verified archive snapshot.
+7. **Medium: database errors escaped CLI sanitization.**
+   - **Repair:** the CLI boundary catches every exception and prints only its category.
+8. **Low: the mount examples used short bind syntax.**
+   - **Repair:** they now use long syntax with `create_host_path: false`.
+9. **Low: a REVOKE silently dropped `expires_at`.**
+   - **Repair:** it is now refused.
+
+**Tests added:**
+- A publication interrupted at `checkpoint:file_written`, `high_water:file_written` or `public_checkpoint:renamed` completes when the same file is published again, at a later wall-clock time, and a further retry is identical. Mutation: a wall-clock `recorded_at` fails 2 of the 3 cases. The checkpoint-phase case has no high-water bytes yet, so any time works there.
+- An unbound approval is refused before the root exists, and a swapped public registry makes import refuse.
+- CLI: a REVOKE with an expiry is refused, and an unexpected error prints only `Governance ceremony refused: RuntimeError`.
+
+**Verification:**
+- PostgreSQL 18: `tests/integration/r2/governance`, `tests/unit/r2/governance` and `tests/unit/scripts/r2` give 470 passed, 4 skipped, 2 failed. The failures are the same two actual-lifespan tests as before, a local-environment issue.
+- Static gates are clean. The full-suite hook was reformatted with no behaviour change.

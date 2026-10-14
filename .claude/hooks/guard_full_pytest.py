@@ -13,8 +13,25 @@ import sys
 
 # Options whose next token is their value, not a test path.
 _VALUED = {
-    "-n", "--numprocesses", "--dist", "-k", "-m", "-p", "-c", "-o", "--deselect", "--ignore", "--ignore-glob",
-    "--timeout", "--rootdir", "--basetemp", "--durations", "--maxfail", "--tb", "-W", "--confcutdir",
+    "-n",
+    "--numprocesses",
+    "--dist",
+    "-k",
+    "-m",
+    "-p",
+    "-c",
+    "-o",
+    "--deselect",
+    "--ignore",
+    "--ignore-glob",
+    "--timeout",
+    "--rootdir",
+    "--basetemp",
+    "--durations",
+    "--maxfail",
+    "--tb",
+    "-W",
+    "--confcutdir",
 }
 _WHOLE = {"tests", "tests/", ".", "./"}
 

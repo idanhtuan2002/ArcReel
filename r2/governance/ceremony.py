@@ -202,6 +202,8 @@ def sign_grant_event(
         "issued_at": issued,
         "signer_key_id": signer_key_id,
     }
+    if event_type == "REVOKE" and expires_at is not None:
+        raise CeremonyInvalid("a REVOKE takes no expires_at")
     if event_type == "ISSUE":
         if expires_at is None:
             raise CeremonyInvalid("an ISSUE needs expires_at")

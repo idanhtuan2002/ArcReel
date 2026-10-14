@@ -39,10 +39,17 @@ from server.services.governance_ceremony import (
     import_grant_event,
     next_checkpoint_body,
     publish_signed_checkpoint,
+    reconcile,
 )
 
 OFFLINE = ("keygen", "registry", "approve", "genesis-body", "sign-checkpoint", "sign-event")
-HOST = ("enroll", "import-event", "next-body", "publish")
+HOST = ("enroll", "import-event", "next-body", "publish", "reconcile")
+
+
+def _require_posix_key_custody() -> None:
+    """Key files rely on POSIX modes; other platforms cannot guarantee a private key stays private."""
+    if os.name != "posix":
+        raise CeremonyInvalid("signing keys are supported only on a POSIX signing machine")
 
 
 def _write_new(path: Path, raw: bytes, mode: int = 0o644) -> None:
@@ -67,7 +74,8 @@ def _text(path: Path) -> str:
 
 
 def _private_key(path: Path) -> bytes:
-    if os.name == "posix" and path.stat().st_mode & 0o077:
+    _require_posix_key_custody()
+    if path.stat().st_mode & 0o077:
         raise CeremonyInvalid("the private key file must not be readable by group or others")
     return decode_public_key(_text(path))  # the same 32-byte base64url encoding
 
@@ -121,6 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("import-event", "import one signed grant event"),
         ("next-body", "export the unsigned next checkpoint body"),
         ("publish", "retain and publish one signed successor checkpoint"),
+        ("reconcile", "republish the public pair from the retained archive"),
     ):
         host = commands.add_parser(name, help=help_text)
         host.add_argument("--root", type=Path, required=True)
@@ -139,6 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
 def run_offline(args: argparse.Namespace) -> str:
     command = cast(str, args.command)
     if command == "keygen":
+        _require_posix_key_custody()
         pair = generate_key()
         encoded = public_key_of(pair.private_raw)
         _write_new(args.private, (_b64(pair.private_raw) + "\n").encode(), 0o600)
@@ -222,6 +232,9 @@ async def run_host(args: argparse.Namespace) -> str:
         if args.command == "next-body":
             _write_new(args.out, await next_checkpoint_body(root, session_factory=sessions))
             return "next checkpoint body written; sign it offline"
+        if args.command == "reconcile":
+            result = await reconcile(root, session_factory=sessions)
+            return f"reconciled; checkpoint sequence {result.snapshot.high_water.checkpoint_sequence}"
         result = await publish_signed_checkpoint(
             root, _read(args.checkpoint), operator_id=args.operator_id, session_factory=sessions
         )
@@ -234,8 +247,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         message = asyncio.run(run_host(args)) if args.command in HOST else run_offline(args)
-    except (CeremonyInvalid, ValueError, OSError) as error:
-        # Sanitized: a category, never a key, path content or database detail.
+    except Exception as error:
+        # Sanitized: a category, never a key, path content, SQL or database detail.
         print(f"Governance ceremony refused: {type(error).__name__}", file=sys.stderr)
         return 1
     print(message)
