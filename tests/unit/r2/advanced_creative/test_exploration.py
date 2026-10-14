@@ -301,7 +301,7 @@ async def _noop() -> None:
 
 async def test_only_a_format_slot_at_version_zero_may_start_without_a_master() -> None:
     world = _World(_revision())
-    world.master = None  # type: ignore[assignment]
+    world.master = None
 
     genesis = await _preview(world, _target(target_ref="m8-format:abc:square@1", expected_target_version=0))
     assert (genesis.expected_master_id, genesis.expected_master_digest) == (None, None)
@@ -319,7 +319,7 @@ async def test_only_a_format_slot_at_version_zero_may_start_without_a_master() -
 
 def _World_without_master() -> _World:
     world = _World(_revision())
-    world.master = None  # type: ignore[assignment]
+    world.master = None
     return world
 
 
