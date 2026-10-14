@@ -84,7 +84,7 @@ def test_one_head_and_the_exact_parent(alembic_cfg: tuple[Config, Path]) -> None
     cfg, _ = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
 
-    assert script.get_heads() == ["916c4a0e0001"]
+    assert script.get_heads() == ["917c4a0e0001"]
     assert script.get_revision("8a8c4a0e0001").down_revision == "c9e1f4a2b701"
 
 

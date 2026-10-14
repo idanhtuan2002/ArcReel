@@ -19,6 +19,7 @@ pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ff
 
 
 def make_source(path: Path, *, width: int = 1280, height: int = 720, audio: bool = True, seconds: int = 2) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     argv = [
         "ffmpeg",
         "-nostdin",

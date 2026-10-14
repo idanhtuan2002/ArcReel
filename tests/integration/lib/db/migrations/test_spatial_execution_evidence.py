@@ -16,7 +16,7 @@ TABLE = "m8_spatial_execution_evidence"
 def test_evidence_migration_has_scoped_restrict_keys_and_downgrades_alone(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["916c4a0e0001"]
+    assert script.get_heads() == ["917c4a0e0001"]
     assert script.get_revision("8c8c4a0e0001").down_revision == "8b8c4a0e0001"
 
     command.upgrade(cfg, "head")

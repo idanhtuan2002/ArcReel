@@ -132,6 +132,8 @@ class M8PromotionPreviewModel(_EvidenceOwner, Base):
         CheckConstraint("ttl_seconds > 0 AND ttl_seconds <= 3600", name="ck_m8_promotion_previews_ttl"),
         CheckConstraint(
             "(target_kind = 'ARTIFACT_SLOT' AND expected_master_id IS NOT NULL AND expected_master_digest IS NOT NULL)"
+            " OR (target_kind = 'ARTIFACT_SLOT' AND expected_master_id IS NULL AND expected_master_digest IS NULL"
+            " AND expected_target_version = 0 AND target_ref LIKE 'm8-format:%')"
             " OR (target_kind = 'PRODUCTION_BINDING' AND expected_master_id IS NULL"
             " AND expected_master_digest IS NULL)",
             name="ck_m8_promotion_previews_master_coupling",
