@@ -194,4 +194,21 @@ describe("Formats page", () => {
       expected_candidate_head_version: 1,
     });
   });
+
+  it("retries a render with the same command after an unknown outcome and with a new one after a refusal", async () => {
+    const outcomes = [json({ detail: "server error" }, 500), json({ detail: "render failed" }, 409)];
+    routes["/plans/square-pad-1/renders"] = () => outcomes.shift() ?? json({ execution_id: "exec-2", plan_id: "square-pad-1", artifact_digest: "sha256:b", replayed: false });
+    render(<FormatsPage projectName="demo" />);
+    const card = await screen.findByRole("article");
+    const renderButton = () => within(within(card).getByRole("list")).getAllByRole("button")[0];
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await waitFor(() => expect(renderButton()).toBeEnabled());
+      fireEvent.click(renderButton());
+      await waitFor(() => expect(posted("/plans/square-pad-1/renders")).toHaveLength(attempt));
+    }
+    const commands = posted("/plans/square-pad-1/renders").map((body) => body.command_id);
+    expect(commands[1]).toBe(commands[0]);
+    expect(commands[2]).not.toBe(commands[1]);
+  });
 });

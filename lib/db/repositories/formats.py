@@ -24,6 +24,8 @@ from lib.db.models.formats import (
 from r2.advanced_creative.digests import digest_canonical
 from r2.advanced_creative.errors import FormatConflictError, FormatNotFoundError
 from r2.advanced_creative.formats import (
+    SINGLE_REVIEWER_DEVIATION,
+    FormatInvalidError,
     overlay_digest,
     profile_digest,
     validate_output_profile,
@@ -57,6 +59,8 @@ class FormatRepository:
 
         Report writers take it before appending and evidence readers before reading, so a promotion
         that verified the latest reports commits before any later report of that plan is appended.
+        Lock order: a caller that also locks the plan's exploration candidate head locks that head
+        first, as preview and promotion do.
         """
         if self.session.get_bind().dialect.name == "postgresql":
             key = f"m8-format-reports:{user_id}:{project_name}:{plan_id}"
@@ -252,6 +256,18 @@ class FormatRepository:
                 return None
             latest.append(contract.model_validate(row.report_json))
         technical, semantic = latest
+        assert isinstance(semantic, SemanticParityReport)
+        plan = await self.get_plan(user_id=user_id, project_name=project_name, plan_id=plan_id)
+        if plan is None:
+            return None
+        try:
+            # A stored pass counts only if it still meets the current rules (every review names
+            # the showrunner grant that authorized its reviewer).
+            validate_semantic_report(
+                semantic, plan, deviation=SINGLE_REVIEWER_DEVIATION if len(semantic.reviews) < 2 else None
+            )
+        except FormatInvalidError:
+            return None
         assert isinstance(technical, TechnicalValidationReport)
         assert isinstance(semantic, SemanticParityReport)
         return technical, semantic

@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.db.models.formats import FormatReviewPacketModel
-from lib.db.repositories.formats import FormatRepository
+from lib.db.models.formats import FormatReviewPacketModel, FormatSemanticReportModel
+from lib.db.repositories.formats import FormatRepository, report_digest
 from r2.advanced_creative.errors import FormatConflictError, FormatNotFoundError
 from r2.advanced_creative.formats import SEMANTIC_ITEMS, FormatInvalidError
+from r2.contracts.advanced_creative import CanonicalJsonObject, SemanticParityReport
 from server.services.format_render import ffmpeg_available, file_digest
 from server.services.format_review import FormatReviewService
-from server.services.format_validation import media_facts
+from server.services.format_validation import FormatValidationService, media_facts
 from server.services.governance_grants import CurrentShowrunnerGrantReader, ShowrunnerGrantUnavailableError
 from tests.integration.server.routers.spatial_approval_support import showrunner_grants
 from tests.integration.server.services.test_format_validation import PROJECT, USER, _render
@@ -258,3 +261,103 @@ async def test_a_review_waits_for_a_concurrent_review_and_aggregates_it(
     report = await waiter
     assert [review.model_dump(mode="python")["reviewer_id"] for review in report.reviews] == ["a", "b"]
     assert (report.material_disagreement, report.passed) == (True, False)
+
+
+def _video_stream_md5(path: Path) -> str:
+    result = subprocess.run(
+        ["ffmpeg", "-nostdin", "-v", "error", "-i", str(path), "-map", "0:v:0", "-c", "copy", "-f", "md5", "-"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+async def test_review_copies_share_no_compressed_stream_with_the_recorded_files(
+    session_factory: Factory, tmp_path: Path
+) -> None:
+    source, result = await _render(session_factory, tmp_path)
+    service = FormatReviewService(session_factory, grants=await granted(session_factory, "sponsor"))
+    packet = await _open(service, tmp_path, result.execution_id)
+    recorded = {_video_stream_md5(source), _video_stream_md5(result.artifact_path)}
+    for label in ("A", "B"):
+        path, _digest = await service.clip(
+            user_id=USER,
+            project_name=PROJECT,
+            project_dir=tmp_path,
+            packet_id=packet.packet_id,
+            label=label,
+            reviewer_id="sponsor",
+        )
+        assert _video_stream_md5(path) not in recorded
+
+
+async def test_a_review_recorded_without_a_grant_is_neither_evidence_nor_aggregated(
+    session_factory: Factory, tmp_path: Path
+) -> None:
+    _source, result = await _render(session_factory, tmp_path)
+    service = FormatReviewService(session_factory, grants=await granted(session_factory, "sponsor", "legacy"))
+    legacy = await _open(service, tmp_path, result.execution_id, reviewer="legacy")
+    # A review and a passing report as stored before reviews named their grant.
+    legacy_review = {"reviewer_id": "legacy", "items": {**ALL_PASS, "audio": "FAIL"}, "note": ""}
+    async with session_factory() as session, session.begin():
+        row = await session.get(FormatReviewPacketModel, (USER, PROJECT, legacy.packet_id))
+        assert row is not None
+        row.review_json = legacy_review
+        plan = await FormatRepository(session).get_plan(user_id=USER, project_name=PROJECT, plan_id="plan-1")
+        assert plan is not None
+        report = SemanticParityReport(
+            report_id="sem-legacy",
+            plan_digest=plan.plan_digest,
+            source_master_digest=plan.source_master_digest,
+            artifact_digest=result.artifact_digest,
+            rubric_version="format-semantic@1",
+            reviews=(CanonicalJsonObject.model_validate({"reviewer_id": "legacy", "items": ALL_PASS}),),
+            material_disagreement=False,
+            passed=True,
+        )
+        session.add(
+            FormatSemanticReportModel(
+                sequence=1,
+                user_id=USER,
+                project_name=PROJECT,
+                report_id=report.report_id,
+                plan_id="plan-1",
+                artifact_digest=result.artifact_digest,
+                report_json=report.model_dump(mode="json"),
+                report_digest=report_digest(report),
+                reviewer_count=1,
+                deviation=None,
+                passed=True,
+                created_at=datetime.now(UTC),
+            )
+        )
+    technical = await FormatValidationService(session_factory).validate(
+        user_id=USER,
+        project_name=PROJECT,
+        project_dir=tmp_path,
+        execution_id=result.execution_id,
+        source=tmp_path / "master.mp4",
+    )
+    assert technical.passed
+    async with session_factory() as session:
+        assert (
+            await FormatRepository(session).passing_reports(
+                user_id=USER, project_name=PROJECT, plan_id="plan-1", artifact_digest=result.artifact_digest
+            )
+            is None
+        )
+
+    fresh = await _open(service, tmp_path, result.execution_id)
+    aggregated = await service.submit(
+        user_id=USER, project_name=PROJECT, packet_id=fresh.packet_id, reviewer_id="sponsor", items=ALL_PASS, note=""
+    )
+    assert [review.model_dump(mode="python")["reviewer_id"] for review in aggregated.reviews] == ["sponsor"]
+    assert aggregated.passed
+    async with session_factory() as session:
+        assert (
+            await FormatRepository(session).passing_reports(
+                user_id=USER, project_name=PROJECT, plan_id="plan-1", artifact_digest=result.artifact_digest
+            )
+            is not None
+        )

@@ -237,9 +237,11 @@ class FormatRenderService:
             if recorded.plan_id != plan_id:
                 raise FormatConflictError("this render command already rendered another plan")
             path = project_dir / recorded.artifact_ref
-            if not path.is_file():
-                raise FormatMediaMissingError("the recorded output is missing; render with a new command")
-            if await asyncio.to_thread(file_digest, path) != recorded.artifact_digest:
+            try:
+                on_disk = await asyncio.to_thread(file_digest, path)
+            except (FileNotFoundError, IsADirectoryError) as error:
+                raise FormatMediaMissingError("the recorded output is missing; render with a new command") from error
+            if on_disk != recorded.artifact_digest:
                 raise FormatConflictError("the recorded output changed; render with a new command")
             return RenderResult(recorded.execution_id, recorded.artifact_digest, path, replayed=True)
 

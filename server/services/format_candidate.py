@@ -140,6 +140,10 @@ async def prepare_format_candidate(
         raise FormatConflictError("the rendered projection changed or is not a valid candidate") from error
 
     async with sessions() as session, session.begin():
+        # Lock order shared with preview and promotion: the candidate head, then the plan's reports.
+        await ExplorationRepository(session).get_head(
+            user_id=user_id, project_name=project_name, candidate_id=f"format:{plan.plan_id}", for_update=True
+        )
         await FormatRepository(session).lock_plan_reports(
             user_id=user_id, project_name=project_name, plan_id=plan.plan_id
         )

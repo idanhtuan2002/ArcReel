@@ -253,16 +253,39 @@ def disposition(ok: bool, improved: bool = False) -> str:
     return "IMPROVED" if improved and ok else ("PARITY" if ok else "EXCLUDED")
 
 
+def _tree_state(root: Path) -> dict[str, str]:
+    """Every file under ``root`` with its content hash, and every directory with its mtime."""
+    state: dict[str, str] = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_dir():
+            state[relative + "/"] = str(path.stat().st_mtime_ns)
+        elif path.is_file():
+            state[relative] = sha256_file(path)
+    state["./"] = str(root.stat().st_mtime_ns)
+    return state
+
+
 def measure_refusals(clone: Path, work: Path, missing: Path, plan) -> dict:
-    """Run both sides RUNS times on a source that does not exist and measure every refusal."""
-    before = {path.name: path.stat().st_size for path in work.iterdir() if path.is_file()}
-    donor_out, r2_out = work / "donor-missing.mp4", work / "r2-missing.mp4"
+    """Run both sides RUNS times on a source that does not exist and measure every refusal.
+
+    Each side writes into its own fresh, empty output directory. A file created and deleted there
+    still changes the directory's mtime; a rewrite of an existing work file changes its hash.
+    """
+    donor_dir, r2_dir = work / "refusal-donor", work / "refusal-r2"
+    for directory in (donor_dir, r2_dir):
+        directory.mkdir()
+    # Directory mtimes have coarse granularity on some filesystems; wait so a write is visible.
+    time.sleep(0.05)
+    before = _tree_state(work)
+    donor_out, r2_out = donor_dir / "out.mp4", r2_dir / "out.mp4"
     donor_runs, r2_runs = [], []
     for _attempt in range(RUNS):
         donor_runs.append(donor_render(clone, missing, donor_out, 1080, 1080, "pad"))
         r2_runs.append(r2_render(plan, missing, r2_out))
-    after = {path.name: path.stat().st_size for path in work.iterdir() if path.is_file()}
-    new_files = {name: size for name, size in after.items() if name not in before}
+    after = _tree_state(work)
+    changed = sorted(key for key in set(before) | set(after) if before.get(key) != after.get(key))
+    new_files = [work / key for key in after if key not in before and not key.endswith("/")]
     donor_reasons = [error.replace(str(work), "<work>").strip()[-160:] for _ok, _t, error in donor_runs]
     r2_reasons = [error.replace(str(work), "<work>").strip()[-160:] for _ok, _t, error in r2_runs]
     return {
@@ -273,9 +296,10 @@ def measure_refusals(clone: Path, work: Path, missing: Path, plan) -> dict:
         "r2_succeeded": any(ok for ok, _t, _e in r2_runs) or r2_out.exists(),
         "donor_reasons_stable": len(set(donor_reasons)) == 1,
         "r2_reasons_stable": len(set(r2_reasons)) == 1,
-        "outputs_left": donor_out.exists() or r2_out.exists() or any(name.endswith(".partial.mp4") for name in after),
-        "work_changed": before != after,
-        "bytes_written": sum(new_files.values()),
+        "outputs_left": any(donor_dir.iterdir()) or any(r2_dir.iterdir()),
+        "work_changed": bool(changed),
+        "changed_paths": changed,
+        "bytes_written": sum(path.stat().st_size for path in new_files if path.is_file()),
         "donor_max_s": round(max(t for _ok, t, _e in donor_runs), 3),
         "r2_max_s": round(max(t for _ok, t, _e in r2_runs), 3),
         "donor_reason_given": all(reason for reason in donor_reasons),
@@ -416,14 +440,14 @@ def main() -> int:
         "determinism": refusals["donor_reasons_stable"] and refusals["r2_reasons_stable"],
         # No output or partial file remains at either output path.
         "failure_safety": not refusals["outputs_left"],
-        # The work directory holds exactly the files it held before the refusals.
+        # No file or directory in the work tree was created, removed, rewritten or touched.
         "data_integrity": not refusals["work_changed"],
         # The donor gives a reason, and R2's reason names the missing file.
         "observability": observable,
         # Each refusal returns within the pre-set bound.
         "performance": refusals["donor_max_s"] <= REFUSAL_SECONDS_MAX and refusals["r2_max_s"] <= REFUSAL_SECONDS_MAX,
-        # No bytes are written.
-        "resources": refusals["bytes_written"] == 0,
+        # No bytes are written, not even transiently: the fresh output directories were never touched.
+        "resources": refusals["bytes_written"] == 0 and not refusals["work_changed"],
     }
     rows.append(
         {

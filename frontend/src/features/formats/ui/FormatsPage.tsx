@@ -9,6 +9,8 @@ import "./formats.css";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ApiRequestError } from "@/api";
+
 import {
   approvePromotion,
   boxFromPercent,
@@ -360,11 +362,29 @@ function PlanCard({ projectName, summary, onChanged }: { projectName: string; su
   const { busy, error, run } = useStep();
   const [reviewing, setReviewing] = useState(false);
   const [candidate, setCandidate] = useState<PreparedCandidate | null>(null);
+  const renderCommand = useRef<string | null>(null);
 
   async function prepare() {
     if (!latest) return;
     const prepared = await run((signal) => prepareCandidate(projectName, latest.execution_id, { signal }), t("formats_candidate_failed"));
     if (prepared) setCandidate(prepared);
+  }
+
+  async function renderOnce(signal: AbortSignal) {
+    // A render whose outcome is unknown (network failure or server error) is retried with the same
+    // command, which the server completes or replays; a refusal or a success starts a new command next.
+    const command = renderCommand.current ?? crypto.randomUUID();
+    renderCommand.current = command;
+    try {
+      const rendered = await renderPlan(projectName, plan.plan_id, command, { signal });
+      renderCommand.current = null;
+      return rendered;
+    } catch (failure: unknown) {
+      if (failure instanceof ApiRequestError && failure.status !== undefined && failure.status < 500) {
+        renderCommand.current = null;
+      }
+      throw failure;
+    }
   }
 
   async function step<T>(action: (signal: AbortSignal) => Promise<T>, fallback: string) {
@@ -399,7 +419,7 @@ function PlanCard({ projectName, summary, onChanged }: { projectName: string; su
             type="button"
             className="fm-btn"
             disabled={busy}
-            onClick={() => void step((signal) => renderPlan(projectName, plan.plan_id, crypto.randomUUID(), { signal }), t("formats_render_failed"))}
+            onClick={() => void step(renderOnce, t("formats_render_failed"))}
           >
             {latest ? t("formats_render_again") : t("formats_render")}
           </button>

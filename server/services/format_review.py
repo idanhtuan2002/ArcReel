@@ -5,9 +5,9 @@ review; the grant event digest is recorded on the packet and in the review, so t
 sponsor deviation is bound to that authorized principal.
 
 A packet covers one succeeded render: the source master and the projection, labelled A and B in an
-order the server draws and keeps. The reviewer is served two per-packet review copies, remuxed from
-verified snapshots with metadata stripped and a random per-packet tag, so neither copy carries the
-bytes, digest, name or timestamps of a recorded file. What blindness cannot hide is what the clips
+order the server draws and keeps. The reviewer is served two per-packet review copies, re-encoded
+with identical settings from verified snapshots, with metadata stripped and a random per-packet tag,
+so neither copy carries the bytes, compressed streams, digest, name or timestamps of a recorded file. What blindness cannot hide is what the clips
 show: the projection has the target's shape. After each review the service appends a semantic report
 over every reviewer's review of that plan and artifact, serialized per plan.
 """
@@ -88,7 +88,7 @@ class FormatReviewService:
         return event.event_digest
 
     async def _neutral_copy(self, snapshot: Path, destination: Path) -> str:
-        """A stream copy of ``snapshot`` without container metadata, tagged with a random value."""
+        """A re-encoded copy of ``snapshot`` without container metadata, tagged with a random value."""
         command = [
             self._ffmpeg,
             "-nostdin",
@@ -100,8 +100,20 @@ class FormatReviewService:
             "0:v:0",
             "-map",
             "0:a?",
-            "-c",
-            "copy",
+            # Both clips are re-encoded with the same settings, so neither keeps the compressed
+            # streams of a recorded file.
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "160k",
             "-map_metadata",
             "-1",
             "-map_chapters",
@@ -242,17 +254,19 @@ class FormatReviewService:
             if packet.review_json is not None:
                 raise FormatConflictError("this packet already has its review")
             model = FormatReviewPacketModel
-            earlier = await session.scalar(
-                select(model.packet_id).where(
-                    model.user_id == user_id,
-                    model.project_name == project_name,
-                    model.plan_id == packet.plan_id,
-                    model.artifact_digest == packet.artifact_digest,
-                    model.reviewer_id == reviewer_id,
-                    model.review_json.is_not(None),
+            earlier = (
+                await session.scalars(
+                    select(model).where(
+                        model.user_id == user_id,
+                        model.project_name == project_name,
+                        model.plan_id == packet.plan_id,
+                        model.artifact_digest == packet.artifact_digest,
+                        model.reviewer_id == reviewer_id,
+                        model.review_json.is_not(None),
+                    )
                 )
-            )
-            if earlier is not None:
+            ).all()
+            if any(row.review_json and row.review_json.get("grant_event_digest") for row in earlier):
                 raise FormatConflictError("this reviewer already reviewed this projection")
             packet.review_json = {
                 "reviewer_id": reviewer_id,
@@ -284,7 +298,9 @@ class FormatReviewService:
                     "items": row.review_json["items"],
                 }
                 for row in reviewed
-                if row.review_json is not None
+                # A review recorded without a grant (before grants were required) is not authorized
+                # evidence and is not aggregated.
+                if row.review_json is not None and row.review_json.get("grant_event_digest")
             ]
             per_item = {item: {review["items"][item] for review in reviews} for item in SEMANTIC_ITEMS}
             disagreement = any(len(verdicts) > 1 for verdicts in per_item.values())

@@ -35,7 +35,7 @@ from lib.db.repositories.formats import FormatRepository
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.project_manager import get_project_manager
 from r2.advanced_creative.digests import digest_canonical
-from r2.advanced_creative.errors import ExplorationNotFoundError, FormatNotFoundError, M8Error
+from r2.advanced_creative.errors import ExplorationNotFoundError, FormatMediaMissingError, FormatNotFoundError, M8Error
 from r2.advanced_creative.formats import SEMANTIC_ITEMS, SEMANTIC_RUBRIC, Box, ReframeKind, parse_source_master_id
 from r2.contracts.advanced_creative import (
     FormatProjectionPlan,
@@ -93,6 +93,9 @@ async def _run[T](operation: Callable[[], Awaitable[T]]) -> T:
         return await operation()
     except (M8Error, ValueError, PermissionError) as error:
         raise _api_error(error) from error
+    except FileNotFoundError as error:
+        # A media file removed between a check and its use is the same conflict as one found missing.
+        raise ConflictError(FormatMediaMissingError.code) from error
 
 
 def _project_dir(project_name: str):

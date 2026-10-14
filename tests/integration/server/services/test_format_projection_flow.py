@@ -8,8 +8,10 @@ from fractions import Fraction
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.db.repositories.advanced_creative import ExplorationRepository
 from lib.db.repositories.formats import FormatRepository
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from r2.advanced_creative.digests import digest_canonical
@@ -334,3 +336,41 @@ async def test_two_projections_racing_for_a_new_format_slot_promote_exactly_one(
 async def _dialect(factory: Factory) -> str:
     async with factory() as probe:
         return probe.get_bind().dialect.name
+
+
+async def wait_for_any_lock_waiter(factory: Factory) -> None:
+    async with asyncio.timeout(10):
+        while True:
+            async with factory() as observer:
+                waiting = await observer.scalar(text("SELECT count(*) FROM pg_locks WHERE NOT granted"))
+            if waiting:
+                return
+            await asyncio.sleep(0.01)
+
+
+async def test_preparing_a_revision_takes_locks_in_the_promotion_order(
+    concurrent_session_factory: Factory, tmp_path: Path
+) -> None:
+    factory = concurrent_session_factory
+    if (await _dialect(factory)) != "postgresql":
+        pytest.skip("requires PostgreSQL row and advisory locks")
+    source = make_source(tmp_path / "masters" / "episode.mp4")
+    await _seed_master(factory, tmp_path, source, "a")
+    plan = await _plan(factory, tmp_path, source, version=1)
+    first = await _reviewed_render(factory, tmp_path, source, plan.plan_id, "r-1")
+    await _prepare(factory, tmp_path, first.execution_id)
+    # A second render of the same plan reuses the passing reports but needs a new candidate revision.
+    second = await render_service(factory).render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id=plan.plan_id, source=source, command_id="r-2"
+    )
+
+    # A promotion holds the candidate head and then asks for the plan's report lock.
+    async with factory() as holder, holder.begin():
+        await ExplorationRepository(holder).get_head(
+            user_id=USER, project_name=PROJECT, candidate_id=f"format:{plan.plan_id}", for_update=True
+        )
+        preparing = asyncio.create_task(_prepare(factory, tmp_path, second.execution_id))
+        await wait_for_any_lock_waiter(factory)
+        await FormatRepository(holder).lock_plan_reports(user_id=USER, project_name=PROJECT, plan_id=plan.plan_id)
+    prepared = await preparing
+    assert prepared.revision == 2
