@@ -1226,3 +1226,33 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 - `duration_seconds` is the profile's duration, not probed. Gate C's readable-media check still runs on the staged bytes.
 - There is no frontend UI. Multi-episode R2 projects are out of scope.
 - Self-review only, as the sponsor chose for M8-C.
+
+## M8-C vertical acceptance test — 2026-10-14 (Claude session)
+
+**Base:** `r2-v2/main` `bad83b80` (packets 1–4 merged). **Branch:** `test/r2-m8c-vertical-acceptance`.
+
+**Observable outcome.** `tests/integration/server/routers/test_m8c_vertical_acceptance.py` runs one offline chain on real persisted rows and media bytes, with fake vision (Gemini) and video (DashScope Wan) providers. No step writes the next step's input directly:
+1. Signed grant import → review session (frame fetch and acknowledge) → V2 pair APPROVE of a LOCATION binding (version 1). Services, as in `spatial_approval_support.py`.
+2. `SpatialExecutionService` analyzes the approved pair's exact frame receipts into one evidence-bound candidate revision (VISIBLE, INFERRED and GAP assertions).
+3. `SpatialPromotionService` previews the two VISIBLE assertions and promotes binding version 2 under the human authorization. The current snapshot carries the verified constraint set.
+4. `POST /r2/shots/{target}/generate` admits the promoted snapshot and queues one task bound to its digest.
+5. The worker submits once. The prompt carries both VISIBLE constraints and not the INFERRED one. The worker seals the output digest.
+6. `POST /gates/r2-shots/{target}` approves the sealed output as `episode_video(1, target)`.
+7. `verify_masters` returns the new master as a verified head, so spatial frame sources can read it.
+8. A generation naming a stale snapshot digest is refused (409).
+
+`shots_client` moved from `test_r2_shots_route.py` into the routers `conftest.py`, unchanged except for the offline builder's name.
+
+**Verification on the branch:**
+- SQLite: the vertical test plus the shot route, Gate C, worker and promotion files give 17 passed, 1 skipped (the PostgreSQL-only test).
+- PostgreSQL 18 (disposable container): the same selection gives 18 passed.
+- SQLite, the whole `tests/integration/server/routers` directory (the shared `conftest.py` changed): 862 passed, 8 skipped.
+- ruff, format, basedpyright (0/0 on the changed files), lint-imports (22 kept) and `audit_tests --check` are clean.
+
+**Findings (not fixed here):**
+- **F1, frame distinctness.** LOCATION binding creation and V2 pair APPROVE accept two distinct receipts whose decoded frames are byte-identical; the existing `_current_binding` fixture builds exactly that (two black masters). `SpatialExecutionService` then refuses with "MASTER and REVERSE must be distinct frame bytes", so such an approved pair is a dead end. The specs require distinct receipts only. Deciding whether binding or pair admission should also require distinct frame content is a spec change. The vertical test uses red and blue masters.
+- **F2, no application path for the human steps.** Location binding creation, the review session, the V2 pair decision and the spatial promotion have no HTTP route. `server/app.py` constructs the review, pair reader and pair decision services only when governance is activated (ADR-0103), and never constructs `SpatialPromotionService`. It also passes `projects_root` as their `project_dir`, while `SpatialFrameReader` reads `<project_dir>/spatial/frames/`; nothing uses these app-state services yet, so this is latent. The chain above is therefore runnable in-process, not from the app or UI.
+
+**State:** integration candidate (implemented, integrated, demonstrated offline; self-review only). Full M8-C acceptance still needs ADR-0103 activation by an operator, the HTTP/UI path for the human steps (F2), and the independent review the M8-C spec names; M8-D stays gated on it.
+
+**Next:** design the application routes for binding creation, review, pair decision and promotion (a public contract and authority seam: research, ADR/spec, then implementation), resolving F1 and F2 there.

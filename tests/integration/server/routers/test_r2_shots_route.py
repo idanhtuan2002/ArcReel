@@ -3,47 +3,22 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.task import Task
-from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE, GenerationQueue
+from lib.generation_queue import R2_SHOT_GENERATION_TASK_TYPE
 from r2.contracts.shot_generation import R2ShotGenerationTaskV1
 from r2.production_intelligence.shot_identity import verify_task_evidence
 from r2.production_intelligence.shot_profiles import WAN27_TWO_VIEW_PROFILE
-from server.auth import get_current_user
-from server.error_handlers import register_error_handlers
-from server.routers import r2_shots
-from tests.auth_deps import AUTH_DEPENDENCIES
-from tests.fakes import GateProjectManager
-from tests.integration.server.routers.test_gates_export import PROJECT, USER
-from tests.integration.server.routers.test_r2_shot_admission import _admissible_shot, _builder
+from tests.integration.server.routers.test_gates_export import PROJECT
+from tests.integration.server.routers.test_r2_shot_admission import _admissible_shot
 
 type Factory = async_sessionmaker[AsyncSession]
-
-
-@pytest.fixture
-async def shots_client(
-    monkeypatch: pytest.MonkeyPatch, session_factory: Factory, project_dir: Path
-) -> AsyncIterator[AsyncClient]:
-    projects = GateProjectManager(project_dir.parent)
-    queue = GenerationQueue(session_factory=session_factory, project_manager=projects)
-    monkeypatch.setattr(r2_shots, "async_session_factory", session_factory)
-    monkeypatch.setattr(r2_shots, "get_project_manager", lambda: projects)
-    monkeypatch.setattr(r2_shots, "get_generation_queue", lambda: queue)
-    app = FastAPI()
-    app.dependency_overrides[get_current_user] = lambda: USER
-    app.dependency_overrides[r2_shots.payload_builder] = lambda: _builder
-    app.include_router(r2_shots.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
-    register_error_handlers(app)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
-        yield http
 
 
 def _body(command, **overrides: object) -> dict[str, object]:
