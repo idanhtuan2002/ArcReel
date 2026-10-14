@@ -2,11 +2,11 @@
 
 An AST scan:
 
-- The M8 domain (contracts and ``r2/advanced_creative``) carries no persistence, server, HTTP
+- The M8 domain (contracts, ``r2/advanced_creative`` and ``r2/learning``) carries no persistence, server, HTTP
   or provider import, and no Canon, NarrativePlan, CreativePolicy, Claim or legacy approval
   writer.
 - Only ``promotion.py`` invokes the authority adapter.
-- The M8 repository never commits.
+- The M8 repositories never commit.
 - ``server/app.py`` registers the M8 router exactly once, behind authentication and the
   project migration gate.
 """
@@ -20,6 +20,7 @@ _ROOT = Path(__file__).resolve().parents[3]
 _DOMAIN = [
     _ROOT / "r2" / "contracts" / "advanced_creative.py",
     *sorted((_ROOT / "r2" / "advanced_creative").glob("*.py")),
+    *sorted((_ROOT / "r2" / "learning").glob("*.py")),
 ]
 _FORBIDDEN_ROOTS = {"sqlalchemy", "server", "fastapi", "httpx", "asyncpg", "aiosqlite", "alembic"}
 _FORBIDDEN_NEEDLES = (
@@ -76,10 +77,11 @@ def test_only_the_promotion_module_invokes_the_authority_adapter() -> None:
     assert {name: count for name, count in calls.items() if count} == {"promotion.py": 1}
 
 
-def test_the_m8_repository_never_commits() -> None:
-    source = (_ROOT / "lib" / "db" / "repositories" / "advanced_creative.py").read_text(encoding="utf-8")
+def test_the_m8_repositories_never_commit() -> None:
+    for name in ("advanced_creative.py", "learning.py"):
+        source = (_ROOT / "lib" / "db" / "repositories" / name).read_text(encoding="utf-8")
 
-    assert ".commit(" not in source
+        assert ".commit(" not in source, name
 
 
 def test_the_m8_router_is_registered_once_behind_auth_and_the_migration_gate() -> None:

@@ -298,6 +298,15 @@ forbidden_modules = [
     "r2.production_intelligence.admission",
 ]
 
+# M8-D：Learning 纯层（观察身份、折叠、建议规则）持久化中立，且无 authority 写端口。
+[[tool.importlinter.contracts]]
+name = "R2 learning core does not depend on Host persistence"
+type = "forbidden"
+source_modules = ["r2.learning"]
+forbidden_modules = [
+    "lib.db",
+]
+
 # M5A：R2 叙事核心持久化中立，只依赖 Protocol；SQLAlchemy 绑定归 Host 适配器。
 [[tool.importlinter.contracts]]
 name = "R2 narrative core does not depend on Host persistence"

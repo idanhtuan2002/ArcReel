@@ -38,28 +38,29 @@
    - When `metric_value` is null, a reason from this set is required.
    - When there is a value, the reason must be null.
    - This check sits in a pure validator in `r2/learning`; the accepted A0 contract is unchanged.
-5. **Command idempotency.** `ingest(command_id)` records an `INGEST_OBSERVATION` command receipt.
-   - Replaying the same command with the same digest returns the original result before any other check.
-   - The same `command_id` with different content is a conflict.
+5. **Command idempotency.** The observation row is its own command receipt, with a `command_id` that is unique in its scope and the command digest stored alongside.
+   - Replaying the same command with the same digest returns the stored result before any other check.
+   - The same `command_id` with different content is a conflict (`CommandConflictError`).
+   - `m8_command_receipts` is not reused: its `operation` check constraint belongs to the accepted M8-A schema, and changing it would need a separately designed revision (`M8_ACCEPTED_SCHEMA_CHANGE_REQUIRED`).
 6. **Cutoff fold.** A pure function `current_as_of(records, cutoff)` resolves each identity to the latest record in its chain with `ingested_at <= cutoff`, so a late correction after the cutoff is invisible. Recommendation evidence (D3) pins this cutoff.
 7. **Scope.** Every read and write takes `(user_id, project_name)`, and `lineage.project_name` must equal the project. A foreign or unknown observation id reads as not found.
 8. **No route in D1.** Internal adapters (D2) and a route (D3) come later.
 
 ## Tasks
 
-- [ ] **Pure layer** in `r2/learning/observations.py`:
+- [x] **Pure layer** in `r2/learning/observations.py`:
   - identity key, digest, missing-reason validation;
   - correction admissibility;
   - `current_as_of` fold;
   - unit tests.
-- [ ] **Migration `914c4a0e0001`** with model `M8LearningObservationModel`:
+- [x] **Migration `914c4a0e0001`** with model `M8LearningObservationModel`:
   - table `m8_learning_observations`, append-only;
   - unique `(user_id, project_name, observation_id)`;
   - a partial unique index on the identity for originals;
   - unique `(user_id, project_name, correction_of)`;
   - a check constraint for the value/reason pair.
-- [ ] **Repository** `LearningObservationRepository` in `lib/db/repositories/learning.py`: `ingest`, `get`, `chain`, `list_as_of`, implementing `ObservationRepository`.
-- [ ] **Tests** on SQLite and on PostgreSQL 18:
+- [x] **Repository** `LearningObservationRepository` in `lib/db/repositories/learning.py`: `ingest`, `get`, `chain`, `list_as_of`, implementing `ObservationRepository`.
+- [x] **Tests** on SQLite and on PostgreSQL 18:
   - exact replay;
   - divergent duplicate;
   - correction chain and a branch refusal;

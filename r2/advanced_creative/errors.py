@@ -39,11 +39,25 @@ class PromotionTargetUnavailableError(M8Error):
     code = "m8_promotion_target_unavailable"
 
 
+class ObservationNotFoundError(M8Error):
+    """An unknown or foreign learning observation; the two are indistinguishable to callers."""
+
+    code = "m8_observation_not_found"
+
+
+class ObservationConflictError(M8Error):
+    """The observation's identity or correction chain already holds different content."""
+
+    code = "m8_observation_conflict"
+
+
 __all__ = [
     "CandidateConflictError",
     "CommandConflictError",
     "ExplorationNotFoundError",
     "M8Error",
+    "ObservationConflictError",
+    "ObservationNotFoundError",
     "PromotionBindingStaleError",
     "PromotionTargetUnavailableError",
 ]

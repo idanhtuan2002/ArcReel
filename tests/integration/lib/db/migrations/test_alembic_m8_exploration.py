@@ -84,7 +84,7 @@ def test_one_head_and_the_exact_parent(alembic_cfg: tuple[Config, Path]) -> None
     cfg, _ = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
 
-    assert script.get_heads() == ["913c4a0e0001"]
+    assert script.get_heads() == ["914c4a0e0001"]
     assert script.get_revision("8a8c4a0e0001").down_revision == "c9e1f4a2b701"
 
 
@@ -196,5 +196,6 @@ def test_downgrade_removes_only_the_m8_tables(alembic_cfg: tuple[Config, Path]) 
         "m8_spatial_constraint_sets",
         "m8_spatial_preview_bindings",
         "m8_spatial_promotion_results",
+        "m8_learning_observations",
     }
     assert set(sa.inspect(_engine(db_path)).get_table_names()) >= M8_TABLES

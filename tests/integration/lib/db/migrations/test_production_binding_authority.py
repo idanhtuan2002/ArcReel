@@ -19,7 +19,7 @@ TABLES = {"production_binding_heads", "production_binding_versions", "production
 def test_binding_authority_revision_and_scoped_keys(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["913c4a0e0001"]
+    assert script.get_heads() == ["914c4a0e0001"]
     assert script.get_revision("8d8c4a0e0001").down_revision == "8c9c4a0e0001"
 
     command.upgrade(cfg, "head")
