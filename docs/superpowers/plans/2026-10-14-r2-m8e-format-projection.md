@@ -73,3 +73,14 @@
 - **E4:** seal `R2_M8_E_FORMAT_PARITY.json`.
 
 Each packet runs only its related tests, the static gates and an independent Codex review.
+
+## Sponsor decision: reviewer assignment (2026-10-14)
+
+The sponsor named a single blind semantic reviewer: the sponsor.
+
+The spec asks for at least two independent blind reviews, so this is a recorded **deviation**:
+- The semantic report records `reviewer_count = 1` and `deviation = "single_reviewer_by_sponsor_decision_2026-10-14"`.
+- `material_disagreement` cannot arise with one review.
+- The E4 evidence states the limit.
+
+The service still accepts two or more reviewers whenever they are assigned.
