@@ -66,7 +66,7 @@ def file_digest(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
-async def _run(argv: list[str]) -> tuple[int, bytes]:
+async def run_process(argv: list[str]) -> tuple[int, bytes]:
     """Run to completion; cancellation (including an enclosing ``asyncio.timeout``) kills the process."""
     process = await asyncio.create_subprocess_exec(
         *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -83,7 +83,7 @@ async def _run(argv: list[str]) -> tuple[int, bytes]:
 
 async def probe_source(path: Path, *, ffprobe: str = "ffprobe") -> SourceFacts:
     async with asyncio.timeout(60):
-        code, output = await _run([ffprobe, "-v", "error", "-show_streams", "-of", "json", str(path)])
+        code, output = await run_process([ffprobe, "-v", "error", "-show_streams", "-of", "json", str(path)])
     if code != 0:
         raise FormatRenderFailedError("the source could not be probed")
     streams = json.loads(output.decode("utf-8", "replace") or "{}").get("streams", [])
@@ -99,7 +99,7 @@ async def probe_source(path: Path, *, ffprobe: str = "ffprobe") -> SourceFacts:
 
 async def ffmpeg_version(ffmpeg: str = "ffmpeg") -> str:
     async with asyncio.timeout(30):
-        code, output = await _run([ffmpeg, "-version"])
+        code, output = await run_process([ffmpeg, "-version"])
     if code != 0:
         raise FormatRenderFailedError("ffmpeg is not available")
     return output.decode("utf-8", "replace").splitlines()[0].strip()
@@ -159,7 +159,7 @@ class FormatRenderService:
             command = materialize(argv, source=str(source), output=str(temporary))
             command[0] = self._ffmpeg
             async with asyncio.timeout(self._timeout):
-                code, output = await _run(command)
+                code, output = await run_process(command)
             if code != 0:
                 tail = output.decode("utf-8", "replace")[-800:]
                 await self._finish(
@@ -285,4 +285,5 @@ __all__ = [
     "ffmpeg_version",
     "file_digest",
     "probe_source",
+    "run_process",
 ]
