@@ -19,7 +19,7 @@ from r2.advanced_creative.formats import (
     reframe_decision,
 )
 from r2.contracts.advanced_creative import SemanticParityReport, TechnicalValidationReport
-from tests.unit.r2.advanced_creative.test_formats import DIGEST, _review, overlay, profile
+from tests.unit.r2.advanced_creative.test_formats import DIGEST, _review, full_checks, overlay, profile
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -74,7 +74,9 @@ def _technical(plan, report_id: str, passed: bool = True) -> TechnicalValidation
         report_id=report_id,
         plan_digest=plan.plan_digest,
         artifact_digest=ARTIFACT,
-        checks=({"name": "dimensions", "verdict": "PASS" if passed else "FAIL"},),
+        checks=full_checks()
+        if passed
+        else full_checks(decode={"name": "decode", "observed": 2, "expected": 0, "verdict": "FAIL"}),
         passed=passed,
     )
 
@@ -156,3 +158,29 @@ async def test_both_planes_must_pass_for_the_same_artifact(session_factory: Fact
         )
     with pytest.raises(FormatNotFoundError):
         await _call(session_factory, "append_technical_report", plan_id="nope", report=_technical(plan, "t9"))
+
+
+async def test_report_order_is_the_append_sequence_not_the_clock(session_factory: Factory) -> None:
+    class Frozen:
+        def __call__(self) -> datetime:
+            return datetime(2026, 10, 14, tzinfo=UTC)
+
+    async def call(method, **kwargs):
+        async with session_factory() as session:
+            result = await getattr(FormatRepository(session, clock=Frozen()), method)(
+                user_id=USER, project_name=PROJECT, **kwargs
+            )
+            await session.commit()
+            return result
+
+    await _seed(session_factory)
+    plan = await call("create_plan", plan=_plan())
+    await call(
+        "append_semantic_report", plan_id="p1", report=_semantic(plan, "s1"), deviation=SINGLE_REVIEWER_DEVIATION
+    )
+    # Same timestamp; a passing "z" then a failing "a": the failing one was appended later and wins.
+    await call("append_technical_report", plan_id="p1", report=_technical(plan, "z"))
+    await call("append_technical_report", plan_id="p1", report=_technical(plan, "a", passed=False))
+    assert await call("passing_reports", plan_id="p1", artifact_digest=ARTIFACT) is None
+    await call("append_technical_report", plan_id="p1", report=_technical(plan, "b"))
+    assert (await call("passing_reports", plan_id="p1", artifact_digest=ARTIFACT))[0].report_id == "b"

@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.formats import (
@@ -28,9 +28,9 @@ from r2.advanced_creative.formats import (
     profile_digest,
     validate_output_profile,
     validate_overlay_set,
+    validate_plan,
     validate_semantic_report,
     validate_technical_report,
-    verify_plan_digest,
 )
 from r2.contracts.advanced_creative import (
     FormatProjectionPlan,
@@ -51,6 +51,18 @@ class FormatRepository:
     def __init__(self, session: AsyncSession, *, clock: Clock | None = None) -> None:
         self.session = session
         self._clock = clock or (lambda: datetime.now(UTC))
+
+    async def _next_sequence(self, model: type, *, user_id: str, project_name: str, plan_id: str) -> int:
+        """The next append position of one plan's report stream, serialized per plan (PostgreSQL)."""
+        if self.session.get_bind().dialect.name == "postgresql":
+            key = f"m8-format-reports:{model.__tablename__}:{user_id}:{project_name}:{plan_id}"
+            await self.session.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": key})
+        current = await self.session.scalar(
+            select(func.max(model.sequence)).where(
+                model.user_id == user_id, model.project_name == project_name, model.plan_id == plan_id
+            )
+        )
+        return int(current or 0) + 1
 
     async def put_profile(self, *, user_id: str, project_name: str, profile: OutputProfile) -> OutputProfile:
         validate_output_profile(profile)
@@ -97,7 +109,7 @@ class FormatRepository:
         return overlay
 
     async def create_plan(self, *, user_id: str, project_name: str, plan: FormatProjectionPlan) -> FormatProjectionPlan:
-        verify_plan_digest(plan)
+        validate_plan(plan)
         profile = await self.session.get(FormatProfileModel, (user_id, project_name, plan.output_profile.profile_ref))
         overlay = await self.session.get(
             OverlayConstraintSetModel, (user_id, project_name, plan.overlay_constraints.constraint_ref)
@@ -151,8 +163,12 @@ class FormatRepository:
             if row.report_digest != digest:
                 raise FormatConflictError("report id already names another report")
             return report
+        sequence = await self._next_sequence(
+            FormatTechnicalReportModel, user_id=user_id, project_name=project_name, plan_id=plan_id
+        )
         self.session.add(
             FormatTechnicalReportModel(
+                sequence=sequence,
                 user_id=user_id,
                 project_name=project_name,
                 report_id=report.report_id,
@@ -178,8 +194,12 @@ class FormatRepository:
             if row.report_digest != digest:
                 raise FormatConflictError("report id already names another report")
             return report
+        sequence = await self._next_sequence(
+            FormatSemanticReportModel, user_id=user_id, project_name=project_name, plan_id=plan_id
+        )
         self.session.add(
             FormatSemanticReportModel(
+                sequence=sequence,
                 user_id=user_id,
                 project_name=project_name,
                 report_id=report.report_id,
@@ -201,7 +221,8 @@ class FormatRepository:
     ) -> tuple[TechnicalValidationReport, SemanticParityReport] | None:
         """The latest passing technical and semantic reports for one plan and artifact, or None.
 
-        A later failing report of either plane supersedes an earlier pass for that plane.
+        A later failing report of either plane supersedes an earlier pass for that plane; "later" is the
+        serialized append sequence of the plan's report stream, never a clock.
         """
         latest: list[object] = []
         for model, contract in (
@@ -216,7 +237,7 @@ class FormatRepository:
                     model.plan_id == plan_id,
                     model.artifact_digest == artifact_digest,
                 )
-                .order_by(model.created_at.desc(), model.report_id.desc())
+                .order_by(model.sequence.desc())
                 .limit(1)
             )
             if row is None or not row.passed:

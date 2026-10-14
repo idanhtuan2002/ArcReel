@@ -96,6 +96,7 @@ def upgrade() -> None:
             *_scope(),
             sa.Column("report_id", sa.String(length=255), nullable=False),
             sa.Column("plan_id", sa.String(length=255), nullable=False),
+            sa.Column("sequence", sa.Integer(), nullable=False),
             sa.Column("artifact_digest", sa.String(length=71), nullable=False),
             sa.Column("report_json", sa.JSON(), nullable=False),
             sa.Column("report_digest", sa.String(length=71), nullable=False),
@@ -103,6 +104,7 @@ def upgrade() -> None:
             sa.Column("passed", sa.Boolean(), nullable=False),
             sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
             sa.PrimaryKeyConstraint("user_id", "project_name", "report_id", name=f"pk_{table}"),
+            sa.UniqueConstraint("user_id", "project_name", "plan_id", "sequence", name=f"uq_{table}_sequence"),
             _owner(),
             sa.ForeignKeyConstraint(
                 ["user_id", "project_name", "plan_id"], _PLAN, name=f"fk_{table}_plan", ondelete="RESTRICT"

@@ -219,7 +219,7 @@ def test_a_plan_digest_binds_master_profile_overlay_and_reframe() -> None:
             overlay=overlay(surface="story"),
             decisions=plan.reframe_decisions,
         )
-    with pytest.raises(FormatInvalidError, match="another size"):
+    with pytest.raises(FormatInvalidError, match="disagree"):
         build_plan(
             plan_id="p",
             source_master_id="m",
@@ -230,16 +230,119 @@ def test_a_plan_digest_binds_master_profile_overlay_and_reframe() -> None:
         )
 
 
-def test_ui_regions_collide_with_the_projected_focal_span_only() -> None:
-    focal = Box(F(2, 5), F(1, 4), F(3, 5), F(3, 4))
+def test_collisions_check_subject_and_captions_for_every_kind() -> None:
+    subject = Box(F(2, 5), F(1, 4), F(3, 5), F(3, 4))
+    caption = Box(F(1, 4), F(17, 20), F(3, 4), F(19, 20))
     right_rail = {"kind": "ui", "x0": "17/20", "y0": "1/2", "x1": "1", "y1": "9/10"}
-    bottom_caption = {"kind": "caption", "x0": "0", "y0": "4/5", "x1": "1", "y1": "1"}
     over_face = {"kind": "ui", "x0": "2/5", "y0": "2/5", "x1": "3/5", "y1": "3/5"}
+    bottom_bar = {"kind": "ui", "x0": "0", "y0": "11/20", "x1": "1", "y1": "13/20"}
 
-    assert overlay_collisions(_plan([right_rail, bottom_caption], focal=focal)) == ()
-    assert overlay_collisions(_plan([right_rail, over_face], focal=focal)) == ("ui region 1",)
+    def plan(kind, regions, focal=None):
+        target = profile()
+        decision = reframe_decision(
+            decision_id="r1",
+            kind=kind,
+            source_size=(1920, 1080),
+            profile=target,
+            focal=focal,
+            subject=subject,
+            captions=(caption,),
+            rationale="fixture",
+        )
+        return build_plan(
+            plan_id="p",
+            source_master_id="m",
+            source_master_digest=DIGEST,
+            profile=target,
+            overlay=overlay(regions),
+            decisions=(decision,),
+        )
+
+    assert overlay_collisions(plan(ReframeKind.COVER_FOCAL, [right_rail], focal=subject)) == (
+        "caption 0 partly cropped",
+        "ui region 0 covers caption 0",
+    )
+    # PAD keeps everything but a UI region can still sit on the subject.
+    assert overlay_collisions(plan(ReframeKind.PAD, [over_face])) == ("ui region 0 covers subject",)
+    # A bar across the letterboxed band covers the caption, not the subject.
+    assert "ui region 0 covers caption 0" in overlay_collisions(plan(ReframeKind.PAD, [bottom_bar]))
+    assert overlay_collisions(plan(ReframeKind.COVER_CENTER, [])) == ("caption 0 partly cropped",)
     with pytest.raises(FormatInvalidError, match="kind"):
-        _plan([{"kind": "banner", "x0": "0", "y0": "0", "x1": "1", "y1": "1"}], focal=focal)
+        plan(ReframeKind.PAD, [{"kind": "banner", "x0": "0", "y0": "0", "x1": "1", "y1": "1"}])
+
+
+def test_a_plan_whose_spans_or_risk_disagree_with_its_kind_is_refused() -> None:
+    from r2.advanced_creative.digests import digest_canonical
+    from r2.advanced_creative.formats import _plan_body, validate_plan
+
+    honest = _plan(kind=ReframeKind.COVER_CENTER)
+    decision = honest.reframe_decisions[0]
+    for forged_decision in (
+        decision.model_copy(update={"kind": "PAD"}),
+        decision.model_copy(update={"semantic_risk": "LOW"}),
+    ):
+        forged = honest.model_copy(update={"reframe_decisions": (forged_decision,)})
+        forged = forged.model_copy(update={"plan_digest": digest_canonical(_plan_body(forged))})
+        with pytest.raises(FormatInvalidError, match="disagree"):
+            validate_plan(forged)
+    rehashed = honest.model_copy(update={"reframe_decisions": (decision, decision)})
+    rehashed = rehashed.model_copy(update={"plan_digest": digest_canonical(_plan_body(rehashed))})
+    with pytest.raises(FormatInvalidError, match="exactly one"):
+        validate_plan(rehashed)
+
+
+def test_more_profile_and_geometry_guards() -> None:
+    with pytest.raises(FormatInvalidError, match="fps"):
+        validate_output_profile(profile(fps=Fraction(240)))
+    with pytest.raises(FormatInvalidError, match="container"):
+        validate_output_profile(profile(container="mov"))
+    with pytest.raises(FormatInvalidError, match="PAD keeps"):
+        reframe_geometry(
+            source_width=1920,
+            source_height=1080,
+            target_width=1080,
+            target_height=1080,
+            kind=ReframeKind.PAD,
+            focal=Box(F(0), F(0), F(1, 2), F(1, 2)),
+        )
+    with pytest.raises(FormatInvalidError, match="centred"):
+        reframe_geometry(
+            source_width=1920,
+            source_height=1080,
+            target_width=1080,
+            target_height=1080,
+            kind=ReframeKind.COVER_CENTER,
+            focal=Box(F(0), F(0), F(1, 2), F(1, 2)),
+        )
+    # A portrait source into a landscape target crops vertically.
+    portrait = reframe_geometry(
+        source_width=1080,
+        source_height=1920,
+        target_width=1920,
+        target_height=1080,
+        kind=ReframeKind.COVER_CENTER,
+        focal=None,
+    )
+    assert (portrait.source_window.x0, portrait.source_window.x1) == (0, 1)
+    assert portrait.source_window.y1 - portrait.source_window.y0 == F(81, 256)
+    # Equal ratios remove nothing either way.
+    same = reframe_geometry(
+        source_width=1920,
+        source_height=1080,
+        target_width=1280,
+        target_height=720,
+        kind=ReframeKind.COVER_CENTER,
+        focal=None,
+    )
+    assert same.removed_fraction == 0
+
+
+def full_checks(**overrides) -> tuple[dict, ...]:
+    from r2.advanced_creative.formats import TECHNICAL_CHECKS
+
+    rows = {name: {"name": name, "observed": "x", "expected": "x", "verdict": "PASS"} for name in TECHNICAL_CHECKS}
+    rows.update(overrides)
+    return tuple(rows.values())
 
 
 def _technical(plan, checks, passed):
@@ -275,12 +378,19 @@ def test_a_technical_report_passes_exactly_when_every_check_passes() -> None:
     from r2.advanced_creative.formats import validate_technical_report
 
     plan = _plan(kind=ReframeKind.PAD)
-    good = ({"name": "dimensions", "verdict": "PASS"}, {"name": "decode", "verdict": "PASS"})
+    good = full_checks()
     validate_technical_report(_technical(plan, good, True), plan)
+    failing = full_checks(decode={"name": "decode", "observed": 3, "expected": 0, "verdict": "FAIL"})
+    validate_technical_report(_technical(plan, failing, False), plan)
     with pytest.raises(FormatInvalidError, match="exactly when"):
-        validate_technical_report(_technical(plan, ({"name": "decode", "verdict": "FAIL"},), True), plan)
+        validate_technical_report(_technical(plan, failing, True), plan)
     with pytest.raises(FormatInvalidError, match="unique"):
-        validate_technical_report(_technical(plan, good + good, True), plan)
+        validate_technical_report(_technical(plan, good + good[:1], True), plan)
+    with pytest.raises(FormatInvalidError, match="versioned check set"):
+        validate_technical_report(_technical(plan, good[:1], True), plan)
+    lying = full_checks(fps={"name": "fps", "observed": "25/1", "expected": "30/1", "verdict": "PASS"})
+    with pytest.raises(FormatInvalidError, match="contradicts"):
+        validate_technical_report(_technical(plan, lying, True), plan)
 
 
 def test_semantic_reports_need_two_reviewers_or_the_recorded_deviation() -> None:

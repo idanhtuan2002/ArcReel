@@ -189,6 +189,37 @@ def semantic_risk(geometry: Geometry) -> str:
     return "LOW"
 
 
+def _decision_spans(
+    *,
+    kind: ReframeKind,
+    source_size: tuple[int, int],
+    target_size: tuple[int, int],
+    focal: Box | None,
+    subject: Box | None,
+    captions: tuple[Box, ...],
+) -> tuple[dict[str, object], dict[str, object], str]:
+    geometry = reframe_geometry(
+        source_width=source_size[0],
+        source_height=source_size[1],
+        target_width=target_size[0],
+        target_height=target_size[1],
+        kind=kind,
+        focal=focal,
+    )
+    source: dict[str, object] = {
+        **geometry.source_window.as_json(),
+        "width": source_size[0],
+        "height": source_size[1],
+        "captions": [caption.as_json() for caption in captions],
+    }
+    if focal is not None:
+        source["focal"] = focal.as_json()
+    if subject is not None:
+        source["subject"] = subject.as_json()
+    target = {**geometry.target_window.as_json(), "width": target_size[0], "height": target_size[1]}
+    return source, target, semantic_risk(geometry)
+
+
 def reframe_decision(
     *,
     decision_id: str,
@@ -197,38 +228,83 @@ def reframe_decision(
     profile: OutputProfile,
     focal: Box | None,
     rationale: str,
+    subject: Box | None = None,
+    captions: tuple[Box, ...] = (),
 ) -> ReframeDecision:
+    """One explicit reframe. ``focal`` positions a COVER_FOCAL crop; ``subject`` and ``captions`` are the
+    source evidence every kind is checked against (the subject defaults to the focal span)."""
     if not rationale.strip():
         raise FormatInvalidError("a reframe decision states its rationale")
-    geometry = reframe_geometry(
-        source_width=source_size[0],
-        source_height=source_size[1],
-        target_width=profile.width,
-        target_height=profile.height,
+    source, target, risk = _decision_spans(
         kind=kind,
+        source_size=source_size,
+        target_size=(profile.width, profile.height),
         focal=focal,
+        subject=subject or focal,
+        captions=captions,
     )
     return ReframeDecision(
         decision_id=decision_id,
         kind=kind.value,
-        source_span=CanonicalJsonObject.model_validate(
-            {
-                **geometry.source_window.as_json(),
-                "width": source_size[0],
-                "height": source_size[1],
-                **({"focal": focal.as_json()} if focal else {}),
-            }
-        ),
-        target_span=CanonicalJsonObject.model_validate(
-            {**geometry.target_window.as_json(), "width": profile.width, "height": profile.height}
-        ),
+        source_span=CanonicalJsonObject.model_validate(source),
+        target_span=CanonicalJsonObject.model_validate(target),
         rationale=rationale,
-        semantic_risk=semantic_risk(geometry),
+        semantic_risk=risk,
     )
 
 
 def _plan_body(plan: FormatProjectionPlan) -> dict[str, object]:
     return {"contract_version": "1", "plan": plan.model_dump(mode="python", exclude={"plan_digest"})}
+
+
+def _boxes(value: object) -> tuple[Box, ...]:
+    if not isinstance(value, (list, tuple)) or not all(isinstance(item, dict) for item in value):
+        raise FormatInvalidError("captions are a list of boxes")
+    return tuple(Box.parse(item) for item in value)
+
+
+def validate_plan(plan: FormatProjectionPlan) -> None:
+    """Everything a plan asserts, recomputed: profile, overlay, surface, and the reframe geometry and risk.
+
+    A plan whose spans or risk disagree with the geometry its kind implies is refused, so a decision
+    cannot claim PAD while cropping, or LOW risk while removing most of the frame.
+    """
+    profile = plan.output_profile
+    overlay = plan.overlay_constraints
+    validate_output_profile(profile)
+    validate_overlay_set(overlay)
+    if (overlay.platform, overlay.surface) != (profile.platform, profile.surface):
+        raise FormatInvalidError("the overlay set belongs to another platform surface")
+    if len(plan.reframe_decisions) != 1:
+        raise FormatInvalidError("V1 projects one master with exactly one reframe decision")
+    decision = plan.reframe_decisions[0]
+    if not decision.rationale.strip() or not decision.decision_id:
+        raise FormatInvalidError("a reframe decision states its id and rationale")
+    try:
+        kind = ReframeKind(decision.kind)
+    except ValueError as exc:
+        raise FormatInvalidError("unknown reframe kind") from exc
+    source = decision.source_span.model_dump(mode="python")
+    width, height = source.get("width"), source.get("height")
+    if not isinstance(width, int) or not isinstance(height, int):
+        raise FormatInvalidError("the source span names the source size")
+    focal = Box.parse(source["focal"]) if isinstance(source.get("focal"), dict) else None
+    subject = Box.parse(source["subject"]) if isinstance(source.get("subject"), dict) else None
+    expected_source, expected_target, risk = _decision_spans(
+        kind=kind,
+        source_size=(width, height),
+        target_size=(profile.width, profile.height),
+        focal=focal,
+        subject=subject,
+        captions=_boxes(source.get("captions", [])),
+    )
+    if (
+        CanonicalJsonObject.model_validate(expected_source) != decision.source_span
+        or CanonicalJsonObject.model_validate(expected_target) != decision.target_span
+        or risk != decision.semantic_risk
+    ):
+        raise FormatInvalidError("the reframe spans or risk disagree with the geometry of its kind")
+    verify_plan_digest(plan)
 
 
 def build_plan(
@@ -241,15 +317,6 @@ def build_plan(
     decisions: tuple[ReframeDecision, ...],
 ) -> FormatProjectionPlan:
     """A plan binding one exact master, profile, overlay set and reframe; its digest covers all of it."""
-    validate_output_profile(profile)
-    validate_overlay_set(overlay)
-    if (overlay.platform, overlay.surface) != (profile.platform, profile.surface):
-        raise FormatInvalidError("the overlay set belongs to another platform surface")
-    if len(decisions) != 1:
-        raise FormatInvalidError("V1 projects one master with exactly one reframe decision")
-    target = decisions[0].target_span.model_dump(mode="python")
-    if (target.get("width"), target.get("height")) != (profile.width, profile.height):
-        raise FormatInvalidError("the reframe targets another size than the profile")
     draft = FormatProjectionPlan(
         plan_id=plan_id,
         source_master_id=source_master_id,
@@ -259,7 +326,9 @@ def build_plan(
         reframe_decisions=decisions,
         plan_digest="sha256:" + "0" * 64,
     )
-    return draft.model_copy(update={"plan_digest": digest_canonical(_plan_body(draft))})
+    plan = draft.model_copy(update={"plan_digest": digest_canonical(_plan_body(draft))})
+    validate_plan(plan)
+    return plan
 
 
 def verify_plan_digest(plan: FormatProjectionPlan) -> None:
@@ -267,31 +336,51 @@ def verify_plan_digest(plan: FormatProjectionPlan) -> None:
         raise FormatInvalidError("plan digest does not match its contents")
 
 
-def overlay_collisions(plan: FormatProjectionPlan) -> tuple[str, ...]:
-    """UI regions that cover the projected focal span; caption and safe regions never collide."""
-    decision = plan.reframe_decisions[0]
-    source = decision.source_span.model_dump(mode="python")
-    focal_value = source.get("focal")
-    if not isinstance(focal_value, dict):
-        return ()
-    focal = Box.parse(focal_value)
-    window = Box.parse(source)
-    target_window = Box.parse(decision.target_span.model_dump(mode="python"))
+def _project(box: Box, window: Box, target: Box) -> Box | None:
+    """``box`` (source coordinates) after cropping to ``window`` and placing in ``target``; None if cut away."""
+    x0, y0 = max(box.x0, window.x0), max(box.y0, window.y0)
+    x1, y1 = min(box.x1, window.x1), min(box.y1, window.y1)
+    if x0 >= x1 or y0 >= y1:
+        return None
 
-    def project(value: Fraction, lo: Fraction, hi: Fraction, tlo: Fraction, thi: Fraction) -> Fraction:
+    def along(value: Fraction, lo: Fraction, hi: Fraction, tlo: Fraction, thi: Fraction) -> Fraction:
         return tlo + (value - lo) / (hi - lo) * (thi - tlo)
 
-    projected = Box(
-        project(max(focal.x0, window.x0), window.x0, window.x1, target_window.x0, target_window.x1),
-        project(max(focal.y0, window.y0), window.y0, window.y1, target_window.y0, target_window.y1),
-        project(min(focal.x1, window.x1), window.x0, window.x1, target_window.x0, target_window.x1),
-        project(min(focal.y1, window.y1), window.y0, window.y1, target_window.y0, target_window.y1),
+    return Box(
+        along(x0, window.x0, window.x1, target.x0, target.x1),
+        along(y0, window.y0, window.y1, target.y0, target.y1),
+        along(x1, window.x0, window.x1, target.x0, target.x1),
+        along(y1, window.y0, window.y1, target.y0, target.y1),
     )
-    return tuple(
-        f"ui region {index}"
-        for index, (kind, box) in enumerate(validate_overlay_set(plan.overlay_constraints))
-        if kind == "ui" and box.overlaps(projected)
-    )
+
+
+def overlay_collisions(plan: FormatProjectionPlan) -> tuple[str, ...]:
+    """Problems the projection creates: a subject or caption cropped out or partly cut, or covered by UI.
+
+    The subject and caption spans are source evidence independent of how the crop was positioned, so
+    PAD and COVER_CENTER are checked exactly like COVER_FOCAL.
+    """
+    decision = plan.reframe_decisions[0]
+    source = decision.source_span.model_dump(mode="python")
+    window = Box.parse(source)
+    target = Box.parse(decision.target_span.model_dump(mode="python"))
+    ui = [
+        (index, box) for index, (kind, box) in enumerate(validate_overlay_set(plan.overlay_constraints)) if kind == "ui"
+    ]
+    evidence: list[tuple[str, Box]] = []
+    if isinstance(source.get("subject"), dict):
+        evidence.append(("subject", Box.parse(source["subject"])))
+    evidence += [(f"caption {index}", box) for index, box in enumerate(_boxes(source.get("captions", [])))]
+    problems: list[str] = []
+    for name, box in evidence:
+        projected = _project(box, window, target)
+        if projected is None:
+            problems.append(f"{name} cropped out")
+            continue
+        if not (window.x0 <= box.x0 and box.x1 <= window.x1 and window.y0 <= box.y0 and box.y1 <= window.y1):
+            problems.append(f"{name} partly cropped")
+        problems += [f"ui region {index} covers {name}" for index, region in ui if region.overlaps(projected)]
+    return tuple(problems)
 
 
 SEMANTIC_RUBRIC = "format-semantic@1"
@@ -299,23 +388,34 @@ SEMANTIC_ITEMS = ("focal_subject", "action", "shot_intent", "on_screen_text", "c
 SINGLE_REVIEWER_DEVIATION = "single_reviewer_by_sponsor_decision_2026-10-14"
 
 
+TECHNICAL_CHECKS = ("dimensions", "ratio", "video_codec", "fps", "duration", "audio", "decode", "overlay")
+_EXACT_CHECKS = frozenset({"dimensions", "ratio", "video_codec", "fps", "audio"})
+
+
 def validate_technical_report(report: TechnicalValidationReport, plan: FormatProjectionPlan) -> None:
-    """Every check is a named row with a verdict; the report passes only when every row passes."""
+    """The complete versioned check set, each with observed and expected values and a verdict.
+
+    Exact checks pass exactly when observed equals expected; the others carry the measuring rule's
+    verdict. The report passes exactly when every check passes.
+    """
     if report.plan_digest != plan.plan_digest:
         raise FormatInvalidError("technical report names another plan")
-    if not report.checks:
-        raise FormatInvalidError("a technical report has checks")
-    verdicts = []
-    names = []
+    rows: dict[str, dict[str, object]] = {}
     for check in report.checks:
         body = check.model_dump(mode="python")
-        if not body.get("name") or body.get("verdict") not in ("PASS", "FAIL"):
-            raise FormatInvalidError("each check has a name and a PASS/FAIL verdict")
-        names.append(body["name"])
-        verdicts.append(body["verdict"] == "PASS")
-    if len(set(names)) != len(names):
-        raise FormatInvalidError("check names are unique")
-    if report.passed != all(verdicts):
+        name = body.get("name")
+        if not isinstance(name, str) or name in rows:
+            raise FormatInvalidError("each check has a unique name")
+        if body.get("verdict") not in ("PASS", "FAIL") or "observed" not in body or "expected" not in body:
+            raise FormatInvalidError("each check has observed and expected values and a PASS/FAIL verdict")
+        rows[name] = body
+    if tuple(sorted(rows)) != tuple(sorted(TECHNICAL_CHECKS)):
+        raise FormatInvalidError("a technical report has exactly the versioned check set")
+    for name in _EXACT_CHECKS:
+        row = rows[name]
+        if (row["verdict"] == "PASS") != (row["observed"] == row["expected"]):
+            raise FormatInvalidError(f"the {name} verdict contradicts its observation")
+    if report.passed != all(row["verdict"] == "PASS" for row in rows.values()):
         raise FormatInvalidError("a technical report passes exactly when every check passes")
 
 
@@ -362,6 +462,7 @@ __all__ = [
     "SEMANTIC_ITEMS",
     "SEMANTIC_RUBRIC",
     "SINGLE_REVIEWER_DEVIATION",
+    "TECHNICAL_CHECKS",
     "V1_RATIOS",
     "Box",
     "FormatInvalidError",
@@ -377,6 +478,7 @@ __all__ = [
     "semantic_risk",
     "validate_output_profile",
     "validate_overlay_set",
+    "validate_plan",
     "validate_semantic_report",
     "validate_technical_report",
     "verify_plan_digest",

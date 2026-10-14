@@ -94,10 +94,14 @@ class FormatTechnicalReportModel(_Scoped, Base):
             name="fk_m8_format_technical_reports_plan",
             ondelete="RESTRICT",
         ),
+        UniqueConstraint(
+            "user_id", "project_name", "plan_id", "sequence", name="uq_m8_format_technical_reports_sequence"
+        ),
     )
 
     report_id: Mapped[str] = mapped_column(_ID)
     plan_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    sequence: Mapped[int] = mapped_column(nullable=False)
     artifact_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
     report_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     report_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
@@ -115,10 +119,14 @@ class FormatSemanticReportModel(_Scoped, Base):
             name="fk_m8_format_semantic_reports_plan",
             ondelete="RESTRICT",
         ),
+        UniqueConstraint(
+            "user_id", "project_name", "plan_id", "sequence", name="uq_m8_format_semantic_reports_sequence"
+        ),
     )
 
     report_id: Mapped[str] = mapped_column(_ID)
     plan_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    sequence: Mapped[int] = mapped_column(nullable=False)
     artifact_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
     report_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     report_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
