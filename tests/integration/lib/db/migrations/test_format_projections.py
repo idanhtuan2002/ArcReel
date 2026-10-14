@@ -35,6 +35,7 @@ def test_format_migration_has_scoped_restrict_keys_and_downgrades_alone(alembic_
         "m8_format_plans",
         "m8_format_technical_reports",
         "m8_format_semantic_reports",
+        "m8_format_renders",
     }
     before = set(inspector.get_table_names())
     command.downgrade(cfg, "915c4a0e0001")

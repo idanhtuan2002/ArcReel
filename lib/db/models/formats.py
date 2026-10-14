@@ -10,7 +10,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    PrimaryKeyConstraint,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lib.db.base import DEFAULT_USER_ID, Base
@@ -136,9 +145,41 @@ class FormatSemanticReportModel(_Scoped, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class FormatRenderModel(_Scoped, Base):
+    """One render execution of a plan; its id is the deterministic execution identity.
+
+    The state moves RUNNING -> SUCCEEDED, FAILED or CANCELLED. A FAILED, CANCELLED or abandoned
+    RUNNING execution may run again (``attempt`` counts the runs); a SUCCEEDED one only replays.
+    """
+
+    __tablename__ = "m8_format_renders"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "execution_id", name="pk_m8_format_renders"),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "plan_id"], _PLAN, name="fk_m8_format_renders_plan", ondelete="RESTRICT"
+        ),
+        CheckConstraint("state IN ('RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED')", name="ck_m8_format_renders_state"),
+        CheckConstraint("(state = 'SUCCEEDED') = (artifact_digest IS NOT NULL)", name="ck_m8_format_renders_artifact"),
+    )
+
+    execution_id: Mapped[str] = mapped_column(_ID)
+    plan_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    source_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    argv_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+    ffmpeg_version: Mapped[str] = mapped_column(_ID, nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    attempt: Mapped[int] = mapped_column(nullable=False)
+    artifact_digest: Mapped[str | None] = mapped_column(_DIGEST, nullable=True)
+    artifact_ref: Mapped[str | None] = mapped_column(_ID, nullable=True)
+    error: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 __all__ = [
     "FormatPlanModel",
     "FormatProfileModel",
+    "FormatRenderModel",
     "FormatSemanticReportModel",
     "FormatTechnicalReportModel",
     "OverlayConstraintSetModel",

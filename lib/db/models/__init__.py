@@ -41,6 +41,7 @@ from lib.db.models.custom_provider import CustomProvider, CustomProviderModel
 from lib.db.models.formats import (
     FormatPlanModel,
     FormatProfileModel,
+    FormatRenderModel,
     FormatSemanticReportModel,
     FormatTechnicalReportModel,
     OverlayConstraintSetModel,
@@ -151,6 +152,7 @@ __all__ = [
     "FinalCutReceiptModel",
     "FormatPlanModel",
     "FormatProfileModel",
+    "FormatRenderModel",
     "FormatSemanticReportModel",
     "FormatTechnicalReportModel",
     "GenerationBatch",

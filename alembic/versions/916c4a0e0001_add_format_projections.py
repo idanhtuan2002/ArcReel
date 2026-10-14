@@ -111,8 +111,37 @@ def upgrade() -> None:
             ),
         )
 
+    op.create_table(
+        "m8_format_renders",
+        *_scope(),
+        sa.Column("execution_id", sa.String(length=255), nullable=False),
+        sa.Column("plan_id", sa.String(length=255), nullable=False),
+        sa.Column("source_digest", sa.String(length=71), nullable=False),
+        sa.Column("argv_json", sa.JSON(), nullable=False),
+        sa.Column("ffmpeg_version", sa.String(length=255), nullable=False),
+        sa.Column("state", sa.String(length=16), nullable=False),
+        sa.Column("attempt", sa.Integer(), nullable=False),
+        sa.Column("artifact_digest", sa.String(length=71), nullable=True),
+        sa.Column("artifact_ref", sa.String(length=255), nullable=True),
+        sa.Column("error", sa.String(length=1000), nullable=True),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("user_id", "project_name", "execution_id", name="pk_m8_format_renders"),
+        sa.CheckConstraint(
+            "state IN ('RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED')", name="ck_m8_format_renders_state"
+        ),
+        sa.CheckConstraint(
+            "(state = 'SUCCEEDED') = (artifact_digest IS NOT NULL)", name="ck_m8_format_renders_artifact"
+        ),
+        _owner(),
+        sa.ForeignKeyConstraint(
+            ["user_id", "project_name", "plan_id"], _PLAN, name="fk_m8_format_renders_plan", ondelete="RESTRICT"
+        ),
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("m8_format_renders")
     op.drop_table("m8_format_semantic_reports")
     op.drop_table("m8_format_technical_reports")
     op.drop_table("m8_format_plans")
