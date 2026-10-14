@@ -207,7 +207,7 @@ class LearningRecommendationRepository:
         check_hypothesis_language(
             recommendation.hypothesis,
             causal_allowed=surface is not None,
-            neutral_terms=[str(arm) for arm in arms] if isinstance(arms, list) else (),
+            neutral_terms=[str(arm) for arm in arms],
         )
 
         key = proposal_key(recommendation)
