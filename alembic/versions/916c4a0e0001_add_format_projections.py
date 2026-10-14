@@ -139,8 +139,32 @@ def upgrade() -> None:
         ),
     )
 
+    op.create_table(
+        "m8_format_review_packets",
+        *_scope(),
+        sa.Column("packet_id", sa.String(length=255), nullable=False),
+        sa.Column("plan_id", sa.String(length=255), nullable=False),
+        sa.Column("execution_id", sa.String(length=255), nullable=False),
+        sa.Column("artifact_digest", sa.String(length=71), nullable=False),
+        sa.Column("artifact_ref", sa.String(length=255), nullable=False),
+        sa.Column("source_digest", sa.String(length=71), nullable=False),
+        sa.Column("source_ref", sa.String(length=255), nullable=False),
+        sa.Column("projection_label", sa.String(length=1), nullable=False),
+        sa.Column("reviewer_id", sa.String(length=255), nullable=False),
+        sa.Column("review_json", sa.JSON(), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("user_id", "project_name", "packet_id", name="pk_m8_format_review_packets"),
+        sa.CheckConstraint("projection_label IN ('A', 'B')", name="ck_m8_format_review_packets_label"),
+        _owner(),
+        sa.ForeignKeyConstraint(
+            ["user_id", "project_name", "plan_id"], _PLAN, name="fk_m8_format_review_packets_plan", ondelete="RESTRICT"
+        ),
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("m8_format_review_packets")
     op.drop_table("m8_format_renders")
     op.drop_table("m8_format_semantic_reports")
     op.drop_table("m8_format_technical_reports")

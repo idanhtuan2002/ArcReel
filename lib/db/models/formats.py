@@ -176,10 +176,41 @@ class FormatRenderModel(_Scoped, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class FormatReviewPacketModel(_Scoped, Base):
+    """One blind review assignment: two clips labelled A and B in a server-drawn order.
+
+    ``projection_label`` says which label is the projection; it is never sent to the reviewer.
+    A packet takes at most one review, from the reviewer it was opened for.
+    """
+
+    __tablename__ = "m8_format_review_packets"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "packet_id", name="pk_m8_format_review_packets"),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "plan_id"], _PLAN, name="fk_m8_format_review_packets_plan", ondelete="RESTRICT"
+        ),
+        CheckConstraint("projection_label IN ('A', 'B')", name="ck_m8_format_review_packets_label"),
+    )
+
+    packet_id: Mapped[str] = mapped_column(_ID)
+    plan_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    execution_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    artifact_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    artifact_ref: Mapped[str] = mapped_column(_ID, nullable=False)
+    source_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    source_ref: Mapped[str] = mapped_column(_ID, nullable=False)
+    projection_label: Mapped[str] = mapped_column(String(1), nullable=False)
+    reviewer_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    review_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 __all__ = [
     "FormatPlanModel",
     "FormatProfileModel",
     "FormatRenderModel",
+    "FormatReviewPacketModel",
     "FormatSemanticReportModel",
     "FormatTechnicalReportModel",
     "OverlayConstraintSetModel",
