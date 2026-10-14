@@ -22,8 +22,10 @@ from server.auth import CurrentUserInfo
 from server.services.governance_grants import CurrentShowrunnerGrantReader, GovernanceGrantImporter
 from server.services.spatial_pair_decision_v2 import SpatialPairDecisionServiceV2
 from server.services.spatial_review_session import SpatialReviewSessionService
+from tests.integration.server.routers import test_gates_export
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
 from tests.integration.server.routers.test_spatial_constraint_snapshot import _current_binding
+from tests.integration.server.routers.test_spatial_execution import _colored_media
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -41,17 +43,17 @@ class ApprovedLocation:
     approval: PairDecisionResultV2
 
 
-async def approved_location(
-    client: AsyncClient,
-    project_dir: Path,
-    factory: Factory,
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    shot_duration: float | None = None,
-) -> ApprovedLocation:
-    binding_id, target_id = await _current_binding(
-        client, project_dir, factory, monkeypatch, shot_duration=shot_duration
-    )
+def distinct_parent_media(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Approve the binding's two parent masters as red and blue video, so their frames differ in pixels.
+
+    Spatial execution refuses a MASTER and REVERSE with identical frame bytes; the default parents are both black.
+    """
+    colors = {b"constraint-parent-a": "red", b"constraint-parent-b": "blue"}
+    monkeypatch.setattr(test_gates_export, "_media", lambda tag, **_kw: _colored_media(colors[tag]))
+
+
+async def showrunner_grants(factory: Factory) -> CurrentShowrunnerGrantReader:
+    """Import one signed, current HUMAN_SHOWRUNNER grant for the test user and return its reader."""
     private = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
     public = private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     grants = CurrentShowrunnerGrantReader(key_id=KEY_ID, public_key=public)
@@ -75,6 +77,21 @@ async def approved_location(
         canonical_json_bytes({"body": body, "signature": signature}, allow_nan=False),
         scope=GrantScopeV1(USER.id, PROJECT, USER.sub),
     )
+    return grants
+
+
+async def approved_location(
+    client: AsyncClient,
+    project_dir: Path,
+    factory: Factory,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    shot_duration: float | None = None,
+) -> ApprovedLocation:
+    binding_id, target_id = await _current_binding(
+        client, project_dir, factory, monkeypatch, shot_duration=shot_duration
+    )
+    grants = await showrunner_grants(factory)
 
     review = SpatialReviewSessionService(session_factory=factory, project_dir=project_dir, grants=grants)
     snapshot = await review.create(user_id=USER.id, project_name=PROJECT, principal=USER.sub, target_id=target_id)

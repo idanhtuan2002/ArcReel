@@ -127,7 +127,4 @@ async def test_pg_actual_activated_lifespan_starts_only_with_live_attestor(
     ):
         assert app_module.app.state.generation_worker is not None
         assert app_module.app.state.governance_grants is not None
-        assert app_module.app.state.spatial_review_sessions is not None
-        assert app_module.app.state.spatial_pair_current_v2 is not None
-        assert app_module.app.state.spatial_pair_decisions_v2 is not None
     assert not any(task.get_name() == "generation-worker" and not task.done() for task in asyncio.all_tasks())

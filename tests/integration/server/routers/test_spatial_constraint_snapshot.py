@@ -37,15 +37,18 @@ from tests.unit.r2.production_binding import spatial_constraint_fixture as fixtu
 type Factory = async_sessionmaker[AsyncSession]
 
 
-async def _current_binding(
+async def registered_frames(
     client: AsyncClient,
     project_dir: Path,
     factory: Factory,
     monkeypatch: pytest.MonkeyPatch,
     *,
     shot_duration: float | None = None,
-) -> tuple[str, str]:
-    """Register a Take Shot whose Scene has a location, then create its LOCATION binding from two frames."""
+) -> tuple[dict, list[dict]]:
+    """Register a Take Shot whose Scene has a location and derive one frame from each of two approved masters.
+
+    Returns the Shot's target ref and the two receipt refs, sorted, as JSON.
+    """
     monkeypatch.setattr(admission_helpers, "USER", USER.id)
     monkeypatch.setattr(admission_helpers, "PROJECT", PROJECT)
     admission, *_ = await target_helpers._admit(factory)
@@ -81,21 +84,35 @@ async def _current_binding(
             )
         )
     derived.sort(key=lambda receipt: receipt.frame_candidate_id)
+    return registered.shot_targets[0].model_dump(mode="json"), [
+        {"receipt_id": receipt.frame_candidate_id, "receipt_digest": _receipt_digest(receipt)} for receipt in derived
+    ]
+
+
+async def _current_binding(
+    client: AsyncClient,
+    project_dir: Path,
+    factory: Factory,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    shot_duration: float | None = None,
+) -> tuple[str, str]:
+    """Register a Take Shot whose Scene has a location, then create its LOCATION binding from two frames."""
+    target_ref, receipts = await registered_frames(
+        client, project_dir, factory, monkeypatch, shot_duration=shot_duration
+    )
     command = BindingCreateCommandV1.model_validate(
         {
             "user_id": USER.id,
             "project_name": PROJECT,
             "principal": USER.sub,
             "command_id": "constraint-binding-1",
-            "expected_target_ref": registered.shot_targets[0].model_dump(mode="json"),
-            "ordered_frame_receipts": [
-                {"receipt_id": receipt.frame_candidate_id, "receipt_digest": _receipt_digest(receipt)}
-                for receipt in derived
-            ],
+            "expected_target_ref": target_ref,
+            "ordered_frame_receipts": receipts,
         }
     )
     created = await LocationBindingCreationService(session_factory=factory, project_dir=project_dir).create(command)
-    return created.result.binding_id, registered.shot_targets[0].target_id
+    return created.result.binding_id, target_ref["target_id"]
 
 
 def attached_id(constraint_set: SpatialConstraintSetV1) -> str:

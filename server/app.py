@@ -79,6 +79,7 @@ from server.routers import (
     script_review,
     shot_uploads,
     spatial,
+    spatial_review,
     system,
     system_config,
     tasks,
@@ -377,9 +378,6 @@ async def lifespan(app: FastAPI):
     governance_read_dir = os.environ.get("ARCREEL_GOVERNANCE_READ_DIR")
     governance_attestor_dir = os.environ.get("ARCREEL_GOVERNANCE_ATTESTOR_DIR")
     app.state.governance_grants = None
-    app.state.spatial_review_sessions = None
-    app.state.spatial_pair_current_v2 = None
-    app.state.spatial_pair_decisions_v2 = None
     if governance_read_dir is None and governance_attestor_dir is None:
         # Run Alembic migrations (auto-creates tables on first start)
         await init_db()
@@ -391,21 +389,6 @@ async def lifespan(app: FastAPI):
         )
 
     projects_root = app_data_dir()
-    if app.state.governance_grants is not None:
-        from server.services.spatial_pair_current_v2 import CurrentApprovedSpatialPairReaderV2
-        from server.services.spatial_pair_decision_v2 import SpatialPairDecisionServiceV2
-        from server.services.spatial_review_session import SpatialReviewSessionService
-
-        app.state.spatial_review_sessions = SpatialReviewSessionService(
-            session_factory=async_session_factory, project_dir=projects_root, grants=app.state.governance_grants
-        )
-        app.state.spatial_pair_current_v2 = CurrentApprovedSpatialPairReaderV2(
-            session_factory=async_session_factory, project_dir=projects_root, grants=app.state.governance_grants
-        )
-        app.state.spatial_pair_decisions_v2 = SpatialPairDecisionServiceV2(
-            session_factory=async_session_factory, project_dir=projects_root, grants=app.state.governance_grants
-        )
-
     # 源文件编码迁移（幂等；失败不阻塞启动）。先于 schema 迁移跑：源文一律先归到 UTF-8，
     # 之后所有按 UTF-8 读源文的链路（分集规划、派生文件对账）才有统一的输入。
     source_migration_summary = await _migrate_source_encoding_on_startup(projects_root)
@@ -688,6 +671,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M8 spatial"],
+)
+app.include_router(
+    spatial_review.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["M8 spatial review"],
 )
 app.include_router(
     r2_shots.router,

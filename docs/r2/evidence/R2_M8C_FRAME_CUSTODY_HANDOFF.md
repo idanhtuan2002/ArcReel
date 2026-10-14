@@ -1256,3 +1256,38 @@ The single SQLite failure was \`test_overlapping_gate_c_approvals_of_one_artifac
 **State:** integration candidate (implemented, integrated, demonstrated offline; self-review only). Full M8-C acceptance still needs ADR-0103 activation by an operator, the HTTP/UI path for the human steps (F2), and the independent review the M8-C spec names; M8-D stays gated on it.
 
 **Next:** design the application routes for binding creation, review, pair decision and promotion (a public contract and authority seam: research, ADR/spec, then implementation), resolving F1 and F2 there.
+
+## Packet 5: application routes for the human steps — 2026-10-14 (Claude session)
+
+**Plan:** [packet 5 plan](../../superpowers/plans/2026-10-14-r2-m8c-human-step-routes-packet-5.md). Same branch as the vertical acceptance test.
+
+**Implemented:**
+- `server/routers/spatial_review.py` adds seven routes under `/projects/{p}/m8/spatial/`: `bindings`, `review-sessions`, `review-sessions/{id}/frames/{role}`, `review-sessions/{id}/acknowledgments`, `pair-decisions`, `promotion-previews` and `promotions`.
+  - Every route requires `InteractiveUser`, so API keys and anonymous mode get 401. The scope always comes from the session and the path, never from the body.
+  - Without an activated governance grant reader, review, decision and promotion return 503 `m8_spatial_review_unavailable`.
+  - Services are built per request with the project's own directory.
+- **Pair decisions:** the server reads `review_evidence_digest` from the stored, completed review session.
+- **Promotion previews** return the preview with its V2 `preview_digest`.
+- **Promotions:** the server mints the `PromotionAuthorization` from the session. A retried request whose authorization differs only in `authorized_at` replays with the stored authorization (`ExplorationRepository.get_authorization`, `SpatialPromotionService.stored_authorization`). Any other difference stays a 409.
+- **`server/app.py`:** the `app.state` review, pair reader and pair decision services built with `projects_root` are removed (F2's latent wrong `project_dir`), and the router is registered.
+- **i18n:** three error keys were added in en, vi and zh.
+- **Tests:**
+  - `test_spatial_review_routes.py` (3 tests) covers:
+    - the full human path through the routes to binding version 2, plus promotion replay and a changed digest;
+    - a stale decision (409), and body scope fields and a client actor (422);
+    - API key 401 and inactive governance 503.
+  - The fixture helpers `registered_frames`, `showrunner_grants` and `distinct_parent_media` were split out of the existing helpers.
+
+**Verification on the branch (before commit):**
+- SQLite: `tests/unit/lib/i18n`, `tests/integration/server/routers`, the activated governance startup file and `tests/integration/lib/db` give 1301 passed, 27 skipped.
+- PostgreSQL 18 (disposable container): the new route file plus the vertical, promotion, preview, review session, binding creation and constraint snapshot files give 20 passed.
+  - `test_pg_actual_activated_lifespan_starts_only_with_live_attestor` fails in this setup: `relation "execution_attempts" does not exist` from the lifespan's global session factory. It fails identically on the base `bad83b80`, so it is not caused by this packet.
+- Mutation: removing the promotion replay path fails the route test.
+- Static gates: ruff, format, basedpyright `--warnings` (0/0), lint-imports (22 kept), deptry and `audit_tests --check` are all clean.
+
+**Still open:**
+- No frontend UI for these routes.
+- F1 (identical-content pairs).
+- Promotion does not re-check the grant; it is bound to a current approved pair, which required it.
+- ADR-0103 operator activation and the live canary.
+- Self-review only.

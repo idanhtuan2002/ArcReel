@@ -249,6 +249,15 @@ class SpatialPromotionService:
             )
             return preview
 
+    async def stored_authorization(
+        self, *, user_id: str, project_name: str, command_id: str
+    ) -> PromotionAuthorization | None:
+        """The authorization an earlier promotion command stored, so a retried request can replay it exactly."""
+        async with self._sessions() as session:
+            return await ExplorationRepository(session).get_authorization(
+                user_id=user_id, project_name=project_name, command_id=command_id
+            )
+
     async def promote(
         self,
         *,

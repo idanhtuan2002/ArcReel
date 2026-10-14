@@ -434,6 +434,34 @@ class ExplorationRepository:
         row = (await self.session.execute(statement)).scalar_one_or_none()
         return None if row is None else (_preview_from_row(row), row.preview_digest)
 
+    async def get_authorization(
+        self, *, user_id: str, project_name: str, command_id: str
+    ) -> PromotionAuthorization | None:
+        """The authorization a promotion command stored, or None; the caller's replay rechecks its digest."""
+        row = (
+            await self.session.execute(
+                select(M8PromotionAuthorizationModel).where(
+                    M8PromotionAuthorizationModel.user_id == user_id,
+                    M8PromotionAuthorizationModel.project_name == project_name,
+                    M8PromotionAuthorizationModel.command_id == command_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        return PromotionAuthorization.model_validate(
+            {
+                "command_id": row.command_id,
+                "project_name": row.project_name,
+                "preview_id": row.preview_id,
+                "preview_digest": row.preview_digest,
+                "actor_id": row.actor_id,
+                "actor_scope": row.actor_scope,
+                "decision": row.decision,
+                "authorized_at": _as_utc(row.authorized_at),
+            }
+        )
+
     async def stage_authorization(self, *, user_id: str, authorization: PromotionAuthorization) -> str:
         authorization_digest = digest_canonical(authorization)
         self.session.add(
