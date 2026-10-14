@@ -84,3 +84,33 @@ The spec asks for at least two independent blind reviews, so this is a recorded 
 - The E4 evidence states the limit.
 
 The service still accepts two or more reviewers whenever they are assigned.
+
+## Decisions taken during E2 and E3 research
+
+8. **Local render execution records, not M7 attempts.**
+   - M7 `ExecutionAttempt` and the route inventory govern paid provider submits (`PaidAsyncSubmitFamily`). M3 local renders also stay outside M7.
+   - A format render is a local, deterministic FFmpeg run. It is recorded in `m8_format_renders` under an execution identity that binds:
+     - the source digest;
+     - the plan digest, which covers the profile, overlay and reframe;
+     - the full argv, including codec, fps, duration, CRF and threads;
+     - the FFmpeg version and the adapter version.
+
+     This covers everything spec §10 asks the identity to bind.
+   - `FormatCandidate.execution_id` is that render execution id.
+9. **Format slots and genesis.** A projection is promoted into its own M8 artifact slot, `m8-format:<sha256(source artifact key)[:16]>:<profile_ref>`, which is not a manifest key.
+   - The accepted M8-A preview and promotion only replace an existing master. They now also allow the first promotion into an empty slot, under all of these conditions:
+     - the candidate is `FORMAT`;
+     - the target is a format slot;
+     - `expected_target_version` is 0;
+     - the preview's `expected_master_id` and `expected_master_digest` are null (the contract already allows that).
+   - Every other kind and slot keeps the replace-only rule.
+10. **Format evidence gate.** Before a `FORMAT` preview or promotion, a format evidence port re-verifies:
+    - the latest technical report and the latest semantic report for the candidate's plan and artifact both pass, and match the payload's report ids and digests;
+    - the render execution succeeded for that plan and produced exactly that artifact digest;
+    - the plan's source master is still the current head of its source artifact key.
+
+    Any mismatch blocks with `M8_PROMOTION_BINDING_STALE`.
+11. **Blind review.**
+    - The reviewer opens a review packet holding the two clips, labelled A and B in an order the server draws and records. The packet shows no plan, profile or reframe detail.
+    - The reviewer gives PASS or FAIL for each rubric item, plus a note.
+    - Reviews come only from an interactive session. With a single reviewer, the report carries `SINGLE_REVIEWER_DEVIATION`.
