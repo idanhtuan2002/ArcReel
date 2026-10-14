@@ -58,6 +58,9 @@ from lib.db.models.learning import (
     LearningObservationCommandModel,
     LearningObservationModel,
     LearningRawRecordModel,
+    LearningRecommendationDecisionModel,
+    LearningRecommendationEvidenceModel,
+    LearningRecommendationModel,
 )
 from lib.db.models.narrative_lifecycle import (
     NarrativeChangeSetModel,
@@ -143,6 +146,9 @@ __all__ = [
     "LearningObservationCommandModel",
     "LearningObservationModel",
     "LearningRawRecordModel",
+    "LearningRecommendationDecisionModel",
+    "LearningRecommendationEvidenceModel",
+    "LearningRecommendationModel",
     "M8CandidateHeadModel",
     "M8CandidateRevisionModel",
     "M8CommandReceiptModel",

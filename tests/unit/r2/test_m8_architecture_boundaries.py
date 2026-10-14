@@ -78,7 +78,7 @@ def test_only_the_promotion_module_invokes_the_authority_adapter() -> None:
 
 
 def test_the_m8_repositories_never_commit() -> None:
-    for name in ("advanced_creative.py", "learning.py"):
+    for name in ("advanced_creative.py", "learning.py", "learning_recommendations.py"):
         source = (_ROOT / "lib" / "db" / "repositories" / name).read_text(encoding="utf-8")
 
         assert ".commit(" not in source, name
@@ -94,6 +94,61 @@ def test_the_m8_router_is_registered_once_behind_auth_and_the_migration_gate() -
         and node.func.attr == "include_router"
         and node.args
         and ast.unparse(node.args[0]) == "advanced_creative.router"
+    ]
+
+    assert len(registrations) == 1
+    dependencies = next(keyword for keyword in registrations[0].keywords if keyword.arg == "dependencies")
+    rendered = ast.unparse(dependencies.value)
+    assert "get_current_user" in rendered
+    assert "require_project_migration_ok" in rendered
+
+
+_LEARNING_HOST = [
+    _ROOT / "server" / "services" / "learning.py",
+    _ROOT / "server" / "routers" / "learning.py",
+    _ROOT / "lib" / "db" / "repositories" / "learning.py",
+    _ROOT / "lib" / "db" / "repositories" / "learning_recommendations.py",
+]
+_AUTHORITY_WRITERS = (
+    "r2.narrative",
+    "r2.narrative_plan",
+    "r2.narrative_lifecycle",
+    "r2.production",
+    "r2.production_binding",
+    "r2.governance",
+    "r2.adaptation",
+    "r2.gates",
+    "lib.db.repositories.production",
+    "lib.db.repositories.canon",
+    "lib.db.repositories.governance",
+    "lib.generation_queue",
+    "server.services.governance",
+    "server.services.production",
+    "server.services.gates",
+)
+
+
+def test_learning_has_no_authority_write_port() -> None:
+    offenders = {
+        path.relative_to(_ROOT).as_posix(): name
+        for path in _LEARNING_HOST
+        for name in _imports(path)
+        if any(name == writer or name.startswith((writer + ".", writer + "_")) for writer in _AUTHORITY_WRITERS)
+    }
+
+    assert offenders == {}
+
+
+def test_the_learning_router_is_registered_once_behind_auth_and_the_migration_gate() -> None:
+    tree = ast.parse((_ROOT / "server" / "app.py").read_text(encoding="utf-8"))
+    registrations = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "include_router"
+        and node.args
+        and ast.unparse(node.args[0]) == "learning.router"
     ]
 
     assert len(registrations) == 1

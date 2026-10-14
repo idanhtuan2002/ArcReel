@@ -65,7 +65,7 @@ class LearningObservationRepository:
         self.session = session
         self._clock = clock or (lambda: datetime.now(UTC))
 
-    async def _lock_scope(self, *, user_id: str, project_name: str) -> None:
+    async def lock_scope(self, *, user_id: str, project_name: str) -> None:
         """Serialize every admission in one scope (PostgreSQL); SQLite already has one writer."""
         if self.session.get_bind().dialect.name != "postgresql":
             return
@@ -170,7 +170,7 @@ class LearningObservationRepository:
             raise ValueError("command_id is required")
         validate_observation(observation, project_name=project_name)
         command_digest = ingest_command_digest(user_id=user_id, project_name=project_name, observation=observation)
-        await self._lock_scope(user_id=user_id, project_name=project_name)
+        await self.lock_scope(user_id=user_id, project_name=project_name)
         if raw_payload is not None:
             await self._store_raw(
                 user_id=user_id,

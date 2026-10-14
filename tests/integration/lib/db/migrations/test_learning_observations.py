@@ -16,8 +16,9 @@ TABLE = "m8_learning_observations"
 def test_observation_migration_has_scoped_chain_keys_and_downgrades_alone(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["914c4a0e0001"]
+    assert script.get_heads() == ["915c4a0e0001"]
     assert script.get_revision("914c4a0e0001").down_revision == "913c4a0e0001"
+    assert script.get_revision("915c4a0e0001").down_revision == "914c4a0e0001"
 
     command.upgrade(cfg, "head")
     inspector = sa.inspect(sa.create_engine(f"sqlite:///{db_path}"))
@@ -53,7 +54,32 @@ def test_observation_migration_has_scoped_chain_keys_and_downgrades_alone(alembi
     )
     assert original["unique"]
 
+    decisions = "m8_learning_recommendation_decisions"
+    assert {
+        "uq_m8_learning_recommendation_decisions_command",
+        "ck_m8_learning_decision_terminal",
+        "ck_m8_learning_decision_proposal",
+    } <= {
+        item["name"]
+        for item in inspector.get_unique_constraints(decisions) + inspector.get_check_constraints(decisions)
+    }
+    terminal = next(
+        index
+        for index in inspector.get_indexes(decisions)
+        if index["name"] == "uq_m8_learning_recommendation_decisions_terminal"
+    )
+    assert terminal["unique"]
+    evidence = {
+        (tuple(fk["constrained_columns"]), fk["referred_table"], (fk.get("options") or {}).get("ondelete"))
+        for fk in inspector.get_foreign_keys("m8_learning_recommendation_evidence")
+    }
+    assert (("user_id", "project_name", "observation_id"), TABLE, "RESTRICT") in evidence
+
     before = set(inspector.get_table_names())
+    command.downgrade(cfg, "914c4a0e0001")
+    assert {decisions, "m8_learning_recommendations", "m8_learning_recommendation_evidence"} <= before - set(
+        sa.inspect(sa.create_engine(f"sqlite:///{db_path}")).get_table_names()
+    )
     command.downgrade(cfg, "913c4a0e0001")
     after = set(sa.inspect(sa.create_engine(f"sqlite:///{db_path}")).get_table_names())
     assert {TABLE, "m8_learning_observation_commands", "m8_learning_raw_records"} <= before - after

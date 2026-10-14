@@ -51,6 +51,24 @@ class ObservationConflictError(M8Error):
     code = "m8_observation_conflict"
 
 
+class RecommendationNotFoundError(M8Error):
+    """An unknown or foreign recommendation; the two are indistinguishable to callers."""
+
+    code = "m8_recommendation_not_found"
+
+
+class RecommendationConflictError(M8Error):
+    """The recommendation id, proposal or decision conflicts with what is already recorded."""
+
+    code = "m8_recommendation_conflict"
+
+
+class RecommendationStaleError(M8Error):
+    """The recommendation expired, changed, or its evidence is no longer current."""
+
+    code = "m8_recommendation_stale"
+
+
 __all__ = [
     "CandidateConflictError",
     "CommandConflictError",
@@ -60,4 +78,7 @@ __all__ = [
     "ObservationNotFoundError",
     "PromotionBindingStaleError",
     "PromotionTargetUnavailableError",
+    "RecommendationConflictError",
+    "RecommendationNotFoundError",
+    "RecommendationStaleError",
 ]

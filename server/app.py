@@ -66,6 +66,7 @@ from server.routers import (
     gates,
     generate,
     grids,
+    learning,
     onboarding,
     presentations,
     products,
@@ -684,6 +685,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M8 spatial targets"],
+)
+app.include_router(
+    learning.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["M8 learning"],
 )
 app.include_router(
     r2_shots.router,

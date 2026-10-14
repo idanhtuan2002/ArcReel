@@ -143,4 +143,134 @@ class LearningRawRecordModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-__all__ = ["LearningObservationCommandModel", "LearningObservationModel", "LearningRawRecordModel"]
+_TERMINAL = text("terminal")
+
+
+class LearningRecommendationModel(Base):
+    """An append-only proposal; its evidence rows name the exact observations it used."""
+
+    __tablename__ = "m8_learning_recommendations"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "recommendation_id", name="pk_m8_learning_recommendations"),
+        UniqueConstraint("user_id", "project_name", "command_id", name="uq_m8_learning_recommendations_command"),
+        Index("ix_m8_learning_recommendations_proposal", "user_id", "project_name", "proposal_key"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, server_default=DEFAULT_USER_ID
+    )
+    project_name: Mapped[str] = mapped_column(_ID)
+    recommendation_id: Mapped[str] = mapped_column(_ID)
+    recommendation_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    recommendation_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    proposal_key: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    rule: Mapped[str] = mapped_column(_SHORT, nullable=False)
+    evidence_cutoff: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    command_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    command_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class LearningRecommendationEvidenceModel(Base):
+    __tablename__ = "m8_learning_recommendation_evidence"
+    __table_args__ = (
+        PrimaryKeyConstraint(
+            "user_id",
+            "project_name",
+            "recommendation_id",
+            "observation_id",
+            name="pk_m8_learning_recommendation_evidence",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "recommendation_id"],
+            [
+                "m8_learning_recommendations.user_id",
+                "m8_learning_recommendations.project_name",
+                "m8_learning_recommendations.recommendation_id",
+            ],
+            name="fk_m8_learning_recommendation_evidence_recommendation",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "observation_id"],
+            [
+                "m8_learning_observations.user_id",
+                "m8_learning_observations.project_name",
+                "m8_learning_observations.observation_id",
+            ],
+            name="fk_m8_learning_recommendation_evidence_observation",
+            ondelete="RESTRICT",
+        ),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, server_default=DEFAULT_USER_ID
+    )
+    project_name: Mapped[str] = mapped_column(_ID)
+    recommendation_id: Mapped[str] = mapped_column(_ID)
+    observation_id: Mapped[str] = mapped_column(_ID)
+
+
+class LearningRecommendationDecisionModel(Base):
+    """An append-only Human disposition; at most one terminal (ACCEPT/REJECT) per recommendation."""
+
+    __tablename__ = "m8_learning_recommendation_decisions"
+    __table_args__ = (
+        PrimaryKeyConstraint("user_id", "project_name", "decision_id", name="pk_m8_learning_recommendation_decisions"),
+        UniqueConstraint(
+            "user_id", "project_name", "command_id", name="uq_m8_learning_recommendation_decisions_command"
+        ),
+        CheckConstraint(
+            "disposition IN ('ACCEPT', 'REJECT', 'DEFER', 'REQUEST_EXPERIMENT')",
+            name="ck_m8_learning_decision_disposition",
+        ),
+        CheckConstraint("terminal = (disposition IN ('ACCEPT', 'REJECT'))", name="ck_m8_learning_decision_terminal"),
+        CheckConstraint(
+            "(disposition = 'ACCEPT') = (governed_proposal_ref IS NOT NULL)", name="ck_m8_learning_decision_proposal"
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "recommendation_id"],
+            [
+                "m8_learning_recommendations.user_id",
+                "m8_learning_recommendations.project_name",
+                "m8_learning_recommendations.recommendation_id",
+            ],
+            name="fk_m8_learning_recommendation_decisions_recommendation",
+            ondelete="RESTRICT",
+        ),
+        Index(
+            "uq_m8_learning_recommendation_decisions_terminal",
+            "user_id",
+            "project_name",
+            "recommendation_id",
+            unique=True,
+            postgresql_where=_TERMINAL,
+            sqlite_where=_TERMINAL,
+        ),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, server_default=DEFAULT_USER_ID
+    )
+    project_name: Mapped[str] = mapped_column(_ID)
+    decision_id: Mapped[str] = mapped_column(_ID)
+    recommendation_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    disposition: Mapped[str] = mapped_column(String(32), nullable=False)
+    terminal: Mapped[bool] = mapped_column(nullable=False)
+    governed_proposal_ref: Mapped[str | None] = mapped_column(_ID, nullable=True)
+    decision_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    decision_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    command_id: Mapped[str] = mapped_column(_ID, nullable=False)
+    command_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+__all__ = [
+    "LearningObservationCommandModel",
+    "LearningObservationModel",
+    "LearningRawRecordModel",
+    "LearningRecommendationDecisionModel",
+    "LearningRecommendationEvidenceModel",
+    "LearningRecommendationModel",
+]
