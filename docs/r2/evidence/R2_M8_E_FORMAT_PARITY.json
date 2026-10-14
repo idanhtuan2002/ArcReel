@@ -13,7 +13,7 @@
     "donor_test_inventory_digest": "sha256:2d6591851ab7ace9b539348b005889c706dff7859129ce8db01a18b4d9d0c110",
     "fixture_set_digest": "sha256:d94c67f104054487359d04b0cfa278875a6fc4e0fca66ef97894d27701f433c8"
   },
-  "integrated_head": "02ccd0549e4840c6c362a2cdeff23debb14ad1be",
+  "integrated_head": "76696b6b06f07ed7168fec7cf878fcfb29f79852",
   "rows": [
     {
       "behavior_id": "F01",
@@ -166,17 +166,17 @@
   "commands": [
     {
       "command": "executed R2 files at HEAD",
-      "head": "02ccd0549e4840c6c362a2cdeff23debb14ad1be",
+      "head": "76696b6b06f07ed7168fec7cf878fcfb29f79852",
       "digests": {
-        "r2/advanced_creative/format_render.py": "sha256:02cf4b3710b8ae2bd06cea7d8e449ac4d6d4675af0433b8e0e1276aa1fe8d043",
-        "r2/advanced_creative/formats.py": "sha256:c0fa416abd671a8d3dda38533f098f3ea1298cdb987abe11885598947be46d05",
-        "scripts/r2/check_m8e_format_parity.py": "sha256:a9c6ebd9ed3e406ab5a79e90882d9ce4cdda5b7c6c4cfc5d4d2019ada7afb787"
+        "r2/advanced_creative/format_render.py": "sha256:3b7bd02dfaa00060bd6fe019380a2872039e4390f3883a0cc9b9e840be4e7e39",
+        "r2/advanced_creative/formats.py": "sha256:8f65d19e5a5d1c4c6646c14a18e592de8194d2a0449410e9ac5ba82ec7ec8456",
+        "scripts/r2/check_m8e_format_parity.py": "sha256:d8a7c8861c98d93ca1d4bf3433b1f4fa04e0679cd095c8e0c3a96a07b800c9fb"
       }
     },
     {
       "command": "donor pytest tests/tools/test_video_compose_vertical.py",
       "exit": 0,
-      "result": "3 passed in 2.04s"
+      "result": "3 passed in 2.10s"
     }
   ],
   "required_skips": [],
