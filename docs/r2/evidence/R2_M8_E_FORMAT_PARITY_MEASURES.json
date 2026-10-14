@@ -1,5 +1,6 @@
 {
   "cover-1080x1080": {
+    "decode_ok": true,
     "donor": {
       "audio": [
         "aac"
@@ -11,8 +12,10 @@
       "height": 1080,
       "width": 1080
     },
+    "donor_crop_x": 280,
     "donor_deterministic": true,
-    "donor_median_s": 0.598,
+    "donor_median_s": 0.608,
+    "fps_ok": true,
     "psnr_db": 42.48,
     "r2": {
       "audio": [
@@ -25,11 +28,13 @@
       "height": 1080,
       "width": 1080
     },
+    "r2_crop_x": 280,
     "r2_deterministic": true,
-    "r2_median_s": 1.488,
+    "r2_median_s": 1.478,
     "r2_sha256": "sha256:52991c13667fc7e260d577bc29480d6664ae6cd60986412e391a63341c7c7652"
   },
   "cover-1080x1920": {
+    "decode_ok": true,
     "donor": {
       "audio": [
         "aac"
@@ -41,9 +46,11 @@
       "height": 1920,
       "width": 1080
     },
+    "donor_crop_x": 437,
     "donor_deterministic": true,
-    "donor_median_s": 0.802,
-    "psnr_db": 39.6,
+    "donor_median_s": 0.8,
+    "fps_ok": true,
+    "psnr_db": 39.63,
     "r2": {
       "audio": [
         "aac"
@@ -55,11 +62,13 @@
       "height": 1920,
       "width": 1080
     },
+    "r2_crop_x": 438,
     "r2_deterministic": true,
-    "r2_median_s": 1.635,
+    "r2_median_s": 1.631,
     "r2_sha256": "sha256:3b1a50337d1eafd868d3dd179b0dbe3ec5a1e667c8c410b0b703b18cfa22004b"
   },
   "cover-1920x1080": {
+    "decode_ok": true,
     "donor": {
       "audio": [
         "aac"
@@ -71,8 +80,10 @@
       "height": 1080,
       "width": 1920
     },
+    "donor_crop_x": 0,
     "donor_deterministic": true,
-    "donor_median_s": 0.821,
+    "donor_median_s": 0.802,
+    "fps_ok": true,
     "psnr_db": 43.8,
     "r2": {
       "audio": [
@@ -85,15 +96,19 @@
       "height": 1080,
       "width": 1920
     },
+    "r2_crop_x": 0,
     "r2_deterministic": true,
-    "r2_median_s": 2.299,
+    "r2_median_s": 2.313,
     "r2_sha256": "sha256:80fff71201cb13755c695338870765a43a913bcb7323812067dd43e743cf0f14"
   },
   "missing-source": {
-    "donor_failed": true,
-    "r2_failed": true
+    "donor_reason": "Cut source not found: <work>/missing.mp4",
+    "donor_refused": true,
+    "r2_reason_names_missing_file": true,
+    "r2_refused": true
   },
   "pad-1080x1080": {
+    "decode_ok": true,
     "donor": {
       "audio": [
         "aac"
@@ -105,9 +120,11 @@
       "height": 1080,
       "width": 1080
     },
+    "donor_crop_x": null,
     "donor_deterministic": true,
-    "donor_median_s": 0.528,
-    "psnr_db": 44.19,
+    "donor_median_s": 0.524,
+    "fps_ok": true,
+    "psnr_db": 44.15,
     "r2": {
       "audio": [
         "aac"
@@ -119,11 +136,13 @@
       "height": 1080,
       "width": 1080
     },
+    "r2_crop_x": 0,
     "r2_deterministic": true,
-    "r2_median_s": 1.05,
+    "r2_median_s": 1.046,
     "r2_sha256": "sha256:2fc019691310043862fa5e44709bb61d3d4056372dd5fc25a59a2e18fd09b17d"
   },
   "pad-1080x1920": {
+    "decode_ok": true,
     "donor": {
       "audio": [
         "aac"
@@ -135,8 +154,10 @@
       "height": 1920,
       "width": 1080
     },
+    "donor_crop_x": null,
     "donor_deterministic": true,
-    "donor_median_s": 0.646,
+    "donor_median_s": 0.655,
+    "fps_ok": true,
     "psnr_db": 47.22,
     "r2": {
       "audio": [
@@ -149,11 +170,13 @@
       "height": 1920,
       "width": 1080
     },
+    "r2_crop_x": 0,
     "r2_deterministic": true,
-    "r2_median_s": 1.317,
+    "r2_median_s": 1.318,
     "r2_sha256": "sha256:e540400b683100c3737f564ec418d9232d8ca3ef12347154bea3a0ca7d20d046"
   },
   "pad-1920x1080": {
+    "decode_ok": true,
     "donor": {
       "audio": [
         "aac"
@@ -165,9 +188,11 @@
       "height": 1080,
       "width": 1920
     },
+    "donor_crop_x": null,
     "donor_deterministic": true,
-    "donor_median_s": 0.794,
-    "psnr_db": 43.47,
+    "donor_median_s": 0.816,
+    "fps_ok": true,
+    "psnr_db": 43.8,
     "r2": {
       "audio": [
         "aac"
@@ -179,8 +204,9 @@
       "height": 1080,
       "width": 1920
     },
+    "r2_crop_x": 0,
     "r2_deterministic": true,
-    "r2_median_s": 2.319,
+    "r2_median_s": 2.294,
     "r2_sha256": "sha256:80fff71201cb13755c695338870765a43a913bcb7323812067dd43e743cf0f14"
   }
 }
