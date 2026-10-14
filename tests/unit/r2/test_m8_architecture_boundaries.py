@@ -156,3 +156,22 @@ def test_the_learning_router_is_registered_once_behind_auth_and_the_migration_ga
     rendered = ast.unparse(dependencies.value)
     assert "get_current_user" in rendered
     assert "require_project_migration_ok" in rendered
+
+
+def test_the_format_router_is_registered_once_behind_auth_and_the_migration_gate() -> None:
+    tree = ast.parse((_ROOT / "server" / "app.py").read_text(encoding="utf-8"))
+    registrations = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "include_router"
+        and node.args
+        and ast.unparse(node.args[0]) == "formats.router"
+    ]
+
+    assert len(registrations) == 1
+    dependencies = next(keyword for keyword in registrations[0].keywords if keyword.arg == "dependencies")
+    rendered = ast.unparse(dependencies.value)
+    assert "get_current_user" in rendered
+    assert "require_project_migration_ok" in rendered

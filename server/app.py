@@ -63,6 +63,7 @@ from server.routers import (
     end_frames,
     execution_events,
     files,
+    formats,
     gates,
     generate,
     grids,
@@ -691,6 +692,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M8 learning"],
+)
+app.include_router(
+    formats.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["M8 formats"],
 )
 app.include_router(
     r2_shots.router,
