@@ -2419,4 +2419,7 @@ export default {
   'learning_decide': 'Record decision',
   'learning_deciding': 'Recording…',
   'learning_decide_failed': 'The decision could not be recorded',
+  'learning_lead_higher': 'Format {{b}} averages {{lift}} more {{metric}} than {{a}}.',
+  'learning_lead_lower': 'Format {{b}} averages {{lift}} less {{metric}} than {{a}}.',
+  'learning_recorded_hypothesis': 'Recorded hypothesis',
 };

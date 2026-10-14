@@ -2417,4 +2417,7 @@ export default {
   'learning_decide': 'Ghi quyết định',
   'learning_deciding': 'Đang ghi…',
   'learning_decide_failed': 'Không ghi được quyết định',
+  'learning_lead_higher': 'Định dạng {{b}} có {{metric}} trung bình cao hơn {{a}} {{lift}}.',
+  'learning_lead_lower': 'Định dạng {{b}} có {{metric}} trung bình thấp hơn {{a}} {{lift}}.',
+  'learning_recorded_hypothesis': 'Giả thuyết đã ghi',
 } satisfies Record<keyof typeof enDashboard, string>;

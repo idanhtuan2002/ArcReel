@@ -2418,4 +2418,7 @@ export default {
   'learning_decide': '记录决定',
   'learning_deciding': '正在记录…',
   'learning_decide_failed': '无法记录该决定',
+  'learning_lead_higher': '{{b}} 画幅的平均 {{metric}} 比 {{a}} 高 {{lift}}。',
+  'learning_lead_lower': '{{b}} 画幅的平均 {{metric}} 比 {{a}} 低 {{lift}}。',
+  'learning_recorded_hypothesis': '记录的假设',
 } satisfies Record<keyof typeof enDashboard, string>;

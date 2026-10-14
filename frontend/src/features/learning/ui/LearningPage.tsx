@@ -56,6 +56,12 @@ function percent(value: number | null): string {
   return `${sign}${Math.abs(value * 100).toFixed(1)}%`;
 }
 
+function amount(value: string | null, locale: string): string {
+  if (value === null) return "—";
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toLocaleString(locale, { maximumFractionDigits: 2 }) : value;
+}
+
 function when(value: string, locale: string): string {
   return new Date(value).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
 }
@@ -267,7 +273,8 @@ function EvaluatePanel({ projectName, onProposed }: { projectName: string; onPro
 
 /** Arm A and arm B face each other; the signed lift of B over A sits between them. */
 function ArmLedger({ arms }: { arms: ArmSummary[] }) {
-  const { t } = useTranslation("dashboard");
+  const { t, i18n } = useTranslation("dashboard");
+  const locale = i18n.language;
   const means = arms.map((arm) => (arm.mean === null ? 0 : Math.abs(Number(arm.mean))));
   const scale = Math.max(...means, 0) || 1;
   const lift = relativeLift(arms);
@@ -278,7 +285,7 @@ function ArmLedger({ arms }: { arms: ArmSummary[] }) {
           <p className="font-mono text-[10px] tracking-[0.14em] text-text-3">
             {index === 0 ? "ARM A" : "ARM B"} · {arm.arm}
           </p>
-          <p className="mt-1 font-mono text-2xl tabular-nums text-text">{arm.mean ?? "—"}</p>
+          <p className="mt-1 font-mono text-2xl tabular-nums text-text">{amount(arm.mean, locale)}</p>
           <div className="lr-bar" aria-hidden>
             <span style={{ width: `${(means[index] / scale) * 100}%` }} />
           </div>
@@ -288,10 +295,10 @@ function ArmLedger({ arms }: { arms: ArmSummary[] }) {
               {arm.present} / {arm.n}
             </dd>
             <dt>{t("learning_stat_median")}</dt>
-            <dd>{arm.median ?? "—"}</dd>
+            <dd>{amount(arm.median, locale)}</dd>
             <dt>{t("learning_stat_range")}</dt>
             <dd>
-              {arm.min ?? "—"} – {arm.max ?? "—"}
+              {amount(arm.min, locale)} – {amount(arm.max, locale)}
             </dd>
             {Object.entries(arm.missing).map(([reason, count]) => (
               <div key={reason} className="contents">
@@ -324,9 +331,20 @@ function RecommendationCard({
   const { t, i18n } = useTranslation("dashboard");
   const recommendation = view.recommendation;
   const summaries = recommendation.applicability.summaries ?? [];
+  const lift = relativeLift(summaries);
+  const metric = recommendation.applicability.metric_name;
+  const lead =
+    summaries.length === 2 && lift !== null && typeof metric === "string"
+      ? t(lift >= 0 ? "learning_lead_higher" : "learning_lead_lower", {
+          a: summaries[0].arm,
+          b: summaries[1].arm,
+          metric,
+          lift: percent(Math.abs(lift)).replace("+", ""),
+        })
+      : null;
   const expired = new Date(recommendation.expires_at).getTime() <= now;
   return (
-    <article className="rounded-md border border-hairline p-4" aria-labelledby={`lr-${recommendation.recommendation_id}`}>
+    <article className="lr-card rounded-md border border-hairline p-4" aria-labelledby={`lr-${recommendation.recommendation_id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={view.language === "causal" ? "lr-badge lr-badge-causal" : "lr-badge"}>
           {view.language === "causal" ? "CAUSAL" : "ASSOCIATIVE"}
@@ -337,8 +355,13 @@ function RecommendationCard({
         ) : null}
       </div>
       <p id={`lr-${recommendation.recommendation_id}`} className="mt-2 font-editorial text-base leading-snug text-text">
-        {recommendation.hypothesis}
+        {lead ?? recommendation.hypothesis}
       </p>
+      {lead ? (
+        <p className="mt-1 font-mono text-[10px] leading-relaxed text-text-3">
+          {t("learning_recorded_hypothesis")}: {recommendation.hypothesis}
+        </p>
+      ) : null}
       <p className="mt-1 text-xs text-text-3">
         {view.language === "causal" ? t("learning_language_causal") : t("learning_language_associative")}
       </p>
