@@ -146,34 +146,37 @@ class FormatSemanticReportModel(_Scoped, Base):
 
 
 class FormatRenderModel(_Scoped, Base):
-    """One render execution of a plan; its id is the deterministic execution identity.
+    """The evidence of one succeeded M7 render execution of a plan.
 
-    The state moves RUNNING -> SUCCEEDED, FAILED or CANCELLED. A FAILED, CANCELLED or abandoned
-    RUNNING execution may run again (``attempt`` counts the runs); a SUCCEEDED one only replays.
+    The execution itself (planning, submit, failure, unknown outcomes, recovery) is an M7
+    ``execution_attempts`` row; this row binds that execution to its plan, command, exact source,
+    argv, FFmpeg build and content-addressed output. It is written once, when the attempt succeeds.
     """
 
     __tablename__ = "m8_format_renders"
     __table_args__ = (
         PrimaryKeyConstraint("user_id", "project_name", "execution_id", name="pk_m8_format_renders"),
+        UniqueConstraint("user_id", "project_name", "command_id", name="uq_m8_format_renders_command"),
         ForeignKeyConstraint(
             ["user_id", "project_name", "plan_id"], _PLAN, name="fk_m8_format_renders_plan", ondelete="RESTRICT"
         ),
-        CheckConstraint("state IN ('RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED')", name="ck_m8_format_renders_state"),
-        CheckConstraint("(state = 'SUCCEEDED') = (artifact_digest IS NOT NULL)", name="ck_m8_format_renders_artifact"),
+        ForeignKeyConstraint(
+            ["user_id", "project_name", "execution_id"],
+            ["execution_attempts.user_id", "execution_attempts.project_name", "execution_attempts.execution_id"],
+            name="fk_m8_format_renders_attempt",
+            ondelete="RESTRICT",
+        ),
     )
 
     execution_id: Mapped[str] = mapped_column(_ID)
+    command_id: Mapped[str] = mapped_column(_ID, nullable=False)
     plan_id: Mapped[str] = mapped_column(_ID, nullable=False)
     source_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
     argv_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
     ffmpeg_version: Mapped[str] = mapped_column(_ID, nullable=False)
-    state: Mapped[str] = mapped_column(String(16), nullable=False)
-    attempt: Mapped[int] = mapped_column(nullable=False)
-    artifact_digest: Mapped[str | None] = mapped_column(_DIGEST, nullable=True)
-    artifact_ref: Mapped[str | None] = mapped_column(_ID, nullable=True)
-    error: Mapped[str | None] = mapped_column(String(1000), nullable=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    artifact_digest: Mapped[str] = mapped_column(_DIGEST, nullable=False)
+    artifact_ref: Mapped[str] = mapped_column(_ID, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class FormatReviewPacketModel(_Scoped, Base):

@@ -19,6 +19,7 @@ from r2.host_hardening.provider_capabilities import (
 
 HOST_VIDEO_ADAPTER_VERSION = "host-video-v1"
 HOST_SPATIAL_ADAPTER_VERSION = "host-spatial-v1"
+HOST_FORMAT_ADAPTER_VERSION = "host-format-v1"
 CUSTOM_PROVIDER_FAMILY = "custom-*"
 
 
@@ -118,7 +119,16 @@ SPATIAL_SUBMIT_FAMILIES = (
     ),
 )
 
-_ALL_SUBMIT_FAMILIES = PAID_ASYNC_SUBMIT_FAMILIES + SPATIAL_SUBMIT_FAMILIES
+#: Local deterministic FFmpeg projection renders (M8-E): no spend, but the same M7 attempt custody.
+FORMAT_RENDER_SUBMIT_FAMILIES = (
+    PaidAsyncSubmitFamily(
+        SubmitRouteKey("local-ffmpeg", "format-projection", HOST_FORMAT_ADAPTER_VERSION),
+        "local-ffmpeg-format-projection@host-format-v1",
+        "server.services.format_render:FormatRenderService.render",
+    ),
+)
+
+_ALL_SUBMIT_FAMILIES = PAID_ASYNC_SUBMIT_FAMILIES + SPATIAL_SUBMIT_FAMILIES + FORMAT_RENDER_SUBMIT_FAMILIES
 
 #: Built-in video provider ids (backend spec registry) -> the provider id their backend submits as.
 #: Every built-in ``(provider, "video")`` spec must appear here; a new one fails the inventory test.
@@ -212,6 +222,8 @@ def submit_route_inventory_problems() -> list[str]:
 __all__ = [
     "BUILTIN_VIDEO_SUBMIT_PROVIDER",
     "CUSTOM_PROVIDER_FAMILY",
+    "FORMAT_RENDER_SUBMIT_FAMILIES",
+    "HOST_FORMAT_ADAPTER_VERSION",
     "HOST_SPATIAL_ADAPTER_VERSION",
     "HOST_VIDEO_ADAPTER_VERSION",
     "PAID_ASYNC_SUBMIT_FAMILIES",

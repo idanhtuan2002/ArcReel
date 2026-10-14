@@ -18,24 +18,38 @@ import shutil
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.formats import FormatRenderModel
 from lib.db.repositories.formats import FormatRepository
+from lib.db.repositories.host_hardening import ExecutionAttemptRepository
+from lib.video_backends.execution_adapter import accepted_submit_receipt
+from r2.advanced_creative.digests import digest_canonical
 from r2.advanced_creative.errors import FormatConflictError, FormatNotFoundError, M8Error
 from r2.advanced_creative.format_render import execution_identity, materialize, render_argv
-from r2.advanced_creative.formats import validate_plan
+from r2.advanced_creative.formats import FormatInvalidError, validate_plan
+from r2.contracts.execution import ProviderRequest
+from r2.contracts.host_hardening import (
+    AttemptSnapshot,
+    ExecutionAttemptState,
+    ProviderObservation,
+    ProviderObservationKind,
+    ProviderRouteSnapshot,
+)
+from r2.host_hardening.host_submit import AttemptSubmitter
+from r2.host_hardening.paid_routes import current_release_mode
+from r2.host_hardening.route_inventory import (
+    FORMAT_RENDER_SUBMIT_FAMILIES,
+    HOST_FORMAT_ADAPTER_VERSION,
+    require_submit_route,
+)
+from server.services.execution_attempts import capability_resolver
 
 Clock = Callable[[], datetime]
-
-
-class FormatRenderBusyError(M8Error):
-    """The same render execution is already running."""
-
-    code = "m8_format_render_busy"
 
 
 class FormatRenderFailedError(M8Error):
@@ -123,32 +137,86 @@ async def ffmpeg_version(ffmpeg: str = "ffmpeg") -> str:
     return output.decode("utf-8", "replace").splitlines()[0].strip()
 
 
+FORMAT_REQUEST_SCHEMA = "r2.m8.format.render.v1"
+_FAMILY = FORMAT_RENDER_SUBMIT_FAMILIES[0]
+
+
+def render_task_id(user_id: str, project_name: str, command_id: str) -> str:
+    scope = digest_canonical({"user_id": user_id, "project_name": project_name, "command_id": command_id})
+    return "m8e-format:" + scope.removeprefix("sha256:")
+
+
+def render_route(ffmpeg_version_line: str) -> ProviderRouteSnapshot:
+    return ProviderRouteSnapshot(
+        provider_id=_FAMILY.key.provider_id,
+        provider_account_ref="local",
+        provider_model_id="ffmpeg",
+        backend_model_id=ffmpeg_version_line,
+        endpoint_id=_FAMILY.key.endpoint_id,
+        submitted_base_url="local://ffmpeg",
+        adapter_version=HOST_FORMAT_ADAPTER_VERSION,
+        capability_profile_ref=_FAMILY.capability_profile_ref,
+    )
+
+
 class FormatRenderService:
+    """Render one plan through one bounded M7 attempt and record its evidence on success.
+
+    A render command is an M7 task with a single attempt: re-sending the same command replays it
+    (M7 checks the request is identical), and a failed, cancelled or unknown attempt is retried with
+    a new command. The submit function runs FFmpeg on a private snapshot of the exact master bytes
+    and stores the output content-addressed; M7 records the outcome, including unknown ones.
+    """
+
     def __init__(
         self,
         sessions: async_sessionmaker[AsyncSession],
         *,
+        submitter_for: Callable[[AsyncSession, str, str], AttemptSubmitter],
         ffmpeg: str = "ffmpeg",
         ffprobe: str = "ffprobe",
         timeout: float = 1800,
-        stale_after: timedelta = timedelta(hours=2),
         clock: Clock | None = None,
     ) -> None:
         self._sessions = sessions
+        self._submitter_for = submitter_for
         self._ffmpeg = ffmpeg
         self._ffprobe = ffprobe
         self._timeout = timeout
-        self._stale_after = stale_after
         self._clock = clock or (lambda: datetime.now(UTC))
 
     async def render(
-        self, *, user_id: str, project_name: str, project_dir: Path, plan_id: str, source: Path
+        self, *, user_id: str, project_name: str, project_dir: Path, plan_id: str, source: Path, command_id: str
     ) -> RenderResult:
+        if not command_id:
+            raise FormatInvalidError("a render names its command id")
         async with self._sessions() as session:
             plan = await FormatRepository(session).get_plan(user_id=user_id, project_name=project_name, plan_id=plan_id)
+            recorded = await session.scalar(
+                select(FormatRenderModel).where(
+                    FormatRenderModel.user_id == user_id,
+                    FormatRenderModel.project_name == project_name,
+                    FormatRenderModel.command_id == command_id,
+                )
+            )
         if plan is None:
             raise FormatNotFoundError("unknown format plan")
         validate_plan(plan)
+        if recorded is not None:
+            if recorded.plan_id != plan_id:
+                raise FormatConflictError("this render command already rendered another plan")
+            path = project_dir / recorded.artifact_ref
+            if not path.exists() or await asyncio.to_thread(file_digest, path) != recorded.artifact_digest:
+                raise FormatConflictError("the recorded output is missing or changed; render with a new command")
+            return RenderResult(recorded.execution_id, recorded.artifact_digest, path, replayed=True)
+
+        require_submit_route(
+            _FAMILY.key.provider_id,
+            _FAMILY.key.endpoint_id,
+            HOST_FORMAT_ADAPTER_VERSION,
+            release_mode=current_release_mode(),
+            now=self._clock(),
+        )
         store = project_dir / "formats"
         store.mkdir(parents=True, exist_ok=True)
         # Render from a private snapshot whose bytes were hashed as they were copied, so a source
@@ -161,148 +229,97 @@ class FormatRenderService:
             facts = await probe_source(snapshot, ffprobe=self._ffprobe)
             argv = render_argv(plan, source_width=facts.width, source_height=facts.height, has_audio=facts.has_audio)
             version = await ffmpeg_version(self._ffmpeg)
-            execution_id = execution_identity(plan, source_digest=source_digest, argv=argv, ffmpeg_version=version)
-            replay, attempt = await self._begin(
-                user_id=user_id,
-                project_name=project_name,
-                plan_id=plan_id,
-                execution_id=execution_id,
-                source_digest=source_digest,
-                argv=list(argv),
-                version=version,
-                store=store,
+            task_id = render_task_id(user_id, project_name, command_id)
+            request = ProviderRequest(
+                id=f"{task_id}:render",
+                host_task_ref=task_id,
+                provider=_FAMILY.key.provider_id,
+                model="ffmpeg",
+                endpoint=_FAMILY.key.endpoint_id,
+                payload={
+                    "schema": FORMAT_REQUEST_SCHEMA,
+                    "plan_id": plan_id,
+                    "plan_digest": plan.plan_digest,
+                    "source_digest": source_digest,
+                    "argv": list(argv),
+                    "ffmpeg_version": version,
+                    "identity": execution_identity(
+                        plan, source_digest=source_digest, argv=argv, ffmpeg_version=version
+                    ),
+                },
+                adapter_version=HOST_FORMAT_ADAPTER_VERSION,
             )
-            if replay is not None:
-                return replay
-            return await self._execute(
-                user_id=user_id,
-                project_name=project_name,
-                execution_id=execution_id,
-                attempt=attempt,
-                argv=argv,
-                snapshot=snapshot,
-                store=store,
-                redact=(str(source), str(snapshot), str(project_dir)),
-            )
+            redact = (str(source), str(snapshot), str(project_dir))
+
+            async def submit(attempt: AttemptSnapshot):
+                digest = await self._run_ffmpeg(argv=argv, snapshot=snapshot, store=store, redact=redact)
+                # Job ids are unique per scope; identical bytes from two executions stay distinct.
+                return accepted_submit_receipt(digest, provider_job_id=f"{attempt.execution_id}:{digest}")
+
+            async with self._sessions() as session:
+                result = await self._submitter_for(session, user_id, project_name).submit(
+                    task_id=task_id, api_call_id=None, route=render_route(version), request=request, submit=submit
+                )
+            if result.snapshot.state is not ExecutionAttemptState.ACCEPTED or result.value is None:
+                raise FormatRenderFailedError(
+                    f"render {result.execution_id} ended {result.snapshot.state.value} without an output"
+                )
+            digest = result.value
+            artifact_ref = f"formats/{digest.removeprefix('sha256:')}.mp4"
+            async with self._sessions() as session, session.begin():
+                repository = ExecutionAttemptRepository(session, capability_resolver=capability_resolver())
+                succeeded = await repository.apply_provider_observation(
+                    user_id=user_id,
+                    project_name=project_name,
+                    execution_id=result.execution_id,
+                    expected_version=result.snapshot.state_version,
+                    observation=ProviderObservation(
+                        observation_id=f"{result.execution_id}:succeeded",
+                        kind=ProviderObservationKind.SUCCEEDED,
+                        observed_at=self._clock(),
+                        provider_job_id=f"{result.execution_id}:{digest}",
+                        evidence_digest=digest,
+                    ),
+                )
+                if succeeded.state is not ExecutionAttemptState.SUCCEEDED:
+                    raise FormatRenderFailedError("the render attempt could not reach SUCCEEDED")
+                session.add(
+                    FormatRenderModel(
+                        user_id=user_id,
+                        project_name=project_name,
+                        execution_id=result.execution_id,
+                        command_id=command_id,
+                        plan_id=plan_id,
+                        source_digest=source_digest,
+                        argv_json=list(argv),
+                        ffmpeg_version=version,
+                        artifact_digest=digest,
+                        artifact_ref=artifact_ref,
+                        created_at=self._clock(),
+                    )
+                )
+            return RenderResult(result.execution_id, digest, project_dir / artifact_ref, replayed=False)
         finally:
             snapshot.unlink(missing_ok=True)
 
-    async def _execute(
-        self,
-        *,
-        user_id: str,
-        project_name: str,
-        execution_id: str,
-        attempt: int,
-        argv: tuple[str, ...],
-        snapshot: Path,
-        store: Path,
-        redact: tuple[str, ...],
-    ) -> RenderResult:
-        temporary = store / f".{execution_id}.{uuid.uuid4().hex}.partial.mp4"
-
-        async def finish(state: str, **fields: str | None) -> None:
-            await asyncio.shield(
-                self._finish(user_id, project_name, execution_id, attempt=attempt, state=state, **fields)
-            )
-
+    async def _run_ffmpeg(self, *, argv: tuple[str, ...], snapshot: Path, store: Path, redact: tuple[str, ...]) -> str:
+        """Run FFmpeg into a unique temporary file and publish it content-addressed; returns its digest."""
+        temporary = store / f".render-{uuid.uuid4().hex}.partial.mp4"
         try:
             command = materialize(argv, source=str(snapshot), output=str(temporary))
             command[0] = self._ffmpeg
             async with asyncio.timeout(self._timeout):
                 code, output = await run_process(command)
             if code != 0:
-                await finish("FAILED", error=f"ffmpeg exit {code}: {_redacted(output, redact)}")
-                raise FormatRenderFailedError(f"ffmpeg exited {code}")
+                raise FormatRenderFailedError(f"ffmpeg exit {code}: {_redacted(output, redact)}")
             digest = await asyncio.to_thread(file_digest, temporary)
             final = store / f"{digest.removeprefix('sha256:')}.mp4"
             # Content-addressed: an existing file must hold exactly these bytes, or it is replaced.
             if not final.exists() or await asyncio.to_thread(file_digest, final) != digest:
                 os.replace(temporary, final)
-            await finish("SUCCEEDED", artifact_digest=digest, artifact_ref=f"formats/{final.name}")
-            return RenderResult(execution_id=execution_id, artifact_digest=digest, artifact_path=final, replayed=False)
-        except asyncio.CancelledError:
-            await finish("CANCELLED", error="cancelled")
-            raise
-        except TimeoutError:
-            await finish("FAILED", error="timed out")
-            raise
-        except FormatRenderFailedError:
-            raise
-        except Exception as exc:
-            await finish("FAILED", error=f"render error: {type(exc).__name__}")
-            raise
+            return digest
         finally:
             temporary.unlink(missing_ok=True)
-
-    async def _begin(
-        self,
-        *,
-        user_id: str,
-        project_name: str,
-        plan_id: str,
-        execution_id: str,
-        source_digest: str,
-        argv: list[str],
-        version: str,
-        store: Path,
-    ) -> tuple[RenderResult | None, int]:
-        """A replay of a succeeded execution, or the attempt number this caller now owns."""
-        now = self._clock()
-        async with self._sessions() as session, session.begin():
-            row = await session.get(FormatRenderModel, (user_id, project_name, execution_id), with_for_update=True)
-            if row is not None and row.state == "SUCCEEDED":
-                digest, ref = row.artifact_digest, row.artifact_ref
-                path = None if ref is None else store.parent / ref
-                if digest and path and path.exists() and await asyncio.to_thread(file_digest, path) == digest:
-                    return RenderResult(execution_id, digest, path, replayed=True), row.attempt
-            elif row is not None and row.state == "RUNNING":
-                started = row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)
-                if now - started < self._stale_after:
-                    raise FormatRenderBusyError("this render is already running")
-            if row is None:
-                session.add(
-                    FormatRenderModel(
-                        user_id=user_id,
-                        project_name=project_name,
-                        execution_id=execution_id,
-                        plan_id=plan_id,
-                        source_digest=source_digest,
-                        argv_json=argv,
-                        ffmpeg_version=version,
-                        state="RUNNING",
-                        attempt=1,
-                        started_at=now,
-                    )
-                )
-                return None, 1
-            # A failed, cancelled, abandoned or lost-output execution runs again as a new attempt.
-            row.state, row.error, row.finished_at = "RUNNING", None, None
-            row.artifact_digest, row.artifact_ref = None, None
-            row.attempt += 1
-            row.started_at = now
-            return None, row.attempt
-
-    async def _finish(
-        self,
-        user_id: str,
-        project_name: str,
-        execution_id: str,
-        *,
-        attempt: int,
-        state: str,
-        error: str | None = None,
-        artifact_digest: str | None = None,
-        artifact_ref: str | None = None,
-    ) -> None:
-        """Record the outcome only for the attempt that still owns the RUNNING row."""
-        async with self._sessions() as session, session.begin():
-            row = await session.get(FormatRenderModel, (user_id, project_name, execution_id), with_for_update=True)
-            if row is None or row.state != "RUNNING" or row.attempt != attempt:
-                return
-            row.state, row.error = state, error
-            row.artifact_digest, row.artifact_ref = artifact_digest, artifact_ref
-            row.finished_at = self._clock()
 
     async def execution(self, *, user_id: str, project_name: str, execution_id: str) -> FormatRenderModel | None:
         async with self._sessions() as session:
@@ -314,7 +331,7 @@ def ffmpeg_available() -> bool:
 
 
 __all__ = [
-    "FormatRenderBusyError",
+    "FORMAT_REQUEST_SCHEMA",
     "FormatRenderFailedError",
     "FormatRenderService",
     "RenderResult",
@@ -323,5 +340,7 @@ __all__ = [
     "ffmpeg_version",
     "file_digest",
     "probe_source",
+    "render_route",
+    "render_task_id",
     "run_process",
 ]

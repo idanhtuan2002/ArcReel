@@ -70,7 +70,7 @@ class FormatReviewService:
             raise FormatInvalidError("a review packet names its reviewer")
         async with self._sessions() as session:
             render = await session.get(FormatRenderModel, (user_id, project_name, execution_id))
-        if render is None or render.state != "SUCCEEDED" or render.artifact_ref is None:
+        if render is None:
             raise FormatNotFoundError("no succeeded render with this execution id")
         artifact, source = _inside(project_dir, render.artifact_ref), _inside(project_dir, source_ref)
         if await asyncio.to_thread(file_digest, artifact) != render.artifact_digest:

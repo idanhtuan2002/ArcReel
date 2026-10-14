@@ -217,18 +217,22 @@ def test_unexpired_evidence_passes_the_freshness_check(tmp_path: Path) -> None:
 # --- real registry contains only fail-closed, unqualified route profiles -------------------
 
 
-def test_the_real_registry_seeds_unqualified_profiles_and_one_offline_verified_spatial_adapter() -> None:
+def test_the_real_registry_seeds_unqualified_profiles_and_two_offline_verified_adapters() -> None:
     root = Path(__file__).resolve().parents[4]
     real_registry = root / "r2" / "provider_capabilities" / "registry.json"
     document = json.loads(real_registry.read_text())
     assert document["schema_version"] == 1
-    assert len(document["profiles"]) == 13
+    assert len(document["profiles"]) == 14
     statuses = {entry["ref"]: entry["qualification_status"] for entry in document["profiles"]}
     assert statuses.pop("gemini-generate-spatial@host-spatial-v1") == "OFFLINE_VERIFIED"
+    assert statuses.pop("local-ffmpeg-format-projection@host-format-v1") == "OFFLINE_VERIFIED"
     assert set(statuses.values()) == {"UNQUALIFIED"}
     spatial = next(e for e in document["profiles"] if e["ref"] == "gemini-generate-spatial@host-spatial-v1")
     evidence = root / "docs" / "r2" / "evidence" / "R2_M8C_SPATIAL_ADAPTER_OFFLINE_VERIFICATION_2026-10-13.md"
     assert spatial["evidence_digest"] == "sha256:" + hashlib.sha256(evidence.read_bytes()).hexdigest()
+    render = next(e for e in document["profiles"] if e["ref"] == "local-ffmpeg-format-projection@host-format-v1")
+    parity = root / "docs" / "r2" / "evidence" / "R2_M8_E_FORMAT_PARITY.json"
+    assert render["evidence_digest"] == "sha256:" + hashlib.sha256(parity.read_bytes()).hexdigest()
     assert {entry["idempotency_mode"] for entry in document["profiles"]} == {"NONE"}
     for entry in document["profiles"]:
         assert load_capability_profile(entry["ref"], registry_path=real_registry).ref == entry["ref"]

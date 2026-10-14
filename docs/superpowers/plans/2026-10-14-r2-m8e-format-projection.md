@@ -87,17 +87,23 @@ The service still accepts two or more reviewers whenever they are assigned.
 
 ## Decisions taken during E2 and E3 research
 
-8. **Local render execution records, not M7 attempts.**
-   - M7 `ExecutionAttempt` and the route inventory govern paid provider submits (`PaidAsyncSubmitFamily`). M3 local renders also stay outside M7.
-   - A format render is a local, deterministic FFmpeg run. It is recorded in `m8_format_renders` under an execution identity that binds:
-     - the source digest;
-     - the plan digest, which covers the profile, overlay and reframe;
-     - the full argv, including codec, fps, duration, CRF and threads;
-     - the FFmpeg version and the adapter version.
-
-     This covers everything spec §10 asks the identity to bind.
-   - `FormatCandidate.execution_id` is that render execution id.
+8. **Renders are bounded M7 attempts** (revised after the E2 review and a research-first comparison).
+   - Spec §6 says render work "is represented by M7 execution/candidate evidence", and §10 requires the M7 identity to bind the master, plan, profile, overlay, reframe, runtime settings and adapter.
+   - M8-C already extended the M7 route inventory beyond paid video (`host-spatial-v1`), with an evidence table keyed to `execution_attempts`.
+   - So a render now runs through `AttemptSubmitter`:
+     - route `local-ffmpeg / format-projection / host-format-v1`;
+     - capability profile `local-ffmpeg-format-projection@host-format-v1`, `OFFLINE_VERIFIED` against the parity report digest; `QUALIFIED` stays reserved for live verification under the registry policy;
+     - a request payload carrying the plan digest, the source digest, the full argv, the FFmpeg build and the deterministic identity.
+   - M7 owns the lifecycle: planned, submitting, failed before acceptance, outcome unknown, succeeded.
+   - `m8_format_renders` is the evidence row written on success. It carries a foreign key to `execution_attempts`, the command, the plan, the source, the argv and the content-addressed output.
+   - One render command is one M7 task. Re-sending it replays; a retry needs a new command.
+   - An earlier draft kept a local state machine outside M7. It was withdrawn because it contradicted §6 and §10.
 9. **Format slots and genesis.** A projection is promoted into its own M8 artifact slot, `m8-format:<sha256(source artifact key)[:16]>:<profile_ref>`, which is not a manifest key.
+   - Options compared:
+     - (a) a narrow contract amendment: a format slot's preview may bind "no master" at expected version 0;
+     - (b) seeding the slot with a copy of the source master, which is semantically false;
+     - (c) a first promotion outside preview and authorization, which violates spec §3.3.
+   - (a) keeps every promotion bound to an exact compare-and-set state, since version 0 is the empty slot. The contract already allows null master fields, and every other slot stays replace-only. Chosen: (a).
    - The accepted M8-A preview and promotion only replace an existing master. They now also allow the first promotion into an empty slot, under all of these conditions:
      - the candidate is `FORMAT`;
      - the target is a format slot;

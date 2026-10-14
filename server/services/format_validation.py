@@ -93,9 +93,8 @@ class FormatValidationService:
                     user_id=user_id, project_name=project_name, plan_id=render.plan_id
                 )
             )
-        if render is None or plan is None or render.state != "SUCCEEDED":
+        if render is None or plan is None:
             raise FormatNotFoundError("no succeeded render with this execution id")
-        assert render.artifact_ref is not None
         artifact = project_dir / render.artifact_ref
         if await asyncio.to_thread(file_digest, artifact) != render.artifact_digest:
             raise FormatConflictError("the rendered artifact changed since it was rendered")

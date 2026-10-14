@@ -11,9 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.db.repositories.formats import FormatRepository
 from r2.advanced_creative.errors import FormatConflictError
 from r2.advanced_creative.formats import Box, ReframeKind, build_plan, reframe_decision
-from server.services.format_render import FormatRenderService, ffmpeg_available, file_digest
+from server.services.format_render import ffmpeg_available, file_digest
 from server.services.format_validation import FormatValidationService
 from tests.integration.r2.advanced_creative.test_format_render import make_source
+from tests.integration.server.services.test_format_render import render_service
 from tests.unit.r2.advanced_creative.test_formats import overlay, profile
 
 type Factory = async_sessionmaker[AsyncSession]
@@ -55,8 +56,8 @@ async def _render(
         await repository.put_overlay(user_id=USER, project_name=PROJECT, overlay=overlay(regions))
         await repository.create_plan(user_id=USER, project_name=PROJECT, plan=plan)
         await session.commit()
-    result = await FormatRenderService(factory).render(
-        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id="plan-1", source=source
+    result = await render_service(factory).render(
+        user_id=USER, project_name=PROJECT, project_dir=tmp_path, plan_id="plan-1", source=source, command_id="r-1"
     )
     return source, result
 

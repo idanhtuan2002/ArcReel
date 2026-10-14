@@ -25,7 +25,7 @@ class HostFormatEvidence:
 
     async def verify(self, *, user_id: str, project_name: str, target_ref: str, payload: FormatCandidate) -> None:
         render = await self._session.get(FormatRenderModel, (user_id, project_name, payload.execution_id))
-        if render is None or render.state != "SUCCEEDED" or render.artifact_digest != payload.rendered_artifact_digest:
+        if render is None or render.artifact_digest != payload.rendered_artifact_digest:
             raise PromotionBindingStaleError("the candidate's render is not a succeeded render of its artifact")
         repository = FormatRepository(self._session)
         plan = await repository.get_plan(user_id=user_id, project_name=project_name, plan_id=render.plan_id)
