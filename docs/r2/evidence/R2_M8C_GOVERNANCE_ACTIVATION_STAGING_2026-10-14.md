@@ -55,8 +55,28 @@ The sponsor ran the single root script `~/arcreel-v2-staging/governance-activate
 - The archive backup is on the same disk as the database backup. It is not an independent custodian.
 - The app runs as root only when activated. Normal staging runs stay non-root and unactivated.
 
+## Restore drill (runbook step 9), 2026-10-14T08:32Z
+
+The drill ran with the root script `~/arcreel-v2-staging/governance-restore-drill.sh`; its log is `~/arcreel-v2-staging/governance-restore-drill.log`. Everything ran on scratch resources:
+- databases `arcreel_drill_new`, restored from `backups/post-governance-20261014T082906Z.dump`, and `arcreel_drill_old`, restored from the pre-governance dump and then migrated to `913c4a0e0001`;
+- the custody root `/srv/arcreel-governance-drill`, restored from `backups/governance-archive-20261014T082430Z.tar.gz`;
+- its own attestor, and an empty data dir.
+
+Afterwards the scratch databases and the scratch root were removed. The live custody root, the live attestor and the staging database were untouched.
+
+| Case | Expected | Preflight | Activated app start |
+|---|---|---|---|
+| 1. Newest DB + newest archive | pass | exit 0, passed | ready |
+| 2. Older DB (before the ISSUE) + newest archive | refuse | exit 1, refused | `GovernanceStartupUnavailable`, startup failed |
+| 3. Case 2 after `import-event issue-1.json` | pass | exit 0, passed | ready |
+
+All six checks matched.
+
+**Finding.** The archive backup contained only `archive/`. `reconcile` refused to rebuild an empty `read/` (`OperatorArchiveReconcileUnavailable`), so the drill copied the live public copies instead.
+- The runbook (step 9) now requires backing up both `archive/` and `read/`.
+- The next staging custody backup must include `read/`.
+
 ## Not yet proven
 
-- **Step 9, the restore drill:** older DB plus newest archive must refuse, and re-importing the events must pass.
 - **A real reviewer flow in the browser:** grant `admin` on `du-an-01-649c62c1`, which needs bound shot targets and live spatial analysis.
 - **Revocation:** step 10.

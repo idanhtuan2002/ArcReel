@@ -204,6 +204,8 @@ Add to the `arcreel` service in `docker-compose.yml`:
 
 The archive is the anti-rollback witness, not ordinary application data. Keep it with an **independent** custodian from the database backup: a separate backup target, written append-only after every `enroll` and `publish`.
 
+Back up the whole custody root, `archive/` **and** `read/` (for example `tar -C "$CUSTODY_ROOT" -czf custody-<time>.tar.gz archive read`). `reconcile` only repairs public copies left behind by an interrupted publication. It refuses to rebuild an empty `read/`, so an archive-only backup cannot be brought back to a startable tree.
+
 **Never restore an older archive together with an older database.** A coherent old pair (say, from before a REVOKE) passes the preflight and brings the revoked grant back to life.
 
 On a database restore, always keep the **newest** independently retained archive. If the restored database lacks grants that archive records, the application refuses to start. Recover by re-importing the newer signed events in order, or treat it as an incident; never by restoring the archive to match the database.
