@@ -1,0 +1,199 @@
+.fm-header {
+  padding-left: 1rem;
+  /* Keeps the workspace's floating assistant button clear of the header. */
+  padding-right: 4rem;
+}
+
+.fm-layout {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .fm-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fm-new,
+.fm-card {
+  container-type: inline-size;
+}
+
+.fm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 0.75rem;
+}
+@container (max-width: 18rem) {
+  .fm-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fm-input {
+  display: block;
+  width: 100%;
+  margin-top: 0.125rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-hairline-strong);
+  background: var(--color-surface-2);
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text);
+}
+
+.fm-btn {
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-hairline-strong);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-text-2);
+}
+.fm-btn:hover:not(:disabled) {
+  color: var(--color-text);
+}
+.fm-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.fm-btn-accent {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+.fm-btn-accent:hover:not(:disabled) {
+  background: var(--color-accent-2);
+  color: var(--color-bg);
+}
+.fm-btn:focus-visible,
+.fm-input:focus-visible,
+.fm-choice:focus-within,
+.fm-clip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The reframe diagram: the source frame, the window the projection keeps, and the subject. */
+.fm-card-head {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+@container (max-width: 22rem) {
+  .fm-card-head {
+    grid-template-columns: 1fr;
+  }
+}
+.fm-diagram {
+  width: 100%;
+  max-width: 9rem;
+}
+.fm-diagram-source {
+  fill: var(--color-surface-2);
+  stroke: var(--color-hairline-strong);
+  stroke-width: 1;
+}
+.fm-diagram-window {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+.fm-diagram-subject {
+  fill: none;
+  stroke: var(--color-text-2);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.fm-risk {
+  display: inline-block;
+  margin-top: 0.25rem;
+  border-radius: 0.25rem;
+  padding: 0.0625rem 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  border: 1px solid var(--color-hairline-strong);
+  color: var(--color-text-2);
+}
+.fm-risk-high {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.fm-steps {
+  display: grid;
+  gap: 0.375rem;
+}
+.fm-steps li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text);
+}
+.fm-state {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--color-text-3);
+}
+
+.fm-checks {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--color-text-2);
+}
+.fm-checks th,
+.fm-checks td {
+  border-top: 1px solid var(--color-hairline);
+  padding: 0.25rem 0.375rem;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.fm-checks .fm-fail {
+  color: var(--color-accent);
+}
+
+/* The light table: clip A and clip B side by side, nothing else to read. */
+.fm-lighttable {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+@container (max-width: 26rem) {
+  .fm-lighttable {
+    grid-template-columns: 1fr;
+  }
+}
+.fm-clip {
+  width: 100%;
+  max-height: 20rem;
+  border-radius: 0.375rem;
+  background: #000;
+}
+.fm-rubric {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.fm-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-hairline-strong);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-2);
+}
+.fm-choice:has(input:checked) {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
