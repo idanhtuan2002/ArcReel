@@ -59,14 +59,15 @@ def _two_track_media(tag: bytes) -> bytes:
 
 @cache
 def _media(tag: bytes, *, tone: bool = False) -> bytes:
-    """A real one-second MP4 whose bytes are unique per ``tag``: silent, or with an audible tone."""
+    """A real one-second MP4 whose bytes and pixels are unique per ``tag``: silent, or with an audible tone."""
+    color = "0x" + hashlib.sha256(tag).hexdigest()[:6]
     audio_in = ["-f", "lavfi", "-i", "sine=frequency=440:duration=1"] if tone else []
     audio_out = ["-c:a", "aac", "-shortest"] if tone else []
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "media.mp4"
         subprocess.run(
             [
-                *("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=64x36:d=1", *audio_in),
+                *("ffmpeg", "-v", "error", "-f", "lavfi", "-i", f"color=c={color}:s=64x36:d=1", *audio_in),
                 *("-metadata", f"comment={tag.hex()}", "-c:v", "libx264", "-pix_fmt", "yuv420p", *audio_out, str(out)),
             ],
             check=True,

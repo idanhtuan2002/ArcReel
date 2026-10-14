@@ -240,6 +240,9 @@ class LocationBindingCreationService:
             if verified.receipt != hint:
                 raise BindingSourceConflictError("binding frame receipt changed after the unlocked hint")
             found.append(verified)
+        if found[0].receipt.identity.frame_content_digest == found[1].receipt.identity.frame_content_digest:
+            # Spatial analysis refuses two views with the same frame content, so such a pair could never be used.
+            raise BindingSourceConflictError("binding frames must differ in content")
         return found[0], found[1]
 
     @staticmethod

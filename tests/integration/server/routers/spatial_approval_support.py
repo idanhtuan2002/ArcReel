@@ -22,10 +22,8 @@ from server.auth import CurrentUserInfo
 from server.services.governance_grants import CurrentShowrunnerGrantReader, GovernanceGrantImporter
 from server.services.spatial_pair_decision_v2 import SpatialPairDecisionServiceV2
 from server.services.spatial_review_session import SpatialReviewSessionService
-from tests.integration.server.routers import test_gates_export
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
 from tests.integration.server.routers.test_spatial_constraint_snapshot import _current_binding
-from tests.integration.server.routers.test_spatial_execution import _colored_media
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -41,15 +39,6 @@ class ApprovedLocation:
     target_id: str
     grants: CurrentShowrunnerGrantReader
     approval: PairDecisionResultV2
-
-
-def distinct_parent_media(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Approve the binding's two parent masters as red and blue video, so their frames differ in pixels.
-
-    Spatial execution refuses a MASTER and REVERSE with identical frame bytes; the default parents are both black.
-    """
-    colors = {b"constraint-parent-a": "red", b"constraint-parent-b": "blue"}
-    monkeypatch.setattr(test_gates_export, "_media", lambda tag, **_kw: _colored_media(colors[tag]))
 
 
 async def showrunner_grants(factory: Factory) -> CurrentShowrunnerGrantReader:

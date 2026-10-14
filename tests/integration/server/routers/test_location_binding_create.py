@@ -29,13 +29,15 @@ from r2.m3.host_integration import GoldenAHostIntegration
 from r2.production_intelligence.take_director import TakeDirectorAdapter
 from r2.target_registry import service as target_service_module
 from r2.target_registry.service import TakeTargetRegistrationService
-from server.services.location_binding import LocationBindingCreationService
+from server.services.location_binding import BindingSourceConflictError, LocationBindingCreationService
 from server.services.location_binding_snapshot import CurrentLocationBindingSnapshotReader
 from server.services.spatial_frame_reader import SpatialFrameReader
 from server.services.spatial_source import FrameDerivationService, FrameSourceConflictError
 from tests.integration.r2.adaptation import test_screenplay_admission as admission_helpers
 from tests.integration.r2.target_registry import test_take_registration as target_helpers
+from tests.integration.server.routers import test_gates_export
 from tests.integration.server.routers.test_gates_export import PROJECT, USER, _approve_shot
+from tests.integration.server.routers.test_spatial_constraint_snapshot import registered_frames
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -280,3 +282,28 @@ async def test_create_replays_exact_two_real_frames_and_current_take_shot(
         await snapshot_reader.read_current(
             user_id=USER.id, project_name=PROJECT, target_id=registered.shot_targets[0].target_id
         )
+
+
+@pytest.mark.asyncio
+async def test_two_frames_with_the_same_content_are_refused(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    same = test_gates_export._media(b"same-pixels")
+    # Two approved masters whose frames decode to identical pixels: spatial analysis could relate nothing.
+    monkeypatch.setattr(test_gates_export, "_media", lambda _tag, **_kw: same)
+    target_ref, receipts = await registered_frames(gate_export_client, project_dir, session_factory, monkeypatch)
+    command = BindingCreateCommandV1.model_validate(
+        {
+            "user_id": USER.id,
+            "project_name": PROJECT,
+            "principal": USER.sub,
+            "command_id": "binding-same-content",
+            "expected_target_ref": target_ref,
+            "ordered_frame_receipts": receipts,
+        }
+    )
+
+    with pytest.raises(BindingSourceConflictError, match="differ in content"):
+        await LocationBindingCreationService(session_factory=session_factory, project_dir=project_dir).create(command)
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(ProductionBindingVersionModel)) == 0

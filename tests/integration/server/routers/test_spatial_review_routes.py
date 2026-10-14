@@ -21,7 +21,6 @@ from tests.auth_deps import AUTH_DEPENDENCIES
 from tests.fakes import GateProjectManager
 from tests.integration.server.routers.spatial_approval_support import (
     PAIR_V2_VECTOR,
-    distinct_parent_media,
     showrunner_grants,
 )
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
@@ -61,7 +60,6 @@ async def review_client(
 
 
 async def _bound(gate_client, review_client, project_dir, factory, monkeypatch) -> dict:
-    distinct_parent_media(monkeypatch)
     target_ref, receipts = await registered_frames(gate_client, project_dir, factory, monkeypatch, shot_duration=5.0)
     response = await review_client.post(
         f"{BASE}/bindings",

@@ -27,7 +27,7 @@ from server.services.spatial_pair_current_v2 import CurrentApprovedSpatialPairRe
 from server.services.spatial_promotion import SpatialPreviewCommand, SpatialPromotionService
 from tests.fakes import bind_safe_session_factory
 from tests.http_capture import capture_http, request_json
-from tests.integration.server.routers.spatial_approval_support import approved_location, distinct_parent_media
+from tests.integration.server.routers.spatial_approval_support import approved_location
 from tests.integration.server.routers.test_gates_export import PROJECT, USER, _media
 from tests.integration.server.routers.test_r2_shot_worker import SUBMIT_URL, _run
 from tests.integration.server.routers.test_spatial_execution import _command, _service, _Vision
@@ -79,7 +79,6 @@ async def test_an_approved_pair_reaches_an_approved_generated_shot_master(
 ) -> None:
     bind_safe_session_factory(monkeypatch, session_factory)
 
-    distinct_parent_media(monkeypatch)
     # 1. A human-reviewed APPROVE of the exact MASTER/REVERSE frames of a LOCATION binding (version 1).
     approved = await approved_location(gate_export_client, project_dir, session_factory, monkeypatch, shot_duration=5.0)
     frames = await _pair_frames(session_factory, project_dir, approved)
