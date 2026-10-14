@@ -9,6 +9,7 @@ Preview and promotion of a prepared candidate use the M8 exploration routes.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter
@@ -26,17 +27,24 @@ from lib.db.models.formats import (
 )
 from lib.db.repositories.formats import FormatRepository
 from lib.project_manager import get_project_manager
-from r2.advanced_creative.errors import FormatNotFoundError, M8Error
+from r2.advanced_creative.digests import digest_canonical
+from r2.advanced_creative.errors import ExplorationNotFoundError, FormatNotFoundError, M8Error
 from r2.advanced_creative.formats import SEMANTIC_ITEMS, SEMANTIC_RUBRIC, Box, ReframeKind
 from r2.contracts.advanced_creative import (
     FormatProjectionPlan,
     M8ContractModel,
     OutputProfile,
     OverlayConstraintSet,
+    PromotionAuthorization,
+    PromotionPreview,
+    PromotionReceipt,
+    PromotionTarget,
+    PromotionTargetKind,
     SemanticParityReport,
     TechnicalValidationReport,
 )
 from server.auth import CurrentUser, InteractiveUser
+from server.services.advanced_creative import exploration_promotion, exploration_service
 from server.services.execution_attempts import build_attempt_submitter
 from server.services.format_candidate import PreparedFormatCandidate, prepare_format_candidate
 from server.services.format_plans import master_source, plan_from_master
@@ -50,7 +58,7 @@ FORMAT_REQUEST_INVALID = "m8_format_request_invalid"
 
 
 def _api_error(error: Exception) -> ApiError:
-    if isinstance(error, FormatNotFoundError):
+    if isinstance(error, (FormatNotFoundError, ExplorationNotFoundError)):
         return NotFoundError(error.code)
     if isinstance(error, M8Error):
         return ConflictError(error.code)
@@ -127,6 +135,26 @@ class CandidateView(M8ContractModel):
     head_version: int
     slot_key: str
     expected_target_version: int
+
+
+class CreateFormatPreviewRequest(M8ContractModel):
+    candidate_id: str = Field(min_length=1, max_length=255)
+    revision: int = Field(ge=1)
+    slot_key: str = Field(min_length=1, max_length=255)
+    expected_target_version: int = Field(ge=0)
+    command_id: str = Field(min_length=1, max_length=255)
+
+
+class FormatPreviewView(M8ContractModel):
+    preview: PromotionPreview
+    preview_digest: str
+
+
+class ApproveFormatPromotionRequest(M8ContractModel):
+    preview_id: str = Field(min_length=1, max_length=255)
+    preview_digest: str = Field(min_length=1, max_length=71)
+    expected_candidate_head_version: int = Field(ge=1)
+    command_id: str = Field(min_length=1, max_length=255)
 
 
 class PlanSummary(M8ContractModel):
@@ -371,5 +399,57 @@ async def prepare_candidate(project_name: str, execution_id: str, user: CurrentU
             )
             await session.commit()
         return CandidateView(**prepared.__dict__)
+
+    return await _run(operation)
+
+
+@router.post("/projects/{project_name}/m8/formats/previews")
+async def preview_promotion(project_name: str, req: CreateFormatPreviewRequest, user: CurrentUser) -> FormatPreviewView:
+    """Preview promoting a prepared candidate into its format slot; the digest is what an approval binds."""
+
+    async def operation() -> FormatPreviewView:
+        async with async_session_factory() as session:
+            preview = await exploration_service(session).create_preview(
+                user_id=user.id,
+                project_name=project_name,
+                candidate_id=req.candidate_id,
+                revision=req.revision,
+                target=PromotionTarget(
+                    kind=PromotionTargetKind.ARTIFACT_SLOT,
+                    target_ref=req.slot_key,
+                    expected_target_version=req.expected_target_version,
+                ),
+                command_id=req.command_id,
+            )
+        return FormatPreviewView(preview=preview, preview_digest=digest_canonical(preview))
+
+    return await _run(operation)
+
+
+@router.post("/projects/{project_name}/m8/formats/promotions")
+async def approve_promotion(
+    project_name: str, req: ApproveFormatPromotionRequest, user: InteractiveUser
+) -> PromotionReceipt:
+    """A person approves the exact preview they saw; the server records them as the authorizing actor."""
+
+    async def operation() -> PromotionReceipt:
+        authorization = PromotionAuthorization(
+            command_id=req.command_id,
+            project_name=project_name,
+            preview_id=req.preview_id,
+            preview_digest=req.preview_digest,
+            # M8-A binds the actor to the scope's user; the interactive session is the human gate.
+            actor_id=user.id,
+            actor_scope=user.id,
+            decision="APPROVE",
+            authorized_at=datetime.now(UTC),
+        )
+        async with async_session_factory() as session:
+            return await exploration_promotion(session).promote(
+                user_id=user.id,
+                project_name=project_name,
+                authorization=authorization,
+                expected_candidate_head_version=req.expected_candidate_head_version,
+            )
 
     return await _run(operation)

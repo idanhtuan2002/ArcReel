@@ -103,6 +103,32 @@ async def test_the_api_takes_a_projection_from_plan_to_candidate(
         assert candidate["slot_key"] == format_slot_key(SOURCE_KEY, "square@1")
         assert candidate["expected_target_version"] == 0
 
+        previewed = await http.post(
+            f"{BASE}/previews",
+            json={
+                "candidate_id": candidate["candidate_id"],
+                "revision": candidate["revision"],
+                "slot_key": candidate["slot_key"],
+                "expected_target_version": 0,
+                "command_id": "preview-1",
+            },
+        )
+        assert previewed.status_code == 200, previewed.text
+        preview = previewed.json()
+        approve = {
+            "preview_id": preview["preview"]["preview_id"],
+            "preview_digest": "sha256:" + "0" * 64,
+            "expected_candidate_head_version": candidate["head_version"],
+            "command_id": "promote-1",
+        }
+        assert (await http.post(f"{BASE}/promotions", json=approve)).status_code == 409
+        receipt = await http.post(
+            f"{BASE}/promotions",
+            json={**approve, "preview_digest": preview["preview_digest"], "command_id": "promote-2"},
+        )
+        assert receipt.status_code == 200, receipt.text
+        assert receipt.json()["result_digest"] == rendered["artifact_digest"]
+
         listed = (await http.get(f"{BASE}/plans")).json()
         assert [item["plan"]["plan_id"] for item in listed] == ["square-pad"]
         assert listed[0]["technical"]["passed"] is True
@@ -134,6 +160,13 @@ async def test_review_needs_an_interactive_session_and_clips_belong_to_their_rev
         assert (await http.get(f"{BASE}/review-packets/{packet['packet_id']}/clips/A")).status_code == 404
     async with _client(_app(monkeypatch, session_factory, tmp_path, reviewer=None)) as http:
         assert (await http.post(f"{BASE}/renders/{execution_id}/review-packets")).status_code == 401
+        approval = {
+            "preview_id": "x",
+            "preview_digest": "sha256:" + "0" * 64,
+            "expected_candidate_head_version": 1,
+            "command_id": "c",
+        }
+        assert (await http.post(f"{BASE}/promotions", json=approval)).status_code == 401
 
 
 async def test_a_plan_needs_an_approved_master_and_a_well_formed_box(
