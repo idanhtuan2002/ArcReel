@@ -110,8 +110,9 @@ Provider payload deletion never rewrites history into false evidence. M9 deletes
 the governed raw, identity, normalized-value, derived-result and assessment
 payloads from an erasable evidence store; append-only PostgreSQL rows retain
 only opaque refs and those non-reversible proofs the exact policy permits. M9
-appends a non-sensitive tombstone, records dependency invalidation, and expires
-or supersedes dependent signals, candidates and Greenlights. Reads fail closed
+appends a non-sensitive tombstone, records dependency invalidation, and marks
+dependent signals, candidates and Greenlight decisions `INVALIDATED` through their
+validity projections. Greenlight decisions themselves stay custodian authority. Reads fail closed
 while propagation is incomplete. Existing Canvas history remains immutable
 historical exploration, but a stale Greenlight cannot seed a new Canvas
 revision.

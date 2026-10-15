@@ -38,7 +38,7 @@ Prerequisite failure routing is exact:
 |---|---|
 | ADR/spec/plan/execution-contract acceptance absent, rejected or hash-drifted | `M9_DESIGN_NOT_ACCEPTED` |
 | accepted M8 implementation absent or rejected | `M9_M8_IMPLEMENTATION_NOT_ACCEPTED` |
-| combined-base acceptance, clean worktree or disposable PostgreSQL evidence absent | `M9_REQUIRED_EVIDENCE_MISSING` |
+| combined-base acceptance, clean worktree, disposable PostgreSQL evidence or the profile custodian's `HUMAN_SHOWRUNNER` grant absent | `M9_REQUIRED_EVIDENCE_MISSING` |
 | accepted canonical/M8 import, factual contract import, signature, behavior or Alembic seam differs | `POST_M8_BASE_SEAM_CHANGED` |
 | selected donor pin/path/inventory cannot be proven | `M9_DONOR_PARITY_INCOMPLETE` |
 | execution would require changing a frozen M9 contract or digest domain | `M9_SCHEMA_CHANGE_REQUIRED` |
@@ -96,7 +96,7 @@ No other production path is owned. If an accepted prerequisite cannot be adapted
 
 ## Fixed HTTP surface
 
-Mount `opportunity.router` under `/api/v1` in `server/app.py` with `Depends(get_current_user)` and `Depends(require_project_migration_ok)`. Handlers derive `user_id` and `actor_id` from `CurrentUser`, and `project_name` from the path. Bodies cannot provide or override those values.
+Mount `opportunity.router` under `/api/v1` in `server/app.py` with `Depends(require_project_migration_ok)`. The publish route depends on `get_current_interactive_user`, so API keys and the auth-disabled anonymous user are refused; read routes depend on `get_current_user`. Handlers derive `user_id = current_user.id` and `actor_id = current_user.sub` (the ADR-0103 grant principal), and `project_name` from the path. Bodies cannot provide or override those values.
 
 | Method | Route | Input | Success |
 |---|---|---|---|
@@ -115,7 +115,7 @@ class PublishCohortProfileRequest(M8ContractModel):
     payload: OpportunityCohortProfilePayload
 ```
 
-The router constructs `CommandContext(command_id, current_user.id, project_name, current_user.id)`. Error mapping is fixed: validation 422; authentication 401; `M9_PROFILE_PUBLICATION_UNAUTHORIZED` 403; not-found 404; `M9_COMMAND_REPLAY_CONFLICT`, `M9_STALE_HEAD` and `M9_COHORT_LEAKAGE` 409; prerequisite/schema/seam errors 503. Error bodies contain stable stop code plus localized detail and reveal no foreign owner.
+The router constructs `CommandContext(command_id, current_user.id, project_name, current_user.sub)`, and the custodian queries `GrantScopeV1(current_user.id, project_name, principal=current_user.sub)`. RED tests cover an API-key caller, auth disabled and a principal without a grant. Error mapping is fixed: validation 422; authentication 401; `M9_PROFILE_PUBLICATION_UNAUTHORIZED` 403; not-found 404; `M9_COMMAND_REPLAY_CONFLICT`, `M9_STALE_HEAD` and `M9_COHORT_LEAKAGE` 409; prerequisite/schema/seam errors 503. Error bodies contain stable stop code plus localized detail and reveal no foreign owner.
 
 ## Fixed persistence map
 
@@ -125,7 +125,7 @@ Migration `9a9c4a0e0001` creates exactly:
 - `m9_cohort_profile_heads`: scope, profile ID, current revision and head version; primary key `(user_id, project_name, profile_id)`; both versions positive.
 - `m9_command_receipts`: scope, actor, operation, command ID, request digest, result kind/ref/digest, committed time; unique `(user_id, actor_id, operation, command_id)` and scoped result index.
 - `m9_events`: monotonic event ID, scope, event kind, aggregate identity/revision, payload digest and committed time; no raw/profile payload or token-like fields.
-- `host_custodian_leases` (host-owned, not an M9 authority table): user, project, actor, command ID, subject digest, authorization ID, policy ID/version, grant event digest, issued time and `admit_not_after`; unique `(user_id, project_name, actor_id, command_id)`. A replay with the same subject returns the stored lease; a different subject, or an expired lease, is refused (spec §9).
+- `host_custodian_leases` (host-owned, not an M9 authority table): user, project, actor, command ID, subject digest, authorization ID, policy ID/version, grant event digest, issued time and `admit_not_after`; unique `(user_id, project_name, actor_id, operation, command_id)`; `admit_not_after` never exceeds the grant's `expires_at`. A replay with the same subject returns the stored lease; a different subject, or an expired lease, is refused (spec §9).
 
 Rows in profiles, receipts and events are append-only. Only profile-head CAS updates. Repository methods flush but never commit; the application service owns begin/commit/rollback.
 
@@ -214,7 +214,7 @@ Rows in profiles, receipts and events are append-only. Only profile-head CAS upd
 
 **Produces:** `OpportunityProfileRepository` with scoped `get_exact`, `get_head_for_update`, `list_heads`, `get_command_receipt`, `stage_profile`, `stage_head`, `stage_command_receipt`, `stage_event`; `OpportunityUnitOfWork` owns one `AsyncSession` transaction.
 
-- [ ] **A2.1 — Write migration RED tests.** Assert exact four-table set, named PK/unique/check/index constraints, `revision='9a9c4a0e0001'`, `down_revision` equal A0 baseline predecessor, one Alembic head and downgrade removal of only M9-A tables.
+- [ ] **A2.1 — Write migration RED tests.** Assert exact five-table set (four M9 tables plus the host-owned `host_custodian_leases`), named PK/unique/check/index constraints, `revision='9a9c4a0e0001'`, `down_revision` equal A0 baseline predecessor, one Alembic head and downgrade removal of only those five tables.
 
 - [ ] **A2.2 — Write repository RED tests on disposable PostgreSQL.** Cover genesis race, append race, parent mismatch, head-version mismatch, immutable historical bytes, exact scoped lookup/list pagination, foreign/unknown equivalence, absent-receipt concurrent first calls, transaction-scoped command-key guard serialization, equal-digest winner reread, divergent-digest conflict and rollback after every staged flush. Include a synthetic advisory-hash collision proving the full receipt key remains authority and collision only serializes.
 

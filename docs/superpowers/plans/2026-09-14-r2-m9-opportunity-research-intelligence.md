@@ -67,6 +67,8 @@
 | `lib/db/models/opportunity.py` | M9 SQLAlchemy rows |
 | `lib/db/repositories/opportunity.py` | scoped repositories and unit of work |
 | `server/services/opportunity.py` | host composition and port adapters |
+| `server/services/m9_custodian.py` | host custodian adapter over ADR-0103 showrunner grants (profile, Greenlight, invalidation) |
+| `lib/db/models/host_custodian.py` | host-owned `host_custodian_leases` replay table |
 | `server/routers/opportunity.py` | authenticated, migration-gated HTTP API |
 | `frontend/src/features/opportunity-desk/` | projection-only Opportunity Desk UI |
 | `scripts/r2/verify_m9_scope.py` | lineage, seam, scope and bypass verifier |
@@ -81,10 +83,10 @@ Task A0 implementation records the exact singleton Alembic predecessor from the 
 
 ```text
 accepted singleton predecessor
-  -> 9a9c4a0e0001  profile, command and baseline evidence metadata
+  -> 9a9c4a0e0001  profile, command and baseline evidence metadata, plus the host-owned host_custodian_leases
   -> 9b9c4a0e0001  capability, query, attempt, snapshot and observation metadata
   -> 9c9c4a0e0001  signal and opportunity candidate metadata
-  -> 9d9c4a0e0001  Greenlight and bridge metadata
+  -> 9d9c4a0e0001  Greenlight, bridge intents and bridge receipts
   -> 9e9c4a0e0001  invalidation jobs, edges and validity projections
 ```
 
@@ -115,7 +117,7 @@ guessed from proposed modules.
 | B | `M9_SOURCE_CAPABILITY_UNAVAILABLE`, `M9_SOURCE_POLICY_FORBIDDEN`, `M9_CREDENTIAL_REFERENCE_INVALID`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `M9_RAW_DIGEST_MISMATCH`, `M9_NORMALIZATION_LOSSY`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
 | C | `M9_DERIVATION_POLICY_UNPROVEN`, `M9_COHORT_LEAKAGE`, `M9_EVIDENCE_STALE`, `M9_DONOR_PARITY_INCOMPLETE`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
 | D | `M9_FACTUAL_AUTHORITY_UNAVAILABLE` (release gate: FA-1 acceptance absent), `M9_GREENLIGHT_UNAUTHORIZED`, `M9_GREENLIGHT_EXPIRED`, `M9_COHORT_LEAKAGE`, `M9_EVIDENCE_STALE`, `M9_STALE_HEAD`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `POST_M8_BASE_SEAM_CHANGED` |
-| E | `M9_INVALIDATION_INCOMPLETE`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_EVIDENCE_STALE`, `M9_REQUIRED_EVIDENCE_MISSING`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
+| E | `M9_INVALIDATION_INCOMPLETE`, `M9_INVALIDATION_UNAUTHORIZED`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_EVIDENCE_STALE`, `M9_REQUIRED_EVIDENCE_MISSING`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
 | F | every upstream code plus `M9_REQUIRED_EVIDENCE_MISSING` when evaluation, reviewer or production-envelope evidence is absent |
 
 Later packet authors copy only the applicable stable codes from this table and the design; they do not invent aliases.
@@ -195,7 +197,7 @@ artifact; the normative execution contract itself does not change state.
 
 **Files:** Create/modify only `invalidation.py`, M9-E persistence/indexes, evidence-store deletion adapter, read projections, fault fixtures and evidence.
 
-**Consumes:** Accepted M9-D dependency edges, M8 correction reads and Factual invalidation receipts.
+**Consumes:** Accepted M9-D closure (dependency columns of snapshots, observations, signals, candidates, decisions and bridge intents), M8 correction reads and Factual invalidation receipts. M9-E creates `m9_invalidation_edges` and builds the edges from those recorded dependencies.
 
 **Produces:** idempotent `InvalidationJob`, deadline-bound traversal, append-only tombstones, `INVALIDATED` historical reads and fail-closed operational use.
 

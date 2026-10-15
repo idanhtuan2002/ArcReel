@@ -26,9 +26,13 @@ status: accepted
    `r2/advanced_creative/lineage.py`. It is pure: the host passes in the admissions.
    - Resolutions v1 and v2 keep their bytes.
    - The function is delivered by the M9-D packet as an explicit M8 evolution, under M8 tests.
-3. **Only the server-side seed adapter calls it.** It runs inside the transaction that appends the
-   seed revision through the M8 exploration service. The client append route (ADR-0107) never
-   accepts a v3 lineage, because its check matches only episode resolutions.
+3. **Only the M9 seed path calls it.**
+   - The `seed_canvas` prepare transaction resolves the lineage and freezes the complete M8
+     revision in a bridge intent.
+   - The server-side seed adapter then appends that frozen revision verbatim through the M8
+     exploration service, and exact replay makes a retry safe.
+   - The client append route (ADR-0107) never accepts a v3 lineage, because its check matches
+     only episode resolutions.
 4. **M8 consumers distinguish the kind.** The `basis_kind` is inside the hashed object, so a v3
    basis cannot collide with a v1 or v2 basis. A future Canvas promotion must check currentness
    against the resolver of the matching kind.
