@@ -111,14 +111,23 @@ guessed from proposed modules.
 
 | Packet | Required stop codes |
 |---|---|
-| A | `M9_DESIGN_NOT_ACCEPTED`, `M9_M8_IMPLEMENTATION_NOT_ACCEPTED`, `M9_FACTUAL_AUTHORITY_UNAVAILABLE`, `M9_REQUIRED_EVIDENCE_MISSING`, `POST_M8_BASE_SEAM_CHANGED`, `M9_SCHEMA_CHANGE_REQUIRED`, `M9_COMMAND_REPLAY_CONFLICT`, `M9_STALE_HEAD`, `M9_COHORT_LEAKAGE`, `M9_PROFILE_PUBLICATION_UNAUTHORIZED`, `M9_DONOR_PARITY_INCOMPLETE` |
-| B | `M9_SOURCE_CAPABILITY_UNAVAILABLE`, `M9_SOURCE_POLICY_FORBIDDEN`, `M9_CREDENTIAL_REFERENCE_INVALID`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `M9_RAW_DIGEST_MISMATCH`, `M9_NORMALIZATION_LOSSY`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
+| A | `M9_DESIGN_NOT_ACCEPTED`, `M9_M8_IMPLEMENTATION_NOT_ACCEPTED`, `M9_REQUIRED_EVIDENCE_MISSING`, `POST_M8_BASE_SEAM_CHANGED`, `M9_SCHEMA_CHANGE_REQUIRED`, `M9_COMMAND_REPLAY_CONFLICT`, `M9_STALE_HEAD`, `M9_COHORT_LEAKAGE`, `M9_PROFILE_PUBLICATION_UNAUTHORIZED`, `M9_DONOR_PARITY_INCOMPLETE` |
+| B | `M9_SOURCE_CAPABILITY_UNAVAILABLE`, `M9_SOURCE_POLICY_FORBIDDEN`, `M9_CREDENTIAL_REFERENCE_INVALID`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `M9_RAW_DIGEST_MISMATCH`, `M9_NORMALIZATION_LOSSY`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
 | C | `M9_DERIVATION_POLICY_UNPROVEN`, `M9_COHORT_LEAKAGE`, `M9_EVIDENCE_STALE`, `M9_DONOR_PARITY_INCOMPLETE`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
-| D | `M9_GREENLIGHT_UNAUTHORIZED`, `M9_GREENLIGHT_EXPIRED`, `M9_EVIDENCE_STALE`, `M9_STALE_HEAD`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `POST_M8_BASE_SEAM_CHANGED` |
-| E | `M9_INVALIDATION_INCOMPLETE`, `M9_EVIDENCE_STALE`, `M9_REQUIRED_EVIDENCE_MISSING`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
+| D | `M9_FACTUAL_AUTHORITY_UNAVAILABLE` (release gate: FA-1 acceptance absent), `M9_GREENLIGHT_UNAUTHORIZED`, `M9_GREENLIGHT_EXPIRED`, `M9_COHORT_LEAKAGE`, `M9_EVIDENCE_STALE`, `M9_STALE_HEAD`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `POST_M8_BASE_SEAM_CHANGED` |
+| E | `M9_INVALIDATION_INCOMPLETE`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_EVIDENCE_STALE`, `M9_REQUIRED_EVIDENCE_MISSING`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
 | F | every upstream code plus `M9_REQUIRED_EVIDENCE_MISSING` when evaluation, reviewer or production-envelope evidence is absent |
 
 Later packet authors copy only the applicable stable codes from this table and the design; they do not invent aliases.
+
+## Task P0: Combined-base acceptance
+
+**Files:** `docs/r2/evidence/schemas/R2_M9_PREREQUISITE_ACCEPTANCE.schema.json`, `scripts/r2/verify_m9_prerequisites.py`, its unit test and `R2_M9_PREREQUISITE_ACCEPTANCE.json`.
+
+**Consumes:** `R2_M8_IMPLEMENTATION_ACCEPTANCE.json` (`M8_IMPLEMENTATION_ACCEPTED`) and `R2_M9_DESIGN_ACCEPTANCE.json` (`M9_DESIGN_ACCEPTED`) on one clean base that descends from both acceptance commits and has one Alembic head.
+
+- [ ] Write the schema and the Git-backed verifier with RED tests: absent or wrong-status acceptances, a base that does not descend from both acceptance commits, a dirty tree, several Alembic heads, and hash drift.
+- [ ] Write the record binding both acceptance artifacts by path and SHA-256, the base HEAD and the Alembic head. Commit it as the sole child of that base, then run an independent review before M9-A starts.
 
 ## Task A: Foundation and cohort profiles
 
@@ -126,7 +135,7 @@ Later packet authors copy only the applicable stable codes from this table and t
 `IMPLEMENTATION_ELIGIBLE` from every valid design and prerequisite acceptance
 artifact; the normative execution contract itself does not change state.
 
-**Consumes:** Independently accepted M8 implementation, Factual Authority seam and M9 design acceptance.
+**Consumes:** Independently accepted M8 implementation and M9 design acceptance (combined base, Task P0). M9-A imports only the existing factual contracts; the durable Factual Authority is the M9-D release gate.
 
 **Produces:** Frozen opportunity contracts, canonical digests, stop codes, donor parity fold, append-only cohort-profile repository/service/routes and `M9_A_CANDIDATE` evidence.
 
@@ -168,6 +177,8 @@ artifact; the normative execution contract itself does not change state.
 ## Task D: Greenlight and authority bridges
 
 **Files:** Create/modify only `greenlight.py`, `bridges.py`, M9-D persistence, host M8/Factual adapters, routes and evidence.
+
+**Release gate:** `R2_FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTANCE.json` with `FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTED` (FA-1), or stop `M9_FACTUAL_AUTHORITY_UNAVAILABLE`. The packet also adds the ADR-0109 resolver as an additive M8 evolution under M8 tests.
 
 **Consumes:** Accepted M9-C candidate closure, `GreenlightCustodianPort`, accepted M8 Canvas seed seam (server-side seed under the ADR-0105 project profile; never the client append route, ADR-0107) and the durable Factual Authority port accepted by FA-1 (release gate).
 

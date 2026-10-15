@@ -392,6 +392,9 @@ class GreenlightSubject(M8ContractModel):
     candidate_payload_digest: Sha256Digest
     requested_disposition: GreenlightDisposition
     canvas_scope: CanvasSeedScope
+    supersedes_decision_id: str | None
+    reason: str
+    requested_expires_at: AwareDatetime
 
 class ProfilePublicationSubject(M8ContractModel):
     user_id: str
@@ -633,6 +636,9 @@ class AcquisitionAttempt(M8ContractModel):
     attempt_version: int = Field(ge=1)
     user_id: str
     project_name: str
+    actor_id: str
+    command_id: str
+    request_digest: Sha256Digest
     query_id: str
     query_revision: int = Field(ge=1)
     query_digest: Sha256Digest
@@ -801,6 +807,21 @@ retention evaluation; raw pages use the earliest applicable refresh/retention
 deadline among their declared classes. A `None` refresh/retention interval means
 the governing evidence explicitly imposes no elapsed-time limit of that kind; it
 never means that policy research or the data-class rule is missing.
+
+M9 enforces these deadlines itself:
+
+- **Read time:** every read or operational use of an erasable payload, or of a
+  derived record whose closure includes one, compares database time with the
+  earliest applicable retention deadline and refuses with
+  `M9_EVIDENCE_RETENTION_EXPIRED` when it has passed. Erased content is never
+  dereferenced. The same applies when a consumed grant with `delete_on_revoke`
+  is revoked.
+- **Sweep:** a host-scheduled idempotent `sweep_retention` command creates one
+  `InvalidationJob(reason=RETENTION_DEADLINE | GRANT_REVOKED)` per affected
+  snapshot closure, keyed by snapshot and deadline, and the normal §13 traversal
+  erases payloads before the job's propagation deadline. The read-time check never
+  depends on sweep latency. M9-B delivers the read-time check; M9-E delivers the
+  sweep.
 
 The `(value_ref, value_integrity_ref)` pair resolves through
 `SnapshotEvidenceStore` to one canonical object containing the native value,
@@ -1203,11 +1224,24 @@ digests.
 | `payload_digest` | `m9.opportunity-payload.v1` plus the entire frozen `OpportunityPayload` |
 | `lineage_digest` | `m9.opportunity-lineage.v1`, candidate/revision/parent/superseded candidate, payload digest, scope, exact cohort-profile identity/revision/digest and evidence closure |
 | profile-publication `subject_digest` | `m9.profile-publication-subject.v1`, exact user/project/actor, profile identity/parent and profile-payload digest |
-| Greenlight `subject_digest` | `m9.greenlight-subject.v1`, exact user/project/actor, candidate identity/revision/payload, requested disposition and Canvas scope |
+| Greenlight `subject_digest` | `m9.greenlight-subject.v1`, exact user/project/actor, candidate identity/revision/payload, requested disposition, Canvas scope, superseded decision, reason and requested expiry |
 | `command_guard_key` | `m9.command-key-guard.v1`, exact user/actor/operation/command tuple; first eight SHA-256 bytes become two signed big-endian 32-bit PostgreSQL advisory-lock integers and never become identity or evidence |
 | `binding_digest` | `m9.greenlight-binding.v1`, scope, candidate/revision/payload, evidence/freshness closure, disposition, Canvas scope, issuer, custodian authorization/policy/evidence identity, admitted time, reason, issued time, expiry and supersession |
 | `projection_digest` | `m9.evidence-validity-projection.v1`, scope, logical identity/revision, validity state, invalidation job/reason/time and content-availability flag |
 | `job_digest` | `m9.invalidation-job.v1`, scope/source, exact target refs, grant identity/digest, version/state/reason, dependency closure, counts, request/deadline/update times and qualified operator reason |
+| `condition_evidence_digest` | `m9.capability-condition-evidence.v1`, exact grant identity/version/digest and the ordered canonical `condition_evidence` objects |
+| `policy_basis_digest` | `m9.signal-policy-basis.v1` plus sorted `(grant_id, grant_version, grant_digest, evaluation_id, evaluation_digest)` tuples for every grant named in `policy_basis_grant_ids` |
+| `signal_closure_digest` | `m9.assessment-signal-closure.v1` plus sorted `(signal_id, revision, signal_digest)` tuples of the assessment's `signal_ids` |
+| `freshness_policy_digest` | `m9.greenlight-freshness-policy.v1`, the bound cohort profile identity/revision/digest, its canonical `freshness_policy`, and the evaluated earliest expiry over the evidence closure |
+| `selected_content_digest` | `m9.factual-selected-content.v1`, snapshot identity/digest, page ordinal, source-identity ref, locator, evidence type and the canonical selected content resolved through `SnapshotEvidenceStore` |
+| `selection_closure_digest` | `m9.factual-selection-closure.v1`, factual scope and sorted `(snapshot_id, snapshot_digest, page_ordinal, source_identity_ref, locator, selected_content_digest, evidence_type)` tuples |
+| receipt `request_digest` | `m9.command-request.v1`, operation, the full `(user_id, actor_id, operation, command_id)` tuple and the canonical command body; server-assigned ids and times are excluded |
+| receipt `result_digest` | `m9.command-result.v1`, operation, `request_digest` and the canonical receipt body without `result_digest`; server-assigned ids and times are included |
+
+Digests produced by a port (`PayloadDeletionResult.result_digest`,
+`FactualEvidenceReceipt.result_digest`, `M8CanvasSeedReceipt.result_digest`,
+`m8_payload_digest`, `custodian_evidence_digest`) belong to the port owner's
+domain. M9 stores them verbatim and never recomputes them under an M9 tag.
 
 Raw payload deletion does not change an old snapshot digest. Source identities,
 raw bytes and integrity digests subject to erasure live behind random opaque
@@ -1257,6 +1291,22 @@ tuple plus request digest remains authority.
    before commit leaves none of them; loss of the commit acknowledgement is
    resolved by receipt preflight without external I/O.
 
+**Host custodian (decided 2026-10-15).** The profile and Greenlight custodians are
+one host adapter over the ADR-0103 governance grants:
+
+- **When it issues a lease.** It issues a `CustodianAuthorizationLease` only to an
+  interactive session whose principal holds a current `HUMAN_SHOWRUNNER` grant
+  for the exact user/project, read through `CurrentShowrunnerGrantReader`.
+- **Policy identity.** `custodian_policy_id` is `arcreel.showrunner-grant` and
+  `custodian_policy_version` is the grant schema version
+  (`governance.showrunner_grant_event.v1`). M9 compares both with these fixed
+  expected values.
+- **Evidence.** `custodian_evidence_digest` is the grant event digest.
+- **Replay state.** Leases are stored durably by the host in
+  `host_custodian_leases`, keyed by user/project/actor/command and subject
+  digest, so replay returns the same lease. M9-A delivers the adapter and its
+  table because profile publication needs it first; M9-D reuses it.
+
 The host-owned custodian defines an issued lease as authorizing the one exact
 command until `admit_not_after`; later policy changes prevent new leases but do
 not reinterpret an already admitted transaction. If the host cannot provide
@@ -1274,6 +1324,13 @@ decision may expire/supersede without changing candidate content.
 Global lock rank is normative whenever a transaction touches more than one row:
 
 1. transaction-scoped command-key advisory guard, then command receipt;
+1a. project invalidation guard: `pg_advisory_xact_lock` (exclusive) for a
+    transaction that starts or advances an invalidation job, and
+    `pg_advisory_xact_lock_shared` for `decide_greenlight`, `seed_canvas` and
+    `submit_factual_evidence` prepare/finalize; the key is
+    `m9.invalidation-guard.v1` over `(user_id, project_name)`, derived like the
+    command guard. An approval or bridge step therefore never interleaves with the
+    start of an invalidation of its closure;
 2. source capability/policy evidence, ordered by ID;
 3. opportunity cohort-profile head;
 4. source query head;
@@ -1282,7 +1339,8 @@ Global lock rank is normative whenever a transaction touches more than one row:
 7. observation and signal correction heads, ordered by type then ID;
 8. opportunity candidate head;
 9. Greenlight head;
-10. Canvas-seed or Factual-bridge receipt.
+10. bridge intent, then Canvas-seed or Factual-bridge receipt;
+11. invalidation job, then its dependency edges ordered by ID.
 
 Transactions acquire only the ranks they need, always ascending and with IDs
 sorted lexicographically inside a rank. No database transaction spans provider,
@@ -1298,14 +1356,24 @@ does not rewrite the query and instead stops or requires a new query revision.
 
 `acquire` runs as prepare / I/O / finalize:
 
-1. transaction: exact replay check, query/grant/currentness validation, create
-   `AcquisitionAttempt(PLANNED)` and commit;
+1. transaction under the §9 command guard: receipt preflight, then the
+   attempt lookup by the full command key `(user_id, actor_id, "acquire",
+   command_id)` (unique on the attempt table). An existing attempt with the same
+   `request_digest` is returned as is and no new provider call starts; a
+   different digest is `M9_COMMAND_REPLAY_CONFLICT`. Only an absent attempt
+   continues to query/grant/currentness validation and the commit of
+   `AcquisitionAttempt(PLANNED)` bound to that key. Concurrent first calls
+   serialize on the guard, so at most one attempt exists per command;
 2. outside transaction: mark RUNNING through CAS, call `MarketSourcePort` page by
    page, persist each raw page idempotently by digest, and retain cursor/request
    identity;
 3. transaction: revalidate query and grant, create one immutable snapshot with
    explicit coverage, append observations only after integrity-ref verification,
    finalize attempt and receipt atomically.
+
+A retry of the same command while its attempt is `RUNNING`, `OUTCOME_UNKNOWN`
+or `NEEDS_OPERATOR` returns that attempt's current state; only reconciliation
+by a stable provider request ID or a qualified-operator receipt moves it.
 
 Before every page, the acquisition service also revalidates the exact cohort
 profile identity/revision/digest bound to the query. If capability expires or is
@@ -1415,7 +1483,10 @@ preflight/authorize/guard/finalize protocol used by profile publication.
 `seed_canvas` accepts a new actor-scoped command, exact decision identity and
 binding digest. It revalidates current `APPROVE`, scope and expiry, commits an
 outbox/bridge intent, invokes `M8CanvasSeedPort` outside the database transaction,
-then reconciles and records the exact `CanvasSeedReceipt`. The M8 seed is a
+then reconciles and records the exact `CanvasSeedReceipt`. The bridge intent
+freezes the complete M8 request: candidate id, revision, `created_at`, resolved
+lineage and node body. Reconciliation after a lost acknowledgement replays exactly
+that request and never re-resolves it. The M8 seed is a
 Canvas node with type `M9_OPPORTUNITY_SEED` and an immutable body containing the
 candidate, Greenlight and evidence-closure identities/digests. It cannot invoke
 M8 promotion or target an artifact slot.
@@ -1439,9 +1510,15 @@ same transaction as the append.
 - **Cohort check.** The seed is refused with `M9_COHORT_LEAKAGE` unless the bound
   cohort profile's `creative_profile_id` and `creative_profile_version` equal that
   project profile.
-- **Content basis.** For this seed only, `content_basis_digest` is populated from
-  M9 `creative_content_digest`. The two are distinct digest domains and are never
-  interchangeable outside that explicit bridge mapping.
+- **Content basis.** The seed uses M8 lineage resolution v3 (ADR-0109): the
+  `content_basis_digest` is the M8 canonical digest of
+  `{"basis_kind": "m9_opportunity_seed", "creative_content_digest",
+  "greenlight_decision_id", "greenlight_binding_digest"}`, produced by an additive
+  M8 resolver function that M9-D delivers as an explicit M8 evolution with M8
+  tests. Earlier resolutions keep their bytes.
+- **Refusals.** M8 lineage refusals (`M8_LINEAGE_AMBIGUOUS`,
+  `M8_LINEAGE_EPISODE_OUT_OF_SCOPE`) map to `M9_COHORT_LEAKAGE` and create no
+  seed.
 - **Master.** `approved_master_id` and `approved_master_digest` are null.
 - **Node body.** It separately binds the candidate, Greenlight and
   evidence-closure identities/digests.
@@ -1458,7 +1535,10 @@ delete or mutate it.
 The Factual bridge is separate. It maps selected source/snapshot material into
 `SourceRecord` and `EvidenceRecord` submissions with exact locators and digests.
 `FactualAuthorityPort` decides acceptance and any later Claim/ResearchPack
-workflow. The bridge is unavailable unless the capability grant permits factual
+workflow. Its bridge intent stores only evidence-store refs and digests for the
+selected content, never the content itself; the content is resolved through
+`SnapshotEvidenceStore` at call time and must still match
+`selected_content_digest`. The bridge is unavailable unless the capability grant permits factual
 use and retention of the exact selection proof required by Factual Authority.
 Greenlight state is not an input that can elevate claim status.
 Submission uses the same prepare/outbox/call/reconcile pattern as the Canvas
@@ -1468,8 +1548,10 @@ lookup by the bridge intent identity; an ambiguous outcome remains pending or
 
 ## 13. Deletion and invalidation
 
-The host or later M12 code requests deletion through an idempotent M9 port; it
-never writes M9 tables directly. M9 creates an `InvalidationJob` binding source,
+The host, the M9 retention sweep or later M12 code requests deletion through an
+idempotent M9 port; it never writes M9 tables directly. A host request
+(`InvalidateSourceEvidence`) is a Human command authorized by a custodian lease
+under §9, exposed by M9-E as a scoped route. M9 creates an `InvalidationJob` binding source,
 payload, policy grant, request identity and deadline. The propagation deadline
 is the earlier of the policy deadline and 24 hours after the accepted request.
 
@@ -1482,6 +1564,13 @@ M8 correction/disposition -> M8 learning evidence ref -> M9 signal
   -> opportunity candidate -> Greenlight validity
   -> Factual bridge receipt -> Factual Authority invalidation
 ```
+
+Pending bridge intents whose request depends on the invalidated closure are
+cancelled (`CANCELLED_BY_INVALIDATION`) before any port call; an intent already
+dispatched is reconciled, and a seed or factual record that was nevertheless
+created is recorded as stale and invalidated through its port. If propagation
+misses the job deadline, the job becomes `NEEDS_OPERATOR` and every dependent
+read stays fail-closed.
 
 Payload/identity/integrity deletion happens through
 `SnapshotEvidenceStore.delete_exact`. Then M9
@@ -1535,7 +1624,7 @@ families:
 - `m9_opportunity_signals`, `m9_signal_heads`;
 - `m9_opportunity_candidates`, `m9_candidate_heads`;
 - `m9_greenlight_decisions`, `m9_greenlight_heads`;
-- `m9_bridge_receipts`, `m9_command_receipts`;
+- `m9_bridge_intents`, `m9_bridge_receipts`, `m9_command_receipts`;
 - `m9_invalidation_jobs`, `m9_invalidation_edges`, `m9_events`.
 
 Every table carries user/project scope; global unique constraints include scope
@@ -1567,6 +1656,7 @@ The repository split is normative:
 - observation and signal repositories own append-only correction chains;
 - candidate repository owns candidate revisions and its CAS head;
 - Greenlight repository owns decisions and its independent CAS head;
+- bridge-intent repository owns frozen bridge requests and their transitions;
 - command/bridge receipt repositories own immutable replay results; and
 - invalidation repository owns jobs, dependency edges and progress versions.
 
@@ -1633,7 +1723,8 @@ under `frontend/src/i18n/`; Darkroom mono kickers remain the documented English
 exception. Keyboard navigation, focus order, dialog focus trapping, accessible
 names, non-color status cues, reduced motion and screen-reader error summaries
 are mandatory. Playwright runs axe-core against empty, loaded, partial,
-unavailable, conflict and invalidation states.
+unavailable, conflict and invalidation states. Playwright is not yet a frontend dependency; M9-F adds it under the
+repository dependency rules.
 
 ## 18. Events and observability
 
@@ -1674,6 +1765,7 @@ capability authorization.
 | `M9_GREENLIGHT_UNAUTHORIZED` | issuer is not an authenticated Human custodian for exact scope |
 | `M9_GREENLIGHT_EXPIRED` | approval is expired or superseded for a new Canvas seed |
 | `M9_INVALIDATION_INCOMPLETE` | a dependent read occurs before deletion/invalidation closure completes |
+| `M9_EVIDENCE_RETENTION_EXPIRED` | a read or use reaches erasable evidence past its retention deadline or a revoked delete-on-revoke grant |
 | `M9_DONOR_PARITY_INCOMPLETE` | selected donor behavior lacks exact-pin, same-fixture and independent parity evidence |
 | `M9_REQUIRED_EVIDENCE_MISSING` | a packet-required Human or environment evidence input is absent or unverified |
 | `M9_OPERATIONAL_ENVELOPE_EXCEEDED` | input exceeds a frozen V1 hard ceiling |
@@ -1764,6 +1856,10 @@ requires design amendment and `POST_M8_BASE_SEAM_CHANGED`:
 - `r2/opportunity/` — deep module, repositories, policy, acquisition,
   normalization, signals, candidates, Greenlight, invalidation and bridges;
 - `lib/db/models/` and `lib/db/repositories/` — ArcReel persistence adapters;
+- `server/services/m9_custodian.py` and `lib/db/models/host_custodian.py` — the
+  host custodian adapter over ADR-0103 grants and its lease replay table (M9-A);
+- `r2/advanced_creative/lineage.py` — only the additive ADR-0109 seed resolver,
+  as an explicit M8 evolution under M8 tests (M9-D);
 - `server/routers/` and request/response schemas — scoped HTTP command/read edge;
 - `frontend/src/` — Opportunity Desk projection and command UI;
 - `alembic/versions/` — one linear M9 chain from accepted predecessor;

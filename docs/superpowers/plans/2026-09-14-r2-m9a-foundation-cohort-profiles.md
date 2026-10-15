@@ -16,7 +16,7 @@
 
 ## Non-interactive execution rule
 
-Read ADR-0081, the design, research, umbrella, execution contract and this packet before changing production files. Execute only in clean branch `impl/r2-m9a-opportunity-foundation`, created from the commit accepting `R2_M9_PREREQUISITE_ACCEPTANCE.json`. Never execute on `design/r2-m5b-narrative-context`.
+Read ADR-0081, the design, research, umbrella, execution contract and this packet before changing production files. Execute only in clean branch `impl/r2-m9a-opportunity-foundation`, created from the commit accepting `R2_M9_PREREQUISITE_ACCEPTANCE.json`. Never execute on a design branch (`design/r2-m5b-narrative-context`, `design/r2-m9-v2-revalidation` or any other `design/*`).
 
 This packet is `PACKET_AUTHORED_FOR_REVIEW` and
 `PACKET_EXECUTION_BLOCKED`. The **A0-preflight gate** is a read-only prerequisite
@@ -60,6 +60,9 @@ Create:
 - `lib/db/repositories/opportunity.py`
 - `server/services/opportunity.py`
 - `server/routers/opportunity.py`
+- `server/services/m9_custodian.py` — host custodian adapter over the ADR-0103 showrunner grants (spec §9)
+- `lib/db/models/host_custodian.py` — `host_custodian_leases` ORM (host-owned replay state)
+- `tests/integration/server/services/test_m9_custodian.py`
 - `scripts/r2/verify_m9_scope.py`
 - `scripts/r2/verify_m9_parity.py`
 - `scripts/r2/verify_m9_evidence.py`
@@ -122,6 +125,7 @@ Migration `9a9c4a0e0001` creates exactly:
 - `m9_cohort_profile_heads`: scope, profile ID, current revision and head version; primary key `(user_id, project_name, profile_id)`; both versions positive.
 - `m9_command_receipts`: scope, actor, operation, command ID, request digest, result kind/ref/digest, committed time; unique `(user_id, actor_id, operation, command_id)` and scoped result index.
 - `m9_events`: monotonic event ID, scope, event kind, aggregate identity/revision, payload digest and committed time; no raw/profile payload or token-like fields.
+- `host_custodian_leases` (host-owned, not an M9 authority table): user, project, actor, command ID, subject digest, authorization ID, policy ID/version, grant event digest, issued time and `admit_not_after`; unique `(user_id, project_name, actor_id, command_id)`. A replay with the same subject returns the stored lease; a different subject, or an expired lease, is refused (spec §9).
 
 Rows in profiles, receipts and events are append-only. Only profile-head CAS updates. Repository methods flush but never commit; the application service owns begin/commit/rollback.
 
@@ -133,7 +137,7 @@ Rows in profiles, receipts and events are append-only. Only profile-head CAS upd
 
 **Produces:** `verify_m9_scope(repo: Path, contract: Mapping[str, object]) -> list[str]` and a baseline binding exact HEAD, singleton Alembic predecessor, document hashes, seam hashes, donor pins and owned paths.
 
-- [ ] **A0.1 — Write verifier RED tests.** Parameterize dirty worktree; design branch; absent/rejected M9 design acceptance; invalid sealed-review schema; duplicate reviewer identity/output ref; review-output hash mismatch; candidate/contract/rubric mismatch; incomplete or failed rubric checks; seal/share ordering violation; absent M8 acceptance; acceptance-parent mismatch; wrong accepted status; SHA/document/seam drift; multiple Alembic heads; missing donor pin; required skip/material unknown; and owned-path collision. Each fixture asserts one normative stop code and verifies no production file is created.
+- [ ] **A0.1 — Write verifier RED tests.** Parameterize dirty worktree; design branch; absent/rejected M9 design acceptance; invalid sealed-review schema; duplicate reviewer identity/output ref; review-output hash mismatch; candidate/contract/rubric mismatch; incomplete or failed rubric checks; seal/share ordering violation; absent M8 acceptance; absent or invalid combined-base acceptance (`R2_M9_PREREQUISITE_ACCEPTANCE.json`, umbrella Task P0); acceptance-parent mismatch; wrong accepted status; SHA/document/seam drift; multiple Alembic heads; missing donor pin; required skip/material unknown; and owned-path collision. Each fixture asserts one normative stop code and verifies no production file is created.
 
 - [ ] **A0.2 — Run RED.** Run:
 
@@ -278,12 +282,12 @@ Rows in profiles, receipts and events are append-only. Only profile-head CAS upd
   uv run basedpyright --warnings
   uv run lint-imports
   uv run deptry lib server alembic scripts tests r2
-  uv run python -m pytest -n 4 --dist loadfile
+  uv run python -m pytest <every test path owned or affected by M9-A, listed explicitly>
   uv run python scripts/audit_tests.py --check
   git diff --check
   ```
 
-  Expected: every command exits 0, full suite has non-zero tests, and required skips/material unknowns remain empty.
+  Expected: every command exits 0, the explicit selection has non-zero tests, and required skips/material unknowns remain empty. The full suite runs only on explicit sponsor request (`ARCREEL_FULL_SUITE=1`, repository rule).
 
 - [ ] **A4.3 — Run focused fault and evidence gates.** Re-run A0–A3 tests explicitly, migration round trip, PostgreSQL concurrency, scope/architecture verifier and parity verifier. Save logs outside the repository, record SHA-256/logical test counts and verify the recorded tested HEAD equals the clean A3 code HEAD.
 

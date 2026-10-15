@@ -64,7 +64,7 @@
     "M8CanvasSeedPort-compatible accepted Canvas append service",
     "M8LearningReadPort-compatible accepted learning reader",
     "FactualAuthorityPort-compatible durable submit and invalidate service (required at the M9-D release gate, not before M9-A)",
-    "host-owned profile and Greenlight custodian interfaces",
+    "host-owned profile and Greenlight custodian interfaces: an adapter over ADR-0103 showrunner grants with durable lease replay, delivered by M9-A (spec §9)",
     "repository-attested disposable PostgreSQL target"
   ],
   "migration_policy": {
@@ -110,7 +110,9 @@
   ],
   "packet_inputs": {
     "M9-A": {
-      "human_inputs_required": [],
+      "human_inputs_required": [
+        "a current HUMAN_SHOWRUNNER governance grant (ADR-0103) for the profile custodian on the disposable target"
+      ],
       "environment_required": [
         "repository-attested disposable PostgreSQL target"
       ],
@@ -188,7 +190,8 @@
     "changes": [
       "Factual Authority acceptance moved from the M9-A release to the M9-D release gate (packet_release_acceptance)",
       "M8 seams updated for ADR-0105 (lineage binds the admitted M6 profile), ADR-0106 and ADR-0107 (client Canvas appends carry a server-resolved lineage); the M9 Canvas seed is created server-side",
-      "design reviewers: two fresh, author-independent, mutually blind model agents by sponsor decision (2026-10-15); the review policy is unchanged"
+      "design reviewers: two fresh, author-independent, mutually blind model agents by sponsor decision (2026-10-15); the review policy is unchanged",
+      "design review pass 1 (blocking findings) resolved: umbrella and stop-code synchronization, digest domains, acquire command-key binding, invalidation guard and bridge intents in the lock rank, host custodian ownership (M9-A), retention enforcement, M8 lineage resolution v3 for seeds (ADR-0109), combined-base Task P0"
     ]
   }
 }

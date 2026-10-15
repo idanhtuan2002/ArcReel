@@ -73,10 +73,20 @@ bridge stops with `M9_FACTUAL_AUTHORITY_UNAVAILABLE` until the accepted authorit
 seam is present and bound by exact commit/hash evidence.
 
 M9 implementation starts only from an independently accepted M8 implementation
-lineage. The present branch contains M8 design packets, not an accepted M8
-implementation. Any executor therefore stops with
-`M9_M8_IMPLEMENTATION_NOT_ACCEPTED` until the prerequisite exists. Planned seam
-names are not executable dependencies.
+lineage. Planned seam names are not executable dependencies.
+
+**V2 revalidation (2026-10-15).** The V2 lineage accepted the M8 implementation at
+`23cf146a`. The design was revalidated against it
+(`docs/research/2026-10-15-r2-m9-prerequisite-path.md`):
+
+- The durable Factual Authority is a separate prerequisite (FA-1), gated at the
+  M9-D release. It is not required before M9-A.
+- Cohort profiles carry the exact M6 creative profile identities (ADR-0105).
+- The Canvas seed uses M8 lineage resolution v3 (ADR-0109) on the server and
+  never the client append route (ADR-0107).
+- The host custodian is an adapter over the ADR-0103 showrunner grants.
+- Retention deadlines are enforced at read time, and a sweep creates the
+  invalidation jobs.
 
 Western generic/factual and Chinese short-drama `zh-shuang` are sibling cohorts.
 They share contracts and evidence mechanics but never silently share source
