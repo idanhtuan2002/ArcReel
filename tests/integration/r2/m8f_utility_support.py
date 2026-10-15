@@ -423,6 +423,8 @@ async def _spatial(
     )
     result.deliverables["SPATIAL"] = 1 if receipt.result.binding_version == 2 else 0
     result.digests["spatial"] = {
+        "receipt": receipt.model_dump(mode="json"),
+        "revision_payload": revision.payload.model_dump(mode="json"),
         "binding_id": created.result.binding_id,
         "pair_decision": approval.decision_digest,
         "constraint_set": preview.binding.proposal.model_dump(mode="json"),
@@ -549,6 +551,9 @@ async def _format(factory: Factory, project: str, project_dir: Path, source_key:
         if technical.passed and semantic.passed and receipt.result_digest == rendered.artifact_digest:
             promoted += 1
         renders[profile_ref] = {
+            "receipt": receipt.model_dump(mode="json"),
+            "technical_report": technical.model_dump(mode="json"),
+            "semantic_report": semantic.model_dump(mode="json"),
             "artifact_digest": rendered.artifact_digest,
             "technical_passed": technical.passed,
             "semantic_passed": semantic.passed,
@@ -668,6 +673,7 @@ async def _learning(
         "evaluation_ids": list(report.evaluation_ids),
         "train_ids": list(report.train_ids),
         "recommendation_id": recommendation["recommendation_id"] if recommendation else None,
+        "recommendation": recommendation,
     }
 
 

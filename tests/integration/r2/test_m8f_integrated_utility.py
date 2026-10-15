@@ -20,6 +20,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.adaptation import AdaptationRepository
+from r2.advanced_creative.digests import digest_payload
+from r2.contracts.advanced_creative import CanvasCandidate, LineageBinding
+from scripts.r2.verify_m8f_determinism import stable_view
 from server.services.format_render import ffmpeg_available
 from tests.fixtures.r2 import m8f_corpus as corpus
 from tests.integration.r2.m8f_utility_support import (
@@ -43,20 +46,8 @@ CEILINGS = PROTOCOL["resource_envelope"]["ceilings"]
 
 
 def _stable(result: CohortResult) -> dict[str, object]:
-    """The fields the protocol requires to match across runs; wall-clock values are excluded."""
-    return {
-        "deliverables": result.deliverables,
-        "baseline": result.baseline,
-        "lineage_profiles": result.lineage_profiles,
-        "canvas": result.digests["canvas"],
-        "format": result.digests["format"],
-        "masters": result.digests["masters"],
-        "sources": result.digests["source_sha256"],
-        "spatial_visible_assertions": result.digests["spatial"]["visible_assertions"],
-        "spatial_relations": [c["relation_kind"] for c in result.digests["spatial"]["constraint_set"]["constraints"]],
-        "learning": {key: result.digests["learning"][key] for key in ("train_ids", "evaluation_ids")},
-        "replay": {key: result.replay[key] for key in ("train_lift", "evaluation_lift", "direction_held")},
-    }
+    """The whole cohort record minus run-scoped fields (scripts/r2/verify_m8f_determinism.py)."""
+    return stable_view(json.loads(json.dumps(result.__dict__, default=str)))
 
 
 def _export_review_media(measured: dict[str, dict[str, object]], root: Path, target: Path) -> None:
@@ -134,7 +125,41 @@ async def _leak_probes(client, factory: Factory, root: Path) -> dict[str, object
             "command_id": "m8f-cross-cohort",
         },
     )
+    western_project = corpus.creative_project(western)
+    shuang_project = corpus.creative_project(shuang)
+    context = (
+        await client.get(f"/api/v1/projects/{western_project}/m8/exploration/context", params={"episode": 1})
+    ).json()
+    forged_lineage = {**context["lineage"], "project_name": shuang_project}
+    payload = {
+        "kind": "CANVAS",
+        "graph_schema_version": "1",
+        "nodes": [],
+        "edges": [],
+        "groups": [],
+        "storyboard_order": [],
+        "viewport_bookmarks": [],
+    }
+    forged_revision = {
+        "candidate_id": "m8f-forged",
+        "revision": 1,
+        "kind": "CANVAS",
+        "parent_revision": None,
+        "payload": payload,
+        "payload_digest": digest_payload(
+            CanvasCandidate.model_validate(payload), LineageBinding.model_validate(forged_lineage)
+        ),
+        "lineage": forged_lineage,
+        "created_by": context["created_by"],
+        "created_at": "2026-10-15T12:00:00Z",
+    }
+    forged = await client.post(
+        f"/api/v1/projects/{shuang_project}/m8/exploration/revisions",
+        json={"candidate": forged_revision, "expected_head_version": None, "command_id": "m8f-forged"},
+    )
     return {
+        "forged_canvas_append_status": forged.status_code,
+        "forged_canvas_append_code": "M8_LINEAGE_NOT_SERVER_RESOLVED" in forged.text,
         "foreign_observation_status": refused.status_code,
         "cross_cohort_evaluation": {key: crossed.json()[key] for key in ("fired", "reason")},
     }
@@ -165,6 +190,8 @@ async def test_both_cohorts_beat_the_baseline_without_leaking_and_replay_identic
         assert _stable(result) == _stable(replayed)
     probes = first["probes"]["result"]
     assert probes == {
+        "forged_canvas_append_status": 409,
+        "forged_canvas_append_code": True,
         "foreign_observation_status": 422,
         "cross_cohort_evaluation": {"fired": False, "reason": "both arms need observations"},
     }
@@ -180,6 +207,7 @@ async def test_both_cohorts_beat_the_baseline_without_leaking_and_replay_identic
                         **{k: v for k, v in first[profile.value].items() if k != "result"},
                     },
                     "run_2_matches_run_1": True,
+                    "run_2": second[profile.value]["result"].__dict__,
                     "run_2_wall_seconds": second[profile.value]["wall_seconds"],
                 }
                 for profile in corpus.COHORTS
