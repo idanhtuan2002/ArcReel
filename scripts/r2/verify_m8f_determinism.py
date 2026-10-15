@@ -5,10 +5,10 @@ than the artifact: generated ids, wall-clock times, grant events, and digests th
 them. Every other field (renders, reports' checks and verdicts, constraint content, sources,
 promotion targets and results, learning evidence and lifts, masters) must match.
 
-    uv run python scripts/r2/verify_m8f_determinism.py <results-a.json> <results-b.json>
+    uv run python scripts/r2/verify_m8f_determinism.py docs/r2/evidence/R2_M8_F_RESULTS_V3.json
 
-compares run 1 of every cohort across two results files (for example SQLite and PostgreSQL), and
-run 1 against run 2 inside each file. It exits 2 on any difference.
+compares run 1 of every cohort across run documents (the ``runs`` embedded in a sealed results file,
+for example SQLite and PostgreSQL, or several raw run files), and run 1 against run 2 inside each. It exits 2 on any difference.
 """
 
 from __future__ import annotations
@@ -70,25 +70,41 @@ def differences(a: Any, b: Any, path: str = "") -> list[str]:
     return [] if a == b else [path or "<root>"]
 
 
+def _run_documents(paths: Sequence[Path]) -> tuple[list[str], list[dict[str, Any]]]:
+    """Raw run documents (``{"cohorts": ...}``) by name; a sealed results file contributes each of its
+    embedded ``runs`` (for example ``runs.sqlite`` and ``runs.postgresql``)."""
+    names: list[str] = []
+    documents: list[dict[str, Any]] = []
+    for path in paths:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if "runs" in document:
+            for dialect, run in document["runs"].items():
+                names.append(f"{path.name}:{dialect}")
+                documents.append(run)
+        else:
+            names.append(path.name)
+            documents.append(document)
+    return names, documents
+
+
 def file_problems(paths: Sequence[Path]) -> list[str]:
-    documents = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+    names, documents = _run_documents(paths)
+    if len(documents) < 2:
+        return [f"{names[0] if names else '<none>'}: cross-run comparison needs at least two run documents"]
     problems: list[str] = []
-    for path, document in zip(paths, documents, strict=True):
+    for name, document in zip(names, documents, strict=True):
         for cohort, runs in document["cohorts"].items():
             if "run_2" in runs:
                 run_1 = {key: runs["run_1"][key] for key in runs["run_2"]}
                 problems += [
-                    f"{path.name} {cohort} run 2: {d}"
-                    for d in differences(stable_view(run_1), stable_view(runs["run_2"]))
+                    f"{name} {cohort} run 2: {d}" for d in differences(stable_view(run_1), stable_view(runs["run_2"]))
                 ]
     first, *rest = documents
-    for path, document in zip(paths[1:], rest, strict=True):
+    for name, document in zip(names[1:], rest, strict=True):
         for cohort in sorted(set(first["cohorts"]) | set(document["cohorts"])):
             a = first["cohorts"].get(cohort, {}).get("run_1", {})
             b = document["cohorts"].get(cohort, {}).get("run_1", {})
-            problems += [
-                f"{paths[0].name} vs {path.name} {cohort}: {d}" for d in differences(stable_view(a), stable_view(b))
-            ]
+            problems += [f"{names[0]} vs {name} {cohort}: {d}" for d in differences(stable_view(a), stable_view(b))]
     return problems
 
 

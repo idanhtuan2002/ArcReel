@@ -50,10 +50,31 @@ def test_artifact_content_differences_are_reported(tmp_path: Path) -> None:
     ]
 
 
+def test_a_sealed_results_file_compares_its_embedded_runs(tmp_path: Path) -> None:
+    other = json.loads(json.dumps(RECORD))
+    other["digests"]["format"]["square@1"]["artifact_digest"] = "sha256:b"
+    sealed = tmp_path / "R2_M8_F_RESULTS.json"
+    run = {"cohorts": {"W": {"run_1": RECORD, "run_2": RECORD}}}
+    sealed.write_text(
+        json.dumps({"runs": {"sqlite": run, "postgresql": {"cohorts": {"W": {"run_1": other}}}}}), encoding="utf-8"
+    )
+
+    assert file_problems([sealed]) == [
+        "R2_M8_F_RESULTS.json:sqlite vs R2_M8_F_RESULTS.json:postgresql W: .digests.format.square@1.artifact_digest"
+    ]
+
+
+def test_a_single_run_document_is_not_a_comparison(tmp_path: Path) -> None:
+    path = tmp_path / "only.json"
+    path.write_text(json.dumps({"cohorts": {"W": {"run_1": RECORD}}}), encoding="utf-8")
+
+    assert file_problems([path]) == ["only.json: cross-run comparison needs at least two run documents"]
+
+
 def test_a_second_run_that_differs_inside_one_file_is_reported(tmp_path: Path) -> None:
     other = json.loads(json.dumps(RECORD))
     other["deliverables"]["FORMAT"] = 1
     path = tmp_path / "sqlite.json"
     path.write_text(json.dumps({"cohorts": {"W": {"run_1": RECORD, "run_2": other}}}), encoding="utf-8")
 
-    assert file_problems([path]) == ["sqlite.json W run 2: .deliverables.FORMAT"]
+    assert file_problems([path, path]) == ["sqlite.json W run 2: .deliverables.FORMAT"] * 2

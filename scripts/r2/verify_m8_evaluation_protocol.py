@@ -28,7 +28,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker
 
 STOP_CODE = "M8_EVALUATION_NOT_PREREGISTERED"
-PROTOCOL = Path("docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V2.json")
+PROTOCOL = Path("docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V3.json")
 SCHEMA = Path("docs/r2/evidence/schemas/R2_M8_EVALUATION_PROTOCOL.schema.json")
 COHORT_IDS = {"WESTERN_GENERIC", "CN_SHORT_DRAMA_SHUANGWEN"}
 

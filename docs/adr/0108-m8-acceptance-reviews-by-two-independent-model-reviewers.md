@@ -44,3 +44,28 @@ v2) and run again under it.
 
 - **Two qualified humans:** not available to the sponsor.
 - **The sponsor plus Codex:** offered; the sponsor declined.
+
+## Amendment 1 (2026-10-15, after the second Codex review)
+
+The second Codex review found that reviewer A was not blind. Reviewer A was the implementing agent,
+built the packet, and held the label key, and the reviewer prompt disclosed the expected calibration
+verdicts. The sponsor's decision (model reviewers only, no human) stands. Blindness is enforced as
+follows:
+
+- **Who reviews.** The two reviewers are fresh model instances run as separate agents, neither of
+  which implemented M8-F:
+  - reviewer A is a new Claude agent with no conversation context;
+  - reviewer B is a new Codex agent.
+
+  The implementing agent only builds the packet and records the outcome.
+- **What reviewers do not see.** Neither reviewer sees:
+  - the label key;
+  - which items are calibration items;
+  - any expected verdict;
+  - the other reviewer's output;
+  - earlier review records.
+
+  Calibration items are unlabelled. A reviewer passes calibration only if it independently fails the
+  planted defect.
+- **Fresh run.** Protocol v3 freezes this roster before a new run and new reviews. The v2 reviews do
+  not count toward acceptance.

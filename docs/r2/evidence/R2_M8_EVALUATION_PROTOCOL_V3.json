@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "packet": "M8-F",
+  "status": "M8_F_EVALUATION_PREREGISTERED",
+  "registered_at": "2026-10-15T03:46:06Z",
+  "base_head": "b81d7aa0",
+  "decisions": [
+    "docs/research/2026-10-15-r2-m8f-evaluation-and-profile-seam.md (DEC-F-0..DEC-F-3)",
+    "docs/adr/0105-m8-lineage-v2-binds-the-admitted-screenplay-profile.md",
+    "docs/superpowers/plans/2026-10-15-r2-m8f-utility-execution.md",
+    "docs/adr/0106-m7-candidate-ids-are-scoped-to-user-and-project.md",
+    "docs/adr/0107-canvas-append-verifies-the-server-resolved-lineage.md",
+    "docs/adr/0108-m8-acceptance-reviews-by-two-independent-model-reviewers.md"
+  ],
+  "corpus": {
+    "builder": "tests/fixtures/r2/m8f_corpus.py",
+    "corpus_version": "m8f-corpus@1",
+    "manifest_digest": "sha256:8389a20bf4d7103932e021db15727f9c696676343f13c116fc45c9f8c7b4974b",
+    "sources": [
+      {
+        "path": "tests/fixtures/r2/m8f_corpus.py",
+        "sha256": "86ea1787b171fec8d5ed8c7479c5d2178bdf36ab5b979d44eb461620b81c83d5"
+      },
+      {
+        "path": "tests/fixtures/r2/m6_dual_profile_corpus.py",
+        "sha256": "cbacc1ba1ace37933b7540ac2201e47ff55c7b6e4c7e6804163b165ba2eed7bf"
+      },
+      {
+        "path": "tests/fixtures/r2/m8f_profiles.py",
+        "sha256": "323fa66db3a00eac237a0c2088f9c5cb89633a51a3d44779ff202a948266299d"
+      },
+      {
+        "path": "r2/adaptation/policy_packs/western_generic_v1.json",
+        "sha256": "bbe9da9e642bc2f7ed6a8204331c21438756d536dbdea9d0f945cb5af36bb74a"
+      },
+      {
+        "path": "r2/adaptation/policy_packs/cn_short_drama_shuangwen_v1.json",
+        "sha256": "9fa1f631e21d8412410d4fa4e9027cf84451196194652af9505f3dee7ac1ef56"
+      },
+      {
+        "path": "r2/learning/adapters.py",
+        "sha256": "47ecc9687107ef396ae2e4b90baf44b2a291b2085d8d8905ddc57bcba94f98ab"
+      },
+      {
+        "path": "r2/learning/cohorts.py",
+        "sha256": "dc691c13df435ded8e5f744cc9b9664cd094d6f9a05f9f3036e4f0641303d32a"
+      },
+      {
+        "path": "r2/learning/replay.py",
+        "sha256": "496d9f25b5dcd24770dd16b389461057ba7a96532271341d9f57fa998b18990e"
+      },
+      {
+        "path": "r2/advanced_creative/lineage.py",
+        "sha256": "b0fdc3a22b2aa9cf17e892ea4eaa887df3dd213e03be7ac456b44634c799ac73"
+      },
+      {
+        "path": "r2/advanced_creative/formats.py",
+        "sha256": "8f65d19e5a5d1c4c6646c14a18e592de8194d2a0449410e9ac5ba82ec7ec8456"
+      },
+      {
+        "path": "tests/integration/r2/m8f_utility_support.py",
+        "sha256": "cc24697b6d5337ee9f5918390f066f79284db55cb6ca47f0cc086c66ef5a0c04"
+      },
+      {
+        "path": "tests/integration/r2/test_m8f_integrated_utility.py",
+        "sha256": "5bb3db5a5b0c5d79619db0a78e1cd7e4f0b03a4746453fc1c4de156ee762489f"
+      },
+      {
+        "path": "scripts/r2/verify_m8f_determinism.py",
+        "sha256": "8bdb01467362ed5ebba47e263619aa9c6b3ed31944174aaa1025da5ae4f1724c"
+      },
+      {
+        "path": "scripts/r2/m8f_review_packet.py",
+        "sha256": "90e8d539cf316988dcf7117f1611d62d7f5f5fff0613b3f92a50d728fd0cac02"
+      }
+    ],
+    "limits": [
+      "Every value is synthetic; the corpus demonstrates mechanism and makes no claim about real audiences.",
+      "The zh-shuang text is Golden B's structurally valid but culturally minimal slice; no cultural representativeness is claimed.",
+      "Holdout observations carry future-dated windows (after registered_at) by construction; replay refuses any evaluation observation older than registration.",
+      "Shot masters are stylized rooms drawn where the pinned spatial fixture places its objects (tests/integration/r2/m8f_utility_support.py SHOT_PATTERNS)."
+    ]
+  },
+  "cohorts": [
+    {
+      "creative_profile_id": "WESTERN_GENERIC",
+      "creative_profile_version": "v1",
+      "spec_label": "generic-western",
+      "creative_project": "m8f-western",
+      "learning_projects": {
+        "train": "m8f-western-train",
+        "holdout": "m8f-western-holdout"
+      }
+    },
+    {
+      "creative_profile_id": "CN_SHORT_DRAMA_SHUANGWEN",
+      "creative_profile_version": "v1",
+      "spec_label": "zh-shuang",
+      "creative_project": "m8f-shuang",
+      "learning_projects": {
+        "train": "m8f-shuang-train",
+        "holdout": "m8f-shuang-holdout"
+      }
+    }
+  ],
+  "design_class": "OFFLINE_REPLAY_SEQUENTIAL",
+  "baseline": {
+    "arm": "HOST_WITHOUT_M8",
+    "description": "The same corpus through ArcReel host surfaces only (admission, approved shot masters, export); no M8 route is called. Baseline deliverable counts are measured by running it, not assumed."
+  },
+  "endpoints": [
+    {
+      "capability": "CANVAS",
+      "deliverable": "an exploration with at least two sibling alternatives and its history, reloaded intact and bound to the cohort lineage",
+      "gates": [
+        "append accepted with server-resolved lineage",
+        "reload returns identical revisions",
+        "approved master bytes and heads unchanged"
+      ],
+      "baseline_expected": 0,
+      "minimum_delta": 1
+    },
+    {
+      "capability": "SPATIAL",
+      "deliverable": "a promoted spatial constraint set on a registered target, available to generation",
+      "gates": [
+        "fixture vision through M7 execution",
+        "no fact without source span",
+        "preview and explicit promotion",
+        "lineage binds the cohort profile"
+      ],
+      "baseline_expected": 0,
+      "minimum_delta": 1
+    },
+    {
+      "capability": "LEARNING",
+      "deliverable": "a lineage-bound recommendation whose direction holds on the registered holdout",
+      "gates": [
+        "ingest only with server lineage",
+        "cohort never pooled across profiles",
+        "compare_cohorts@1 fires on train",
+        "replay direction_held on holdout",
+        "associative language only"
+      ],
+      "baseline_expected": 0,
+      "minimum_delta": 1
+    },
+    {
+      "capability": "FORMAT",
+      "deliverable": "9:16 and 1:1 projections promoted into their format slots",
+      "gates": [
+        "technical report PASS",
+        "semantic report PASS (format-semantic@1)",
+        "preview and promotion bound to the source master",
+        "lineage binds the cohort profile"
+      ],
+      "baseline_expected": 0,
+      "minimum_delta": 2
+    }
+  ],
+  "effect_policy": {
+    "smallest_useful_effect": "For each cohort and each capability, M8 delivers at least minimum_delta more gated deliverables than the baseline, with zero regressions of baseline deliverables (approved master bytes and heads byte-identical).",
+    "confidence": "Deterministic: two independent runs from an empty database must produce identical artifact digests and verdicts. No sampling inference. Review verdict proportions are reported as exact counts with a Wilson 95% interval, descriptive only.",
+    "causal_language": "Forbidden. The design class is offline and sequential; hypotheses stay associative (r2.learning.cohorts causal-language guard).",
+    "pilot_confirmatory": "Not applicable: deterministic outputs and one reviewer give no variance to estimate; recorded as deviation NO_CONFIRMATORY_SAMPLE."
+  },
+  "learning_replay": {
+    "rule": "compare_cohorts@1",
+    "params": {
+      "min_per_arm": 7,
+      "min_relative_lift": "0.10"
+    },
+    "source_family": "youtube.analytics.v2",
+    "metric_name": "views",
+    "metric_definition_version": "youtube.analytics.v2/views@1",
+    "aggregation": "sum_day",
+    "baseline_arm": "landscape-16x9@1",
+    "treatment_arm": "vertical-9x16@1",
+    "train_cutoff": "2026-10-01T00:00:00+00:00",
+    "evaluation_window": [
+      "2026-11-02",
+      "2026-11-15"
+    ],
+    "holdout_salt": "m8f-holdout@2",
+    "evaluation_share": "0.5"
+  },
+  "exclusions": [],
+  "rubrics": [
+    {
+      "rubric_version": "format-semantic@1",
+      "items": [
+        "focal_subject",
+        "action",
+        "shot_intent",
+        "on_screen_text",
+        "captions",
+        "timing",
+        "audio"
+      ],
+      "applies_to": "format projections",
+      "calibration": "One unlabelled format item is a projection with muted audio (scripts/r2/m8f_review_packet.py); a reviewer's cohort verdicts count only if it independently marks that item's audio FAIL."
+    },
+    {
+      "rubric_version": "m8f-spatial-review@1",
+      "items": [
+        "pairing_matches_master_reverse",
+        "visible_assertions_supported_by_frames",
+        "gaps_not_stated_as_facts",
+        "seam_and_direction_locks_plausible"
+      ],
+      "applies_to": "spatial candidates before promotion",
+      "calibration": "One unlabelled spatial item adds a VISIBLE 'green sofa' span over bare wall; a reviewer's cohort verdicts count only if it independently marks that item's visible_assertions_supported_by_frames FAIL."
+    }
+  ],
+  "reviewers": [
+    {
+      "reviewer_ref": "reviewer A: a fresh Claude agent with no conversation context",
+      "kind": "model",
+      "language_cultural_cohort": "not applicable (model)",
+      "role": "blind reviewer",
+      "conflict_declaration": "did not implement M8-F; does not see the label key, calibration identities, expected verdicts, other reviews or evidence records",
+      "qualification": "passes both unlabelled calibration items"
+    },
+    {
+      "reviewer_ref": "reviewer B: a fresh Codex agent",
+      "kind": "model",
+      "language_cultural_cohort": "not applicable (model)",
+      "role": "blind reviewer",
+      "conflict_declaration": "did not implement M8-F; same isolation as reviewer A",
+      "qualification": "passes both unlabelled calibration items"
+    }
+  ],
+  "deviations": [
+    {
+      "code": "MODEL_REVIEWERS_BY_SPONSOR_AMENDMENT",
+      "statement": "ADR-0108: two independent model reviewers replace two qualified human reviewers; no human reviews the M8-F artifacts."
+    },
+    {
+      "code": "REVIEW_OUTSIDE_APP",
+      "statement": "Reviews run on an offline packet of the recorded bytes, without in-app grant custody (exercised in M8-E)."
+    },
+    {
+      "code": "STIMULI_DRAWN_TO_FIXTURE",
+      "statement": "Spatial frames are drawn to match the pinned fixture; the review checks pipeline fidelity, not model perception."
+    },
+    {
+      "code": "NO_CONFIRMATORY_SAMPLE",
+      "statement": "Deterministic outputs; no pilot variance or confirmatory sample size."
+    },
+    {
+      "code": "PACKET_BUILT_BY_IMPLEMENTER",
+      "statement": "The implementing agent built the packet and holds the key; it does not review."
+    }
+  ],
+  "resource_envelope": {
+    "ceilings": {
+      "cohort_wall_seconds": 1800,
+      "format_render_seconds": 1800,
+      "peak_rss_mib": 4096,
+      "cohort_disk_mib": 2048
+    },
+    "basis": "Host ceilings (server.services.format_render.RENDER_TIMEOUT_SECONDS = 1800); M8-E recorded no resource measurements, so no tighter empirical ceiling exists. Human review time is excluded."
+  },
+  "replay_determinism": {
+    "runs": 2,
+    "verifier": "scripts/r2/verify_m8f_determinism.py",
+    "must_match": "every field of each cohort record except the RUN_SCOPED list in the verifier (generated ids, wall-clock times, grant events and digests chaining over them); run 2 vs run 1 in each database and run 1 across SQLite and PostgreSQL"
+  },
+  "invariants": [
+    "zero authority bypass",
+    "zero stale promotion",
+    "zero lost acknowledged edit",
+    "zero profile/cohort leak",
+    "zero untracked semantic reframe",
+    "zero required skip",
+    "zero material unknown",
+    "staging review renders equal the automated run digests",
+    "a forged-lineage client Canvas append is refused (ADR-0107)"
+  ],
+  "stop_codes": [
+    "M8_EVALUATION_NOT_PREREGISTERED",
+    "M8_PROFILE_COHORT_LEAK",
+    "M8_PROMOTION_BINDING_STALE",
+    "M8_FORMAT_PARITY_BLOCKED",
+    "M8_REQUIRED_EVIDENCE_MISSING"
+  ],
+  "non_authorization": "This protocol and any result under it authorize no production activation, deployment, provider or platform call, credential use or publication.",
+  "supersedes": {
+    "protocol": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V2.json",
+    "protocol_sha256": "5c9d388cf9a1840b11bad32023f478d400e56a34c7ba77bd8b678a69b8dcb329",
+    "reason": "ADR-0108 amendment 1: reviewer A under v2 was the implementer holding the label key, and the v2 reviewer prompt disclosed the calibration verdicts; v3 uses two fresh blind model reviewers. v2 reviews do not count toward acceptance."
+  },
+  "review_disagreement_policy": "Item disagreements are retained; any material disagreement blocks acceptance until an adjudication is recorded.",
+  "review_procedure": "Each reviewer receives only the packet path and the rubric item definitions, runs as a separate agent, and returns per-item verdicts with measured reasons. The implementing agent merges the outputs with the key afterwards."
+}

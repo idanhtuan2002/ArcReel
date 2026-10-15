@@ -33,6 +33,14 @@ profile-isolation claim.
 - When the script or the admission changes between reading the context and saving, the save gets 409
   and the client rereads the context, as it already does after a conflict.
 - Router tests now build lineages from a real project and script, not from placeholder digests.
+- **Concurrent changes.** The check and the append run in one session and transaction, but they do not
+  lock admissions or the script file. If an admission is revoked or replaced, or the script is edited,
+  between the check and the commit, the revision keeps the lineage that was current at the check. That
+  lineage is a true historical server resolution, not a forged one. It is the same window ADR-0098
+  accepted for script edits. Currentness is enforced where authority is exercised: at promotion, and
+  in learning cohorts, which key on the profile. Closing the window completely would need a
+  project-wide lock shared with the M6 admission writer and with script writes on the filesystem.
+  Row locks alone miss a concurrently created admission head. That lock is out of M8's scope.
 
 ## Rejected
 
