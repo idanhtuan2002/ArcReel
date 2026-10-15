@@ -114,9 +114,9 @@ guessed from proposed modules.
 | Packet | Required stop codes |
 |---|---|
 | A | `M9_DESIGN_NOT_ACCEPTED`, `M9_M8_IMPLEMENTATION_NOT_ACCEPTED`, `M9_REQUIRED_EVIDENCE_MISSING`, `POST_M8_BASE_SEAM_CHANGED`, `M9_SCHEMA_CHANGE_REQUIRED`, `M9_COMMAND_REPLAY_CONFLICT`, `M9_STALE_HEAD`, `M9_COHORT_LEAKAGE`, `M9_PROFILE_PUBLICATION_UNAUTHORIZED`, `M9_DONOR_PARITY_INCOMPLETE` |
-| B | `M9_SOURCE_CAPABILITY_UNAVAILABLE`, `M9_SOURCE_POLICY_FORBIDDEN`, `M9_CREDENTIAL_REFERENCE_INVALID`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `M9_RAW_DIGEST_MISMATCH`, `M9_NORMALIZATION_LOSSY`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
-| C | `M9_DERIVATION_POLICY_UNPROVEN`, `M9_COHORT_LEAKAGE`, `M9_EVIDENCE_STALE`, `M9_DONOR_PARITY_INCOMPLETE`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
-| D | `M9_FACTUAL_AUTHORITY_UNAVAILABLE` (release gate: FA-1 acceptance absent), `M9_GREENLIGHT_UNAUTHORIZED`, `M9_GREENLIGHT_EXPIRED`, `M9_COHORT_LEAKAGE`, `M9_EVIDENCE_STALE`, `M9_STALE_HEAD`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `POST_M8_BASE_SEAM_CHANGED` |
+| B | `M9_SOURCE_CAPABILITY_UNAVAILABLE`, `M9_SOURCE_POLICY_FORBIDDEN`, `M9_CREDENTIAL_REFERENCE_INVALID`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `M9_RAW_DIGEST_MISMATCH`, `M9_NORMALIZATION_LOSSY`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_EVIDENCE_STALE`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED`, `M9_INVALIDATION_INCOMPLETE` (integrated by M9-E) |
+| C | `M9_DERIVATION_POLICY_UNPROVEN`, `M9_SOURCE_CAPABILITY_UNAVAILABLE`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_COHORT_LEAKAGE`, `M9_EVIDENCE_STALE`, `M9_DONOR_PARITY_INCOMPLETE`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED`, `M9_INVALIDATION_INCOMPLETE` (integrated by M9-E) |
+| D | `M9_FACTUAL_AUTHORITY_UNAVAILABLE` (release gate: FA-1 acceptance absent), `M9_GREENLIGHT_UNAUTHORIZED`, `M9_GREENLIGHT_EXPIRED`, `M9_SOURCE_CAPABILITY_UNAVAILABLE`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_COHORT_LEAKAGE`, `M9_EVIDENCE_STALE`, `M9_STALE_HEAD`, `M9_ACQUISITION_OUTCOME_UNKNOWN`, `POST_M8_BASE_SEAM_CHANGED`, `M9_INVALIDATION_INCOMPLETE` (integrated by M9-E) |
 | E | `M9_INVALIDATION_INCOMPLETE`, `M9_INVALIDATION_UNAUTHORIZED`, `M9_EVIDENCE_RETENTION_EXPIRED`, `M9_EVIDENCE_STALE`, `M9_REQUIRED_EVIDENCE_MISSING`, `M9_OPERATIONAL_ENVELOPE_EXCEEDED` |
 | F | every upstream code plus `M9_REQUIRED_EVIDENCE_MISSING` when evaluation, reviewer or production-envelope evidence is absent |
 
@@ -154,6 +154,7 @@ artifact; the normative execution contract itself does not change state.
 
 - [ ] Freeze M9-B owned paths, exact accepted M9-A HEAD, migration predecessor, manual-import data classes and capability fixtures in the released packet.
 - [ ] RED-test grant state/condition/account/purpose mismatch, credential token leakage, pagination loops, page duplication/order drift, quota and byte ceilings, partial results, timeout/outcome-unknown, revoke-between-pages and exact retry.
+- [ ] RED/GREEN-test database page/class anchors, exact refresh/retention boundaries, replay without renewal, mixed-class minima, late revocation detection and payload reads before/during/after E propagation (integration cases owned by E).
 - [ ] Implement prepare → external I/O → finalize without holding a database transaction across evidence-store or provider I/O.
 - [ ] Register manual-import behavior and no-network capability descriptors for YouTube Data, Google Trends alpha, TikTok Research and TikTok Commercial Content; dormant/unavailable descriptors reject execution before credential or network access.
 - [ ] RED/GREEN-test lossless native field/definition/value/unit/window mapping and prohibited derivation during normalization.
@@ -168,7 +169,8 @@ artifact; the normative execution contract itself does not change state.
 
 **Produces:** Policy-bound `DerivedOpportunitySignal`, dimension assessments, append-only `OpportunityCandidateRevision` and candidate validity reads.
 
-- [ ] Freeze composite-signal policy basis for every dimension and both cohorts before writing transforms.
+- [ ] Freeze composite-signal policy basis for every dimension and both cohorts before writing transforms, including exact creative-policy-pack isolation.
+- [ ] Define and test the M8 entry mapping against accepted M8 reads: an observation is `SUPERSEDED` only when its correction chain supplies a newer head; a recommendation becomes `DISPOSED` on any accepted decision (`ACCEPT`, `REJECT`, `DEFER`, `REQUEST_EXPERIMENT`), with `superseding_ref` naming that disposition. A decision entry remains `CURRENT` as historical decision evidence, inherits the exact recommendation lineage and expiry, and never renews it or issues M9 Greenlight. Expiry is tested independently of entry state. Intake invalidates consumers of the disposed recommendation, including ACCEPT; it does not delete M8 history. Native dispositions and current correction heads remain retrievable through the exact M8 refs, and fixtures cover every mapping, correction and digest mismatch.
 - [ ] RED-test expired/forbidden/mixed-purpose input, correction-head drift, missing-as-zero, cross-cohort leakage, duplicate dimensions, retained-digest policy and candidate closure mismatch.
 - [ ] Implement pure deterministic transforms whose output refs and uncertainty remain erasable; no universal score is introduced.
 - [ ] Port OpenMontage vocabulary and Huohuo `爽型` vocabulary only through typed fixtures; use Kalinga malformed, duplicate and prior-topic collisions as adversarial cases.
@@ -178,7 +180,7 @@ artifact; the normative execution contract itself does not change state.
 
 ## Task D: Greenlight and authority bridges
 
-**Files:** Create/modify only `greenlight.py`, `bridges.py`, M9-D persistence, host M8/Factual adapters, routes and evidence.
+**Files:** Create/modify only `greenlight.py`, `bridges.py`, M9-D persistence, host M8/Factual adapters, routes and evidence, plus `r2/advanced_creative/lineage.py` and focused M8 lineage resolver tests solely for the additive ADR-0109 evolution.
 
 **Release gate:** `R2_FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTANCE.json` with `FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTED` (FA-1), or stop `M9_FACTUAL_AUTHORITY_UNAVAILABLE`. The packet also adds the ADR-0109 resolver as an additive M8 evolution under M8 tests.
 
@@ -186,22 +188,24 @@ artifact; the normative execution contract itself does not change state.
 
 **Produces:** append-only Greenlight decisions, current head, bounded TTL, exact Canvas seed receipts and unverified Factual submissions.
 
+- [ ] RED-test M8 seed `created_by=user_id` with `actor_id != user_id`, policy-pack mismatch despite equal profile ID/version, and byte-stable v1/v2 resolver regressions.
 - [ ] RED-test non-Human/model/provider/donor issuance, scope/actor mismatch, stale candidate/profile/evidence/grant, TTL beyond 24 hours/input expiry, CAS races and supersession rules.
 - [ ] Implement decision append and receipt atomically under the normative lock order.
-- [ ] Verify accepted M8 accepts registered `M9_OPPORTUNITY_SEED`; otherwise stop `POST_M8_BASE_SEAM_CHANGED` without modifying M8.
+- [ ] Verify accepted M8 accepts registered `M9_OPPORTUNITY_SEED`; otherwise stop `POST_M8_BASE_SEAM_CHANGED`. The only permitted M8 change is the additive ADR-0109 resolver and its focused tests; existing resolution v1/v2 bytes, contracts and promotion authority stay frozen.
 - [ ] RED/GREEN-test Canvas prepare/outbox/call/reconcile, exact replay after unknown outcome and prohibition on promotion, Canon, Narrative or Production writes.
-- [ ] RED/GREEN-test Factual selection mapping; Greenlight never elevates Claim status and M9 never writes factual tables.
+- [ ] RED/GREEN-test Factual selection ref/integrity resolution and digest recomputation at prepare/call, changed-ref replay conflicts, lost acknowledgement, erasure before call, downstream lookup after erasure and exact receipt replay after deletion; Greenlight never elevates Claim status and M9 never writes factual tables.
 - [ ] Seal `M9_D_CANDIDATE` evidence at a clean HEAD and stop.
 
 ## Task E: Deletion and invalidation
 
-**Files:** Create/modify only `invalidation.py`, M9-E persistence/indexes, evidence-store deletion adapter, read projections, fault fixtures and evidence.
+**Files:** Create/modify only `invalidation.py`, M9-E persistence/indexes/system-command receipts, evidence-store deletion adapter, read projections, and the invalidation guard/coverage integration in `acquisition.py`, `signals.py`, `candidates.py`, `greenlight.py`, `bridges.py`, with their focused regression/fault fixtures and evidence. This integration is owned by E after its job tables exist; B–D do not query future tables.
 
 **Consumes:** Accepted M9-D closure (dependency columns of snapshots, observations, signals, candidates, decisions and bridge intents), M8 correction reads and Factual invalidation receipts. M9-E creates `m9_invalidation_edges` and builds the edges from those recorded dependencies.
 
 **Produces:** idempotent `InvalidationJob`, deadline-bound traversal, append-only tombstones, `INVALIDATED` historical reads and fail-closed operational use.
 
-- [ ] RED-test every transition, retry, crash cut and operator receipt from spec §13.
+- [ ] RED-test every transition, retry, crash cut and operator receipt from spec §13, including UUIDv7 system-command replay, changed-body conflict and origin-key deduplication across polling commands.
+- [ ] Backfill dependency edges under the exclusive project guard, install shared guard/coverage refusal at every dependent writer/reader and bridge dispatch, then enable invalidation entry points. Prove with PostgreSQL interleavings that input invalidation and new descendants cannot race past each other.
 - [ ] Implement indexed traversal across raw refs → snapshots → observations → signals → candidates → Greenlight → bridge receipts, plus upstream M8 learning refs.
 - [ ] Delete exact governed payload/identity/integrity refs, retain only permitted proofs and append correction/expiry records without rewriting history.
 - [ ] Fail dependent reads with `M9_INVALIDATION_INCOMPLETE` during propagation; after completion return historical projection and fail operational use with `M9_EVIDENCE_STALE`.

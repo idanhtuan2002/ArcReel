@@ -81,12 +81,16 @@ lineage. Planned seam names are not executable dependencies.
 
 - The durable Factual Authority is a separate prerequisite (FA-1), gated at the
   M9-D release. It is not required before M9-A.
-- Cohort profiles carry the exact M6 creative profile identities (ADR-0105).
+- Cohort profiles and M8 evidence carry the exact M6 creative profile ID, version
+  and policy-pack digest (ADR-0105); all three must match the server-resolved
+  project lineage, including the accepted host policy when no admission exists.
 - The Canvas seed uses M8 lineage resolution v3 (ADR-0109) on the server and
   never the client append route (ADR-0107).
 - The host custodian is an adapter over the ADR-0103 showrunner grants.
-- Retention deadlines are enforced at read time, and a sweep creates the
-  invalidation jobs.
+- Per-page/data-class database anchors freeze refresh and retention deadlines;
+  derived closures inherit their earliest deadlines. Reads enforce expiry before
+  payload access, and M9-E adds sweep jobs plus the guard/coverage integration
+  across B–D writers and readers. Greenlight reads carry validity projections.
 
 Western generic/factual and Chinese short-drama `zh-shuang` are sibling cohorts.
 They share contracts and evidence mechanics but never silently share source

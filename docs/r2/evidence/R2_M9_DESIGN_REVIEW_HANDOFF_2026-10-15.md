@@ -97,3 +97,55 @@
   can bind M8 on the shared lineage once the M9 design is accepted.
 - **Resume point.** The pass-3 fix list above. Apply all 8 blocking findings and the cheap notes in one
   revision, then run fresh reviewers A (Claude) and B (Codex) on the new candidate.
+
+## Codex takeover (2026-10-15, after Claude's session)
+
+The takeover started from clean `0899a550381f568cfb662acd2232d3ad35aa0088` on
+`design/r2-m9-v2-revalidation`. The older root worktree's unrelated dirty documents
+were preserved. No M9 implementation, migration, provider call or push was performed.
+
+The remediation revision addresses the pass-3 findings in the proposed design:
+
+| Finding | Candidate change |
+|---|---|
+| A1 | M9-E owns guard/coverage checks in acquisition, signals, candidates, Greenlight, bridges and readers, with backfill/enable ordering and PostgreSQL interleaving tests; B-D routing names E-integrated refusal. |
+| A2 | `GreenlightDecisionView` carries validity; reads during propagation refuse and completed invalidation exposes historical `INVALIDATED` decisions. |
+| B1 | Cohort profiles and M8 entries bind the full creative profile ID/version/policy-pack tuple through digests and server-resolved seed checks. |
+| B2 | Grant digest covers all semantic fields, including refresh/deletion deadlines; snapshot digest covers capability evaluation and persisted class clocks. |
+| B3 | Database page/class anchors, observation page ordinal, closure minima, exact expiry boundaries, revocation detection, sweep origin keys and non-renewable deadlines are specified. |
+| B4 | Factual selection refs/integrity refs are frozen and hashed; resolved content exists only in the transient port call. Replay, erasure and unknown-outcome lookup behavior are explicit. |
+| B5 | Frozen M8 revision uses `created_by=user_id`; M9 retains the interactive `actor_id` separately. |
+| B6 | M9-D owns the additive ADR-0109 resolver and focused M8 tests, with existing resolutions frozen. |
+
+The same revision specifies UUIDv7 system command IDs and separate origin hashes,
+remaining digest domains, M8 entry-state mapping/test ownership, Factual-only port
+invalidation, bridge dispatch guarding, cross-project interactive replay conflicts,
+and the host lease `operation` column and downgrade coupling. The existing note
+that the verifier does not independently recheck its base-review contract remains
+a tooling limitation; the unchanged base contract hash/status was checked directly.
+
+Validation on the candidate working tree:
+
+- `git diff --check`: exit 0.
+- Ordinary `uv run python -m pytest tests/unit/scripts/r2/test_verify_m9_design_acceptance.py -q`:
+  unavailable because the default uv cache is read-only. Retrying with a `/tmp`
+  cache and `--offline --no-sync` did not complete and was interrupted; no pass claimed.
+  A direct run with application conftest setup under `timeout 55s` exited 124
+  without a test result; that execution is unavailable, not a product failure.
+- `.venv/bin/python -m pytest --noconftest tests/unit/scripts/r2/test_verify_m9_design_acceptance.py -q`:
+  **21 passed**. This runs the real verifier tests with pytest built-in fixtures,
+  excluding application-wide conftest setup; it does not prove application integration.
+- Direct Python checks: all five pinned tool/schema/contract hashes match; the
+  base-review contract hash/status match; all 12 candidate paths exist; all seven
+  Python fences in the spec parse. No design acceptance record exists.
+- Graph project `r2-v2-main`, Tier 2, generation `2026-10-15T01:19:44Z`: contract
+  and exploration evidence had matching metadata; `lineage.py` was stale and
+  was read directly. Docs/scripts are excluded and were read directly. This is
+  bounded source verification, not an exhaustive graph audit or fresh donor run.
+
+**Next gate:** commit the remediation candidate, then obtain two fresh mutually
+blind author-independent reviews against that exact HEAD and unchanged review
+contract `d18b6fb107852cdea8c1d9e486b1e05544ae2564cbc9c0f90b6bb0137a5101b3`.
+The changes above are proposed repairs, not independent acceptance. Keep ADR-0081
+proposed, do not start P0/M9-A, and do not push the local M8 merge without sponsor
+approval. Follow the existing four-path acceptance-commit rule only after both PASS.
