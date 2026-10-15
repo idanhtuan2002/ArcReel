@@ -1,6 +1,6 @@
 # M8-E handoff (2026-10-14)
 
-**Branch:** `impl/r2-m8e-format`. **HEAD:** `c9d28aee`, pushed. Not merged into `r2-v2/main` (`52183f4b`).
+**Branch:** `impl/r2-m8e-format`. **HEAD:** see `git log`; code at `c9d28aee`, evidence sealed after it, pushed. Not merged into `r2-v2/main` (`52183f4b`).
 **Plan:** `docs/superpowers/plans/2026-10-14-r2-m8e-format-projection.md`, decisions 1–11 plus the reviewer decision.
 
 ## Done
@@ -41,11 +41,16 @@ All 11 findings are fixed, each with a regression test; the decisions are plan i
   - PostgreSQL 18: 119 passed, 0 skipped;
   - `pnpm check` at `5d7a4715`: 2594 passed. The frontend is unchanged since.
 
+## Blind review and evidence seal (2026-10-15)
+
+- Deployed `93cb85c0` to V2 staging after a database backup; migrations `914`–`918` applied.
+- The sponsor ran the whole flow in the browser on source master `m8e-review-source:SH01`: plan (9:16 PAD), render, 8 technical checks, blind review (7/7 PASS, one reviewer with a showrunner grant), candidate, preview and the first promotion into the empty format slot (version 0 → 1). Every request returned 200.
+- Record: `R2_M8_E_BLIND_REVIEW_2026-10-15.json`, with its limits (one reviewer; the reviewer authored the plan; the 9:16 shape reveals the projection; only PAD at 9:16 was reviewed).
+- Parity resealed at `93cb85c0`: PASS, `verify_donor_parity` OK, the `IMPLEMENTATION` digests are unchanged, and the registry digests are updated.
+
 ## Still open
 
-- The real blind review by the sponsor. It needs this branch on a server with activated showrunner grants: deploy to V2 staging, which needs migrations `914`–`918` after a database backup, with user approval.
-- The final evidence seal: rerun the parity harness at the final HEAD and record the blind review.
-- A final Codex review, then merge after the user approves.
+- A final Codex review, then merge into `r2-v2/main` after the user approves.
 
 ## Environment
 

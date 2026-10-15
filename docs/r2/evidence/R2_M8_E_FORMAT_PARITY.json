@@ -13,7 +13,7 @@
     "donor_test_inventory_digest": "sha256:2d6591851ab7ace9b539348b005889c706dff7859129ce8db01a18b4d9d0c110",
     "fixture_set_digest": "sha256:d94c67f104054487359d04b0cfa278875a6fc4e0fca66ef97894d27701f433c8"
   },
-  "integrated_head": "0b54b5ad43b5ec52648aa7af4e810415033121fb",
+  "integrated_head": "93cb85c0446a8036fc05bfae7256dcaa5108b645",
   "rows": [
     {
       "behavior_id": "F01",
@@ -166,7 +166,7 @@
   "commands": [
     {
       "command": "executed R2 files at HEAD",
-      "head": "0b54b5ad43b5ec52648aa7af4e810415033121fb",
+      "head": "93cb85c0446a8036fc05bfae7256dcaa5108b645",
       "digests": {
         "r2/advanced_creative/format_render.py": "sha256:3b7bd02dfaa00060bd6fe019380a2872039e4390f3883a0cc9b9e840be4e7e39",
         "r2/advanced_creative/formats.py": "sha256:8f65d19e5a5d1c4c6646c14a18e592de8194d2a0449410e9ac5ba82ec7ec8456",
@@ -176,7 +176,7 @@
     {
       "command": "donor pytest tests/tools/test_video_compose_vertical.py",
       "exit": 0,
-      "result": "3 passed in 2.27s"
+      "result": "3 passed in 2.11s"
     }
   ],
   "required_skips": [],

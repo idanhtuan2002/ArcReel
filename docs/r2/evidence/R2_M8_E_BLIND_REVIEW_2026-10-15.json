@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "packet": "M8-E",
+  "record": "sponsor blind semantic review and first format promotion on V2 staging",
+  "deployed_head": "93cb85c0446a8036fc05bfae7256dcaa5108b645",
+  "code_head": "c9d28aee",
+  "environment": {
+    "target": "V2 staging, app run from the impl/r2-m8e-format worktree on 127.0.0.1:1251 with activated governance grants",
+    "database_backup": "~/arcreel-v2-staging/backups/pre-m8de-20261014T164711Z.dump",
+    "migrations": "913c4a0e0001 -> 918c4a0e0001 (914-918 applied)",
+    "project": "du-an-01-649c62c1",
+    "ffmpeg": "8.0.1-3ubuntu2+esm5"
+  },
+  "source_master": {
+    "artifact_key": "m8e-review-source:SH01",
+    "master_version": 1,
+    "content_digest": "sha256:5cf7dacee7aff2047995515e99db7775667e5932c6ef5a63be50ea9fc60ae0e8",
+    "media": "1920x1080, 23 s, with audio",
+    "approval_record": "APR-sponsor-m8e-blind-review-SH01"
+  },
+  "plan": {
+    "plan_id": "vertical-9x16-pad-0cbd62a7",
+    "plan_digest": "sha256:40f4261ced7ea477873a02876bfc2d4a3ad7dd1d94532424edee4051c0c6ffc0",
+    "profile_ref": "vertical-9x16@1",
+    "reframe": "PAD"
+  },
+  "render": {
+    "execution_id": "8be695a2-8f23-40c4-9904-9815f7d2ae12",
+    "artifact_digest": "sha256:c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3",
+    "wall_ms": 10366
+  },
+  "technical_report": {
+    "report_id": "tech-56904ea487bcfca49ec440c6f8175c35",
+    "checks": 8,
+    "passed": true
+  },
+  "review_packet": {
+    "packet_id": "3a2e7a7e-9022-4d9c-8b41-0379a82235bc",
+    "projection_label": "B",
+    "reviewer_id": "admin",
+    "grant_event_digest": "sha256:7bef730be436dece1cebe09ec47a02224b43116804e7c296bdda44f62517abee",
+    "clip_a_digest": "sha256:117bdc4ec6f5eaaaff7d6585b56e3d2a1704dd23b3c54bd305a5ffb78e9b3750",
+    "clip_b_digest": "sha256:3c2b2d670a884ecb7204eb33116bb1ca280e9346fcbad93a08ab9584845beb31",
+    "opened_at": "2026-10-15T00:54:56Z",
+    "reviewed_at": "2026-10-15T00:56:43Z",
+    "items": {
+      "focal_subject": "PASS",
+      "action": "PASS",
+      "shot_intent": "PASS",
+      "on_screen_text": "PASS",
+      "captions": "PASS",
+      "timing": "PASS",
+      "audio": "PASS"
+    }
+  },
+  "semantic_report": {
+    "report_id": "sem-30c4a5f6d4d97b098de3f27b6003c5d9",
+    "rubric_version": "format-semantic@1",
+    "reviewer_count": 1,
+    "deviation": "single_reviewer_by_sponsor_decision_2026-10-14",
+    "material_disagreement": false,
+    "passed": true
+  },
+  "promotion": {
+    "candidate_id": "format:vertical-9x16-pad-0cbd62a7",
+    "candidate_revision": 1,
+    "candidate_object_id": "m7c:33bd8cb5ec6d2459bb146751fed4ea4f7b45bae8",
+    "preview_id": "01a13d0f-e19c-733e-989b-bf4174a0fd50",
+    "expected_target_version": 0,
+    "receipt_id": "01a13d0f-e6a4-7ba8-8ab4-0d13f54f4ae7",
+    "result_artifact_ref": "m8-format:1af334c549b3254d:vertical-9x16@1",
+    "result_digest": "sha256:c9f5d429e8900516dd22b445a60d388b8e42b5826778ff95bdc055d3d127a2b3",
+    "slot_version_after": 1
+  },
+  "request_outcomes": "Every format request of the session returned 200: profiles, overlays, plan, render, validation, review packet, review, candidate, preview, promotion.",
+  "coverage_limits": [
+    "One blind reviewer (the sponsor), by sponsor decision on 2026-10-14; the spec asks for at least two, so material disagreement cannot arise.",
+    "Blindness is limited: the reviewer authored the plan in the same session, and the projection has the 9:16 target shape while the source is 16:9, so the shape reveals which clip is the projection.",
+    "One source master, one profile (vertical 9:16) and one reframe kind (PAD) were reviewed; COVER_CENTER, FOCAL_CROP and the 1:1 profile were not reviewed by a human.",
+    "The review note is empty; the evidence is the per-item verdicts only.",
+    "No live provider call is involved; the render is local FFmpeg."
+  ],
+  "sources": "Rows read from the staging database tables m8_format_plans, m8_format_renders, m8_format_technical_reports, m8_format_review_packets, m8_format_semantic_reports, candidate_objects, m8_promotion_previews and m8_promotion_receipts; request outcomes from the app log.",
+  "created_at": "2026-10-15"
+}
