@@ -28,7 +28,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker
 
 STOP_CODE = "M8_EVALUATION_NOT_PREREGISTERED"
-PROTOCOL = Path("docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL.json")
+PROTOCOL = Path("docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V2.json")
 SCHEMA = Path("docs/r2/evidence/schemas/R2_M8_EVALUATION_PROTOCOL.schema.json")
 COHORT_IDS = {"WESTERN_GENERIC", "CN_SHORT_DRAMA_SHUANGWEN"}
 
@@ -77,13 +77,15 @@ def _first_commit(repo: Path, path: Path) -> str | None:
     return commits[-1] if result.returncode == 0 and commits else None
 
 
-def results_problems(results: object, protocol_bytes: bytes, repo: Path, results_path: Path) -> list[str]:
+def results_problems(
+    results: object, protocol_bytes: bytes, repo: Path, results_path: Path, protocol_path: Path = PROTOCOL
+) -> list[str]:
     """Results must bind this protocol and must have been committed after it."""
     problems: list[str] = []
     digest = "sha256:" + hashlib.sha256(protocol_bytes).hexdigest()
     if not isinstance(results, Mapping) or results.get("protocol_digest") != digest:
         problems.append("results do not bind the registered protocol digest")
-    protocol_commit = _first_commit(repo, PROTOCOL)
+    protocol_commit = _first_commit(repo, protocol_path)
     results_commit = _first_commit(repo, results_path)
     if protocol_commit is None:
         problems.append("the protocol is not committed")
@@ -100,15 +102,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", type=Path, default=Path())
     parser.add_argument("--results", type=Path)
+    parser.add_argument("--protocol", type=Path, default=PROTOCOL)
     args = parser.parse_args(argv)
     repo: Path = args.repo
-    protocol_bytes = (repo / PROTOCOL).read_bytes()
+    protocol_bytes = (repo / args.protocol).read_bytes()
     problems = protocol_problems(
         json.loads(protocol_bytes), json.loads((repo / SCHEMA).read_text(encoding="utf-8")), repo
     )
     if args.results is not None:
         results = json.loads((repo / args.results).read_text(encoding="utf-8"))
-        problems += results_problems(results, protocol_bytes, repo, args.results)
+        problems += results_problems(results, protocol_bytes, repo, args.results, args.protocol)
     for problem in problems:
         print(f"{STOP_CODE}: {problem}", file=sys.stderr)
     if problems:

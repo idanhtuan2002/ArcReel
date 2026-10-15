@@ -21,8 +21,9 @@ def _load(path: Path) -> dict:
     return json.loads((REPO / path).read_text(encoding="utf-8"))
 
 
-def test_the_registered_protocol_passes_and_locks_the_current_corpus() -> None:
-    protocol = _load(PROTOCOL)
+@pytest.mark.parametrize("path", [PROTOCOL, Path("docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL.json")], ids=["v2", "v1"])
+def test_the_registered_protocols_pass_and_lock_the_current_corpus(path: Path) -> None:
+    protocol = _load(path)
 
     assert protocol_problems(protocol, _load(SCHEMA), REPO) == []
     assert protocol["corpus"]["manifest_digest"] == manifest_digest()

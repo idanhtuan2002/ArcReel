@@ -323,6 +323,18 @@
           }
         }
       }
+    },
+    "supersedes": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "protocol_sha256",
+        "reason"
+      ]
+    },
+    "review_disagreement_policy": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }

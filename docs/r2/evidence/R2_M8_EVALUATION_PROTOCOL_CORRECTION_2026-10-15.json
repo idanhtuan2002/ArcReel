@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "packet": "M8-F",
+  "corrects": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL.json amendments[0].at",
+  "recorded_value": "2026-10-15T03:40:00Z",
+  "actual_commit": {"commit": "b198e663", "committed_at": "2026-10-15T02:26:05Z"},
+  "first_results_commit": {"commit": "cbd7fe68", "committed_at": "2026-10-15T02:28:13Z"},
+  "cause": "The agent typed an estimated time instead of reading the clock; the value lies after the results it precedes.",
+  "effect": "The amendment did precede every result by git order (b198e663 before cbd7fe68). Only the recorded timestamp was false. The v1 protocol is left unchanged as registered; protocol v2 records times from the clock.",
+  "found_by": "Codex review of the M8-F candidate, Medium 2"
+}

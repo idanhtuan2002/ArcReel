@@ -39,7 +39,7 @@ type Factory = async_sessionmaker[AsyncSession]
 pytestmark = pytest.mark.skipif(not ffmpeg_available(), reason="needs ffmpeg and ffprobe")
 
 REPO = Path(__file__).resolve().parents[3]
-PROTOCOL = json.loads((REPO / "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL.json").read_text(encoding="utf-8"))
+PROTOCOL = json.loads((REPO / "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V2.json").read_text(encoding="utf-8"))
 REGISTERED_AT = datetime.fromisoformat(PROTOCOL["registered_at"].replace("Z", "+00:00"))
 MINIMUM_DELTA = {item["capability"]: item["minimum_delta"] for item in PROTOCOL["endpoints"]}
 CEILINGS = PROTOCOL["resource_envelope"]["ceilings"]
