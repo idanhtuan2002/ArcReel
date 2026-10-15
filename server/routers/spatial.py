@@ -219,10 +219,12 @@ async def execute_spatial(
 
     async def operation() -> CandidateHead:
         projects = get_project_manager()
-        await episode_lineage(projects, project_name, req.episode)
 
         async def lineage_for(name: str, episode: int) -> LineageBinding:
-            return await episode_lineage(projects, name, episode)
+            async with async_session_factory() as session:
+                return await episode_lineage(projects, session, user_id=user.id, project_name=name, episode=episode)
+
+        await lineage_for(project_name, req.episode)
 
         service = SpatialExecutionService(
             session_factory=async_session_factory,

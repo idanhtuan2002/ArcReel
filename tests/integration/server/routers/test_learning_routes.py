@@ -14,11 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.project_manager import ProjectManager
 from r2.advanced_creative.lineage import resolve_episode_lineage
+from r2.contracts.adaptation import AdaptationProfileId
 from r2.contracts.advanced_creative import MetricWindow
 from server.auth import CurrentUserInfo, get_current_interactive_user, get_current_user
 from server.error_handlers import register_error_handlers
 from server.routers import learning
 from tests.auth_deps import AUTH_DEPENDENCIES
+from tests.fixtures.r2.m8f_profiles import admit_profile
 from tests.unit.r2.learning.test_observations import T0, obs
 
 type Factory = async_sessionmaker[AsyncSession]
@@ -178,3 +180,44 @@ async def test_ingest_needs_the_server_resolved_lineage_and_a_rule_below_thresho
             json={"disposition": "DEFER", "expected_recommendation_digest": "x", "reason": "r", "command_id": "d"},
         )
         assert unknown.status_code == 404
+
+
+async def test_an_admitted_project_ingests_only_its_profile_lineage_and_evaluates_its_own_cohort(
+    monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path
+) -> None:
+    admission = (
+        await admit_profile(
+            session_factory,
+            user_id=USER.id,
+            project_name=PROJECT,
+            profile_id=AdaptationProfileId.CN_SHORT_DRAMA_SHUANGWEN,
+        )
+    ).ref
+    shuang = resolve_episode_lineage(PROJECT, 1, b"one", admissions=(admission,))
+    async with _client(_app(monkeypatch, session_factory, tmp_path, interactive=True)) as http:
+        host = await _ingest(http, _observation(0, "16x9", "1"), "host-lineage")
+        assert host.status_code == 422
+
+        for index in range(3):
+            for arm, value in (("16x9", "100"), ("9x16", "130")):
+                response = await _ingest(http, _observation(index, arm, value, lineage=shuang), f"s-{arm}-{index}")
+                assert response.status_code == 200, response.text
+
+        host_cohort = await http.post(f"{BASE}/recommendations/evaluate", json=EVALUATE)
+        assert (host_cohort.json()["fired"], host_cohort.json()["reason"]) == (False, "both arms need observations")
+        own = await http.post(
+            f"{BASE}/recommendations/evaluate",
+            json={
+                **EVALUATE,
+                "creative_profile_id": "CN_SHORT_DRAMA_SHUANGWEN",
+                "creative_profile_version": "v1",
+                "command_id": "eval-shuang",
+            },
+        )
+        assert own.json()["fired"] is True
+        lineage = own.json()["recommendation"]["recommendation"]["lineage"]
+        assert (lineage["creative_profile_id"], lineage["creative_profile_version"], lineage["policy_digest"]) == (
+            shuang.creative_profile_id,
+            shuang.creative_profile_version,
+            shuang.policy_digest,
+        )

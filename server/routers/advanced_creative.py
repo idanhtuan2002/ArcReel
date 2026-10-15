@@ -74,7 +74,10 @@ async def get_context(project_name: str, user: CurrentUser, episode: int = Query
     """The server-resolved values a revision for this episode binds (ADR-0098)."""
 
     async def operation() -> ExplorationContext:
-        lineage = await episode_lineage(get_project_manager(), project_name, episode)
+        async with async_session_factory() as session:
+            lineage = await episode_lineage(
+                get_project_manager(), session, user_id=user.id, project_name=project_name, episode=episode
+            )
         return ExplorationContext(lineage=lineage, created_by=user.id)
 
     return await _run(operation)

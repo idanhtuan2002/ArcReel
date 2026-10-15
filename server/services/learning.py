@@ -65,7 +65,7 @@ async def ingest_observation(
     raw_payload: Mapping[str, object] | None,
     command_id: str,
 ) -> LearningObservation:
-    lineage = await episode_lineage(projects, project_name, episode)
+    lineage = await episode_lineage(projects, session, user_id=user_id, project_name=project_name, episode=episode)
     if observation.lineage != lineage:
         raise ObservationInvalidError("observation lineage must be the server-resolved episode lineage")
     stored = await LearningObservationRepository(session).ingest(

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.artifact_manifest import decode_artifact_key_parts
 from lib.db.models.host_hardening import MasterAuthorityModel
+from lib.db.repositories.adaptation import AdaptationRepository
 from lib.db.repositories.advanced_creative import ExplorationRepository
 from lib.db.repositories.host_hardening import (
     CandidateObjectRepository,
@@ -163,8 +164,14 @@ def _episode_script_bytes(projects: ProjectManager, project_name: str, episode: 
         raise ExplorationNotFoundError("the episode script cannot be read") from error
 
 
-async def episode_lineage(projects: ProjectManager, project_name: str, episode: int) -> LineageBinding:
-    """The lineage a Canvas revision of this episode binds (ADR-0098); not found for an episode
-    without a readable indexed script."""
+async def episode_lineage(
+    projects: ProjectManager, session: AsyncSession, *, user_id: str, project_name: str, episode: int
+) -> LineageBinding:
+    """The lineage an M8 revision of this episode binds (ADR-0098, ADR-0105): not found for an
+    episode without a readable indexed script; refused when the user's admissions of the project
+    are ambiguous or the episode is outside an admitted project."""
     script = await asyncio.to_thread(_episode_script_bytes, projects, project_name, episode)
-    return resolve_episode_lineage(project_name, episode, script)
+    admissions = await AdaptationRepository(session).list_effective_screenplay_admissions(
+        user_id=user_id, project_name=project_name
+    )
+    return resolve_episode_lineage(project_name, episode, script, admissions=admissions)

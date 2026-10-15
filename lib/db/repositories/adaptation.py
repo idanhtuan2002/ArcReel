@@ -769,6 +769,33 @@ class AdaptationRepository:
         )
         return _admission_from_row(row) if row is not None else None
 
+    async def list_effective_screenplay_admissions(
+        self, *, user_id: str, project_name: str
+    ) -> tuple[AdmittedScreenplayRef, ...]:
+        """The admissions currently selected by an effective ``SCREENPLAY_ADMISSION`` head of the
+        project, ordered by screenplay id and version; a revoked head selects none (ADR-0105)."""
+        result = await self.session.execute(
+            select(AdaptationScreenplayAdmissionModel)
+            .join(
+                AdaptationHeadModel,
+                (AdaptationHeadModel.user_id == AdaptationScreenplayAdmissionModel.user_id)
+                & (AdaptationHeadModel.project_name == AdaptationScreenplayAdmissionModel.project_name)
+                & (
+                    AdaptationHeadModel.effective_decision_id
+                    == AdaptationScreenplayAdmissionModel.admission_decision_id
+                ),
+            )
+            .where(
+                AdaptationHeadModel.family == AdaptationAuthorityFamily.SCREENPLAY_ADMISSION.value,
+                AdaptationScreenplayAdmissionModel.user_id == user_id,
+                AdaptationScreenplayAdmissionModel.project_name == project_name,
+            )
+            .order_by(
+                AdaptationScreenplayAdmissionModel.screenplay_id, AdaptationScreenplayAdmissionModel.screenplay_version
+            )
+        )
+        return tuple(_admission_from_row(row) for row in result.scalars())
+
     async def insert_screenplay_admission(
         self,
         *,

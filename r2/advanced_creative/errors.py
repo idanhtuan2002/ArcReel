@@ -15,6 +15,18 @@ class ExplorationNotFoundError(M8Error):
     code = "m8_exploration_not_found"
 
 
+class LineageAmbiguousError(M8Error):
+    """The project has more than one effective screenplay admission; no profile is chosen (ADR-0105)."""
+
+    code = "M8_LINEAGE_AMBIGUOUS"
+
+
+class LineageEpisodeOutOfScopeError(M8Error):
+    """An admitted R2 project has only episode 1 (ADR-0104, ADR-0105)."""
+
+    code = "M8_LINEAGE_EPISODE_OUT_OF_SCOPE"
+
+
 class CommandConflictError(M8Error):
     """A command id already used in this scope with a different semantic digest."""
 

@@ -14,12 +14,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.advanced_creative import M8CandidateRevisionModel
+from r2.contracts.adaptation import AdaptationProfileId
 from r2.m3.host_integration import GoldenAHostIntegration
 from server.auth import get_current_user
 from server.error_handlers import register_error_handlers
 from server.routers import gates, spatial
 from tests.auth_deps import AUTH_DEPENDENCIES
 from tests.fakes import GateProjectManager
+from tests.fixtures.r2.m8f_profiles import admit_profile
 from tests.integration.server.routers.test_gates_export import PROJECT, USER
 from tests.integration.server.routers.test_spatial_execution import ROUTE, _approve_shot, _Vision
 
@@ -214,3 +216,30 @@ async def test_sources_list_the_episodes_approved_video_masters(spatial_client: 
         {"artifact_key": host.artifact_key_for(shot), "shot_id": shot, "master_version": 1} for shot in ("SH01", "SH02")
     ]
     assert other.json() == []
+
+
+async def test_an_admitted_project_binds_its_profile_and_ambiguity_stops_before_any_provider_call(
+    spatial_client: AsyncClient, project_dir: Path, session_factory: Factory, vision: _Vision
+) -> None:
+    master, reverse = await _frames(spatial_client, project_dir)
+    await admit_profile(
+        session_factory, user_id=USER.id, project_name=PROJECT, profile_id=AdaptationProfileId.WESTERN_GENERIC
+    )
+
+    first = await spatial_client.post(f"{BASE}/executions", json=_execution(master, reverse))
+
+    assert first.status_code == 200, first.text
+    async with session_factory() as session:
+        stored = (await session.execute(select(M8CandidateRevisionModel))).scalars().one()
+    assert stored.lineage_json["creative_profile_id"] == "WESTERN_GENERIC"
+
+    await admit_profile(
+        session_factory, user_id=USER.id, project_name=PROJECT, profile_id=AdaptationProfileId.CN_SHORT_DRAMA_SHUANGWEN
+    )
+    ambiguous = await spatial_client.post(
+        f"{BASE}/executions",
+        json=_execution(master, reverse, command_id="spatial-2", candidate_id="spatial-candidate-2"),
+    )
+    assert ambiguous.status_code == 409
+    assert "M8_LINEAGE_AMBIGUOUS" in ambiguous.text
+    assert len(vision.calls) == 1

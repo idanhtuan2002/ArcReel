@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.project_manager import ProjectManager
 from r2.advanced_creative.digests import digest_payload
 from r2.advanced_creative.lineage import resolve_episode_lineage
+from r2.contracts.adaptation import AdaptationProfileId
 from r2.contracts.advanced_creative import (
     CanvasCandidate,
     ExplorationKind,
@@ -24,6 +25,7 @@ from server.auth import CurrentUserInfo, get_current_user
 from server.error_handlers import register_error_handlers
 from server.routers import advanced_creative
 from tests.auth_deps import AUTH_DEPENDENCIES
+from tests.fixtures.r2.m8f_profiles import admit_profile, revoke_profile
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -320,3 +322,80 @@ async def test_the_context_episode_is_validated(m8_client: AsyncClient, query: s
     response = await m8_client.get(f"{BASE}/context{query}")
 
     assert response.status_code == 422
+
+
+async def test_an_admitted_project_binds_the_admission_profile(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, session_factory: Factory
+) -> None:
+    projects = _project(tmp_path, [{"episode": 1, "script_file": "episode_1.json"}], {"episode_1.json": b"one"})
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+    admission = (
+        await admit_profile(
+            session_factory,
+            user_id=USER.id,
+            project_name=PROJECT,
+            profile_id=AdaptationProfileId.CN_SHORT_DRAMA_SHUANGWEN,
+        )
+    ).ref
+
+    response = await m8_client.get(f"{BASE}/context", params={"episode": 1})
+
+    assert response.status_code == 200
+    lineage = response.json()["lineage"]
+    assert lineage == resolve_episode_lineage(PROJECT, 1, b"one", admissions=(admission,)).model_dump(mode="json")
+    assert (lineage["creative_profile_id"], lineage["creative_profile_version"]) == ("CN_SHORT_DRAMA_SHUANGWEN", "v1")
+    assert lineage["policy_digest"] == admission.profile_ref.policy_pack_digest
+
+
+async def test_another_users_admission_leaves_the_host_profile(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, session_factory: Factory
+) -> None:
+    projects = _project(tmp_path, [{"episode": 1, "script_file": "episode_1.json"}], {"episode_1.json": b"one"})
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+    await admit_profile(
+        session_factory, user_id="u1", project_name=PROJECT, profile_id=AdaptationProfileId.WESTERN_GENERIC
+    )
+
+    response = await m8_client.get(f"{BASE}/context", params={"episode": 1})
+
+    assert response.json()["lineage"] == resolve_episode_lineage(PROJECT, 1, b"one").model_dump(mode="json")
+
+
+async def test_a_revoked_admission_returns_to_the_host_profile(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, session_factory: Factory
+) -> None:
+    projects = _project(tmp_path, [{"episode": 1, "script_file": "episode_1.json"}], {"episode_1.json": b"one"})
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+    admitted = await admit_profile(
+        session_factory, user_id=USER.id, project_name=PROJECT, profile_id=AdaptationProfileId.WESTERN_GENERIC
+    )
+    await revoke_profile(session_factory, admitted)
+
+    response = await m8_client.get(f"{BASE}/context", params={"episode": 1})
+
+    assert response.json()["lineage"] == resolve_episode_lineage(PROJECT, 1, b"one").model_dump(mode="json")
+
+
+async def test_two_admitted_profiles_are_ambiguous_and_an_admitted_project_has_only_episode_one(
+    m8_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, session_factory: Factory
+) -> None:
+    projects = _project(
+        tmp_path,
+        [{"episode": 1, "script_file": "episode_1.json"}, {"episode": 2, "script_file": "episode_2.json"}],
+        {"episode_1.json": b"one", "episode_2.json": b"two"},
+    )
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
+    await admit_profile(
+        session_factory, user_id=USER.id, project_name=PROJECT, profile_id=AdaptationProfileId.WESTERN_GENERIC
+    )
+
+    episode_two = await m8_client.get(f"{BASE}/context", params={"episode": 2})
+    assert episode_two.status_code == 409
+    assert "M8_LINEAGE_EPISODE_OUT_OF_SCOPE" in episode_two.text
+
+    await admit_profile(
+        session_factory, user_id=USER.id, project_name=PROJECT, profile_id=AdaptationProfileId.CN_SHORT_DRAMA_SHUANGWEN
+    )
+    ambiguous = await m8_client.get(f"{BASE}/context", params={"episode": 1})
+    assert ambiguous.status_code == 409
+    assert "M8_LINEAGE_AMBIGUOUS" in ambiguous.text

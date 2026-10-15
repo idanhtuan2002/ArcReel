@@ -15,7 +15,7 @@ from lib.db.repositories.advanced_creative import ExplorationRepository
 from lib.db.repositories.formats import FormatRepository
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from r2.advanced_creative.digests import digest_canonical
-from r2.advanced_creative.errors import PromotionBindingStaleError
+from r2.advanced_creative.errors import LineageAmbiguousError, PromotionBindingStaleError
 from r2.advanced_creative.formats import (
     SEMANTIC_ITEMS,
     Box,
@@ -25,6 +25,7 @@ from r2.advanced_creative.formats import (
     reframe_decision,
     source_master_id,
 )
+from r2.contracts.adaptation import AdaptationProfileId
 from r2.contracts.advanced_creative import (
     CanonicalJsonObject,
     PromotionAuthorization,
@@ -37,6 +38,7 @@ from server.services.format_render import ffmpeg_available, file_digest
 from server.services.format_review import FormatReviewService
 from server.services.format_validation import FormatValidationService
 from server.services.master_authority import master_authority_unit
+from tests.fixtures.r2.m8f_profiles import admit_profile
 from tests.integration.r2.advanced_creative.test_format_render import make_source
 from tests.integration.server.services.test_format_render import render_service
 from tests.integration.server.services.test_format_review import granted, wait_for_advisory_waiter
@@ -374,3 +376,44 @@ async def test_preparing_a_revision_takes_locks_in_the_promotion_order(
         await FormatRepository(holder).lock_plan_reports(user_id=USER, project_name=PROJECT, plan_id=plan.plan_id)
     prepared = await preparing
     assert prepared.revision == 2
+
+
+async def _candidate_lineage(factory: Factory, prepared):
+    async with factory() as session:
+        revision = await ExplorationRepository(session).get_exact(
+            user_id=USER, project_name=PROJECT, candidate_id=prepared.candidate_id, revision=prepared.revision
+        )
+    assert revision is not None
+    return revision.lineage
+
+
+async def test_a_projection_binds_the_admitted_profile_and_a_new_admission_appends_a_revision(
+    session_factory: Factory, tmp_path: Path
+) -> None:
+    source = make_source(tmp_path / "masters" / "episode.mp4")
+    await _seed_master(session_factory, tmp_path, source, "a")
+    plan = await _plan(session_factory, tmp_path, source, version=1)
+    rendered = await _reviewed_render(session_factory, tmp_path, source, plan.plan_id, "r-1")
+
+    host = await _prepare(session_factory, tmp_path, rendered.execution_id)
+    assert (await _candidate_lineage(session_factory, host)).creative_profile_id == "arcreel.host"
+
+    admitted = await admit_profile(
+        session_factory, user_id=USER, project_name=PROJECT, profile_id=AdaptationProfileId.WESTERN_GENERIC
+    )
+    western = await _prepare(session_factory, tmp_path, rendered.execution_id)
+    assert western.revision == host.revision + 1
+    lineage = await _candidate_lineage(session_factory, western)
+    assert (lineage.creative_profile_id, lineage.creative_profile_version, lineage.policy_digest) == (
+        "WESTERN_GENERIC",
+        "v1",
+        admitted.ref.profile_ref.policy_pack_digest,
+    )
+    assert lineage.content_basis_digest == (await _candidate_lineage(session_factory, host)).content_basis_digest
+    assert (await _prepare(session_factory, tmp_path, rendered.execution_id)).revision == western.revision
+
+    await admit_profile(
+        session_factory, user_id=USER, project_name=PROJECT, profile_id=AdaptationProfileId.CN_SHORT_DRAMA_SHUANGWEN
+    )
+    with pytest.raises(LineageAmbiguousError):
+        await _prepare(session_factory, tmp_path, rendered.execution_id)

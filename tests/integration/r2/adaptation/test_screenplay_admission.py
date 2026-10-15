@@ -1358,3 +1358,90 @@ async def test_two_concurrent_admissions_of_the_same_proposal_yield_one_winner(
             head_key=proposal.screenplay_id,
         )
         assert len(decisions) == 1
+
+
+# --- effective admissions of a project (ADR-0105) ---------------------------------------
+
+
+async def _effective(session_factory: Factory, *, user_id: str = USER, project_name: str = PROJECT):
+    async with session_factory() as session:
+        return await AdaptationRepository(session).list_effective_screenplay_admissions(
+            user_id=user_id, project_name=project_name
+        )
+
+
+async def test_effective_admissions_follow_admit_and_revoke(
+    session_factory: Factory,
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    assert await _effective(session_factory) == ()
+    branch, map_receipt, proposal, report = await _seed_admissible_proposal(
+        adaptation_evidence_service, authority_service, evaluation_service
+    )
+    admit = _admit_command(
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+    )
+    receipt = await authority_service.admit_screenplay_for_direction(admit, authenticated_principal=_PRINCIPAL)
+
+    effective = await _effective(session_factory)
+    assert effective == (
+        AdmittedScreenplayRef(
+            screenplay_ref=ArtifactVersionRef(
+                artifact_id=admit.admitted_screenplay.screenplay_id,
+                version=admit.admitted_screenplay.version,
+                content_hash=admit.admitted_screenplay.content_hash,
+            ),
+            admission_ref=receipt.decision_ref,
+            profile_ref=branch.profile_ref,
+        ),
+    )
+    assert await _effective(session_factory, user_id="u2") == ()
+    assert await _effective(session_factory, project_name="project-b") == ()
+
+    revoke = _admit_command(
+        decision_id="d-admit-revoke",
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+        expected_predecessor_id=admit.decision_id,
+        action=AdaptationDecisionAction.REVOKE,
+    )
+    await authority_service.admit_screenplay_for_direction(revoke, authenticated_principal=_PRINCIPAL)
+    assert await _effective(session_factory) == ()
+
+
+async def test_effective_admissions_list_every_admitted_screenplay_in_a_stable_order(
+    session_factory: Factory,
+    authority_service: AdaptationAuthorityService,
+    adaptation_evidence_service: AdaptationEvidenceService,
+    evaluation_service: ProfileEvaluationService,
+) -> None:
+    for suffix in ("2", "1"):
+        branch, map_receipt, proposal, report = await _seed_admissible_proposal(
+            adaptation_evidence_service,
+            authority_service,
+            evaluation_service,
+            branch_id=f"branch-{suffix}",
+            map_id=f"map-{suffix}",
+            screenplay_id=f"sp-{suffix}",
+        )
+        await authority_service.admit_screenplay_for_direction(
+            _admit_command(
+                decision_id=f"d-admit-{suffix}",
+                branch_id=f"branch-{suffix}",
+                proposal=proposal,
+                profile_ref=branch.profile_ref,
+                effective_map_approval_ref=map_receipt.decision_ref,
+                report_refs=[report_ref_of(report)],
+            ),
+            authenticated_principal=_PRINCIPAL,
+        )
+
+    effective = await _effective(session_factory)
+    assert [item.screenplay_ref.artifact_id for item in effective] == ["sp-1", "sp-2"]

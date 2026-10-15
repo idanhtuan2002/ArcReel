@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.candidate_store import CandidateStoreError, prepare_candidate
 from lib.db.models.formats import FormatRenderModel
+from lib.db.repositories.adaptation import AdaptationRepository
 from lib.db.repositories.advanced_creative import ExplorationRepository
 from lib.db.repositories.formats import FormatRepository, report_digest
 from lib.db.repositories.host_hardening import CandidateObjectRepository, MasterAuthorityRepository
@@ -30,7 +31,7 @@ from r2.advanced_creative.errors import (
     PromotionBindingStaleError,
 )
 from r2.advanced_creative.formats import format_slot_key, parse_source_master_id
-from r2.advanced_creative.lineage import HOST_PROFILE_ID, HOST_PROFILE_VERSION, host_policy_digest
+from r2.advanced_creative.lineage import project_profile
 from r2.contracts.advanced_creative import (
     ExplorationKind,
     ExplorationRevision,
@@ -51,9 +52,16 @@ class PreparedFormatCandidate:
 
 
 def format_lineage(
-    project_name: str, artifact_key: str, master_version: int, master_id: str, master_digest: str
+    project_name: str,
+    artifact_key: str,
+    master_version: int,
+    master_id: str,
+    master_digest: str,
+    profile: tuple[str, str, str],
 ) -> LineageBinding:
-    """A projection's lineage: the exact source master it was rendered from."""
+    """A projection's lineage: the exact source master it was rendered from, under the project's
+    creative profile ``(id, version, policy digest)`` (ADR-0105)."""
+    profile_id, profile_version, policy_digest = profile
     return LineageBinding(
         project_name=project_name,
         content_basis_digest=digest_canonical(
@@ -66,9 +74,9 @@ def format_lineage(
         ),
         approved_master_id=master_id,
         approved_master_digest=master_digest,
-        creative_profile_id=HOST_PROFILE_ID,
-        creative_profile_version=HOST_PROFILE_VERSION,
-        policy_digest=host_policy_digest(),
+        creative_profile_id=profile_id,
+        creative_profile_version=profile_version,
+        policy_digest=policy_digest,
     )
 
 
@@ -168,8 +176,16 @@ async def prepare_format_candidate(
             semantic_report_digest=report_digest(semantic),
             execution_id=execution_id,
         )
+        admissions = await AdaptationRepository(session).list_effective_screenplay_admissions(
+            user_id=user_id, project_name=project_name
+        )
         lineage = format_lineage(
-            project_name, artifact_key, master.master_version, master.candidate_id, master.content_digest
+            project_name,
+            artifact_key,
+            master.master_version,
+            master.candidate_id,
+            master.content_digest,
+            project_profile(admissions),
         )
         exploration = ExplorationRepository(session)
         candidate_id = f"format:{plan.plan_id}"
@@ -180,8 +196,8 @@ async def prepare_format_candidate(
             current = await exploration.get_exact(
                 user_id=user_id, project_name=project_name, candidate_id=candidate_id, revision=head.current_revision
             )
-            if current is not None and current.payload == payload:
-                # The same evidence is already the candidate's current revision.
+            if current is not None and current.payload == payload and current.lineage == lineage:
+                # The same evidence under the same lineage is already the candidate's current revision.
                 return PreparedFormatCandidate(
                     candidate_id, head.current_revision, head.head_version, slot_key, slot_version
                 )
@@ -201,7 +217,7 @@ async def prepare_format_candidate(
             project_name=project_name,
             candidate=revision,
             expected_head_version=None if head is None else head.head_version,
-            command_id=f"format-candidate:{execution_id}:{technical.report_id}:{semantic.report_id}",
+            command_id=f"format-candidate:{execution_id}:{revision.payload_digest}",
         )
         return PreparedFormatCandidate(
             candidate_id, appended.current_revision, appended.head_version, slot_key, slot_version
