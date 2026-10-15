@@ -181,7 +181,7 @@ Rows in profiles, receipts and events are append-only. Only profile-head CAS upd
 
 **Produces:** every spec §§4–7 class/protocol, every §8 digest function, `evaluate_m9_parity(report, integrated_head) -> ParityVerdict` and stable error types.
 
-- [ ] **A1.1 — Write contract RED tests.** Cover extra-field rejection; frozen assignment and nested deep-copy; aware UTC; UUIDv7/slug/SHA formats; every enum wire value; forward-reference rebuild; profile uniqueness/dimensions/candidate expiry; command genesis/append pairs; retained-digest names; Canvas scope; validity projection; invalidation target non-emptiness; and all normative cross-field rules from §7.1.
+- [ ] **A1.1 — Write contract RED tests.** Cover extra-field rejection; frozen assignment and nested deep-copy; aware UTC; UUIDv7/slug/SHA formats; every enum wire value; forward-reference rebuild; profile uniqueness/dimensions/candidate expiry, rejection of `UNAVAILABLE` minimum coverage, source-rule proof shape and deterministic digest coverage, rejection of caller invalidation `requested_at`; command genesis/append pairs; retained-digest names; Canvas scope; validity projection; invalidation target non-emptiness; and all normative cross-field rules from §7.1.
 
 - [ ] **A1.2 — Write digest RED tests.** For each §8 domain, assert stable canonical JSON under mapping-order changes, Unicode preservation, domain separation, semantic-field sensitivity and exclusion of server-assigned request fields. Add bridge fixture proving M9 creative-content digest maps into M8 content basis only at the explicit Canvas adapter.
 

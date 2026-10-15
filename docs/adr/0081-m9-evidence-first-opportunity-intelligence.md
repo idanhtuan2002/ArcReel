@@ -45,6 +45,13 @@ binds the exact profile identity, revision and digest;
 changing profile content appends a revision rather than silently changing an
 existing candidate's meaning.
 
+Candidate construction and Greenlight/seed revalidation enforce every frozen
+source rule, including required-source presence, explicit coverage compatibility
+and maximum age. Optional-source absence is explicit, never substituted from a
+sibling cohort or treated as zero. Deterministic source-rule evidence is bound
+into the candidate closure; an expired or insufficient closure cannot authorize
+exploration.
+
 The initial supported adapter is deterministic Human/manual import. YouTube
 public inventory, Google Trends alpha and TikTok Commercial Content are optional
 dormant adapters until the host supplies an opaque credential reference and a

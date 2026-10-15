@@ -171,6 +171,7 @@ artifact; the normative execution contract itself does not change state.
 
 - [ ] Freeze composite-signal policy basis for every dimension and both cohorts before writing transforms, including exact creative-policy-pack isolation.
 - [ ] Define and test the M8 entry mapping against accepted M8 reads: an observation is `SUPERSEDED` only when its correction chain supplies a newer head; a recommendation becomes `DISPOSED` on any accepted decision (`ACCEPT`, `REJECT`, `DEFER`, `REQUEST_EXPERIMENT`), with `superseding_ref` naming that disposition. A decision entry remains `CURRENT` as historical decision evidence, inherits the exact recommendation lineage and expiry, and never renews it or issues M9 Greenlight. Expiry is tested independently of entry state. Intake invalidates consumers of the disposed recommendation, including ACCEPT; it does not delete M8 history. Native dispositions and current correction heads remain retrievable through the exact M8 refs, and fixtures cover every mapping, correction and digest mismatch.
+- [ ] RED/GREEN-test the exact source-rule fold: missing required source, explicit optional absence, stale age boundary, insufficient and non-interchangeable coverage states, indirect snapshots hidden behind signals, forged row/digest, changed profile/policy and sibling-cohort substitution. Greenlight/seed rerun the same checks in D.
 - [ ] RED-test expired/forbidden/mixed-purpose input, correction-head drift, missing-as-zero, cross-cohort leakage, duplicate dimensions, retained-digest policy and candidate closure mismatch.
 - [ ] Implement pure deterministic transforms whose output refs and uncertainty remain erasable; no universal score is introduced.
 - [ ] Port OpenMontage vocabulary and Huohuo `爽型` vocabulary only through typed fixtures; use Kalinga malformed, duplicate and prior-topic collisions as adversarial cases.
@@ -204,11 +205,13 @@ artifact; the normative execution contract itself does not change state.
 
 **Produces:** idempotent `InvalidationJob`, deadline-bound traversal, append-only tombstones, `INVALIDATED` historical reads and fail-closed operational use.
 
+- [ ] RED-test rejection of caller `requested_at`, database admission-time freezing, exact replay after a lost commit, and crash-before-commit retry under the original lease deadline.
 - [ ] RED-test every transition, retry, crash cut and operator receipt from spec §13, including UUIDv7 system-command replay, changed-body conflict and origin-key deduplication across polling commands.
 - [ ] Backfill dependency edges under the exclusive project guard, install shared guard/coverage refusal at every dependent writer/reader and bridge dispatch, then enable invalidation entry points. Prove with PostgreSQL interleavings that input invalidation and new descendants cannot race past each other.
 - [ ] Implement indexed traversal across raw refs → snapshots → observations → signals → candidates → Greenlight → bridge receipts, plus upstream M8 learning refs.
 - [ ] Delete exact governed payload/identity/integrity refs, retain only permitted proofs and append correction/expiry records without rewriting history.
 - [ ] Fail dependent reads with `M9_INVALIDATION_INCOMPLETE` during propagation; after completion return historical projection and fail operational use with `M9_EVIDENCE_STALE`.
+- [ ] Prove history-only reconciliation remains possible during a covering job, creates no new side effect, atomically adds discovered Factual refs to the closure, and prevents COMPLETE while an outcome or required invalidation receipt is unknown. Include invalidation-start between dispatch and acknowledgement.
 - [ ] Prove idempotent replay, deadline evidence, no residual forbidden data and Factual invalidation receipt closure.
 - [ ] Seal `M9_E_CANDIDATE` evidence at a clean HEAD and stop.
 

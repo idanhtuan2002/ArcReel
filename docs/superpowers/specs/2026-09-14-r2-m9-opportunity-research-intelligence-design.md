@@ -951,6 +951,20 @@ class DimensionAssessment(M8ContractModel):
     retained_assessment_digest: Sha256Digest | None
     calibration_ref: str
 
+class SourceRuleSnapshotEvidence(M8ContractModel):
+    snapshot_id: str
+    snapshot_digest: Sha256Digest
+    query_digest: Sha256Digest
+    coverage_state: CoverageState
+    oldest_capture_at: AwareDatetime
+    usable_until: AwareDatetime
+
+class CohortSourceEvidence(M8ContractModel):
+    source_kind: Slug
+    snapshots: tuple[SourceRuleSnapshotEvidence, ...]
+    missing_reason: Literal["NO_SNAPSHOT_IN_CLOSURE"] | None
+    result_digest: Sha256Digest
+
 class OpportunityPayload(M8ContractModel):
     title: str
     premise: str
@@ -964,6 +978,7 @@ class OpportunityPayload(M8ContractModel):
     cohort_profile_digest: Sha256Digest
     creative_content_digest: Sha256Digest
     assessments: tuple[DimensionAssessment, ...]
+    source_rule_evidence: tuple[CohortSourceEvidence, ...]
     snapshot_ids: tuple[str, ...]
     signal_ids: tuple[str, ...]
     evidence_closure_digest: Sha256Digest
@@ -1207,7 +1222,6 @@ class InvalidateSourceEvidence(M8ContractModel):
     capability_grant_id: str
     capability_grant_digest: Sha256Digest
     reason: str
-    requested_at: AwareDatetime
 
 class SweepRetention(M8ContractModel):
     command_id: str  # UUIDv7; scoped system-command receipt key
@@ -1339,6 +1353,10 @@ time.
   match. Evaluation precedes expiry. The erasable result payload schema keeps
   result and uncertainty separate and its retained digest follows every input
   data-class rule.
+- Candidate source evidence exactly matches the pure §11 source-rule fold and
+  its digests recompute from the entire transitive snapshot closure. Required
+  sources cannot be absent. All cited snapshots satisfy the exact profile,
+  intent, data-class, coverage and age checks; optional missingness stays explicit.
 - Candidate assessments have unique dimensions and exactly match the required
   cohort profile set. Every assessment signal belongs to its dimension and
   cohort. Candidate snapshot/signal/M8 refs recompute to the payload closure.
@@ -1371,7 +1389,8 @@ digests.
 | `observation_digest` | `m9.source-observation.v1`, scope, data class, snapshot/digest/page ordinal, opaque source-identity ref, native field/definition/version, erasable value/integrity refs, permitted retained normalized-value digest, unit/window/missingness, payload-integrity ref, permitted retained source-payload digest and normalization version |
 | `input_closure_digest` | `m9.signal-input-closure.v1` plus sorted `(observation_id, observation_digest)` tuples and correction heads |
 | `signal_digest` | `m9.opportunity-signal.v1`, scope/cohort, data class, exact cohort-profile identity/revision/digest, dimension, exact input closure, transform/version/parameters, erasable result schema/ref/integrity, permitted retained signal-result digest, policy basis, applicability/exclusions and expiry |
-| `evidence_closure_digest` | `m9.candidate-evidence-closure.v1` plus sorted snapshot, signal and M8-learning evidence identities, digests, current revisions/states and expiries; M8 entries bind `(creative_profile_id, creative_profile_version, creative_policy_pack_digest)`, which must equal the bound cohort profile's full creative-policy tuple or the closure is refused with `M9_COHORT_LEAKAGE` |
+| `evidence_closure_digest` | `m9.candidate-evidence-closure.v1` plus sorted source-rule result digests and snapshot, signal and M8-learning evidence identities, digests, current revisions/states and expiries; M8 entries bind `(creative_profile_id, creative_profile_version, creative_policy_pack_digest)`, which must equal the bound cohort profile's full creative-policy tuple or the closure is refused with `M9_COHORT_LEAKAGE` |
+| source-rule `result_digest` | `m9.cohort-source-evidence.v1`, scope, exact cohort-profile identity/revision/digest, full source rule, source kind, sorted complete `SourceRuleSnapshotEvidence` rows and explicit missing reason |
 | `creative_content_digest` | `m9.creative-content.v1`, exact title, premise, angle, audience and creator intent; it excludes provider-native or retention-sensitive evidence values |
 | `payload_digest` | `m9.opportunity-payload.v1` plus the entire frozen `OpportunityPayload` |
 | `lineage_digest` | `m9.opportunity-lineage.v1`, candidate/revision/parent/superseded candidate, payload digest, scope, exact cohort-profile identity/revision/digest and evidence closure |
@@ -1506,7 +1525,8 @@ Global lock rank is normative whenever a transaction touches more than one row:
     derivation, candidate append, `decide_greenlight`, `seed_canvas` and
     `submit_factual_evidence` prepare/finalize, and each bridge-intent
     `PENDING -> DISPATCHED` transition. Under the shared guard such a
-    transaction refuses any input covered by a non-`COMPLETE` job with
+    transaction admitting new evidence or a new downstream side effect refuses
+    any input covered by a non-`COMPLETE` job with
     `M9_INVALIDATION_INCOMPLETE`. The key is
     `m9.invalidation-guard.v1` over `(user_id, project_name)`, derived like the
     command guard. An approval or bridge step therefore never interleaves with the
@@ -1521,6 +1541,20 @@ Global lock rank is normative whenever a transaction touches more than one row:
 9. Greenlight head;
 10. bridge intent, then Canvas-seed or Factual-bridge receipt;
 11. invalidation job, then its dependency edges ordered by ID.
+
+Bridge reconciliation is a history-only exception to admission refusal, not an
+exception to locking. A previously `DISPATCHED`/`NEEDS_OPERATOR` intent may record
+its exact frozen-request downstream outcome under ranks 1, 1a, 10 and 11 while
+a covering invalidation is incomplete, expired or revoked. It cannot dispatch a
+new side effect, renew a decision, dereference erased content or mark the result
+current. The transaction records the bridge receipt and stale/invalid validity,
+extends the covering job's dependency edges/version for any newly discovered
+Factual refs, and emits its event atomically. Port lookup/invalidation stays
+outside the transaction. Ordinary commands still fail admission. An invalidation
+job cannot become `COMPLETE` while any covered dispatched intent has an unknown
+outcome or any created Factual ref lacks its invalidation receipt; two stable
+traversal passes alone do not prove this. Unresolved intent outcomes leave the
+job fail-closed in `NEEDS_OPERATOR`, including after its deadline.
 
 M9-B/C/D implement elapsed-time freshness/retention and grant checks without
 querying future invalidation tables. They are accepted intermediate packets;
@@ -1666,6 +1700,56 @@ the model identity, prompt/input digest and output digest become evidence, and
 schema/duplicate/cohort checks run before persistence. Model output can never
 issue a decision.
 
+### 11.1 Source-rule admission fold
+
+Candidate construction runs one deterministic fold over the bound profile and
+the union of every snapshot referenced directly or through any consumed signal.
+M8 learning entries remain a separate evidence family; they cannot stand in for
+a market-source rule. There is exactly one `CohortSourceEvidence` row per profile
+source rule, sorted by source kind. Its snapshot rows are sorted by ID/digest
+and include every transitive snapshot of that kind; no caller may silently
+filter out a stale or incompatible referenced input. An undeclared source or
+foreign profile/cohort/policy tuple fails `M9_COHORT_LEAKAGE`.
+
+Each cited snapshot must resolve through its exact query to this profile
+identity/revision/digest, an allowed intent and allowed data classes. The pure
+fold checks coverage with this explicit compatibility relation, never enum order:
+
+| Rule `minimum_coverage` | Admitted snapshot states |
+|---|---|
+| `COMPLETE_WITHIN_DECLARED_BOUNDS` | `COMPLETE_WITHIN_DECLARED_BOUNDS` |
+| `TRUNCATED` | `COMPLETE_WITHIN_DECLARED_BOUNDS`, `TRUNCATED` |
+| `SAMPLED` | `COMPLETE_WITHIN_DECLARED_BOUNDS`, `SAMPLED` |
+| `PARTIAL` | `COMPLETE_WITHIN_DECLARED_BOUNDS`, `PARTIAL` |
+
+`UNAVAILABLE` never qualifies and is rejected as a profile's minimum at
+publication. Truncated, sampled and partial evidence are not interchangeable.
+`oldest_capture_at` is the minimum database capture anchor over all pages of
+the referenced snapshot. `usable_until` is the minimum of `oldest_capture_at +
+maximum_age_seconds` and all applicable §5 refresh/retention/grant/evaluation
+and policy-document deadlines. Every cited snapshot must still be usable at database admission time;
+`now >= usable_until` refuses with `M9_EVIDENCE_STALE`. Empty or unavailable
+snapshots do not satisfy a required source. Insufficient coverage, a missing
+required source or an expired cited source also fails `M9_EVIDENCE_STALE`.
+
+An optional source with no snapshot in the transitive closure has an empty
+snapshot tuple and `missing_reason=NO_SNAPSHOT_IN_CLOSURE`; this reports absence,
+not its provider cause. Otherwise `missing_reason` is null. Required-source
+missingness is never an authorizing outcome in V1: a Human must publish a new
+profile making that source optional rather than bypassing the rule. Optional
+missingness does not fill a required assessment, borrow sibling-cohort evidence
+or synthesize zero. A candidate carrying bad optional evidence must be revised
+explicitly to remove it; the service cannot silently discard it.
+
+The snapshot facts and deadlines are clock-independent functions of immutable
+inputs; the fold takes no current-time field and cannot renew an input. The
+service recomputes and compares the complete caller-supplied rows/digests under
+the normal locks, then checks admission time. Source-row digests are included in
+`evidence_closure_digest`, hence payload, lineage and Greenlight binding digests.
+Greenlight and seed revalidation rerun the fold and admission-time checks, and
+Greenlight TTL/freshness policy includes its earliest `usable_until`. Historical
+reads keep the frozen proof and expose stale validity after any such deadline.
+
 ## 12. Greenlight and bridge protocols
 
 `decide_greenlight` requires `expected_candidate_head_version` and
@@ -1783,7 +1867,15 @@ idempotent M9 port; it never writes M9 tables directly. A host request
 (`InvalidateSourceEvidence`) is a Human command authorized by
 `InvalidationCustodianPort.authorize_invalidation` under §9, with the
 `InvalidationSubject` digest, and exposed by M9-E as a scoped interactive route.
-A denial is `M9_INVALIDATION_UNAUTHORIZED`. System commands use UUIDv7 command
+A denial is `M9_INVALIDATION_UNAUTHORIZED`. A Human request has no caller
+`requested_at`. Under its command guard, first successful admission freezes
+database time into `InvalidationJob.requested_at`; request/subject digests contain
+only caller semantic fields, while the job and result digests cover this time.
+Receipt-first replay returns the original job/time. A crash before commit leaves
+no accepted request timestamp; retry must still admit the exact original lease
+within its 30-second deadline and freezes the actual new admission time. Any
+caller attempt to supply `requested_at` is rejected by extra-field-forbid.
+System commands use UUIDv7 command
 IDs and immutable receipts unique on `(user_id, project_name, operation,
 command_id)`, with exact request-digest conflict checks and a command-key guard
 over that same tuple under `m9.system-command-key-guard.v1`. They carry no Human

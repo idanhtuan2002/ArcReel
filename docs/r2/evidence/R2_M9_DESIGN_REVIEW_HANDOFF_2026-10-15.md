@@ -149,3 +149,49 @@ contract `d18b6fb107852cdea8c1d9e486b1e05544ae2564cbc9c0f90b6bb0137a5101b3`.
 The changes above are proposed repairs, not independent acceptance. Keep ADR-0081
 proposed, do not start P0/M9-A, and do not push the local M8 merge without sponsor
 approval. Follow the existing four-path acceptance-commit rule only after both PASS.
+
+## Subsequent review and repair checkpoint (2026-10-15)
+
+The first remediation was committed as
+`ffc75a22d3d9d2c2bc6e8d9951ec75927adc18e4`. Native reviewer B independently
+sealed **FAIL** against it at `2026-10-15T08:33:20Z` with two blocking findings.
+The exact diagnostic is kept locally outside the reviewed linked worktree at
+`.worktrees/m9-design-review-pass4-B-ffc75a22.json` (not an accepted sealed review).
+Runtime session `01a13ea9-8ae4-7ee0-ae92-34ae73987655` records
+`turn_context.model=gpt-5.6-sol`; the generic GPT-6 persona text quoted in that
+review is not runtime model authority.
+
+The sponsor explicitly said Claude has no quota and to skip Claude review.
+The review contract itself still requires two distinct author-independent,
+mutually blind reviewers, not two different model families. A fresh native
+reviewer A read the same candidate independently, but its turn failed at the
+usage limit **before sealing a result**. This is unavailable review evidence,
+not a second PASS or FAIL. No more background agents are launched at this
+checkpoint. Preserve the existing two-review acceptance requirement.
+
+The next revision addresses both confirmed B findings and a main-agent
+cross-check; these are proposed repairs pending fresh independent review:
+
+| Item | Source-grounded defect | Repair |
+|---|---|---|
+| B-01 | Caller `requested_at` affected invalidation timing but was absent from the authorization subject; crash-before-commit could replay the lease with changed timing. | Remove it from the Human command; freeze database admission time into job/result evidence, retain exact receipt replay, and test extra-field rejection plus crash/lease boundaries in E. |
+| B-02 | Candidate/Greenlight contracts bound source-rule profiles without defining admission for required presence, coverage and age. | Add deterministic source-rule proof rows bound into the closure, an explicit coverage compatibility table, conservative page-age deadlines, explicit optional absence and required-source refusal. C owns the fold; D rechecks it for Greenlight/seed. |
+| Main cross-check | Rank-1a refused bridge finalization during a covering job, while job completion required reconciliation of dispatched bridge outcomes (candidate spec lines 1502-1510 and 1822-1827). | Permit only history-only reconciliation under the same locks, atomically extend job dependencies for discovered Factual refs, and prohibit COMPLETE while dispatched outcomes or Factual invalidation receipts remain unknown. Fresh dispatch remains refused. |
+
+Additional validation after these repairs:
+
+- `git diff --check`: exit 0.
+- Rebuilt all **80** proposed Pydantic models from the seven spec Python fences
+  against the actual accepted M8 base/canonical/digest types; a valid Human
+  invalidation command parsed, and adding caller `requested_at` failed with the
+  exact `extra_forbidden` location. Greenlight view, source-rule payload and
+  ref-only versus transient-resolved Factual selection shapes were checked.
+  This executes documentation contracts only, not the future M9 application.
+- `.venv/bin/python -m pytest --noconftest tests/unit/scripts/r2/test_verify_m9_design_acceptance.py -q`: **21 passed in 0.15s** on the revised tree; no application-conftest or M9 runtime integration claim.
+
+**Resume:** inspect current HEAD/status and
+`.worktrees/M9_CODEX_TAKEOVER_2026-10-15.md`. Obtain two fresh blind reviews of
+the revised clean candidate when review quota is available. The `ffc75a22`
+diagnostic does not transfer acceptance to a later revision. Keep ADR-0081
+proposed; no `R2_M9_DESIGN_ACCEPTANCE.json`, P0 or M9-A implementation is authorized
+by the repairs or the contract probe. The M8 merge remains local and unpushed.
