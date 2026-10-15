@@ -27,7 +27,7 @@ from lib.db.repositories.host_hardening import (
     MasterHeadConflictError,
 )
 from r2.host_hardening import master_authority as master_authority_module
-from r2.host_hardening.master_authority import MasterDivergedError, m7_candidate_id
+from r2.host_hardening.master_authority import MasterDivergedError, scoped_m7_candidate_id
 from r2.host_hardening.promotion import AtomicPromotionService
 from r2.m3.host_integration import GoldenAHostIntegration
 from scripts.r2 import backfill_master_authority as backfill
@@ -120,7 +120,7 @@ async def test_a_divergent_head_is_reported_and_exits_2(
         sh02_object = await CandidateObjectRepository(session).get_exact(
             user_id=USER.id,
             project_name=PROJECT,
-            candidate_id=m7_candidate_id(sh02, records[sh02].selected_candidate_id),
+            candidate_id=scoped_m7_candidate_id(USER.id, PROJECT, sh02, records[sh02].selected_candidate_id),
         )
     assert sh02_object is not None
     async with session_factory() as session:
@@ -478,4 +478,4 @@ async def test_a_gate_c_approval_between_the_head_check_and_the_promotion_is_not
         )
     assert summary["promoted"] == [sh01, sh02]
     assert head is not None
-    assert (head.master_version, head.candidate_id) == (2, m7_candidate_id(sh01, "CAND-late"))
+    assert (head.master_version, head.candidate_id) == (2, scoped_m7_candidate_id(USER.id, PROJECT, sh01, "CAND-late"))

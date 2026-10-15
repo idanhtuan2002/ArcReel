@@ -33,9 +33,36 @@ class CandidateObjectConflictError(RuntimeError):
 
 
 def m7_candidate_id(artifact_key: str, generation_candidate_id: str) -> str:
-    """The M7 candidate id of a host generation candidate, unique per artifact within a project."""
+    """The unscoped (legacy) M7 candidate id: unique only while ``generation_candidate_id`` is unique.
+
+    Host generation ids such as ``CAND-SH01-V1`` repeat across projects, and candidate ids are global
+    keys, so a new master candidate takes ``scoped_m7_candidate_id``; this form stays the id of a
+    candidate already registered under it in its own project (ADR-0106).
+    """
     digest = hashlib.sha256(f"{artifact_key}\n{generation_candidate_id}".encode()).hexdigest()
     return _CANDIDATE_ID_PREFIX + digest[:_CANDIDATE_ID_HEX]
+
+
+def scoped_m7_candidate_id(user_id: str, project_name: str, artifact_key: str, generation_candidate_id: str) -> str:
+    """The M7 candidate id of a host generation candidate, unique per user, project and artifact."""
+    scope = f"m7c-scoped-v1\n{user_id}\n{project_name}\n{artifact_key}\n{generation_candidate_id}"
+    return _CANDIDATE_ID_PREFIX + hashlib.sha256(scope.encode()).hexdigest()[:_CANDIDATE_ID_HEX]
+
+
+class CandidateLookup(Protocol):
+    async def get_exact(
+        self, *, user_id: str, project_name: str, candidate_id: str
+    ) -> VerifiedCandidateObject | None: ...
+
+
+async def resolve_m7_candidate_id(
+    candidates: CandidateLookup, *, user_id: str, project_name: str, artifact_key: str, generation_candidate_id: str
+) -> str:
+    """The legacy id when this project already registered the candidate under it, else the scoped id."""
+    legacy = m7_candidate_id(artifact_key, generation_candidate_id)
+    if await candidates.get_exact(user_id=user_id, project_name=project_name, candidate_id=legacy) is not None:
+        return legacy
+    return scoped_m7_candidate_id(user_id, project_name, artifact_key, generation_candidate_id)
 
 
 def stream_probe_digest(path: Path) -> str:
@@ -68,14 +95,27 @@ SelectedGenerationCandidate = Callable[[str, str], str | None]
 
 
 class FileMasterProjection:
-    """``LegacyMasterProjection`` over the file manifest's ``approved_master``."""
+    """``LegacyMasterProjection`` over the file manifest's ``approved_master``.
 
-    def __init__(self, selected: SelectedGenerationCandidate) -> None:
+    The selected generation candidate maps to the M7 candidate id ``resolve_m7_candidate_id`` gives
+    in the read's project, the same id a promotion of that candidate registered.
+    """
+
+    def __init__(self, selected: SelectedGenerationCandidate, *, candidates: CandidateLookup) -> None:
         self._selected = selected
+        self._candidates = candidates
 
     async def get_selected_candidate_id(self, *, user_id: str, project_name: str, artifact_key: str) -> str | None:
         selected = await asyncio.to_thread(self._selected, project_name, artifact_key)
-        return None if selected is None else m7_candidate_id(artifact_key, selected)
+        if selected is None:
+            return None
+        return await resolve_m7_candidate_id(
+            self._candidates,
+            user_id=user_id,
+            project_name=project_name,
+            artifact_key=artifact_key,
+            generation_candidate_id=selected,
+        )
 
 
 class CandidateObjectStore(Protocol):
@@ -124,7 +164,13 @@ class MasterAuthorityUnit:
         command_id: str,
     ) -> MasterHeadSnapshot:
         """Promote ``version_file`` if its bytes still hash to ``expected_content_digest`` (the staged output)."""
-        candidate_id = m7_candidate_id(artifact_key, generation_candidate_id)
+        candidate_id = await resolve_m7_candidate_id(
+            self._candidates,
+            user_id=user_id,
+            project_name=project_name,
+            artifact_key=artifact_key,
+            generation_candidate_id=generation_candidate_id,
+        )
         replay = await self._receipts.get_exact(
             user_id=user_id, project_name=project_name, artifact_key=artifact_key, command_id=command_id
         )
@@ -248,6 +294,8 @@ __all__ = [
     "MasterAuthorityUnit",
     "MasterDivergedError",
     "m7_candidate_id",
+    "resolve_m7_candidate_id",
+    "scoped_m7_candidate_id",
     "stream_probe_digest",
     "verify_project_masters",
 ]

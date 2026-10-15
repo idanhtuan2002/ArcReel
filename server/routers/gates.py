@@ -59,7 +59,7 @@ from r2.contracts.gates import (
     PublishApprovalDecision,
     ScriptLockDecision,
 )
-from r2.host_hardening.master_authority import CandidateObjectConflictError, MasterDivergedError, m7_candidate_id
+from r2.host_hardening.master_authority import CandidateObjectConflictError, MasterDivergedError
 from r2.host_hardening.promotion import (
     CandidateArtifactMismatchError,
     PromotionExpectedVersionConflictError,
@@ -430,7 +430,7 @@ async def _approve_cut(
         except (KeyError, ValueError) as exc:
             raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
         try:
-            await master_authority_unit(session, defer_commit=True).promote_staged(
+            head = await master_authority_unit(session, defer_commit=True).promote_staged(
                 user_id=user.id,
                 project_name=project_name,
                 project_dir=project_root,
@@ -443,7 +443,7 @@ async def _approve_cut(
             )
         except _MASTER_CONFLICTS as exc:
             raise HTTPException(status_code=409, detail=f"master_conflict: {exc}") from exc
-        return registered
+        return registered, head.candidate_id
 
     project_root = await run_noninterruptible_sync(project_dir.resolve)
     artifact_key = host.artifact_key_for(approval.target_ref)
@@ -455,7 +455,7 @@ async def _approve_cut(
         project_name=project_name,
         artifact_keys=[artifact_key, *source_keys],
     ) as session:
-        registered = await _stage_and_promote(session)
+        registered, candidate_id = await _stage_and_promote(session)
     # Phase 2 projects and exports under the row lock again, only while this candidate is the head,
     # so an older approval can never overwrite a newer projection or export.
     try:
@@ -465,7 +465,7 @@ async def _approve_cut(
                 user_id=user.id,
                 project_name=project_name,
                 artifact_key=artifact_key,
-                candidate_id=m7_candidate_id(artifact_key, registered.candidate.id),
+                candidate_id=candidate_id,
                 project=lambda: run_noninterruptible_sync(lambda: _project_and_export(registered)),
             )
     except MasterSupersededError as exc:

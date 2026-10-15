@@ -47,11 +47,12 @@ from lib.content_digest import sha256_file
 from lib.db import async_session_factory
 from lib.db.repositories.host_hardening import (
     CandidateIdentityConflictError,
+    CandidateObjectRepository,
     MasterAuthorityRepository,
     MasterHeadConflictError,
 )
 from lib.project_manager import get_project_manager
-from r2.host_hardening.master_authority import CandidateObjectConflictError, m7_candidate_id
+from r2.host_hardening.master_authority import CandidateObjectConflictError, resolve_m7_candidate_id
 from r2.host_hardening.promotion import PromotionExpectedVersionConflictError, PromotionReceiptReplayMismatchError
 from r2.m3.host_integration import GoldenAHostIntegration
 from server.services.master_authority import master_authority_unit, scan_master_records, serialized_artifact
@@ -185,7 +186,13 @@ async def _backfill_locked(
         logger.warning("backfill: the projection of %s changed before its lock", artifact_key)
         return "diverged"
     key = ArtifactKey.decode(artifact_key)
-    expected = m7_candidate_id(artifact_key, record.selected_candidate_id)
+    expected = await resolve_m7_candidate_id(
+        CandidateObjectRepository(session),
+        user_id=user_id,
+        project_name=project_name,
+        artifact_key=artifact_key,
+        generation_candidate_id=record.selected_candidate_id,
+    )
     head = await MasterAuthorityRepository(session).get_current(
         user_id=user_id, project_name=project_name, artifact_key=artifact_key
     )

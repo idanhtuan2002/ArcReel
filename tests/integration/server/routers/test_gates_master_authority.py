@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.host_hardening import MasterHeadVersionModel, ProjectEventModel, PromotionReceiptModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
-from r2.host_hardening.master_authority import m7_candidate_id
+from r2.host_hardening.master_authority import scoped_m7_candidate_id
 from r2.m3.host_integration import GoldenAHostIntegration
 from server.routers import gates
 from server.services.master_authority import master_authority_unit, projected_masters, verify_masters
@@ -66,7 +66,7 @@ async def test_gate_c_writes_the_database_head_and_its_projection(
     ((key, generation_id),) = projected.items()
     head = await _database_head(session_factory, key)
     assert head is not None
-    assert (head.master_version, head.candidate_id) == (1, m7_candidate_id(key, generation_id))
+    assert (head.master_version, head.candidate_id) == (1, scoped_m7_candidate_id(USER.id, PROJECT, key, generation_id))
     assert await _count(session_factory, PromotionReceiptModel) == 1
     assert await _count(session_factory, ProjectEventModel) >= 1
 
@@ -87,7 +87,7 @@ async def test_two_gate_c_video_masters_have_distinct_current_heads(
     for shot, head in heads.items():
         assert head is not None
         assert head.master_version == 1
-        assert head.candidate_id == m7_candidate_id(keys[shot], projected[keys[shot]])
+        assert head.candidate_id == scoped_m7_candidate_id(USER.id, PROJECT, keys[shot], projected[keys[shot]])
     assert heads["SH01"].content_digest != heads["SH02"].content_digest
     assert first != second
     async with session_factory() as session:
@@ -127,7 +127,7 @@ async def test_a_retry_after_a_failed_projection_converges(
     ((key, generation_id),) = projected_masters(project_dir).items()
     head = await _database_head(session_factory, key)
     assert head is not None
-    assert head.candidate_id == m7_candidate_id(key, generation_id)
+    assert head.candidate_id == scoped_m7_candidate_id(USER.id, PROJECT, key, generation_id)
     assert await _count(session_factory, MasterHeadVersionModel) == 1
 
 
@@ -437,3 +437,25 @@ async def test_a_composite_holds_its_source_shots_while_it_stages_and_promotes(
 
     assert final.status_code == 200, final.text
     assert order == ["shot-still-waiting", "final-done"]
+
+
+async def test_a_second_project_of_the_same_user_approves_the_same_shot(
+    gate_export_client: AsyncClient, project_dir: Path, session_factory: Factory
+) -> None:
+    await _approve_shot(gate_export_client, project_dir, "SH01", b"first project")
+    other = project_dir.parent / "second-project"
+    (other / "production").mkdir(parents=True)
+    data = _media(b"second project")
+    (other / "production" / "SH01.mp4").write_bytes(data)
+
+    response = await gate_export_client.post("/api/v1/projects/second-project/gates/final-cut", json=_body("SH01", data))
+
+    assert response.status_code == 200, response.text
+    key, generation_id = next(iter(projected_masters(other).items()))
+    async with session_factory() as session:
+        head = await MasterAuthorityRepository(session).get_current(
+            user_id=USER.id, project_name="second-project", artifact_key=key
+        )
+    assert head is not None
+    assert head.candidate_id == scoped_m7_candidate_id(USER.id, "second-project", key, generation_id)
+    assert head.candidate_id != (await _database_head(session_factory, key)).candidate_id

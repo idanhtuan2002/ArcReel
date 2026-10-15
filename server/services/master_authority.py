@@ -217,8 +217,11 @@ def _is_projected_kind(artifact_key: str) -> bool:
     return parts is not None and parts.kind == ArtifactKind.EPISODE_VIDEO.value
 
 
-def file_master_projection(project_dir: Path) -> FileMasterProjection:
-    return FileMasterProjection(lambda _project, artifact_key: projected_masters(project_dir).get(artifact_key))
+def file_master_projection(project_dir: Path, session: AsyncSession) -> FileMasterProjection:
+    return FileMasterProjection(
+        lambda _project, artifact_key: projected_masters(project_dir).get(artifact_key),
+        candidates=CandidateObjectRepository(session),
+    )
 
 
 async def verify_masters(
@@ -248,7 +251,9 @@ async def verify_masters(
         user_id=user_id,
         project_name=project_name,
         authorities=authorities,
-        projection=FileMasterProjection(lambda _project, artifact_key: projected.get(artifact_key)),
+        projection=FileMasterProjection(
+            lambda _project, artifact_key: projected.get(artifact_key), candidates=CandidateObjectRepository(session)
+        ),
         database_keys=database_keys,
         projected_keys=projected,
     )
