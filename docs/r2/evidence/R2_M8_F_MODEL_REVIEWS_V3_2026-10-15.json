@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "packet": "M8-F",
+  "record": "two blind model reviews of the M8-F artifacts under protocol v3 (ADR-0108 amendment 1)",
+  "protocol": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V3.json",
+  "results": "docs/r2/evidence/R2_M8_F_RESULTS_V3.json",
+  "packet_builder": "scripts/r2/m8f_review_packet.py --seed 3",
+  "label_key": {
+    "format": {
+      "F1": {
+        "cohort": "WESTERN_GENERIC",
+        "profile": "square@1",
+        "calibration": false
+      },
+      "F2": {
+        "cohort": "WESTERN_GENERIC",
+        "profile": "vertical-9x16@1",
+        "calibration": false
+      },
+      "F3": {
+        "cohort": "WESTERN_GENERIC",
+        "profile": "vertical-9x16@1",
+        "calibration": true
+      },
+      "F4": {
+        "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+        "profile": "square@1",
+        "calibration": false
+      },
+      "F5": {
+        "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+        "profile": "vertical-9x16@1",
+        "calibration": false
+      }
+    },
+    "spatial": {
+      "S1": {
+        "cohort": "WESTERN_GENERIC",
+        "calibration": false
+      },
+      "S2": {
+        "cohort": "WESTERN_GENERIC",
+        "calibration": true
+      },
+      "S3": {
+        "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+        "calibration": false
+      }
+    }
+  },
+  "packet_projection_digests_match_results": true,
+  "reviewers": [
+    {
+      "id": "A",
+      "agent": "fresh Claude agent, no conversation context",
+      "model_reported": "claude-opus-5-5",
+      "isolation": "packet directory only; no key, calibration identities, expected verdicts, other reviews or evidence"
+    },
+    {
+      "id": "B",
+      "agent": "fresh Codex agent",
+      "model_reported": "gpt-5",
+      "isolation": "same as A; the runtime did not confirm the requested gpt-5.6-sol",
+      "note": "its temporary directory was read-only, so it measured in memory"
+    }
+  ],
+  "order": "A completed before B started; B never saw A's output; the implementing agent merged both with the key after B returned",
+  "calibration": {
+    "A": {
+      "format_item": "F3",
+      "passed_format": true,
+      "spatial_item": "S2",
+      "passed_spatial": true
+    },
+    "B": {
+      "format_item": "F3",
+      "passed_format": true,
+      "spatial_item": "S2",
+      "passed_spatial": true
+    }
+  },
+  "reviews": {
+    "A": {
+      "F1": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "1280x720 to 1080x1080 letterbox: content box 1080x608 (aspect 1.776, y236-843), whole frame kept, no crop; mean|diff| vs scaled source 0.09. Static in both. Only yellow/red/gray/black, no text or captions lost or added. 60 frames at 30 fps, 2.0s in both. Audio 732 Hz, RMS 0.0878 vs 0.0877, correlation 0.99994 at lag 0."
+      },
+      "F2": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "1080x1920 letterbox: content 1080x608 (aspect 1.776, y656-1263), full frame kept; mean|diff| 0.09. Static in both. No text or captions. 60 frames, 2.0s. Audio 732 Hz, RMS 0.0878 vs 0.0877, correlation 0.99994 at lag 0."
+      },
+      "F3": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "FAIL",
+        "note": "Video identical to F2. Projection audio is all digital silence: RMS 0.0, peak 0.0, against source RMS 0.0878 at 732 Hz. The audio was dropped."
+      },
+      "F4": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "1080x1080 letterbox: content 1080x608, full frame kept, mean|diff| 0.09. Static, no text or captions. 60 frames, 2.0s. Audio 313 Hz, RMS 0.08807 vs 0.08805, correlation 0.999999 at lag 0."
+      },
+      "F5": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "1080x1920 letterbox: content 1080x608, full frame kept, mean|diff| 0.09. Static, no text or captions. 60 frames, 2.0s. Audio 313 Hz, RMS 0.08807 vs 0.08805, correlation 0.999999 at lag 0."
+      },
+      "S1": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "All 4 spans 100% named colour (master yellow x0-153, master red x896-1049, reverse blue x832-1010, reverse yellow x1126-1279, y144-575). Left-wall yellow painting at left edge in MASTER, right edge in REVERSE, consistent with a 180-degree reversal. INFERRED hedged ('may', 0.3); GAP labelled."
+      },
+      "S2": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "FAIL",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "Same images as S1. Red, yellow and blue spans 100% their colour. VISIBLE 'green sofa' span (x384-640, y324-576 MASTER) is 100% gray; MASTER has no green pixels. Pairing and reversal consistent; INFERRED hedged; GAP labelled."
+      },
+      "S3": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "Same images and spans as S1, different order. All 4 VISIBLE spans 100% named colour. Yellow painting flips left to right edge. INFERRED hedged; GAP labelled unseen."
+      }
+    },
+    "B": {
+      "F1": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "subjects retained at proportional coordinates; 60 frames static; full 16:9 letterboxed without cropping, SSIM 0.999900; no text or captions; 60 frames/2.00 s with 0.020 s container padding; audio 89,088 samples each, RMS 0.0878002/0.0877160, peak 732.13 Hz, correlation 0.99994104."
+      },
+      "F2": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "subjects retained; static; letterboxed without cropping, SSIM 0.999925; no text or captions; 60 frames/2.00 s; audio RMS 0.0878002/0.0877160, 732.13 Hz, correlation 0.99994104."
+      },
+      "F3": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "FAIL",
+        "note": "video as F2 (SSIM 0.999925); source RMS 0.0878002 at 732.13 Hz but projection RMS exactly 0.0000000, so the audio was lost."
+      },
+      "F4": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "subjects retained; static; letterboxed without cropping, SSIM 0.999900; no text or captions; 60 frames/2.00 s; audio RMS 0.0880691/0.0880465, 312.85 Hz, correlation 0.99999915."
+      },
+      "F5": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "subjects retained; static; letterboxed without cropping, SSIM 0.999925; no text or captions; 60 frames/2.00 s; audio RMS 0.0880691/0.0880465, 312.85 Hz, correlation 0.99999915."
+      },
+      "S1": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "shared yellow moves from master left edge to reverse right edge; boxes 94.16% yellow, 99.23% red (master), 99.44% blue, 93.51% yellow (reverse); GAP explicit, INFERRED at 0.3; landmark reversal consistent."
+      },
+      "S2": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "FAIL",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "red, yellow, blue boxes 93.51-99.44% their colours, but the green-sofa span (384,324)-(640,576) is 100.00% gray with no green object; GAP and INFERRED qualified; reversal consistent."
+      },
+      "S3": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "as S1: 99.23% red, 94.16% yellow (master), 93.51% yellow, 99.44% blue (reverse); GAP and INFERRED qualified; reversal consistent."
+      }
+    }
+  },
+  "agreement": {
+    "items_compared": 47,
+    "disagreements": [],
+    "adjudication": "none needed"
+  },
+  "summary": {
+    "cohort_items_per_reviewer": 36,
+    "pass": {
+      "A": 36,
+      "B": 36
+    },
+    "wilson95_pass_rate": [
+      0.9036,
+      1.0
+    ]
+  },
+  "deviations": [
+    "MODEL_REVIEWERS_BY_SPONSOR_AMENDMENT",
+    "REVIEW_OUTSIDE_APP",
+    "STIMULI_DRAWN_TO_FIXTURE",
+    "NO_CONFIRMATORY_SAMPLE",
+    "PACKET_BUILT_BY_IMPLEMENTER"
+  ],
+  "limits": [
+    "No human reviewed these artifacts (ADR-0108).",
+    "Object identity is supported only at the stylized colour/shape level of synthetic frames.",
+    "The implementing agent built the packet and the key."
+  ],
+  "non_authorization": "No production activation, deployment, provider or platform call, credential use or publication is authorized."
+}
