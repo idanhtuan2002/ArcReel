@@ -59,6 +59,23 @@ def _stable(result: CohortResult) -> dict[str, object]:
     }
 
 
+def _export_review_media(measured: dict[str, dict[str, object]], root: Path, target: Path) -> None:
+    """Copy each cohort's source shots and projections, for the offline blind review packet."""
+    for profile in corpus.COHORTS:
+        result = measured[profile.value]["result"]
+        assert isinstance(result, CohortResult)
+        project_dir = root / result.project
+        out = target / profile.value
+        out.mkdir(parents=True, exist_ok=True)
+        for shot in ("SH01", "SH02"):
+            shutil.copyfile(project_dir / "production" / f"{shot}.mp4", out / f"{shot}.mp4")
+        for profile_ref, render in result.digests["format"].items():
+            shutil.copyfile(project_dir / render["artifact_ref"], out / f"{profile_ref.split('@', 1)[0]}.mp4")
+        (out / "spatial.json").write_text(
+            json.dumps(result.digests["spatial"]["assertions"], indent=2), encoding="utf-8"
+        )
+
+
 def _disk_mib(path: Path) -> float:
     return sum(item.stat().st_size for item in path.rglob("*") if item.is_file()) / 2**20
 
@@ -177,5 +194,8 @@ async def test_both_cohorts_beat_the_baseline_without_leaking_and_replay_identic
             json.dumps(payload, ensure_ascii=False, indent=2, default=str) + "\n",
             encoding="utf-8",
         )
+    review_dir = os.environ.get("M8F_REVIEW_DIR")
+    if review_dir:
+        await asyncio.to_thread(_export_review_media, first, tmp_path / "run-1", Path(review_dir))
     shutil.rmtree(tmp_path / "run-1", ignore_errors=True)
     shutil.rmtree(tmp_path / "run-2", ignore_errors=True)

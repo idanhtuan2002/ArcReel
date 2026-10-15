@@ -95,7 +95,12 @@ type Factory = async_sessionmaker[AsyncSession]
 USER = CurrentUserInfo(id="default", sub="operator-1", role="admin")
 REVIEWER = "m8f-test-reviewer"
 SOURCE_SIZE = (1280, 720)
-SHOT_PATTERNS = {"SH01": "testsrc2", "SH02": "smptebars"}
+# Stylized rooms drawn to match the pinned spatial fixture: boxes sit where its visible assertions'
+# spans put them (x as a fraction of the width, y 0.2-0.8), so a reviewer can check each assertion.
+SHOT_PATTERNS = {
+    "SH01": (("red", 0.70, 0.82), ("yellow", 0.00, 0.12)),
+    "SH02": (("blue", 0.65, 0.79), ("yellow", 0.88, 1.00)),
+}
 VIEWS_DEFINITION = f"{YOUTUBE_FAMILY}/views@{ADAPTER_VERSION}"
 FORMAT_TARGETS = (("vertical-9x16@1", 1080, 1920), ("square@1", 1080, 1080))
 
@@ -152,15 +157,21 @@ def write_project(root: Path, project: str, script: bytes) -> Path:
     return project_dir
 
 
-def _shot_media(path: Path, pattern: str, project: str) -> bytes:
+def _shot_media(path: Path, boxes: tuple[tuple[str, float, float], ...], project: str) -> bytes:
     """Deterministic media; the tone frequency differs per project, so masters never share bytes."""
     width, height = SOURCE_SIZE
     frequency = 300 + int(hashlib.sha256(project.encode()).hexdigest()[:4], 16) % 500
+    draw = ",".join(
+        f"drawbox=x={round(x0 * width)}:y={round(0.2 * height)}:w={round((x1 - x0) * width)}"
+        f":h={round(0.6 * height)}:color={color}:t=fill"
+        for color, x0, x1 in boxes
+    )
     subprocess.run(
         [
             *("ffmpeg", "-nostdin", "-y", "-v", "error"),
-            *("-f", "lavfi", "-i", f"{pattern}=s={width}x{height}:d=2:r=30"),
+            *("-f", "lavfi", "-i", f"color=c=gray:s={width}x{height}:d=2:r=30"),
             *("-f", "lavfi", "-i", f"sine=frequency={frequency}:duration=2"),
+            *("-vf", draw),
             *("-c:v", "libx264", "-pix_fmt", "yuv420p", "-threads", "1", "-c:a", "aac", "-shortest"),
             *("-fflags", "+bitexact", "-flags:v", "+bitexact", "-flags:a", "+bitexact", "-map_metadata", "-1"),
             str(path),
@@ -416,6 +427,17 @@ async def _spatial(
         "pair_decision": approval.decision_digest,
         "constraint_set": preview.binding.proposal.model_dump(mode="json"),
         "visible_assertions": len(visible),
+        "assertions": [
+            {
+                "assertion_id": a.assertion_id,
+                "evidence_class": a.evidence_class.value,
+                "subjects": list(a.subject_refs),
+                "relation": a.relation,
+                "confidence": a.confidence,
+                "spans": [span.model_dump(mode="json") for span in a.source_spans],
+            }
+            for a in revision.payload.spatial.assertions
+        ],
     }
 
 
@@ -531,6 +553,7 @@ async def _format(factory: Factory, project: str, project_dir: Path, source_key:
             "technical_passed": technical.passed,
             "semantic_passed": semantic.passed,
             "slot": prepared.slot_key,
+            "artifact_ref": rendered.artifact_path.relative_to(project_dir).as_posix(),
         }
     result.deliverables["FORMAT"] = promoted
     result.digests["format"] = renders

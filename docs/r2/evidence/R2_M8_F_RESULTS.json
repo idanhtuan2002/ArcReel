@@ -3,17 +3,17 @@
   "packet": "M8-F",
   "part": "F2 automated integrated run",
   "protocol_digest": "sha256:2c474b679171a3b36e4646711ba5d4ef1a1562f5f8197694350b8b5c5b6b5c3b",
-  "tested_head": "b198e663c82351fe7cd6b70fef34796fa903637b",
+  "tested_head": "see the commit that records this file; code under test is its parent",
   "commands": [
     {
-      "command": "M8F_RESULTS_OUT=<scratch>/f2_sqlite.json uv run python -m pytest tests/integration/r2/test_m8f_integrated_utility.py -q",
+      "command": "M8F_REVIEW_DIR=<scratch>/review_media M8F_RESULTS_OUT=<scratch>/f2_sqlite.json uv run python -m pytest tests/integration/r2/test_m8f_integrated_utility.py -q",
       "exit": 0,
-      "result": "1 passed in 42.88s"
+      "result": "1 passed in 33.00s"
     },
     {
       "command": "DATABASE_URL=postgresql+asyncpg://…@127.0.0.1:55481/arcreel M8F_RESULTS_OUT=<scratch>/f2_pg.json uv run python -m pytest tests/integration/r2/test_m8f_integrated_utility.py -q",
       "exit": 0,
-      "result": "1 passed in 44.03s (PostgreSQL 18)"
+      "result": "1 passed in 34.80s (PostgreSQL 18)"
     }
   ],
   "endpoints": {
@@ -68,25 +68,25 @@
     "measured": {
       "sqlite": {
         "WESTERN_GENERIC": {
-          "wall_seconds": 9.9,
-          "disk_mib": 6.8
+          "wall_seconds": 7.5,
+          "disk_mib": 0.4
         },
         "CN_SHORT_DRAMA_SHUANGWEN": {
-          "wall_seconds": 9.7,
-          "disk_mib": 6.8
+          "wall_seconds": 7.2,
+          "disk_mib": 0.4
         },
-        "peak_rss_mib": 288.4
+        "peak_rss_mib": 286.4
       },
       "postgresql": {
         "WESTERN_GENERIC": {
-          "wall_seconds": 10.6,
-          "disk_mib": 6.8
+          "wall_seconds": 8.2,
+          "disk_mib": 0.4
         },
         "CN_SHORT_DRAMA_SHUANGWEN": {
-          "wall_seconds": 10.3,
-          "disk_mib": 6.8
+          "wall_seconds": 7.8,
+          "disk_mib": 0.4
         },
-        "peak_rss_mib": 281.4
+        "peak_rss_mib": 279.7
       }
     }
   },
@@ -145,16 +145,6 @@
       "hypothesis": "Format vertical-9x16@1 is associated with 14.9% higher mean views than format landscape-16x9@1 (youtube.analytics.v2, CN_SHORT_DRAMA_SHUANGWEN@v1)."
     }
   },
-  "review_artifacts_for_staging": {
-    "WESTERN_GENERIC": {
-      "vertical-9x16@1": "sha256:2ff8bc9abffd9697ca94a973a4fef5abae3c9e0345b61977aa4a6b9f24b561d9",
-      "square@1": "sha256:401059c01496f142878df3037bbf87ad73d275fd1f8b16045402d7fef8c4098e"
-    },
-    "CN_SHORT_DRAMA_SHUANGWEN": {
-      "vertical-9x16@1": "sha256:3c754d2edd6c27d74177e2dfa28c140bcc0f9df6b58bdac640d367cccb1faccc",
-      "square@1": "sha256:408fbd46fd4db9059682a94495cc2a2cfdebbb21a54b80a4781b00a3f8d56275"
-    }
-  },
   "runs": {
     "sqlite": {
       "cohorts": {
@@ -180,12 +170,12 @@
                 "sha256:f58dd8fb4912ca091e6d1f2f56261352fa85d76062743c6a8ffaf67f2b199366"
               ],
               "canvas_payload_digests": [
-                "sha256:56d61600cab84c4b4d2aa28f331b0b6abe5561abe2ac3b277bd34ddeaec13943",
-                "sha256:b6112d175694e2a87740d069a2d549e5671e34c001ba68b7e06eaf8cc87abf10"
+                "sha256:935f9ac221b0afaf615d3ae10f97cf5a6c4e62766da68427430ccaede7246949",
+                "sha256:9cadc86e5e317170ecd943d77afcd60b3ff571fb88a5347404fef34a28ed452a"
               ],
               "spatial": {
                 "binding_id": "m8b:3bfc763d671ec86b54921ea8536714de70ae4f8de1af9d657a8b311194da68ee",
-                "pair_decision": "sha256:90d27832cc60dde9e0690743985c4136b9bd9ef0dfde7a2aaa0449b4e7eab528",
+                "pair_decision": "sha256:fc7c8b442e16a14d82baae16bdb7202876f38bbb47f202c6f5b6a42986aa83a3",
                 "constraint_set": {
                   "schema_version": "1",
                   "user_id": "default",
@@ -193,7 +183,7 @@
                   "binding_id": "m8b:3bfc763d671ec86b54921ea8536714de70ae4f8de1af9d657a8b311194da68ee",
                   "candidate_id": "m8f-spatial",
                   "candidate_revision": 1,
-                  "candidate_payload_digest": "sha256:b9067bc0e2ff64bdb6fca147498d67bd7b053ae0d604ed9b19b2f0d0528f86f5",
+                  "candidate_payload_digest": "sha256:1a101eb279ff83c6820080e68b5f4dad5942e917aeee2dc7c65cc00cbc541421",
                   "constraints": [
                     {
                       "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
@@ -203,7 +193,7 @@
                       "source_spans": [
                         {
                           "source_ref": "master",
-                          "source_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1",
+                          "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
                           "view": "MASTER",
                           "x0": 0.7,
                           "y0": 0.2,
@@ -220,7 +210,7 @@
                       "source_spans": [
                         {
                           "source_ref": "reverse",
-                          "source_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a",
+                          "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
                           "view": "REVERSE",
                           "x0": 0.65,
                           "y0": 0.2,
@@ -237,7 +227,7 @@
                       "source_spans": [
                         {
                           "source_ref": "master",
-                          "source_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1",
+                          "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
                           "view": "MASTER",
                           "x0": 0.0,
                           "y0": 0.2,
@@ -246,7 +236,7 @@
                         },
                         {
                           "source_ref": "reverse",
-                          "source_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a",
+                          "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
                           "view": "REVERSE",
                           "x0": 0.88,
                           "y0": 0.2,
@@ -289,46 +279,137 @@
                   "normalizer_version": "spatial-r2-v1",
                   "pair_id": "m8p:83475d7afdf350570af491e46d72215f569fa9b7f27b6ce4bac979317f618ba9",
                   "pair_version": 1,
-                  "pair_decision_digest": "sha256:90d27832cc60dde9e0690743985c4136b9bd9ef0dfde7a2aaa0449b4e7eab528",
+                  "pair_decision_digest": "sha256:fc7c8b442e16a14d82baae16bdb7202876f38bbb47f202c6f5b6a42986aa83a3",
                   "ordered_sources": [
                     {
                       "view": "MASTER",
                       "parent_artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0",
                       "parent_master_version": 1,
                       "parent_candidate_id": "m7c:3f4c264b5dabda9a652086182953ae3d22f97d7f",
-                      "parent_content_digest": "sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d",
-                      "frame_derivation_receipt_id": "m8f:2c38eb0ef7987e4396f4af878aa55ade6736c6f2e91f6a1730b3b839f8f41872",
-                      "frame_derivation_receipt_digest": "sha256:4850107270a1197c82278504c5545fecb001366d150ba8146a35712c0dfb0bdf",
-                      "frame_candidate_id": "m8f:2c38eb0ef7987e4396f4af878aa55ade6736c6f2e91f6a1730b3b839f8f41872",
-                      "frame_content_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1"
+                      "parent_content_digest": "sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23",
+                      "frame_derivation_receipt_id": "m8f:149c49222686b6d150c17b27bb309d6182a18c9291f450c84651839d3678a6ca",
+                      "frame_derivation_receipt_digest": "sha256:fde39082b101fbaebb8c6dc159e44974b8ffb73825f2d897065f68c68597b32b",
+                      "frame_candidate_id": "m8f:149c49222686b6d150c17b27bb309d6182a18c9291f450c84651839d3678a6ca",
+                      "frame_content_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f"
                     },
                     {
                       "view": "REVERSE",
                       "parent_artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0",
                       "parent_master_version": 1,
                       "parent_candidate_id": "m7c:eefd06cec49239c8392f9abbe6de9b35d94f6437",
-                      "parent_content_digest": "sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-                      "frame_derivation_receipt_id": "m8f:a9489c90ee333b75bd8daba3f05b629010cff0ccc0933b456dc2c64176515fdc",
-                      "frame_derivation_receipt_digest": "sha256:201936fe313f586ca61b4461f3299abea75046220738ada73f53c50d16eee2c1",
-                      "frame_candidate_id": "m8f:a9489c90ee333b75bd8daba3f05b629010cff0ccc0933b456dc2c64176515fdc",
-                      "frame_content_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a"
+                      "parent_content_digest": "sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+                      "frame_derivation_receipt_id": "m8f:f876d6c8d445121abc2889b15fccb1b09c69eb108f68dea05265a855d15bc616",
+                      "frame_derivation_receipt_digest": "sha256:19e677e9e87fc16117fe90f8a4bec53bcb4d6e2cc032742eb27809a20ee62bd8",
+                      "frame_candidate_id": "m8f:f876d6c8d445121abc2889b15fccb1b09c69eb108f68dea05265a855d15bc616",
+                      "frame_content_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97"
                     }
                   ]
                 },
-                "visible_assertions": 3
+                "visible_assertions": 3,
+                "assertions": [
+                  {
+                    "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "red fire extinguisher cabinet"
+                    ],
+                    "relation": "red fire extinguisher cabinet on front wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "master",
+                        "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
+                        "view": "MASTER",
+                        "x0": 0.7,
+                        "y0": 0.2,
+                        "x1": 0.82,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:5a8932462ab8780a6ed00f6c",
+                    "evidence_class": "INFERRED",
+                    "subjects": [
+                      "radiator"
+                    ],
+                    "relation": "may sit under the window",
+                    "confidence": 0.3,
+                    "spans": []
+                  },
+                  {
+                    "assertion_id": "spatial:0d1b9affc46e3caf8d86bd40",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "blue exit door"
+                    ],
+                    "relation": "blue exit door on back wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "reverse",
+                        "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
+                        "view": "REVERSE",
+                        "x0": 0.65,
+                        "y0": 0.2,
+                        "x1": 0.79,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:78725c87213000e914c5e38e",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "yellow painting"
+                    ],
+                    "relation": "yellow painting on left wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "master",
+                        "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
+                        "view": "MASTER",
+                        "x0": 0.0,
+                        "y0": 0.2,
+                        "x1": 0.12,
+                        "y1": 0.8
+                      },
+                      {
+                        "source_ref": "reverse",
+                        "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
+                        "view": "REVERSE",
+                        "x0": 0.88,
+                        "y0": 0.2,
+                        "x1": 1.0,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:098c264005b7e90a43d0cbbd",
+                    "evidence_class": "GAP",
+                    "subjects": [],
+                    "relation": "ceiling corners unseen",
+                    "confidence": null,
+                    "spans": []
+                  }
+                ]
               },
               "format": {
                 "vertical-9x16@1": {
-                  "artifact_digest": "sha256:2ff8bc9abffd9697ca94a973a4fef5abae3c9e0345b61977aa4a6b9f24b561d9",
+                  "artifact_digest": "sha256:101309d3ad4e508ec34f65328380976f8626b15095431d126c955bb3f72d01c0",
                   "technical_passed": true,
                   "semantic_passed": true,
-                  "slot": "m8-format:53e86b8d7cecd5dc:vertical-9x16@1"
+                  "slot": "m8-format:53e86b8d7cecd5dc:vertical-9x16@1",
+                  "artifact_ref": "formats/101309d3ad4e508ec34f65328380976f8626b15095431d126c955bb3f72d01c0.mp4"
                 },
                 "square@1": {
-                  "artifact_digest": "sha256:401059c01496f142878df3037bbf87ad73d275fd1f8b16045402d7fef8c4098e",
+                  "artifact_digest": "sha256:ef3cc645c42b23cd050e84de47a11f2fa29b04a091c811e8f51962d01f3dc693",
                   "technical_passed": true,
                   "semantic_passed": true,
-                  "slot": "m8-format:53e86b8d7cecd5dc:square@1"
+                  "slot": "m8-format:53e86b8d7cecd5dc:square@1",
+                  "artifact_ref": "formats/ef3cc645c42b23cd050e84de47a11f2fa29b04a091c811e8f51962d01f3dc693.mp4"
                 }
               },
               "learning": {
@@ -395,12 +476,12 @@
                 "recommendation_id": "rec-9b8a483340d9a1a28d6eda064d5544fa"
               },
               "masters": {
-                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d"
+                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
               },
               "source_sha256": {
-                "SH01": "sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-                "SH02": "sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d"
+                "SH01": "sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+                "SH02": "sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
               }
             },
             "lineage_profiles": {
@@ -411,12 +492,12 @@
               "learning": "WESTERN_GENERIC"
             },
             "master_heads_before": {
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d"
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
             },
             "master_heads_after": {
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d"
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
             },
             "replay": {
               "train_fired": true,
@@ -474,10 +555,10 @@
                     ],
                     "viewport_bookmarks": []
                   },
-                  "payload_digest": "sha256:56d61600cab84c4b4d2aa28f331b0b6abe5561abe2ac3b277bd34ddeaec13943",
+                  "payload_digest": "sha256:935f9ac221b0afaf615d3ae10f97cf5a6c4e62766da68427430ccaede7246949",
                   "lineage": {
                     "project_name": "m8f-western",
-                    "content_basis_digest": "sha256:d4763a2ba74f474367a9cfec04b8855e95ed33d6205ddb727557f66a2d1a91d5",
+                    "content_basis_digest": "sha256:3f5e6bb883d3d9ac2edd56998723cc38347ee62546ebffcf32d70f735241f331",
                     "approved_master_id": null,
                     "approved_master_digest": null,
                     "creative_profile_id": "WESTERN_GENERIC",
@@ -542,10 +623,10 @@
                     ],
                     "viewport_bookmarks": []
                   },
-                  "payload_digest": "sha256:b6112d175694e2a87740d069a2d549e5671e34c001ba68b7e06eaf8cc87abf10",
+                  "payload_digest": "sha256:9cadc86e5e317170ecd943d77afcd60b3ff571fb88a5347404fef34a28ed452a",
                   "lineage": {
                     "project_name": "m8f-western",
-                    "content_basis_digest": "sha256:d4763a2ba74f474367a9cfec04b8855e95ed33d6205ddb727557f66a2d1a91d5",
+                    "content_basis_digest": "sha256:3f5e6bb883d3d9ac2edd56998723cc38347ee62546ebffcf32d70f735241f331",
                     "approved_master_id": null,
                     "approved_master_digest": null,
                     "creative_profile_id": "WESTERN_GENERIC",
@@ -557,11 +638,11 @@
                 }
               ]
             },
-            "wall_seconds": 9.9,
-            "disk_mib": 6.8
+            "wall_seconds": 7.5,
+            "disk_mib": 0.4
           },
           "run_2_matches_run_1": true,
-          "run_2_wall_seconds": 10.7
+          "run_2_wall_seconds": 8.3
         },
         "CN_SHORT_DRAMA_SHUANGWEN": {
           "run_1": {
@@ -585,12 +666,12 @@
                 "sha256:f58dd8fb4912ca091e6d1f2f56261352fa85d76062743c6a8ffaf67f2b199366"
               ],
               "canvas_payload_digests": [
-                "sha256:01f673e2a700dcb6d5dbf0d70e5fa60603ab0fa369844bcf855cc707e2090a7d",
-                "sha256:5b3153814957f3b5a37403a929ce1b4bd38f29d7a4117a5297ea71001e423e69"
+                "sha256:1363112efe1c3b3416801185a2756a18ddf5c3069633c269d56d9fe5c47e4f42",
+                "sha256:7aa0d40ad475c4a7f4c1deee06bb171695966fd957aad3c662d928e0a6c67614"
               ],
               "spatial": {
                 "binding_id": "m8b:f8520cc1ed96c92e4c424a3d25bf150739158331cd1466caee20f273c1973fa3",
-                "pair_decision": "sha256:1a95ba4897dcbe167346f5e9150a8c0be9ebaebadada76a8ad0d649338d5dcc8",
+                "pair_decision": "sha256:cd7679858049ab9c8df7db4dcb9a76086f15525e7ccb9d8174e8c590d3cfe4d4",
                 "constraint_set": {
                   "schema_version": "1",
                   "user_id": "default",
@@ -598,7 +679,7 @@
                   "binding_id": "m8b:f8520cc1ed96c92e4c424a3d25bf150739158331cd1466caee20f273c1973fa3",
                   "candidate_id": "m8f-spatial",
                   "candidate_revision": 1,
-                  "candidate_payload_digest": "sha256:d1629899cbb0f905e7699963c1ecd21c3f3ed2f448cff91de8e5d8ca1f5fecd1",
+                  "candidate_payload_digest": "sha256:b70599524ac1a0431099b7d6fb5a866864c63a1222ad5aee4608aa1c16340b2a",
                   "constraints": [
                     {
                       "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
@@ -608,7 +689,7 @@
                       "source_spans": [
                         {
                           "source_ref": "master",
-                          "source_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a",
+                          "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
                           "view": "MASTER",
                           "x0": 0.7,
                           "y0": 0.2,
@@ -625,7 +706,7 @@
                       "source_spans": [
                         {
                           "source_ref": "reverse",
-                          "source_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1",
+                          "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
                           "view": "REVERSE",
                           "x0": 0.65,
                           "y0": 0.2,
@@ -642,7 +723,7 @@
                       "source_spans": [
                         {
                           "source_ref": "master",
-                          "source_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a",
+                          "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
                           "view": "MASTER",
                           "x0": 0.0,
                           "y0": 0.2,
@@ -651,7 +732,7 @@
                         },
                         {
                           "source_ref": "reverse",
-                          "source_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1",
+                          "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
                           "view": "REVERSE",
                           "x0": 0.88,
                           "y0": 0.2,
@@ -694,46 +775,137 @@
                   "normalizer_version": "spatial-r2-v1",
                   "pair_id": "m8p:588c4867a384b8f8c5f1e04f0409a220aa635bf0abd48ca03c9f8c8ea5d20dce",
                   "pair_version": 1,
-                  "pair_decision_digest": "sha256:1a95ba4897dcbe167346f5e9150a8c0be9ebaebadada76a8ad0d649338d5dcc8",
+                  "pair_decision_digest": "sha256:cd7679858049ab9c8df7db4dcb9a76086f15525e7ccb9d8174e8c590d3cfe4d4",
                   "ordered_sources": [
                     {
                       "view": "MASTER",
                       "parent_artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0",
                       "parent_master_version": 1,
                       "parent_candidate_id": "m7c:264ea8b3b30af6098a80dd0ff31e818188449bed",
-                      "parent_content_digest": "sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-                      "frame_derivation_receipt_id": "m8f:7951ca71ff3158c88513d7e5914ca6881aff9ace683a527cd8e138035d27090a",
-                      "frame_derivation_receipt_digest": "sha256:cae2b5026821a3032b7747de0d25e2e9320de8b373470e386d205726351c6757",
-                      "frame_candidate_id": "m8f:7951ca71ff3158c88513d7e5914ca6881aff9ace683a527cd8e138035d27090a",
-                      "frame_content_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a"
+                      "parent_content_digest": "sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+                      "frame_derivation_receipt_id": "m8f:3b2f74dad964b319beff195dd066f07a7139a6039673c1cea9f7e2e674b945a6",
+                      "frame_derivation_receipt_digest": "sha256:c4c0514226d314f92c5c154ff4a7e4cadcfedf95a8957b58d1e2bca7f22ea85e",
+                      "frame_candidate_id": "m8f:3b2f74dad964b319beff195dd066f07a7139a6039673c1cea9f7e2e674b945a6",
+                      "frame_content_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97"
                     },
                     {
                       "view": "REVERSE",
                       "parent_artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0",
                       "parent_master_version": 1,
                       "parent_candidate_id": "m7c:c7c2538084240e6f85af964b2f9b744fd9904572",
-                      "parent_content_digest": "sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194",
-                      "frame_derivation_receipt_id": "m8f:aecc58e3ca811a4276993b233a884b5301c71ddba63959e4a0d4f1ce61224bf9",
-                      "frame_derivation_receipt_digest": "sha256:c4d3455962ad4d0c44364ea3e3ea0a9c3617ccda8186fac27cfa3458d9bdbb82",
-                      "frame_candidate_id": "m8f:aecc58e3ca811a4276993b233a884b5301c71ddba63959e4a0d4f1ce61224bf9",
-                      "frame_content_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1"
+                      "parent_content_digest": "sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8",
+                      "frame_derivation_receipt_id": "m8f:485b22d5f607d5c18c3e9c7923d385dbeae6c5b15a3f4e16c494d59ad64e39fd",
+                      "frame_derivation_receipt_digest": "sha256:c637b026e32aaa6dfd7aa4414e692c19fe3677073e0f2570c320a1b311593e4c",
+                      "frame_candidate_id": "m8f:485b22d5f607d5c18c3e9c7923d385dbeae6c5b15a3f4e16c494d59ad64e39fd",
+                      "frame_content_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f"
                     }
                   ]
                 },
-                "visible_assertions": 3
+                "visible_assertions": 3,
+                "assertions": [
+                  {
+                    "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "red fire extinguisher cabinet"
+                    ],
+                    "relation": "red fire extinguisher cabinet on front wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "master",
+                        "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
+                        "view": "MASTER",
+                        "x0": 0.7,
+                        "y0": 0.2,
+                        "x1": 0.82,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:5a8932462ab8780a6ed00f6c",
+                    "evidence_class": "INFERRED",
+                    "subjects": [
+                      "radiator"
+                    ],
+                    "relation": "may sit under the window",
+                    "confidence": 0.3,
+                    "spans": []
+                  },
+                  {
+                    "assertion_id": "spatial:0d1b9affc46e3caf8d86bd40",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "blue exit door"
+                    ],
+                    "relation": "blue exit door on back wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "reverse",
+                        "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
+                        "view": "REVERSE",
+                        "x0": 0.65,
+                        "y0": 0.2,
+                        "x1": 0.79,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:78725c87213000e914c5e38e",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "yellow painting"
+                    ],
+                    "relation": "yellow painting on left wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "master",
+                        "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
+                        "view": "MASTER",
+                        "x0": 0.0,
+                        "y0": 0.2,
+                        "x1": 0.12,
+                        "y1": 0.8
+                      },
+                      {
+                        "source_ref": "reverse",
+                        "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
+                        "view": "REVERSE",
+                        "x0": 0.88,
+                        "y0": 0.2,
+                        "x1": 1.0,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:098c264005b7e90a43d0cbbd",
+                    "evidence_class": "GAP",
+                    "subjects": [],
+                    "relation": "ceiling corners unseen",
+                    "confidence": null,
+                    "spans": []
+                  }
+                ]
               },
               "format": {
                 "vertical-9x16@1": {
-                  "artifact_digest": "sha256:3c754d2edd6c27d74177e2dfa28c140bcc0f9df6b58bdac640d367cccb1faccc",
+                  "artifact_digest": "sha256:86d4ff11857f40fb604b29bb13719b388bde8f449dbdb500aee6e4213ddbedb8",
                   "technical_passed": true,
                   "semantic_passed": true,
-                  "slot": "m8-format:53e86b8d7cecd5dc:vertical-9x16@1"
+                  "slot": "m8-format:53e86b8d7cecd5dc:vertical-9x16@1",
+                  "artifact_ref": "formats/86d4ff11857f40fb604b29bb13719b388bde8f449dbdb500aee6e4213ddbedb8.mp4"
                 },
                 "square@1": {
-                  "artifact_digest": "sha256:408fbd46fd4db9059682a94495cc2a2cfdebbb21a54b80a4781b00a3f8d56275",
+                  "artifact_digest": "sha256:7cc9265ad7b0dc12b121038e0301d7c60acf300f00f0b50a2a0d909ae9e26506",
                   "technical_passed": true,
                   "semantic_passed": true,
-                  "slot": "m8-format:53e86b8d7cecd5dc:square@1"
+                  "slot": "m8-format:53e86b8d7cecd5dc:square@1",
+                  "artifact_ref": "formats/7cc9265ad7b0dc12b121038e0301d7c60acf300f00f0b50a2a0d909ae9e26506.mp4"
                 }
               },
               "learning": {
@@ -800,12 +972,12 @@
                 "recommendation_id": "rec-69a69f54996c29794990dfbedce42910"
               },
               "masters": {
-                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194"
+                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
               },
               "source_sha256": {
-                "SH01": "sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-                "SH02": "sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194"
+                "SH01": "sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+                "SH02": "sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
               }
             },
             "lineage_profiles": {
@@ -816,12 +988,12 @@
               "learning": "CN_SHORT_DRAMA_SHUANGWEN"
             },
             "master_heads_before": {
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194"
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
             },
             "master_heads_after": {
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194"
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
             },
             "replay": {
               "train_fired": true,
@@ -879,10 +1051,10 @@
                     ],
                     "viewport_bookmarks": []
                   },
-                  "payload_digest": "sha256:01f673e2a700dcb6d5dbf0d70e5fa60603ab0fa369844bcf855cc707e2090a7d",
+                  "payload_digest": "sha256:1363112efe1c3b3416801185a2756a18ddf5c3069633c269d56d9fe5c47e4f42",
                   "lineage": {
                     "project_name": "m8f-shuang",
-                    "content_basis_digest": "sha256:1e0073b08a608fd8134aa0ccc35c93234b3352ed5f3c72878ebd24c0ce5adb5e",
+                    "content_basis_digest": "sha256:1eba5399fcab6ff8154d0a7a5ce52c724f6a1ec43cd06a94ca546d252ff590d8",
                     "approved_master_id": null,
                     "approved_master_digest": null,
                     "creative_profile_id": "CN_SHORT_DRAMA_SHUANGWEN",
@@ -947,10 +1119,10 @@
                     ],
                     "viewport_bookmarks": []
                   },
-                  "payload_digest": "sha256:5b3153814957f3b5a37403a929ce1b4bd38f29d7a4117a5297ea71001e423e69",
+                  "payload_digest": "sha256:7aa0d40ad475c4a7f4c1deee06bb171695966fd957aad3c662d928e0a6c67614",
                   "lineage": {
                     "project_name": "m8f-shuang",
-                    "content_basis_digest": "sha256:1e0073b08a608fd8134aa0ccc35c93234b3352ed5f3c72878ebd24c0ce5adb5e",
+                    "content_basis_digest": "sha256:1eba5399fcab6ff8154d0a7a5ce52c724f6a1ec43cd06a94ca546d252ff590d8",
                     "approved_master_id": null,
                     "approved_master_digest": null,
                     "creative_profile_id": "CN_SHORT_DRAMA_SHUANGWEN",
@@ -962,11 +1134,11 @@
                 }
               ]
             },
-            "wall_seconds": 9.7,
-            "disk_mib": 6.8
+            "wall_seconds": 7.2,
+            "disk_mib": 0.4
           },
           "run_2_matches_run_1": true,
-          "run_2_wall_seconds": 10.7
+          "run_2_wall_seconds": 8.1
         }
       },
       "probes": {
@@ -977,7 +1149,7 @@
         }
       },
       "vision_calls_per_run": 2,
-      "peak_rss_mib": 288.4,
+      "peak_rss_mib": 286.4,
       "database": "sqlite"
     },
     "postgresql": {
@@ -1004,12 +1176,12 @@
                 "sha256:f58dd8fb4912ca091e6d1f2f56261352fa85d76062743c6a8ffaf67f2b199366"
               ],
               "canvas_payload_digests": [
-                "sha256:3ca67a982eed5de716df7a5ce1bf9e64233dfad05339702c628466a99a88bf84",
-                "sha256:2e571b4714624cdaf5e66923b289f069a74ae4d44d69e48033d9d55fc5778fb5"
+                "sha256:92123cfbdd6113dcc7ccc71fd9b083e1739bfd33edbf99dd80de88aa3cef17b6",
+                "sha256:e86d7686cea306263ab36e8beba0afe90e2435706f07c24bf33f5d078398b0ab"
               ],
               "spatial": {
                 "binding_id": "m8b:3bfc763d671ec86b54921ea8536714de70ae4f8de1af9d657a8b311194da68ee",
-                "pair_decision": "sha256:ae8db55584b1a0e70c86a93e1c7aea158adbacaa20e4984e2bb5b5053c7b9dd3",
+                "pair_decision": "sha256:58e72feda2c57bdcb0045b9568bdc4520500d5d6eaf5e30a2467c7c974c7026d",
                 "constraint_set": {
                   "schema_version": "1",
                   "user_id": "default",
@@ -1017,7 +1189,7 @@
                   "binding_id": "m8b:3bfc763d671ec86b54921ea8536714de70ae4f8de1af9d657a8b311194da68ee",
                   "candidate_id": "m8f-spatial",
                   "candidate_revision": 1,
-                  "candidate_payload_digest": "sha256:6852b6a27ee3ede2ad262adff75eb03510bd9b9230804a53773cacf406d9a821",
+                  "candidate_payload_digest": "sha256:9bcafe3c7876a3eb5076040fe604508829a90a3d65c5831fc8b027eecd07e8ed",
                   "constraints": [
                     {
                       "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
@@ -1027,7 +1199,7 @@
                       "source_spans": [
                         {
                           "source_ref": "master",
-                          "source_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1",
+                          "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
                           "view": "MASTER",
                           "x0": 0.7,
                           "y0": 0.2,
@@ -1044,7 +1216,7 @@
                       "source_spans": [
                         {
                           "source_ref": "reverse",
-                          "source_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a",
+                          "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
                           "view": "REVERSE",
                           "x0": 0.65,
                           "y0": 0.2,
@@ -1061,7 +1233,7 @@
                       "source_spans": [
                         {
                           "source_ref": "master",
-                          "source_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1",
+                          "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
                           "view": "MASTER",
                           "x0": 0.0,
                           "y0": 0.2,
@@ -1070,7 +1242,7 @@
                         },
                         {
                           "source_ref": "reverse",
-                          "source_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a",
+                          "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
                           "view": "REVERSE",
                           "x0": 0.88,
                           "y0": 0.2,
@@ -1113,46 +1285,137 @@
                   "normalizer_version": "spatial-r2-v1",
                   "pair_id": "m8p:83475d7afdf350570af491e46d72215f569fa9b7f27b6ce4bac979317f618ba9",
                   "pair_version": 1,
-                  "pair_decision_digest": "sha256:ae8db55584b1a0e70c86a93e1c7aea158adbacaa20e4984e2bb5b5053c7b9dd3",
+                  "pair_decision_digest": "sha256:58e72feda2c57bdcb0045b9568bdc4520500d5d6eaf5e30a2467c7c974c7026d",
                   "ordered_sources": [
                     {
                       "view": "MASTER",
                       "parent_artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0",
                       "parent_master_version": 1,
                       "parent_candidate_id": "m7c:3f4c264b5dabda9a652086182953ae3d22f97d7f",
-                      "parent_content_digest": "sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d",
-                      "frame_derivation_receipt_id": "m8f:2c38eb0ef7987e4396f4af878aa55ade6736c6f2e91f6a1730b3b839f8f41872",
-                      "frame_derivation_receipt_digest": "sha256:5f546d19723138c1a867b411da0560084624206d83ae86386180d7f0acebf519",
-                      "frame_candidate_id": "m8f:2c38eb0ef7987e4396f4af878aa55ade6736c6f2e91f6a1730b3b839f8f41872",
-                      "frame_content_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1"
+                      "parent_content_digest": "sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23",
+                      "frame_derivation_receipt_id": "m8f:149c49222686b6d150c17b27bb309d6182a18c9291f450c84651839d3678a6ca",
+                      "frame_derivation_receipt_digest": "sha256:4e6651df24d8b3e331951c44f8099e6dad307de2a5e3bc6a32a0160e088b345a",
+                      "frame_candidate_id": "m8f:149c49222686b6d150c17b27bb309d6182a18c9291f450c84651839d3678a6ca",
+                      "frame_content_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f"
                     },
                     {
                       "view": "REVERSE",
                       "parent_artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0",
                       "parent_master_version": 1,
                       "parent_candidate_id": "m7c:eefd06cec49239c8392f9abbe6de9b35d94f6437",
-                      "parent_content_digest": "sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-                      "frame_derivation_receipt_id": "m8f:a9489c90ee333b75bd8daba3f05b629010cff0ccc0933b456dc2c64176515fdc",
-                      "frame_derivation_receipt_digest": "sha256:023fe6489e524b7c2042b9c76c7f8dc620174bd054cd0a4ed9b31044630b5fae",
-                      "frame_candidate_id": "m8f:a9489c90ee333b75bd8daba3f05b629010cff0ccc0933b456dc2c64176515fdc",
-                      "frame_content_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a"
+                      "parent_content_digest": "sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+                      "frame_derivation_receipt_id": "m8f:f876d6c8d445121abc2889b15fccb1b09c69eb108f68dea05265a855d15bc616",
+                      "frame_derivation_receipt_digest": "sha256:8736a906a189dcecfd0e2e8fb76b4f149d5d98c644b66afa4967d048b2c3167b",
+                      "frame_candidate_id": "m8f:f876d6c8d445121abc2889b15fccb1b09c69eb108f68dea05265a855d15bc616",
+                      "frame_content_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97"
                     }
                   ]
                 },
-                "visible_assertions": 3
+                "visible_assertions": 3,
+                "assertions": [
+                  {
+                    "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "red fire extinguisher cabinet"
+                    ],
+                    "relation": "red fire extinguisher cabinet on front wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "master",
+                        "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
+                        "view": "MASTER",
+                        "x0": 0.7,
+                        "y0": 0.2,
+                        "x1": 0.82,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:5a8932462ab8780a6ed00f6c",
+                    "evidence_class": "INFERRED",
+                    "subjects": [
+                      "radiator"
+                    ],
+                    "relation": "may sit under the window",
+                    "confidence": 0.3,
+                    "spans": []
+                  },
+                  {
+                    "assertion_id": "spatial:0d1b9affc46e3caf8d86bd40",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "blue exit door"
+                    ],
+                    "relation": "blue exit door on back wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "reverse",
+                        "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
+                        "view": "REVERSE",
+                        "x0": 0.65,
+                        "y0": 0.2,
+                        "x1": 0.79,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:78725c87213000e914c5e38e",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "yellow painting"
+                    ],
+                    "relation": "yellow painting on left wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "master",
+                        "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
+                        "view": "MASTER",
+                        "x0": 0.0,
+                        "y0": 0.2,
+                        "x1": 0.12,
+                        "y1": 0.8
+                      },
+                      {
+                        "source_ref": "reverse",
+                        "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
+                        "view": "REVERSE",
+                        "x0": 0.88,
+                        "y0": 0.2,
+                        "x1": 1.0,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:098c264005b7e90a43d0cbbd",
+                    "evidence_class": "GAP",
+                    "subjects": [],
+                    "relation": "ceiling corners unseen",
+                    "confidence": null,
+                    "spans": []
+                  }
+                ]
               },
               "format": {
                 "vertical-9x16@1": {
-                  "artifact_digest": "sha256:2ff8bc9abffd9697ca94a973a4fef5abae3c9e0345b61977aa4a6b9f24b561d9",
+                  "artifact_digest": "sha256:101309d3ad4e508ec34f65328380976f8626b15095431d126c955bb3f72d01c0",
                   "technical_passed": true,
                   "semantic_passed": true,
-                  "slot": "m8-format:53e86b8d7cecd5dc:vertical-9x16@1"
+                  "slot": "m8-format:53e86b8d7cecd5dc:vertical-9x16@1",
+                  "artifact_ref": "formats/101309d3ad4e508ec34f65328380976f8626b15095431d126c955bb3f72d01c0.mp4"
                 },
                 "square@1": {
-                  "artifact_digest": "sha256:401059c01496f142878df3037bbf87ad73d275fd1f8b16045402d7fef8c4098e",
+                  "artifact_digest": "sha256:ef3cc645c42b23cd050e84de47a11f2fa29b04a091c811e8f51962d01f3dc693",
                   "technical_passed": true,
                   "semantic_passed": true,
-                  "slot": "m8-format:53e86b8d7cecd5dc:square@1"
+                  "slot": "m8-format:53e86b8d7cecd5dc:square@1",
+                  "artifact_ref": "formats/ef3cc645c42b23cd050e84de47a11f2fa29b04a091c811e8f51962d01f3dc693.mp4"
                 }
               },
               "learning": {
@@ -1219,12 +1482,12 @@
                 "recommendation_id": "rec-9b8a483340d9a1a28d6eda064d5544fa"
               },
               "masters": {
-                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d"
+                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
               },
               "source_sha256": {
-                "SH01": "sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-                "SH02": "sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d"
+                "SH01": "sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+                "SH02": "sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
               }
             },
             "lineage_profiles": {
@@ -1235,12 +1498,12 @@
               "learning": "WESTERN_GENERIC"
             },
             "master_heads_before": {
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d"
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
             },
             "master_heads_after": {
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:574da255647f25627c954bdf4353b643cab05139b47cd399b28e0b48b55e5fd4",
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:23d9d26bf8354268a87597720d743803d38a604108bc14f6cea124de29619d1d"
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
             },
             "replay": {
               "train_fired": true,
@@ -1298,10 +1561,10 @@
                     ],
                     "viewport_bookmarks": []
                   },
-                  "payload_digest": "sha256:3ca67a982eed5de716df7a5ce1bf9e64233dfad05339702c628466a99a88bf84",
+                  "payload_digest": "sha256:92123cfbdd6113dcc7ccc71fd9b083e1739bfd33edbf99dd80de88aa3cef17b6",
                   "lineage": {
                     "project_name": "m8f-western",
-                    "content_basis_digest": "sha256:293cbc56fea383ac157ec156d9f38c111eeb37a6b98c206697ef5395b32d2ac7",
+                    "content_basis_digest": "sha256:9770f4344f8c33fa49e48ce72b62fd9789525a66616549d2734b5dcdef5921f6",
                     "approved_master_id": null,
                     "approved_master_digest": null,
                     "creative_profile_id": "WESTERN_GENERIC",
@@ -1366,10 +1629,10 @@
                     ],
                     "viewport_bookmarks": []
                   },
-                  "payload_digest": "sha256:2e571b4714624cdaf5e66923b289f069a74ae4d44d69e48033d9d55fc5778fb5",
+                  "payload_digest": "sha256:e86d7686cea306263ab36e8beba0afe90e2435706f07c24bf33f5d078398b0ab",
                   "lineage": {
                     "project_name": "m8f-western",
-                    "content_basis_digest": "sha256:293cbc56fea383ac157ec156d9f38c111eeb37a6b98c206697ef5395b32d2ac7",
+                    "content_basis_digest": "sha256:9770f4344f8c33fa49e48ce72b62fd9789525a66616549d2734b5dcdef5921f6",
                     "approved_master_id": null,
                     "approved_master_digest": null,
                     "creative_profile_id": "WESTERN_GENERIC",
@@ -1381,11 +1644,11 @@
                 }
               ]
             },
-            "wall_seconds": 10.6,
-            "disk_mib": 6.8
+            "wall_seconds": 8.2,
+            "disk_mib": 0.4
           },
           "run_2_matches_run_1": true,
-          "run_2_wall_seconds": 10.5
+          "run_2_wall_seconds": 8.1
         },
         "CN_SHORT_DRAMA_SHUANGWEN": {
           "run_1": {
@@ -1409,12 +1672,12 @@
                 "sha256:f58dd8fb4912ca091e6d1f2f56261352fa85d76062743c6a8ffaf67f2b199366"
               ],
               "canvas_payload_digests": [
-                "sha256:eeb84fb0ebd48ce46e8106d2f1491ef4d649e7c05ae09a58e3444ec93a75cce5",
-                "sha256:67beeee97c18c120ef7efa39bda40b85770478e82b102de96e058e98f200ee3a"
+                "sha256:7ea97068ae1dd0ff32b293ec0e19f4dda1d6773dbdec6d33460bf65ec50b7116",
+                "sha256:91ff2af365b27f484184474b8838faa37e2a7b0bfcfee210b10e6201ca083795"
               ],
               "spatial": {
                 "binding_id": "m8b:f8520cc1ed96c92e4c424a3d25bf150739158331cd1466caee20f273c1973fa3",
-                "pair_decision": "sha256:7f175f9406a00d13d27d36cbcf99ec3990bab8fd67af78590ef5a23ff53c4a3d",
+                "pair_decision": "sha256:4bc47fa6fe4eb88732cdf592a776d292f64025c623c750cdc36e3ab8b25d5310",
                 "constraint_set": {
                   "schema_version": "1",
                   "user_id": "default",
@@ -1422,7 +1685,7 @@
                   "binding_id": "m8b:f8520cc1ed96c92e4c424a3d25bf150739158331cd1466caee20f273c1973fa3",
                   "candidate_id": "m8f-spatial",
                   "candidate_revision": 1,
-                  "candidate_payload_digest": "sha256:4de3ac784c91e744e1c84a43489d08378def828dcd4bf67b1d784fbd1c9e89b9",
+                  "candidate_payload_digest": "sha256:c56ba5ee6d6184cca81c1e10fa6d9d3da8cdb1587901d19dffb491552cab0f3b",
                   "constraints": [
                     {
                       "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
@@ -1432,7 +1695,7 @@
                       "source_spans": [
                         {
                           "source_ref": "master",
-                          "source_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a",
+                          "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
                           "view": "MASTER",
                           "x0": 0.7,
                           "y0": 0.2,
@@ -1449,7 +1712,7 @@
                       "source_spans": [
                         {
                           "source_ref": "reverse",
-                          "source_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1",
+                          "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
                           "view": "REVERSE",
                           "x0": 0.65,
                           "y0": 0.2,
@@ -1466,7 +1729,7 @@
                       "source_spans": [
                         {
                           "source_ref": "master",
-                          "source_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a",
+                          "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
                           "view": "MASTER",
                           "x0": 0.0,
                           "y0": 0.2,
@@ -1475,7 +1738,7 @@
                         },
                         {
                           "source_ref": "reverse",
-                          "source_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1",
+                          "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
                           "view": "REVERSE",
                           "x0": 0.88,
                           "y0": 0.2,
@@ -1518,46 +1781,137 @@
                   "normalizer_version": "spatial-r2-v1",
                   "pair_id": "m8p:588c4867a384b8f8c5f1e04f0409a220aa635bf0abd48ca03c9f8c8ea5d20dce",
                   "pair_version": 1,
-                  "pair_decision_digest": "sha256:7f175f9406a00d13d27d36cbcf99ec3990bab8fd67af78590ef5a23ff53c4a3d",
+                  "pair_decision_digest": "sha256:4bc47fa6fe4eb88732cdf592a776d292f64025c623c750cdc36e3ab8b25d5310",
                   "ordered_sources": [
                     {
                       "view": "MASTER",
                       "parent_artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0",
                       "parent_master_version": 1,
                       "parent_candidate_id": "m7c:264ea8b3b30af6098a80dd0ff31e818188449bed",
-                      "parent_content_digest": "sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-                      "frame_derivation_receipt_id": "m8f:7951ca71ff3158c88513d7e5914ca6881aff9ace683a527cd8e138035d27090a",
-                      "frame_derivation_receipt_digest": "sha256:8b9b423cd26ce8637982ed2571e473bc5e6b2d5d6506ad50fefea11ec0bd85ab",
-                      "frame_candidate_id": "m8f:7951ca71ff3158c88513d7e5914ca6881aff9ace683a527cd8e138035d27090a",
-                      "frame_content_digest": "sha256:7e3afda3cfd364f8fb7ffc41003097be9f3e131f4ccd7ef48f3825320a47452a"
+                      "parent_content_digest": "sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+                      "frame_derivation_receipt_id": "m8f:3b2f74dad964b319beff195dd066f07a7139a6039673c1cea9f7e2e674b945a6",
+                      "frame_derivation_receipt_digest": "sha256:db240b66465f86561cd1c5c2105da1c584bbbc2ea1016f479d53342e236ba57b",
+                      "frame_candidate_id": "m8f:3b2f74dad964b319beff195dd066f07a7139a6039673c1cea9f7e2e674b945a6",
+                      "frame_content_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97"
                     },
                     {
                       "view": "REVERSE",
                       "parent_artifact_key": "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0",
                       "parent_master_version": 1,
                       "parent_candidate_id": "m7c:c7c2538084240e6f85af964b2f9b744fd9904572",
-                      "parent_content_digest": "sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194",
-                      "frame_derivation_receipt_id": "m8f:aecc58e3ca811a4276993b233a884b5301c71ddba63959e4a0d4f1ce61224bf9",
-                      "frame_derivation_receipt_digest": "sha256:e2cb4b7bf8aed0c688c71e6d96b1ed3fa9d09db0f88f660648c119fd1c57e417",
-                      "frame_candidate_id": "m8f:aecc58e3ca811a4276993b233a884b5301c71ddba63959e4a0d4f1ce61224bf9",
-                      "frame_content_digest": "sha256:e229344430b88cb884a2a3971f8c918e6199b195a5a494507d4f1f53e36926c1"
+                      "parent_content_digest": "sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8",
+                      "frame_derivation_receipt_id": "m8f:485b22d5f607d5c18c3e9c7923d385dbeae6c5b15a3f4e16c494d59ad64e39fd",
+                      "frame_derivation_receipt_digest": "sha256:49b56a6a8f01ff6b16b94b7a9b0bbe7da30f2efc7990711ff21bb3e04f861c08",
+                      "frame_candidate_id": "m8f:485b22d5f607d5c18c3e9c7923d385dbeae6c5b15a3f4e16c494d59ad64e39fd",
+                      "frame_content_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f"
                     }
                   ]
                 },
-                "visible_assertions": 3
+                "visible_assertions": 3,
+                "assertions": [
+                  {
+                    "assertion_id": "spatial:1398d6aa13103f2a9fcfb399",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "red fire extinguisher cabinet"
+                    ],
+                    "relation": "red fire extinguisher cabinet on front wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "master",
+                        "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
+                        "view": "MASTER",
+                        "x0": 0.7,
+                        "y0": 0.2,
+                        "x1": 0.82,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:5a8932462ab8780a6ed00f6c",
+                    "evidence_class": "INFERRED",
+                    "subjects": [
+                      "radiator"
+                    ],
+                    "relation": "may sit under the window",
+                    "confidence": 0.3,
+                    "spans": []
+                  },
+                  {
+                    "assertion_id": "spatial:0d1b9affc46e3caf8d86bd40",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "blue exit door"
+                    ],
+                    "relation": "blue exit door on back wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "reverse",
+                        "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
+                        "view": "REVERSE",
+                        "x0": 0.65,
+                        "y0": 0.2,
+                        "x1": 0.79,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:78725c87213000e914c5e38e",
+                    "evidence_class": "VISIBLE",
+                    "subjects": [
+                      "yellow painting"
+                    ],
+                    "relation": "yellow painting on left wall",
+                    "confidence": null,
+                    "spans": [
+                      {
+                        "source_ref": "master",
+                        "source_digest": "sha256:6a71ea7d9ca8e50faef62ae51edc8c37c7bb8078b8798eb8e502e35eaa7e7d97",
+                        "view": "MASTER",
+                        "x0": 0.0,
+                        "y0": 0.2,
+                        "x1": 0.12,
+                        "y1": 0.8
+                      },
+                      {
+                        "source_ref": "reverse",
+                        "source_digest": "sha256:6b618794af769990ccbc195ce84fe0a36b1fb80e88947baeb22b244be6630c4f",
+                        "view": "REVERSE",
+                        "x0": 0.88,
+                        "y0": 0.2,
+                        "x1": 1.0,
+                        "y1": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "assertion_id": "spatial:098c264005b7e90a43d0cbbd",
+                    "evidence_class": "GAP",
+                    "subjects": [],
+                    "relation": "ceiling corners unseen",
+                    "confidence": null,
+                    "spans": []
+                  }
+                ]
               },
               "format": {
                 "vertical-9x16@1": {
-                  "artifact_digest": "sha256:3c754d2edd6c27d74177e2dfa28c140bcc0f9df6b58bdac640d367cccb1faccc",
+                  "artifact_digest": "sha256:86d4ff11857f40fb604b29bb13719b388bde8f449dbdb500aee6e4213ddbedb8",
                   "technical_passed": true,
                   "semantic_passed": true,
-                  "slot": "m8-format:53e86b8d7cecd5dc:vertical-9x16@1"
+                  "slot": "m8-format:53e86b8d7cecd5dc:vertical-9x16@1",
+                  "artifact_ref": "formats/86d4ff11857f40fb604b29bb13719b388bde8f449dbdb500aee6e4213ddbedb8.mp4"
                 },
                 "square@1": {
-                  "artifact_digest": "sha256:408fbd46fd4db9059682a94495cc2a2cfdebbb21a54b80a4781b00a3f8d56275",
+                  "artifact_digest": "sha256:7cc9265ad7b0dc12b121038e0301d7c60acf300f00f0b50a2a0d909ae9e26506",
                   "technical_passed": true,
                   "semantic_passed": true,
-                  "slot": "m8-format:53e86b8d7cecd5dc:square@1"
+                  "slot": "m8-format:53e86b8d7cecd5dc:square@1",
+                  "artifact_ref": "formats/7cc9265ad7b0dc12b121038e0301d7c60acf300f00f0b50a2a0d909ae9e26506.mp4"
                 }
               },
               "learning": {
@@ -1624,12 +1978,12 @@
                 "recommendation_id": "rec-69a69f54996c29794990dfbedce42910"
               },
               "masters": {
-                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194"
+                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+                "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
               },
               "source_sha256": {
-                "SH01": "sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-                "SH02": "sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194"
+                "SH01": "sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+                "SH02": "sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
               }
             },
             "lineage_profiles": {
@@ -1640,12 +1994,12 @@
               "learning": "CN_SHORT_DRAMA_SHUANGWEN"
             },
             "master_heads_before": {
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194"
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
             },
             "master_heads_after": {
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:447dab2661d4e056594b067b90600d1d4e4ba4f6522b03a92ca29525832a9788",
-              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:86ef0e09b482c6bdb3b0687f0713f888a7610154e5c53881397fbf6c4acfb194"
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAxIl0": "1:sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+              "artifact-key-v1:WyJlcGlzb2RlLXZpZGVvIiwxLCJTSDAyIl0": "1:sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
             },
             "replay": {
               "train_fired": true,
@@ -1703,10 +2057,10 @@
                     ],
                     "viewport_bookmarks": []
                   },
-                  "payload_digest": "sha256:eeb84fb0ebd48ce46e8106d2f1491ef4d649e7c05ae09a58e3444ec93a75cce5",
+                  "payload_digest": "sha256:7ea97068ae1dd0ff32b293ec0e19f4dda1d6773dbdec6d33460bf65ec50b7116",
                   "lineage": {
                     "project_name": "m8f-shuang",
-                    "content_basis_digest": "sha256:bf3e993e179d68e6ee8d151e574e60106c680b32dc488a23b1e86c735423dc1d",
+                    "content_basis_digest": "sha256:79a276abe898a7838a934a5c485c62835f546c64a3c67c0292eb070ef76ca83a",
                     "approved_master_id": null,
                     "approved_master_digest": null,
                     "creative_profile_id": "CN_SHORT_DRAMA_SHUANGWEN",
@@ -1771,10 +2125,10 @@
                     ],
                     "viewport_bookmarks": []
                   },
-                  "payload_digest": "sha256:67beeee97c18c120ef7efa39bda40b85770478e82b102de96e058e98f200ee3a",
+                  "payload_digest": "sha256:91ff2af365b27f484184474b8838faa37e2a7b0bfcfee210b10e6201ca083795",
                   "lineage": {
                     "project_name": "m8f-shuang",
-                    "content_basis_digest": "sha256:bf3e993e179d68e6ee8d151e574e60106c680b32dc488a23b1e86c735423dc1d",
+                    "content_basis_digest": "sha256:79a276abe898a7838a934a5c485c62835f546c64a3c67c0292eb070ef76ca83a",
                     "approved_master_id": null,
                     "approved_master_digest": null,
                     "creative_profile_id": "CN_SHORT_DRAMA_SHUANGWEN",
@@ -1786,11 +2140,11 @@
                 }
               ]
             },
-            "wall_seconds": 10.3,
-            "disk_mib": 6.8
+            "wall_seconds": 7.8,
+            "disk_mib": 0.4
           },
           "run_2_matches_run_1": true,
-          "run_2_wall_seconds": 10.3
+          "run_2_wall_seconds": 8.2
         }
       },
       "probes": {
@@ -1801,12 +2155,12 @@
         }
       },
       "vision_calls_per_run": 2,
-      "peak_rss_mib": 281.4,
+      "peak_rss_mib": 279.7,
       "database": "postgresql"
     }
   },
   "limits": [
-    "Semantic format reports in this run come from a test reviewer with a showrunner grant; they exercise the mechanism and are not the protocol's blind reviews (pending sponsor review on V2 staging).",
+    "Semantic format reports in this run come from a test reviewer with a showrunner grant; they exercise the mechanism. The protocol's blind reviews are the sponsor's offline review of the same bytes (review_artifacts), recorded separately.",
     "The vision model is the pinned spatial fixture response; no provider was called.",
     "Corpus values are synthetic (see protocol corpus.limits); learning lifts are associative and demonstrate the mechanism only.",
     "Restart, concurrent promotion and retry-after-unknown are covered by the existing packet suites cited in the dossier, not re-run here."
@@ -1815,5 +2169,26 @@
   "material_unknowns": [
     "sponsor blind review of the format projections and spatial candidates (protocol rubrics) not yet recorded"
   ],
-  "non_authorization": "No production activation, deployment, provider or platform call, credential use or publication is authorized."
+  "non_authorization": "No production activation, deployment, provider or platform call, credential use or publication is authorized.",
+  "review_artifacts": {
+    "WESTERN_GENERIC": {
+      "vertical-9x16@1": "sha256:101309d3ad4e508ec34f65328380976f8626b15095431d126c955bb3f72d01c0",
+      "square@1": "sha256:ef3cc645c42b23cd050e84de47a11f2fa29b04a091c811e8f51962d01f3dc693",
+      "sources": {
+        "SH01": "sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+        "SH02": "sha256:6c354ce21b2eda189f27f684143946eb8aaeb2868ac93569686d8e34286b4e23"
+      }
+    },
+    "CN_SHORT_DRAMA_SHUANGWEN": {
+      "vertical-9x16@1": "sha256:86d4ff11857f40fb604b29bb13719b388bde8f449dbdb500aee6e4213ddbedb8",
+      "square@1": "sha256:7cc9265ad7b0dc12b121038e0301d7c60acf300f00f0b50a2a0d909ae9e26506",
+      "sources": {
+        "SH01": "sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+        "SH02": "sha256:639b0f5604f263a6a2e03a085677ed31b14a3d23abbd10cc67ecfb745a1ccab8"
+      }
+    }
+  },
+  "history": [
+    "cbd7fe68 recorded the first results with test-pattern shot media (testsrc2/smptebars). The shots are now stylized rooms drawn where the pinned spatial fixture's visible assertions place their objects, so the spatial blind review can check them; endpoints, isolation and determinism are unchanged, and only media digests differ."
+  ]
 }
