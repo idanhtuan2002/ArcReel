@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
-  "status": "M9_PREREQUISITES_CANDIDATE",
-  "combined_base_head": "d3f65729cf42c7807389dbb938e5f8a6679f60d0",
+  "status": "M9_PREREQUISITES_ACCEPTED",
+  "combined_base_head": "8670c0785c14455504985e7b21b1bee3d7db67e4",
   "alembic_head": "918c4a0e0001",
   "revision_graph_digest": "sha256:5d45355ceb6350efffdaf368ff7a6786ffde24ec24fc06f0a4ee820dbc3be425",
   "acceptances": {
@@ -21,7 +21,16 @@
     "sha256": "bb56498c2688181d3317964abb0b8e22fed0586fd73f381d5537010f69a4613d"
   },
   "schema_sha256": "9bd1808f6468fff1df4ca065dc506213bb7ec8c865453a0fd85a48b5da66e68d",
-  "review": null,
+  "review": {
+    "reviewer_id": "m9-p0-independent-codex",
+    "reviewed_candidate_head": "8670c0785c14455504985e7b21b1bee3d7db67e4",
+    "independent_of_author": true,
+    "verdict": "PASS",
+    "findings": [],
+    "required_skips": [],
+    "material_unknowns": [],
+    "sealed_at": "2026-10-15T15:08:18Z"
+  },
   "required_skips": [],
   "material_unknowns": []
 }
