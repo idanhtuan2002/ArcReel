@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "status": "M9_PREREQUISITES_CANDIDATE",
-  "combined_base_head": "7da02c5f6c2e61ef5e651ca1777865401ef29112",
+  "combined_base_head": "d3f65729cf42c7807389dbb938e5f8a6679f60d0",
   "alembic_head": "918c4a0e0001",
   "revision_graph_digest": "sha256:5d45355ceb6350efffdaf368ff7a6786ffde24ec24fc06f0a4ee820dbc3be425",
   "acceptances": {
@@ -18,7 +18,7 @@
   },
   "tooling": {
     "path": "scripts/r2/verify_m9_prerequisites.py",
-    "sha256": "789bd99693eb652602597414b07ad052ac13922f3a89dad700137683f342c3ca"
+    "sha256": "bb56498c2688181d3317964abb0b8e22fed0586fd73f381d5537010f69a4613d"
   },
   "schema_sha256": "9bd1808f6468fff1df4ca065dc506213bb7ec8c865453a0fd85a48b5da66e68d",
   "review": null,
