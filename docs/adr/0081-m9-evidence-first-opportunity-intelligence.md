@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # M9 uses an evidence-first opportunity module with capability-gated source adapters

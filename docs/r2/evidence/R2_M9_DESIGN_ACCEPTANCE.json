@@ -1,0 +1,47 @@
+{
+  "schema_version": "1",
+  "status": "M9_DESIGN_ACCEPTED",
+  "acceptance_mode": "EXPLICIT_SPONSOR_DECISION",
+  "acceptance_scope": "M9_DESIGN_ONLY",
+  "accepted_candidate_head": "24fa05e0610efa6fb60db50d1b22b10de48f2786",
+  "accepted_candidate_parent": "ffc75a22d3d9d2c2bc6e8d9951ec75927adc18e4",
+  "accepted_adr_sha256": "27f8d79bb005a1242d7ecfd616c32f40d78bc684ed5ca994f9aae8b79adde64b",
+  "review_contract_sha256": "d18b6fb107852cdea8c1d9e486b1e05544ae2564cbc9c0f90b6bb0137a5101b3",
+  "sponsor_decision": {
+    "authority": "SPONSOR_USER_INSTRUCTION",
+    "quote": "chap nhan m9 roi sang buoc tiep theo luon",
+    "recorded_at": "2026-10-15T14:34:54.570969+00:00"
+  },
+  "amendment": {
+    "path": "docs/adr/0110-m9-design-acceptance-by-explicit-sponsor-decision.md",
+    "sha256": "1bfa0d518d68799292bd577785a08310b79ac7e8d36652a0241b78029a5a9265"
+  },
+  "artifacts": {
+    "docs/adr/0081-m9-evidence-first-opportunity-intelligence.md": "44946cc8a77490c3dbcd7eb9cd6fed2be1b6edd670e6f5947342c465ec7b49b0",
+    "docs/research/2026-09-14-r2-m9-opportunity-research-intelligence.md": "0d40ba87982546e1ac5eb306ed2e008769e4e4a1efce267b928071c7672e1e1a",
+    "docs/research/2026-09-15-r2-m9-design-validation.md": "51bfa2f0d8c6558193aabe5f31f4eea6d7b649e49e3ec139aeb84a97730bc15e",
+    "docs/superpowers/specs/2026-09-14-r2-m9-opportunity-research-intelligence-design.md": "8e7c34e1e53380ccd6f61b79dc48205da801f1743545f924bb1e812dd615a934",
+    "docs/superpowers/plans/2026-09-14-r2-m9-opportunity-research-intelligence.md": "28ae1f9d99c6a5f6d5af7a377cc6d803d026e8e312df87d042cbef6a1a38afee",
+    "docs/superpowers/plans/2026-09-14-r2-m9a-foundation-cohort-profiles.md": "c6d87502c82f180546817a23acd482d612624ef1c66e431ed5ceb7c46f61828e",
+    "docs/r2/evidence/R2_M9_EXECUTION_CONTRACT_2026-09-14.json": "6223fae310fce2f267cbfd13dddc18ecae4d13f2380e11ebc7a7b5a13433ca6d",
+    "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE_CONTRACT_2026-09-15.json": "d18b6fb107852cdea8c1d9e486b1e05544ae2564cbc9c0f90b6bb0137a5101b3",
+    "docs/r2/evidence/schemas/R2_M9_DESIGN_ACCEPTANCE.schema.json": "05d1620b1c0e44203e3a8cf008b46fbdf93bb2dc6b00ccb1342a14ebd9b1f57a",
+    "docs/r2/evidence/schemas/R2_M9_DESIGN_REVIEW.schema.json": "7670b10b709e5574d85c3ed781ba7ea9a4e29ede139c06c1173ef98e4615800c",
+    "scripts/r2/verify_m9_design_acceptance.py": "4890ebd9dd5199269b8a38b36c66300b3ed60ff38f46139bbdf36ce52595eae0",
+    "tests/unit/scripts/r2/test_verify_m9_design_acceptance.py": "77b3f6e9ba215b032a177d12cb3355e14f45d90b4b840cbe4727d4e22f034778"
+  },
+  "independent_review_status": "WAIVED_FOR_THIS_CANDIDATE_BY_SPONSOR",
+  "independent_reviews": [],
+  "limitations": [
+    "No two independent PASS reviews exist for this revised candidate.",
+    "Design acceptance is not M9 implementation or production acceptance."
+  ],
+  "production_operations_authorized": false,
+  "acceptance_changed_paths": [
+    "docs/adr/0081-m9-evidence-first-opportunity-intelligence.md",
+    "docs/adr/0110-m9-design-acceptance-by-explicit-sponsor-decision.md",
+    "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json",
+    "docs/r2/evidence/R2_M9_DESIGN_REVIEW_HANDOFF_2026-10-15.md",
+    "docs/r2/evidence/schemas/R2_M9_SPONSOR_DESIGN_ACCEPTANCE.schema.json"
+  ]
+}

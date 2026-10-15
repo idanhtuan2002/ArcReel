@@ -195,3 +195,16 @@ the revised clean candidate when review quota is available. The `ffc75a22`
 diagnostic does not transfer acceptance to a later revision. Keep ADR-0081
 proposed; no `R2_M9_DESIGN_ACCEPTANCE.json`, P0 or M9-A implementation is authorized
 by the repairs or the contract probe. The M8 merge remains local and unpushed.
+
+## Explicit sponsor acceptance (2026-10-15)
+
+The sponsor explicitly accepted the revised design: `chap nhan m9 roi sang buoc tiep theo luon`. ADR-0110
+records the one-candidate exception for `24fa05e0610efa6fb60db50d1b22b10de48f2786`.
+`R2_M9_DESIGN_ACCEPTANCE.json` now records **M9_DESIGN_ACCEPTED by sponsor**,
+with twelve candidate artifact hashes and no fabricated review outputs.
+All earlier missing-review notes remain historical; this section supersedes
+their design-acceptance blocker for this candidate only.
+
+Next: execute umbrella Task P0, using the dedicated sponsor schema and
+Git-bound verification; preserve the existing later-packet review requirements.
+No M9 implementation, production activation or remote push is accepted here.
