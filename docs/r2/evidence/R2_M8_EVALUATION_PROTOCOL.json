@@ -20,11 +20,11 @@
       },
       {
         "path": "tests/fixtures/r2/m6_dual_profile_corpus.py",
-        "sha256": "8927d23466b61d9963e801fd3aeda304a508161c7d00abdccc63bab48859828d"
+        "sha256": "cbacc1ba1ace37933b7540ac2201e47ff55c7b6e4c7e6804163b165ba2eed7bf"
       },
       {
         "path": "tests/fixtures/r2/m8f_profiles.py",
-        "sha256": "ffb3d640dc0b19e84e184bebbb2e67efdd83cac0fc51f683a87a54cb130611e2"
+        "sha256": "323fa66db3a00eac237a0c2088f9c5cb89633a51a3d44779ff202a948266299d"
       },
       {
         "path": "r2/adaptation/policy_packs/western_generic_v1.json",
@@ -231,9 +231,9 @@
   "replay_determinism": {
     "runs": 2,
     "must_match": [
-      "artifact digests",
+      "artifact digests (Canvas: graph digest; the lineage-bound payload digest names each run's admission decision and is recorded per run)",
       "report verdicts",
-      "recommendation digests excluding timestamps",
+      "recommendation evidence ids and replay lifts",
       "promotion receipt result digests"
     ]
   },
@@ -254,5 +254,17 @@
     "M8_FORMAT_PARITY_BLOCKED",
     "M8_REQUIRED_EVIDENCE_MISSING"
   ],
-  "non_authorization": "This protocol and any result under it authorize no production activation, deployment, provider or platform call, credential use or publication."
+  "non_authorization": "This protocol and any result under it authorize no production activation, deployment, provider or platform call, credential use or publication.",
+  "amendments": [
+    {
+      "at": "2026-10-15T03:40:00Z",
+      "before_results": true,
+      "reason": "The first integrated run failed before producing any result: adaptation branch ids are global keys and Golden B derived them from the profile alone, so a cohort's creative and learning projects collided. build_screenplay_admission_command gained an optional branch_id (default unchanged) and admit_profile passes a per-project id. The same run exposed the M7 candidate id defect fixed by ADR-0106. Canvas determinism compares the graph digest because the lineage-bound payload digest binds each run's admission decision.",
+      "changed": [
+        "tests/fixtures/r2/m6_dual_profile_corpus.py",
+        "tests/fixtures/r2/m8f_profiles.py",
+        "replay_determinism.must_match"
+      ]
+    }
+  ]
 }

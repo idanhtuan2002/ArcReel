@@ -76,6 +76,7 @@ async def admit_profile(
         uow_factory=uow_factory,
         user_id=user_id,
         project_name=project_name,
+        branch_id=f"{project_name}-{profile_id.value.lower()}",
     )
     receipt = await AdaptationAuthorityService(uow_factory, GrantingAuthority()).admit_screenplay_for_direction(
         setup.admit, authenticated_principal=PRINCIPAL

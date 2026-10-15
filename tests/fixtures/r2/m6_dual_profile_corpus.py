@@ -282,13 +282,16 @@ async def build_screenplay_admission_command(
     uow_factory: AdaptationUnitOfWorkFactory,
     user_id: str,
     project_name: str,
+    branch_id: str | None = None,
 ) -> PreAdmissionSetup:
     """Real branch -> map -> map approval -> screenplay proposal -> profile
     evaluation -> waiver-if-needed, ending in a real, submittable
     ``ScreenplayAdmissionCommand`` -- everything Gate B (Narrative Lock)
     needs before an admission decision, extracted from ``run_profile_slice``
     so it is independently reusable (P1's real-authority end-to-end test)."""
-    branch_id = f"golden-b-{profile_ref.profile_id.value.lower()}"
+    # Branch, map and screenplay ids are global keys; a caller admitting the same profile in several
+    # projects passes a distinct ``branch_id``.
+    branch_id = branch_id or f"golden-b-{profile_ref.profile_id.value.lower()}"
     map_id = f"{branch_id}-map"
     screenplay_id = f"{branch_id}-sp"
 
