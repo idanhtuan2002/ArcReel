@@ -87,3 +87,13 @@
   - the `host_custodian_leases` columns include `operation`.
 - **Next:** apply all of the above in one revision, sweep for cross-file contradictions, then run two fresh
   reviewers (A Claude, B Codex) on the new candidate.
+
+## Session end (2026-10-15)
+
+- **M8 merged locally.** At the sponsor's request, `r2-v2/main` was fast-forwarded to `23cf146a` (the M8
+  implementation acceptance), 18 commits from `6d4f7369`. It is **not pushed**: `origin/r2-v2/main` is still
+  at `6d4f7369`. Push only with the sponsor's approval.
+- **M9 design branch.** `design/r2-m9-v2-revalidation` descends from `r2-v2/main`. Task P0 (combined base)
+  can bind M8 on the shared lineage once the M9 design is accepted.
+- **Resume point.** The pass-3 fix list above. Apply all 8 blocking findings and the cheap notes in one
+  revision, then run fresh reviewers A (Claude) and B (Codex) on the new candidate.
