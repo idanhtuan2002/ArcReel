@@ -35,9 +35,22 @@ DIGEST = "sha256:" + "a" * 64
 BASE = f"/api/v1/projects/{PROJECT}/m8/exploration"
 
 
+SCRIPT = b'{"episode": 1}'
+
+
 @pytest.fixture
-async def m8_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory):
+async def m8_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory, tmp_path: Path):
+    root = tmp_path / "m8-root"
+    for name in (PROJECT, "other"):
+        (root / name / "scripts").mkdir(parents=True)
+        (root / name / "project.json").write_text(
+            json.dumps({"title": name, "episodes": [{"episode": 1, "script_file": "episode_1.json"}]}),
+            encoding="utf-8",
+        )
+        (root / name / "scripts" / "episode_1.json").write_bytes(SCRIPT)
+    projects = ProjectManager(root)
     monkeypatch.setattr(advanced_creative, "async_session_factory", session_factory)
+    monkeypatch.setattr(advanced_creative, "get_project_manager", lambda: projects)
     app = FastAPI()
     app.dependency_overrides[get_current_user] = lambda: USER
     app.include_router(advanced_creative.router, prefix="/api/v1", dependencies=AUTH_DEPENDENCIES)
@@ -46,7 +59,9 @@ async def m8_client(monkeypatch: pytest.MonkeyPatch, session_factory: Factory):
         yield http
 
 
-def _canvas_revision(*, project: str = PROJECT, created_by: str = "default") -> dict[str, object]:
+def _canvas_revision(
+    *, project: str = PROJECT, created_by: str = "default", lineage: LineageBinding | None = None
+) -> dict[str, object]:
     payload = CanvasCandidate(
         kind=ExplorationKind.CANVAS,
         graph_schema_version="1",
@@ -56,15 +71,7 @@ def _canvas_revision(*, project: str = PROJECT, created_by: str = "default") -> 
         storyboard_order=(),
         viewport_bookmarks=(),
     )
-    lineage = LineageBinding(
-        project_name=project,
-        content_basis_digest=DIGEST,
-        approved_master_id=None,
-        approved_master_digest=None,
-        creative_profile_id="profile",
-        creative_profile_version="1",
-        policy_digest=DIGEST,
-    )
+    lineage = lineage or resolve_episode_lineage(project, 1, SCRIPT)
     revision = ExplorationRevision(
         candidate_id="c-1",
         revision=1,
@@ -399,3 +406,58 @@ async def test_two_admitted_profiles_are_ambiguous_and_an_admitted_project_has_o
     ambiguous = await m8_client.get(f"{BASE}/context", params={"episode": 1})
     assert ambiguous.status_code == 409
     assert "M8_LINEAGE_AMBIGUOUS" in ambiguous.text
+
+
+def _forged(**changes: str) -> LineageBinding:
+    return resolve_episode_lineage(PROJECT, 1, SCRIPT).model_copy(update=changes)
+
+
+@pytest.mark.parametrize(
+    "lineage",
+    [
+        _forged(creative_profile_id="CN_SHORT_DRAMA_SHUANGWEN"),
+        _forged(creative_profile_version="2"),
+        _forged(policy_digest=DIGEST),
+        _forged(content_basis_digest=DIGEST),
+    ],
+    ids=["profile", "profile-version", "policy", "content-basis"],
+)
+async def test_an_append_with_a_lineage_the_server_did_not_resolve_is_refused(
+    m8_client: AsyncClient, lineage: LineageBinding
+) -> None:
+    body = {"candidate": _canvas_revision(lineage=lineage), "expected_head_version": None, "command_id": "forged"}
+
+    response = await m8_client.post(f"{BASE}/revisions", json=body)
+
+    assert response.status_code == 409
+    assert "M8_LINEAGE_NOT_SERVER_RESOLVED" in response.text
+    assert (await m8_client.get(f"{BASE}/candidates/c-1")).status_code == 404
+
+
+async def test_after_an_admission_the_host_lineage_is_refused_and_the_admitted_one_accepted(
+    m8_client: AsyncClient, session_factory: Factory
+) -> None:
+    admitted = await admit_profile(
+        session_factory, user_id=USER.id, project_name=PROJECT, profile_id=AdaptationProfileId.WESTERN_GENERIC
+    )
+
+    stale = await m8_client.post(f"{BASE}/revisions", json=_append_body())
+    current = {
+        "candidate": _canvas_revision(lineage=resolve_episode_lineage(PROJECT, 1, SCRIPT, admissions=(admitted.ref,))),
+        "expected_head_version": None,
+        "command_id": "admitted",
+    }
+    accepted = await m8_client.post(f"{BASE}/revisions", json=current)
+
+    assert stale.status_code == 409
+    assert "M8_LINEAGE_NOT_SERVER_RESOLVED" in stale.text
+    assert accepted.status_code == 200, accepted.text
+
+
+async def test_clients_append_only_canvas_revisions(m8_client: AsyncClient) -> None:
+    body = _append_body()
+    body["candidate"]["kind"] = "FORMAT"  # type: ignore[index]
+
+    response = await m8_client.post(f"{BASE}/revisions", json=body)
+
+    assert response.status_code in (409, 422)

@@ -14,9 +14,10 @@ from fastapi import APIRouter, Query
 from lib.api_errors import ApiError, ConflictError, NotFoundError
 from lib.db import async_session_factory
 from lib.project_manager import get_project_manager
-from r2.advanced_creative.errors import ExplorationNotFoundError, M8Error
+from r2.advanced_creative.errors import CandidateConflictError, ExplorationNotFoundError, M8Error
 from r2.contracts.advanced_creative import (
     CandidateHead,
+    ExplorationKind,
     ExplorationRevision,
     LineageBinding,
     M8ContractModel,
@@ -26,7 +27,12 @@ from r2.contracts.advanced_creative import (
     PromotionTarget,
 )
 from server.auth import CurrentUser
-from server.services.advanced_creative import episode_lineage, exploration_promotion, exploration_service
+from server.services.advanced_creative import (
+    episode_lineage,
+    exploration_promotion,
+    exploration_service,
+    require_server_lineage,
+)
 
 router = APIRouter()
 
@@ -86,7 +92,18 @@ async def get_context(project_name: str, user: CurrentUser, episode: int = Query
 @router.post("/projects/{project_name}/m8/exploration/revisions")
 async def append_revision(project_name: str, req: AppendRevisionRequest, user: CurrentUser) -> CandidateHead:
     async def operation() -> CandidateHead:
+        if req.candidate.lineage.project_name != project_name or req.candidate.created_by != user.id:
+            raise ExplorationNotFoundError("the revision is not in this scope")
+        if req.candidate.kind is not ExplorationKind.CANVAS:
+            raise CandidateConflictError("only Canvas revisions are appended by clients; others are server-prepared")
         async with async_session_factory() as session:
+            await require_server_lineage(
+                get_project_manager(),
+                session,
+                user_id=user.id,
+                project_name=project_name,
+                lineage=req.candidate.lineage,
+            )
             return await exploration_service(session).append_revision(
                 user_id=user.id,
                 project_name=project_name,

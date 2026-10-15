@@ -24,7 +24,13 @@ from lib.db.repositories.host_hardening import (
 )
 from lib.path_safety import PathTraversalError, safe_join
 from lib.project_manager import ProjectManager, find_episode
-from r2.advanced_creative.errors import CommandConflictError, ExplorationNotFoundError, PromotionBindingStaleError
+from r2.advanced_creative.errors import (
+    CommandConflictError,
+    ExplorationNotFoundError,
+    LineageEpisodeOutOfScopeError,
+    LineageNotServerResolvedError,
+    PromotionBindingStaleError,
+)
 from r2.advanced_creative.exploration import ExplorationService, FormatEvidence
 from r2.advanced_creative.lineage import resolve_episode_lineage
 from r2.advanced_creative.promotion import ExplorationPromotion
@@ -162,6 +168,35 @@ def _episode_script_bytes(projects: ProjectManager, project_name: str, episode: 
     except (OSError, ValueError, TypeError, AttributeError, PathTraversalError) as error:
         # Loading migrates the metadata in memory; malformed metadata surfaces as a type error there.
         raise ExplorationNotFoundError("the episode script cannot be read") from error
+
+
+def _indexed_episodes(projects: ProjectManager, project_name: str) -> list[int]:
+    try:
+        episodes = projects.load_project_readonly(project_name).get("episodes")
+    except (OSError, ValueError, TypeError, AttributeError):
+        return []
+    if not isinstance(episodes, list):
+        return []
+    return sorted(
+        {entry["episode"] for entry in episodes if isinstance(entry, dict) and isinstance(entry.get("episode"), int)}
+    )
+
+
+async def require_server_lineage(
+    projects: ProjectManager, session: AsyncSession, *, user_id: str, project_name: str, lineage: LineageBinding
+) -> None:
+    """Refuse a client lineage unless it equals the lineage the server resolves for one indexed episode
+    of the project now (ADR-0107); an ambiguous admission set refuses every episode."""
+    for episode in await asyncio.to_thread(_indexed_episodes, projects, project_name):
+        try:
+            resolved = await episode_lineage(
+                projects, session, user_id=user_id, project_name=project_name, episode=episode
+            )
+        except (ExplorationNotFoundError, LineageEpisodeOutOfScopeError):
+            continue
+        if resolved == lineage:
+            return
+    raise LineageNotServerResolvedError("the revision lineage is not a current server-resolved episode lineage")
 
 
 async def episode_lineage(

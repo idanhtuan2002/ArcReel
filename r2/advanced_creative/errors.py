@@ -27,6 +27,12 @@ class LineageEpisodeOutOfScopeError(M8Error):
     code = "M8_LINEAGE_EPISODE_OUT_OF_SCOPE"
 
 
+class LineageNotServerResolvedError(M8Error):
+    """A client revision's lineage is not one the server resolves for any episode of the project (ADR-0107)."""
+
+    code = "M8_LINEAGE_NOT_SERVER_RESOLVED"
+
+
 class CommandConflictError(M8Error):
     """A command id already used in this scope with a different semantic digest."""
 
