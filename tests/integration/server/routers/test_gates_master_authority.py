@@ -448,7 +448,9 @@ async def test_a_second_project_of_the_same_user_approves_the_same_shot(
     data = _media(b"second project")
     (other / "production" / "SH01.mp4").write_bytes(data)
 
-    response = await gate_export_client.post("/api/v1/projects/second-project/gates/final-cut", json=_body("SH01", data))
+    response = await gate_export_client.post(
+        "/api/v1/projects/second-project/gates/final-cut", json=_body("SH01", data)
+    )
 
     assert response.status_code == 200, response.text
     key, generation_id = next(iter(projected_masters(other).items()))
