@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "packet": "M8-F",
+  "status": "M8_F_EVALUATION_PREREGISTERED",
+  "registered_at": "2026-10-15T01:59:27Z",
+  "base_head": "560f1aa4",
+  "decisions": [
+    "docs/research/2026-10-15-r2-m8f-evaluation-and-profile-seam.md (DEC-F-0..DEC-F-3)",
+    "docs/adr/0105-m8-lineage-v2-binds-the-admitted-screenplay-profile.md",
+    "docs/superpowers/plans/2026-10-15-r2-m8f-utility-execution.md"
+  ],
+  "corpus": {
+    "builder": "tests/fixtures/r2/m8f_corpus.py",
+    "corpus_version": "m8f-corpus@1",
+    "manifest_digest": "sha256:8389a20bf4d7103932e021db15727f9c696676343f13c116fc45c9f8c7b4974b",
+    "sources": [
+      {
+        "path": "tests/fixtures/r2/m8f_corpus.py",
+        "sha256": "86ea1787b171fec8d5ed8c7479c5d2178bdf36ab5b979d44eb461620b81c83d5"
+      },
+      {
+        "path": "tests/fixtures/r2/m6_dual_profile_corpus.py",
+        "sha256": "8927d23466b61d9963e801fd3aeda304a508161c7d00abdccc63bab48859828d"
+      },
+      {
+        "path": "tests/fixtures/r2/m8f_profiles.py",
+        "sha256": "ffb3d640dc0b19e84e184bebbb2e67efdd83cac0fc51f683a87a54cb130611e2"
+      },
+      {
+        "path": "r2/adaptation/policy_packs/western_generic_v1.json",
+        "sha256": "bbe9da9e642bc2f7ed6a8204331c21438756d536dbdea9d0f945cb5af36bb74a"
+      },
+      {
+        "path": "r2/adaptation/policy_packs/cn_short_drama_shuangwen_v1.json",
+        "sha256": "9fa1f631e21d8412410d4fa4e9027cf84451196194652af9505f3dee7ac1ef56"
+      },
+      {
+        "path": "r2/learning/adapters.py",
+        "sha256": "47ecc9687107ef396ae2e4b90baf44b2a291b2085d8d8905ddc57bcba94f98ab"
+      },
+      {
+        "path": "r2/learning/cohorts.py",
+        "sha256": "dc691c13df435ded8e5f744cc9b9664cd094d6f9a05f9f3036e4f0641303d32a"
+      },
+      {
+        "path": "r2/learning/replay.py",
+        "sha256": "496d9f25b5dcd24770dd16b389461057ba7a96532271341d9f57fa998b18990e"
+      },
+      {
+        "path": "r2/advanced_creative/lineage.py",
+        "sha256": "b0fdc3a22b2aa9cf17e892ea4eaa887df3dd213e03be7ac456b44634c799ac73"
+      },
+      {
+        "path": "r2/advanced_creative/formats.py",
+        "sha256": "8f65d19e5a5d1c4c6646c14a18e592de8194d2a0449410e9ac5ba82ec7ec8456"
+      }
+    ],
+    "limits": [
+      "Every value is synthetic; the corpus demonstrates mechanism and makes no claim about real audiences.",
+      "The zh-shuang text is Golden B's structurally valid but culturally minimal slice; no cultural representativeness is claimed.",
+      "Holdout observations carry future-dated windows (after registered_at) by construction; replay refuses any evaluation observation older than registration."
+    ]
+  },
+  "cohorts": [
+    {
+      "creative_profile_id": "WESTERN_GENERIC",
+      "creative_profile_version": "v1",
+      "spec_label": "generic-western",
+      "creative_project": "m8f-western",
+      "learning_projects": {
+        "train": "m8f-western-train",
+        "holdout": "m8f-western-holdout"
+      }
+    },
+    {
+      "creative_profile_id": "CN_SHORT_DRAMA_SHUANGWEN",
+      "creative_profile_version": "v1",
+      "spec_label": "zh-shuang",
+      "creative_project": "m8f-shuang",
+      "learning_projects": {
+        "train": "m8f-shuang-train",
+        "holdout": "m8f-shuang-holdout"
+      }
+    }
+  ],
+  "design_class": "OFFLINE_REPLAY_SEQUENTIAL",
+  "baseline": {
+    "arm": "HOST_WITHOUT_M8",
+    "description": "The same corpus through ArcReel host surfaces only (admission, approved shot masters, export); no M8 route is called. Baseline deliverable counts are measured by running it, not assumed."
+  },
+  "endpoints": [
+    {
+      "capability": "CANVAS",
+      "deliverable": "an exploration with at least two sibling alternatives and its history, reloaded intact and bound to the cohort lineage",
+      "gates": [
+        "append accepted with server-resolved lineage",
+        "reload returns identical revisions",
+        "approved master bytes and heads unchanged"
+      ],
+      "baseline_expected": 0,
+      "minimum_delta": 1
+    },
+    {
+      "capability": "SPATIAL",
+      "deliverable": "a promoted spatial constraint set on a registered target, available to generation",
+      "gates": [
+        "fixture vision through M7 execution",
+        "no fact without source span",
+        "preview and explicit promotion",
+        "lineage binds the cohort profile"
+      ],
+      "baseline_expected": 0,
+      "minimum_delta": 1
+    },
+    {
+      "capability": "LEARNING",
+      "deliverable": "a lineage-bound recommendation whose direction holds on the registered holdout",
+      "gates": [
+        "ingest only with server lineage",
+        "cohort never pooled across profiles",
+        "compare_cohorts@1 fires on train",
+        "replay direction_held on holdout",
+        "associative language only"
+      ],
+      "baseline_expected": 0,
+      "minimum_delta": 1
+    },
+    {
+      "capability": "FORMAT",
+      "deliverable": "9:16 and 1:1 projections promoted into their format slots",
+      "gates": [
+        "technical report PASS",
+        "semantic report PASS (format-semantic@1)",
+        "preview and promotion bound to the source master",
+        "lineage binds the cohort profile"
+      ],
+      "baseline_expected": 0,
+      "minimum_delta": 2
+    }
+  ],
+  "effect_policy": {
+    "smallest_useful_effect": "For each cohort and each capability, M8 delivers at least minimum_delta more gated deliverables than the baseline, with zero regressions of baseline deliverables (approved master bytes and heads byte-identical).",
+    "confidence": "Deterministic: two independent runs from an empty database must produce identical artifact digests and verdicts. No sampling inference. Review verdict proportions are reported as exact counts with a Wilson 95% interval, descriptive only.",
+    "causal_language": "Forbidden. The design class is offline and sequential; hypotheses stay associative (r2.learning.cohorts causal-language guard).",
+    "pilot_confirmatory": "Not applicable: deterministic outputs and one reviewer give no variance to estimate; recorded as deviation NO_CONFIRMATORY_SAMPLE."
+  },
+  "learning_replay": {
+    "rule": "compare_cohorts@1",
+    "params": {
+      "min_per_arm": 7,
+      "min_relative_lift": "0.10"
+    },
+    "source_family": "youtube.analytics.v2",
+    "metric_name": "views",
+    "metric_definition_version": "youtube.analytics.v2/views@1",
+    "aggregation": "sum_day",
+    "baseline_arm": "landscape-16x9@1",
+    "treatment_arm": "vertical-9x16@1",
+    "train_cutoff": "2026-10-01T00:00:00+00:00",
+    "evaluation_window": [
+      "2026-11-02",
+      "2026-11-15"
+    ],
+    "holdout_salt": "m8f-holdout@2",
+    "evaluation_share": "0.5"
+  },
+  "exclusions": [],
+  "rubrics": [
+    {
+      "rubric_version": "format-semantic@1",
+      "items": [
+        "focal_subject",
+        "action",
+        "shot_intent",
+        "on_screen_text",
+        "captions",
+        "timing",
+        "audio"
+      ],
+      "applies_to": "format projections",
+      "calibration": "docs/r2/evidence/R2_M8_E_BLIND_REVIEW_2026-10-15.json (sponsor completed the rubric on SH01 9:16 PAD, 7/7)"
+    },
+    {
+      "rubric_version": "m8f-spatial-review@1",
+      "items": [
+        "pairing_matches_master_reverse",
+        "visible_assertions_supported_by_frames",
+        "gaps_not_stated_as_facts",
+        "seam_and_direction_locks_plausible"
+      ],
+      "applies_to": "spatial candidates before promotion",
+      "calibration": "one calibration candidate with an unsupported visible assertion, reviewed first; the reviewer must mark visible_assertions_supported_by_frames FAIL before the cohort reviews count"
+    }
+  ],
+  "reviewers": [
+    {
+      "reviewer_ref": "sponsor (showrunner grant on V2 staging)",
+      "language_cultural_cohort": "Vietnamese; not a native zh-shuang reader",
+      "role": "sponsor and plan author",
+      "conflict_declaration": "authored the evaluation plan and owns the project; reviews are blind to arm labels only",
+      "qualification": "format-semantic@1 calibration passed in M8-E; m8f-spatial-review@1 calibration recorded before reviews"
+    }
+  ],
+  "deviations": [
+    {
+      "code": "SINGLE_REVIEWER_DEVIATION",
+      "statement": "Spec §9 asks for at least two blind qualified reviews per artifact; the sponsor named a single reviewer (2026-10-15)."
+    },
+    {
+      "code": "NON_NATIVE_ZH_SHUANG_REVIEWER",
+      "statement": "The zh-shuang cohort is reviewed by a non-native reader."
+    },
+    {
+      "code": "REVIEWER_AUTHORED_PLAN",
+      "statement": "The reviewer authored the plans under review."
+    },
+    {
+      "code": "NO_CONFIRMATORY_SAMPLE",
+      "statement": "No pilot variance estimate or confirmatory sample size; utility is a deterministic capability delta."
+    }
+  ],
+  "resource_envelope": {
+    "ceilings": {
+      "cohort_wall_seconds": 1800,
+      "format_render_seconds": 1800,
+      "peak_rss_mib": 4096,
+      "cohort_disk_mib": 2048
+    },
+    "basis": "Host ceilings (server.services.format_render.RENDER_TIMEOUT_SECONDS = 1800); M8-E recorded no resource measurements, so no tighter empirical ceiling exists. Human review time is excluded."
+  },
+  "replay_determinism": {
+    "runs": 2,
+    "must_match": [
+      "artifact digests",
+      "report verdicts",
+      "recommendation digests excluding timestamps",
+      "promotion receipt result digests"
+    ]
+  },
+  "invariants": [
+    "zero authority bypass",
+    "zero stale promotion",
+    "zero lost acknowledged edit",
+    "zero profile/cohort leak",
+    "zero untracked semantic reframe",
+    "zero required skip",
+    "zero material unknown",
+    "staging review renders equal the automated run digests"
+  ],
+  "stop_codes": [
+    "M8_EVALUATION_NOT_PREREGISTERED",
+    "M8_PROFILE_COHORT_LEAK",
+    "M8_PROMOTION_BINDING_STALE",
+    "M8_FORMAT_PARITY_BLOCKED",
+    "M8_REQUIRED_EVIDENCE_MISSING"
+  ],
+  "non_authorization": "This protocol and any result under it authorize no production activation, deployment, provider or platform call, credential use or publication."
+}

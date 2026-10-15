@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R2 M8-F evaluation protocol (pre-registration)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet",
+    "status",
+    "registered_at",
+    "base_head",
+    "decisions",
+    "corpus",
+    "cohorts",
+    "design_class",
+    "baseline",
+    "endpoints",
+    "effect_policy",
+    "learning_replay",
+    "exclusions",
+    "rubrics",
+    "reviewers",
+    "deviations",
+    "resource_envelope",
+    "replay_determinism",
+    "invariants",
+    "stop_codes",
+    "non_authorization"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "packet": {"const": "M8-F"},
+    "status": {"const": "M8_F_EVALUATION_PREREGISTERED"},
+    "registered_at": {"type": "string", "format": "date-time"},
+    "base_head": {"type": "string", "pattern": "^[0-9a-f]{8,40}$"},
+    "decisions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["builder", "corpus_version", "manifest_digest", "sources", "limits"],
+      "properties": {
+        "builder": {"type": "string", "minLength": 1},
+        "corpus_version": {"type": "string", "minLength": 1},
+        "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }
+          }
+        },
+        "limits": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "cohorts": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["creative_profile_id", "creative_profile_version", "spec_label", "creative_project", "learning_projects"],
+        "properties": {
+          "creative_profile_id": {"enum": ["WESTERN_GENERIC", "CN_SHORT_DRAMA_SHUANGWEN"]},
+          "creative_profile_version": {"type": "string", "minLength": 1},
+          "spec_label": {"enum": ["generic-western", "zh-shuang"]},
+          "creative_project": {"type": "string", "minLength": 1},
+          "learning_projects": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["train", "holdout"],
+            "properties": {"train": {"type": "string"}, "holdout": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "design_class": {"const": "OFFLINE_REPLAY_SEQUENTIAL"},
+    "baseline": {"type": "object", "required": ["arm", "description"]},
+    "endpoints": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability", "deliverable", "gates", "baseline_expected", "minimum_delta"],
+        "properties": {
+          "capability": {"enum": ["CANVAS", "SPATIAL", "LEARNING", "FORMAT"]},
+          "deliverable": {"type": "string", "minLength": 1},
+          "gates": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "baseline_expected": {"type": "integer", "minimum": 0},
+          "minimum_delta": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "effect_policy": {"type": "object", "required": ["smallest_useful_effect", "confidence", "causal_language"]},
+    "learning_replay": {"type": "object", "required": ["rule", "params", "baseline_arm", "treatment_arm", "train_cutoff", "evaluation_window", "holdout_salt", "evaluation_share"]},
+    "exclusions": {"type": "array", "maxItems": 0},
+    "rubrics": {"type": "array", "minItems": 1},
+    "reviewers": {"type": "array", "minItems": 1},
+    "deviations": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["code", "statement"]}},
+    "resource_envelope": {"type": "object", "required": ["ceilings", "basis"]},
+    "replay_determinism": {"type": "object", "required": ["runs", "must_match"]},
+    "invariants": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "stop_codes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "non_authorization": {"type": "string", "minLength": 1}
+  }
+}
