@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R2 M9 combined-base prerequisite acceptance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "combined_base_head",
+    "alembic_head",
+    "revision_graph_digest",
+    "acceptances",
+    "tooling",
+    "schema_sha256",
+    "review",
+    "required_skips",
+    "material_unknowns"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "status": {
+      "enum": [
+        "M9_PREREQUISITES_CANDIDATE",
+        "M9_PREREQUISITES_ACCEPTED"
+      ]
+    },
+    "combined_base_head": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "alembic_head": {
+      "type": "string",
+      "pattern": "^[0-9a-z]+$"
+    },
+    "revision_graph_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "acceptances": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "m8",
+        "m9"
+      ],
+      "properties": {
+        "m8": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "acceptance_commit"
+          ],
+          "properties": {
+            "path": {
+              "const": "docs/r2/evidence/R2_M8_IMPLEMENTATION_ACCEPTANCE.json"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "acceptance_commit": {
+              "const": "23cf146a61c3b7acfb78440d2b1498fd9d77db4b"
+            }
+          }
+        },
+        "m9": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "acceptance_commit"
+          ],
+          "properties": {
+            "path": {
+              "const": "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "acceptance_commit": {
+              "const": "9d4e4ce6a01a4d1077de263b5cbadf4412055103"
+            }
+          }
+        }
+      }
+    },
+    "tooling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "scripts/r2/verify_m9_prerequisites.py"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "schema_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "review": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reviewer_id",
+            "reviewed_candidate_head",
+            "independent_of_author",
+            "verdict",
+            "findings",
+            "required_skips",
+            "material_unknowns",
+            "sealed_at"
+          ],
+          "properties": {
+            "reviewer_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewed_candidate_head": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "independent_of_author": {
+              "const": true
+            },
+            "verdict": {
+              "const": "PASS"
+            },
+            "findings": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "required_skips": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "material_unknowns": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "sealed_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      ]
+    },
+    "required_skips": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "material_unknowns": {
+      "type": "array",
+      "maxItems": 0
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "M9_PREREQUISITES_ACCEPTED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "review": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviewer_id",
+              "reviewed_candidate_head",
+              "independent_of_author",
+              "verdict",
+              "findings",
+              "required_skips",
+              "material_unknowns",
+              "sealed_at"
+            ],
+            "properties": {
+              "reviewer_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reviewed_candidate_head": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "independent_of_author": {
+                "const": true
+              },
+              "verdict": {
+                "const": "PASS"
+              },
+              "findings": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "required_skips": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "material_unknowns": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "sealed_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "review": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}
