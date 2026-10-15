@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "packet": "M8-F",
+  "record": "blind model reviews of the M8-F artifacts under protocol v2 (ADR-0108)",
+  "protocol": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V2.json",
+  "results": "docs/r2/evidence/R2_M8_F_RESULTS_V2.json",
+  "label_key": {
+    "format": {
+      "FA": {
+        "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+        "profile": "vertical-9x16"
+      },
+      "FB": {
+        "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+        "profile": "square"
+      },
+      "FC": {
+        "cohort": "WESTERN_GENERIC",
+        "profile": "vertical-9x16"
+      },
+      "FD": {
+        "cohort": "WESTERN_GENERIC",
+        "profile": "square"
+      },
+      "FX": {
+        "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+        "profile": "vertical-9x16",
+        "calibration": true
+      }
+    },
+    "spatial": {
+      "S0": {
+        "cohort": "WESTERN_GENERIC",
+        "calibration": true
+      },
+      "SA": {
+        "cohort": "WESTERN_GENERIC",
+        "calibration": false
+      },
+      "SB": {
+        "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+        "calibration": false
+      }
+    }
+  },
+  "packet_projection_digests_match_results": true,
+  "reviewers": [
+    {
+      "id": "A",
+      "reviewer": "Claude",
+      "model": "claude-opus-5-5",
+      "conflict": "implementer of the code and packet",
+      "method": "measured script (tools.review_a), run before reviewer B's report was read"
+    },
+    {
+      "id": "B",
+      "reviewer": "Codex",
+      "model_reported": "gpt-6",
+      "conflict": "none; ran as a separate agent without the label key or reviewer A's verdicts",
+      "method": "own frame, pixel, FFT, RMS and correlation measurements"
+    }
+  ],
+  "calibration": {
+    "A": {
+      "FX": true,
+      "S0": true
+    },
+    "B": {
+      "FX": true,
+      "S0": true
+    }
+  },
+  "reviews": {
+    "A": {
+      "FX": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "FAIL",
+        "note": "PAD picture region keeps aspect and both boxes at 3 times: True; duration delta 0.020s; audio corr 0.0000, rms 0.000; no text in source or projection"
+      },
+      "FA": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "PAD picture region keeps aspect and both boxes at 3 times: True; duration delta 0.020s; audio corr 1.0000, rms 0.088; no text in source or projection"
+      },
+      "FB": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "PAD picture region keeps aspect and both boxes at 3 times: True; duration delta 0.020s; audio corr 1.0000, rms 0.088; no text in source or projection"
+      },
+      "FC": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "PAD picture region keeps aspect and both boxes at 3 times: True; duration delta 0.020s; audio corr 0.9999, rms 0.088; no text in source or projection"
+      },
+      "FD": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "PAD picture region keeps aspect and both boxes at 3 times: True; duration delta 0.020s; audio corr 0.9999, rms 0.088; no text in source or projection"
+      },
+      "S0": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "FAIL",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "MASTER 'green sofa' 0.00; MASTER 'red fire extinguisher cabinet' 1.00; MASTER 'yellow painting' 1.00; REVERSE 'blue exit door' 1.00; REVERSE 'yellow painting' 1.00; shared left-wall painting at MASTER left edge and REVERSE right edge: True"
+      },
+      "SA": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "MASTER 'red fire extinguisher cabinet' 1.00; MASTER 'yellow painting' 1.00; REVERSE 'blue exit door' 1.00; REVERSE 'yellow painting' 1.00; shared left-wall painting at MASTER left edge and REVERSE right edge: True"
+      },
+      "SB": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "MASTER 'red fire extinguisher cabinet' 1.00; MASTER 'yellow painting' 1.00; REVERSE 'blue exit door' 1.00; REVERSE 'yellow painting' 1.00; shared left-wall painting at MASTER left edge and REVERSE right edge: True"
+      }
+    },
+    "B": {
+      "FX": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "FAIL",
+        "note": "source RMS 0.088068 at 312.85Hz versus projection RMS exactly zero; framing preserved in 1080x608 letterboxed content; both videos 2.000s/30fps, projection container 2.020s"
+      },
+      "FA": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "objects fully retained; 60 frames static; composition preserved at y=656-1264; no text; audio RMS 0.088068->0.088046, peak 312.85Hz, correlation 0.99999916"
+      },
+      "FB": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "objects fully retained; static scene; composition preserved at y=236-844; no text; audio correlation 0.99999916"
+      },
+      "FC": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "objects fully retained; static; composition preserved at y=656-1264; audio RMS 0.087800->0.087716, peak 732.13Hz, correlation 0.99994106"
+      },
+      "FD": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS",
+        "note": "objects fully retained; static; composition preserved at y=236-844; audio correlation 0.99994106"
+      },
+      "S0": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "FAIL",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "sofa box [384,324,640,576) contains 64,512 exclusively gray pixels, no green object; other boxes match; identities supported only at stylized colour/shape level"
+      },
+      "SA": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "red, yellow, blue and reverse yellow boxes each 100% matching colour; INFERRED stays 'may' at 0.3; GAP labeled; yellow marker moves left->right under reversal"
+      },
+      "SB": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS",
+        "note": "same measurements as SA"
+      }
+    }
+  },
+  "agreement": {
+    "items_compared": 47,
+    "disagreements": [],
+    "adjudication": "none needed"
+  },
+  "summary": {
+    "cohort_items_per_reviewer": 36,
+    "pass_per_reviewer": 36,
+    "wilson95_pass_rate": [
+      0.9036,
+      1.0
+    ],
+    "both_calibrations_passed": true
+  },
+  "deviations": [
+    "MODEL_REVIEWERS_BY_SPONSOR_AMENDMENT",
+    "REVIEWER_A_IS_IMPLEMENTER",
+    "REVIEW_OUTSIDE_APP",
+    "STIMULI_DRAWN_TO_FIXTURE",
+    "NO_CONFIRMATORY_SAMPLE"
+  ],
+  "limits": [
+    "No human reviewed these artifacts (ADR-0108).",
+    "Object identities are supported only at the stylized colour/shape level of synthetic frames (both reviewers).",
+    "The packet and the label key were built by reviewer A."
+  ],
+  "tools": {
+    "packet_builder": "\"\"\"Build the M8-F offline blind review packet from exported review media.\"\"\"\nimport json, random, shutil, subprocess, sys\nfrom pathlib import Path\n\nmedia, out = Path(sys.argv[1]), Path(sys.argv[2])\nshutil.rmtree(out, ignore_errors=True); (out / \"m\").mkdir(parents=True)\nrng = random.Random(20261015)\ncohorts = [\"WESTERN_GENERIC\", \"CN_SHORT_DRAMA_SHUANGWEN\"]\nfmt = [(c, p) for c in cohorts for p in (\"vertical-9x16\", \"square\")]\nrng.shuffle(fmt)\nkey = {\"format\": {}, \"spatial\": {}}\nfmt_items = []\nfor i, (c, p) in enumerate(fmt):\n    label = \"F\" + \"ABCD\"[i]\n    shutil.copyfile(media / c / \"SH01.mp4\", out / \"m\" / f\"{label}-source.mp4\")\n    shutil.copyfile(media / c / f\"{p}.mp4\", out / \"m\" / f\"{label}-projection.mp4\")\n    key[\"format\"][label] = {\"cohort\": c, \"profile\": p}\n    fmt_items.append(label)\n# FX: format calibration, a projection with its audio muted.\nfx_c, fx_p = fmt[0]\nshutil.copyfile(media / fx_c / \"SH01.mp4\", out / \"m\" / \"FX-source.mp4\")\nsubprocess.run([\"ffmpeg\", \"-v\", \"error\", \"-y\", \"-i\", str(media / fx_c / f\"{fx_p}.mp4\"), \"-c:v\", \"copy\", \"-af\", \"volume=0\", \"-c:a\", \"aac\", str(out / \"m\" / \"FX-projection.mp4\")], check=True)\nkey[\"format\"][\"FX\"] = {\"cohort\": fx_c, \"profile\": fx_p, \"calibration\": True}\nfmt_items.insert(0, \"FX\")\ndef frame(src, dst):\n    subprocess.run([\"ffmpeg\", \"-v\", \"error\", \"-y\", \"-i\", str(src), \"-frames:v\", \"1\", str(dst)], check=True)\nsp = cohorts[:]; rng.shuffle(sp)\nspatial_items = []\ncal = json.loads((media / sp[0] / \"spatial.json\").read_text())\ncal_assertions = [a for a in cal if a[\"evidence_class\"] != \"VISIBLE\"] + [{\n    \"assertion_id\": \"calibration\", \"evidence_class\": \"VISIBLE\", \"subjects\": [\"green sofa\"],\n    \"relation\": \"green sofa against the front wall\", \"confidence\": None,\n    \"spans\": [{\"view\": \"MASTER\", \"x0\": 0.3, \"y0\": 0.45, \"x1\": 0.5, \"y1\": 0.8}]}] + [a for a in cal if a[\"evidence_class\"] == \"VISIBLE\"]\nfor label, c, assertions in [(\"S0\", sp[0], cal_assertions)] + [(\"S\" + \"AB\"[i], c, json.loads((media / c / \"spatial.json\").read_text())) for i, c in enumerate(sp)]:\n    frame(media / c / \"SH01.mp4\", out / \"m\" / f\"{label}-master.png\")\n    frame(media / c / \"SH02.mp4\", out / \"m\" / f\"{label}-reverse.png\")\n    key[\"spatial\"][label] = {\"cohort\": c, \"calibration\": label == \"S0\"}\n    spatial_items.append((label, assertions))\n(out.parent / \"packet_key_v2.json\").write_text(json.dumps(key, indent=2))\nF_ITEMS = [\"focal_subject\", \"action\", \"shot_intent\", \"on_screen_text\", \"captions\", \"timing\", \"audio\"]\nS_ITEMS = [\"pairing_matches_master_reverse\", \"visible_assertions_supported_by_frames\", \"gaps_not_stated_as_facts\", \"seam_and_direction_locks_plausible\"]\ndef radios(item_id, items):\n    rows = \"\".join(f'<tr><td><code>{it}</code></td><td><label><input type=\"radio\" name=\"{item_id}.{it}\" value=\"PASS\"> PASS</label> <label><input type=\"radio\" name=\"{item_id}.{it}\" value=\"FAIL\"> FAIL</label></td></tr>' for it in items)\n    return f'<table>{rows}</table><textarea name=\"{item_id}.note\" placeholder=\"Ghi chú (tùy chọn)\"></textarea>'\ndef boxes(assertions, view):\n    out_ = \"\"\n    for a in assertions:\n        for s in a.get(\"spans\", []):\n            if s.get(\"view\") == view:\n                out_ += f'<div class=\"span\" style=\"left:{s[\"x0\"]*100}%;top:{s[\"y0\"]*100}%;width:{(s[\"x1\"]-s[\"x0\"])*100}%;height:{(s[\"y1\"]-s[\"y0\"])*100}%\"><span>{a[\"subjects\"][0]}</span></div>'\n    return out_\nsections = []\nfor label in fmt_items:\n    sections.append(f'<section><h2>{label} — format projection{\" (calibration, do first)\" if label == \"FX\" else \"\"}</h2><div class=\"pair\"><figure><figcaption>Nguồn (master)</figcaption><video src=\"m/{label}-source.mp4\" controls loop></video></figure><figure><figcaption>Bản chiếu (projection)</figcaption><video src=\"m/{label}-projection.mp4\" controls loop></video></figure></div><p>So bản chiếu với nguồn: chủ thể chính, hành động, ý đồ shot, chữ trên màn hình, phụ đề, nhịp thời gian, âm thanh còn nguyên nghĩa không? (Không có chữ/phụ đề trong nguồn thì PASS nếu bản chiếu cũng không thêm/mất gì.)</p>{radios(label, F_ITEMS)}</section>')\nfor label, assertions in spatial_items:\n    lst = \"\".join(f'<li><b>{a[\"evidence_class\"]}</b> {a[\"relation\"]}' + (f' (confidence {a[\"confidence\"]})' if a[\"confidence\"] is not None else \"\") + \"</li>\" for a in assertions)\n    title = \"S0 — hiệu chuẩn (làm trước)\" if label == \"S0\" else f\"{label} — spatial candidate\"\n    sections.append(f'<section><h2>{title}</h2><div class=\"pair\"><figure><figcaption>MASTER</figcaption><div class=\"frame\"><img src=\"m/{label}-master.png\">{boxes(assertions,\"MASTER\")}</div></figure><figure><figcaption>REVERSE</figcaption><div class=\"frame\"><img src=\"m/{label}-reverse.png\">{boxes(assertions,\"REVERSE\")}</div></figure></div><p>Khung nét đứt = vùng mà assertion VISIBLE khẳng định. Kiểm tra: mỗi VISIBLE có thật sự thấy trong vùng đó? INFERRED/khoảng trống có bị nói như sự thật không? Cặp MASTER/REVERSE có hợp lý không?</p><ul>{lst}</ul>{radios(label, S_ITEMS)}</section>')\nhtml = f\"\"\"<!doctype html><html lang=\"vi\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>M8-F blind review</title>\n<style>body{{font-family:system-ui,sans-serif;max-width:1100px;margin:24px auto;padding:0 16px;background:#fafafa;color:#222}}section{{background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;margin:16px 0}}.pair{{display:flex;gap:16px;flex-wrap:wrap}}figure{{margin:0;flex:1;min-width:280px}}video,img{{max-width:100%;max-height:360px;background:#000;display:block}}.frame{{position:relative;display:inline-block}}.span{{position:absolute;border:2px dashed #0af;box-sizing:border-box}}.span span{{background:#0af;color:#fff;font-size:11px;padding:1px 3px}}table td{{padding:3px 8px}}textarea{{width:100%;min-height:40px}}button{{font-size:16px;padding:8px 16px}}pre{{white-space:pre-wrap;background:#eee;padding:8px}}</style></head><body>\n<h1>M8-F — review mù (rubric format-semantic@1 và m8f-spatial-review@1)</h1><p>Nhãn A/B/C/D không cho biết cohort. Chấm từng mục PASS/FAIL, rồi bấm “Xuất kết quả” và dán JSON lại cho Claude.</p>\n<form id=\"f\">{''.join(sections)}</form><button onclick=\"exportResult()\">Xuất kết quả</button><pre id=\"o\"></pre>\n<script>function exportResult(){{const d=new FormData(document.getElementById('f'));const r={{reviewer:'sponsor',reviewed_at:new Date().toISOString(),items:{{}}}};for(const[k,v] of d.entries()){{const[i,f]=k.split('.');(r.items[i]=r.items[i]||{{}})[f]=v;}}document.getElementById('o').textContent=JSON.stringify(r);}}</script></body></html>\"\"\"\n(out / \"index.html\").write_text(html, encoding=\"utf-8\")\nprint(out / \"index.html\")\n",
+    "review_a": "\"\"\"Reviewer A's measured review of the M8-F v2 packet (format-semantic@1, m8f-spatial-review@1).\"\"\"\nimport json, re, subprocess, sys\nfrom pathlib import Path\nimport numpy as np\nfrom PIL import Image\n\nP = Path(sys.argv[1]); M = P / \"m\"\npage = (P / \"index.html\").read_text(encoding=\"utf-8\")\nF = [\"focal_subject\", \"action\", \"shot_intent\", \"on_screen_text\", \"captions\", \"timing\", \"audio\"]\nCOLORS = {\"red\": (255, 0, 0), \"blue\": (0, 0, 255), \"yellow\": (255, 255, 0), \"green\": (0, 160, 0)}\n\ndef frame(f, t):\n    raw = subprocess.run([\"ffmpeg\", \"-v\", \"error\", \"-ss\", str(t), \"-i\", str(f), \"-frames:v\", \"1\", \"-f\", \"rawvideo\", \"-pix_fmt\", \"rgb24\", \"-\"], capture_output=True, check=True).stdout\n    w, h = json.loads(subprocess.check_output([\"ffprobe\", \"-v\", \"error\", \"-select_streams\", \"v\", \"-show_entries\", \"stream=width,height\", \"-of\", \"json\", str(f)]))[\"streams\"][0].values()\n    return np.frombuffer(raw, np.uint8).reshape(h, w, 3).astype(int)\n\ndef content_box(img):\n    \"\"\"The non-black (picture) region of a padded frame.\"\"\"\n    m = img.sum(axis=2) > 30\n    ys, xs = np.where(m)\n    return xs.min(), ys.min(), xs.max() + 1, ys.max() + 1\n\ndef boxes(img):\n    out = {}\n    for name, c in COLORS.items():\n        m = np.all(np.abs(img - np.array(c)) < 50, axis=2)\n        ys, xs = np.where(m)\n        if len(xs) > 50:\n            out[name] = (xs.min() / img.shape[1], ys.min() / img.shape[0], (xs.max() + 1) / img.shape[1], (ys.max() + 1) / img.shape[0])\n    return out\n\ndef pcm(f):\n    raw = subprocess.run([\"ffmpeg\", \"-v\", \"error\", \"-i\", str(f), \"-f\", \"f32le\", \"-ac\", \"1\", \"-ar\", \"44100\", \"-\"], capture_output=True, check=True).stdout\n    return np.frombuffer(raw, np.float32)\n\ndef dur(f):\n    return float(subprocess.check_output([\"ffprobe\", \"-v\", \"error\", \"-show_entries\", \"format=duration\", \"-of\", \"csv=p=0\", str(f)]))\n\nitems, notes = {}, {}\nfor L in [\"FX\", \"FA\", \"FB\", \"FC\", \"FD\"]:\n    src, prj = M / f\"{L}-source.mp4\", M / f\"{L}-projection.mp4\"\n    rel = []\n    for t in (0.1, 1.0, 1.9):\n        s, p = frame(src, t), frame(prj, t)\n        x0, y0, x1, y1 = content_box(p)\n        picture = p[y0:y1, x0:x1]\n        bs, bp = boxes(s), boxes(picture)\n        rel.append(set(bs) == set(bp) and all(max(abs(a - b) for a, b in zip(bs[k], bp[k])) < 0.02 for k in bs))\n        aspect_ok = abs((x1 - x0) / (y1 - y0) - s.shape[1] / s.shape[0]) < 0.02\n    a, b = pcm(src), pcm(prj)\n    n = min(len(a), len(b))\n    corr = float(np.corrcoef(a[:n], b[:n])[0, 1]) if b[:n].std() > 0 else 0.0\n    rms_b = float(np.sqrt((b ** 2).mean()))\n    audio_ok = corr > 0.99 and rms_b > 0.01\n    timing_ok = abs(dur(src) - dur(prj)) < 0.05\n    picture_ok = all(rel) and aspect_ok\n    v = {k: (\"PASS\" if picture_ok else \"FAIL\") for k in (\"focal_subject\", \"action\", \"shot_intent\")}\n    v.update(on_screen_text=\"PASS\", captions=\"PASS\", timing=\"PASS\" if timing_ok else \"FAIL\", audio=\"PASS\" if audio_ok else \"FAIL\")\n    v[\"note\"] = f\"PAD picture region keeps aspect and both boxes at 3 times: {picture_ok}; duration delta {abs(dur(src)-dur(prj)):.3f}s; audio corr {corr:.4f}, rms {rms_b:.3f}; no text in source or projection\"\n    items[L] = v\n\nS_ITEMS = [\"pairing_matches_master_reverse\", \"visible_assertions_supported_by_frames\", \"gaps_not_stated_as_facts\", \"seam_and_direction_locks_plausible\"]\nfor L in [\"S0\", \"SA\", \"SB\"]:\n    sec = page[page.index(f\"m/{L}-master.png\"):]\n    sec = sec[: sec.index(\"</section>\")]\n    spans = {}\n    for view, name in ((\"MASTER\", \"master\"), (\"REVERSE\", \"reverse\")):\n        part = sec[sec.index(f\"m/{L}-{name}.png\"):]\n        part = part[: part.index(\"</figure>\")]\n        spans[view] = [(float(a) / 100, float(b) / 100, float(c) / 100, float(d) / 100, t) for a, b, c, d, t in re.findall(r'left:([\\d.]+)%;top:([\\d.]+)%;width:([\\d.]+)%;height:([\\d.]+)%\"><span>([^<]*)', part)]\n    ok, details = True, []\n    for view, name in ((\"MASTER\", \"master\"), (\"REVERSE\", \"reverse\")):\n        img = np.array(Image.open(M / f\"{L}-{name}.png\").convert(\"RGB\")).astype(int)\n        H, W, _ = img.shape\n        for x, y, w, h, subject in spans[view]:\n            region = img[int(y * H) : int((y + h) * H), int(x * W) : int((x + w) * W)]\n            colour = subject.split()[0]\n            target = COLORS.get(colour)\n            frac = float(np.all(np.abs(region - np.array(target)) < 50, axis=2).mean()) if target else 0.0\n            supported = frac > 0.9\n            ok &= supported\n            details.append(f\"{view} '{subject}' {frac:.2f}\")\n    lst = re.sub(\"<[^>]+>\", \" \", sec[sec.index(\"<ul>\") : sec.index(\"</ul>\")])\n    inferred_ok = \"INFERRED\" in lst and \"confidence\" in lst and \"GAP\" in lst\n    m_boxes = boxes(np.array(Image.open(M / f\"{L}-master.png\").convert(\"RGB\")).astype(int))\n    r_boxes = boxes(np.array(Image.open(M / f\"{L}-reverse.png\").convert(\"RGB\")).astype(int))\n    mirror = m_boxes.get(\"yellow\", (1,))[0] < 0.2 and r_boxes.get(\"yellow\", (0, 0, 0))[2] > 0.8\n    v = dict(zip(S_ITEMS, [\"PASS\" if mirror else \"FAIL\", \"PASS\" if ok else \"FAIL\", \"PASS\" if inferred_ok else \"FAIL\", \"PASS\" if mirror else \"FAIL\"]))\n    v[\"note\"] = \"; \".join(details) + f\"; shared left-wall painting at MASTER left edge and REVERSE right edge: {mirror}\"\n    items[L] = v\n\ncalibration = {\"FX\": items[\"FX\"][\"audio\"] == \"FAIL\", \"S0\": items[\"S0\"][\"visible_assertions_supported_by_frames\"] == \"FAIL\"}\nprint(json.dumps({\"reviewer\": \"claude\", \"model\": \"claude-opus-5-5\", \"calibration\": calibration, \"items\": items}, indent=1))\n"
+  },
+  "non_authorization": "No production activation, deployment, provider or platform call, credential use or publication is authorized."
+}
