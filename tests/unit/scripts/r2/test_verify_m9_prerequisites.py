@@ -203,8 +203,18 @@ def test_combined_base_refuses_missing_or_changed_acceptance_evidence(evidence, 
     assert verify_prerequisite_record(record, source, acceptance_ref=HEAD, candidate=True)
 
 
-def test_accepted_prerequisites_require_a_pass_review_of_the_exact_base(evidence) -> None:
+def _prepare_accepted(evidence) -> None:
     record, source = evidence
+    candidate = deepcopy(record)
+    candidate["combined_base_head"] = "c" * 40
+    source.blobs[BASE, P0_PATH] = json.dumps(candidate).encode()
+    source.parent_map[BASE] = ["c" * 40]
+    source.changes[BASE] = {P0_PATH}
+    source.ancestry.update({(M8, "c" * 40), (SPONSOR, "c" * 40), (BASE, HEAD)})
+    source.migrations["c" * 40] = source.migrations[BASE]
+    source.blobs.update(
+        {("c" * 40, path): data for (ref, path), data in list(source.blobs.items()) if ref == BASE and path != P0_PATH}
+    )
     record["status"] = "M9_PREREQUISITES_ACCEPTED"
     record["review"] = {
         "reviewer_id": "independent-p0-reviewer",
@@ -216,8 +226,34 @@ def test_accepted_prerequisites_require_a_pass_review_of_the_exact_base(evidence
         "material_unknowns": [],
         "sealed_at": "2026-10-15T14:45:00Z",
     }
+
+
+def test_accepted_prerequisites_require_a_pass_review_of_the_exact_base(evidence) -> None:
+    record, source = evidence
+    _prepare_accepted(evidence)
     assert verify_prerequisite_record(record, source, acceptance_ref=HEAD) == []
     record["review"]["reviewed_candidate_head"] = "f" * 40
+    assert verify_prerequisite_record(record, source, acceptance_ref=HEAD)
+
+
+@pytest.mark.parametrize("fault", ["missing", "malformed", "accepted_parent", "evidence_drift"])
+def test_accepted_prerequisites_require_the_reviewed_candidate_record(evidence, fault: str) -> None:
+    record, source = evidence
+    _prepare_accepted(evidence)
+    record["review"]["reviewed_candidate_head"] = BASE
+    candidate = json.loads(source.blobs[BASE, P0_PATH])
+    if fault == "missing":
+        del source.blobs[BASE, P0_PATH]
+    elif fault == "malformed":
+        source.blobs[BASE, P0_PATH] = b"{}"
+    elif fault == "accepted_parent":
+        candidate["status"] = "M9_PREREQUISITES_ACCEPTED"
+        candidate["review"] = record["review"]
+        source.blobs[BASE, P0_PATH] = json.dumps(candidate).encode()
+    else:
+        candidate["alembic_head"] = "different"
+        source.migrations["c" * 40] = (("different",), candidate["revision_graph_digest"])
+        source.blobs[BASE, P0_PATH] = json.dumps(candidate).encode()
     assert verify_prerequisite_record(record, source, acceptance_ref=HEAD)
 
 

@@ -150,8 +150,16 @@ def verify_prerequisite_record(
         expected_status = "M9_PREREQUISITES_CANDIDATE" if candidate else "M9_PREREQUISITES_ACCEPTED"
         if record["status"] != expected_status:
             return ["M9_REQUIRED_EVIDENCE_MISSING: independent review is required before prerequisite acceptance"]
-        if not candidate and record["review"]["reviewed_candidate_head"] != base:
-            errors.append("independent review does not bind the exact combined base")
+        if not candidate:
+            if record["review"]["reviewed_candidate_head"] != base:
+                errors.append("independent review does not bind the exact combined base")
+            reviewed = loads_unique_json(source.blob(base, P0_PATH))
+            errors.extend(verify_prerequisite_record(reviewed, source, acceptance_ref=base, candidate=True))
+            transition_fields = {"status", "combined_base_head", "review"}
+            if {key: value for key, value in record.items() if key not in transition_fields} != {
+                key: value for key, value in reviewed.items() if key not in transition_fields
+            }:
+                errors.append("accepted evidence differs from the reviewed prerequisite candidate")
         for name, expected_ref, path, status in (
             ("m8", M8_ACCEPTANCE, M8_PATH, "M8_IMPLEMENTATION_ACCEPTED"),
             ("m9", SPONSOR_ACCEPTANCE, M9_PATH, "M9_DESIGN_ACCEPTED"),
