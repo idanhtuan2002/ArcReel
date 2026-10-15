@@ -11,6 +11,26 @@ runtime activation, publication or production activity.
 `7d271f7833ed84a4b8a4aeee62c837a831a668c8`. This is research lineage, not M9
 design or implementation acceptance.
 
+**V2 revalidation (2026-10-15):** this design was revalidated against V2 commit
+`23cf146a`, where the M8 implementation was accepted
+(`docs/research/2026-10-15-r2-m9-prerequisite-path.md`). It still awaits
+independent design review. The revalidation changes four things:
+
+1. **Factual Authority gate.** The accepted durable Factual Authority is required
+   at the M9-D release gate, not before M9-A. Only M9-D calls
+   `FactualAuthorityPort`. M9-A to M9-C start from the accepted M8 implementation
+   and the accepted M9 design.
+2. **Creative profile identities.** Cohort profiles name creative profiles by the
+   exact identities the M8 lineage carries (ADR-0105): `WESTERN_GENERIC` (label
+   `generic-western`), `CN_SHORT_DRAMA_SHUANGWEN` (label `zh-shuang`), or the host
+   profile `arcreel.host` for a project without an admitted screenplay.
+3. **The Canvas seed.** The seed is created server-side under a lineage the server
+   resolves (§12). It never passes through the client append route, which ADR-0107
+   restricts to server-resolved episode lineages.
+4. **Reviewers.** By sponsor decision, the two required author-independent,
+   mutually blind design reviewers are fresh model agents. The review policy and
+   the rubric are unchanged.
+
 ## 1. Goal and authority boundary
 
 M9 adds an evidence-first Opportunity Intelligence module to the ArcReel host.
@@ -35,8 +55,9 @@ Claim approval, M8 observations/recommendations, M8 promotion, Canon,
 NarrativePlan, CreativePolicy, routing, production artifacts, ApprovedMaster,
 quality disposition, publication or platform analytics ingestion.
 
-The current branch has no accepted M8 implementation and no verified durable
-Factual Authority service. Design and planning may continue. M9-A remains
+The V2 lineage has an accepted M8 implementation (`23cf146a`) but no verified
+durable Factual Authority service (FA-1 delivers it before M9-D). Design and
+planning may continue. M9-A remains
 `PACKET_AUTHORED_FOR_REVIEW` and `PACKET_EXECUTION_BLOCKED`: only its read-only
 A0 preflight may run before exact accepted prerequisite evidence exists, and it
 may emit an uncommitted stop receipt; no production-file creation may begin.
@@ -1362,7 +1383,10 @@ Publishing revision N+1 makes N non-current for new query, derivation,
 candidate, Greenlight and seed commands; historical reads keep the exact bound
 revision and digest.
 
-`generic-western` and `zh-shuang` are distinct profile lineages. Huohuo fields
+`generic-western` (`WESTERN_GENERIC`) and `zh-shuang`
+(`CN_SHORT_DRAMA_SHUANGWEN`) are distinct profile lineages. The payload's
+`creative_profile_id` holds the exact M6 identity, or `arcreel.host`, never the
+label. Huohuo fields
 may provide `zh-shuang` creative-fit vocabulary and fixtures, not popularity or
 truth. OpenMontage landscape/gap/audience/angle sections and Kalinga topic
 suggestions supply proposal/fixture shapes, not scores or Greenlight.
@@ -1404,10 +1428,26 @@ or digest semantics. If it uses a closed node-type union or rejects the value,
 execution stops with `POST_M8_BASE_SEAM_CHANGED`; M9 must not patch M8 under this
 packet.
 
-For this seed only, M8 `LineageBinding.content_basis_digest` is populated from
-M9 `creative_content_digest`. They are distinct digest domains and are never
-interchangeable outside that explicit bridge mapping. The node body separately
-binds the candidate, Greenlight and evidence-closure identities/digests.
+The seed adapter resolves the seed's M8 `LineageBinding` on the server, inside the
+same transaction as the append.
+
+- **Profile.** It reads the project's creative profile with the ADR-0105 rule
+  (`project_profile` over the user's effective screenplay admissions):
+  - no admission gives `arcreel.host`;
+  - one admission gives its M6 profile and policy pack;
+  - two or more give `M8_LINEAGE_AMBIGUOUS`.
+- **Cohort check.** The seed is refused with `M9_COHORT_LEAKAGE` unless the bound
+  cohort profile's `creative_profile_id` and `creative_profile_version` equal that
+  project profile.
+- **Content basis.** For this seed only, `content_basis_digest` is populated from
+  M9 `creative_content_digest`. The two are distinct digest domains and are never
+  interchangeable outside that explicit bridge mapping.
+- **Master.** `approved_master_id` and `approved_master_digest` are null.
+- **Node body.** It separately binds the candidate, Greenlight and
+  evidence-closure identities/digests.
+
+The seed uses the server-side M8 exploration service, never the client append
+route (ADR-0107).
 
 Exact replay returns the original decision/seed receipt even if its evidence has
 since expired; that is historical idempotency, not renewed authorization. A new
@@ -1788,6 +1828,7 @@ acceptance authority object.
 
 Design acceptance satisfies only the design limb checked by read-only A0; it
 does not authorize code or mutate the normative execution contract. M9 code
-remains blocked until the exact accepted M8 implementation and Factual Authority
-seams exist and the combined prerequisite manifest independently validates all
-required acceptances.
+remains blocked until the combined prerequisite manifest independently validates
+the exact accepted M8 implementation and the M9 design acceptance. M9-D also
+remains blocked until the durable Factual Authority implementation is accepted
+(FA-1, the `packet_release_acceptance` gate of the execution contract).

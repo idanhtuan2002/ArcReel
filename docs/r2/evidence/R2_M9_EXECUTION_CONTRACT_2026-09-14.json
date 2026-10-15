@@ -39,11 +39,6 @@
       "status": "M8_IMPLEMENTATION_ACCEPTED",
       "on_failure": "M9_M8_IMPLEMENTATION_NOT_ACCEPTED"
     },
-    "factual_authority": {
-      "path": "docs/r2/evidence/R2_FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTANCE.json",
-      "status": "FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTED",
-      "on_failure": "M9_FACTUAL_AUTHORITY_UNAVAILABLE"
-    },
     "combined_base": {
       "path": "docs/r2/evidence/R2_M9_PREREQUISITE_ACCEPTANCE.json",
       "status": "M9_PREREQUISITES_ACCEPTED",
@@ -55,7 +50,7 @@
     "two distinct author-independent mutually blind reviewers seal PASS outputs against one exact candidate HEAD and rubric before sharing",
     "each acceptance artifact binds an exact candidate HEAD and SHA-256 identities",
     "the M9 design acceptance commit has the reviewed candidate as its sole parent and changes exactly ADR-0081 status, the acceptance record and two sealed reviews",
-    "the combined-base artifact binds the accepted M8 and Factual artifacts, one clean descendant base HEAD and one Alembic head",
+    "the combined-base artifact binds the accepted M8 implementation and M9 design acceptance artifacts, one clean descendant base HEAD and one Alembic head; the Factual Authority acceptance is bound at the M9-D release gate",
     "the combined-base acceptance commit changes only that artifact and has the bound clean base HEAD as parent",
     "the M9 implementation worktree starts from that combined-base acceptance commit",
     "the worktree is clean, is not the design branch and has one Alembic head",
@@ -68,7 +63,7 @@
     "r2.contracts.advanced_creative.Sha256Digest",
     "M8CanvasSeedPort-compatible accepted Canvas append service",
     "M8LearningReadPort-compatible accepted learning reader",
-    "FactualAuthorityPort-compatible durable submit and invalidate service",
+    "FactualAuthorityPort-compatible durable submit and invalidate service (required at the M9-D release gate, not before M9-A)",
     "host-owned profile and Greenlight custodian interfaces",
     "repository-attested disposable PostgreSQL target"
   ],
@@ -120,7 +115,7 @@
         "repository-attested disposable PostgreSQL target"
       ],
       "on_missing": "M9_REQUIRED_EVIDENCE_MISSING",
-      "continue_when": "all design, M8, Factual, seam, migration, donor and cleanliness checks pass"
+      "continue_when": "all design, M8, seam, migration, donor and cleanliness checks pass"
     },
     "M9-B": {
       "release_condition": "M9-A independently accepted",
@@ -137,7 +132,7 @@
       "on_missing": "M9_REQUIRED_EVIDENCE_MISSING"
     },
     "M9-D": {
-      "release_condition": "M9-C independently accepted",
+      "release_condition": "M9-C independently accepted and the durable Factual Authority implementation (FA-1) independently accepted",
       "human_inputs_required": [
         "qualified Human Greenlight custodian fixture"
       ],
@@ -174,6 +169,26 @@
       "failed_checks",
       "evidence_refs",
       "created_at"
+    ]
+  },
+  "packet_release_acceptance": {
+    "M9-D": {
+      "factual_authority": {
+        "path": "docs/r2/evidence/R2_FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTANCE.json",
+        "status": "FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTED",
+        "on_failure": "M9_FACTUAL_AUTHORITY_UNAVAILABLE",
+        "note": "Only M9-D consumes FactualAuthorityPort (Greenlight, Canvas seed and Factual bridge); the durable Factual Authority is delivered by its own prerequisite packet FA-1 before M9-D is released."
+      }
+    }
+  },
+  "v2_revalidation": {
+    "date": "2026-10-15",
+    "base": "23cf146a (M8 implementation accepted)",
+    "research": "docs/research/2026-10-15-r2-m9-prerequisite-path.md",
+    "changes": [
+      "Factual Authority acceptance moved from the M9-A release to the M9-D release gate (packet_release_acceptance)",
+      "M8 seams updated for ADR-0105 (lineage binds the admitted M6 profile), ADR-0106 and ADR-0107 (client Canvas appends carry a server-resolved lineage); the M9 Canvas seed is created server-side",
+      "design reviewers: two fresh, author-independent, mutually blind model agents by sponsor decision (2026-10-15); the review policy is unchanged"
     ]
   }
 }

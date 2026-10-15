@@ -38,9 +38,8 @@ Prerequisite failure routing is exact:
 |---|---|
 | ADR/spec/plan/execution-contract acceptance absent, rejected or hash-drifted | `M9_DESIGN_NOT_ACCEPTED` |
 | accepted M8 implementation absent or rejected | `M9_M8_IMPLEMENTATION_NOT_ACCEPTED` |
-| durable Factual Authority acceptance or required port absent | `M9_FACTUAL_AUTHORITY_UNAVAILABLE` |
 | combined-base acceptance, clean worktree or disposable PostgreSQL evidence absent | `M9_REQUIRED_EVIDENCE_MISSING` |
-| accepted canonical/M8/Factual import, signature, behavior or Alembic seam differs | `POST_M8_BASE_SEAM_CHANGED` |
+| accepted canonical/M8 import, factual contract import, signature, behavior or Alembic seam differs | `POST_M8_BASE_SEAM_CHANGED` |
 | selected donor pin/path/inventory cannot be proven | `M9_DONOR_PARITY_INCOMPLETE` |
 | execution would require changing a frozen M9 contract or digest domain | `M9_SCHEMA_CHANGE_REQUIRED` |
 
@@ -130,11 +129,11 @@ Rows in profiles, receipts and events are append-only. Only profile-head CAS upd
 
 **Files:** `scripts/r2/verify_m9_scope.py`, its unit test, baseline schema and `R2_M9_BASELINE.json`.
 
-**Consumes:** execution contract plus accepted M8, Factual Authority and M9 design-acceptance artifacts.
+**Consumes:** execution contract plus accepted M8 and M9 design-acceptance artifacts. (M9-A uses only the existing factual contracts; the durable Factual Authority is gated at M9-D.)
 
 **Produces:** `verify_m9_scope(repo: Path, contract: Mapping[str, object]) -> list[str]` and a baseline binding exact HEAD, singleton Alembic predecessor, document hashes, seam hashes, donor pins and owned paths.
 
-- [ ] **A0.1 — Write verifier RED tests.** Parameterize dirty worktree; design branch; absent/rejected M9 design acceptance; invalid sealed-review schema; duplicate reviewer identity/output ref; review-output hash mismatch; candidate/contract/rubric mismatch; incomplete or failed rubric checks; seal/share ordering violation; absent M8 acceptance; absent Factual Authority acceptance; acceptance-parent mismatch; wrong accepted status; SHA/document/seam drift; multiple Alembic heads; missing donor pin; required skip/material unknown; and owned-path collision. Each fixture asserts one normative stop code and verifies no production file is created.
+- [ ] **A0.1 — Write verifier RED tests.** Parameterize dirty worktree; design branch; absent/rejected M9 design acceptance; invalid sealed-review schema; duplicate reviewer identity/output ref; review-output hash mismatch; candidate/contract/rubric mismatch; incomplete or failed rubric checks; seal/share ordering violation; absent M8 acceptance; acceptance-parent mismatch; wrong accepted status; SHA/document/seam drift; multiple Alembic heads; missing donor pin; required skip/material unknown; and owned-path collision. Each fixture asserts one normative stop code and verifies no production file is created.
 
 - [ ] **A0.2 — Run RED.** Run:
 
@@ -158,7 +157,7 @@ Rows in profiles, receipts and events are append-only. Only profile-head CAS upd
   artifact mismatch, non-status ADR change, acceptance-parent
   mismatch, extra acceptance path or dirty tree as `M9_DESIGN_NOT_ACCEPTED`.
 
-- [ ] **A0.4 — Write and verify baseline evidence.** Schema rejects unknown fields and requires `schema_version`, `status`, `base_head`, `branch`, `alembic_predecessor`, `m8_acceptance`, `factual_acceptance`, `m9_design_acceptance`, document/seam hashes, donor pins, scope allowlist, required skips, material unknowns and creation time. `status` is `M9_BASELINE_VERIFIED`; skip/unknown arrays are empty.
+- [ ] **A0.4 — Write and verify baseline evidence.** Schema rejects unknown fields and requires `schema_version`, `status`, `base_head`, `branch`, `alembic_predecessor`, `m8_acceptance`, `m9_design_acceptance`, document/seam hashes, donor pins, scope allowlist, required skips, material unknowns and creation time. `status` is `M9_BASELINE_VERIFIED`; skip/unknown arrays are empty.
 
 - [ ] **A0.5 — Run GREEN and commit.** Run:
 
@@ -192,7 +191,7 @@ Rows in profiles, receipts and events are append-only. Only profile-head CAS upd
 
   Expected: missing-module failures; zero collected tests is failure.
 
-- [ ] **A1.5 — Implement the minimum contracts and pure folds.** Copy no M8 canonicalizer. Import the A0-recorded accepted module, implement exact domain-tag functions and parity recomputation, and expose only protocols at external seams. Architecture tests reject imports of credentials, direct provider SDKs, M8/Factual repositories, Canon/Narrative/Production writers and commit calls from repository modules.
+- [ ] **A1.5 — Implement the minimum contracts and pure folds.** Copy no M8 canonicalizer. Import the A0-recorded accepted module, implement exact domain-tag functions and parity recomputation, and expose only protocols at external seams. Architecture tests reject imports of credentials, direct provider SDKs, M8/Factual repositories, Canon/Narrative/Production writers and commit calls from repository modules. `OpportunityCohortProfilePayload.creative_profile_id` accepts only the exact identities the accepted M8 lineage carries (`WESTERN_GENERIC`, `CN_SHORT_DRAMA_SHUANGWEN`, `arcreel.host`; ADR-0105) and refuses labels such as `generic-western`, with a RED test.
 
 - [ ] **A1.6 — Run GREEN and static checks.** Run the A1 selection, then:
 

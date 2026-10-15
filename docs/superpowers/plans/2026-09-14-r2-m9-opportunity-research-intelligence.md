@@ -20,7 +20,7 @@
 
 ## Global Constraints
 
-- Implementation starts only from the acceptance commit for `R2_M9_PREREQUISITE_ACCEPTANCE.json`; its parent is a clean descendant base binding independently accepted M8 implementation, durable Factual Authority and one Alembic head. The M9-A **A0-preflight gate** exits before production-file writes with `M9_M8_IMPLEMENTATION_NOT_ACCEPTED`, `M9_FACTUAL_AUTHORITY_UNAVAILABLE` or `M9_REQUIRED_EVIDENCE_MISSING` when that chain is absent. **Task A0 implementation** begins only after that gate passes.
+- Implementation starts only from the acceptance commit for `R2_M9_PREREQUISITE_ACCEPTANCE.json`; its parent is a clean descendant base binding the independently accepted M8 implementation, the accepted M9 design and one Alembic head. The M9-A **A0-preflight gate** exits before production-file writes with `M9_DESIGN_NOT_ACCEPTED`, `M9_M8_IMPLEMENTATION_NOT_ACCEPTED` or `M9_REQUIRED_EVIDENCE_MISSING` when that chain is absent. The durable Factual Authority (FA-1) is required at the M9-D release gate; M9-D stops with `M9_FACTUAL_AUTHORITY_UNAVAILABLE` without it (V2 revalidation 2026-10-15). **Task A0 implementation** begins only after that gate passes.
 - ADR-0081 and the M9 design must be independently accepted with exact SHA-256 identities before M9-A. Proposed documents and this plan authorize planning only.
 - ArcReel remains the runtime host; PostgreSQL remains the metadata authority store. `SnapshotEvidenceStore` is an erasable content seam, not a second metadata authority.
 - Public contracts are frozen extra-field-forbid Pydantic v2 models and reuse the exact accepted M8 canonical JSON and digest implementation. Semantic seam drift stops `POST_M8_BASE_SEAM_CHANGED`.
@@ -169,7 +169,7 @@ artifact; the normative execution contract itself does not change state.
 
 **Files:** Create/modify only `greenlight.py`, `bridges.py`, M9-D persistence, host M8/Factual adapters, routes and evidence.
 
-**Consumes:** Accepted M9-C candidate closure, `GreenlightCustodianPort`, accepted M8 Canvas seed seam and durable Factual Authority port.
+**Consumes:** Accepted M9-C candidate closure, `GreenlightCustodianPort`, accepted M8 Canvas seed seam (server-side seed under the ADR-0105 project profile; never the client append route, ADR-0107) and the durable Factual Authority port accepted by FA-1 (release gate).
 
 **Produces:** append-only Greenlight decisions, current head, bounded TTL, exact Canvas seed receipts and unverified Factual submissions.
 
