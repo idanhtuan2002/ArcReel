@@ -50,7 +50,8 @@ All 11 findings are fixed, each with a regression test; the decisions are plan i
 
 ## Still open
 
-- A final Codex review, then merge into `r2-v2/main` after the user approves.
+- The final Codex review at `0d89120a` returned `M8_E_ACCEPTED` with no Critical, High or Medium findings. It read the source only, without running any tools.
+- Merge into `r2-v2/main` after the user approves.
 
 ## Environment
 
