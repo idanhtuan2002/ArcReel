@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arcreel.invalid/schemas/R2_M9_DESIGN_ACCEPTANCE.schema.json",
+  "title": "R2 M9 Design Acceptance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "accepted_candidate_head",
+    "accepted_candidate_parent",
+    "accepted_adr_sha256",
+    "hash_algorithm",
+    "review_contract_sha256",
+    "acceptance_schema_sha256",
+    "review_schema_sha256",
+    "verifier_sha256",
+    "artifacts",
+    "rubric_id",
+    "reviewers",
+    "reviews_shared_at",
+    "dirty_paths",
+    "required_skips",
+    "material_unknowns",
+    "reviewed_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "status": { "const": "M9_DESIGN_ACCEPTED" },
+    "accepted_candidate_head": { "$ref": "#/$defs/gitSha" },
+    "accepted_candidate_parent": { "$ref": "#/$defs/gitSha" },
+    "accepted_adr_sha256": { "$ref": "#/$defs/sha256" },
+    "hash_algorithm": { "const": "sha256" },
+    "review_contract_sha256": { "$ref": "#/$defs/sha256" },
+    "acceptance_schema_sha256": { "$ref": "#/$defs/sha256" },
+    "review_schema_sha256": { "$ref": "#/$defs/sha256" },
+    "verifier_sha256": { "$ref": "#/$defs/sha256" },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adr",
+        "research",
+        "validation",
+        "design",
+        "umbrella_plan",
+        "first_packet",
+        "execution_contract",
+        "acceptance_contract",
+        "acceptance_schema",
+        "review_schema",
+        "verifier",
+        "verifier_tests"
+      ],
+      "properties": {
+        "adr": { "$ref": "#/$defs/adrArtifact" },
+        "research": { "$ref": "#/$defs/researchArtifact" },
+        "validation": { "$ref": "#/$defs/validationArtifact" },
+        "design": { "$ref": "#/$defs/designArtifact" },
+        "umbrella_plan": { "$ref": "#/$defs/umbrellaArtifact" },
+        "first_packet": { "$ref": "#/$defs/packetArtifact" },
+        "execution_contract": { "$ref": "#/$defs/executionContractArtifact" },
+        "acceptance_contract": { "$ref": "#/$defs/acceptanceContractArtifact" },
+        "acceptance_schema": { "$ref": "#/$defs/acceptanceSchemaArtifact" },
+        "review_schema": { "$ref": "#/$defs/reviewSchemaArtifact" },
+        "verifier": { "$ref": "#/$defs/verifierArtifact" },
+        "verifier_tests": { "$ref": "#/$defs/verifierTestsArtifact" }
+      }
+    },
+    "rubric_id": { "const": "R2_M9_DESIGN_REVIEW_V1" },
+    "reviewers": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/reviewer" }
+    },
+    "reviews_shared_at": { "$ref": "#/$defs/timestamp" },
+    "dirty_paths": { "type": "array", "maxItems": 0 },
+    "required_skips": { "type": "array", "maxItems": 0 },
+    "material_unknowns": { "type": "array", "maxItems": 0 },
+    "reviewed_at": { "$ref": "#/$defs/timestamp" }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "adrArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/adr/0081-m9-evidence-first-opportunity-intelligence.md" } }
+    },
+    "researchArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/research/2026-09-14-r2-m9-opportunity-research-intelligence.md" } }
+    },
+    "validationArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/research/2026-09-15-r2-m9-design-validation.md" } }
+    },
+    "designArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/superpowers/specs/2026-09-14-r2-m9-opportunity-research-intelligence-design.md" } }
+    },
+    "umbrellaArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/superpowers/plans/2026-09-14-r2-m9-opportunity-research-intelligence.md" } }
+    },
+    "packetArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/superpowers/plans/2026-09-14-r2-m9a-foundation-cohort-profiles.md" } }
+    },
+    "executionContractArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/r2/evidence/R2_M9_EXECUTION_CONTRACT_2026-09-14.json" } }
+    },
+    "acceptanceContractArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE_CONTRACT_2026-09-15.json" } }
+    },
+    "acceptanceSchemaArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/r2/evidence/schemas/R2_M9_DESIGN_ACCEPTANCE.schema.json" } }
+    },
+    "reviewSchemaArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "docs/r2/evidence/schemas/R2_M9_DESIGN_REVIEW.schema.json" } }
+    },
+    "verifierArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "scripts/r2/verify_m9_design_acceptance.py" } }
+    },
+    "verifierTestsArtifact": {
+      "allOf": [{ "$ref": "#/$defs/artifact" }],
+      "properties": { "path": { "const": "tests/unit/scripts/r2/test_verify_m9_design_acceptance.py" } }
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_id",
+        "qualification_evidence",
+        "conflict_declaration",
+        "rubric_id",
+        "review_contract_sha256",
+        "reviewed_candidate_head",
+        "review_output_ref",
+        "review_output_sha256",
+        "verdict",
+        "sealed_at"
+      ],
+      "properties": {
+        "reviewer_id": { "type": "string", "minLength": 1 },
+        "qualification_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "conflict_declaration": { "type": "string", "minLength": 1 },
+        "rubric_id": { "const": "R2_M9_DESIGN_REVIEW_V1" },
+        "review_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "reviewed_candidate_head": { "$ref": "#/$defs/gitSha" },
+        "review_output_ref": {
+          "type": "string",
+          "pattern": "^docs/r2/evidence/reviews/m9/[^/]+\\.json$"
+        },
+        "review_output_sha256": { "$ref": "#/$defs/sha256" },
+        "verdict": { "const": "PASS" },
+        "sealed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}

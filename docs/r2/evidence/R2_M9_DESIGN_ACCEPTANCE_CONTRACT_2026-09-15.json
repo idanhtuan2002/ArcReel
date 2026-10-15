@@ -1,0 +1,116 @@
+{
+  "schema_version": "1",
+  "status": "NORMATIVE_REVIEW_CONTRACT",
+  "purpose": "Machine-verifiable, fail-closed design acceptance contract for R2 M9",
+  "base_review_contract": {
+    "path": "docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE_CONTRACT_2026-09-14.json",
+    "sha256": "047551f6a198bb1a310292aec389d0c3828d997e220effcf7ac2c1c2f6369ea4",
+    "required_status": "NORMATIVE_REVIEW_CONTRACT"
+  },
+  "output": {
+    "path": "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json",
+    "schema_path": "docs/r2/evidence/schemas/R2_M9_DESIGN_ACCEPTANCE.schema.json",
+    "review_schema_path": "docs/r2/evidence/schemas/R2_M9_DESIGN_REVIEW.schema.json",
+    "verifier_path": "scripts/r2/verify_m9_design_acceptance.py",
+    "required_status": "M9_DESIGN_ACCEPTED"
+  },
+  "candidate_artifacts": [
+    "docs/adr/0081-m9-evidence-first-opportunity-intelligence.md",
+    "docs/research/2026-09-14-r2-m9-opportunity-research-intelligence.md",
+    "docs/research/2026-09-15-r2-m9-design-validation.md",
+    "docs/superpowers/specs/2026-09-14-r2-m9-opportunity-research-intelligence-design.md",
+    "docs/superpowers/plans/2026-09-14-r2-m9-opportunity-research-intelligence.md",
+    "docs/superpowers/plans/2026-09-14-r2-m9a-foundation-cohort-profiles.md",
+    "docs/r2/evidence/R2_M9_EXECUTION_CONTRACT_2026-09-14.json",
+    "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE_CONTRACT_2026-09-15.json",
+    "docs/r2/evidence/schemas/R2_M9_DESIGN_ACCEPTANCE.schema.json",
+    "docs/r2/evidence/schemas/R2_M9_DESIGN_REVIEW.schema.json",
+    "scripts/r2/verify_m9_design_acceptance.py",
+    "tests/unit/scripts/r2/test_verify_m9_design_acceptance.py"
+  ],
+  "rubric": {
+    "rubric_id": "R2_M9_DESIGN_REVIEW_V1",
+    "frozen_before_reviews": true,
+    "required_checks": [
+      "authority ownership and prerequisite fail-closed behavior",
+      "contract fields, digest domains and cohort isolation",
+      "exact command replay, concurrent-first-call serialization, CAS and lock order",
+      "custodian authorization lease subject, policy, replay and admission deadline",
+      "provider capability, retention, deletion and unknown-outcome boundaries",
+      "Canvas and Factual bridge non-escalation",
+      "invalidation closure and historical-read behavior",
+      "packet state, A0 boundary, stop-code and artifact synchronization",
+      "donor behavioral parity excluding all license questions by sponsor direction",
+      "operational envelope, accessibility and executable evidence requirements"
+    ],
+    "required_verdict": "PASS"
+  },
+  "review_policy": {
+    "reviewer_count": 2,
+    "independent_of_author": true,
+    "independent_of_each_other": true,
+    "blind_until_both_outputs_sealed": true,
+    "timestamp_policy": "sealed_at, reviews_shared_at and reviewed_at ordering is checked inside the signed evidence; Git commit author/committer dates are forgeable metadata and are not acceptance authority",
+    "distinct_reviewer_ids": true,
+    "same_candidate_head_required": true,
+    "same_contract_sha256_required": true,
+    "review_output_directory": "docs/r2/evidence/reviews/m9",
+    "review_output_schema": "docs/r2/evidence/schemas/R2_M9_DESIGN_REVIEW.schema.json",
+    "required_reviewer_fields": [
+      "reviewer_id",
+      "qualification_evidence",
+      "conflict_declaration",
+      "rubric_id",
+      "review_contract_sha256",
+      "reviewed_candidate_head",
+      "review_output_ref",
+      "review_output_sha256",
+      "verdict",
+      "sealed_at"
+    ]
+  },
+  "verification_policy": {
+    "json_duplicate_keys_rejected": true,
+    "schema_additional_properties_rejected": true,
+    "candidate_head_must_be_clean": true,
+    "candidate_parent_required": true,
+    "all_candidate_artifact_sha256_recomputed_from_candidate_head": true,
+    "review_contract_and_schema_sha256_recomputed": true,
+    "review_outputs_sha256_recomputed": true,
+    "review_outputs_validate_against_strict_schema": true,
+    "review_bundle_cross_record_verifier": "scripts.r2.verify_m9_design_acceptance.verify_sealed_review_files",
+    "reviewer_ids_and_output_refs_distinct": true,
+    "review_candidate_contract_and_rubric_equal_acceptance": true,
+    "all_rubric_checks_exactly_once_and_pass": true,
+    "review_seal_times_precede_share_time": true,
+    "accepted_adr_sha256_recomputed_after_status_only_transition": true,
+    "review_share_time_must_follow_both_seal_times": true,
+    "required_skips": [],
+    "material_unknowns": [],
+    "self_attested_command_evidence_forbidden": true
+  },
+  "acceptance_commit_policy": {
+    "parent_must_equal_reviewed_candidate_head": true,
+    "allowed_paths": [
+      "docs/adr/0081-m9-evidence-first-opportunity-intelligence.md",
+      "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json",
+      "docs/r2/evidence/reviews/m9/R2_M9_DESIGN_REVIEW_1.json",
+      "docs/r2/evidence/reviews/m9/R2_M9_DESIGN_REVIEW_2.json"
+    ],
+    "allowed_changes": [
+      "ADR-0081 status-only transition from proposed to accepted",
+      "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json",
+      "exactly two sealed review outputs under docs/r2/evidence/reviews/m9"
+    ],
+    "implementation_changes_allowed": false,
+    "production_operations_authorized": false,
+    "verifier_command": "uv run python scripts/r2/verify_m9_design_acceptance.py"
+  },
+  "packet_transition": {
+    "before_design_acceptance": "READ_ONLY_A0_PREFLIGHT_ONLY",
+    "after_design_acceptance": "READ_ONLY_A0_PREFLIGHT_ONLY",
+    "after_all_required_acceptance": "IMPLEMENTATION_ELIGIBLE",
+    "implementation_requires": "R2_M9_PREREQUISITE_ACCEPTANCE.json with status M9_PREREQUISITES_ACCEPTED"
+  },
+  "on_failure": "M9_DESIGN_NOT_ACCEPTED"
+}

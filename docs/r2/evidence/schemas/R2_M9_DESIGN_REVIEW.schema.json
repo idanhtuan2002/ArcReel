@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arcreel.invalid/schemas/R2_M9_DESIGN_REVIEW.schema.json",
+  "title": "R2 M9 Sealed Design Review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "reviewer_id",
+    "qualification_evidence",
+    "conflict_declaration",
+    "rubric_id",
+    "review_contract_sha256",
+    "reviewed_candidate_head",
+    "required_checks",
+    "findings",
+    "required_skips",
+    "material_unknowns",
+    "verdict",
+    "sealed_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "status": { "const": "SEALED_M9_DESIGN_REVIEW" },
+    "reviewer_id": { "type": "string", "minLength": 1 },
+    "qualification_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "conflict_declaration": { "type": "string", "minLength": 1 },
+    "rubric_id": { "const": "R2_M9_DESIGN_REVIEW_V1" },
+    "review_contract_sha256": { "$ref": "#/$defs/sha256" },
+    "reviewed_candidate_head": { "$ref": "#/$defs/gitSha" },
+    "required_checks": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "prefixItems": [
+        { "$ref": "#/$defs/checkAuthority" },
+        { "$ref": "#/$defs/checkContracts" },
+        { "$ref": "#/$defs/checkReplay" },
+        { "$ref": "#/$defs/checkLease" },
+        { "$ref": "#/$defs/checkProvider" },
+        { "$ref": "#/$defs/checkBridges" },
+        { "$ref": "#/$defs/checkInvalidation" },
+        { "$ref": "#/$defs/checkPacket" },
+        { "$ref": "#/$defs/checkDonor" },
+        { "$ref": "#/$defs/checkOperations" }
+      ],
+      "items": false
+    },
+    "findings": { "type": "array", "maxItems": 0 },
+    "required_skips": { "type": "array", "maxItems": 0 },
+    "material_unknowns": { "type": "array", "maxItems": 0 },
+    "verdict": { "const": "PASS" },
+    "sealed_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "passCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check", "status"],
+      "properties": {
+        "check": { "type": "string" },
+        "status": { "const": "PASS" }
+      }
+    },
+    "checkAuthority": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "authority ownership and prerequisite fail-closed behavior" } }
+    },
+    "checkContracts": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "contract fields, digest domains and cohort isolation" } }
+    },
+    "checkReplay": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "exact command replay, concurrent-first-call serialization, CAS and lock order" } }
+    },
+    "checkLease": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "custodian authorization lease subject, policy, replay and admission deadline" } }
+    },
+    "checkProvider": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "provider capability, retention, deletion and unknown-outcome boundaries" } }
+    },
+    "checkBridges": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "Canvas and Factual bridge non-escalation" } }
+    },
+    "checkInvalidation": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "invalidation closure and historical-read behavior" } }
+    },
+    "checkPacket": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "packet state, A0 boundary, stop-code and artifact synchronization" } }
+    },
+    "checkDonor": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "donor behavioral parity excluding all license questions by sponsor direction" } }
+    },
+    "checkOperations": {
+      "allOf": [{ "$ref": "#/$defs/passCheck" }],
+      "properties": { "check": { "const": "operational envelope, accessibility and executable evidence requirements" } }
+    }
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "schema_version": "1",
+  "status": "NORMATIVE_EXECUTION_CONTRACT",
+  "purpose": "Fail-closed non-interactive execution contract for the first M9 Claude Code packet",
+  "adr": "docs/adr/0081-m9-evidence-first-opportunity-intelligence.md",
+  "design": "docs/superpowers/specs/2026-09-14-r2-m9-opportunity-research-intelligence-design.md",
+  "research": "docs/research/2026-09-14-r2-m9-opportunity-research-intelligence.md",
+  "umbrella_plan": "docs/superpowers/plans/2026-09-14-r2-m9-opportunity-research-intelligence.md",
+  "first_packet": "docs/superpowers/plans/2026-09-14-r2-m9a-foundation-cohort-profiles.md",
+  "execution_policy": {
+    "one_packet_at_a_time": true,
+    "authored_packet": "M9-A",
+    "packet_state": "PACKET_AUTHORED_FOR_REVIEW",
+    "before_all_required_acceptance": "READ_ONLY_A0_PREFLIGHT_ONLY",
+    "after_all_required_acceptance": "IMPLEMENTATION_ELIGIBLE",
+    "ask_for_architecture_choices": false,
+    "stop_instead_of_guess": true,
+    "implementation_on_design_branch": false,
+    "production_operations_authorized": false
+  },
+  "required_acceptance": {
+    "m9_design": {
+      "path": "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json",
+      "contract_path": "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE_CONTRACT_2026-09-15.json",
+      "contract_sha256": "d18b6fb107852cdea8c1d9e486b1e05544ae2564cbc9c0f90b6bb0137a5101b3",
+      "schema_path": "docs/r2/evidence/schemas/R2_M9_DESIGN_ACCEPTANCE.schema.json",
+      "schema_sha256": "05d1620b1c0e44203e3a8cf008b46fbdf93bb2dc6b00ccb1342a14ebd9b1f57a",
+      "review_schema_path": "docs/r2/evidence/schemas/R2_M9_DESIGN_REVIEW.schema.json",
+      "review_schema_sha256": "7670b10b709e5574d85c3ed781ba7ea9a4e29ede139c06c1173ef98e4615800c",
+      "verifier_path": "scripts/r2/verify_m9_design_acceptance.py",
+      "verifier_sha256": "4890ebd9dd5199269b8a38b36c66300b3ed60ff38f46139bbdf36ce52595eae0",
+      "verifier_tests_path": "tests/unit/scripts/r2/test_verify_m9_design_acceptance.py",
+      "verifier_tests_sha256": "77b3f6e9ba215b032a177d12cb3355e14f45d90b4b840cbe4727d4e22f034778",
+      "status": "M9_DESIGN_ACCEPTED",
+      "on_failure": "M9_DESIGN_NOT_ACCEPTED"
+    },
+    "m8_implementation": {
+      "path": "docs/r2/evidence/R2_M8_IMPLEMENTATION_ACCEPTANCE.json",
+      "status": "M8_IMPLEMENTATION_ACCEPTED",
+      "on_failure": "M9_M8_IMPLEMENTATION_NOT_ACCEPTED"
+    },
+    "factual_authority": {
+      "path": "docs/r2/evidence/R2_FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTANCE.json",
+      "status": "FACTUAL_AUTHORITY_IMPLEMENTATION_ACCEPTED",
+      "on_failure": "M9_FACTUAL_AUTHORITY_UNAVAILABLE"
+    },
+    "combined_base": {
+      "path": "docs/r2/evidence/R2_M9_PREREQUISITE_ACCEPTANCE.json",
+      "status": "M9_PREREQUISITES_ACCEPTED",
+      "on_failure": "M9_REQUIRED_EVIDENCE_MISSING"
+    }
+  },
+  "required_acceptance_properties": [
+    "M9 design acceptance validates against the exact bound contract, acceptance schema, sealed-review schema and cross-record verifier",
+    "two distinct author-independent mutually blind reviewers seal PASS outputs against one exact candidate HEAD and rubric before sharing",
+    "each acceptance artifact binds an exact candidate HEAD and SHA-256 identities",
+    "the M9 design acceptance commit has the reviewed candidate as its sole parent and changes exactly ADR-0081 status, the acceptance record and two sealed reviews",
+    "the combined-base artifact binds the accepted M8 and Factual artifacts, one clean descendant base HEAD and one Alembic head",
+    "the combined-base acceptance commit changes only that artifact and has the bound clean base HEAD as parent",
+    "the M9 implementation worktree starts from that combined-base acceptance commit",
+    "the worktree is clean, is not the design branch and has one Alembic head",
+    "required_skips and material_unknowns are empty",
+    "the Git-backed normative verifier command exits zero; acceptance records cannot self-attest command output"
+  ],
+  "required_seams": [
+    "r2.contracts.advanced_creative.M8ContractModel",
+    "r2.contracts.advanced_creative.CanonicalJsonObject",
+    "r2.contracts.advanced_creative.Sha256Digest",
+    "M8CanvasSeedPort-compatible accepted Canvas append service",
+    "M8LearningReadPort-compatible accepted learning reader",
+    "FactualAuthorityPort-compatible durable submit and invalidate service",
+    "host-owned profile and Greenlight custodian interfaces",
+    "repository-attested disposable PostgreSQL target"
+  ],
+  "migration_policy": {
+    "first_revision": "9a9c4a0e0001",
+    "down_revision": "exact singleton head recorded by M9-A Task A0",
+    "multiple_heads_allowed": false,
+    "live_database_allowed": false,
+    "on_semantic_drift": "POST_M8_BASE_SEAM_CHANGED"
+  },
+  "scope_policy": {
+    "allowlist_source": "docs/superpowers/plans/2026-09-14-r2-m9a-foundation-cohort-profiles.md#exact-owned-file-map",
+    "scope_expansion_allowed": false,
+    "on_required_expansion": "POST_M8_BASE_SEAM_CHANGED"
+  },
+  "donors": [
+    {
+      "name": "OpenMontage",
+      "commit": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "selected_paths": [
+        "skills/pipelines/explainer/research-director.md",
+        "schemas/artifacts/research_brief.schema.json",
+        "schemas/artifacts/decision_log.schema.json"
+      ]
+    },
+    {
+      "name": "Kalinga-Shorts-Factory",
+      "commit": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+      "selected_paths": [
+        "pipeline/src/research.py",
+        "pipeline/src/creative.py",
+        "pipeline/src/kalinga.py",
+        "pipeline/src/daily.py",
+        "channels/history-shorts/channel.yaml"
+      ]
+    },
+    {
+      "name": "Huohuo-Drama",
+      "commit": "f104b853b3563e124d9cde25f9331d323fb483b9",
+      "selected_paths": [
+        "workbench-server/src/services/novel/novel-outline-drama-fields.ts"
+      ]
+    }
+  ],
+  "packet_inputs": {
+    "M9-A": {
+      "human_inputs_required": [],
+      "environment_required": [
+        "repository-attested disposable PostgreSQL target"
+      ],
+      "on_missing": "M9_REQUIRED_EVIDENCE_MISSING",
+      "continue_when": "all design, M8, Factual, seam, migration, donor and cleanliness checks pass"
+    },
+    "M9-B": {
+      "release_condition": "M9-A independently accepted",
+      "human_inputs_required": [
+        "approved manual-import data-class and retention fixtures"
+      ],
+      "on_missing": "M9_REQUIRED_EVIDENCE_MISSING"
+    },
+    "M9-C": {
+      "release_condition": "M9-B independently accepted",
+      "human_inputs_required": [
+        "frozen per-cohort transform and calibration profiles"
+      ],
+      "on_missing": "M9_REQUIRED_EVIDENCE_MISSING"
+    },
+    "M9-D": {
+      "release_condition": "M9-C independently accepted",
+      "human_inputs_required": [
+        "qualified Human Greenlight custodian fixture"
+      ],
+      "on_missing": "M9_REQUIRED_EVIDENCE_MISSING"
+    },
+    "M9-E": {
+      "release_condition": "M9-D independently accepted",
+      "human_inputs_required": [
+        "policy deletion deadline fixtures"
+      ],
+      "on_missing": "M9_REQUIRED_EVIDENCE_MISSING"
+    },
+    "M9-F": {
+      "release_condition": "M9-E independently accepted",
+      "human_inputs_required": [
+        "locked Western and zh-shuang evaluation corpora",
+        "preregistered rubric version and smallest useful effect",
+        "qualified blind reviewer roster and conflict declarations",
+        "sponsor-approved production envelope"
+      ],
+      "on_missing": "M9_REQUIRED_EVIDENCE_MISSING"
+    }
+  },
+  "stop_receipt": {
+    "output_path": "docs/r2/evidence/R2_M9_STOP.json",
+    "commit": false,
+    "required_fields": [
+      "schema_version",
+      "packet",
+      "task",
+      "stop_code",
+      "head",
+      "dirty_paths",
+      "failed_checks",
+      "evidence_refs",
+      "created_at"
+    ]
+  }
+}
