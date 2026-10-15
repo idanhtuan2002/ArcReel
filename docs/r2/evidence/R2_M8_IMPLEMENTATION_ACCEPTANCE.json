@@ -1,0 +1,297 @@
+{
+  "schema_version": 1,
+  "status": "M8_IMPLEMENTATION_ACCEPTED",
+  "accepted_candidate_head": "2bba4e3bcf39ea45f6dd25988b854b28080c51b0",
+  "accepted_candidate_parent": "6b1b2b672d411a54a2fd308d0410da33529bb8bb",
+  "base": "r2-v2/main 6d4f7369 (M8-A..M8-E merged)",
+  "branch": "impl/r2-m8f-utility",
+  "m7_evidence_sha256": "4cfa038beda73708891b3f9995393bcb06a6d33152cb1b4ab61cbb0572e2345c",
+  "packets": {
+    "M8-A": {
+      "path": "docs/r2/evidence/R2_M8_A_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "5554df8e37d2a0f039389e4eda73cb638fd647e984222dc89e09059f9f501569",
+      "status": "M8_A_ACCEPTED"
+    },
+    "M8-B": {
+      "path": "docs/r2/evidence/R2_M8_B_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "547153f9efc4164d61f855d59adf7c16a1b8a402e2d6f2b07723de15fa497b96",
+      "status": "M8_B_ACCEPTED",
+      "parity": {
+        "path": "docs/r2/evidence/R2_M8_B_CANVAS_PARITY.json",
+        "sha256": "ba8a22f74c6989f45b01357be41162e0bac8dc2b7168c365aaa04bd77f3f0322"
+      }
+    },
+    "M8-C": {
+      "path": "docs/r2/evidence/R2_M8_C_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "5295a48972594564061603e53808622435a13e978a80c7bab48e9396d2b5dc3b",
+      "status": "M8_C_ACCEPTED",
+      "parity": {
+        "path": "docs/r2/evidence/R2_M8_C_SPATIAL_PARITY.json",
+        "sha256": "6a0765b46509bfa65a4bc480830f979e0f8fb17d5abf3e1b5e0a70cdd4611210"
+      },
+      "closure": "docs/r2/evidence/R2_M8C_CLOSURE_2026-10-14.md"
+    },
+    "M8-D": {
+      "path": "docs/r2/evidence/R2_M8_D_LEARNING.json",
+      "sha256": "1b8b15a45c9657c49b6653659f5a8b3d4b9b9682d6efb5db335cf91e79d80ff3",
+      "status": "M8_D_IMPLEMENTED_REVIEWED"
+    },
+    "M8-E": {
+      "handoff": "docs/r2/evidence/R2_M8_E_HANDOFF.md",
+      "final_review": "Codex M8_E_ACCEPTED at 0d89120a",
+      "parity": {
+        "path": "docs/r2/evidence/R2_M8_E_FORMAT_PARITY.json",
+        "sha256": "521bb5881b88d0c65507aaf873aac724d8a66b96b00e9665b9510dc60bddc9a1"
+      },
+      "blind_review": {
+        "path": "docs/r2/evidence/R2_M8_E_BLIND_REVIEW_2026-10-15.json",
+        "sha256": "d3203b78a9bc6c2a833af874430e76d14f528ffad76bb378b21ac21f17151bb7"
+      }
+    },
+    "M8-F": {
+      "superseded": [
+        {
+          "path": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL.json",
+          "sha256": "2c474b679171a3b36e4646711ba5d4ef1a1562f5f8197694350b8b5c5b6b5c3b"
+        },
+        {
+          "path": "docs/r2/evidence/R2_M8_F_RESULTS.json",
+          "sha256": "9671a5dc985ca68093ace16d1dd043b6a2c6927b7d409c6cd7420ae45d20d3e4"
+        },
+        {
+          "path": "docs/r2/evidence/R2_M8_F_BLIND_REVIEW_2026-10-15.json",
+          "sha256": "9750718d9968cea8701ed28b63f314878a1486d20a202cc415f2d544ac3c7c4b"
+        },
+        {
+          "path": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V2.json",
+          "sha256": "5c9d388cf9a1840b11bad32023f478d400e56a34c7ba77bd8b678a69b8dcb329"
+        },
+        {
+          "path": "docs/r2/evidence/R2_M8_F_RESULTS_V2.json",
+          "sha256": "edef8165835699f357d13bd5aac31de6039549f49dae339ddf671c2a7ca6014d"
+        },
+        {
+          "path": "docs/r2/evidence/R2_M8_F_MODEL_REVIEWS_2026-10-15.json",
+          "sha256": "5505a6725591017406b6900dda02117e5668e8db174dfbc3e7b9141c90c8f3a5"
+        }
+      ],
+      "correction": {
+        "path": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_CORRECTION_2026-10-15.json",
+        "sha256": "ea268060874c067e34c75881bc8d11e984ea860e6daf42d4f59a07c3a4ebd599"
+      },
+      "decisions": [
+        "docs/research/2026-10-15-r2-m8f-evaluation-and-profile-seam.md",
+        "docs/adr/0105-m8-lineage-v2-binds-the-admitted-screenplay-profile.md",
+        "docs/adr/0106-m7-candidate-ids-are-scoped-to-user-and-project.md",
+        "docs/adr/0107-canvas-append-verifies-the-server-resolved-lineage.md",
+        "docs/adr/0108-m8-acceptance-reviews-by-two-independent-model-reviewers.md"
+      ],
+      "protocol_v3": {
+        "path": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL_V3.json",
+        "sha256": "6a3148b018f688ef8c647bd0408cb2199c6460e3f43d7741e807ca5fcf83c51f"
+      },
+      "results_v3": {
+        "path": "docs/r2/evidence/R2_M8_F_RESULTS_V3.json",
+        "sha256": "1f5d08e452596ac1d420210be81a48aff2b6fa2b526a88fd9a5f41c9b8c67e20"
+      },
+      "blind_model_reviews_v3": {
+        "path": "docs/r2/evidence/R2_M8_F_MODEL_REVIEWS_V3_2026-10-15.json",
+        "sha256": "043db7b8ac65b7717bc71b0911a144c6c474b2c1b0652e04deac6b296906e271"
+      }
+    }
+  },
+  "gate_F_utility": {
+    "endpoints": {
+      "WESTERN_GENERIC": {
+        "deliverables": {
+          "CANVAS": 1,
+          "SPATIAL": 1,
+          "FORMAT": 2,
+          "LEARNING": 1
+        },
+        "baseline": {
+          "CANVAS": 0,
+          "SPATIAL": 0,
+          "LEARNING": 0,
+          "FORMAT": 0
+        },
+        "minimum_delta_met": true,
+        "master_heads_unchanged": true
+      },
+      "CN_SHORT_DRAMA_SHUANGWEN": {
+        "deliverables": {
+          "CANVAS": 1,
+          "SPATIAL": 1,
+          "FORMAT": 2,
+          "LEARNING": 1
+        },
+        "baseline": {
+          "CANVAS": 0,
+          "SPATIAL": 0,
+          "LEARNING": 0,
+          "FORMAT": 0
+        },
+        "minimum_delta_met": true,
+        "master_heads_unchanged": true
+      }
+    },
+    "resources": {
+      "ceilings": {
+        "cohort_wall_seconds": 1800,
+        "format_render_seconds": 1800,
+        "peak_rss_mib": 4096,
+        "cohort_disk_mib": 2048
+      },
+      "measured": {
+        "sqlite": {
+          "WESTERN_GENERIC": {
+            "wall_seconds": 7.3,
+            "disk_mib": 0.4
+          },
+          "CN_SHORT_DRAMA_SHUANGWEN": {
+            "wall_seconds": 6.9,
+            "disk_mib": 0.4
+          },
+          "peak_rss_mib": 286.8
+        },
+        "postgresql": {
+          "WESTERN_GENERIC": {
+            "wall_seconds": 7.9,
+            "disk_mib": 0.4
+          },
+          "CN_SHORT_DRAMA_SHUANGWEN": {
+            "wall_seconds": 7.5,
+            "disk_mib": 0.4
+          },
+          "peak_rss_mib": 279.6
+        }
+      }
+    },
+    "isolation": {
+      "forged_canvas_append_status": 409,
+      "forged_canvas_append_code": true,
+      "foreign_observation_status": 422,
+      "cross_cohort_evaluation": {
+        "fired": false,
+        "reason": "both arms need observations"
+      }
+    },
+    "determinism": "verify_m8f_determinism docs/r2/evidence/R2_M8_F_RESULTS_V3.json: run 2 = run 1 per database and SQLite = PostgreSQL over every non-run-scoped field",
+    "reviews": "two fresh blind model agents (Claude, Codex) isolated from the key; both independently failed the unlabelled calibration items F3 and S2; 36/36 cohort items PASS each; 0 disagreements"
+  },
+  "defects_found_and_fixed_in_M8_F": [
+    "M8 lineage bound only the host profile (ADR-0105, 560f1aa4)",
+    "format candidate command id did not bind lineage (560f1aa4)",
+    "M7 candidate ids were global, blocking a second project's Gate C (ADR-0106, 6354d937)",
+    "client Canvas append accepted forged lineage (ADR-0107, a7339471)"
+  ],
+  "verification": {
+    "tested_head": "2bba4e3bcf39ea45f6dd25988b854b28080c51b0",
+    "tree_clean": true,
+    "commands": [
+      {
+        "command": "uv run ruff check . && uv run ruff format --check .",
+        "exit": 0,
+        "result": "all checks passed; 1915 files formatted"
+      },
+      {
+        "command": "uv run basedpyright --warnings",
+        "exit": 0,
+        "result": "0 errors, 0 warnings, 0 notes"
+      },
+      {
+        "command": "uv run lint-imports",
+        "exit": 0,
+        "result": "23 kept, 0 broken"
+      },
+      {
+        "command": "uv run deptry lib server alembic scripts tests r2",
+        "exit": 0,
+        "result": "no dependency issues"
+      },
+      {
+        "command": "uv run python scripts/audit_tests.py --check",
+        "exit": 0,
+        "result": "0 violations"
+      },
+      {
+        "command": "git diff --check r2-v2/main HEAD",
+        "exit": 0
+      },
+      {
+        "command": "uv run python -m pytest tests/unit/r2/advanced_creative tests/unit/r2/learning tests/unit/r2/host_hardening tests/unit/scripts/r2/test_verify_m8_evaluation_protocol.py tests/integration/r2/test_m8f_integrated_utility.py tests/integration/r2/host_hardening tests/integration/r2/adaptation/test_screenplay_admission.py tests/integration/scripts/r2/test_backfill_master_authority.py tests/integration/server/routers/test_advanced_creative_router.py tests/integration/server/routers/test_learning_routes.py tests/integration/server/routers/test_format_routes.py tests/integration/server/services/test_format_projection_flow.py tests/integration/server/services/test_format_render.py tests/integration/server/services/test_format_review.py tests/integration/server/services/test_format_validation.py tests/integration/server/routers/test_spatial_route.py tests/integration/server/routers/test_spatial_execution.py tests/integration/server/routers/test_spatial_promotion.py tests/integration/server/routers/test_spatial_promotion_preview.py tests/integration/server/routers/test_spatial_frame_registration.py tests/integration/server/routers/test_spatial_review_session_real.py tests/integration/server/routers/test_gates_master_authority.py tests/integration/server/routers/test_gates_router.py tests/integration/server/routers/test_gates_export.py tests/integration/server/routers/test_r2_shot_gate_c.py tests/integration/r2/advanced_creative tests/unit/scripts/r2/test_verify_m8f_determinism.py tests/e2e/test_m8b_canvas_a11y.py tests/unit/scripts/r2/test_m8f_review_packet.py -q -n 4",
+        "exit": 0,
+        "result": "870 passed, 34 skipped (PostgreSQL-only) in 97.3s"
+      },
+      {
+        "command": "DATABASE_URL=<disposable PostgreSQL 18> uv run python -m pytest tests/unit/r2/advanced_creative tests/unit/r2/learning tests/unit/r2/host_hardening tests/unit/scripts/r2/test_verify_m8_evaluation_protocol.py tests/integration/r2/test_m8f_integrated_utility.py tests/integration/r2/host_hardening tests/integration/r2/adaptation/test_screenplay_admission.py tests/integration/scripts/r2/test_backfill_master_authority.py tests/integration/server/routers/test_advanced_creative_router.py tests/integration/server/routers/test_learning_routes.py tests/integration/server/routers/test_format_routes.py tests/integration/server/services/test_format_projection_flow.py tests/integration/server/services/test_format_render.py tests/integration/server/services/test_format_review.py tests/integration/server/services/test_format_validation.py tests/integration/server/routers/test_spatial_route.py tests/integration/server/routers/test_spatial_execution.py tests/integration/server/routers/test_spatial_promotion.py tests/integration/server/routers/test_spatial_promotion_preview.py tests/integration/server/routers/test_spatial_frame_registration.py tests/integration/server/routers/test_spatial_review_session_real.py tests/integration/server/routers/test_gates_master_authority.py tests/integration/server/routers/test_gates_router.py tests/integration/server/routers/test_gates_export.py tests/integration/server/routers/test_r2_shot_gate_c.py tests/integration/r2/advanced_creative tests/unit/scripts/r2/test_verify_m8f_determinism.py tests/e2e/test_m8b_canvas_a11y.py tests/unit/scripts/r2/test_m8f_review_packet.py -q -n 2",
+        "exit": 0,
+        "result": "904 passed, 0 skipped in 287.4s"
+      },
+      {
+        "command": "uv run python scripts/r2/verify_m8_evaluation_protocol.py --results docs/r2/evidence/R2_M8_F_RESULTS_V3.json",
+        "exit": 0,
+        "result": "M8_EVALUATION_PREREGISTERED_OK"
+      },
+      {
+        "command": "uv run python scripts/r2/verify_m8f_determinism.py docs/r2/evidence/R2_M8_F_RESULTS_V3.json",
+        "exit": 0,
+        "result": "M8_F_DETERMINISM_OK"
+      },
+      {
+        "command": "uv run python scripts/r2/verify_donor_parity.py <B|C|E report> --head <its sealed head> --donor-clone <pinned clone>",
+        "exit": 0,
+        "result": "M8_DONOR_PARITY_OK x3; M8-F changes no parity IMPLEMENTATION file"
+      },
+      {
+        "command": "uv run python scripts/r2/check_m8c_spatial_parity.py <pinned donor file>",
+        "exit": 0,
+        "result": "4 PARITY, 2 IMPROVED, 0 regressed"
+      }
+    ],
+    "migrations": {
+      "alembic_head": "918c4a0e0001",
+      "new_in_M8_F": []
+    },
+    "frontend": "unchanged since r2-v2/main",
+    "not_run": [
+      "full backend suite (repository rule: related tests only)",
+      "tests/e2e/test_m7_production_candidate_workflow.py and the golden restore drill (need a restored environment)",
+      "Canvas benchmark (gated by ARCREEL_M8B_BENCHMARK)"
+    ]
+  },
+  "deviations": [
+    "MODEL_REVIEWERS_BY_SPONSOR_AMENDMENT",
+    "REVIEW_OUTSIDE_APP",
+    "STIMULI_DRAWN_TO_FIXTURE",
+    "NO_CONFIRMATORY_SAMPLE",
+    "PACKET_BUILT_BY_IMPLEMENTER",
+    "M8-C live provider canary deferred by sponsor (closure 2026-10-14)"
+  ],
+  "coverage_limits": [
+    "No human reviewed the M8-F artifacts (ADR-0108).",
+    "Corpus values are synthetic; no claim about real audiences or cultural representativeness.",
+    "No provider or platform call; spatial uses the pinned fixture response."
+  ],
+  "reviewer": {
+    "agent": "Codex (independent acceptance review, separate agent)",
+    "model_reported": "GPT-5 (deployment suffix not exposed; gpt-5.6-sol requested, not confirmed)",
+    "record": "docs/r2/evidence/R2_M8_IMPLEMENTATION_CODEX_REVIEW_2026-10-15.md"
+  },
+  "reviewed_at": "2026-10-15T04:11:00Z",
+  "required_skips": [],
+  "material_unknowns": [],
+  "non_authorization": "M8 implementation acceptance is not production activation, deployment, provider or platform activation, credential use or publication approval.",
+  "known_residuals": [
+    "ADR-0107: a Canvas append keeps the lineage current at its check if an admission or script changes before commit (same window as ADR-0098); a full close needs a project-wide lock shared with the M6 admission writer."
+  ],
+  "review_history": [
+    "0355b99c NOT_ACCEPTED (forged Canvas lineage, no two blind reviews, determinism scope)",
+    "b81d7aa0 NOT_ACCEPTED (reviewer A not blind, Canvas race, verifier input shape)",
+    "2bba4e3b ACCEPTED (Canvas race accepted as documented residual)"
+  ],
+  "non_blocking_notes": [
+    "verify_m8f_determinism builds run 1's comparison from run 2's keys, so a field missing only from run 2 is not reported; the sealed v3 results show no difference in a full independent comparison; fix follows this acceptance.",
+    "Protocol v3 effect_policy.pilot_confirmatory still says 'one reviewer' (stale text; the roster is two reviewers)."
+  ]
+}
