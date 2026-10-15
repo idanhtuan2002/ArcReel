@@ -1,0 +1,211 @@
+{
+  "schema_version": "1",
+  "status": "M9_BASELINE_VERIFIED",
+  "base_head": "39b9c5dab5d0fd56cf52bf65e95355437cb1023b",
+  "branch": "impl/r2-m9a-opportunity-foundation",
+  "alembic_predecessor": "918c4a0e0001",
+  "revision_graph_digest": "sha256:5d45355ceb6350efffdaf368ff7a6786ffde24ec24fc06f0a4ee820dbc3be425",
+  "m8_acceptance": {
+    "path": "docs/r2/evidence/R2_M8_IMPLEMENTATION_ACCEPTANCE.json",
+    "acceptance_commit": "23cf146a61c3b7acfb78440d2b1498fd9d77db4b",
+    "sha256": "686f5250b13befb7ec3cbad9110407989eecd2b236a7f2030cd3a4a4ddcfcda2"
+  },
+  "m9_design_acceptance": {
+    "path": "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json",
+    "acceptance_commit": "9d4e4ce6a01a4d1077de263b5cbadf4412055103",
+    "sha256": "e863092c910bf659625bf15019c593b98eb2a539fd2a4542437c8269844e3ebf"
+  },
+  "documents": {
+    "docs/adr/0081-m9-evidence-first-opportunity-intelligence.md": "27f8d79bb005a1242d7ecfd616c32f40d78bc684ed5ca994f9aae8b79adde64b",
+    "docs/research/2026-09-14-r2-m9-opportunity-research-intelligence.md": "0d40ba87982546e1ac5eb306ed2e008769e4e4a1efce267b928071c7672e1e1a",
+    "docs/research/2026-09-15-r2-m9-design-validation.md": "51bfa2f0d8c6558193aabe5f31f4eea6d7b649e49e3ec139aeb84a97730bc15e",
+    "docs/superpowers/specs/2026-09-14-r2-m9-opportunity-research-intelligence-design.md": "8e7c34e1e53380ccd6f61b79dc48205da801f1743545f924bb1e812dd615a934",
+    "docs/superpowers/plans/2026-09-14-r2-m9-opportunity-research-intelligence.md": "28ae1f9d99c6a5f6d5af7a377cc6d803d026e8e312df87d042cbef6a1a38afee",
+    "docs/superpowers/plans/2026-09-14-r2-m9a-foundation-cohort-profiles.md": "c6d87502c82f180546817a23acd482d612624ef1c66e431ed5ceb7c46f61828e",
+    "docs/r2/evidence/R2_M9_EXECUTION_CONTRACT_2026-09-14.json": "6223fae310fce2f267cbfd13dddc18ecae4d13f2380e11ebc7a7b5a13433ca6d",
+    "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE_CONTRACT_2026-09-15.json": "d18b6fb107852cdea8c1d9e486b1e05544ae2564cbc9c0f90b6bb0137a5101b3",
+    "docs/r2/evidence/schemas/R2_M9_DESIGN_ACCEPTANCE.schema.json": "05d1620b1c0e44203e3a8cf008b46fbdf93bb2dc6b00ccb1342a14ebd9b1f57a",
+    "docs/r2/evidence/schemas/R2_M9_DESIGN_REVIEW.schema.json": "7670b10b709e5574d85c3ed781ba7ea9a4e29ede139c06c1173ef98e4615800c",
+    "scripts/r2/verify_m9_design_acceptance.py": "4890ebd9dd5199269b8a38b36c66300b3ed60ff38f46139bbdf36ce52595eae0",
+    "tests/unit/scripts/r2/test_verify_m9_design_acceptance.py": "77b3f6e9ba215b032a177d12cb3355e14f45d90b4b840cbe4727d4e22f034778"
+  },
+  "seams": {
+    "r2/contracts/advanced_creative.py": {
+      "sha256": "064ebe4dc1dba759bc9321d2cb4a5028fb36f2f0903295a5e338bfb78d537b65",
+      "symbols": {
+        "r2.contracts.advanced_creative:M8ContractModel": {
+          "signature": "class M8ContractModel",
+          "sha256": "3419fac731a3200ae63970f82588e07d066b646cc333c26d2652ef0007e39641"
+        },
+        "r2.contracts.advanced_creative:CanonicalJsonObject": {
+          "signature": "class CanonicalJsonObject",
+          "sha256": "a2a900b24724eb3fb9c8642cfc1386f68ba5ecd01d8b3bca7b56c9d11e45a464"
+        }
+      }
+    },
+    "r2/advanced_creative/digests.py": {
+      "sha256": "f9e4357a14ab0b55405c5231b84c96069ebb4b207171c91328e9aaaa71f573fa",
+      "symbols": {
+        "r2.advanced_creative.digests:canonical_json_bytes": {
+          "signature": "(value: object) -> bytes",
+          "sha256": "26239975e11cbe3c886c691156b13450b53365f017bd23c6b33c3ea84d765058"
+        },
+        "r2.advanced_creative.digests:digest_canonical": {
+          "signature": "(value: object) -> str",
+          "sha256": "4a6f624eec65f2ee59cf530993fe6cfbf8dd2ffcae19c46804b1bc22aca27dd6"
+        }
+      }
+    },
+    "r2/advanced_creative/exploration.py": {
+      "sha256": "2a350075723bcfe5939690381dc3806450ea3d4818a0d59ce84f89a3744172cc",
+      "symbols": {
+        "r2.advanced_creative.exploration:ExplorationService.append_revision": {
+          "signature": "(self, *, user_id: str, project_name: str, candidate: ExplorationRevision, expected_head_version: int | None, command_id: str) -> CandidateHead",
+          "sha256": "2ae93a9bd17ad60a405680210a594bfcf62a26dbe4bda3746fd87873b692e998"
+        }
+      }
+    },
+    "lib/db/repositories/learning.py": {
+      "sha256": "1a2f8a5103a789b3bd495169523fa5295581b3dbb7dc55b0e1a3afa8b2a093f1",
+      "symbols": {
+        "lib.db.repositories.learning:LearningObservationRepository.list_as_of": {
+          "signature": "(self, *, user_id: str, project_name: str, cutoff: datetime, source_family: str | None=None) -> tuple[LearningObservation, ...]",
+          "sha256": "52e5c82a82408dcdd9f98824ab07b5e823be29e21e6fc2f1de70fc4ee13cc412"
+        }
+      }
+    },
+    "r2/contracts/factual.py": {
+      "sha256": "f3478d17683f5b859b7fa342b223c5babfd527d14f9365f7e598e892316bbb15",
+      "symbols": {
+        "r2.contracts.factual:SourceRecord": {
+          "signature": "class SourceRecord",
+          "sha256": "c0fd0e2e8f80ae8157a768ca6ff35d0bddec07001e9834a57c2587e72a900a6d"
+        },
+        "r2.contracts.factual:EvidenceRecord": {
+          "signature": "class EvidenceRecord",
+          "sha256": "99baeef3768dd49dcb6d5e3d4d98076bc66b29c1f319e17256c17eac1d071360"
+        }
+      }
+    },
+    "server/services/governance_grants.py": {
+      "sha256": "18f9376f33dafbbc84ac49486476685cd8f1b74bb042f8b28c9f7df9aec36746",
+      "symbols": {
+        "server.services.governance_grants:CurrentShowrunnerGrantReader.require_current_locked": {
+          "signature": "(self, session: AsyncSession, *, scope: GrantScopeV1) -> VerifiedGrantEventV1",
+          "sha256": "5aaa7cac59b9f199f99d2c798328e06777cd2a6cef6d17ac95cf1324dd839bf5"
+        }
+      }
+    }
+  },
+  "donors": [
+    {
+      "name": "OpenMontage",
+      "commit": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "files": {
+        "skills/pipelines/explainer/research-director.md": "420641d56fed790a19f7d9c85795ec0728138c692552e06cdcf106f506e151f3",
+        "schemas/artifacts/research_brief.schema.json": "0d263fb8f46c6ef8e8f31492d679506c22ecfe0dd379d44432dac658ff0401f3",
+        "schemas/artifacts/decision_log.schema.json": "4fb3b3dac79b1b9c742523f7c6878ffc8c64049b0fe5f811d26076761eca773f"
+      }
+    },
+    {
+      "name": "Kalinga-Shorts-Factory",
+      "commit": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+      "files": {
+        "pipeline/src/research.py": "e0feb3c718d6494c969e51d90270e4aaa46577e70013101ef65f62b6e90f9575",
+        "pipeline/src/creative.py": "3efc1b24cbd5f479959041ad5597f6f2a2c65ea03536b27782869d561807dfcd",
+        "pipeline/src/kalinga.py": "d8fed2e491c7a184f9682173fc04cc56eba5da41aafe1263c453c2c78c9c22f3",
+        "pipeline/src/daily.py": "d5b3b32704147596d0c6e9d0804d70853e4fb67b56a89e0880ab665f495129fe",
+        "channels/history-shorts/channel.yaml": "34da60396c43970db5e9e3aee42b3b19d63bbea74d6fb1e75f7b7c717f970858"
+      }
+    },
+    {
+      "name": "Huohuo-Drama",
+      "commit": "f104b853b3563e124d9cde25f9331d323fb483b9",
+      "files": {
+        "workbench-server/src/services/novel/novel-outline-drama-fields.ts": "7a7db8a7674445d8352beb7a165fb5fe40bf02c1d526a89c31a6c74fa9029c67"
+      }
+    }
+  ],
+  "scope_allowlist": [
+    "alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py",
+    "docs/r2/evidence/R2_M9_A_FOUNDATION.json",
+    "docs/r2/evidence/R2_M9_BASELINE.json",
+    "docs/r2/evidence/schemas/R2_M9_A_FOUNDATION.schema.json",
+    "docs/r2/evidence/schemas/R2_M9_BASELINE.schema.json",
+    "lib/db/models/__init__.py",
+    "lib/db/models/host_custodian.py",
+    "lib/db/models/opportunity.py",
+    "lib/db/repositories/__init__.py",
+    "lib/db/repositories/opportunity.py",
+    "lib/i18n/en/errors.py",
+    "lib/i18n/vi/errors.py",
+    "lib/i18n/zh/errors.py",
+    "r2/contracts/__init__.py",
+    "r2/contracts/opportunity.py",
+    "r2/opportunity/__init__.py",
+    "r2/opportunity/digests.py",
+    "r2/opportunity/errors.py",
+    "r2/opportunity/parity.py",
+    "r2/opportunity/ports.py",
+    "r2/opportunity/profiles.py",
+    "scripts/r2/verify_m9_evidence.py",
+    "scripts/r2/verify_m9_parity.py",
+    "scripts/r2/verify_m9_scope.py",
+    "server/app.py",
+    "server/routers/opportunity.py",
+    "server/services/m9_custodian.py",
+    "server/services/opportunity.py",
+    "tests/architecture/test_m9_opportunity_boundaries.py",
+    "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py",
+    "tests/integration/lib/db/repositories/test_opportunity_profiles.py",
+    "tests/integration/r2/opportunity/test_profile_concurrency.py",
+    "tests/integration/server/services/test_m9_custodian.py",
+    "tests/unit/r2/contracts/test_opportunity.py",
+    "tests/unit/r2/opportunity/test_digests.py",
+    "tests/unit/r2/opportunity/test_parity.py",
+    "tests/unit/r2/opportunity/test_profiles.py",
+    "tests/unit/scripts/r2/test_verify_m9_evidence.py",
+    "tests/unit/scripts/r2/test_verify_m9_parity.py",
+    "tests/unit/scripts/r2/test_verify_m9_scope.py",
+    "tests/unit/server/routers/test_opportunity_router.py"
+  ],
+  "create_paths": [
+    "alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py",
+    "docs/r2/evidence/R2_M9_A_FOUNDATION.json",
+    "docs/r2/evidence/R2_M9_BASELINE.json",
+    "docs/r2/evidence/schemas/R2_M9_A_FOUNDATION.schema.json",
+    "docs/r2/evidence/schemas/R2_M9_BASELINE.schema.json",
+    "lib/db/models/host_custodian.py",
+    "lib/db/models/opportunity.py",
+    "lib/db/repositories/opportunity.py",
+    "r2/contracts/opportunity.py",
+    "r2/opportunity/__init__.py",
+    "r2/opportunity/digests.py",
+    "r2/opportunity/errors.py",
+    "r2/opportunity/parity.py",
+    "r2/opportunity/ports.py",
+    "r2/opportunity/profiles.py",
+    "scripts/r2/verify_m9_evidence.py",
+    "scripts/r2/verify_m9_parity.py",
+    "scripts/r2/verify_m9_scope.py",
+    "server/routers/opportunity.py",
+    "server/services/m9_custodian.py",
+    "server/services/opportunity.py",
+    "tests/architecture/test_m9_opportunity_boundaries.py",
+    "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py",
+    "tests/integration/lib/db/repositories/test_opportunity_profiles.py",
+    "tests/integration/r2/opportunity/test_profile_concurrency.py",
+    "tests/integration/server/services/test_m9_custodian.py",
+    "tests/unit/r2/contracts/test_opportunity.py",
+    "tests/unit/r2/opportunity/test_digests.py",
+    "tests/unit/r2/opportunity/test_parity.py",
+    "tests/unit/r2/opportunity/test_profiles.py",
+    "tests/unit/scripts/r2/test_verify_m9_evidence.py",
+    "tests/unit/scripts/r2/test_verify_m9_parity.py",
+    "tests/unit/scripts/r2/test_verify_m9_scope.py",
+    "tests/unit/server/routers/test_opportunity_router.py"
+  ],
+  "required_skips": [],
+  "material_unknowns": [],
+  "created_at": "2026-10-15T15:52:56.988483+00:00"
+}
