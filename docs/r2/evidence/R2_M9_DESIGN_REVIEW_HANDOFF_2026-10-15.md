@@ -53,3 +53,37 @@
 - No sealed M9 review exists yet. `R2_M9_DESIGN_ACCEPTANCE.json` does not exist.
 - Carried over from M8: `verify_m8f_determinism` can miss a field that is absent only from run 2. It is a
   locked protocol v3 source, so fix it only under a new protocol.
+
+## Pass-3 results (both received, both FAIL), stored in `docs/r2/evidence/m9-design-review/`
+
+- **Reviewer A** (`pass3-reviewer-A-4fa2b8e8.json`): 2 blocking findings, 8/10 checks pass.
+  1. The invalidation guard and coverage refusal in M9-B/C/D need the job table, which only M9-E creates.
+     Fix: Task E owns the guard call sites in acquisition, signals, candidates, greenlight and bridges, with
+     their tests. The spec says the rank-1a guard applies from M9-E, because no invalidation exists before
+     it. Add `M9_INVALIDATION_INCOMPLETE` to the routing rows.
+  2. `get_greenlight` returns a bare decision. Fix: add `GreenlightDecisionView(decision, validity)` and make
+     incomplete propagation return `M9_INVALIDATION_INCOMPLETE`.
+- **Reviewer B** (`pass3-reviewer-B-4fa2b8e8.json`, `gpt-5.6-sol`): 6 blocking findings.
+  1. Add the creative policy-pack digest to cohort profiles and M8 entries, and require it to equal
+     `LineageBinding.policy_digest`.
+  2. `grant_digest` must cover `refresh_after` and `deletion_deadline_seconds`, and `snapshot_digest` must
+     cover `capability_evaluation_digest`.
+  3. Define the retention and refresh deadline anchor (database time per page and data class), the
+     calculation, the closure fold, and the behaviour at refresh expiry, retention expiry and
+     delete-on-revoke.
+  4. Add a selected-content ref and integrity ref to `FactualEvidenceSelection`, bound in the digests and
+     in replay.
+  5. The frozen seed revision has `created_by = user_id`, and the M9 evidence keeps `actor_id`.
+  6. Task D owns `r2/advanced_creative/lineage.py` and the M8 resolver tests, and the no-M8-change rule
+     excepts ADR-0109.
+- **Cheap notes to apply in the same revision:**
+  - the sweep wording `RETENTION_SWEEP`;
+  - port invalidation applies to Factual only, not Canvas;
+  - `SweepRetention` and `IntakeM8Correction` take UUIDv7 command ids, with their own idempotency key
+    columns;
+  - the M8 entry state mapping goes into the M9-C packet;
+  - domains for `dependency_closure_digest`, the bridge intent `closure_digest`/`request_digest` and the
+    cursor digests;
+  - the `host_custodian_leases` columns include `operation`.
+- **Next:** apply all of the above in one revision, sweep for cross-file contradictions, then run two fresh
+  reviewers (A Claude, B Codex) on the new candidate.
