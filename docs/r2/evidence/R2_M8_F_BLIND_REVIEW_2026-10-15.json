@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "packet": "M8-F",
+  "record": "offline blind review of the M8-F format projections and spatial candidates",
+  "protocol": "docs/r2/evidence/R2_M8_EVALUATION_PROTOCOL.json",
+  "results": "docs/r2/evidence/R2_M8_F_RESULTS.json",
+  "reviewer": {
+    "reviewer_ref": "Claude (implementing agent, claude-opus-5-5) by sponsor delegation on 2026-10-15",
+    "language_cultural_cohort": "not applicable (non-human)",
+    "role": "implemented M8-F and built the review packet",
+    "conflict_declaration": "reviewer is the implementer and packet author"
+  },
+  "sponsor_delegation": "After the offline packet was opened, the sponsor asked the agent to perform the review itself and continue ('ban hay tu su dung claude-in-chrome de review va lam cac buoc tiep theo'). The browser extension was not connected, so the agent reviewed the same packet media directly (frame extraction, PCM comparison, pixel measurement).",
+  "rubrics": [
+    "format-semantic@1",
+    "m8f-spatial-review@1"
+  ],
+  "format": {
+    "FA": {
+      "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+      "profile": "vertical-9x16@1",
+      "projection_sha256": "sha256:86d4ff11857f40fb604b29bb13719b388bde8f449dbdb500aee6e4213ddbedb8",
+      "source_sha256": "sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+      "verdicts": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS"
+      },
+      "evidence": "PAD keeps the whole 1280x720 frame; both boxes keep position and proportion at 0.1/1.0/1.9 s; no text or captions in source or projection; audio identical (same dominant frequency, PCM correlation >= 0.9999, same length); duration 2.00 s video, audio 2.02 s (+20 ms AAC priming, within the technical check)."
+    },
+    "FB": {
+      "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+      "profile": "square@1",
+      "projection_sha256": "sha256:7cc9265ad7b0dc12b121038e0301d7c60acf300f00f0b50a2a0d909ae9e26506",
+      "source_sha256": "sha256:9f70d55713769d678126bb6fb14b70b1d6d17b2a03380531a3c5ff42236a8592",
+      "verdicts": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS"
+      },
+      "evidence": "PAD keeps the whole 1280x720 frame; both boxes keep position and proportion at 0.1/1.0/1.9 s; no text or captions in source or projection; audio identical (same dominant frequency, PCM correlation >= 0.9999, same length); duration 2.00 s video, audio 2.02 s (+20 ms AAC priming, within the technical check)."
+    },
+    "FC": {
+      "cohort": "WESTERN_GENERIC",
+      "profile": "vertical-9x16@1",
+      "projection_sha256": "sha256:101309d3ad4e508ec34f65328380976f8626b15095431d126c955bb3f72d01c0",
+      "source_sha256": "sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+      "verdicts": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS"
+      },
+      "evidence": "PAD keeps the whole 1280x720 frame; both boxes keep position and proportion at 0.1/1.0/1.9 s; no text or captions in source or projection; audio identical (same dominant frequency, PCM correlation >= 0.9999, same length); duration 2.00 s video, audio 2.02 s (+20 ms AAC priming, within the technical check)."
+    },
+    "FD": {
+      "cohort": "WESTERN_GENERIC",
+      "profile": "square@1",
+      "projection_sha256": "sha256:ef3cc645c42b23cd050e84de47a11f2fa29b04a091c811e8f51962d01f3dc693",
+      "source_sha256": "sha256:88cc5fa2c38b8e446785c4c8d19d7be994717b2fe77c4468112b9b1261fd74fb",
+      "verdicts": {
+        "focal_subject": "PASS",
+        "action": "PASS",
+        "shot_intent": "PASS",
+        "on_screen_text": "PASS",
+        "captions": "PASS",
+        "timing": "PASS",
+        "audio": "PASS"
+      },
+      "evidence": "PAD keeps the whole 1280x720 frame; both boxes keep position and proportion at 0.1/1.0/1.9 s; no text or captions in source or projection; audio identical (same dominant frequency, PCM correlation >= 0.9999, same length); duration 2.00 s video, audio 2.02 s (+20 ms AAC priming, within the technical check)."
+    }
+  },
+  "spatial": {
+    "S0": {
+      "cohort": "WESTERN_GENERIC",
+      "calibration": true,
+      "verdicts": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "FAIL",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS"
+      },
+      "evidence": "Calibration: the VISIBLE 'green sofa' span (MASTER x0.30-0.50, y0.45-0.80) covers bare wall; the reviewer failed it as required, so the cohort reviews count."
+    },
+    "SA": {
+      "cohort": "WESTERN_GENERIC",
+      "calibration": false,
+      "verdicts": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS"
+      },
+      "evidence": "Pixel check: red MASTER x0.70-0.82, blue REVERSE x0.65-0.79, yellow MASTER x0.00-0.12 and REVERSE x0.88-1.00, all y0.20-0.80, exactly at the VISIBLE spans; INFERRED radiator keeps confidence 0.3 and is not promoted; the GAP 'ceiling corners unseen' stays a gap; the shared left-wall painting appears at the MASTER's left edge and the REVERSE's right edge, consistent with opposite views."
+    },
+    "SB": {
+      "cohort": "CN_SHORT_DRAMA_SHUANGWEN",
+      "calibration": false,
+      "verdicts": {
+        "pairing_matches_master_reverse": "PASS",
+        "visible_assertions_supported_by_frames": "PASS",
+        "gaps_not_stated_as_facts": "PASS",
+        "seam_and_direction_locks_plausible": "PASS"
+      },
+      "evidence": "Pixel check: red MASTER x0.70-0.82, blue REVERSE x0.65-0.79, yellow MASTER x0.00-0.12 and REVERSE x0.88-1.00, all y0.20-0.80, exactly at the VISIBLE spans; INFERRED radiator keeps confidence 0.3 and is not promoted; the GAP 'ceiling corners unseen' stays a gap; the shared left-wall painting appears at the MASTER's left edge and the REVERSE's right edge, consistent with opposite views."
+    }
+  },
+  "summary": {
+    "cohort_items": 36,
+    "pass": 36,
+    "fail": 0,
+    "wilson95_pass_rate": [
+      0.9036,
+      1.0
+    ],
+    "calibration_passed": true,
+    "disagreements": []
+  },
+  "deviations": [
+    {
+      "code": "SINGLE_REVIEWER_DEVIATION",
+      "statement": "One reviewer; spec §9 asks for at least two."
+    },
+    {
+      "code": "AGENT_REVIEWER_NOT_HUMAN",
+      "statement": "The registered reviewer was the sponsor; the sponsor delegated the review to the agent. No human reviewed these artifacts."
+    },
+    {
+      "code": "REVIEWER_IS_IMPLEMENTER",
+      "statement": "The reviewer implemented the code and the packet under review."
+    },
+    {
+      "code": "REVIEW_OUTSIDE_APP",
+      "statement": "Reviewed from an offline packet, without the in-app showrunner-grant custody (that custody was exercised in M8-E)."
+    },
+    {
+      "code": "BLINDNESS_LIMITED",
+      "statement": "Labels hid the cohort, but both cohorts' stimuli are pixel-identical (only the tone differs), the output shape reveals the profile, and the reviewer saw the per-cohort spatial data while checking spans."
+    },
+    {
+      "code": "STIMULI_DRAWN_TO_FIXTURE",
+      "statement": "Spatial frames were drawn to match the pinned fixture response, so the review checks that spans, evidence classes and gaps survive the pipeline intact; it says nothing about a vision model's perception."
+    },
+    {
+      "code": "NON_NATIVE_ZH_SHUANG_REVIEWER",
+      "statement": "Retained from the protocol; the zh-shuang stimuli contain no text, so language was not exercised."
+    }
+  ],
+  "packet_defects": [
+    "The packet page drew only the first span box per frame for the two-view 'yellow painting'; the reviewer verified that assertion by pixel measurement instead."
+  ],
+  "non_authorization": "No production activation, deployment, provider or platform call, credential use or publication is authorized."
+}
