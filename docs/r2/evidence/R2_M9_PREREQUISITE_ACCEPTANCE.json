@@ -1,0 +1,27 @@
+{
+  "schema_version": "1",
+  "status": "M9_PREREQUISITES_CANDIDATE",
+  "combined_base_head": "7da02c5f6c2e61ef5e651ca1777865401ef29112",
+  "alembic_head": "918c4a0e0001",
+  "revision_graph_digest": "sha256:5d45355ceb6350efffdaf368ff7a6786ffde24ec24fc06f0a4ee820dbc3be425",
+  "acceptances": {
+    "m8": {
+      "path": "docs/r2/evidence/R2_M8_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "686f5250b13befb7ec3cbad9110407989eecd2b236a7f2030cd3a4a4ddcfcda2",
+      "acceptance_commit": "23cf146a61c3b7acfb78440d2b1498fd9d77db4b"
+    },
+    "m9": {
+      "path": "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE.json",
+      "sha256": "e863092c910bf659625bf15019c593b98eb2a539fd2a4542437c8269844e3ebf",
+      "acceptance_commit": "9d4e4ce6a01a4d1077de263b5cbadf4412055103"
+    }
+  },
+  "tooling": {
+    "path": "scripts/r2/verify_m9_prerequisites.py",
+    "sha256": "789bd99693eb652602597414b07ad052ac13922f3a89dad700137683f342c3ca"
+  },
+  "schema_sha256": "9bd1808f6468fff1df4ca065dc506213bb7ec8c865453a0fd85a48b5da66e68d",
+  "review": null,
+  "required_skips": [],
+  "material_unknowns": []
+}
