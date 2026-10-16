@@ -270,3 +270,27 @@ async def test_command_uuid_is_actor_scoped_even_within_one_owner_and_project(se
     assert first.command_id == second.command_id == COMMAND
     assert first.profile.profile_id != second.profile.profile_id
     assert await row_counts(session_factory) == (2, 2, 2, 2)
+
+
+async def test_database_driver_failures_do_not_expose_profile_payload_in_exception_paths(session_factory):
+    import traceback
+
+    from r2.contracts.opportunity import CanonicalJsonObject
+
+    canary = "m9-profile-payload-private-canary"
+    original = make_profile(actor_id="x" * 256)
+    payload = original.payload.model_copy(
+        update={"freshness_policy": CanonicalJsonObject.model_validate({"private": canary})}
+    )
+    shell = original.model_copy(update={"payload": payload, "payload_digest": digest_cohort_profile_payload(payload)})
+    profile = shell.model_copy(update={"profile_digest": digest_cohort_profile(shell)})
+
+    async def persist():
+        async with OpportunityUnitOfWork(session_factory).transaction() as repo:
+            await repo.stage_profile(profile)
+
+    with pytest.raises(OpportunityError) as safe:
+        await persist()
+    assert safe.value.code is StopCode.M9_REQUIRED_EVIDENCE_MISSING
+    assert canary not in "".join(traceback.format_exception(safe.value))
+    assert await row_counts(session_factory) == (0, 0, 0, 0)

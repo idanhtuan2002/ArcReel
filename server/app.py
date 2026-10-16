@@ -69,6 +69,7 @@ from server.routers import (
     grids,
     learning,
     onboarding,
+    opportunity,
     presentations,
     products,
     project_events,
@@ -692,6 +693,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M8 learning"],
+)
+app.include_router(
+    opportunity.router,
+    prefix="/api/v1",
+    dependencies=[Depends(require_project_migration_ok)],
+    tags=["M9 opportunity"],
 )
 app.include_router(
     formats.router,

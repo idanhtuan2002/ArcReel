@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 from pydantic import ValidationError
 from sqlalchemy import and_, func, select, text, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.opportunity import M9CohortProfileModel, M9CommandReceiptModel, M9EventModel, M9ProfileHeadModel
@@ -20,26 +20,11 @@ from r2.contracts.opportunity import (
 )
 from r2.opportunity.digests import (
     command_guard_key,
-    digest_cohort_profile,
-    digest_cohort_profile_payload,
-    digest_command_result,
 )
 from r2.opportunity.errors import OpportunityError, StopCode
+from r2.opportunity.profiles import verified_profile, verified_receipt
 
 type GuardKey = Callable[[str, CommandContext], tuple[int, int]]
-
-
-def verified_profile(profile: OpportunityCohortProfile) -> OpportunityCohortProfile:
-    try:
-        result = OpportunityCohortProfile.model_validate(profile.model_dump(mode="python"))
-        if (
-            digest_cohort_profile_payload(result.payload) != result.payload_digest
-            or digest_cohort_profile(result) != result.profile_digest
-        ):
-            raise ValueError("profile integrity mismatch")
-    except (ValidationError, ValueError):
-        raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
-    return result
 
 
 def _profile(row: M9CohortProfileModel) -> OpportunityCohortProfile:
@@ -176,11 +161,9 @@ class OpportunityProfileRepository:
                 result_digest=row.result_digest,
                 committed_at=row.committed_at,
             )
-            if digest_command_result(operation, request_digest, receipt) != row.result_digest:
-                raise ValueError("receipt result integrity mismatch")
         except (ValidationError, ValueError):
             raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
-        return receipt
+        return verified_receipt(receipt, context, request_digest)
 
     async def stage_profile(self, profile: OpportunityCohortProfile) -> None:
         profile = verified_profile(profile)
@@ -226,19 +209,7 @@ class OpportunityProfileRepository:
     async def stage_command_receipt(
         self, *, context: CommandContext, operation: str, receipt: CohortProfileReceipt
     ) -> None:
-        if (receipt.profile.user_id, receipt.profile.project_name, receipt.command_id) != (
-            context.user_id,
-            context.project_name,
-            context.command_id,
-        ):
-            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
-        if digest_command_result(operation, receipt.request_digest, receipt) != receipt.result_digest:
-            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
-        if (receipt.head.profile_id, receipt.head.current_revision) != (
-            receipt.profile.profile_id,
-            receipt.profile.revision,
-        ):
-            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        receipt = verified_receipt(receipt, context, receipt.request_digest)
         self.session.add(
             M9CommandReceiptModel(
                 user_id=context.user_id,
@@ -272,10 +243,10 @@ class OpportunityProfileRepository:
     async def flush(self) -> None:
         try:
             await self.session.flush()
-        except IntegrityError as error:
+        except SQLAlchemyError as error:
             code = (
                 StopCode.M9_STALE_HEAD
-                if getattr(error.orig, "sqlstate", None) == "23505"
+                if isinstance(error, IntegrityError) and getattr(error.orig, "sqlstate", None) == "23505"
                 else StopCode.M9_REQUIRED_EVIDENCE_MISSING
             )
             raise OpportunityError(code) from None

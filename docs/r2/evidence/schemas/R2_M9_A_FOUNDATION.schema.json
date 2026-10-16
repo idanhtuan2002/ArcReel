@@ -1,0 +1,504 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "tested_head",
+    "tested_parent",
+    "branch",
+    "baseline_sha256",
+    "documents",
+    "contracts",
+    "seams",
+    "migration",
+    "scope_allowlist",
+    "commands",
+    "fault_matrix",
+    "donor_inventory",
+    "required_skips",
+    "material_unknowns",
+    "graph_coverage",
+    "artifacts",
+    "independent_review",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "status": {
+      "const": "M9_A_CANDIDATE"
+    },
+    "tested_head": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "tested_parent": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "branch": {
+      "const": "impl/r2-m9a-opportunity-foundation"
+    },
+    "baseline_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "documents": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "seams": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "head",
+        "predecessor"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "head": {
+          "const": "9a9c4a0e0001"
+        },
+        "predecessor": {
+          "const": "918c4a0e0001"
+        }
+      }
+    },
+    "scope_allowlist": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gate",
+          "command",
+          "exit",
+          "tested_head",
+          "passed",
+          "skipped",
+          "log"
+        ],
+        "properties": {
+          "gate": {
+            "type": "string",
+            "minLength": 1
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exit": {
+            "const": 0
+          },
+          "tested_head": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "const": 0
+          },
+          "log": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "fault_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replay",
+        "scope",
+        "custody",
+        "rollback",
+        "integrity",
+        "concurrency",
+        "architecture"
+      ],
+      "properties": {
+        "replay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "command_gate",
+            "test_refs"
+          ],
+          "properties": {
+            "status": {
+              "const": "PASS"
+            },
+            "command_gate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "test_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "command_gate",
+            "test_refs"
+          ],
+          "properties": {
+            "status": {
+              "const": "PASS"
+            },
+            "command_gate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "test_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "custody": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "command_gate",
+            "test_refs"
+          ],
+          "properties": {
+            "status": {
+              "const": "PASS"
+            },
+            "command_gate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "test_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "rollback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "command_gate",
+            "test_refs"
+          ],
+          "properties": {
+            "status": {
+              "const": "PASS"
+            },
+            "command_gate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "test_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "integrity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "command_gate",
+            "test_refs"
+          ],
+          "properties": {
+            "status": {
+              "const": "PASS"
+            },
+            "command_gate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "test_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "concurrency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "command_gate",
+            "test_refs"
+          ],
+          "properties": {
+            "status": {
+              "const": "PASS"
+            },
+            "command_gate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "test_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "architecture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "command_gate",
+            "test_refs"
+          ],
+          "properties": {
+            "status": {
+              "const": "PASS"
+            },
+            "command_gate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "test_refs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "donor_inventory": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "commit",
+          "files"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commit": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "files": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "required_skips": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "material_unknowns": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "graph_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "generation",
+        "signal",
+        "paths",
+        "source_fallback",
+        "artifact"
+      ],
+      "properties": {
+        "project": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signal": {
+          "const": "best_effort"
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "source_fallback": {
+          "type": "array",
+          "minItems": 0,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "independent_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "approval_claimed"
+      ],
+      "properties": {
+        "status": {
+          "const": "PENDING"
+        },
+        "approval_claimed": {
+          "const": false
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

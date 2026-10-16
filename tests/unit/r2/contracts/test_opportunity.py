@@ -720,3 +720,9 @@ def test_profile_cannot_borrow_a_sibling_cohorts_reviewer_rubric():
     raw["reviewer_qualification"]["cultural_cohort"] = "zh-shuang"
     with pytest.raises(ValidationError, match="cohort"):
         c.OpportunityCohortProfilePayload.model_validate(raw)
+
+
+def test_opaque_scope_identities_are_preserved_exactly_instead_of_unicode_rewritten():
+    principal = "reviewer-e\u0301"
+    context = c.CommandContext(command_id=ID, user_id="u1", project_name="show-a", actor_id=principal)
+    assert context.actor_id == principal

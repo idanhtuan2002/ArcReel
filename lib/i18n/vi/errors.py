@@ -530,4 +530,10 @@ MESSAGES = {
     "r2_shot_authority_stale": "Shot, binding bối cảnh hoặc frame nguồn đã thay đổi; hãy tải lại rồi thử lại",
     "r2_shot_command_conflict": "Mã lệnh này đã được dùng cho một yêu cầu shot khác",
     "r2_shot_backend_unavailable": "Nhà cung cấp video cho profile này không khả dụng; hãy kiểm tra cấu hình",
+    "m9_profile_publication_unauthorized": "Bạn không có quyền xuất bản hồ sơ cơ hội này.",
+    "m9_command_replay_conflict": "Lệnh này đã được dùng cho yêu cầu khác. Hãy gửi một lệnh mới.",
+    "m9_stale_head": "Hồ sơ đã thay đổi. Hãy tải lại trước khi xuất bản.",
+    "m9_cohort_leakage": "Hồ sơ này không khớp với chính sách sáng tạo của dự án.",
+    "m9_required_evidence_missing": "Hồ sơ cơ hội chưa sẵn sàng. Hãy nhờ quản trị viên dự án hoàn tất thiết lập.",
+    "m9_profile_invalid": "Hãy kiểm tra hồ sơ cơ hội rồi thử lại.",
 }

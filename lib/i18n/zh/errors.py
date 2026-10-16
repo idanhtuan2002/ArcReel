@@ -473,4 +473,10 @@ MESSAGES = {
     "r2_shot_authority_stale": "镜头、场景绑定或源帧已变更，请重新加载后重试",
     "r2_shot_command_conflict": "该命令 ID 已用于其他镜头请求",
     "r2_shot_backend_unavailable": "该配置的视频供应商不可用，请检查配置",
+    "m9_profile_publication_unauthorized": "你没有发布此机会配置的权限。",
+    "m9_command_replay_conflict": "此命令已用于其他请求，请提交新命令。",
+    "m9_stale_head": "此配置已更改，请重新加载后再发布。",
+    "m9_cohort_leakage": "此配置与项目的创作策略不匹配。",
+    "m9_required_evidence_missing": "机会配置尚未就绪，请联系项目管理员完成设置。",
+    "m9_profile_invalid": "请检查机会配置后重试。",
 }

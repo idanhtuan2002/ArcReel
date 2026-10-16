@@ -531,4 +531,10 @@ MESSAGES = {
     "r2_shot_authority_stale": "The shot, its location binding or its source frames changed; reload and try again",
     "r2_shot_command_conflict": "This command ID was already used for a different shot request",
     "r2_shot_backend_unavailable": "The video provider for this profile is not available; check its configuration",
+    "m9_profile_publication_unauthorized": "You are not authorized to publish this opportunity profile.",
+    "m9_command_replay_conflict": "This command was used for a different request. Submit a new command.",
+    "m9_stale_head": "This profile has changed. Reload it before publishing again.",
+    "m9_cohort_leakage": "This profile does not match the project's creative policy.",
+    "m9_required_evidence_missing": "Opportunity profiles are not ready. Ask the project administrator to complete setup.",
+    "m9_profile_invalid": "Check the opportunity profile and try again.",
 }

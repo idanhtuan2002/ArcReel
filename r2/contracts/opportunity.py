@@ -69,8 +69,7 @@ def _require_uuid7(value: str) -> None:
 
 
 def _nonempty(value: str) -> str:
-    value = unicodedata.normalize("NFC", value)
-    if not value.strip():
+    if not unicodedata.normalize("NFC", value).strip():
         raise ValueError("text must be non-empty")
     return value
 
