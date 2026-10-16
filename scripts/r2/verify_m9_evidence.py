@@ -30,9 +30,25 @@ from scripts.audit_tests import (
 )
 from scripts.r2.verify_donor_parity import clone_file_hashes
 from scripts.r2.verify_m8_evidence import artifact_problems, verify_m8_evidence
-from scripts.r2.verify_m9_parity import ArtifactReference, retained_evidence, verified_artifact_bytes, verify_m9_parity
+from scripts.r2.verify_m9_parity import (
+    ArtifactReference,
+    foundation_inventory_document,
+    foundation_inventory_problems,
+    retained_evidence,
+    verified_artifact_bytes,
+    verify_m9_parity,
+)
 from scripts.r2.verify_m9_prerequisites import LOAD_ERRORS, GitPrerequisiteReader, loads_unique_json
-from scripts.r2.verify_m9_scope import BASE, BASELINE, BRANCH, CONTRACT, SEAMS, verify_m9_scope
+from scripts.r2.verify_m9_scope import (
+    BASE,
+    BASELINE,
+    BRANCH,
+    CONTRACT,
+    SEAMS,
+    donor_problems,
+    effective_owned_paths,
+    verify_m9_scope,
+)
 
 SCHEMA = "docs/r2/evidence/schemas/R2_M9_A_FOUNDATION.schema.json"
 EVIDENCE = "docs/r2/evidence/R2_M9_A_FOUNDATION.json"
@@ -92,6 +108,7 @@ def repository_bindings(source: GitPrerequisiteReader, tested_head: str) -> dict
     def digest(path: str) -> str:
         return hashlib.sha256(source.blob(tested_head, path)).hexdigest()
 
+    foundation = foundation_inventory_document(source, tested_head)
     return {
         "tested_parent": parents[0],
         "branch": BRANCH,
@@ -108,8 +125,14 @@ def repository_bindings(source: GitPrerequisiteReader, tested_head: str) -> dict
             "head": "9a9c4a0e0001",
             "predecessor": "918c4a0e0001",
         },
-        "scope_allowlist": baseline["scope_allowlist"],
+        "scope_allowlist": effective_owned_paths(source, tested_head)[0],
         "donor_inventory": baseline["donors"],
+        "packet": "M9-A",
+        "parity_scope": foundation["scope"],
+        "sponsor_amendment": foundation["sponsor_amendment"],
+        "donor_runtime_executed": False,
+        "runtime_parity_claimed": False,
+        "runtime_ports": [],
     }
 
 
@@ -219,6 +242,15 @@ def command_shape_problems(gate: str, argv: tuple[str, ...], document: dict[str,
         )
         return [] if binary.startswith("python") and rest == expected else ["focused command mismatch"]
     if gate == "parity":
+        if document["parity_scope"] == "FOUNDATION_INVENTORY_VERIFIED":
+            expected = [
+                "scripts/r2/verify_m9_parity.py",
+                document["parity_reports"][0]["path"],
+                "--head",
+                document["tested_head"],
+                "--foundation-inventory",
+            ]
+            return [] if binary.startswith("python") and rest == expected else ["foundation inventory command mismatch"]
         if not binary.startswith("python") or len(rest) not in {6, 8} or rest[0] != "scripts/r2/verify_m9_parity.py":
             return ["parity command is not the pinned verifier"]
         if rest[2:4] != ["--head", document["tested_head"]] or rest[4] != "--donor-clone":
@@ -433,6 +465,19 @@ def recorded_log_problems(
 
 def recorded_parity_problems(document: dict[str, Any], repo: Path, donor_root: Path) -> list[str]:
     os.environ["GIT_NO_LAZY_FETCH"] = "1"
+    if document["parity_scope"] == "FOUNDATION_INVENTORY_VERIFIED":
+        try:
+            source = GitPrerequisiteReader(repo)
+            expected = foundation_inventory_document(source, document["tested_head"])
+            ref = ArtifactReference.model_validate(document["parity_reports"][0])
+            raw = verified_artifact_bytes(ref, {ref.path: (repo / ref.path).read_bytes()})
+            return foundation_inventory_problems(loads_unique_json(raw), expected) + donor_problems(
+                loads_unique_json(source.blob(document["tested_head"], BASELINE)),
+                loads_unique_json(source.blob(document["tested_head"], CONTRACT)),
+                donor_root,
+            )
+        except LOAD_ERRORS:
+            return ["M9_DONOR_PARITY_INCOMPLETE: foundation inventory or sponsor authority unavailable"]
     problems = []
     manifests = {item["commit"]: item for item in document["donor_inventory"]}
     seen = []

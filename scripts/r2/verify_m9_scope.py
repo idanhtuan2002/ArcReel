@@ -49,6 +49,9 @@ CONTRACT = "docs/r2/evidence/R2_M9_EXECUTION_CONTRACT_2026-09-14.json"
 PACKET = "docs/superpowers/plans/2026-09-14-r2-m9a-foundation-cohort-profiles.md"
 BASELINE = "docs/r2/evidence/R2_M9_BASELINE.json"
 SCHEMA = "docs/r2/evidence/schemas/R2_M9_BASELINE.schema.json"
+AMENDMENT = "docs/r2/evidence/R2_M9_A_SPONSOR_AMENDMENT.json"
+AMENDMENT_COMMIT = "7b16c36c50fc040a5402bcdec2361896a3dded95"
+AMENDMENT_BASE = "211363f69771225df0b281931f1e0992e93ce09a"
 SEAMS = {
     "r2/contracts/advanced_creative.py": (
         "r2.contracts.advanced_creative:M8ContractModel",
@@ -114,6 +117,40 @@ def evaluate_scope(observed: ScopeObservation) -> list[str]:
 
 def _sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def amendment_record(source: Any, head: str) -> dict[str, Any] | None:
+    """Read the exact sponsor decision; a descendant cannot replace or remove it."""
+    try:
+        raw = source.blob(head, AMENDMENT)
+    except LOAD_ERRORS:
+        if source.is_ancestor(AMENDMENT_COMMIT, head):
+            raise ValueError("sponsor amendment is missing from its descendant") from None
+        return None
+    if not source.is_ancestor(AMENDMENT_COMMIT, head):
+        raise ValueError("sponsor amendment has no pinned acceptance ancestry")
+    if raw != source.blob(AMENDMENT_COMMIT, AMENDMENT) or source.parents(AMENDMENT_COMMIT) != [AMENDMENT_BASE]:
+        raise ValueError("sponsor amendment record or parent differs")
+    record = loads_unique_json(raw)
+    if source.changed_paths(AMENDMENT_COMMIT) != set(record["amendment_paths"]):
+        raise ValueError("sponsor amendment changed-path ceremony differs")
+    for path, digest in record["artifacts"].items():
+        pinned = source.blob(AMENDMENT_COMMIT, path)
+        if _sha(pinned) != digest or source.blob(head, path) != pinned:
+            raise ValueError("sponsor amendment artifact differs")
+    for ref in (record["baseline"], record["execution_contract"]):
+        if _sha(source.blob(head, ref["path"])) != ref["sha256"]:
+            raise ValueError("sponsor amendment frozen prerequisite differs")
+    return record
+
+
+def effective_owned_paths(source: Any, head: str) -> tuple[list[str], list[str]]:
+    allowed, creates = owned_paths(source.blob(BASE, PACKET))
+    record = amendment_record(source, head)
+    if record is not None:
+        allowed = sorted(set(allowed) | set(record["additional_paths"]) | set(record["amendment_paths"]))
+        creates = sorted(set(creates) | set(record["amendment_paths"]) | {"tests/unit/r2/opportunity/__init__.py"})
+    return allowed, creates
 
 
 def owned_paths(packet: bytes) -> tuple[list[str], list[str]]:
@@ -317,7 +354,7 @@ def verify_m9_scope(repo: Path, contract: Mapping[str, object]) -> list[str]:
                     tuple(baseline_errors),
                 )
             )
-        allowed, creates = owned_paths(source.blob(BASE, PACKET))
+        allowed, creates = effective_owned_paths(source, head)
         changed = source._run("diff", "--name-only", f"{BASE}..{head}").decode().splitlines()
         collisions = [
             path

@@ -62,6 +62,12 @@ def evidence():
     return {
         "schema_version": "1",
         "status": "M9_A_CANDIDATE",
+        "packet": "M9-A",
+        "parity_scope": "RUNTIME_PARITY",
+        "donor_runtime_executed": True,
+        "runtime_parity_claimed": True,
+        "runtime_ports": ["fixture"],
+        "sponsor_amendment": None,
         "tested_head": HEAD,
         **bindings,
         "commands": commands,
@@ -573,3 +579,33 @@ def test_migration_wrapper_cannot_omit_a_step_check_even_with_matching_counts(tm
 
     replace_physical_artifact(command["result"], change_result)
     assert any("round-trip/head check" in problem for problem in recorded_log_problems(document, tmp_path, source))
+
+
+@pytest.mark.parametrize("mutation", ["packet", "runtime", "claim", "ports", "approval", "reports"])
+def test_foundation_candidate_cannot_broaden_the_approved_exception(mutation):
+    from scripts.r2.verify_m9_scope import AMENDMENT, AMENDMENT_COMMIT
+
+    document, bindings = evidence()
+    document.update(
+        {
+            "parity_scope": "FOUNDATION_INVENTORY_VERIFIED",
+            "donor_runtime_executed": False,
+            "runtime_parity_claimed": False,
+            "runtime_ports": [],
+            "sponsor_amendment": {"path": AMENDMENT, "sha256": H, "commit": AMENDMENT_COMMIT},
+        }
+    )
+    assert verify(document, bindings) == []
+    if mutation == "packet":
+        document["packet"] = "M9-B"
+    elif mutation == "runtime":
+        document["donor_runtime_executed"] = True
+    elif mutation == "claim":
+        document["runtime_parity_claimed"] = True
+    elif mutation == "ports":
+        document["runtime_ports"] = ["research"]
+    elif mutation == "approval":
+        document["sponsor_amendment"] = None
+    else:
+        document["parity_reports"] *= 2
+    assert verify(document, bindings)

@@ -8,7 +8,7 @@ import os
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, ValidationError
 
@@ -16,6 +16,51 @@ from r2.contracts.advanced_creative import DonorParityReport, M8ContractModel, P
 from r2.opportunity.parity import FixtureComparison, evaluate_m9_parity
 from scripts.r2.verify_donor_parity import clone_file_hashes, verify_donor_parity
 from scripts.r2.verify_m9_design_acceptance import loads_unique_json
+from scripts.r2.verify_m9_prerequisites import GitPrerequisiteReader
+from scripts.r2.verify_m9_scope import AMENDMENT, AMENDMENT_COMMIT, BASELINE, CONTRACT, amendment_record, donor_problems
+
+
+def foundation_inventory_document(source: Any, head: str) -> dict[str, Any]:
+    record = amendment_record(source, head)
+    if record is None:
+        raise ValueError("foundation inventory requires the pinned sponsor amendment")
+    for path, digest in record["native_runtime_files"].items():
+        if hashlib.sha256(source.blob(head, path)).hexdigest() != digest:
+            raise ValueError("foundation inventory cannot exempt a changed native runtime")
+    baseline = loads_unique_json(source.blob(head, BASELINE))
+    return {
+        "schema_version": "m9.foundation-inventory.v1",
+        "packet": "M9-A",
+        "scope": "FOUNDATION_INVENTORY_VERIFIED",
+        "tested_head": head,
+        "sponsor_amendment": {
+            "path": AMENDMENT,
+            "commit": AMENDMENT_COMMIT,
+            "sha256": hashlib.sha256(source.blob(AMENDMENT_COMMIT, AMENDMENT)).hexdigest(),
+        },
+        "donor_runtime_executed": False,
+        "runtime_parity_claimed": False,
+        "runtime_ports": [],
+        "donors": baseline["donors"],
+        "classifications": [
+            {"donor": row["name"], "path": path, "classification": "DEFERRED_RUNTIME"}
+            for row in baseline["donors"]
+            for path in sorted(row["files"])
+        ],
+    }
+
+
+def foundation_inventory_problems(document: object, expected: dict[str, Any]) -> list[str]:
+    if (
+        not isinstance(document, dict)
+        or document.get("donor_runtime_executed") is not False
+        or document.get("runtime_parity_claimed") is not False
+        or document != expected
+    ):
+        return ["M9_DONOR_PARITY_INCOMPLETE: foundation inventory differs from the exact amended scope"]
+    if REGISTERED_FIXTURE_HARNESSES:
+        return ["M9_DONOR_PARITY_INCOMPLETE: a registered runtime harness requires actual paired parity"]
+    return []
 
 
 def verify_m9_parity(
@@ -175,10 +220,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("report", type=Path)
     parser.add_argument("--head", required=True)
     parser.add_argument("--evidence-root", type=Path)
-    parser.add_argument("--donor-clone", required=True, type=Path)
+    parser.add_argument("--donor-clone", type=Path)
+    parser.add_argument("--foundation-inventory", action="store_true")
+    parser.add_argument("--repo", type=Path, default=Path())
     args = parser.parse_args(argv)
     try:
         document = loads_unique_json(args.report.read_bytes())
+        if args.foundation_inventory:
+            source = GitPrerequisiteReader(args.repo.resolve())
+            expected = foundation_inventory_document(source, args.head)
+            problems = foundation_inventory_problems(document, expected)
+            donor_root = os.environ.get("ARCREEL_M9_DONOR_ROOT")
+            problems.extend(
+                donor_problems(
+                    loads_unique_json(source.blob(args.head, BASELINE)),
+                    loads_unique_json(source.blob(args.head, CONTRACT)),
+                    Path(donor_root) if donor_root else None,
+                )
+            )
+            for problem in problems:
+                print(problem)
+            if problems:
+                return 2
+            print("M9_FOUNDATION_INVENTORY_VERIFIED: donor runtime not executed; runtime parity not claimed")
+            return 0
+        if args.donor_clone is None:
+            raise ValueError("runtime parity requires a pinned local donor clone")
         report = DonorParityReport.model_validate(document)
         os.environ["GIT_NO_LAZY_FETCH"] = "1"
         hashes = clone_file_hashes(args.donor_clone, report.donor.commit_sha, report.donor.selected_paths)

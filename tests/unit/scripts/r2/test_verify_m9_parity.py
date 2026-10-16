@@ -262,3 +262,64 @@ def test_a_registered_harness_must_recompute_the_recorded_outputs(monkeypatch):
     )
     monkeypatch.setattr(verifier, "REGISTERED_FIXTURE_HARNESSES", {(PIN, "research"): lambda *_: changed})
     assert verify_m9_parity(body, HEAD, hashes, execution_fixture(body))
+
+
+@pytest.mark.parametrize("mutation", ["packet", "runtime", "claim", "ports", "classification", "head"])
+def test_foundation_inventory_cannot_claim_runtime_or_another_packet(mutation):
+    import copy
+
+    from scripts.r2.verify_m9_parity import foundation_inventory_document, foundation_inventory_problems
+    from tests.unit.scripts.r2.test_verify_m9_scope import AmendmentSource
+
+    source = AmendmentSource()
+    expected = foundation_inventory_document(source, source.head_ref)
+    body = copy.deepcopy(expected)
+    if mutation == "packet":
+        body["packet"] = "M9-B"
+    elif mutation == "runtime":
+        body["donor_runtime_executed"] = True
+    elif mutation == "claim":
+        body["runtime_parity_claimed"] = True
+    elif mutation == "ports":
+        body["runtime_ports"] = ["research"]
+    elif mutation == "classification":
+        body["classifications"][0]["classification"] = "RUNTIME_VERIFIED"
+    else:
+        body["tested_head"] = "b" * 40
+    assert foundation_inventory_problems(body, expected)
+    assert foundation_inventory_problems(expected, expected) == []
+
+
+def test_foundation_inventory_refuses_a_changed_native_runtime():
+    from scripts.r2.verify_m9_parity import foundation_inventory_document
+    from tests.unit.scripts.r2.test_verify_m9_scope import AmendmentSource
+
+    source = AmendmentSource()
+    path = next(iter(source.record["native_runtime_files"]))
+    source.blobs[source.head_ref, path] += b"\n"
+    with pytest.raises(ValueError, match="runtime"):
+        foundation_inventory_document(source, source.head_ref)
+
+
+@pytest.mark.parametrize("replacement", [0, None, "false"])
+def test_foundation_inventory_requires_literal_false_runtime_claims(replacement):
+    import copy
+
+    from scripts.r2.verify_m9_parity import foundation_inventory_document, foundation_inventory_problems
+    from tests.unit.scripts.r2.test_verify_m9_scope import AmendmentSource
+
+    source = AmendmentSource()
+    expected = foundation_inventory_document(source, source.head_ref)
+    body = copy.deepcopy(expected)
+    body["donor_runtime_executed"] = replacement
+    assert foundation_inventory_problems(body, expected)
+
+
+def test_foundation_inventory_cannot_exempt_a_registered_runtime_harness(monkeypatch):
+    from scripts.r2 import verify_m9_parity as module
+    from tests.unit.scripts.r2.test_verify_m9_scope import AmendmentSource
+
+    source = AmendmentSource()
+    body = module.foundation_inventory_document(source, source.head_ref)
+    monkeypatch.setattr(module, "REGISTERED_FIXTURE_HARNESSES", {("pin", "runtime"): lambda *_: None})
+    assert module.foundation_inventory_problems(body, body)

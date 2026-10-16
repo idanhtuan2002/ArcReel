@@ -269,3 +269,63 @@ def test_owned_paths_maps_only_the_m9_architecture_test_into_the_required_unit_t
     owned, creates = owned_paths(packet)
     assert creates == ["tests/architecture/unrelated.py", "tests/unit/r2/opportunity/test_m9_opportunity_boundaries.py"]
     assert owned == ["server/app.py", *creates]
+
+
+class AmendmentSource:
+    """Immutable Git object port substitute for the pinned sponsor boundary."""
+
+    def __init__(self):
+        import json
+
+        from scripts.r2.verify_m9_scope import AMENDMENT, AMENDMENT_COMMIT
+
+        root = Path(__file__).resolve().parents[4]
+        self.head_ref = "a" * 40
+        self.record = json.loads((root / AMENDMENT).read_bytes())
+        paths = [AMENDMENT, *self.record["artifacts"], *self.record["native_runtime_files"]]
+        paths.extend([self.record["baseline"]["path"], self.record["execution_contract"]["path"]])
+        self.blobs = {
+            (ref, path): (root / path).read_bytes() for ref in (AMENDMENT_COMMIT, self.head_ref) for path in paths
+        }
+        self.ancestor = True
+        self.parent = self.record["approved_base"]
+
+    def blob(self, ref, path):
+        return self.blobs[ref, path]
+
+    def is_ancestor(self, ancestor, descendant):
+        return self.ancestor
+
+    def parents(self, ref):
+        return [self.parent]
+
+    def changed_paths(self, ref):
+        return set(self.record["amendment_paths"])
+
+
+@pytest.mark.parametrize("mutation", ["record", "artifact", "parent", "ancestry", "baseline"])
+def test_sponsor_scope_extension_rejects_authority_drift(mutation):
+    from scripts.r2.verify_m9_scope import AMENDMENT, amendment_record
+
+    source = AmendmentSource()
+    if mutation in {"record", "artifact", "baseline"}:
+        path = AMENDMENT if mutation == "record" else next(iter(source.record["artifacts"]))
+        if mutation == "baseline":
+            path = source.record["baseline"]["path"]
+        source.blobs[source.head_ref, path] += b"\n"
+    elif mutation == "parent":
+        source.parent = "b" * 40
+    else:
+        source.ancestor = False
+    with pytest.raises(ValueError, match="amendment"):
+        amendment_record(source, source.head_ref)
+
+
+def test_sponsor_scope_extends_only_the_exact_approved_paths():
+    from scripts.r2.verify_m9_scope import amendment_record
+
+    source = AmendmentSource()
+    record = amendment_record(source, source.head_ref)
+    assert record["additional_paths"] == source.record["additional_paths"]
+    assert len(record["additional_paths"]) == 13
+    assert record["later_packets_released"] == []
