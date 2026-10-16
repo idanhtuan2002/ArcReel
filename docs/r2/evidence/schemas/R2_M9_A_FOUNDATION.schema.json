@@ -22,7 +22,10 @@
     "graph_coverage",
     "artifacts",
     "independent_review",
-    "created_at"
+    "created_at",
+    "test_report",
+    "parity_reports",
+    "migration_report"
   ],
   "properties": {
     "schema_version": {
@@ -117,7 +120,8 @@
           "tested_head",
           "passed",
           "skipped",
-          "log"
+          "log",
+          "result"
         ],
         "properties": {
           "gate": {
@@ -143,6 +147,24 @@
             "const": 0
           },
           "log": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "result": {
             "type": "object",
             "additionalProperties": false,
             "required": [
@@ -412,8 +434,7 @@
       ],
       "properties": {
         "project": {
-          "type": "string",
-          "minLength": 1
+          "const": "r2-m9a"
         },
         "generation": {
           "type": "string",
@@ -499,6 +520,64 @@
     "created_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "test_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "parity_reports": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "migration_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
     }
   }
 }

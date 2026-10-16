@@ -3,6 +3,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.adaptation import AdaptationRepository
@@ -18,6 +19,9 @@ from server.services.m9_custodian import M9ProfileCustodian
 
 class HostProfileTransaction(OpportunityProfileRepository):
     async def creative_policy_identity(self, *, user_id: str, project_name: str) -> tuple[str, str, str]:
+        # The table lock covers new head keys as well as transitions of existing heads.
+        # Accepted adaptation writers always INSERT before taking a per-head row lock.
+        await self.session.execute(text("LOCK TABLE adaptation_heads IN SHARE MODE"))
         admissions = await AdaptationRepository(self.session).list_effective_screenplay_admissions(
             user_id=user_id, project_name=project_name
         )

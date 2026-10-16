@@ -139,3 +139,90 @@ async def test_append_waiter_reads_the_committed_head_before_admission(session_f
         receipt, head = await asyncio.gather(*tasks)
     assert receipt.head == head
     assert await row_counts(session_factory) == (2, 1, 2, 2)
+
+
+@pytest.mark.parametrize("writer_first", [True, False])
+async def test_project_policy_read_serializes_real_admission_in_both_directions(session_factory, writer_first):
+    from lib.db.adaptation_uow import SqlAlchemyAdaptationUnitOfWork, adaptation_uow_factory
+    from r2.adaptation.authority import AdaptationAuthorityService
+    from r2.adaptation.evaluation import ProfileEvaluationService, report_ref_of
+    from r2.adaptation.evidence import AdaptationEvidenceService
+    from r2.advanced_creative.lineage import host_policy_digest
+    from server.services.opportunity import HostProfileUnitOfWork
+    from tests.integration.r2.adaptation._fakes import FakeAuthority
+    from tests.integration.r2.adaptation.test_screenplay_admission import (
+        _PRINCIPAL,
+        _admit_command,
+        _seed_admissible_proposal,
+    )
+
+    factory = adaptation_uow_factory(session_factory)
+    branch, map_receipt, proposal, report = await _seed_admissible_proposal(
+        AdaptationEvidenceService(factory),
+        AdaptationAuthorityService(factory, FakeAuthority()),
+        ProfileEvaluationService(factory),
+    )
+    command = _admit_command(
+        proposal=proposal,
+        profile_ref=branch.profile_ref,
+        effective_map_approval_ref=map_receipt.decision_ref,
+        report_refs=[report_ref_of(report)],
+    )
+    writer_entered, writer_staged = asyncio.Event(), asyncio.Event()
+    reader_entered, reader_resolved, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    pids = {}
+
+    class ObservedAdmissionUnitOfWork(SqlAlchemyAdaptationUnitOfWork):
+        async def __aenter__(self):
+            await super().__aenter__()
+            pids["writer"] = await self.session.scalar(text("SELECT pg_backend_pid()"))
+            writer_entered.set()
+            return self
+
+        async def commit(self):
+            writer_staged.set()
+            if writer_first:
+                await release.wait()
+            await super().commit()
+
+    authority = AdaptationAuthorityService(lambda: ObservedAdmissionUnitOfWork(session_factory), FakeAuthority())
+
+    async def read_policy():
+        async with HostProfileUnitOfWork(session_factory).transaction() as repo:
+            pids["reader"] = await repo.session.scalar(text("SELECT pg_backend_pid()"))
+            reader_entered.set()
+            policy = await repo.creative_policy_identity(user_id="u1", project_name="project-a")
+            reader_resolved.set()
+            if not writer_first:
+                await release.wait()
+            return policy
+
+    async def admit():
+        return await authority.admit_screenplay_for_direction(command, authenticated_principal=_PRINCIPAL)
+
+    tasks = []
+    try:
+        if writer_first:
+            tasks.append(asyncio.create_task(admit()))
+            await asyncio.wait_for(writer_staged.wait(), timeout=10)
+            tasks.append(asyncio.create_task(read_policy()))
+            await asyncio.wait_for(reader_entered.wait(), timeout=10)
+            await observe_blocked(session_factory, pids["reader"], pids["writer"])
+        else:
+            tasks.append(asyncio.create_task(read_policy()))
+            await asyncio.wait_for(reader_resolved.wait(), timeout=10)
+            tasks.append(asyncio.create_task(admit()))
+            await asyncio.wait_for(writer_entered.wait(), timeout=10)
+            await observe_blocked(session_factory, pids["writer"], pids["reader"])
+    finally:
+        release.set()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+    assert not any(isinstance(result, BaseException) for result in results), results
+    expected = (
+        branch.profile_ref.profile_id.value,
+        branch.profile_ref.profile_version,
+        branch.profile_ref.policy_pack_digest,
+    )
+    assert results[1] == expected if writer_first else results[0] == ("arcreel.host", "1", host_policy_digest())
+    async with HostProfileUnitOfWork(session_factory).transaction() as repo:
+        assert await repo.creative_policy_identity(user_id="u1", project_name="project-a") == expected

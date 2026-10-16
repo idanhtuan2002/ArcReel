@@ -187,7 +187,8 @@ async def test_missing_activated_grant_reader_is_a_prerequisite_failure(session_
     assert await lease_count(session_factory) == 0
 
 
-async def test_host_composition_publishes_and_replays_the_exact_signed_custody(session_factory):
+@pytest.mark.parametrize("same_command", [True, False])
+async def test_host_composition_publishes_and_replays_the_exact_signed_custody(session_factory, same_command):
     from r2.advanced_creative.lineage import host_policy_digest
     from r2.contracts.opportunity import OpportunityCohortProfilePayload
     from server.auth import CurrentUserInfo
@@ -208,14 +209,29 @@ async def test_host_composition_publishes_and_replays_the_exact_signed_custody(s
         }
     )
     command = publication(actor_id="reviewer-a", payload=payload)
-    first, second = await asyncio.gather(
-        service.publish_cohort_profile(command), service.publish_cohort_profile(command)
+    other_command = (
+        command
+        if same_command
+        else command.model_copy(
+            update={
+                "context": command.context.model_copy(update={"command_id": OTHER}),
+                "profile_id": OTHER,
+            }
+        )
     )
-    assert first.model_dump_json() == second.model_dump_json()
+    first, second = await asyncio.wait_for(
+        asyncio.gather(service.publish_cohort_profile(command), service.publish_cohort_profile(other_command)),
+        timeout=10,
+    )
+    if same_command:
+        assert first.model_dump_json() == second.model_dump_json()
+    else:
+        assert first.profile.profile_id != second.profile.profile_id
     assert first.profile.custodian_evidence_digest == event.event_digest
     assert (first.profile.user_id, first.profile.created_by) == ("u1", "reviewer-a")
-    assert await row_counts(session_factory) == (1, 1, 1, 1)
-    assert await lease_count(session_factory) == 1
+    count = 1 if same_command else 2
+    assert await row_counts(session_factory) == (count, count, count, count)
+    assert await lease_count(session_factory) == count
 
 
 @pytest.mark.parametrize("principal", ["reviewer-a", "reviewer-e\u0301"])
