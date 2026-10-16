@@ -1,0 +1,718 @@
+{
+  "schema_version": "1",
+  "status": "M9_A_CANDIDATE",
+  "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+  "tested_parent": "f0804ec1c1eb73d9793fc79485fc9df46a708a24",
+  "branch": "impl/r2-m9a-opportunity-foundation",
+  "baseline_sha256": "f6d256baa080fd7fc4333afb34405c13f5c6dcef2a8f178e2674772dced66e25",
+  "documents": {
+    "docs/adr/0081-m9-evidence-first-opportunity-intelligence.md": "27f8d79bb005a1242d7ecfd616c32f40d78bc684ed5ca994f9aae8b79adde64b",
+    "docs/research/2026-09-14-r2-m9-opportunity-research-intelligence.md": "0d40ba87982546e1ac5eb306ed2e008769e4e4a1efce267b928071c7672e1e1a",
+    "docs/research/2026-09-15-r2-m9-design-validation.md": "51bfa2f0d8c6558193aabe5f31f4eea6d7b649e49e3ec139aeb84a97730bc15e",
+    "docs/superpowers/specs/2026-09-14-r2-m9-opportunity-research-intelligence-design.md": "8e7c34e1e53380ccd6f61b79dc48205da801f1743545f924bb1e812dd615a934",
+    "docs/superpowers/plans/2026-09-14-r2-m9-opportunity-research-intelligence.md": "28ae1f9d99c6a5f6d5af7a377cc6d803d026e8e312df87d042cbef6a1a38afee",
+    "docs/superpowers/plans/2026-09-14-r2-m9a-foundation-cohort-profiles.md": "c6d87502c82f180546817a23acd482d612624ef1c66e431ed5ceb7c46f61828e",
+    "docs/r2/evidence/R2_M9_EXECUTION_CONTRACT_2026-09-14.json": "6223fae310fce2f267cbfd13dddc18ecae4d13f2380e11ebc7a7b5a13433ca6d",
+    "docs/r2/evidence/R2_M9_DESIGN_ACCEPTANCE_CONTRACT_2026-09-15.json": "d18b6fb107852cdea8c1d9e486b1e05544ae2564cbc9c0f90b6bb0137a5101b3",
+    "docs/r2/evidence/schemas/R2_M9_DESIGN_ACCEPTANCE.schema.json": "05d1620b1c0e44203e3a8cf008b46fbdf93bb2dc6b00ccb1342a14ebd9b1f57a",
+    "docs/r2/evidence/schemas/R2_M9_DESIGN_REVIEW.schema.json": "7670b10b709e5574d85c3ed781ba7ea9a4e29ede139c06c1173ef98e4615800c",
+    "scripts/r2/verify_m9_design_acceptance.py": "4890ebd9dd5199269b8a38b36c66300b3ed60ff38f46139bbdf36ce52595eae0",
+    "tests/unit/scripts/r2/test_verify_m9_design_acceptance.py": "77b3f6e9ba215b032a177d12cb3355e14f45d90b4b840cbe4727d4e22f034778"
+  },
+  "contracts": {
+    "r2/contracts/opportunity.py": "ccb81102c2eebf42e9e9226afa908b182f896c10ff3433020c1e6e137a117d37",
+    "r2/opportunity/digests.py": "092d00fc1c815d37c08d94dd917142959a894cbcb8e98720d7d8aa983b7fa4a5",
+    "r2/opportunity/ports.py": "3bfa92c87d322accfe38bd11cb5d10ab4b80e59e176198dec6591a9b1dcc23d0"
+  },
+  "seams": {
+    "r2/contracts/advanced_creative.py": "064ebe4dc1dba759bc9321d2cb4a5028fb36f2f0903295a5e338bfb78d537b65",
+    "r2/advanced_creative/digests.py": "f9e4357a14ab0b55405c5231b84c96069ebb4b207171c91328e9aaaa71f573fa",
+    "r2/advanced_creative/exploration.py": "2a350075723bcfe5939690381dc3806450ea3d4818a0d59ce84f89a3744172cc",
+    "lib/db/repositories/learning.py": "1a2f8a5103a789b3bd495169523fa5295581b3dbb7dc55b0e1a3afa8b2a093f1",
+    "r2/contracts/factual.py": "f3478d17683f5b859b7fa342b223c5babfd527d14f9365f7e598e892316bbb15",
+    "server/services/governance_grants.py": "18f9376f33dafbbc84ac49486476685cd8f1b74bb042f8b28c9f7df9aec36746"
+  },
+  "migration": {
+    "path": "alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py",
+    "sha256": "150d291e51c3f5c49de794281cf9b517a93c9979bb73c5791caa4a87f7a8e53f",
+    "head": "9a9c4a0e0001",
+    "predecessor": "918c4a0e0001"
+  },
+  "scope_allowlist": [
+    "alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py",
+    "docs/adr/0111-m9a-foundation-inventory-and-test-compatibility.md",
+    "docs/r2/evidence/R2_M9_A_FOUNDATION.json",
+    "docs/r2/evidence/R2_M9_A_SCHEDULER_TEST_AMENDMENT.json",
+    "docs/r2/evidence/R2_M9_A_SPONSOR_AMENDMENT.json",
+    "docs/r2/evidence/R2_M9_BASELINE.json",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-parity.md",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-scheduler.patch",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.json",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.md",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.patch",
+    "docs/r2/evidence/schemas/R2_M9_A_FOUNDATION.schema.json",
+    "docs/r2/evidence/schemas/R2_M9_BASELINE.schema.json",
+    "lib/db/models/__init__.py",
+    "lib/db/models/host_custodian.py",
+    "lib/db/models/opportunity.py",
+    "lib/db/repositories/__init__.py",
+    "lib/db/repositories/opportunity.py",
+    "lib/i18n/en/errors.py",
+    "lib/i18n/vi/errors.py",
+    "lib/i18n/zh/errors.py",
+    "r2/contracts/__init__.py",
+    "r2/contracts/opportunity.py",
+    "r2/opportunity/__init__.py",
+    "r2/opportunity/digests.py",
+    "r2/opportunity/errors.py",
+    "r2/opportunity/parity.py",
+    "r2/opportunity/ports.py",
+    "r2/opportunity/profiles.py",
+    "scripts/r2/verify_m9_evidence.py",
+    "scripts/r2/verify_m9_parity.py",
+    "scripts/r2/verify_m9_scope.py",
+    "server/app.py",
+    "server/routers/opportunity.py",
+    "server/services/m9_custodian.py",
+    "server/services/opportunity.py",
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+    "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py",
+    "tests/integration/lib/db/migrations/test_format_projections.py",
+    "tests/integration/lib/db/migrations/test_learning_observations.py",
+    "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+    "tests/integration/lib/db/migrations/test_production_target_registry.py",
+    "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+    "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+    "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+    "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+    "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+    "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+    "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+    "tests/integration/lib/db/repositories/test_opportunity_profiles.py",
+    "tests/integration/r2/opportunity/test_profile_concurrency.py",
+    "tests/integration/server/services/test_execution_recovery_scheduler.py",
+    "tests/integration/server/services/test_m9_custodian.py",
+    "tests/unit/r2/contracts/test_opportunity.py",
+    "tests/unit/r2/opportunity/__init__.py",
+    "tests/unit/r2/opportunity/test_digests.py",
+    "tests/unit/r2/opportunity/test_m9_opportunity_boundaries.py",
+    "tests/unit/r2/opportunity/test_parity.py",
+    "tests/unit/r2/opportunity/test_profiles.py",
+    "tests/unit/scripts/r2/test_verify_m9_evidence.py",
+    "tests/unit/scripts/r2/test_verify_m9_parity.py",
+    "tests/unit/scripts/r2/test_verify_m9_scope.py",
+    "tests/unit/server/routers/test_opportunity_router.py"
+  ],
+  "donor_inventory": [
+    {
+      "name": "OpenMontage",
+      "commit": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "files": {
+        "skills/pipelines/explainer/research-director.md": "420641d56fed790a19f7d9c85795ec0728138c692552e06cdcf106f506e151f3",
+        "schemas/artifacts/research_brief.schema.json": "0d263fb8f46c6ef8e8f31492d679506c22ecfe0dd379d44432dac658ff0401f3",
+        "schemas/artifacts/decision_log.schema.json": "4fb3b3dac79b1b9c742523f7c6878ffc8c64049b0fe5f811d26076761eca773f"
+      }
+    },
+    {
+      "name": "Kalinga-Shorts-Factory",
+      "commit": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+      "files": {
+        "pipeline/src/research.py": "e0feb3c718d6494c969e51d90270e4aaa46577e70013101ef65f62b6e90f9575",
+        "pipeline/src/creative.py": "3efc1b24cbd5f479959041ad5597f6f2a2c65ea03536b27782869d561807dfcd",
+        "pipeline/src/kalinga.py": "d8fed2e491c7a184f9682173fc04cc56eba5da41aafe1263c453c2c78c9c22f3",
+        "pipeline/src/daily.py": "d5b3b32704147596d0c6e9d0804d70853e4fb67b56a89e0880ab665f495129fe",
+        "channels/history-shorts/channel.yaml": "34da60396c43970db5e9e3aee42b3b19d63bbea74d6fb1e75f7b7c717f970858"
+      }
+    },
+    {
+      "name": "Huohuo-Drama",
+      "commit": "f104b853b3563e124d9cde25f9331d323fb483b9",
+      "files": {
+        "workbench-server/src/services/novel/novel-outline-drama-fields.ts": "7a7db8a7674445d8352beb7a165fb5fe40bf02c1d526a89c31a6c74fa9029c67"
+      }
+    }
+  ],
+  "packet": "M9-A",
+  "parity_scope": "FOUNDATION_INVENTORY_VERIFIED",
+  "sponsor_amendment": {
+    "path": "docs/r2/evidence/R2_M9_A_SPONSOR_AMENDMENT.json",
+    "commit": "7b16c36c50fc040a5402bcdec2361896a3dded95",
+    "sha256": "f855ab6eb9200aceebfd522af69b4354a331b10b6de3c0749a9a3f66d0c4eaa7"
+  },
+  "donor_runtime_executed": false,
+  "runtime_parity_claimed": false,
+  "runtime_ports": [],
+  "commands": [
+    {
+      "gate": "audit",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/audit_tests.py --check",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/audit.log",
+        "sha256": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/audit.result.json",
+        "sha256": "6f72e5710c02eebbd68d7f2f0d64c32e76994e7f1e58a73e7350d9c8492ed7d7"
+      }
+    },
+    {
+      "gate": "dependencies",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry lib server alembic scripts tests r2",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/dependencies.log",
+        "sha256": "c57c45a0323a8863d134325acc5ebb06123210b494ccacfcac28dc4151a48135"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/dependencies.result.json",
+        "sha256": "cbd07e0ac132387bbfb18bdd1085a309f7e09dfdedfc66ec0f55ef767aad594e"
+      }
+    },
+    {
+      "gate": "diff",
+      "command": "git diff --check",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/diff.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/diff.result.json",
+        "sha256": "6c9308b20ac7c2087e132247631171e52eb38c09d68b6bfda9fe061246da18ee"
+      }
+    },
+    {
+      "gate": "format",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff format --check .",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/format.log",
+        "sha256": "e58d21f8cd8eb0bb34f728d82649fac518f5953bc9848ede80a65d15a8a90a3a"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/format.result.json",
+        "sha256": "5ac35bc896b1f0d9aa041d0f59af95211f61631160c789b2c60b4f6d47f42dd7"
+      }
+    },
+    {
+      "gate": "imports",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/imports.log",
+        "sha256": "4703eb2cc41c3ee6abd5dc3e1edfed5200e97f31f1547293b53a203c5e0ca16f"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/imports.result.json",
+        "sha256": "79884fa62680d24c79112e573e9b4c5f34f1d521a487612458770dcdb0bffaa2"
+      }
+    },
+    {
+      "gate": "migration",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/migrations/test_alembic_m9_foundation.py --junitxml /tmp/m9a-final-fd9543de6053/migration.xml",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 2,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/migration.log",
+        "sha256": "d3aa4a1196b8539ebc73bc28e504bdee7515ff083ff313392b8d193bc6f9c60d"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/migration.result.json",
+        "sha256": "4992d178501f0112e1438ce10abd205cb351c8f00287193f75ee02fed845f10e"
+      }
+    },
+    {
+      "gate": "parity",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/r2/verify_m9_parity.py /tmp/m9a-final-fd9543de6053/foundation-inventory.json --head fd9543de6053c5b21a17605c5ea13b967a6ff638 --foundation-inventory",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/parity.log",
+        "sha256": "ead4076ae6da3c46fcfb1645509a3addd2db41c20b9ee4d2c218e387da5b70af"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/parity.result.json",
+        "sha256": "6f883f5cb66f2fbf59ddfe3135ba94d749a3f6406550f664e1b7de3b748edacc"
+      }
+    },
+    {
+      "gate": "ruff",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff check .",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/ruff.log",
+        "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/ruff.result.json",
+        "sha256": "fd17480e4a14e70fcb54968a92b096520480e4a29a0be79ed2264206384f2df6"
+      }
+    },
+    {
+      "gate": "scope",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/r2/verify_m9_scope.py docs/r2/evidence/R2_M9_EXECUTION_CONTRACT_2026-09-14.json",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/scope.log",
+        "sha256": "6999fc9d0a74cd24b0e9d7f3d7797df79be6ea697dce2b838f54dca7010f7e85"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/scope.result.json",
+        "sha256": "00091722a9bd4017d8a10f6cf21d40b982833ee1128f4f0d2f213b108392d8a2"
+      }
+    },
+    {
+      "gate": "tests",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/integration/lib/db/migrations/test_alembic_m8_exploration.py tests/integration/lib/db/migrations/test_alembic_m9_foundation.py tests/integration/lib/db/migrations/test_format_projections.py tests/integration/lib/db/migrations/test_learning_observations.py tests/integration/lib/db/migrations/test_production_binding_authority.py tests/integration/lib/db/migrations/test_production_target_registry.py tests/integration/lib/db/migrations/test_spatial_constraint_sets.py tests/integration/lib/db/migrations/test_spatial_execution_evidence.py tests/integration/lib/db/migrations/test_spatial_frame_receipts.py tests/integration/lib/db/migrations/test_spatial_pair_authority.py tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py tests/integration/lib/db/migrations/test_spatial_review_custody.py tests/integration/lib/db/repositories/test_opportunity_profiles.py tests/integration/r2/opportunity/test_profile_concurrency.py tests/integration/server/services/test_execution_recovery_scheduler.py tests/integration/server/services/test_m9_custodian.py tests/unit/r2/opportunity/__init__.py tests/unit/r2/opportunity/test_digests.py tests/unit/r2/opportunity/test_m9_opportunity_boundaries.py tests/unit/r2/opportunity/test_parity.py tests/unit/r2/opportunity/test_profiles.py tests/unit/scripts/r2/test_verify_m9_evidence.py tests/unit/scripts/r2/test_verify_m9_parity.py tests/unit/scripts/r2/test_verify_m9_scope.py tests/unit/server/routers/test_opportunity_router.py tests/unit/r2/contracts tests/unit/server/test_interactive_auth.py tests/unit/lib/i18n/test_i18n_consistency.py tests/unit/r2/advanced_creative/test_lineage.py --junitxml /tmp/m9a-final-fd9543de6053/tests.xml",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 802,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/tests.log",
+        "sha256": "0ff186af448279c3d31711f41776d9b0fecb80d26d0f01d79bf89437aedd24ec"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/tests.result.json",
+        "sha256": "c6d90c216eb799b1a52ab8463f5858d3ecb78ddcaa954fa1f21ff99d4e1def56"
+      }
+    },
+    {
+      "gate": "types",
+      "command": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright --warnings",
+      "exit": 0,
+      "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+      "passed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/tmp/m9a-final-fd9543de6053/types.log",
+        "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+      },
+      "result": {
+        "path": "/tmp/m9a-final-fd9543de6053/types.result.json",
+        "sha256": "9b7c5c178bb6b1763af638fb2e3d8050f9248a4ceb2b50960dc84b5912e66f91"
+      }
+    }
+  ],
+  "fault_matrix": {
+    "replay": {
+      "status": "PASS",
+      "command_gate": "tests",
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_profile_concurrency::test_absent_receipt_races_serialize_but_full_key_and_digest_remain_authority[collision]",
+        "tests.integration.r2.opportunity.test_profile_concurrency::test_absent_receipt_races_serialize_but_full_key_and_digest_remain_authority[divergent]",
+        "tests.integration.r2.opportunity.test_profile_concurrency::test_absent_receipt_races_serialize_but_full_key_and_digest_remain_authority[equal]",
+        "tests.unit.r2.opportunity.test_profiles::test_lost_commit_acknowledgement_reconciles_from_receipt_without_reauthorization"
+      ]
+    },
+    "scope": {
+      "status": "PASS",
+      "command_gate": "tests",
+      "test_refs": [
+        "tests.unit.r2.opportunity.test_profiles::test_read_boundary_does_not_return_hash_valid_foreign_scope_or_head[head-id]",
+        "tests.unit.r2.opportunity.test_profiles::test_read_boundary_does_not_return_hash_valid_foreign_scope_or_head[profile-owner]",
+        "tests.unit.server.routers.test_opportunity_router::test_body_scope_injection_is_rejected_before_authorization[actor_id]",
+        "tests.unit.server.routers.test_opportunity_router::test_body_scope_injection_is_rejected_before_authorization[project_name]",
+        "tests.unit.server.routers.test_opportunity_router::test_body_scope_injection_is_rejected_before_authorization[user_id]"
+      ]
+    },
+    "custody": {
+      "status": "PASS",
+      "command_gate": "tests",
+      "test_refs": [
+        "tests.integration.server.services.test_m9_custodian::test_a_principal_without_a_human_grant_cannot_issue_a_lease",
+        "tests.integration.server.services.test_m9_custodian::test_expired_unadmitted_command_never_refreshes_its_lease",
+        "tests.integration.server.services.test_m9_custodian::test_lease_replay_rejects_tampered_retained_signed_bytes_without_disclosing_them",
+        "tests.unit.server.routers.test_opportunity_router::test_auth_disabled_or_api_key_cannot_reach_human_publication[False]",
+        "tests.unit.server.routers.test_opportunity_router::test_auth_disabled_or_api_key_cannot_reach_human_publication[True]"
+      ]
+    },
+    "rollback": {
+      "status": "PASS",
+      "command_gate": "tests",
+      "test_refs": [
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_every_staged_flush_rolls_back_with_the_authority_transaction[event]",
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_every_staged_flush_rolls_back_with_the_authority_transaction[head]",
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_every_staged_flush_rolls_back_with_the_authority_transaction[profile]",
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_every_staged_flush_rolls_back_with_the_authority_transaction[receipt]",
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_stale_head_cas_rolls_back_an_already_staged_revision"
+      ]
+    },
+    "integrity": {
+      "status": "PASS",
+      "command_gate": "tests",
+      "test_refs": [
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_database_driver_failures_do_not_expose_profile_payload_in_exception_paths",
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_reads_recompute_the_complete_profile_not_only_stored_digest_columns[custodian_evidence_digest-sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb]",
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_reads_recompute_the_complete_profile_not_only_stored_digest_columns[payload_json-value0]",
+        "tests.integration.lib.db.repositories.test_opportunity_profiles::test_receipt_ref_cannot_substitute_a_different_valid_profile"
+      ]
+    },
+    "concurrency": {
+      "status": "PASS",
+      "command_gate": "tests",
+      "test_refs": [
+        "tests.integration.r2.opportunity.test_profile_concurrency::test_append_waiter_reads_the_committed_head_before_admission",
+        "tests.integration.r2.opportunity.test_profile_concurrency::test_different_commands_racing_genesis_commit_one_complete_aggregate",
+        "tests.integration.r2.opportunity.test_profile_concurrency::test_project_policy_read_serializes_real_admission_in_both_directions[False]",
+        "tests.integration.r2.opportunity.test_profile_concurrency::test_project_policy_read_serializes_real_admission_in_both_directions[True]"
+      ]
+    },
+    "architecture": {
+      "status": "PASS",
+      "command_gate": "tests",
+      "test_refs": [
+        "tests.unit.r2.opportunity.test_m9_opportunity_boundaries::test_deep_module_cannot_import_credentials_providers_or_foreign_repositories",
+        "tests.unit.r2.opportunity.test_m9_opportunity_boundaries::test_opportunity_module_exposes_only_protocols_at_external_seams",
+        "tests.unit.r2.opportunity.test_m9_opportunity_boundaries::test_repository_never_commits_or_calls_another_authority"
+      ]
+    }
+  },
+  "test_report": {
+    "path": "/tmp/m9a-final-fd9543de6053/tests.xml",
+    "sha256": "8163215642fa8ff1d1d1a8fab458131a18b875be54f8620fed42ffa61afd4de9"
+  },
+  "migration_report": {
+    "path": "/tmp/m9a-final-fd9543de6053/migration.xml",
+    "sha256": "cbe8882774fbe89829cac411d5636b0269e710b62174810b16a08ac2c9fb9d55"
+  },
+  "parity_reports": [
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/foundation-inventory.json",
+      "sha256": "24c46e5cc420c7bca95d34ddc4be3d54edccf8f16386d618163da15ca9341daa"
+    }
+  ],
+  "required_skips": [],
+  "material_unknowns": [],
+  "graph_coverage": {
+    "project": "r2-m9a",
+    "generation": "2026-10-16T05:59:52Z",
+    "signal": "best_effort",
+    "paths": [
+      "alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py",
+      "docs/adr/0111-m9a-foundation-inventory-and-test-compatibility.md",
+      "docs/r2/evidence/R2_M9_A_SCHEDULER_TEST_AMENDMENT.json",
+      "docs/r2/evidence/R2_M9_A_SPONSOR_AMENDMENT.json",
+      "docs/r2/evidence/R2_M9_BASELINE.json",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-parity.md",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-scheduler.patch",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-tests.json",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-tests.md",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-tests.patch",
+      "docs/r2/evidence/schemas/R2_M9_A_FOUNDATION.schema.json",
+      "docs/r2/evidence/schemas/R2_M9_BASELINE.schema.json",
+      "lib/db/models/__init__.py",
+      "lib/db/models/host_custodian.py",
+      "lib/db/models/opportunity.py",
+      "lib/db/repositories/__init__.py",
+      "lib/db/repositories/opportunity.py",
+      "lib/i18n/en/errors.py",
+      "lib/i18n/vi/errors.py",
+      "lib/i18n/zh/errors.py",
+      "r2/contracts/__init__.py",
+      "r2/contracts/opportunity.py",
+      "r2/opportunity/__init__.py",
+      "r2/opportunity/digests.py",
+      "r2/opportunity/errors.py",
+      "r2/opportunity/parity.py",
+      "r2/opportunity/ports.py",
+      "r2/opportunity/profiles.py",
+      "scripts/r2/verify_m9_evidence.py",
+      "scripts/r2/verify_m9_parity.py",
+      "scripts/r2/verify_m9_scope.py",
+      "server/app.py",
+      "server/routers/opportunity.py",
+      "server/services/m9_custodian.py",
+      "server/services/opportunity.py",
+      "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+      "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py",
+      "tests/integration/lib/db/migrations/test_format_projections.py",
+      "tests/integration/lib/db/migrations/test_learning_observations.py",
+      "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+      "tests/integration/lib/db/migrations/test_production_target_registry.py",
+      "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+      "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+      "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+      "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+      "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+      "tests/integration/lib/db/repositories/test_opportunity_profiles.py",
+      "tests/integration/r2/opportunity/test_profile_concurrency.py",
+      "tests/integration/server/services/test_execution_recovery_scheduler.py",
+      "tests/integration/server/services/test_m9_custodian.py",
+      "tests/unit/r2/contracts/test_opportunity.py",
+      "tests/unit/r2/opportunity/__init__.py",
+      "tests/unit/r2/opportunity/test_digests.py",
+      "tests/unit/r2/opportunity/test_m9_opportunity_boundaries.py",
+      "tests/unit/r2/opportunity/test_parity.py",
+      "tests/unit/r2/opportunity/test_profiles.py",
+      "tests/unit/scripts/r2/test_verify_m9_evidence.py",
+      "tests/unit/scripts/r2/test_verify_m9_parity.py",
+      "tests/unit/scripts/r2/test_verify_m9_scope.py",
+      "tests/unit/server/routers/test_opportunity_router.py"
+    ],
+    "source_fallback": [
+      "docs/adr/0111-m9a-foundation-inventory-and-test-compatibility.md",
+      "docs/r2/evidence/R2_M9_A_SCHEDULER_TEST_AMENDMENT.json",
+      "docs/r2/evidence/R2_M9_A_SPONSOR_AMENDMENT.json",
+      "docs/r2/evidence/R2_M9_BASELINE.json",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-parity.md",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-scheduler.patch",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-tests.json",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-tests.md",
+      "docs/r2/evidence/amendments/2026-10-16-m9a-tests.patch",
+      "docs/r2/evidence/schemas/R2_M9_A_FOUNDATION.schema.json",
+      "docs/r2/evidence/schemas/R2_M9_BASELINE.schema.json",
+      "lib/i18n/en/errors.py",
+      "lib/i18n/vi/errors.py",
+      "lib/i18n/zh/errors.py",
+      "scripts/r2/verify_m9_evidence.py",
+      "scripts/r2/verify_m9_parity.py",
+      "scripts/r2/verify_m9_scope.py",
+      "server/services/opportunity.py",
+      "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+      "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py",
+      "tests/integration/lib/db/migrations/test_format_projections.py",
+      "tests/integration/lib/db/migrations/test_learning_observations.py",
+      "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+      "tests/integration/lib/db/migrations/test_production_target_registry.py",
+      "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+      "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+      "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+      "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+      "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+      "tests/integration/lib/db/repositories/test_opportunity_profiles.py",
+      "tests/integration/r2/opportunity/test_profile_concurrency.py",
+      "tests/integration/server/services/test_execution_recovery_scheduler.py",
+      "tests/integration/server/services/test_m9_custodian.py",
+      "tests/unit/r2/opportunity/__init__.py",
+      "tests/unit/scripts/r2/test_verify_m9_evidence.py",
+      "tests/unit/scripts/r2/test_verify_m9_parity.py",
+      "tests/unit/scripts/r2/test_verify_m9_scope.py"
+    ],
+    "artifact": {
+      "path": "/tmp/m9a-final-fd9543de6053/graph-coverage.json",
+      "sha256": "3c85cc2b848bf9cfaa530f65a3cf6bf4b22b7cf65953109488882129000cd400"
+    }
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/active-process-snapshot.json",
+      "sha256": "249a2b42cd853da95051619aabde00394f9f029ccd13d9f38a0b5c23f36b0d97"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/audit.log",
+      "sha256": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/audit.result.json",
+      "sha256": "6f72e5710c02eebbd68d7f2f0d64c32e76994e7f1e58a73e7350d9c8492ed7d7"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/collection.log",
+      "sha256": "7ea8cb9666c5b31523b822de22f3641342d178f52230ce6e0ff5d3cd83000335"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/collection.result.json",
+      "sha256": "eaff8518364df4b515c5524bd825c745f7875e6f7eccb245a1e4fe0e4dac760a"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/core-proof-check.json",
+      "sha256": "78bf08c228d0336e16bb54c0cc0a838831ba52aea6a79bd2e1e823bc83489af5"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/dependencies.log",
+      "sha256": "c57c45a0323a8863d134325acc5ebb06123210b494ccacfcac28dc4151a48135"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/dependencies.result.json",
+      "sha256": "cbd07e0ac132387bbfb18bdd1085a309f7e09dfdedfc66ec0f55ef767aad594e"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/diff.result.json",
+      "sha256": "6c9308b20ac7c2087e132247631171e52eb38c09d68b6bfda9fe061246da18ee"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/format.log",
+      "sha256": "e58d21f8cd8eb0bb34f728d82649fac518f5953bc9848ede80a65d15a8a90a3a"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/format.result.json",
+      "sha256": "5ac35bc896b1f0d9aa041d0f59af95211f61631160c789b2c60b4f6d47f42dd7"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/foundation-inventory.json",
+      "sha256": "24c46e5cc420c7bca95d34ddc4be3d54edccf8f16386d618163da15ca9341daa"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/full-sqlite-interruption.json",
+      "sha256": "a80c90eff3788a3729d7058eed2be74a53a9a2b0b2e4a3af6e68acadc11a542f"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/full-sqlite.log",
+      "sha256": "da40c6805adebfce0409724fe6de08afc34fbc264cb411596cb8d2349b33d980"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/full-sqlite.result.json",
+      "sha256": "3f8cd61d5e235cdc807c20c3c3628e704ee3a640c87ff0a6c00a36c98c4ffb4f"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/full-sqlite.xml",
+      "sha256": "60f5feba8b0407e0ecb1901916353a1bb94e9ec6cf3581ff3e14e72becef8938"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/graph-coverage.json",
+      "sha256": "3c85cc2b848bf9cfaa530f65a3cf6bf4b22b7cf65953109488882129000cd400"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/graph-coverage.raw.json",
+      "sha256": "f768be5e278497ced61070133aeedacc14428efdaf5f4c32e0d60d36cc881fe4"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/immutable-bindings.json",
+      "sha256": "c0365f26c0e5dc6077d43ae13e725e62493cd48ba448fd2ac1df9fc005339b75"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/imports.log",
+      "sha256": "4703eb2cc41c3ee6abd5dc3e1edfed5200e97f31f1547293b53a203c5e0ca16f"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/imports.result.json",
+      "sha256": "79884fa62680d24c79112e573e9b4c5f34f1d521a487612458770dcdb0bffaa2"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/migration.log",
+      "sha256": "d3aa4a1196b8539ebc73bc28e504bdee7515ff083ff313392b8d193bc6f9c60d"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/migration.result.json",
+      "sha256": "4992d178501f0112e1438ce10abd205cb351c8f00287193f75ee02fed845f10e"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/migration.xml",
+      "sha256": "cbe8882774fbe89829cac411d5636b0269e710b62174810b16a08ac2c9fb9d55"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/native-backend-coverage.json",
+      "sha256": "87aa34efc188f9867cf0ec64406b5c5c1dd439cbc8eb485583c5d1c743507fd0"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/parity.log",
+      "sha256": "ead4076ae6da3c46fcfb1645509a3addd2db41c20b9ee4d2c218e387da5b70af"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/parity.result.json",
+      "sha256": "6f883f5cb66f2fbf59ddfe3135ba94d749a3f6406550f664e1b7de3b748edacc"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/postgres-compat.log",
+      "sha256": "8c44c83ccc2d63203961f275800fb3c2de14a05a51f5bec8fbed46f28c92ac44"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/postgres-compat.result.json",
+      "sha256": "7830e87f0723dc0a978783582390472ffa86c00e8e9e30aeaaa60969cba6f922"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/postgres-compat.xml",
+      "sha256": "274fd4cbe8e425f0f2ebc58ffb2e3cb94f3f1d0407a69a781dd78d86c7b831ad"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/review-coverage-limits.json",
+      "sha256": "3f0fc09ac40430ee7019fb9a0cc3290f035cab19733f0b33bbd0d67a5dbddedf"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/ruff.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/ruff.result.json",
+      "sha256": "fd17480e4a14e70fcb54968a92b096520480e4a29a0be79ed2264206384f2df6"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/scope.log",
+      "sha256": "6999fc9d0a74cd24b0e9d7f3d7797df79be6ea697dce2b838f54dca7010f7e85"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/scope.result.json",
+      "sha256": "00091722a9bd4017d8a10f6cf21d40b982833ee1128f4f0d2f213b108392d8a2"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/source-fallback-sha256.json",
+      "sha256": "62e19fe7e46dce33aa3cecd446a8bbba8841fc96c713a5b3824e5a2e665d5031"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/sqlite-baseline-reuse.json",
+      "sha256": "df2931b95dddca17c38dab00e7dcb7bd899c9e113469b676651aa0eb79cb7a1a"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/sqlite-baseline.log",
+      "sha256": "8caf32602c10f0420db9756180c0d4be943d06cc9016c32f56ea48362b3f0aed"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/sqlite-baseline.result.json",
+      "sha256": "e00a358979a956ff4c8fd264416dc4662b1f501495b71a61850ae91bad6d3b65"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/sqlite-baseline.xml",
+      "sha256": "7330e352a44c5df864ba73346f0acca077ddb43c3bba50e39286ca66a7d2ed85"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/tests.log",
+      "sha256": "0ff186af448279c3d31711f41776d9b0fecb80d26d0f01d79bf89437aedd24ec"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/tests.result.json",
+      "sha256": "c6d90c216eb799b1a52ab8463f5858d3ecb78ddcaa954fa1f21ff99d4e1def56"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/tests.xml",
+      "sha256": "8163215642fa8ff1d1d1a8fab458131a18b875be54f8620fed42ffa61afd4de9"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/types.log",
+      "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+    },
+    {
+      "path": "/tmp/m9a-final-fd9543de6053/types.result.json",
+      "sha256": "9b7c5c178bb6b1763af638fb2e3d8050f9248a4ceb2b50960dc84b5912e66f91"
+    }
+  ],
+  "independent_review": {
+    "status": "PENDING",
+    "approval_claimed": false
+  },
+  "created_at": "2026-10-16T15:34:04.325201+00:00"
+}
