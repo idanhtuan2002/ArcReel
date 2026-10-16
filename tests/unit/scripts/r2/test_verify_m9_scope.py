@@ -284,8 +284,12 @@ class AmendmentSource:
         self.record = json.loads((root / AMENDMENT).read_bytes())
         paths = [AMENDMENT, *self.record["artifacts"], *self.record["native_runtime_files"]]
         paths.extend([self.record["baseline"]["path"], self.record["execution_contract"]["path"]])
+        paths.extend(self.record["additional_paths"])
+        paths.append("alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py")
         self.blobs = {
-            (ref, path): (root / path).read_bytes() for ref in (AMENDMENT_COMMIT, self.head_ref) for path in paths
+            (ref, path): (root / path).read_bytes()
+            for ref in (AMENDMENT_COMMIT, self.head_ref, self.record["approved_base"])
+            for path in paths
         }
         self.ancestor = True
         self.parent = self.record["approved_base"]

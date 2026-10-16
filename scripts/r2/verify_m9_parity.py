@@ -24,6 +24,13 @@ def foundation_inventory_document(source: Any, head: str) -> dict[str, Any]:
     record = amendment_record(source, head)
     if record is None:
         raise ValueError("foundation inventory requires the pinned sponsor amendment")
+    manifest = loads_unique_json(source.blob(AMENDMENT_COMMIT, "docs/r2/evidence/amendments/2026-10-16-m9a-tests.json"))
+    for path, entry in manifest["paths"].items():
+        if hashlib.sha256(source.blob(head, path)).hexdigest() != entry["proposal_sha256"]:
+            raise ValueError("foundation inventory requires the exact approved compatibility patch")
+    migration = "alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py"
+    if source.blob(head, migration) != source.blob(record["approved_base"], migration):
+        raise ValueError("foundation inventory cannot exempt changed migration behavior")
     for path, digest in record["native_runtime_files"].items():
         if hashlib.sha256(source.blob(head, path)).hexdigest() != digest:
             raise ValueError("foundation inventory cannot exempt a changed native runtime")

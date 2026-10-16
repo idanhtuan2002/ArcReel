@@ -323,3 +323,26 @@ def test_foundation_inventory_cannot_exempt_a_registered_runtime_harness(monkeyp
     body = module.foundation_inventory_document(source, source.head_ref)
     monkeypatch.setattr(module, "REGISTERED_FIXTURE_HARNESSES", {("pin", "runtime"): lambda *_: None})
     assert module.foundation_inventory_problems(body, body)
+
+
+def test_foundation_inventory_requires_the_exact_approved_test_patch():
+    from scripts.r2.verify_m9_parity import foundation_inventory_document
+    from tests.unit.scripts.r2.test_verify_m9_scope import AmendmentSource
+
+    source = AmendmentSource()
+    path = source.record["additional_paths"][0]
+    source.blobs[source.head_ref, path] = b"# weakened replacement\n"
+    with pytest.raises(ValueError, match="compatibility"):
+        foundation_inventory_document(source, source.head_ref)
+
+
+def test_foundation_inventory_cannot_exempt_migration_behavior_changes():
+    from scripts.r2.verify_m9_parity import foundation_inventory_document
+    from tests.unit.scripts.r2.test_verify_m9_scope import AmendmentSource
+
+    source = AmendmentSource()
+    path = "alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py"
+    source.blobs[source.record["approved_base"], path] = b"original migration"
+    source.blobs[source.head_ref, path] = b"changed migration"
+    with pytest.raises(ValueError, match="migration"):
+        foundation_inventory_document(source, source.head_ref)
