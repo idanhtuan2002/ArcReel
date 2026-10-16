@@ -1,0 +1,57 @@
+{
+  "status": "UNAPPROVED_PROPOSAL_ONLY",
+  "base_head": "3835011bd856c7a3ffe315aecfa3663a724f6f55",
+  "paths": {
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py": {
+      "base_sha256": "1f50db9b2f47230daa841b1f998bfa9733147421bfece856ebce7c40564f3a8a",
+      "proposal_sha256": "25b0bc4161d1068583764f91f11cd84dca1331e2d6f9a1e9ad9f54e60d8af554"
+    },
+    "tests/integration/lib/db/migrations/test_format_projections.py": {
+      "base_sha256": "c980b58c3c333e80dd698b2e2e79176698b8bc31af3e8ca3092eea91f66275a0",
+      "proposal_sha256": "336be9ba3e6b78b41676e8e7e9040a8bfab4eaa1bf780d10163c0baa26cbf9bf"
+    },
+    "tests/integration/lib/db/migrations/test_learning_observations.py": {
+      "base_sha256": "37abc37b1ad37d307c01809711d87774417b2b111ddca7aa7e164b258aefc581",
+      "proposal_sha256": "f7b566a8bbfef11cb990020a1aee083443433f58c6459df4b80ae899b8ac619a"
+    },
+    "tests/integration/lib/db/migrations/test_production_binding_authority.py": {
+      "base_sha256": "b8d2943b6b30a95d5b88999b825458022a8c5ae4e35141cb22d38d3a65d5ba03",
+      "proposal_sha256": "ea7bef8ae3055332ee232ef38d8dc699ac70bf3b5719b91e60562525817b7ae6"
+    },
+    "tests/integration/lib/db/migrations/test_production_target_registry.py": {
+      "base_sha256": "edbfb78f0796c3dc93bb73f149991535827ea241b1b41194741e57a0da3191e3",
+      "proposal_sha256": "ebca5cdd727b181a20f7ac1a60a7bbf7c18e2d5099d321df115262026b7202e8"
+    },
+    "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py": {
+      "base_sha256": "157e54fa75addf66f0d1821ed3881f5e5353abd5aa56d5c4138b156b46857a97",
+      "proposal_sha256": "76b1bda8b4a0ead215c8918f2e5efaeecb57816e1e6c23153fd740df4bdea4c9"
+    },
+    "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py": {
+      "base_sha256": "f5572d24fe45baa4cfce98847a704a6cf5d47aaa5f774e8452301a35dd5ef257",
+      "proposal_sha256": "c69349f332724bba587024c27ea1331bebd1897c70fca861cc6198c90261d605"
+    },
+    "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py": {
+      "base_sha256": "6626fe61df1ab4edfc141c44000dbc7cb6670f079fccd08dc40197b7eecc91a1",
+      "proposal_sha256": "2a36200d14981d7445463f913a33005e73346d0e452efcc20088e3f3cd8ec143"
+    },
+    "tests/integration/lib/db/migrations/test_spatial_pair_authority.py": {
+      "base_sha256": "3351c3c61a7faeefb0399cc5fac84aa18f0985b7549cbc4cf62cee68e6ac0486",
+      "proposal_sha256": "2d98c8f60d77a2183386bb431f5030f0dab61dd8c3581b3a11c4f86136f58bc5"
+    },
+    "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py": {
+      "base_sha256": "39f1911c6b990e09dae8847a707d6afbeff22dd580344531f7c63bcfe72354c4",
+      "proposal_sha256": "a09d68aab3cd24c81039e4df712188e7db670ec3245b98c61e093ef9225298bd"
+    },
+    "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py": {
+      "base_sha256": "28dbe7c933b3d348f6def643bfa70e6cc4d2ad1bb65bbc4869741d072866f2a7",
+      "proposal_sha256": "ca940c40e242cf904113a0a7004eaaed0e98e61433bffb7ce9694acbcd2a4c5b"
+    },
+    "tests/integration/lib/db/migrations/test_spatial_review_custody.py": {
+      "base_sha256": "3b2fa145fcfa0f4927e3b180b2a8b5ae8a0dc89d062920fe36f9a98ab67d5ea2",
+      "proposal_sha256": "e78d081cbf063376b4db5a48203e8a0a0c5fa649de92becd90deb083fb13cca7"
+    },
+    "tests/unit/r2/opportunity/__init__.py": {
+      "proposal_sha256": "ba7ec86faab219f71a7e93e4122d13061989adee1326be6cd5feecff7cb0f1fa"
+    }
+  }
+}

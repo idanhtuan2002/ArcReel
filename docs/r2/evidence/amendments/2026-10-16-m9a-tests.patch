@@ -1,0 +1,150 @@
+--- a/tests/integration/lib/db/migrations/test_alembic_m8_exploration.py
++++ b/tests/integration/lib/db/migrations/test_alembic_m8_exploration.py
+@@ -84,7 +84,7 @@
+     cfg, _ = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+ 
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("8a8c4a0e0001").down_revision == "c9e1f4a2b701"
+ 
+ 
+@@ -176,6 +176,11 @@
+     command.upgrade(cfg, "head")
+ 
+     assert before - after == M8_TABLES | {
++        "m9_cohort_profiles",
++        "m9_cohort_profile_heads",
++        "m9_command_receipts",
++        "m9_events",
++        "host_custodian_leases",
+         "m8_spatial_frame_receipts",
+         "m8_spatial_execution_evidence",
+         "production_target_heads",
+--- a/tests/integration/lib/db/migrations/test_format_projections.py
++++ b/tests/integration/lib/db/migrations/test_format_projections.py
+@@ -15,7 +15,7 @@
+ def test_format_migration_has_scoped_restrict_keys_and_downgrades_alone(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("916c4a0e0001").down_revision == "915c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_learning_observations.py
++++ b/tests/integration/lib/db/migrations/test_learning_observations.py
+@@ -16,7 +16,7 @@
+ def test_observation_migration_has_scoped_chain_keys_and_downgrades_alone(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("914c4a0e0001").down_revision == "913c4a0e0001"
+     assert script.get_revision("915c4a0e0001").down_revision == "914c4a0e0001"
+ 
+--- a/tests/integration/lib/db/migrations/test_production_binding_authority.py
++++ b/tests/integration/lib/db/migrations/test_production_binding_authority.py
+@@ -19,7 +19,7 @@
+ def test_binding_authority_revision_and_scoped_keys(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("8d8c4a0e0001").down_revision == "8c9c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_production_target_registry.py
++++ b/tests/integration/lib/db/migrations/test_production_target_registry.py
+@@ -19,7 +19,7 @@
+ def test_target_registry_revision_and_scoped_constraints(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("8c9c4a0e0001").down_revision == "8c8c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_spatial_constraint_sets.py
++++ b/tests/integration/lib/db/migrations/test_spatial_constraint_sets.py
+@@ -16,7 +16,7 @@
+ def test_constraint_set_revision_keys_and_downgrade(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("912c4a0e0001").down_revision == "911c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_spatial_execution_evidence.py
++++ b/tests/integration/lib/db/migrations/test_spatial_execution_evidence.py
+@@ -16,7 +16,7 @@
+ def test_evidence_migration_has_scoped_restrict_keys_and_downgrades_alone(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("8c8c4a0e0001").down_revision == "8b8c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_spatial_frame_receipts.py
++++ b/tests/integration/lib/db/migrations/test_spatial_frame_receipts.py
+@@ -16,7 +16,7 @@
+ def test_frame_receipt_migration_has_scoped_restrict_keys(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("8b8c4a0e0001").down_revision == "8a8c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_spatial_pair_authority.py
++++ b/tests/integration/lib/db/migrations/test_spatial_pair_authority.py
+@@ -19,7 +19,7 @@
+ def test_pair_revision_scoped_keys_and_round_trip(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("8e8c4a0e0001").down_revision == "8d8c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py
++++ b/tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py
+@@ -17,7 +17,7 @@
+ def test_v2_custody_migration_and_scoped_foreign_keys(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("911c4a0e0001").down_revision == "901c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py
++++ b/tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py
+@@ -21,7 +21,7 @@
+ def test_sidecar_tables_link_their_base_rows_and_authorities(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("913c4a0e0001").down_revision == "912c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+--- a/tests/integration/lib/db/migrations/test_spatial_review_custody.py
++++ b/tests/integration/lib/db/migrations/test_spatial_review_custody.py
+@@ -27,7 +27,7 @@
+ def test_review_custody_revision_and_scoped_child_keys(alembic_cfg: tuple[Config, Path]) -> None:
+     cfg, db_path = alembic_cfg
+     script = ScriptDirectory.from_config(cfg)
+-    assert script.get_heads() == ["918c4a0e0001"]
++    assert script.get_heads() == ["9a9c4a0e0001"]
+     assert script.get_revision("901c4a0e0001").down_revision == "8f8c4a0e0001"
+ 
+     command.upgrade(cfg, "head")
+diff --git a/tests/unit/r2/opportunity/__init__.py b/tests/unit/r2/opportunity/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/tests/unit/r2/opportunity/__init__.py
+@@ -0,0 +1 @@
++"""Opportunity tests use qualified module names during full-suite collection."""

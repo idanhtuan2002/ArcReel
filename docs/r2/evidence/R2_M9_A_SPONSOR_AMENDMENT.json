@@ -1,0 +1,75 @@
+{
+  "schema_version": "m9.a-sponsor-amendment.v1",
+  "status": "SPONSOR_AMENDMENT_ACCEPTED",
+  "packet": "M9-A",
+  "branch": "impl/r2-m9a-opportunity-foundation",
+  "approved_base": "211363f69771225df0b281931f1e0992e93ce09a",
+  "approval": "duyet",
+  "created_at": "2026-10-16T00:00:00Z",
+  "amendment_paths": [
+    "docs/adr/0111-m9a-foundation-inventory-and-test-compatibility.md",
+    "docs/r2/evidence/R2_M9_A_SPONSOR_AMENDMENT.json",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-parity.md",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.json",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.md",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.patch"
+  ],
+  "artifacts": {
+    "docs/adr/0111-m9a-foundation-inventory-and-test-compatibility.md": "9ae61d7a9d16b7bdd4f10c5c2d83839ef43bbc9fddab0360089e6fba95906b43",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-parity.md": "de25dfa9fdd62cd55e681c5359e20ed89d3992a7337d19221046d007524d87f1",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.md": "7a2edd13a0b95ce395b17ebd6c15614fde73fae88e5406977fea90d1ff74b8bf",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.patch": "ead76a3d65163b3b17835d9749e415f38ee25f00c3307e37ec1d8e8a1b06bb52",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-tests.json": "cbeaeb34d82bd1dd3d97d22b49045cea8b12b7792c623af82bec1da245871835"
+  },
+  "baseline": {
+    "path": "docs/r2/evidence/R2_M9_BASELINE.json",
+    "sha256": "f6d256baa080fd7fc4333afb34405c13f5c6dcef2a8f178e2674772dced66e25"
+  },
+  "execution_contract": {
+    "path": "docs/r2/evidence/R2_M9_EXECUTION_CONTRACT_2026-09-14.json",
+    "sha256": "6223fae310fce2f267cbfd13dddc18ecae4d13f2380e11ebc7a7b5a13433ca6d"
+  },
+  "additional_paths": [
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+    "tests/integration/lib/db/migrations/test_format_projections.py",
+    "tests/integration/lib/db/migrations/test_learning_observations.py",
+    "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+    "tests/integration/lib/db/migrations/test_production_target_registry.py",
+    "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+    "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+    "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+    "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+    "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+    "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+    "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+    "tests/unit/r2/opportunity/__init__.py"
+  ],
+  "test_patch_sha256": "ead76a3d65163b3b17835d9749e415f38ee25f00c3307e37ec1d8e8a1b06bb52",
+  "parity_scope": "FOUNDATION_INVENTORY_VERIFIED",
+  "donor_runtime_executed": false,
+  "runtime_parity_claimed": false,
+  "native_runtime_files": {
+    "lib/db/models/__init__.py": "67eda8cba860dbae9e2d6f5cb377d2c96d2e970d8db120573bc543577b83ef9c",
+    "lib/db/models/host_custodian.py": "1646baffe9c017d9930ffd015c991b94de6d00d1d28abd864995c448431b0d8d",
+    "lib/db/models/opportunity.py": "1160c4a1ff3bc7600d093f3c17303dc7b3cfca05e175bc1c333495f6f390473c",
+    "lib/db/repositories/__init__.py": "912bce6acadbd5e061c91d4d79d7b408bf1bf3f1b3a86c8c18df5123210a941f",
+    "lib/db/repositories/opportunity.py": "f622b1bd6713c49b81b3ceb7dc249524cee258f27d3742c9722d5bda08bb03a5",
+    "lib/i18n/en/errors.py": "1de28f0277be02e1f68fb39f347a8e6d375445aa2b272bd531a4b4eafe8849a5",
+    "lib/i18n/vi/errors.py": "61b8af9f4b03c3178ee4eca4c206e3c037a715434ab158ee26ac131a1d14ac5d",
+    "lib/i18n/zh/errors.py": "0bbfb01e6a1184400aa07fbcbb411f7a366110d57499bede308a1513a300da58",
+    "r2/contracts/__init__.py": "a9f57047b0afa667a5343f96a9dd2f2d2d9389957a27e3fc7d47e9f31ca1187d",
+    "r2/contracts/opportunity.py": "ccb81102c2eebf42e9e9226afa908b182f896c10ff3433020c1e6e137a117d37",
+    "r2/opportunity/__init__.py": "74c0511e48cb89a4b679acaa0b0804c4bb0a718d7152d83869a0a6610713c772",
+    "r2/opportunity/digests.py": "092d00fc1c815d37c08d94dd917142959a894cbcb8e98720d7d8aa983b7fa4a5",
+    "r2/opportunity/errors.py": "3c62559622617945bf1fde27c17cdc9b6a4948fb3b456ac94445e92b27514095",
+    "r2/opportunity/parity.py": "e09af2ec327ac81a8cc2702d8336986fae135c2f99c2ea9ce20fe7dc8fb440b6",
+    "r2/opportunity/ports.py": "3bfa92c87d322accfe38bd11cb5d10ab4b80e59e176198dec6591a9b1dcc23d0",
+    "r2/opportunity/profiles.py": "1e35af4dee492013f5a2cca0af74cf18aff7a286ee10c93103edd23a63fbfce1",
+    "server/app.py": "4691a7d7b0e29466addd988238979fd4ed27572588f1789f1b90f69a38624f8f",
+    "server/routers/opportunity.py": "af73ba9a9ed736a2e674ca6a414939ae66eec06f4dab5e8a19810d5703cfdda4",
+    "server/services/m9_custodian.py": "03a9665a86adb7d5aeb493ac64c89b42a7945796d8ac51d5d484d0de7dc41831",
+    "server/services/opportunity.py": "830dcd1207b43d5bb036721766013983f34a79f0f182e27ca72b9da0bce1e041"
+  },
+  "implementation_accepted": false,
+  "later_packets_released": []
+}
