@@ -1,0 +1,80 @@
+{
+  "status": "PROPOSED_NOT_APPROVED",
+  "source_candidate": "912abc3bedf5cf2f5965284919f11acc3a3c7593",
+  "purpose": "Offline synthetic acceptance fixtures only; not production retention policy or a capability grant",
+  "human_approval_required_by": "R2_M9_EXECUTION_CONTRACT_2026-09-14.json packet_inputs.M9-B",
+  "source_kind": "manual-import",
+  "source_contract_version": "manual-import.v1",
+  "credential_ref": null,
+  "intent": "LANDSCAPE",
+  "production_activation_authorized": false,
+  "data_rules": [
+    {
+      "data_class": "manual-public-metadata",
+      "refresh_interval_seconds": 60,
+      "retention_seconds": 120,
+      "delete_on_revoke": true,
+      "digest_proof_may_be_retained": true
+    },
+    {
+      "data_class": "manual-excerpt",
+      "refresh_interval_seconds": 30,
+      "retention_seconds": 90,
+      "delete_on_revoke": true,
+      "digest_proof_may_be_retained": false
+    }
+  ],
+  "payload": {
+    "schema": "m9.manual-fixture.v1",
+    "origin": "synthetic-fixture",
+    "uploader": "fixture-human",
+    "records": [
+      {
+        "source_native_id": "synthetic-metric-001",
+        "data_class": "manual-public-metadata",
+        "field_name": "views",
+        "definition_version": "synthetic-count.v1",
+        "value": 125,
+        "unit": "count",
+        "window": {
+          "starts_at": "2026-10-15T00:00:00Z",
+          "ends_at": "2026-10-16T00:00:00Z"
+        },
+        "field_definition": "Synthetic view count within the declared window."
+      },
+      {
+        "source_native_id": "synthetic-text-001",
+        "data_class": "manual-excerpt",
+        "field_name": "excerpt",
+        "definition_version": "synthetic-excerpt.v1",
+        "value": "Entirely synthetic fixture text.",
+        "unit": "text",
+        "window": null,
+        "field_definition": "Synthetic text supplied by the Human fixture."
+      }
+    ]
+  },
+  "payload_sha256": "f1af59d141d9109bbb1126e8da6507e2c0fc38586bd4d4c5990af0454caa0809",
+  "raw_page_contract_validated": true,
+  "expected_mixed_page_clocks": {
+    "retention_due_at_offset_seconds": 90,
+    "anchor": "database page admission time; supplied provider time never substitutes",
+    "refresh_due_at_offset_seconds": 30
+  },
+  "boundary_fixture_family": [
+    "strictly-before refresh/retention",
+    "exactly-at refresh/retention",
+    "strictly-after refresh/retention",
+    "same-command replay does not renew clocks",
+    "mixed classes use earliest non-null clock",
+    "explicit rule with both intervals null means no interval; missing rule always rejects",
+    "revocation during page acquisition",
+    "proof digest may survive only for permitted class; excerpt proof never retained"
+  ],
+  "deletion_deadline_seconds": 30,
+  "expected_proof_retention": {
+    "mixed_raw_page_digest": false,
+    "metadata_normalized_value_digest": true,
+    "excerpt_normalized_value_digest": false
+  }
+}

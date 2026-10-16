@@ -1,0 +1,70 @@
+{
+  "candidate_head": "912abc3bedf5cf2f5965284919f11acc3a3c7593",
+  "git_clean": true,
+  "files": {
+    "r2/contracts/opportunity.py": "ccb81102c2eebf42e9e9226afa908b182f896c10ff3433020c1e6e137a117d37",
+    "r2/opportunity/ports.py": "3bfa92c87d322accfe38bd11cb5d10ab4b80e59e176198dec6591a9b1dcc23d0",
+    "r2/opportunity/digests.py": "092d00fc1c815d37c08d94dd917142959a894cbcb8e98720d7d8aa983b7fa4a5",
+    "lib/db/models/opportunity.py": "1160c4a1ff3bc7600d093f3c17303dc7b3cfca05e175bc1c333495f6f390473c",
+    "lib/db/repositories/opportunity.py": "f622b1bd6713c49b81b3ceb7dc249524cee258f27d3742c9722d5bda08bb03a5",
+    "server/services/opportunity.py": "830dcd1207b43d5bb036721766013983f34a79f0f182e27ca72b9da0bce1e041",
+    "r2/learning/adapters.py": "47ecc9687107ef396ae2e4b90baf44b2a291b2085d8d8905ddc57bcba94f98ab",
+    "tests/unit/r2/learning/test_adapters.py": "1501fe9dd24bfcb31353b7f8a730fdf69fbb03b739bcccc84c8f927574e8ec7d",
+    "lib/json_io.py": "d642a2d089fa22b70ecd268ca3c5571867ed0ca7bf412ddee0727cb0d33749f6",
+    "lib/artifact_manifest.py": "a0c80e4f4cec429d631f2a6fae339739ddfd21c283c974e3377caff8c7668479",
+    "r2/host_hardening/master_authority.py": "ca2bf5668743c0d336e6c1db71cc5e9ea071c8d79d7b640b31193b343f74952b",
+    "tests/unit/scripts/r2/test_verify_m9_scope.py": "0f056a0454a2efe01ca4f60a2c6f98ddee5ed5c526b9c3e63ba53fb7a578faf8",
+    "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py": "6cb4cf16cd0e71ef473884195f526f334d7b0717881cc345324fe65842f14b37",
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py": "25b0bc4161d1068583764f91f11cd84dca1331e2d6f9a1e9ad9f54e60d8af554",
+    "tests/fixtures/r2/learning/youtube_day_report.json": "d732ee35b171ddf9c3e3422ee882939abc1fdd2aa46074ed0eb97e6b9f00f2ff",
+    "tests/fixtures/r2/learning/tiktok_video.json": "d09c0b289054790323625caee16f51bd3c6bcb92888dd15297bcb1ec999f22b7"
+  },
+  "fixture_proposal_sha256": "282235f09b96cdb73f43da5c02c96e422b3e74e054e02825023338bc30df972c",
+  "status": "DRAFT_NOT_RELEASED_HUMAN_FIXTURE_AND_PLAN_REVIEW_PENDING",
+  "existing_adapter_probe": {
+    "tested_head": "912abc3bedf5cf2f5965284919f11acc3a3c7593",
+    "passed": 11,
+    "skipped": 0,
+    "exit": 0,
+    "log_sha256": "d7e962ed2ad09ba0433bc9e7f713f70c87f513752975b0df92c8da0da378680a",
+    "xml_sha256": "729f32895e2bb0e620020458f9a3e33d88c647fc34571e8408eba8819d1ffe73",
+    "scope": "existing M8 adapter fixture behavior only; not M9-B runtime or donor parity"
+  },
+  "accepted_predecessor": "04b1b92184a5d5b0643256be533332de6ed8b009",
+  "acceptance_path": "docs/r2/evidence/R2_M9_A_IMPLEMENTATION_ACCEPTANCE.json",
+  "native_sources_unchanged_from_candidate": true,
+  "human_fixture_approval_received": false,
+  "production_activation_authorized": false,
+  "plan": {
+    "path": "docs/superpowers/plans/2026-10-16-r2-m9b-acquisition-observations.md",
+    "sha256": "cc727fd95139a3233576a088b5eece3604b5d6b9e6ea4171bd98d10769ad67ff"
+  },
+  "research": {
+    "path": "docs/research/2026-10-16-r2-m9b-native-reuse.md",
+    "sha256": "1a061bdb1eb133a5deac6a63dea2d1b139dbbfb5b6e4ce9c826d425d212ce290"
+  },
+  "accepted_predecessor_artifacts": {
+    "docs/r2/evidence/R2_M9_A_IMPLEMENTATION_ACCEPTANCE.json": "770f9976b2498ed3f10f8e7c94d5217c49721f467fa9b7e62ea93d60a135f48e",
+    "docs/r2/evidence/reviews/2026-10-16-m9a-foundation-acceptance.md": "acf1610cbc85dd8c80401c69de09cea4370983365d9a35f0832301af9d04c7d1"
+  },
+  "git_clean_scope": "accepted predecessor before adding these four draft planning artifacts",
+  "isolated_worktree_baseline": {
+    "tested_head": "04b1b92184a5d5b0643256be533332de6ed8b009",
+    "argv": [
+      "python",
+      "-m",
+      "pytest",
+      "tests/unit/r2/opportunity",
+      "tests/unit/r2/learning/test_adapters.py",
+      "-q",
+      "--junitxml=/tmp/m9b-draft-baseline.xml"
+    ],
+    "exit": 0,
+    "passed": 87,
+    "skipped": 0,
+    "warnings": 1,
+    "log_sha256": "0a31c8235c86efcfbaf9011f3ff097e7943805b06cb3f4c664605e5c3ab2bb66",
+    "xml_sha256": "03921bb692c283c3bcd2123438de2e0b2db37dbfcef076b18cec4813b750b4d8",
+    "scope": "Existing A foundation and M8 adapter behavior only; no B runtime exists"
+  }
+}
