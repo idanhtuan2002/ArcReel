@@ -1,0 +1,25 @@
+{
+  "status": "SPONSOR_APPROVED",
+  "base_head": "0e6842efc1c4d8507c8749bc3afe1bc1dc7d2bde",
+  "path": "tests/integration/server/services/test_execution_recovery_scheduler.py",
+  "base_sha256": "4ae5c7c751647a89a106eceb50f341bfbd59147d18094566a8974f8d0672cd63",
+  "proposal_sha256": "5b71a89908616c0ca989f9cb741e0f7bd80820108553272a708602cafdc22b2c",
+  "patch_sha256": "47ad45788519ad503da489957109f74f700366b298b490dd46b5f3cd6313cc40",
+  "production_paths_changed": [],
+  "pg_cases": 3,
+  "sqlite_cases": 3,
+  "approval_text": "duyet",
+  "scope": "M9-A only; exact one-file scheduler test patch",
+  "original_amendment_commit": "7b16c36c50fc040a5402bcdec2361896a3dded95",
+  "amendment_paths": [
+    "docs/r2/evidence/R2_M9_A_SCHEDULER_TEST_AMENDMENT.json",
+    "docs/r2/evidence/amendments/2026-10-16-m9a-scheduler.patch"
+  ],
+  "patch_path": "docs/r2/evidence/amendments/2026-10-16-m9a-scheduler.patch",
+  "constraints": [
+    "No production scheduler or repository changes",
+    "No additional review round",
+    "No M9-B through M9-F release",
+    "No donor runtime execution or runtime parity claim"
+  ]
+}
