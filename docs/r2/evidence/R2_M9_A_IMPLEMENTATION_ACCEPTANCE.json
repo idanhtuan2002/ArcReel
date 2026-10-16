@@ -1,0 +1,110 @@
+{
+  "schema_version": "m9.a-acceptance.v1",
+  "status": "M9_A_ACCEPTED",
+  "packet": "M9-A",
+  "acceptance_scope": "FOUNDATION_ONLY",
+  "accepted_candidate": "912abc3bedf5cf2f5965284919f11acc3a3c7593",
+  "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+  "p0_base": "39b9c5dab5d0fd56cf52bf65e95355437cb1023b",
+  "candidate_evidence": {
+    "path": "docs/r2/evidence/R2_M9_A_FOUNDATION.json",
+    "sha256": "42a5732b1cb899fe3b9e3e5f9a791c2d77405d9c6c16be40dbfd19b55461e818",
+    "source_commit": "912abc3bedf5cf2f5965284919f11acc3a3c7593"
+  },
+  "independent_review": {
+    "reviewer_agent": "/root/m9a_acceptance_once",
+    "agent_role": "reviewer",
+    "model_requested": "gpt-5.6-sol",
+    "reasoning_requested": "high",
+    "parent_history_inherited": false,
+    "verdict": "PASS_M9_A_FOUNDATION",
+    "confirmed_critical": 0,
+    "confirmed_important": 0,
+    "report": {
+      "path": "docs/r2/evidence/reviews/2026-10-16-m9a-foundation-acceptance.md",
+      "sha256": "acf1610cbc85dd8c80401c69de09cea4370983365d9a35f0832301af9d04c7d1"
+    },
+    "fresh_suite_execution_claimed": false
+  },
+  "integrator_preflight": {
+    "executed_at_candidate": "912abc3bedf5cf2f5965284919f11acc3a3c7593",
+    "tested_head": "fd9543de6053c5b21a17605c5ea13b967a6ff638",
+    "argv": [
+      "python",
+      "scripts/r2/verify_m9_evidence.py",
+      "docs/r2/evidence/R2_M9_A_FOUNDATION.json",
+      "--tested-head",
+      "fd9543de6053c5b21a17605c5ea13b967a6ff638"
+    ],
+    "environment_keys": [
+      "PYTHONPATH",
+      "DATABASE_URL",
+      "ARCREEL_M9_ENVIRONMENT_EVIDENCE",
+      "ARCREEL_M9_DONOR_ROOT"
+    ],
+    "exit": 0,
+    "stdout": "M9_A_CANDIDATE_EVIDENCE_OK",
+    "log": {
+      "path": ".superpowers/sdd/2026-09-14-r2-m9a-foundation-cohort-profiles/acceptance-preflight-912abc3b.log",
+      "sha256": "54ebf02799a21574ced4c5f1383b8b7dc1d5aec6b584740cf40401b49ebe3dd0"
+    }
+  },
+  "amendments": [
+    {
+      "commit": "7b16c36c50fc040a5402bcdec2361896a3dded95",
+      "path": "docs/r2/evidence/R2_M9_A_SPONSOR_AMENDMENT.json",
+      "sha256": "f855ab6eb9200aceebfd522af69b4354a331b10b6de3c0749a9a3f66d0c4eaa7",
+      "source_commit": "912abc3bedf5cf2f5965284919f11acc3a3c7593"
+    },
+    {
+      "commit": "274f630e0eb856751f0ff79bf0b695e39420cf14",
+      "path": "docs/r2/evidence/R2_M9_A_SCHEDULER_TEST_AMENDMENT.json",
+      "sha256": "331d69d3a63312379c415429ce5742799ca0b696f6de7a00f852c3ee5ed2e592",
+      "source_commit": "912abc3bedf5cf2f5965284919f11acc3a3c7593"
+    }
+  ],
+  "evidence_summary": {
+    "recorded_required_passed": 802,
+    "recorded_required_skipped": 0,
+    "recorded_migration_passed": 2,
+    "recorded_postgres_passed": 1559,
+    "recorded_postgres_skipped": 23,
+    "historical_sqlite_head": "0e6842efc1c4d8507c8749bc3afe1bc1dc7d2bde",
+    "historical_sqlite_passed": 17297,
+    "historical_sqlite_skipped": 187,
+    "fresh_full_sqlite_pass_claimed": false
+  },
+  "review_budget_this_step": {
+    "maximum_independent_passes": 1,
+    "independent_passes_used": 1,
+    "repair_passes_used": 0,
+    "automatic_rereview_authorized": false
+  },
+  "ceremony": {
+    "sole_parent": "912abc3bedf5cf2f5965284919f11acc3a3c7593",
+    "exact_changed_paths": [
+      "docs/r2/evidence/R2_M9_A_IMPLEMENTATION_ACCEPTANCE.json",
+      "docs/r2/evidence/reviews/2026-10-16-m9a-foundation-acceptance.md"
+    ],
+    "candidate_evidence_must_remain_unchanged": true
+  },
+  "donor_runtime_executed": false,
+  "runtime_parity_claimed": false,
+  "runtime_ports": [],
+  "production_activated": false,
+  "later_packets_released": [],
+  "next_packet_conditions": {
+    "M9-B": [
+      "Human-approved manual-import data-class and retention fixtures",
+      "Released packet freezing exact accepted predecessor, owned paths, capability fixtures and migration lineage"
+    ]
+  },
+  "limitations": [
+    "Independent PASS accepts only the amended M9-A foundation contract and retained evidence",
+    "Candidate JSON remains immutable with its historical PENDING review field; this later record binds the independent decision",
+    "Physical corpus/calibration validity and donor runtime parity are not accepted",
+    "No production operations, push, deployment or provider activation authorized"
+  ],
+  "human_instruction": "lam cac buoc tiep theo luon",
+  "created_at": "2026-10-16T16:18:34.519530+00:00"
+}
