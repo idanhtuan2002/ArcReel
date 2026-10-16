@@ -52,6 +52,9 @@ SCHEMA = "docs/r2/evidence/schemas/R2_M9_BASELINE.schema.json"
 AMENDMENT = "docs/r2/evidence/R2_M9_A_SPONSOR_AMENDMENT.json"
 AMENDMENT_COMMIT = "7b16c36c50fc040a5402bcdec2361896a3dded95"
 AMENDMENT_BASE = "211363f69771225df0b281931f1e0992e93ce09a"
+SCHEDULER_AMENDMENT = "docs/r2/evidence/R2_M9_A_SCHEDULER_TEST_AMENDMENT.json"
+SCHEDULER_AMENDMENT_COMMIT = "274f630e0eb856751f0ff79bf0b695e39420cf14"
+SCHEDULER_AMENDMENT_BASE = "0e6842efc1c4d8507c8749bc3afe1bc1dc7d2bde"
 SEAMS = {
     "r2/contracts/advanced_creative.py": (
         "r2.contracts.advanced_creative:M8ContractModel",
@@ -144,12 +147,42 @@ def amendment_record(source: Any, head: str) -> dict[str, Any] | None:
     return record
 
 
+def scheduler_amendment_record(source: Any, head: str) -> dict[str, Any] | None:
+    """Bind the supplemental approval and exact test bytes without expanding runtime authority."""
+    accepted = source.is_ancestor(SCHEDULER_AMENDMENT_COMMIT, head)
+    try:
+        raw = source.blob(head, SCHEDULER_AMENDMENT)
+    except LOAD_ERRORS:
+        if accepted:
+            raise ValueError("scheduler amendment is missing from its descendant") from None
+        return None
+    if not accepted or source.parents(SCHEDULER_AMENDMENT_COMMIT) != [SCHEDULER_AMENDMENT_BASE]:
+        raise ValueError("scheduler amendment acceptance ancestry differs")
+    if raw != source.blob(SCHEDULER_AMENDMENT_COMMIT, SCHEDULER_AMENDMENT):
+        raise ValueError("scheduler amendment decision differs")
+    record = loads_unique_json(raw)
+    if source.changed_paths(SCHEDULER_AMENDMENT_COMMIT) != set(record["amendment_paths"]):
+        raise ValueError("scheduler amendment changed-path ceremony differs")
+    patch = source.blob(SCHEDULER_AMENDMENT_COMMIT, record["patch_path"])
+    if _sha(patch) != record["patch_sha256"] or source.blob(head, record["patch_path"]) != patch:
+        raise ValueError("scheduler amendment patch differs")
+    if _sha(source.blob(SCHEDULER_AMENDMENT_BASE, record["path"])) != record["base_sha256"]:
+        raise ValueError("scheduler amendment base test differs")
+    if _sha(source.blob(head, record["path"])) != record["proposal_sha256"]:
+        raise ValueError("scheduler amendment requires the exact approved test bytes")
+    return record
+
+
 def effective_owned_paths(source: Any, head: str) -> tuple[list[str], list[str]]:
     allowed, creates = owned_paths(source.blob(BASE, PACKET))
     record = amendment_record(source, head)
     if record is not None:
         allowed = sorted(set(allowed) | set(record["additional_paths"]) | set(record["amendment_paths"]))
         creates = sorted(set(creates) | set(record["amendment_paths"]) | {"tests/unit/r2/opportunity/__init__.py"})
+    supplement = scheduler_amendment_record(source, head)
+    if supplement is not None:
+        allowed = sorted(set(allowed) | set(supplement["amendment_paths"]) | {supplement["path"]})
+        creates = sorted(set(creates) | set(supplement["amendment_paths"]))
     return allowed, creates
 
 

@@ -333,3 +333,44 @@ def test_sponsor_scope_extends_only_the_exact_approved_paths():
     assert record["additional_paths"] == source.record["additional_paths"]
     assert len(record["additional_paths"]) == 13
     assert record["later_packets_released"] == []
+
+
+@pytest.mark.parametrize("mutation", [None, "decision", "patch", "test", "missing", "parent", "ceremony"])
+def test_scheduler_supplement_binds_exact_patch_and_immutable_approval(mutation):
+    from scripts.r2.verify_m9_prerequisites import GitPrerequisiteReader
+    from scripts.r2.verify_m9_scope import SCHEDULER_AMENDMENT, SCHEDULER_AMENDMENT_COMMIT, scheduler_amendment_record
+
+    root = Path(__file__).resolve().parents[4]
+    actual = GitPrerequisiteReader(root)
+    head = actual.head()
+
+    class Source:
+        def blob(self, ref, path):
+            raw = actual.blob(ref, path)
+            if ref == head:
+                if mutation == "missing" and path == SCHEDULER_AMENDMENT:
+                    raise ValueError("missing")
+                if (
+                    (mutation == "decision" and path == SCHEDULER_AMENDMENT)
+                    or (mutation == "patch" and path.endswith("m9a-scheduler.patch"))
+                    or (mutation == "test" and path.endswith("test_execution_recovery_scheduler.py"))
+                ):
+                    return raw + b"\n"
+            return raw
+
+        def is_ancestor(self, ancestor, descendant):
+            return actual.is_ancestor(ancestor, descendant)
+
+        def parents(self, ref):
+            return ["b" * 40] if mutation == "parent" else actual.parents(ref)
+
+        def changed_paths(self, ref):
+            return {"unrelated.py"} if mutation == "ceremony" else actual.changed_paths(ref)
+
+    if mutation is None:
+        record = scheduler_amendment_record(Source(), head)
+        assert record["path"] == "tests/integration/server/services/test_execution_recovery_scheduler.py"
+        assert actual.parents(SCHEDULER_AMENDMENT_COMMIT) == [record["base_head"]]
+    else:
+        with pytest.raises(ValueError, match="scheduler"):
+            scheduler_amendment_record(Source(), head)
