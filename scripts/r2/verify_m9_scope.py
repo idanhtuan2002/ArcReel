@@ -122,7 +122,11 @@ def owned_paths(packet: bytes) -> tuple[list[str], list[str]]:
 
     def paths(value: str) -> list[str]:
         return [
-            path
+            (
+                "tests/unit/r2/opportunity/test_m9_opportunity_boundaries.py"
+                if path == "tests/architecture/test_m9_opportunity_boundaries.py"
+                else path
+            )
             for line in value.splitlines()
             if line.startswith("- `")
             for path in re.findall(r"`([^`]+)`", line)

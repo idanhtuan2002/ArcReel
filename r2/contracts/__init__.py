@@ -1,4 +1,4 @@
-from . import advanced_creative
+from . import advanced_creative, opportunity
 from .capabilities import (
     CapabilityDescriptor,
     CapabilityFeatureSupport,
@@ -409,4 +409,5 @@ __all__ = [
     "compute_source_content_hash",
     "ensure_json_value",
     "operation_kinds_for",
+    "opportunity",
 ]

@@ -260,3 +260,12 @@ def test_disposable_target_rejects_url_query_overrides_before_connecting(monkeyp
     proof = {"container_name": "fixture", "container_id": "fixture-container", "database": "m9a"}
     with pytest.raises(ValueError, match="database URL differs"):
         asyncio.run(_read_environment(proof, f"postgresql+asyncpg://m9test:test@127.0.0.1:32772/m9a?{query}"))
+
+
+def test_owned_paths_maps_only_the_m9_architecture_test_into_the_required_unit_tier() -> None:
+    from scripts.r2.verify_m9_scope import owned_paths
+
+    packet = b"## Exact owned file map\nCreate:\n- `tests/architecture/test_m9_opportunity_boundaries.py`\n- `tests/architecture/unrelated.py`\nModify only when exact accepted integration requires it:\n- `server/app.py`\n\n## Fixed HTTP surface\n"
+    owned, creates = owned_paths(packet)
+    assert creates == ["tests/architecture/unrelated.py", "tests/unit/r2/opportunity/test_m9_opportunity_boundaries.py"]
+    assert owned == ["server/app.py", *creates]
