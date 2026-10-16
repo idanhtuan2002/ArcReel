@@ -81,6 +81,13 @@ from lib.db.models.narrative_lifecycle import (
     NarrativeRevisionModel,
 )
 from lib.db.models.narrative_plan import NarrativePlanModel, NarrativePlanVersionModel
+from lib.db.models.opportunity import (
+    HostCustodianLeaseModel,
+    M9CohortProfileModel,
+    M9CommandReceiptModel,
+    M9EventModel,
+    M9ProfileHeadModel,
+)
 from lib.db.models.production_binding import (
     ProductionBindingCommandModel,
     ProductionBindingHeadModel,
@@ -159,6 +166,7 @@ __all__ = [
     "FormatTechnicalReportModel",
     "GenerationBatch",
     "GreenlightDecisionModel",
+    "HostCustodianLeaseModel",
     "LearningEvaluationModel",
     "LearningObservationCommandModel",
     "LearningObservationModel",
@@ -172,6 +180,10 @@ __all__ = [
     "M8PromotionAuthorizationModel",
     "M8PromotionPreviewModel",
     "M8PromotionReceiptModel",
+    "M9CohortProfileModel",
+    "M9CommandReceiptModel",
+    "M9EventModel",
+    "M9ProfileHeadModel",
     "MasterAuthorityModel",
     "MasterHeadVersionModel",
     "NarrativeChangeSetModel",
