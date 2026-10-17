@@ -2,6 +2,7 @@
 
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import SimpleNamespace
 
 from alembic.config import Config
 from alembic.migration import MigrationContext
@@ -13,18 +14,39 @@ TABLES = {"m9_cohort_profiles", "m9_cohort_profile_heads", "m9_command_receipts"
 ROOT = Path(__file__).resolve().parents[5]
 
 
-def migration():
+def migration(*, include_successors: bool = True):
     path = ROOT / "alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py"
     spec = spec_from_file_location("m9_foundation_migration", path)
     assert spec is not None
     assert spec.loader is not None
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    if not include_successors:
+        return module
+    from tests.integration.lib.db.migrations.test_alembic_m9_acquisition import migration as acquisition_migration
+
+    acquisition = acquisition_migration()
+
+    def downgrade() -> None:
+        acquisition.downgrade()
+        module.downgrade()
+
+    def upgrade() -> None:
+        module.upgrade()
+        acquisition.upgrade()
+
+    return SimpleNamespace(
+        revision=module.revision,
+        down_revision=module.down_revision,
+        branch_labels=module.branch_labels,
+        depends_on=module.depends_on,
+        upgrade=upgrade,
+        downgrade=downgrade,
+    )
 
 
 def test_migration_extends_the_accepted_singleton_with_one_linear_revision():
-    module = migration()
+    module = migration(include_successors=False)
     assert (module.revision, module.down_revision, module.branch_labels, module.depends_on) == (
         "9a9c4a0e0001",
         "918c4a0e0001",
@@ -37,7 +59,7 @@ def test_migration_extends_the_accepted_singleton_with_one_linear_revision():
 
 
 async def test_five_table_round_trip_preserves_every_existing_table(session_factory):
-    module = migration()
+    module = migration(include_successors=False)
     async with session_factory() as session, session.begin():
         assert session.get_bind().dialect.name == "postgresql", (
             "M9_REQUIRED_EVIDENCE_MISSING: disposable PostgreSQL required"
