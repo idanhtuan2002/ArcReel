@@ -1,0 +1,30 @@
+{
+  "schema": "m9.manual-fixture.v1",
+  "origin": "synthetic-fixture",
+  "uploader": "fixture-human",
+  "records": [
+    {
+      "source_native_id": "synthetic-metric-001",
+      "data_class": "manual-public-metadata",
+      "field_name": "views",
+      "definition_version": "synthetic-count.v1",
+      "value": 125,
+      "unit": "count",
+      "window": {
+        "starts_at": "2026-10-15T00:00:00Z",
+        "ends_at": "2026-10-16T00:00:00Z"
+      },
+      "field_definition": "Synthetic view count within the declared window."
+    },
+    {
+      "source_native_id": "synthetic-text-001",
+      "data_class": "manual-excerpt",
+      "field_name": "excerpt",
+      "definition_version": "synthetic-excerpt.v1",
+      "value": "Entirely synthetic fixture text.",
+      "unit": "text",
+      "window": null,
+      "field_definition": "Synthetic text supplied by the Human fixture."
+    }
+  ]
+}
