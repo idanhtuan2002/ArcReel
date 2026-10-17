@@ -3,6 +3,11 @@
 from lib.db.repositories.api_key_repository import ApiKeyRepository
 from lib.db.repositories.budget_reservation_repo import BudgetReservationRepository
 from lib.db.repositories.opportunity import OpportunityProfileRepository, OpportunityUnitOfWork
+from lib.db.repositories.opportunity_acquisition import (
+    CapabilityEvidenceRepository,
+    OpportunityAcquisitionUnitOfWork,
+    SourceQueryRepository,
+)
 from lib.db.repositories.session_repo import SessionRepository
 from lib.db.repositories.task_repo import TaskRepository
 from lib.db.repositories.usage_repo import UsageRepository
@@ -10,9 +15,12 @@ from lib.db.repositories.usage_repo import UsageRepository
 __all__ = [
     "ApiKeyRepository",
     "BudgetReservationRepository",
+    "CapabilityEvidenceRepository",
+    "OpportunityAcquisitionUnitOfWork",
     "OpportunityProfileRepository",
     "OpportunityUnitOfWork",
     "SessionRepository",
+    "SourceQueryRepository",
     "TaskRepository",
     "UsageRepository",
 ]

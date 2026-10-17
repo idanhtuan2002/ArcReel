@@ -84,7 +84,7 @@ def test_one_head_and_the_exact_parent(alembic_cfg: tuple[Config, Path]) -> None
     cfg, _ = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
 
-    assert script.get_heads() == ["9a9c4a0e0001"]
+    assert script.get_heads() == ["9b9c4a0e0001"]
     assert script.get_revision("8a8c4a0e0001").down_revision == "c9e1f4a2b701"
 
 
@@ -176,6 +176,15 @@ def test_downgrade_removes_only_the_m8_tables(alembic_cfg: tuple[Config, Path]) 
     command.upgrade(cfg, "head")
 
     assert before - after == M8_TABLES | {
+        "m9_consumed_capability_grants",
+        "m9_capability_evaluations",
+        "m9_source_queries",
+        "m9_source_query_heads",
+        "m9_acquisition_attempts",
+        "m9_snapshot_pages",
+        "m9_source_snapshots",
+        "m9_source_observations",
+        "m9_observation_heads",
         "m9_cohort_profiles",
         "m9_cohort_profile_heads",
         "m9_command_receipts",

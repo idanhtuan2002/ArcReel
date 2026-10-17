@@ -15,7 +15,7 @@ from alembic import command
 def test_format_migration_has_scoped_restrict_keys_and_downgrades_alone(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["9a9c4a0e0001"]
+    assert script.get_heads() == ["9b9c4a0e0001"]
     assert script.get_revision("916c4a0e0001").down_revision == "915c4a0e0001"
 
     command.upgrade(cfg, "head")

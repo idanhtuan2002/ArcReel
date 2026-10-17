@@ -33,7 +33,7 @@ def test_migration_extends_the_accepted_singleton_with_one_linear_revision():
     )
     cfg = Config()
     cfg.set_main_option("script_location", str(ROOT / "alembic"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["9a9c4a0e0001"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["9b9c4a0e0001"]
 
 
 async def test_five_table_round_trip_preserves_every_existing_table(session_factory):
@@ -48,14 +48,23 @@ async def test_five_table_round_trip_preserves_every_existing_table(session_fact
             before = set(inspect(sync_connection).get_table_names())
             assert before >= TABLES
             context = MigrationContext.configure(sync_connection)
+            from tests.integration.lib.db.migrations.test_alembic_m9_acquisition import (
+                migration as acquisition_migration,
+            )
+
+            acquisition = acquisition_migration()
             with Operations.context(context):
+                acquisition.downgrade()
+                predecessor_tables = set(inspect(sync_connection).get_table_names())
                 module.downgrade()
-                assert set(inspect(sync_connection).get_table_names()) == before - TABLES
+                assert set(inspect(sync_connection).get_table_names()) == predecessor_tables - TABLES
                 module.upgrade()
-                assert set(inspect(sync_connection).get_table_names()) == before
+                assert set(inspect(sync_connection).get_table_names()) == predecessor_tables
                 module.downgrade()
-                assert set(inspect(sync_connection).get_table_names()) == before - TABLES
+                assert set(inspect(sync_connection).get_table_names()) == predecessor_tables - TABLES
                 module.upgrade()
+                assert set(inspect(sync_connection).get_table_names()) == predecessor_tables
+                acquisition.upgrade()
                 assert set(inspect(sync_connection).get_table_names()) == before
             assert sync_connection.scalar(text("SELECT count(*) FROM users")) >= 1
             inspector = inspect(sync_connection)

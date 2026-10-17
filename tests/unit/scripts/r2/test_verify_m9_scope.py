@@ -277,6 +277,7 @@ class AmendmentSource:
     def __init__(self):
         import json
 
+        from scripts.r2.verify_m9_prerequisites import GitPrerequisiteReader
         from scripts.r2.verify_m9_scope import AMENDMENT, AMENDMENT_COMMIT
 
         root = Path(__file__).resolve().parents[4]
@@ -287,7 +288,7 @@ class AmendmentSource:
         paths.extend(self.record["additional_paths"])
         paths.append("alembic/versions/9a9c4a0e0001_add_m9_opportunity_foundation.py")
         self.blobs = {
-            (ref, path): (root / path).read_bytes()
+            (ref, path): GitPrerequisiteReader(root).blob("fd9543de6053c5b21a17605c5ea13b967a6ff638", path)
             for ref in (AMENDMENT_COMMIT, self.head_ref, self.record["approved_base"])
             for path in paths
         }
