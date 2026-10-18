@@ -61,6 +61,7 @@ from lib.config.registry import PROVIDER_REGISTRY
 from lib.config.resolver import constrain_durations, video_bucket_for_generation_mode
 from lib.config.service import DEFAULT_VIDEO_POLL_TIMEOUT_SECONDS
 from lib.db.base import DEFAULT_USER_ID
+from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE
 from lib.generation_queue import (
     R2_SHOT_GENERATION_TASK_TYPE,
     CompensableGenerationResult,
@@ -3569,6 +3570,15 @@ async def _execute_r2_shot_task_proxy(
     return await execute_r2_shot_task(project_name, resource_id, payload, user_id=user_id, task_id=task_id)
 
 
+async def _execute_story_run_task_proxy(
+    project_name: str, resource_id: str, payload: dict[str, Any], *, user_id: str, task_id: str | None
+) -> dict[str, Any]:
+    """Lazy proxy: the story run executor imports the narrative owners and the commit protocol."""
+    from server.story_authoring.executor import execute_story_run_task
+
+    return await execute_story_run_task(project_name, resource_id, payload, user_id=user_id, task_id=task_id)
+
+
 _TASK_EXECUTORS = {
     "storyboard": execute_storyboard_task,
     "video": execute_video_task,
@@ -3583,6 +3593,7 @@ _TASK_EXECUTORS = {
     "image_edit": _execute_image_edit_task_proxy,
     DERIVATIVE_TASK_TYPE: _execute_character_derivative_task_proxy,
     R2_SHOT_GENERATION_TASK_TYPE: _execute_r2_shot_task_proxy,
+    STORY_RUN_TASK_TYPE: _execute_story_run_task_proxy,
 }
 
 

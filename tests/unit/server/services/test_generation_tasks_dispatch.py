@@ -183,3 +183,31 @@ async def test_execute_generation_task_runs_provider_work_without_ambient_baggag
         otel_context.detach(token)
 
     assert seen == [{}]
+
+
+@pytest.mark.asyncio
+async def test_execute_generation_task_dispatches_a_story_run_to_its_executor(monkeypatch):
+    from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE
+    from server.services import generation_tasks
+
+    seen: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    async def _fake_story_executor(*args, **kwargs):
+        seen.append((args, kwargs))
+        return {"run_id": "run1", "phase": "READY_FOR_APPROVAL"}
+
+    monkeypatch.setattr("server.story_authoring.executor.execute_story_run_task", _fake_story_executor)
+
+    result = await generation_tasks.execute_generation_task(
+        {
+            "task_id": "story-1",
+            "task_type": STORY_RUN_TASK_TYPE,
+            "project_name": "demo",
+            "resource_id": "run1",
+            "payload": {"brief": {}},
+            "user_id": "u1",
+        }
+    )
+
+    assert result == {"run_id": "run1", "phase": "READY_FOR_APPROVAL"}
+    assert seen == [(("demo", "run1", {"brief": {}}), {"user_id": "u1", "task_id": "story-1"})]
