@@ -1,6 +1,6 @@
 # R2 V2 story release — amendment to the idea-to-story plan
 
-Status: DRAFT_FOR_HUMAN_REVIEW, revision 5 (consistency amendment). Supersedes revision 4 (`9314799c`), revision 3 (`92d7eef9`), revision 2 (`04f2e2af`) and revision 1 (`e833e27a`). Amends `docs/superpowers/plans/2026-10-17-r2-idea-to-story-authoring.md` (approved 2026-10-17); everything in that plan stays in force unless this document changes it.
+Status: DRAFT_FOR_HUMAN_REVIEW, revision 5.1 (revision 5 plus the fourth-review conditions in § Conditions 5.1). The fourth review recommends `APPROVE_WITH_CONDITIONS — TASK0_TO_TASK3_ONLY`; approval is the Human's decision. Supersedes revision 4 (`9314799c`), revision 3 (`92d7eef9`), revision 2 (`04f2e2af`) and revision 1 (`e833e27a`). Amends `docs/superpowers/plans/2026-10-17-r2-idea-to-story-authoring.md` (approved 2026-10-17); everything in that plan stays in force unless this document changes it.
 
 Research basis: `docs/research/2026-10-18-r2-v2-story-release-research.md`, through the addendum "revision 5 probes". Revision 5 closes the third review (P0-01…04, P1-01…06, P2-01…04). It changes only contracts, state machines and acceptance gates. Revision 4 answered the second review of 2026-10-18 (P0-01…05, P1-01…10, P2) in this order: data model, governance commit protocol, provider qualification, durable execution, acceptance and release. The overall architecture, scope, owners, donors, the two touchpoints, the six stages and the task order are unchanged.
 
@@ -20,6 +20,21 @@ Research basis: `docs/research/2026-10-18-r2-v2-story-release-research.md`, thro
   - **Story: 2.** (1) enter and approve the story brief (Gate A); (2) approve the final manuscript. Automatic brief entry and approval may replace (1) later; that change is not part of V2.
   - **Video: 3**, unchanged — Gates B, C and D.
   - **Optional, not counted:** revision requests, discard, withdraw, and a Gate A re-approval caused by a Human edit of the brief. The run never waits for them and never asks for them. The clean acceptance run has zero optional actions.
+
+## Conditions 5.1 (fourth review, 2026-10-18)
+
+These changes are applied in the sections below. Task4–Task7 stay closed until Task3 passes and the Human opens them.
+
+| ID | Condition | Where |
+|---|---|---|
+| P0-A | Topological dirty propagation until no pending or stale node remains | Change D, impacted-node algorithm |
+| P0-B | Scene freshness uses the same pair as the binding proof (`context_pack_id` and `content_hash`); a content-equal context gets a deterministic rebase revision instead of a model call | Change D |
+| P0-C | A successor manifest reuses a receipt only if its subject revision and change-set digests are unchanged; otherwise the Human chooses abort | Change C §7 |
+| P0-D | Acceptance evidence names the tested code commit; evidence commits on top are evidence-only (the V1 convention) | Release |
+| P1-01 | Separate response contracts for `COUNT` and `GENERATE` | Change P §2, §7 |
+| P1-02 | `total_http_calls_max = count_calls_max + generate_calls_max`; wall clock includes probes and waits; a count probe reserves the server context limit | Change E §4, Size and budget |
+| P1-03 | Discard creates no Plan or Canon commit; Gate A records follow their owner's retention and revocation policy | Change C §8 |
+| P1-04 | After `COMMITTED`, a change is a new R2 candidate/revision through the existing lifecycle with a new Human acceptance | Change C §8 |
 
 ## Change 0 — Task0 closes with owner map, schema sufficiency and lineage proof
 
@@ -51,7 +66,12 @@ Three kinds of object, never mixed:
 **Edges** (data dependency; "A → B" means B is produced from A):
 
 - `brief` → `seed` → `story_bible`, `style_bible` → `outline` → `scene_contract[c,s]`.
-- `scene_contract[c,s]`, `story_bible`, `style_bible` and the compiled context pack of `[c,s]` → `scene_draft[c,s]`. The context pack is compiled from the earlier scene heads in story order, so an earlier scene affects `[c,s]` only when it changes that pack's `content_hash`. A span repair that leaves the compiled context unchanged stales nothing downstream.
+- `scene_contract[c,s]`, `story_bible`, `style_bible` and the compiled context pack of `[c,s]` → `scene_draft[c,s]`. The context pack is compiled from the earlier scene heads in story order.
+- **Context identity (P0-B).** Fact (`r2/narrative_context/compiler.py`): `context_pack_id = sha("ncp:", pack_input)`, and `pack_input` includes identities: canon branch and version, plan, scene contract and policy versions, `recent_accepted_refs`, retrieval snapshot, compiler and token-counter versions. `content_hash` covers the segment and trace digests. A new revision of an earlier scene therefore changes `context_pack_id` even when the content is identical.
+  - Scene freshness compares the same pair as the binding proof: `(context_pack_id, content_hash)`.
+  - If only `context_pack_id` changed and `content_hash` (every segment digest) is equal, the scene gets a deterministic **rebase revision**. It has the same text and a new basis (`context_pack_id`), costs no model call, and has its own fingerprint. Otherwise the scene is regenerated.
+  - Task3 proves that R2 evidence (`r2/narrative_lifecycle/evidence.py`, whose shared basis fields include `context_pack_id`) accepts a rebase revision. If it does not, every pack-ID change regenerates.
+  - The compiler's hashing and its Canon authority are never changed.
 - All `scene_draft[c,*]` → `chapter_review[c]`.
 - All `chapter_review[*]` and all `scene_draft` → `manuscript_review` → `packaging`.
 - An `intent` targeting node X → X. Intents have no inputs; they are sources only.
@@ -84,11 +104,14 @@ A node is **stale** when its recomputed fingerprint differs from the one recorde
 | chapter `c` | one intent per `scene_draft[c,*]`, all carrying the same note |
 | packaging | an intent on `packaging` |
 
-**Impacted-node algorithm** (`server/story_authoring/pipeline.py`):
-1. The new revision or intent on X defines `impacted = forward_closure(X)` over the static edge table.
-2. Every impacted node whose recomputed fingerprint changed is stale.
-3. Regenerate stale nodes in topological order (story order for scenes). A node is regenerated at most once per revision event.
-4. Fresh nodes are never regenerated.
+**Impacted-node algorithm: topological dirty propagation (P0-A)** (`server/story_authoring/pipeline.py`):
+1. The new revision or intent on X marks X and every descendant in the expanded graph `PENDING_REEVALUATION`.
+2. Take pending nodes in topological order (story order for scenes). For each, recompute its effective fingerprint from the **current** heads of its inputs; for a scene, recompile the context first.
+3. Fingerprint unchanged → the node becomes fresh, keeping its head. Changed → rebase revision (scenes, P0-B case) or regenerate; then promote the new head.
+4. After every promotion, the node's descendants are reevaluated from step 2 with the new digests.
+5. A revision event is complete only when no node is `PENDING_REEVALUATION` or stale. Each node is regenerated at most once per event; a second need within the same event means a defect → `BLOCKED_PROPAGATION` with the node.
+
+A node is never judged against an upstream head that is still pending.
 
 The edge table is static code. A unit test runs a Kahn sort on the **expanded** graph: static edges plus `intent → target` edges, over randomized intent sets for every node kind.
 
@@ -112,7 +135,9 @@ Owned: `server/story_authoring/pipeline.py`, `tests/unit/server/story_authoring/
 - acyclicity of the expanded graph;
 - for each change type (brief, bible, outline, contract, scene, chapter, packaging), the exact stale set;
 - topological order;
-- a span repair with unchanged context stales nothing.
+- a bible revision that changes the outline content propagates to the scene contracts and every descendant;
+- an upstream regeneration with byte-identical effective content leaves the descendants fresh;
+- a prior-scene revision with equal context content gives a rebase revision, not a model call.
 
 PostgreSQL fencing tests in `tests/integration/server/story_authoring/test_runtime.py`:
 - two same-fingerprint attempts completing in reverse order: exactly one promoted;
@@ -170,18 +195,24 @@ PostgreSQL fencing tests in `tests/integration/server/story_authoring/test_runti
    - **Successor manifest after `COMMIT_BLOCKED` (frozen committed prefix).** When a concurrent Canon change blocks step k, the steps before k stay committed and are never sent again.
      1. The affected scenes become stale and are regenerated against the new committed state.
      2. A successor manifest M2 is built with `predecessor_manifest_digest = M1`. Its `committed_prefix` is M1's exact receipts, and only the uncommitted suffix may differ.
-     3. Before M2 is offered, every prefix receipt is re-verified: it is still the effective decision, and the plan version is still as committed. If any prefix receipt is no longer effective, M2 cannot be built; the run offers only abort (below), and any later correction goes through the normal R2 revision lifecycle as a new append-only revision.
+     3. Before M2 is offered, every prefix receipt is re-verified on two counts (P0-C):
+        - it is still the effective decision, and the plan version is still as committed;
+        - its **subject is unchanged**: the scene revision IDs and digests, the change-set ID and digest, and the approval digest that the receipt binds equal M2's entries for that chapter.
+
+        A prefix may end inside a chapter, for example after `decide_revision` but before `admit_canon_handoff`. If the regenerated suffix touches any scene of such a chapter, its earlier receipts bind the old candidate and are not reused. M2 cannot be built; the run offers only abort (`ABORTED_PARTIAL`, a Human action), and the correction goes through the normal R2 revision lifecycle as new append-only revisions. M2 is built only when every committed subject is unchanged.
      4. M2 needs its own Approve (an optional action; not counted). M1's approval is never reused for M2's suffix: the keys differ, and the approval binds M2's digest.
-     5. Task3 proves `PARTIALLY_COMMITTED(M1)` → `COMMITTED(M2)` on PostgreSQL: no duplicate decision, no reuse of M1's approval, every chapter consistent.
+     5. Task3 proves on PostgreSQL:
+        - `PARTIALLY_COMMITTED(M1)` → `COMMITTED(M2)` with no duplicate decision, no reuse of M1's approval, and every chapter consistent;
+        - a prefix ending inside chapter 2 with a regenerated chapter-2 scene → M2 refused, abort offered.
    - Export and video hand-off are allowed only in `COMMITTED`.
 8. **Run lifecycle and who may end it (third-review P0-03).** Every action below is a Human action through the existing interactive-auth dependency, by a principal holding the project's authoring grant — the same principal class that may Approve. An agent or a run never performs any of them.
 
    | State | Allowed Human actions | Result |
    |---|---|---|
-   | `RUNNING`, `AWAITING_GATE_A`, `BLOCKED_*`, `READY_FOR_APPROVAL` | revise, retry (blocked), **discard** | `DISCARDED` (terminal): no governance record, export or hand-off; in-flight attempts fenced |
+   | `RUNNING`, `AWAITING_GATE_A`, `BLOCKED_*`, `READY_FOR_APPROVAL` | revise, retry (blocked), **discard** | `DISCARDED` (terminal): no `NarrativePlan` or Canon commit, no export or hand-off; in-flight attempts fenced. A Gate A decision already recorded stays under the gates owner's retention and revocation policy (P1-03) |
    | `APPROVING` | none (the sequence is running) | — |
    | `PARTIALLY_COMMITTED`, `COMMIT_BLOCKED` | resume, approve successor manifest, **abort** | `ABORTED_PARTIAL` (terminal) |
-   | `COMMITTED` | export, send to video, **withdraw** | `WITHDRAWN` (terminal for hand-off and export) |
+   | `COMMITTED` | export, send to video, **withdraw**, **request a change** | `WITHDRAWN` (terminal for hand-off and export); a change opens a new R2 candidate/revision through the existing lifecycle and needs a new Human acceptance. The scene heads in the accepted manifest are never edited (P1-04) |
 
    - `ABORTED_PARTIAL` keeps every committed receipt unchanged; R2 records are append-only, so the committed plan and chapters remain real R2 state. It blocks export and hand-off and marks the run as not resumable. The UI states exactly which chapters were committed. Further changes go only through the normal R2 lifecycle.
    - `WITHDRAWN` blocks `send_to_video` and further export, and labels the export superseded.
@@ -225,7 +256,8 @@ Decisions:
    ```
 
    - The response fields used are `done`, `message.content`, `done_reason`, `prompt_eval_count` and `eval_count`.
-   - **Acceptance of a response (third-review P1-04)** requires all of: HTTP 200; `done == true`; `done_reason == "stop"`; valid JSON matching the schema; the shared detector clean; and every L1 completeness check passing (closing punctuation, minimum length, scene-contract coverage, no meta text). `stop` is necessary, not sufficient.
+   - **`COUNT` responses (P1-01)** are validated for: HTTP 200 (or HTTP 400 `exceed_context_size_error`, which yields `INPUT_OVER_CONTEXT`); `done == true`; `done_reason` in {`stop`, `length`}; an integer `prompt_eval_count`; the model identity; and a request digest equal to the following `GENERATE` request except `num_predict`. Their output is never promoted or stored.
+   - **Acceptance of a `GENERATE` response (third-review P1-04)** requires all of: HTTP 200; `done == true`; `done_reason == "stop"`; valid JSON matching the schema; the shared detector clean; and every L1 completeness check passing (closing punctuation, minimum length, scene-contract coverage, no meta text). `stop` is necessary, not sufficient.
    - No SDK retry, no fallback. One HTTP request is one attempt in the attempt ledger.
    - Task1 verifies that `options.num_ctx` equal to the tag value does not reload the model.
 3. **Structured calls:** `format` is the Pydantic schema. **Prose calls** use the envelope `{"type":"object","properties":{"text":{"type":"string","minLength":1,"pattern":"<NO_CJK>"}},"required":["text"],"additionalProperties":false}`. The result is unwrapped by `json.loads`, validated with the Pydantic model, then checked by the shared detector. The unwrapped text and the raw envelope digest are stored.
@@ -251,7 +283,7 @@ Decisions:
    | `server_context_limit` | `num_ctx` (32,768) | enforced by the server with `truncate: false` → `INPUT_OVER_CONTEXT` with the exact count |
 
    - The count probe is an attempt of kind `COUNT` in the ledger, with its own `count_calls_max`. Its prefill is cached for the real call.
-   - Task1 proves `counted == actual` on n ≥ 20 requests, including structured `format` calls.
+   - Task1 proves `counted == actual` on n ≥ 20 requests, including structured `format` calls, with only `num_predict` differing between the two requests.
    - With `counted_input_tokens` exact and output bounded by `num_predict` (server-enforced), the reservation `counted_input_tokens + num_predict` is a true upper bound, so the token ceilings are hard limits.
    **Truncation, output:** `done_reason = "length"` or a missing `done_reason` → `OUTPUT_TRUNCATED`, never stored.
    The acceptance claim "zero truncated calls" rests on the server refusal plus `done_reason`, and is proven by Task1 tests at the boundary: prompts of 24,000–24,576 tokens with the real system prompt, schema and template, and at 32,769 tokens (→ 400).
@@ -282,8 +314,9 @@ Owned additions: `lib/custom_provider/endpoints.py`, `lib/text_backends/ollama.p
 
    Resume then continues from the stale or missing nodes (Change D). It never resends silently: the replacement attempt has a new attempt ID and is visible.
 4. **`RunBudget`, immutable at run start** and recorded in the run: `calls_max`, `input_tokens_max`, `output_tokens_max`, `wall_clock_max`, `regenerations_max`, plus the per-scene and per-chapter caps from § Size and budget.
-   - Each generate attempt reserves `counted_input_tokens + num_predict` **before** dispatch, under a row lock through the existing `budget_guard` reservation path; a count probe reserves its byte upper bound (UTF-8 bytes + template tokens; byte-level BPE emits at least one byte per token) + 1. Completion releases the unused part; an `UNKNOWN` attempt keeps the full charge.
+   - Each generate attempt reserves `counted_input_tokens + num_predict` **before** dispatch, under a row lock through the existing `budget_guard` reservation path; a count probe reserves `server_context_limit` (32,768) input tokens + 1 output token. This is a proven bound, since the server refuses anything larger, and the unused part is released at completion. Completion releases the unused part; an `UNKNOWN` attempt keeps the full charge.
    - Every retry layer — schema repair, span repair, scene regeneration, binding regeneration, chapter-review repair — draws from the same caps. Layers never multiply.
+   - `total_http_calls_max = count_calls_max + generate_calls_max`, with one count probe per generate attempt (`count_calls_max = generate_calls_max`). `wall_clock_max` includes count probes, retries and provider waits.
    - Exhausting a cap → `BLOCKED_BUDGET` with the exact cap.
 5. **Ledger for `LOCAL`.** The price is 0 minor units in currency `LOCAL`, so there is no billing. It is not free: every attempt still uses GPU time, wall clock and budget. Ledger rows carry token quantities for observability; `LOCAL` rows are excluded from money totals.
 
@@ -301,8 +334,9 @@ Owned: the attempt ledger, checkpoint and budget glue live in `server/story_auth
 | Output per call | ≤ 4,096 tokens |
 | Per-scene attempt cap | 6 model attempts of any kind (draft, schema repair, span repair, regeneration, binding regeneration) |
 | Per-chapter review cycles | 2 |
-| Run `calls_max` | upper bound = planning (≤ 10) + scenes (≤ 15 × 6) + chapter reviews (≤ 3 × 2 × 4) + manuscript review and packaging (≤ 8) = 132. Task4 sets the default to the measured p95 × 1.2, never above the bound. |
-| Run `wall_clock_max` | from Task1's per-call worst-case time × `calls_max` |
+| Run `generate_calls_max` | upper bound = planning (≤ 10) + scenes (≤ 15 × 6) + chapter reviews (≤ 3 × 2 × 4) + manuscript review and packaging (≤ 8) = 132. Task4 sets the default to the measured p95 × 1.2, never above the bound. |
+| Run `total_http_calls_max` | `count_calls_max` (= `generate_calls_max`) + `generate_calls_max`; upper bound 264 |
+| Run `wall_clock_max` | from Task1's worst-case time per count probe and per generate call, × their caps, plus provider wait time |
 
 **Length allocation (P2-01).**
 - The outline validator (L1, deterministic) requires 9–15 scenes in total, each scene target within 600–1,000 syllables, and the sum of targets within 7,000–11,000. A failing outline gets one repair attempt, then `BLOCKED_QUALITY` (hard structural).
@@ -377,11 +411,11 @@ Owned: `server/story_authoring/handoff.py`, `tests/unit/server/story_authoring/t
 | Task0 | schema round-trips for every new record; lineage evidence | Every record has a home, or `SCHEMA_GAP`; lineage recorded |
 | Task1 | transport fixtures (stop, length, `done: false`, 400 over-context, 200 non-compliant, 200 `stop` with incomplete content, timeout, cancel, unavailable); count probe `counted == actual` n ≥ 20; boundary prompts 24,000–24,576 and 32,769; generation at context end with `shift: false`; adversarial CJK canary n ≥ 20 per schema kind; system-prompt override; resource envelope | Fail closed in every case; no output accepted without proof |
 | Task2 | two workers reserve budget concurrently (PostgreSQL); attempt state machine; crash between content write and transaction; crash after `DISPATCHED`; same-fingerprint reverse-order completion; result after discard/abort | No ceiling exceeded; exactly one promotion; reconcile to a consistent state or `RECOVERY_INCONSISTENT` |
-| Task3 | manifest canonical payload and derived keys; plan + 3 chapters; crash after each transition kind and between authority commit and run record; Canon change between proof and commit; successor manifest M1 → M2; abort → `ABORTED_PARTIAL`; concurrent Approve; stale manifest; Gate A rebind; authority adapter batch | Each decision has the right authority, revision and approval digest; no duplicates; no approval reused across manifests; blocked, never wrongly committed |
-| Task4 | stale set per change type (brief, bible, outline, contract, scene, chapter, packaging); expanded-graph acyclicity; revision during a running call (late result fenced); chapter loop to `SEALED`, `SEALED_WITH_FINDINGS` and `BLOCKED_QUALITY`; outline length allocation; restart during chapter 2; donor parity n ≥ 10 | Exact stale sets; no seal with stale nodes or hard findings; chapter 1 not regenerated; parity rows `PARITY`/`IMPROVED` |
+| Task3 | context-pack identity and rebase revision accepted by R2 evidence (P0-B); successor manifest with a prefix inside a chapter refused (P0-C); manifest canonical payload and derived keys; plan + 3 chapters; crash after each transition kind and between authority commit and run record; Canon change between proof and commit; successor manifest M1 → M2; abort → `ABORTED_PARTIAL`; concurrent Approve; stale manifest; Gate A rebind; authority adapter batch | Each decision has the right authority, revision and approval digest; no duplicates; no approval reused across manifests; blocked, never wrongly committed |
+| Task4 | topological dirty propagation (bible → outline → contracts; identical upstream content keeps descendants fresh); stale set per change type (brief, bible, outline, contract, scene, chapter, packaging); expanded-graph acyclicity; revision during a running call (late result fenced); chapter loop to `SEALED`, `SEALED_WITH_FINDINGS` and `BLOCKED_QUALITY`; outline length allocation; restart during chapter 2; donor parity n ≥ 10 | Exact stale sets; no seal with stale nodes or hard findings; chapter 1 not regenerated; parity rows `PARITY`/`IMPROVED` |
 | Task5 | withdraw, re-export, duplicate hand-off, Approve disabled with unticked critical exceptions, two-tab Approve | Withdrawn text is never sent; no wrong or duplicate source |
 | Task6 | clean live run; separate live restart, revision and discard runs; adverse cases (endpoint down mid-run, kill during a call, a CJK-baiting brief, an over-long brief); 3 variation runs with different ideas and genres | Two separate passes, both required. **Safety pass:** every run (adverse and variation) ends at touchpoint 2 or a typed blocked state, with no invariant breach, crash or hang. **Completion pass:** at least 2 of the 3 variation runs reach touchpoint 2 with no hard finding, and reach `COMMITTED` after the sponsor's decision. Completion rate, blocking causes and latency per stage are recorded as observations, never as a long-run reliability estimate. Evidence is separate per property and bound to HEAD. |
-| Task7 | fast-forward check; tag on the accepted commit; deploy from the tag; staging smoke | Tagged commit == accepted commit; code, model blob digest, Modelfile hash, schema/prompt versions and alembic head match the evidence |
+| Task7 | fast-forward check; evidence-only descendant check; tag; deploy from the tag; staging smoke | Tagged commit = T plus evidence-only commits; tag message names T; code, model blob digest, Modelfile hash, schema/prompt versions and alembic head match the evidence |
 
 The two hardest cases — concurrent approval with a Canon change, and recovery after a partial commit — run on PostgreSQL with the real authority adapter, not with fixture models alone.
 
@@ -415,11 +449,16 @@ Criteria:
 
 ## Release (Task7)
 
+0. **Evidence never names itself (P0-D).** This follows the V1 convention: tag `r2-v1.0.0` names its "Code candidate" `d5c4e6b0`, and the tagged commit `54240210` is a descendant whose diff touches only `docs/r2/evidence/`.
+   - Acceptance evidence records `tested_code_head` = the code commit T that the runs used. It never records the commit that contains the evidence.
+   - The evidence is committed on top of T in **evidence-only** commits, whose diff from T touches only `docs/r2/evidence/`.
+   - The release check verifies: T is an ancestor of the release HEAD; `git diff --name-only T..HEAD` ⊆ `docs/r2/evidence/`; and the tag message names T as the code candidate.
+   - Any code change after T invalidates the evidence; Task6 runs again on the new T.
 1. **Pre-merge checks**, recorded in evidence:
    - `release/r2-v2-story` has the current `r2-v2/main` as an ancestor;
    - `git diff r2-v2/main..release` contains only story-authoring paths and their docs, and no `scripts/r2/verify_m9_*`;
    - the worktree is clean;
-   - the release HEAD equals the commit named in `R2_STORY_ACCEPTANCE_RUN.json`.
+   - the release HEAD is T (`tested_code_head` in `R2_STORY_ACCEPTANCE_RUN.json`) plus evidence-only commits (step 0).
 2. **Fast-forward only.** `git merge --ff-only release/r2-v2-story` into `r2-v2/main`, so the accepted commit becomes `r2-v2/main` unchanged. Annotate tag `r2-v2.0.0` on that exact commit (ADR-0089 §7).
    - If `r2-v2/main` moved after acceptance, a fast-forward is impossible. The release branch is rebased, and Task6's acceptance checks run again on the new commit with new evidence before any tag. A merge commit is never tagged without its own qualification.
    - The release evidence records the tag object, the commit, the model blob digest, the Modelfile hash, the prompt/schema version table and the alembic head.
@@ -430,4 +469,6 @@ Criteria:
 
 ## Execution
 
-Main agent, inline and serial: Task0 → Task1 → Task2 → Task3 (hard gate) → Task4 → Task5 → Task6 → Task7. One progress report per task gate; one final independent review (Codex) and at most one repair.
+Main agent, inline and serial: Task0 → Task1 → Task2 → Task3 (hard gate) → Task4 → Task5 → Task6 → Task7.
+
+On conditional approval, only Task0–Task3 are open. Task4 opens only after Task3 passes with P0-B and P0-C closed on PostgreSQL with the real Showrunner authority adapter, and after the Human opens it. A contract that cannot be proven fails closed. There is no manual exception for hard integrity. One progress report per task gate; one final independent review (Codex) and at most one repair.
