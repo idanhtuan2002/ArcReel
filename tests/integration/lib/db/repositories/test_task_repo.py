@@ -1063,17 +1063,28 @@ class TestStoryRunState:
         with pytest.raises(StoryRunStateConflict):
             await repo.read_story_run_state(task_id)
 
-    async def test_a_finished_run_refuses_writes_and_transforms(self, db_session):
+    async def test_a_cancelled_run_refuses_writes_and_transforms(self, db_session):
         repo = TaskRepository(db_session)
         task_id = await self._run(db_session)
         await repo.write_story_run_state(
             task_id, expected_version=None, state_json='{"state_version": 1}', new_version=1
         )
-        await repo.claim_next("text")
-        await repo.mark_succeeded(task_id, {})
+        await repo.cancel_task(task_id)
 
         with pytest.raises(StoryRunStateConflict):
             await repo.transform_story_run_state(task_id, lambda current: '{"state_version": 2}')
+
+    async def test_a_finished_run_is_requeued_only_from_succeeded_or_failed(self, db_session):
+        repo = TaskRepository(db_session)
+        task_id = await self._run(db_session)
+        assert await repo.requeue_finished_story_run(task_id) == 0
+        await repo.claim_next("text")
+        assert await repo.requeue_finished_story_run(task_id) == 0
+        await repo.mark_succeeded(task_id, {})
+
+        assert await repo.requeue_finished_story_run(task_id) == 1
+        status, _ = await repo.read_story_run_state(task_id)
+        assert status == "queued"
 
     async def test_a_transform_that_changes_nothing_writes_nothing(self, db_session):
         repo = TaskRepository(db_session)

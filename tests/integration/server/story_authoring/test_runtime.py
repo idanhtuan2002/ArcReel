@@ -203,12 +203,22 @@ async def test_two_results_with_the_same_expectations_promote_exactly_once(concu
     assert final.revisions[stale].outcome is RevisionOutcome.STALE_RESULT
 
 
-async def test_a_finished_run_task_refuses_every_state_change(concurrent_session_factory: Factory):
+async def test_a_cancelled_run_task_refuses_every_state_change(concurrent_session_factory: Factory):
+    store = await _run(concurrent_session_factory)
+    async with concurrent_session_factory() as session:
+        await TaskRepository(session).cancel_task(store.task_id)
+
+    with pytest.raises(StoryRunStateConflict):
+        await store.apply(lambda s: (set_phase(s, RunPhase.DISCARDED), None))
+
+
+async def test_a_finished_generation_keeps_its_run_state_writable(concurrent_session_factory: Factory):
     store = await _run(concurrent_session_factory)
     async with concurrent_session_factory() as session:
         repo = TaskRepository(session)
         await repo.claim_next("text")
         await repo.mark_succeeded(store.task_id, {})
 
-    with pytest.raises(StoryRunStateConflict):
-        await store.apply(lambda s: (set_phase(s, RunPhase.DISCARDED), None))
+    state, _ = await store.apply(lambda s: (set_phase(s, RunPhase.READY_FOR_APPROVAL), None))
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL

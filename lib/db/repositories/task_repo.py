@@ -33,8 +33,11 @@ ACTIVE_TASK_STATUSES = ("queued", "running", "cancelling")
 
 #: 故事创作 run 任务：整个 run 的状态（节点 head、尝试台账、预算、checkpoint）存于
 #: ``execution_checkpoint_json``，只经 ``write_story_run_state`` 的行锁 + 版本比对写入。
+#: 生成结束（succeeded/failed）后 run 仍在人工审批、修订、恢复的生命周期内，状态照常可写；
+#: run 是否终结由状态内的阶段（phase）决定。用户取消（cancelled）后不再可写。
 STORY_RUN_TASK_TYPE = "story_authoring_run"
-STORY_RUN_WRITABLE_STATUSES = ("queued", "running")
+STORY_RUN_WRITABLE_STATUSES = ("queued", "running", "succeeded", "failed")
+STORY_RUN_REQUEUEABLE_STATUSES = ("succeeded", "failed")
 
 
 class StoryRunStateConflict(RuntimeError):
@@ -1243,6 +1246,28 @@ class TaskRepository(BaseRepository):
             raise StoryRunStateRace(f"story run {task_id} changed during the transform")
         await self.session.commit()
         return new_json, True
+
+    async def requeue_finished_story_run(self, task_id: str) -> int:
+        """生成已结束的 story run 再次入队（修订请求或阻塞后重试），由执行器按状态续跑；返回更新行数。"""
+        result = await self.session.execute(
+            update(Task)
+            .where(
+                Task.task_id == task_id,
+                Task.task_type == STORY_RUN_TASK_TYPE,
+                Task.status.in_(STORY_RUN_REQUEUEABLE_STATUSES),
+            )
+            .values(
+                status="queued",
+                started_at=None,
+                finished_at=None,
+                result_json=None,
+                error_message=None,
+                queued_at=utc_now(),
+                updated_at=utc_now(),
+            )
+        )
+        await self.session.commit()
+        return rowcount(result)
 
     async def requeue_story_run(self, task_id: str) -> int:
         """把重启后残留为 running 的 story run 任务放回队列，由执行器先对账再续跑；返回更新行数。"""
