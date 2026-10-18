@@ -703,6 +703,10 @@ class GenerationQueue:
         async with self._task_repo() as repo:
             return await repo.list_orphan_tasks_on_start()
 
+    async def requeue_story_run(self, task_id: str) -> int:
+        async with self._task_repo() as repo:
+            return await repo.requeue_story_run(task_id)
+
     async def persist_provider_job_id(
         self,
         task_id: str,

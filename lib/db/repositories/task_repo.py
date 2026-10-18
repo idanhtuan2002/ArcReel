@@ -31,6 +31,20 @@ logger = logging.getLogger(__name__)
 
 ACTIVE_TASK_STATUSES = ("queued", "running", "cancelling")
 
+#: 故事创作 run 任务：整个 run 的状态（节点 head、尝试台账、预算、checkpoint）存于
+#: ``execution_checkpoint_json``，只经 ``write_story_run_state`` 的行锁 + 版本比对写入。
+STORY_RUN_TASK_TYPE = "story_authoring_run"
+STORY_RUN_WRITABLE_STATUSES = ("queued", "running")
+
+
+class StoryRunStateConflict(RuntimeError):
+    """run 状态写入被守卫拒绝：版本已变、任务不是 story run，或任务不在可写状态。"""
+
+
+class StoryRunStateRace(StoryRunStateConflict):
+    """并发写者在本次变换期间改动了状态（仅 SQLite 可能出现）；调用方可重新读取后重试。"""
+
+
 # 落库 error_message 的长度上限。裸切片会把结构化原因切在 JSON 中途，使 render_failure
 # 无法解析、用户看到机器码碎片而非本地化文案，因此两条落库路径都经 bound_reason 收窄。
 # 级联编码另在编码前按预算裁剪 reason（_encode_bounded_cascade_failure），保证结果本身
@@ -1132,6 +1146,113 @@ class TaskRepository(BaseRepository):
             await self.session.rollback()
             raise ValueError(f"execution checkpoint persistence guard rejected task: {task_id}")
         await self.session.commit()
+
+    async def read_story_run_state(self, task_id: str) -> tuple[str, str | None]:
+        """返回 story run 任务的 ``(status, execution_checkpoint_json)``；任务不存在或类型不符时抛冲突。"""
+        row = (
+            await self.session.execute(
+                select(Task.status, Task.execution_checkpoint_json).where(
+                    Task.task_id == task_id, Task.task_type == STORY_RUN_TASK_TYPE
+                )
+            )
+        ).first()
+        if row is None:
+            raise StoryRunStateConflict(f"story run task not found: {task_id}")
+        return row[0], row[1]
+
+    async def write_story_run_state(
+        self, task_id: str, *, expected_version: int | None, state_json: str, new_version: int
+    ) -> None:
+        """在一个事务内以行锁比对版本后整体替换 story run 状态。
+
+        ``expected_version`` 为 None 表示首次写入（当前状态必须为空）。状态 JSON 顶层的
+        ``state_version`` 必须等于 ``new_version`` 且严格大于 ``expected_version``。PostgreSQL 上
+        ``SELECT ... FOR UPDATE`` 串行化并发写者；SQLite 由库级写锁串行化。版本不符、任务类型不符
+        或任务不在 queued/running 时回滚并抛 :class:`StoryRunStateConflict`，调用方重新读取后再决定。
+        """
+        parsed = _json_loads(state_json, None)
+        if not isinstance(parsed, dict) or parsed.get("state_version") != new_version:
+            raise ValueError("state_json.state_version must equal new_version")
+        if expected_version is not None and new_version <= expected_version:
+            raise ValueError("new_version must be greater than expected_version")
+        row = (
+            await self.session.execute(
+                select(Task.status, Task.execution_checkpoint_json)
+                .where(Task.task_id == task_id, Task.task_type == STORY_RUN_TASK_TYPE)
+                .with_for_update()
+            )
+        ).first()
+        current_version: object = None
+        if row is not None and row[1] is not None:
+            current = _json_loads(row[1], None)
+            current_version = current.get("state_version") if isinstance(current, dict) else "malformed"
+        if row is None or row[0] not in STORY_RUN_WRITABLE_STATUSES or current_version != expected_version:
+            await self.session.rollback()
+            raise StoryRunStateConflict(
+                f"story run state guard rejected task {task_id}: "
+                f"status={None if row is None else row[0]!r} version={current_version!r} expected={expected_version!r}"
+            )
+        await self.session.execute(
+            update(Task)
+            .where(Task.task_id == task_id)
+            .values(execution_checkpoint_json=state_json, updated_at=utc_now())
+        )
+        await self.session.commit()
+
+    async def transform_story_run_state(
+        self, task_id: str, transform: Callable[[str | None], str | None]
+    ) -> tuple[str | None, bool]:
+        """在一个持行锁的事务内读取、变换并写回 story run 状态；返回 ``(当前状态, 是否写入)``。
+
+        ``transform`` 收到当前 JSON，返回新 JSON；返回 None 或原值表示不写。它必须是不做 I/O 的纯计算：
+        行锁持有期间只做这一次计算。写入以「状态文本未变」为条件，PostgreSQL 上行锁使条件恒成立；
+        SQLite 并发写者在库锁或条件不符时抛错/冲突，由调用方重试。任务类型不符或不在 queued/running
+        时抛 :class:`StoryRunStateConflict`；``transform`` 抛出的异常回滚后原样上抛。
+        """
+        row = (
+            await self.session.execute(
+                select(Task.status, Task.execution_checkpoint_json)
+                .where(Task.task_id == task_id, Task.task_type == STORY_RUN_TASK_TYPE)
+                .with_for_update()
+            )
+        ).first()
+        if row is None or row[0] not in STORY_RUN_WRITABLE_STATUSES:
+            await self.session.rollback()
+            raise StoryRunStateConflict(
+                f"story run state guard rejected task {task_id}: status={None if row is None else row[0]!r}"
+            )
+        current: str | None = row[1]
+        try:
+            new_json = transform(current)
+        except BaseException:
+            await self.session.rollback()
+            raise
+        if new_json is None or new_json == current:
+            await self.session.rollback()
+            return current, False
+        unchanged = (
+            Task.execution_checkpoint_json.is_(None) if current is None else Task.execution_checkpoint_json == current
+        )
+        result = await self.session.execute(
+            update(Task)
+            .where(Task.task_id == task_id, unchanged)
+            .values(execution_checkpoint_json=new_json, updated_at=utc_now())
+        )
+        if rowcount(result) != 1:
+            await self.session.rollback()
+            raise StoryRunStateRace(f"story run {task_id} changed during the transform")
+        await self.session.commit()
+        return new_json, True
+
+    async def requeue_story_run(self, task_id: str) -> int:
+        """把重启后残留为 running 的 story run 任务放回队列，由执行器先对账再续跑；返回更新行数。"""
+        result = await self.session.execute(
+            update(Task)
+            .where(Task.task_id == task_id, Task.task_type == STORY_RUN_TASK_TYPE, Task.status == "running")
+            .values(status="queued", started_at=None, updated_at=utc_now())
+        )
+        await self.session.commit()
+        return rowcount(result)
 
     async def _merge_payload_field(self, task_id: str, key: str, value: Any, *, raise_if_missing: bool = True) -> None:
         """把单个字段并入 task.payload 并提交；``raise_if_missing`` 决定 task 缺失时的处置。

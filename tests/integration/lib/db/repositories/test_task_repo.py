@@ -7,7 +7,7 @@ from sqlalchemy import event, select, update
 
 from lib.db.models.api_call import ApiCall
 from lib.db.models.task import Task
-from lib.db.repositories.task_repo import TaskRepository
+from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, StoryRunStateConflict, TaskRepository
 from lib.db.repositories.usage_repo import SettlementInput, UsageRepository
 from lib.i18n import _ as translate_message
 from lib.task_failure import encode_failure, render_failure
@@ -1017,3 +1017,100 @@ class TestCancelRespectsScope:
         assert result == {"cancelled_count": 1, "skipped_running_count": 1}
         assert (await repo.get(claimed))["status"] == "running"
         assert (await repo.get(remaining))["status"] == "cancelled"
+
+
+class TestStoryRunState:
+    async def _run(self, db_session, *, task_type: str = STORY_RUN_TASK_TYPE) -> str:
+        task = await TaskRepository(db_session).enqueue(
+            project_name="demo", task_type=task_type, media_type="text", resource_id="run"
+        )
+        return task["task_id"]
+
+    async def test_the_first_write_and_each_later_write_must_name_the_current_version(self, db_session):
+        repo = TaskRepository(db_session)
+        task_id = await self._run(db_session)
+
+        await repo.write_story_run_state(
+            task_id, expected_version=None, state_json='{"state_version": 1}', new_version=1
+        )
+        with pytest.raises(StoryRunStateConflict):
+            await repo.write_story_run_state(
+                task_id, expected_version=None, state_json='{"state_version": 1}', new_version=1
+            )
+        with pytest.raises(StoryRunStateConflict):
+            await repo.write_story_run_state(
+                task_id, expected_version=7, state_json='{"state_version": 8}', new_version=8
+            )
+        await repo.write_story_run_state(task_id, expected_version=1, state_json='{"state_version": 2}', new_version=2)
+
+        assert await repo.read_story_run_state(task_id) == ("queued", '{"state_version": 2}')
+
+    async def test_the_written_json_must_carry_the_new_version(self, db_session):
+        repo = TaskRepository(db_session)
+        task_id = await self._run(db_session)
+        with pytest.raises(ValueError, match="state_version must equal new_version"):
+            await repo.write_story_run_state(
+                task_id, expected_version=None, state_json='{"state_version": 3}', new_version=1
+            )
+
+    async def test_another_task_type_is_never_a_story_run(self, db_session):
+        repo = TaskRepository(db_session)
+        task_id = await self._run(db_session, task_type="text_script")
+        with pytest.raises(StoryRunStateConflict):
+            await repo.write_story_run_state(
+                task_id, expected_version=None, state_json='{"state_version": 1}', new_version=1
+            )
+        with pytest.raises(StoryRunStateConflict):
+            await repo.read_story_run_state(task_id)
+
+    async def test_a_finished_run_refuses_writes_and_transforms(self, db_session):
+        repo = TaskRepository(db_session)
+        task_id = await self._run(db_session)
+        await repo.write_story_run_state(
+            task_id, expected_version=None, state_json='{"state_version": 1}', new_version=1
+        )
+        await repo.claim_next("text")
+        await repo.mark_succeeded(task_id, {})
+
+        with pytest.raises(StoryRunStateConflict):
+            await repo.transform_story_run_state(task_id, lambda current: '{"state_version": 2}')
+
+    async def test_a_transform_that_changes_nothing_writes_nothing(self, db_session):
+        repo = TaskRepository(db_session)
+        task_id = await self._run(db_session)
+        await repo.write_story_run_state(
+            task_id, expected_version=None, state_json='{"state_version": 1}', new_version=1
+        )
+
+        assert await repo.transform_story_run_state(task_id, lambda current: None) == ('{"state_version": 1}', False)
+        assert await repo.transform_story_run_state(task_id, lambda current: current) == ('{"state_version": 1}', False)
+        assert await repo.transform_story_run_state(task_id, lambda current: '{"state_version": 2}') == (
+            '{"state_version": 2}',
+            True,
+        )
+
+    async def test_a_failing_transform_leaves_the_state_unchanged(self, db_session):
+        repo = TaskRepository(db_session)
+        task_id = await self._run(db_session)
+        await repo.write_story_run_state(
+            task_id, expected_version=None, state_json='{"state_version": 1}', new_version=1
+        )
+
+        def explode(current):
+            raise RuntimeError("budget refused")
+
+        with pytest.raises(RuntimeError):
+            await repo.transform_story_run_state(task_id, explode)
+        assert await repo.read_story_run_state(task_id) == ("queued", '{"state_version": 1}')
+
+    async def test_only_a_running_story_run_is_requeued(self, db_session):
+        repo = TaskRepository(db_session)
+        run_id = await self._run(db_session)
+        assert await repo.requeue_story_run(run_id) == 0
+        claimed = await repo.claim_next("text")
+        assert claimed is not None
+        assert claimed["task_id"] == run_id
+
+        assert await repo.requeue_story_run(run_id) == 1
+        status, _ = await repo.read_story_run_state(run_id)
+        assert status == "queued"

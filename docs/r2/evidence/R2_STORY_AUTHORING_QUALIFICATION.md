@@ -160,3 +160,77 @@ Scripts and outputs are retained in `.superpowers/sdd/2026-10-18-r2-v2-story-rel
 - **English code-mixing (F25) rises when CJK is blocked**: 12/20 prose and 10/20 structured canary outputs contained English words, against 1/20 in free decoding. In the normal scene prompt it was 1/20 (envelope) against 4/20 (free). The F25 detector in Task4 L1 stays mandatory.
 - **Budget basis**: worst case about 111 s per generate call; a count probe costs one prefill, about 1 s with the cache. `wall_clock_max` is derived from these in Task4.
 - **`StoryLimits` defaults stand**: 24,576 input + 4,096 output inside 32,768. The model stays 100 % on the GPU at the worst case, so no lowering is needed on this host.
+
+---
+
+## V2 Task2: durable run state, attempt ledger, content store (2026-10-18)
+
+Status: **DONE within the owned map**. These are runtime primitives; no story executor is registered yet. That is Task4, after Task3.
+
+### What exists now
+
+- **`lib/db/repositories/task_repo.py`** (story run task type `story_authoring_run`):
+  - `read_story_run_state`;
+  - `write_story_run_state`: first write and version compare-and-set under `SELECT … FOR UPDATE`;
+  - `transform_story_run_state`: read, pure transform and conditional write in one row-locked transaction;
+  - `requeue_story_run`.
+
+  Video checkpoint methods and guards are unchanged. `lib/generation_queue.py` gains the `requeue_story_run` wrapper.
+- **`lib/generation_worker.py`:**
+  - story runs get their own rate bucket `story_authoring` (text default 1), so an hours-long run never occupies the shared `text` bucket;
+  - an orphaned running story run is requeued for reconciliation instead of `[restart_lost_text]`.
+- **`server/story_authoring/runtime.py`:**
+  - `RunState`: phase lifecycle, node heads with `generation_epoch` and `required_fingerprint`, revision index, attempt ledger, budget usage and checkpoint.
+  - Pure transitions: `reserve`, `mark_dispatched`, `complete`, `fail`, `mark_unknown`, `require`, `promote`, `reconcile`, `orphan_digests`.
+  - `RunStateStore.apply`: one row-locked transaction per transition.
+  - `StoryAttemptSink`: the durable `AttemptSink` for the Task1 gateway.
+  - `recover_run`.
+- **`server/story_authoring/artifacts.py`:** `StoryBlobStore`, content-addressed and immutable under `<project>/story_authoring/blobs/`.
+  - Atomic write; the digest is verified on every read and on a repeated put.
+  - Malformed digests are refused, and so is a symlink anywhere below the project directory.
+
+### Decisions and facts found while implementing
+
+1. **No change to `lib/ledger.py` or `lib/budget_guard.py`.** The Task0 owner map allowed both, but neither is needed for V2.
+   - `Ledger.record` always calls `reserve_for_call`, which outside DEV reserves money (at least `MIN_RESERVATION`) against a currency scope. That is wrong for a local model.
+   - `LOCAL` attempts write their usage rows directly through the existing `UsageRepository` (`call_type` text, currency `LOCAL`, cost 0, real token counts).
+   - Every money aggregation already filters `cost_amount > 0`; a test proves `cost_by_currency` stays empty.
+   - The priced path stays untouched until a priced provider is qualified; the gateway refuses every other endpoint.
+2. **`api_calls.execution_id` is a foreign key to M7 `execution_attempts`** (`fk_api_calls_execution_attempt`). PostgreSQL rejected binding story attempt IDs to it; SQLite tests did not, because they run with foreign keys off.
+   - The attempt ID goes in `request_id` instead. Each attempt is exactly one provider request, and recovery looks rows up by `(task_id, request_id)`.
+   - This is why every Task2 database test also runs on PostgreSQL.
+3. **Charging rules:**
+   - A reservation charges its maximum until settled.
+   - Completion charges the actual usage.
+   - A dispatched failure charges the known input (or the reserved input), plus the reserved output unless the failure produced no generation (`MODEL_UNAVAILABLE`, `INPUT_OVER_CONTEXT`).
+   - A never-dispatched attempt releases its call and its tokens.
+   - `UNKNOWN` keeps its full charge.
+   - The wall-clock cap is cumulative model time, so Human waiting time does not count.
+4. **Promotion fencing**: the conditions are equal fingerprint, equal expected head, equal epoch and phase `RUNNING`. The first promotion bumps the epoch.
+5. **Backup:** blobs are regular files under the projects root, so `r2/host_hardening/deployment_backup.py` captures them; it refuses symlinks, as the store does. The backup also refuses to run while tasks are active (`ACTIVE_TASK_STATUSES`), so the runbook must say not to back up during a story run.
+
+### Tests
+
+Unit (SQLite or none) — `uv run python -m pytest tests/unit/server/story_authoring tests/integration/server/story_authoring -q` → 133 passed:
+- `test_runtime_state.py`: reservations, caps, charges, fencing including same-fingerprint and after-discard cases, reconcile, orphans;
+- `test_artifacts.py`: store, tamper, digest injection, symlinked directory and file;
+- the Task1 suites.
+
+PostgreSQL 16 on the disposable `arcreel-story-test-pg` (per-test schemas) — `DATABASE_URL=postgresql+asyncpg://…@127.0.0.1:55480/arcreel_story_test uv run python -m pytest tests/integration/server/story_authoring "tests/integration/lib/db/repositories/test_task_repo.py::TestStoryRunState" -q` → 14 passed:
+- 12 concurrent reservations against a cap of 5: exactly 5 granted, the run `BLOCKED_BUDGET`;
+- the usage row: currency `LOCAL`, cost 0, tokens, `request_id` equal to the attempt ID;
+- the run stopped before dispatch: nothing sent, call released;
+- restart recovery: in-flight → `UNKNOWN`, not dispatched → `FAILED NOT_DISPATCHED`, usage rows closed, idempotent;
+- two same-expectation promotions on two connections: exactly one head;
+- a finished run task refuses every change;
+- the repository guards.
+
+Regression: every generation queue and worker suite (12 files) → 259 passed. Queue, worker, repository and accounting suites together with the story suites → 437 passed, 1 skipped. ruff, ruff format, `basedpyright --warnings` (0/0/0), `lint-imports` (23 kept), `deptry` and `audit_tests --check` are clean.
+
+### Open for later tasks
+
+- **Task4:**
+  - registers the story executor;
+  - runs `recover_run` at every start;
+  - maps `CancelledError` of an in-flight call to `UNKNOWN` before the task is cancelled;
+  - for a priced currency, stops at `UNKNOWN` instead of continuing. `LOCAL` continues with a new visible attempt.

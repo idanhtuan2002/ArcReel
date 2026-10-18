@@ -8,9 +8,11 @@ from typing import Any
 import pytest
 
 from lib.artifact_manifest import ArtifactBasis, compose_video_artifact_basis
+from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE
 from lib.generation_worker import (
     _ORPHAN_RESCAN_LEASE_LOST_MULT,
     DEFAULT_PROVIDER,
+    STORY_RUN_LANE_KEY,
     CapacityTable,
     GenerationWorker,
     SlotTable,
@@ -211,6 +213,11 @@ class _FakeQueue:
         self._failed_rows = failed_rows
         self._orphans: list[dict] = []
         self.persisted_providers: list[tuple[str, str]] = []
+        self.requeued_story_runs: list[str] = []
+
+    async def requeue_story_run(self, task_id):
+        self.requeued_story_runs.append(task_id)
+        return 1
 
     async def persist_execution_provider_id(self, task_id, provider_id):
         self.persisted_providers.append((task_id, provider_id))
@@ -598,6 +605,28 @@ class TestExtractProvider:
         monkeypatch.setattr("lib.config.resolver.get_project_manager", _raising_pm)
         task = {"payload": {}, "project_name": "deleted-proj", "task_type": "video"}
         assert await _extract_provider(task) == DEFAULT_PROVIDER
+
+
+class TestStoryRunLane:
+    async def test_a_story_run_gets_its_own_rate_bucket(self):
+        task = {"task_type": STORY_RUN_TASK_TYPE, "media_type": "text", "payload": {}}
+        assert await _extract_provider(task) == STORY_RUN_LANE_KEY
+
+    async def test_other_text_tasks_keep_the_shared_text_bucket(self):
+        assert await _extract_provider({"task_type": "text_script", "media_type": "text", "payload": {}}) == "text"
+
+    async def test_an_orphaned_story_run_is_requeued_for_reconciliation_not_failed(self):
+        queue = _FakeQueue()
+        queue._orphans = [
+            {"task_id": "run-1", "status": "running", "task_type": STORY_RUN_TASK_TYPE, "media_type": "text"},
+            {"task_id": "txt-1", "status": "running", "task_type": "text_script", "media_type": "text"},
+        ]
+        worker = GenerationWorker(queue=queue, capacity=CapacityTable(_limits={}, _defaults={"text": 1}))
+
+        await worker._handle_orphan_tasks_on_start()
+
+        assert queue.requeued_story_runs == ["run-1"]
+        assert queue.failed == [("txt-1", "[restart_lost_text]")]
 
 
 class TestExtractProviderAlignsWithExecution:

@@ -45,6 +45,7 @@ from lib.budget_guard import BudgetExceededError, BudgetScopeMissingError
 from lib.config.resolver import VideoBucketCapabilityError
 from lib.custom_provider.comfyui.failures import ComfyuiError
 from lib.custom_provider.declarative_backend import DeclarativeRuntimeError
+from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE
 from lib.generation_queue import (
     I2I_ONLY_TASK_TYPES,
     TASK_POLL_INTERVAL_SEC,
@@ -74,6 +75,9 @@ from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 
 # Default provider used when a task payload does not specify one.
 DEFAULT_PROVIDER = "gemini-aistudio"
+
+#: 故事创作 run 的限流桶键；未在容量表登记，按 text lane 缺省并发 1。
+STORY_RUN_LANE_KEY = "story_authoring"
 
 
 def _non_resumable_video_providers() -> frozenset[str]:
@@ -478,6 +482,9 @@ async def _extract_provider(task: dict[str, Any]) -> str:
         payload = {**payload, "script_file": task["script_file"]}
     # 以 media lane 区分 video / audio / image：reference_video 等 task_type 同属 video lane。
     is_text = task.get("media_type") == "text"
+    if task.get("task_type") == STORY_RUN_TASK_TYPE:
+        # 故事创作 run 长时间占用本地模型：独立限流桶，不挤占其它文本任务的 "text" 桶。
+        return STORY_RUN_LANE_KEY
     is_video = task.get("media_type") == "video" or task.get("task_type") in ("video", "reference_video")
     is_audio = task.get("media_type") == "audio" or task.get("task_type") == "tts"
     if is_text:
@@ -1265,6 +1272,13 @@ class GenerationWorker:
                 )
                 if rows == 0:
                     await self.queue.mark_task_cancelled(task_id, cancelled_by="user")
+                continue
+
+            # 故事创作 run 的每次模型调用都在 run 状态里有尝试台账：回队后执行器先对账
+            # （未完成的调用记为结果未知并按预留计费，绝不静默重发），再从 checkpoint 续跑。
+            if task_type == STORY_RUN_TASK_TYPE:
+                rows = await self.queue.requeue_story_run(task_id)
+                logger.warning("孤儿 story run → requeue 以对账续跑: %s rows=%d", task_id, rows)
                 continue
 
             # text 同步调用可能在线程中继续运行，但进程重启后没有可接续的 job identity；
