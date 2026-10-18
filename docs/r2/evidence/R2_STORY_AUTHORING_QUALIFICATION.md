@@ -356,3 +356,48 @@ Status: **PASSED (hard gate)** for option A, on disposable PostgreSQL 16 with th
 
 - M5C architecture boundary suites (unit and DB) plus `tests/integration/r2/narrative_lifecycle`, `narrative_plan`, `narrative` and `tests/unit/r2/narrative_context` → 230 passed, 7 skipped (PostgreSQL-only concurrency cases; no R2 code changed).
 - ruff, ruff format, `basedpyright --warnings` (0/0/0), `lint-imports` (23 kept), `deptry` and `audit_tests --check` are clean.
+
+## V2 Task4.5: run driver, executor, service, routes and video hand-off (2026-10-19)
+
+Status: **PASSED (scripted model)** at HEAD `9de851aa` on `release/r2-v2-story`. The live end-to-end run and the
+n ≥ 10 differential are Task4.6.
+
+### What was built
+
+| Part | Code | Behaviour |
+|---|---|---|
+| Node graph and staleness | `pipeline.py` (`75c99f4b`) | acyclic graph for 3–5 scenes per chapter; fingerprints over template, route, decoding, input heads, intents and binding; forward closure equals the Change D stale set |
+| Run driver | `driver.py` (`f45f010b`, `7dbfd051`) | converges in topological order, skips a node whose head carries its fingerprint, regenerates the rest under per-node call caps; L1 checks and repair ladder per scene; 4 L2 audits with ≤ 2 repair cycles per chapter; the critic's `NO_ENDING` rewrites the final scene once; packaging keeps only quoted selling points (≥ 3); whole-story length outside 6,000–12,500 is hard structural, outside 7,000–11,000 stylistic; builds and offers the manifest, with successor fields after a partial commit |
+| Executor | `executor.py`, `_TASK_EXECUTORS` (`4a984608`) | reconciles after a restart, re-resolves the frozen route against the custom provider (changed base URL, endpoint or credential presence → `MODEL_UNAVAILABLE` before any call), drives the run; a run that is not `RUNNING` is returned unchanged |
+| Service and routes | `service.py`, `server/routers/story_runs.py` (`9de851aa`) | brief draft with frozen route; start only on a current Gate A greenlight of the exact brief digest; touchpoint 2 through the committer; revise, retry, discard, withdraw, resume, abort; every changing action needs an interactive session and the Showrunner grant |
+| Hand-off | `handoff.py` (`9de851aa`) | `COMMITTED` only, once per run, digest-checked, CJK re-scanned, ASCII slug name with a digest suffix on collision, `PENDING` before the upload |
+
+### Verification (PostgreSQL `arcreel-story-test-pg`, scripted model through the real gateway and attempt sink)
+
+| Property | Test | Result |
+|---|---|---|
+| Clean run reaches touchpoint 2 with 9 scenes, 3 chapters, export bound to the manifest | `test_driver::test_a_clean_run_converges_and_offers_one_manifest` | pass |
+| A converged run calls no model again; the same manifest digest | `test_a_second_run_of_a_converged_story_calls_no_model` | pass |
+| Crash at scene 5 → `MODEL_UNAVAILABLE`; resume regenerates only scenes 5–9, no planning node | `test_a_crash_mid_run_resumes_without_regenerating_converged_nodes` | pass |
+| Revision of scene [3,1] keeps scenes 1–6 decisions, regenerates 7–9 and chapter 3 review only | `test_a_scene_revision_regenerates_that_scene_and_everything_after_it` | pass |
+| A quoted continuity error is patched before the chapter is sealed | `test_a_quoted_continuity_error_is_repaired_before_the_chapter_is_sealed` | pass |
+| Node cap → `BLOCKED_QUALITY`; unresolved ending rewritten once, then blocked; packaging needs 3 quoted points; short story blocked | 5 tests | pass |
+| A revision requested while the run converges is honoured before the offer | `test_a_revision_requested_while_running_is_honoured_before_the_offer` | pass |
+| Route change refused before any call; finished run not re-driven; queue dispatch | `test_executor`, `test_generation_tasks_dispatch` | pass |
+| Brief → Gate A → start → run → Approve → `COMMITTED` → export → hand-off (real `upload_source`) → repeat returns the same record → other command refused → withdraw blocks export | `test_service::test_a_greenlit_brief_runs_to_an_approved_manuscript_handed_to_video` | pass |
+| Crash after the source write, before the record → retry completes with no second upload, one source file | `test_a_pending_hand_off_whose_source_was_written_completes_without_a_second_upload` | pass |
+| Gate A: digest mismatch, missing, superseded by revoke, principal without grant; repeated start → same run | `test_start_requires_a_current_greenlight_of_this_exact_brief` | pass |
+| Blocked → retry (new epoch) → ready; unknown target refused; chapter revision; discard → Approve refused | `test_revise_discard_and_retry_follow_the_lifecycle` | pass |
+| HTTP: non-interactive session → 401; refusal codes; stale manifest 409; approve, export, send-to-video, withdraw | `test_routes` (3 tests) | pass |
+
+Commands: `DATABASE_URL=… pytest tests/integration/server/story_authoring` → 48 passed; SQLite: story unit + integration,
+dispatch, worker module and task repository tests → 414 passed. ruff, `basedpyright --warnings` (0/0/0),
+`lint-imports` (23 kept), `deptry` and `audit_tests --check` are clean.
+
+### Recorded deviations and open values
+
+- **Brief edit = new run.** A Human brief edit is a new draft, a new Gate A and a new run; the `AWAITING_GATE_A` pause of Change C §4 is not used. The old run can be discarded. Same touchpoint count.
+- **One hand-off per run.** A second command id for the same run is refused (`ALREADY_HANDED_OFF`), so a duplicate source cannot be written.
+- **Intent expiry.** Discard, abort and `COMMITTED` are terminal for the driver, so remaining intents are inert; they are not rewritten to `EXPIRED`.
+- **Default limits** (`DEFAULT_LIMITS`): the Change "Size and budget" upper bounds (132 calls, 132 × 24,576 input tokens, 132 × 4,096 output tokens, 6 h). Task4.6 replaces them with measured p95 × 1.2.
+- The scripted model proves control flow and owners, not prose quality; quality evidence is Task4.6.
