@@ -234,3 +234,50 @@ Regression: every generation queue and worker suite (12 files) → 259 passed. Q
   - runs `recover_run` at every start;
   - maps `CancelledError` of an in-flight call to `UNKNOWN` before the task is cancelled;
   - for a priced currency, stops at `UNKNOWN` instead of continuing. `LOCAL` continues with a new visible attempt.
+
+---
+
+## V2 Task3 finding: `NARRATIVE_CANON_EXTRACTION_GAP` (2026-10-18)
+
+Status: **STOPPED FOR HUMAN DECISION** (amendment Change C §6–7: "if a decision family cannot be bound this way, Task3 returns the exact incompatibility before Task4"). No Task3 code has been written.
+
+### Facts (source-traced on `release/r2-v2-story`)
+
+1. **The real per-scene chain is longer than the amendment's "per chapter: `decide_revision` → `review_change_set` → `admit_canon_handoff`".** The R2 unit is the scene (`NarrativeRevision.scene_contract_version`), and the chain is:
+   1. `record_draft_candidate` and `record_revision` (needs an approved plan version ≥ 1, a scene contract version, a Canon base version and a `context_pack_id`);
+   2. **`decide_revision`** (Human);
+   3. `admit_extraction`: the `ExtractionAttempt` must name the `revision_acceptance_decision_id`, so extraction can only start after the Human accepts the revision;
+   4. an extractor produces `NarrativeChangeSet`s; `record_successful_extraction`;
+   5. **`review_change_set`** (Human, per change set);
+   6. `admit_compilation`;
+   7. `CanonDeltaCompiler.compile` under a `CompilerPolicy`;
+   8. `record_successful_compilation`;
+   9. **`admit_canon_handoff`** with an exact `CanonCommitApproval` (Human);
+   10. `NarrativeCanonHandoffFacade.commit_from_admission` → `CanonTransactionService.commit`.
+2. **No production extractor exists.** `r2/narrative_lifecycle/changeset_parser.py` is the Huohuo change-record parser; its own docstring says its output "is not a `NarrativeChangeSet`". Nothing maps prose to `NarrativeChangeSet`s with `NarrativeSemanticEffectKey`s.
+3. **No production compiler policy exists.** `CanonDeltaCompiler` expands accepted effect keys into Canon operations only through `CompilerPolicy.mutation_rules` (`CanonMutationRule`: an exact `(subject kind, subject ref, effect descriptor)` → explicit `CanonOperation`s). No code authors those rules.
+4. **Consequence for a single Approve.** If extraction ran after the click, the Human's `review_change_set` and `CanonCommitApproval` would approve change sets and Canon operations that did not exist when they clicked. That is not a decision bound to an exact revision.
+5. **No production `NarrativeShowrunnerAuthorityPort` adapter exists.** Only the test fake exists. The grant source does exist: the ADR-0103 ceremony and `server/services/governance_grants.py` `CurrentShowrunnerGrantReader` / `CheckpointedShowrunnerGrantReader`. Accepted M8 services already authorize with it in production (`format_review.py`, `spatial_pair_decision_v2.py`). A Narrative adapter over the same reader is host composition owned by Task3; it mints and infers no grant.
+6. **`NarrativeContextCompiler` has no production composition** (no non-test `NarrativeContextCompiler(` call). Readers to compose:
+   - Canon: `lib/db/repositories/canon_repo.py`;
+   - plan: `NarrativePlanService`;
+   - accepted narrative: the existing `AcceptedNarrativeAdapter`;
+   - creative policy, retrieval snapshot and token counter.
+
+   This is glue owned by Task3, not a blocker.
+7. **Decision IDs must be content-derived.** The accepted-narrative reference is a revision-acceptance decision ID, and it enters the next scene's `context_pack_id`, the revision and so the manifest. Deriving decision IDs from the manifest digest (amendment Change C §5) would therefore be circular. They must be derived from content: `sha256("story-decision-v1" ‖ run_id ‖ node_id ‖ revision digest)`. Manifest step keys stay host-side bookkeeping only. As a consequence, unchanged prefix scenes keep their decision IDs in a successor manifest.
+
+### Options presented to the Human
+
+- **A — outcome-only Canon for V2 (recommended).**
+  - At touchpoint 2, the one Approve covers:
+    - the Canon genesis: entities and facts deterministically mapped from the story bible, shown and bound in the manifest;
+    - the plan commit;
+    - one `decide_revision` ACCEPT per scene.
+  - No extraction, change-set review or Canon handoff per scene. Story continuity comes from the plan, the genesis Canon and the accepted prose (the `RECENT_ACCEPTED` context channel).
+  - Every Human decision binds content shown before the click. 2 touchpoints are kept, and no new R2 component is built.
+  - Canon does not record story events; a later version can add extraction.
+- **B — build an extractor and compiler policy now.**
+  - A model writes change records → `NarrativeChangeSet`s plus `CanonMutationRule`s. They are pre-computed before touchpoint 2 and shown and bound in the manifest, so the full chain runs in one Approve.
+  - This is a large new component outside "integrate existing owners": an extra model step per scene on a 9B model, model-authored Canon operations, and many more items for the Human to review at touchpoint 2.
+- **C — as B, with a third Human touchpoint** after acceptance to review change sets and approve the Canon handoff. This breaks the 2-touchpoint decision.
