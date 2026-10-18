@@ -54,7 +54,18 @@ Stage order (Novel Studio workflow shape, short-story scale):
 5. Per chapter: continuity check (M5C `continuity_rules` + donor continuity prompt) → style revision pass.
 6. Whole manuscript: L3 critic pass (advisory findings), ending check, packaging (title, blurb).
 
-Each model-calling stage takes its prompt content from the donor surface that wins the same-fixture differential (`DonorParityContract`); Vietnamese translation of a donor prompt is a recorded intentional deviation. Final selection per stage is recorded in the parity contract document, not here.
+Each model-calling stage takes its prompt content from the donor surface that wins the same-fixture differential (`DonorParityContract`); Vietnamese translation of a donor prompt is a recorded intentional deviation. The provisional selection (surfaces S01–S11, pins, source hashes, deviations, rejected surfaces) is `docs/r2/evidence/R2_STORY_DONOR_BASELINE.json`; Task4 confirms it with n ≥ 10.
+
+Every step follows the standard step contract and handles the failure taxonomy F01–F71 from the research (addendum "small-model failure research").
+
+Additional owned paths (added to the 2026-10-17 file map):
+
+- `server/story_authoring/prompts/` (`outline.py`, `planning.py`, `drafting.py`, `packaging.py`): donor-derived Vietnamese prompt templates, each citing its donor path and hash.
+- `server/story_authoring/checks.py`: L1 deterministic checks (language, length, repetition/dedupe core, names, attributes, xưng hô matrix, coverage, meta).
+- `server/story_authoring/audits.py`: L2 specialists and L3 critic; quote-verified findings.
+- `server/story_authoring/repair.py`: Huohuo span-local repair port and length normalizing.
+- Tests: `tests/unit/server/story_authoring/test_checks.py`, `test_audits.py`, `test_repair.py`, `test_prompts.py`.
+- Donor parity: `tests/integration/donor_parity/huohuo_continuity_patch_runner.mjs`, `huohuo_dedupe_runner.mjs`, fixtures under `tests/integration/donor_parity/fixtures/{huohuo_continuity_patch,huohuo_dedupe}/`, vendored unmodified sources, and `docs/r2/evidence/R2_STORY_*_PARITY.json` per selected surface.
 
 ## Change 4 — two touchpoints and revisions at any step
 
