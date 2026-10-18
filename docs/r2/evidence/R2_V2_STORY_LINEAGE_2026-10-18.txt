@@ -1,0 +1,157 @@
+# V2 story release lineage evidence (Task0, amendment rev5.1 Change 0 §3-4)
+# captured_at: 2026-10-18T19:22:11+07:00
+# repository_root: /home/anhtuan/content-production-os/.worktrees/r2-v2-story-release
+# release_worktree_head_before_evidence: 2befd4105085c0e61839ac742c0ccfc5495c2222
+# r2-v2/main: 23cf146a61c3b7acfb78440d2b1498fd9d77db4b
+# r2-v1.0.0 commit: 54240210f74cf51c1aacff50f4a193e92c69f8ae
+# design/r2-story-authoring: 0d169702cd427a715c476f93e773ccfd4a1062a4
+
+$ git merge-base --is-ancestor r2-v2/main HEAD
+exit 0 (ancestor)
+$ git merge-base --is-ancestor r2-v1.0.0 HEAD
+exit 0 (ancestor)
+
+$ git diff --name-only r2-v2/main..HEAD
+docs/r2/evidence/R2_STORY_AUTHORING_QUALIFICATION.md
+docs/r2/evidence/R2_STORY_DONOR_BASELINE.json
+docs/research/2026-10-18-r2-v2-story-release-research.md
+docs/superpowers/plans/2026-10-17-r2-idea-to-story-authoring.md
+docs/superpowers/plans/2026-10-18-r2-v2-story-release-amendment.md
+docs/superpowers/specs/2026-10-17-r2-idea-to-story-authoring-design.md
+
+$ git log --format="%H %s" r2-v2/main..HEAD
+2befd4105085c0e61839ac742c0ccfc5495c2222 docs(r2): record conditional approval of story amendment rev5.1
+c08b969df38bf63f2a4d7980e362a8d27106a98a docs(r2): story amendment rev5.1 fourth-review conditions
+0f650daa4a6e29ec3a9c9e31eb060f304baf387e docs(r2): story amendment rev5 consistency fixes
+71694f821606685f05bf99fafd62adde21c8d99d docs(r2): story amendment rev4 for second review
+eb53239d7d8ed180d3ed71fe28a74adb3db88f36 docs(r2): token calibration and grammar CJK ban probe
+a32fec73fd707ba0f6b1b2b4c68a270c6e4d6a1c docs(r2): story amendment rev3 answers review points
+1189338c60af24690a650bf76605bfc11d41c852 docs(r2): story donor baseline and owned paths for donor surfaces
+6a5800d80efe33f13a0922defa26aa0678f95cbe docs(r2): record same-idea donor differential for v2 story authoring
+a89902c0d4436bba8f254864d0670f4ae34da5eb docs(r2): small-model failure taxonomy and standard step contract
+660213ced0cf4dae838eeade2941c69fd84aec54 docs(r2): consolidate donor rationale for v2 story authoring
+90d295d48b48264fb32c5172f153d6f5c476ad6c docs(r2): revise v2 story release amendment for two story touchpoints
+9a6676e09f5aa7fd730b9a5f5d3a2f7e7cedbd3b docs(r2): record language probe and shenbi pipeline run for v2 story release
+fdb12ef779bb33d24079ff166c6d459d28c11eeb docs(r2): inventory writer donor surfaces for the Vietnamese short story
+90c7bfae333401ca5d013ef9b7a458e6ecd2b1b7 docs(r2): record the frozen writer donor roles and the unimplemented writer gap
+96503e0babd08cd0b9b6e3d08cb6ee9502d41ff7 docs(r2): amend the story plan for the automated V2 release on local Ollama
+d49129f75a4f01b639836ed39e47ef27fcc4c8c5 docs(r2): research the V2 story-authoring release base, gates and local model
+8c9cd5db89542c5078f867177a08c76f935a76c1 docs(r2): record native story authoring qualification gaps
+9f1fc9233a1ff58e34f86440406f901e40cef7b5 docs(r2): plan selectable-model story authoring integration
+cdd310fa251c36e5dd7b6a4df38a1a066ad207a8 docs(r2): propose idea-to-story authoring with selectable models
+
+$ git diff --name-only r2-v2/main..design/r2-story-authoring -- scripts tests  (M9 verifier files kept off the release branch)
+scripts/r2/verify_m9_design_acceptance.py
+scripts/r2/verify_m9_prerequisites.py
+tests/integration/scripts/r2/test_verify_m9_prerequisites_git.py
+tests/unit/scripts/r2/test_verify_m9_design_acceptance.py
+tests/unit/scripts/r2/test_verify_m9_prerequisites.py
+
+$ git for-each-ref --format="%(refname)" | grep -i -E "native|writer"
+refs/remotes/upstream/research/comfyui-native-api
+$ git log --all --oneline -i --grep="web writer" --grep="web-writer" --grep="native-narrative" --grep="native narrative"
+(end)
+$ find / -maxdepth 5 -type d -iname "*native-narrative*" 2>/dev/null
+(end)
+
+$ git worktree list --porcelain
+worktree /home/anhtuan/content-production-os
+HEAD dbaf93a625bd9e5499f1e50a6838355ff8c0c9e5
+branch refs/heads/design/r2-m5b-narrative-context
+
+worktree /home/anhtuan/content-production-os-m5b
+HEAD a2dc1c141c77ce1365eea8360a3593b55567c5af
+branch refs/heads/feat/r2-m5b-epistemic-plan-context
+
+worktree /home/anhtuan/content-production-os-m5c
+HEAD 43ec287abf11e8f4909c998ba2751300719a2f24
+branch refs/heads/feat/r2-m5c-narrative-lifecycle
+
+worktree /home/anhtuan/content-production-os-m6
+HEAD 814761e3a40a0f2b7c694aaf56a51302ca24eaa8
+branch refs/heads/feat/r2-m6-dual-profile-adaptation
+
+worktree /home/anhtuan/content-production-os-m7
+HEAD 95ea4eff132e5e154d2de8a2fe6342ed12edc8ba
+branch refs/heads/feat/r2-m7-host-production-hardening
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m7-14171
+HEAD f0b7ed7d923af2bcb7f819d65f389429de5b8259
+branch refs/heads/feat/r2-m7-host-production-hardening-14171
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m7e-h8
+HEAD a833aafb682ebccba28a533a56044d7e2e3500fa
+branch refs/heads/feat/r2-m7e-h8
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m7e-v1-lineage
+HEAD 6ab361a7181240e5c445eddc0a952d5a9f0bb2bd
+branch refs/heads/r2-v1/maintenance
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m8a
+HEAD 68be75bf943beed2a427d36ea2cd275497fb24ce
+branch refs/heads/impl/r2-m8a-exploration-promotion
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m8b
+HEAD 774952b235aa899c0125ee2109d426e9bc6dc9ff
+branch refs/heads/impl/r2-m8b-creative-canvas
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m8c
+HEAD 20b9bc2b1ef93c883a99699d072fcb0dbdeb7db5
+branch refs/heads/impl/r2-m8c-followups
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m8c-binding-design
+HEAD 0be0726f0f0f2c95b68147934e3fdb2d27e35598
+branch refs/heads/impl/r2-m8c-frame-receipts
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m8c-output-custody
+HEAD bad83b800c8e2907d02851e2ab560c59b37d2908
+branch refs/heads/design/r2-m8c-shot-output-custody
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m9a
+HEAD 04b1b92184a5d5b0643256be533332de6ed8b009
+branch refs/heads/impl/r2-m9a-opportunity-foundation
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-m9b
+HEAD bba1bd9622eb4423160c771f4dde2dc927b58f0a
+branch refs/heads/impl/r2-m9b-acquisition-observations
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-story-authoring
+HEAD 0d169702cd427a715c476f93e773ccfd4a1062a4
+branch refs/heads/design/r2-story-authoring
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v1-m5c-m6
+HEAD 14171d0fec96b2ecb57b05fb6e7f4fe045c4fed7
+branch refs/heads/integration/r2-v1-m5c-m6
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v1-operator-trial
+HEAD 0610b51bee3619c63b7327a39c416c65a1e3a543
+detached
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v2-02
+HEAD 9c25e70e5effcddfbda3e1e4abc0eac90aa78c5c
+branch refs/heads/feat/r2-v2-02-master-authority
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v2-02b
+HEAD 1f8441af8abd255a4c30de395bc57cb86e1d8db4
+branch refs/heads/fix/r2-v2-02b-serialize-gate-c
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v2-02c
+HEAD 34bd4346505c5ae715983c9cdc8d6517c988b98e
+branch refs/heads/fix/r2-v2-02c-m7-lock-order
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v2-02d
+HEAD b829ca5fe6ef9119cb74beefde56e27c07428381
+branch refs/heads/fix/r2-v2-02e-m8-lineage
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v2-03
+HEAD 4cc5c5ea1dae6b48bd34aae9a5049fc2e4581bfc
+branch refs/heads/impl/r2-v2-03-comfyui
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v2-main
+HEAD 39b9c5dab5d0fd56cf52bf65e95355437cb1023b
+branch refs/heads/design/r2-m9-v2-revalidation
+
+worktree /home/anhtuan/content-production-os/.worktrees/r2-v2-story-release
+HEAD 2befd4105085c0e61839ac742c0ccfc5495c2222
+branch refs/heads/release/r2-v2-story
+
