@@ -164,6 +164,7 @@ class RunState(_Frozen):
     revisions: Mapping[str, RevisionRecord] = Field(default_factory=dict)
     checkpoint: Checkpoint | None = None
     commit: CommitProgress | None = None
+    intents: Mapping[str, tuple[str, ...]] = Field(default_factory=dict)
 
     def attempt(self, attempt_id: str) -> AttemptRecord:
         for record in self.attempts:
@@ -363,6 +364,14 @@ def mark_unknown(state: RunState, *, attempt_id: str) -> RunState:
         update={"state": AttemptState.UNKNOWN, "failure_code": StoryFailureCode.OUTCOME_UNKNOWN}
     )
     return state.model_copy(update={"attempts": _replace_attempt(state, updated)})
+
+
+def add_intent(state: RunState, *, node_ids: tuple[str, ...], note: str) -> RunState:
+    """Attach a Human revision note to nodes; it enters their fingerprints, so they regenerate."""
+    intents = dict(state.intents)
+    for node_id in node_ids:
+        intents[node_id] = (*intents.get(node_id, ()), note)
+    return state.model_copy(update={"intents": intents})
 
 
 def set_phase(state: RunState, phase: RunPhase, *, reason: str | None = None) -> RunState:

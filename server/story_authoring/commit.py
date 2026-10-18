@@ -119,6 +119,7 @@ class ManuscriptCommitManifest(_Frozen):
     findings_open: tuple[str, ...] = ()
     exceptions_offered: tuple[str, ...] = ()
     export_digest: str
+    quality_record_digest: str | None = None
 
     def digest(self) -> str:
         return manifest_digest(self)
@@ -249,26 +250,7 @@ class ManuscriptCommitter:
 
     async def offer(self, manifest: ManuscriptCommitManifest) -> str:
         """Store the manifest and offer it at touchpoint 2. A successor must keep its committed prefix."""
-        digest = self._blobs.put(manifest_bytes(manifest))
-
-        def change(state: RunState) -> tuple[RunState, CommitRefused | None]:
-            if state.phase not in OFFERABLE_PHASES:
-                return state, CommitRefused(CommitRefusal.NOT_OFFERABLE, f"run is {state.phase.value}")
-            completed = state.commit.completed_steps if state.commit is not None else ()
-            if state.phase is RunPhase.COMMIT_BLOCKED:
-                previous = self._load_offered(state)
-                refusal = _successor_refusal(previous, manifest, completed)
-                if refusal is not None:
-                    return state, CommitRefused(CommitRefusal.SUCCESSOR_REFUSED, refusal)
-            elif manifest.predecessor_manifest_digest is not None or manifest.committed_prefix:
-                return state, CommitRefused(CommitRefusal.SUCCESSOR_REFUSED, "a first manifest has no predecessor")
-            progress = CommitProgress(offered_manifest_digest=digest, completed_steps=completed)
-            return set_phase(state, RunPhase.READY_FOR_APPROVAL).model_copy(update={"commit": progress}), None
-
-        _, refused = await self._store.apply(change)
-        if refused is not None:
-            raise refused
-        return digest
+        return await offer_manifest(self._store, self._blobs, manifest)
 
     # --- approval and execution --------------------------------------------------------------------
 
@@ -495,10 +477,35 @@ class ManuscriptCommitter:
         return problems
 
     def _load_offered(self, state: RunState) -> ManuscriptCommitManifest:
-        assert state.commit is not None
-        return ManuscriptCommitManifest.model_validate_json(
-            self._blobs.read_exact(state.commit.offered_manifest_digest)
-        )
+        return load_offered_manifest(self._blobs, state)
+
+
+def load_offered_manifest(blobs: StoryBlobStore, state: RunState) -> ManuscriptCommitManifest:
+    assert state.commit is not None
+    return ManuscriptCommitManifest.model_validate_json(blobs.read_exact(state.commit.offered_manifest_digest))
+
+
+async def offer_manifest(store: RunStateStore, blobs: StoryBlobStore, manifest: ManuscriptCommitManifest) -> str:
+    """Store a manifest and move the run to ``READY_FOR_APPROVAL``; a successor must keep its committed prefix."""
+    digest = blobs.put(manifest_bytes(manifest))
+
+    def change(state: RunState) -> tuple[RunState, CommitRefused | None]:
+        if state.phase not in OFFERABLE_PHASES:
+            return state, CommitRefused(CommitRefusal.NOT_OFFERABLE, f"run is {state.phase.value}")
+        completed = state.commit.completed_steps if state.commit is not None else ()
+        if completed:
+            refusal = _successor_refusal(load_offered_manifest(blobs, state), manifest, completed)
+            if refusal is not None:
+                return state, CommitRefused(CommitRefusal.SUCCESSOR_REFUSED, refusal)
+        elif manifest.predecessor_manifest_digest is not None or manifest.committed_prefix:
+            return state, CommitRefused(CommitRefusal.SUCCESSOR_REFUSED, "a first manifest has no predecessor")
+        progress = CommitProgress(offered_manifest_digest=digest, completed_steps=completed)
+        return set_phase(state, RunPhase.READY_FOR_APPROVAL).model_copy(update={"commit": progress}), None
+
+    _, refused = await store.apply(change)
+    if refused is not None:
+        raise refused
+    return digest
 
 
 def _successor_refusal(
