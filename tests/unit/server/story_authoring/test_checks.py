@@ -16,6 +16,7 @@ from server.story_authoring.checks import (
     meta_leaks,
     repeated_trigram_excess,
     strip_intra_chapter_near_duplicate,
+    strip_replayed_sentences,
     unknown_names,
 )
 
@@ -55,15 +56,31 @@ def test_repeated_trigrams_count_only_beyond_the_second_use():
     assert repeated_trigram_excess(" ".join(SENTENCES)) == 0
 
 
-def test_the_vietnamese_dedupe_profile_removes_a_replayed_block():
+def test_replayed_sentences_are_removed_and_first_occurrences_kept():
     text = " ".join([*SENTENCES, *SENTENCES[2:5]])
-    hit = find_intra_chapter_near_duplicate(text, profile=VIETNAMESE_PUNCTUATION)
-    assert hit is not None
-    cleaned, hits = strip_intra_chapter_near_duplicate(text)
-    assert 1 <= len(hits) <= 2
-    assert cleaned.count(SENTENCES[2]) == 1
-    assert cleaned.count(SENTENCES[3]) == 1
-    assert cleaned.startswith(" ".join(SENTENCES))
+    cleaned, hits = strip_replayed_sentences(text)
+    assert cleaned == " ".join(SENTENCES)
+    assert len(hits) == 3
+
+
+def test_short_repeated_sentences_are_kept():
+    text = "Anh gật đầu. Minh đi ra sân. Anh gật đầu."
+    assert strip_replayed_sentences(text) == (text, ())
+
+
+def test_the_donor_heuristic_applied_to_vietnamese_removes_a_sentence_that_is_not_repeated():
+    """Evidence for the recorded S08 deviation: the Han-tuned anchor heuristics over-remove on Vietnamese."""
+    sentences = [
+        "Trời vừa hửng sáng thì Minh đẩy cánh cổng, bản lề kêu lên một tiếng dài và khàn.",
+        "Anh đứng trên bậc thềm nhìn rất lâu, cây táo ngoài sân đã cao hơn trong trí nhớ.",
+        "Mẹ nhóm lửa trong bếp, khói chậm rãi bốc lên qua khe mái ngói rồi tan vào sương.",
+        "Lan ngẩng lên từ bên giếng, chiếc thùng gỗ trong tay khẽ chao, nước đổ xuống đá.",
+    ]
+    text = " ".join([*sentences, *sentences[1:3]])
+    donor_cleaned, _ = strip_intra_chapter_near_duplicate(text, profile=VIETNAMESE_PUNCTUATION)
+    runtime_cleaned, _ = strip_replayed_sentences(text)
+    assert sentences[3] not in donor_cleaned
+    assert runtime_cleaned == " ".join(sentences)
 
 
 def test_clean_prose_has_no_near_duplicate():

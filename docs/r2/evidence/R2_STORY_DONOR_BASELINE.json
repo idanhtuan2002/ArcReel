@@ -169,7 +169,33 @@
         "Vietnamese translation of PATCH_SYSTEM",
         "cultivation-genre rules (realm/injury) removed"
       ],
-      "evidence": "Novel Studio whole-chapter style revision changed 1,397 -> 1,396 syllables, introduced a CJK leak and did not converge on chapter 3"
+      "evidence": "Novel Studio whole-chapter style revision changed 1,397 -> 1,396 syllables, introduced a CJK leak and did not converge on chapter 3",
+      "vendored": {
+        "root": "tests/integration/donor_parity/vendor/huohuo",
+        "entry": "workbench-server/src/services/novel/novel-continuity-patch.ts",
+        "files": {
+          "workbench-server/src/services/novel/novel-continuity-patch.ts": "4311e814dac0cfc0b12c5cc2f2550b92b9566a9adf0c8898d3f57e3b41e365b2",
+          "workbench-server/src/common/novel/novel-char-limit.ts": "6c0fa2792f1c699719a91a7ace2b59f91b4c240971503b90ef03b940608e59dc"
+        },
+        "stubbed_imports": {
+          "../ai/ai.js": "model client; used only by patchNovelChapterContinuity, which is not under test",
+          "./novel-continuity-check.js": "continuity plan helpers; used only by patchNovelChapterContinuity",
+          "./novel-continuity-deterministic-fix.js": "genre-specific deterministic fixes; used only by patchNovelChapterContinuity",
+          "./novel-continuity.js": "Canon lock and state blocks over the donor database; used only by patchNovelChapterContinuity"
+        },
+        "stub_rule": "tests/integration/donor_parity/huohuo_stub_loader.mjs resolves exactly these specifiers to modules whose exports throw when called; the source under test is unmodified",
+        "port": "server/story_authoring/repair.py::apply_continuity_patches and build_conflict_excerpt_block (DONOR_PUNCTUATION profile)",
+        "exported_under_test": [
+          "applyContinuityPatches",
+          "buildConflictExcerptBlock"
+        ],
+        "intentional_deviations": [
+          "Vietnamese genre-neutral PATCH_SYSTEM",
+          "grammar-constrained PatchResponse instead of parsePatchResponse (fence/JSON salvage)",
+          "VIETNAMESE profile: quote hints also “…” and \"…\"; fallback words keep all Unicode letters",
+          "length ratio counted in syllables instead of countNovelChars"
+        ]
+      }
     },
     {
       "id": "S08_intra_chapter_dedupe",
@@ -200,9 +226,9 @@
         "port": "server/story_authoring/checks.py::find_intra_chapter_near_duplicate (DONOR_PUNCTUATION profile)",
         "exported_under_test": "findIntraChapterNearDuplicate",
         "intentional_deviations": [
-          "VIETNAMESE_PUNCTUATION profile at runtime (sentence ends . ! ? …; Vietnamese quotes and dashes removed by norm)",
+          "runtime Vietnamese dedupe is sentence-level replay removal over the same normalized-fingerprint idea (server/story_authoring/checks.py::strip_replayed_sentences): the donor's Han-tuned anchor and extension heuristics, run on Vietnamese (VIETNAMESE_PUNCTUATION profile), remove a sentence that is not repeated (tests/unit/server/story_authoring/test_checks.py::test_the_donor_heuristic_applied_to_vietnamese_removes_a_sentence_that_is_not_repeated); scaling the character thresholds by 2-4 did not fix it",
           "code-point indices (donor mixes code points and UTF-16 units; identical on BMP text, which the fixtures use)",
-          "only the find core and the two-round removal loop; the donor's bridge, stakes, emotion-label, kinship and deadline strippers are Chinese-specific and not taken"
+          "only the find core and the two-round removal loop are ported; the donor's bridge, stakes, emotion-label, kinship and deadline strippers are Chinese-specific and not taken"
         ]
       }
     },

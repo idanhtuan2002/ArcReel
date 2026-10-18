@@ -9,8 +9,9 @@ The intra-chapter near-duplicate core is a clean-room port of Huohuo
 ``workbench-server/src/services/novel/novel-intra-chapter-dedupe.ts`` (pin ``f104b853``, source sha256
 ``2a633d79…f393``): ``find_intra_chapter_near_duplicate`` and its helpers, branch for branch. The
 ``DONOR_PUNCTUATION`` profile reproduces the donor's Chinese punctuation exactly and is verified against the
-unmodified source by ``tests/integration/donor_parity/test_huohuo_dedupe.py``; ``VIETNAMESE_PUNCTUATION`` is the
-recorded intentional deviation used at runtime. JS ``\\s`` and ``trim()`` are emulated with the explicit ECMAScript
+unmodified source by ``tests/integration/donor_parity/test_huohuo_dedupe.py``. At runtime Vietnamese prose uses
+``strip_replayed_sentences``, a sentence-level form of the same normalized-fingerprint idea, because the donor's
+Han-tuned heuristics over-remove on Vietnamese (recorded deviation). JS ``\\s`` and ``trim()`` are emulated with the explicit ECMAScript
 whitespace set. Indices are code points; the donor mixes code points and UTF-16 units, which agree on BMP text.
 """
 
@@ -468,7 +469,7 @@ _TRIPLE_NEWLINES = re.compile(r"\n{3,}")
 
 
 def strip_intra_chapter_near_duplicate(
-    content: str, *, profile: PunctuationProfile = VIETNAMESE_PUNCTUATION
+    content: str, *, profile: PunctuationProfile = DONOR_PUNCTUATION
 ) -> tuple[str, tuple[DupHit, ...]]:
     """The donor's two-round removal around ``find``; a round that would remove half the text is not applied."""
     text = content
@@ -483,6 +484,44 @@ def strip_intra_chapter_near_duplicate(
         text = nxt
         hits.append(hit)
     return text, tuple(hits)
+
+
+_VI_SENTENCE = re.compile(r"[^.!?…\n]+[.!?…]*[”\"’»)]?")
+_VI_NORM_DROP = re.compile(r"[\W_]+")
+REPLAY_MIN_SYLLABLES = 8
+
+
+def strip_replayed_sentences(content: str) -> tuple[str, tuple[DupHit, ...]]:
+    """Vietnamese runtime form of the dedupe core: a sentence of at least ``REPLAY_MIN_SYLLABLES`` syllables whose
+    normalized fingerprint already occurred earlier is removed; the first occurrence always stays.
+
+    The donor's anchor-and-extend heuristics are tuned to Han characters and, applied to Vietnamese, remove
+    sentences that are not repeated (recorded deviation, ``R2_STORY_DONOR_BASELINE.json`` S08).
+    """
+    seen: set[str] = set()
+    removals: list[tuple[int, int]] = []
+    for match in _VI_SENTENCE.finditer(content):
+        sentence = match.group(0)
+        if count_syllables(sentence) < REPLAY_MIN_SYLLABLES:
+            continue
+        key = _VI_NORM_DROP.sub("", sentence.lower())
+        if key in seen:
+            removals.append((match.start(), match.end()))
+        else:
+            seen.add(key)
+    if not removals:
+        return content, ()
+    pieces: list[str] = []
+    cursor = 0
+    hits: list[DupHit] = []
+    for start, end in removals:
+        pieces.append(content[cursor:start])
+        cursor = end
+        hits.append(DupHit(start, end, end - start, " ".join(content[start:end].split())[:56]))
+    pieces.append(content[cursor:])
+    text = re.sub(r"[ \t]{2,}", " ", "".join(pieces))
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    return _TRIPLE_NEWLINES.sub("\n\n", text).strip(), tuple(hits)
 
 
 # --- surface checks --------------------------------------------------------------------------------
@@ -580,7 +619,7 @@ def check_scene_prose(
         findings.append(
             Finding("FOREIGN_WORDS", severity, node_id, f"{len(foreign)} non-Vietnamese words", " ".join(foreign[:8]))
         )
-    _, duplicates = strip_intra_chapter_near_duplicate(text)
+    _, duplicates = strip_replayed_sentences(text)
     findings.extend(
         Finding("NEAR_DUPLICATE", Severity.NARRATIVE_CRITICAL, node_id, "a passage repeats", hit.excerpt)
         for hit in duplicates
