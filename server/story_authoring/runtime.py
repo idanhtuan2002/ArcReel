@@ -150,6 +150,16 @@ class CommitProgress(_Frozen):
     blocked_step: str | None = None
 
 
+class HandoffRecord(_Frozen):
+    """The run's one hand-off to video: written ``PENDING`` before the source upload, ``DONE`` after it."""
+
+    command_id: str
+    filename: str
+    export_digest: str
+    done: bool = False
+    path: str | None = None
+
+
 class RunState(_Frozen):
     schema_id: str = RUN_STATE_SCHEMA
     state_version: int = Field(ge=1)
@@ -165,6 +175,7 @@ class RunState(_Frozen):
     checkpoint: Checkpoint | None = None
     commit: CommitProgress | None = None
     intents: Mapping[str, tuple[str, ...]] = Field(default_factory=dict)
+    handoff: HandoffRecord | None = None
 
     def attempt(self, attempt_id: str) -> AttemptRecord:
         for record in self.attempts:
@@ -376,6 +387,17 @@ def add_intent(state: RunState, *, node_ids: tuple[str, ...], note: str) -> RunS
 
 def set_phase(state: RunState, phase: RunPhase, *, reason: str | None = None) -> RunState:
     return state.model_copy(update={"phase": phase, "block_reason": reason})
+
+
+def reopen_unconverged(state: RunState) -> RunState:
+    """A Human retry: every node whose head does not carry its required fingerprint gets a new generation epoch,
+    so its call cap starts again and any late result of the old epoch is fenced."""
+    nodes = dict(state.nodes)
+    for node_id, node in state.nodes.items():
+        head = state.revisions.get(node.head_revision_id) if node.head_revision_id is not None else None
+        if head is None or head.fingerprint != node.required_fingerprint:
+            nodes[node_id] = node.model_copy(update={"generation_epoch": node.generation_epoch + 1})
+    return state.model_copy(update={"nodes": nodes})
 
 
 def require(state: RunState, *, node_id: str, fingerprint: str) -> RunState:

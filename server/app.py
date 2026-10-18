@@ -83,6 +83,7 @@ from server.routers import (
     spatial,
     spatial_review,
     spatial_targets,
+    story_runs,
     system,
     system_config,
     tasks,
@@ -680,6 +681,12 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
     tags=["M8 spatial review"],
+)
+app.include_router(
+    story_runs.router,
+    prefix="/api/v1",
+    dependencies=[Depends(get_current_user), Depends(require_project_migration_ok)],
+    tags=["V2 story authoring"],
 )
 app.include_router(
     spatial_targets.router,

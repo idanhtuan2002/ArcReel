@@ -49,7 +49,6 @@ from server.story_authoring.narrative import (
     scene_refs,
 )
 from server.story_authoring.runtime import RunPhase, RunStateStore, new_run_state
-from tests.integration.server.routers.spatial_approval_support import showrunner_grants
 from tests.integration.server.story_authoring.test_narrative import BIBLE, IDENTITY, NOW, OUTLINE, PROSE
 
 type Factory = async_sessionmaker[AsyncSession]
@@ -128,14 +127,6 @@ async def _store(factory: Factory) -> RunStateStore:
     limits = StoryLimits(input_tokens_max=10**6, output_tokens_max=10**6, wall_clock_max_seconds=10**5)
     await store.initialize(new_run_state(run_id=IDENTITY.run_id, limits=limits, now=NOW))
     return store
-
-
-@pytest.fixture
-async def grants(concurrent_session_factory: Factory) -> CurrentShowrunnerGrantReader:
-    """One signed grant import per test: a second import in another second would be a different event."""
-    return await showrunner_grants(
-        concurrent_session_factory, user_id=IDENTITY.user_id, project_name=IDENTITY.project_name, principal=SPONSOR
-    )
 
 
 def _committer(
