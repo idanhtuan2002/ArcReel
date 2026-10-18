@@ -164,6 +164,7 @@ PostgreSQL fencing tests in `tests/integration/server/story_authoring/test_runti
      run_id, brief_digest, gate_a_decision_id,
      predecessor_manifest_digest | null,
      committed_prefix: [ {step_index, step_kind, receipt_id, receipt_digest} ],   // empty for a first manifest
+     canon_genesis: {branch_id, genesis_delta_digest, canon_commit_approval_digest} | null,  // only when the project has no Canon branch (Task0 fact)
      plan:     {plan_revision_id, content_hash, expected_version} | null,         // null when already in the prefix
      chapters: [ {chapter, scene_revisions:[{node, revision_id, digest}], change_set_ids,
                   expected_canon_base_version, canon_commit_approval_digest,
@@ -180,7 +181,7 @@ PostgreSQL fencing tests in `tests/integration/server/story_authoring/test_runti
    - Revision and receipt IDs created after approval are never written into the `.md` bytes. They live in a separate export record linked by digest.
 6. **Touchpoint 2.** The Human sees the manuscript, findings and outline, all bound to one manifest digest, and chooses **Approve**, **Request revision** or **Discard**. Approve is one authenticated Human request through the existing interactive-auth dependency, bound to the manifest digest and to the list of exceptions the Human ticked. It authorizes exactly the decisions listed in the manifest and nothing else; each decision record carries the Human principal and the manifest digest. Task3 proves that the real Showrunner authority adapter accepts decisions created in one authenticated Human request. If an authority requires one interaction per decision, Task3 returns the exact incompatibility before Task4.
 7. **Commit execution**, through the existing owners only (`NarrativePlanService.commit_revision`, `NarrativeAcceptanceService.decide_revision` → `review_change_set` → `admit_canon_handoff`); no parallel authority. State machine:
-   - `APPROVING` → step k (plan, then per chapter the three decisions) → `PARTIALLY_COMMITTED(k)` after each step → `COMMITTED` after a read-back verifies every receipt against the manifest.
+   - `APPROVING` → step k (Canon genesis through `CanonTransactionService.create_branch` and `commit` when needed, plan, then per chapter the three decisions) → `PARTIALLY_COMMITTED(k)` after each step → `COMMITTED` after a read-back verifies every receipt against the manifest.
    - Before each step: check the current versions and heads the manifest expects (optimistic concurrency, using the services' existing `expected_version`/`expected_latest_decision_id` checks), recompile that chapter's context from the real committed state, and compare with the manifest.
    - Any difference or refusal → `COMMIT_BLOCKED(step, reason)`. No further decision is sent.
    - Every step uses its idempotency key. The existing exact-retry paths (`get_version_by_revision`, admission retry resolution) return the original receipt for a repeated step.
@@ -314,7 +315,7 @@ Owned additions: `lib/custom_provider/endpoints.py`, `lib/text_backends/ollama.p
 
    Resume then continues from the stale or missing nodes (Change D). It never resends silently: the replacement attempt has a new attempt ID and is visible.
 4. **`RunBudget`, immutable at run start** and recorded in the run: `calls_max`, `input_tokens_max`, `output_tokens_max`, `wall_clock_max`, `regenerations_max`, plus the per-scene and per-chapter caps from § Size and budget.
-   - Each generate attempt reserves `counted_input_tokens + num_predict` **before** dispatch, under a row lock through the existing `budget_guard` reservation path; a count probe reserves `server_context_limit` (32,768) input tokens + 1 output token. This is a proven bound, since the server refuses anything larger, and the unused part is released at completion. Completion releases the unused part; an `UNKNOWN` attempt keeps the full charge.
+   - Each generate attempt reserves `counted_input_tokens + num_predict` **before** dispatch. For currency `LOCAL`, the reservation is held in the run-state row, in the same row-locked transaction that writes the attempt `RESERVED`; the existing `budget_guard` reservation path serves priced currencies only. Task0 fact: `budget_reservations` requires `reserved_amount > 0`. A count probe reserves `server_context_limit` (32,768) input tokens + 1 output token. This is a proven bound, since the server refuses anything larger, and the unused part is released at completion. Completion releases the unused part; an `UNKNOWN` attempt keeps the full charge.
    - Every retry layer — schema repair, span repair, scene regeneration, binding regeneration, chapter-review repair — draws from the same caps. Layers never multiply.
    - `total_http_calls_max = count_calls_max + generate_calls_max`, with one count probe per generate attempt (`count_calls_max = generate_calls_max`). `wall_clock_max` includes count probes, retries and provider waits.
    - Exhausting a cap → `BLOCKED_BUDGET` with the exact cap.
