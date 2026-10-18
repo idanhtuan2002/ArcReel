@@ -270,6 +270,44 @@ Conclusions:
 - **Inference:** Shenbi's role stays as frozen in `R2_01` §20 — skills (planning/drafting prompts, audit dimensions) and audits — not its runner. The R2 host must own the output contract: one structured JSON response per call, validated by schema, with a bounded local repair.
 - **Parity consequence:** Shenbi end-to-end output cannot serve as the quality baseline on this model. Model-calling Shenbi surfaces are compared per surface (same prompt content, same model, same input) instead.
 
+## Addendum — consolidated donor rationale (2026-10-18, sponsor request)
+
+Sources: R1.5 §1–§5, §17–§19, §26–§29; `R2_01` §20; `2026-09-09-r2-donor-reuse-maximization.md` §1–§3 (branch `design/r2-m5b-narrative-context`); ADR-0079; `R2_M5C_DONOR_BASELINE.json`, `R2_M6_DONOR_BASELINE.json`.
+
+### Why mix donors (fact, R1.5 §1)
+
+No single repository can be the narrative system. Each donor is strong in one layer and unsafe as an authority: Novel Studio and Huohuo keep story truth in their own SQLite/Prisma memory; Shenbi's `state-settling` writes truth files during drafting, before its audits run (R1.5 §2), which breaks "Candidate ≠ Canon". R2 therefore owns the authority (Canon, Plan, Context compiler, Lifecycle) and takes from each donor only the layer where it is best.
+
+### What each donor contributes and why
+
+| Donor (pin) | Why it was chosen | Taken | Not taken |
+|---|---|---|---|
+| Novel Studio `9b690ae2` | Cleanest acceptance boundary: plan → context pack → draft → continuity → style revision → accept → extract; "drafts never update canon" matches R2 (R1.5 §3) | Workflow shape and hierarchy (bible → outline → chapter → scene beats), context-pack patterns, `hardRules` (already ported in M5C), drafting/continuity/revision prompt shapes | SQLite memory as truth, its project state, acceptance-as-mutation |
+| Shenbi `65ddfc26` | Broadest craft library: 70+ skills, 18 specialist audits, G0–G7 gate philosophy, independent-evaluator rule (R1.5 §2, §4.4 "highest-value reusable section") | Planning/drafting skill content, specialist audits as L2/L3, NG0–NG7 process concept, output-integrity gate, short-story track (outline, drafting with ≤3 revisions and best-version fallback, packaging) | Truth files, state-settling order, pipeline runner and state, numeric 94 threshold |
+| Huohuo `f104b853` | Unique causal change record and causal audit; strict local repair loop; novel → screen adaptation (R1.5 §5, §29) | Change record parser (already ported in M5C), drama fields (M6), strict local repair loop, bounded-context heuristics | Four-layer memory authority, DB runtime, Director/media stack |
+
+### How a taken surface is integrated (facts: 2026-09-09 sponsor rule, ADR-0079, M5C/M6 precedent)
+
+1. Pin the exact donor commit; vendor the unmodified source file under the parity fixtures.
+2. Re-implement it in Python inside the R2 owner module (the host is Python; TypeScript cannot run in-process). Donor I/O and authority (DB, memory, truth files) are replaced by R2 ports.
+3. Prove parity:
+   - deterministic surface: a Node runner executes the donor file and the Python port on the same fixtures; outputs must be equal;
+   - model-calling surface (prompt/skill): same idea, same model, scored differential against the donor's own flow.
+4. Record every intentional deviation (here: Vietnamese prompt translation; R2-owned JSON output contract; object-rooted schemas).
+5. Write a `DonorParityContract` JSON bound to the integrated HEAD; every material row `PARITY` or `IMPROVED`; independent review.
+
+### Already integrated (facts)
+
+- M5B: Novel Studio context-pack concept → `r2/narrative_context/compiler.py`.
+- M5C: Huohuo `novel-change-record.ts` → `r2/narrative_lifecycle/changeset_parser.py`; Novel Studio `hardRules.ts` → `r2/narrative_lifecycle/continuity_rules.py`.
+- M6: take shot vocabulary → `r2/contracts/production.py`; Huohuo drama fields → `r2/adaptation/shuangwen_profile.py`.
+- Not yet integrated: every writer, planner, specialist-audit and repair surface (the gap this release closes).
+
+### Lessons from the 2026-10-18 runs that change the "how"
+
+- Neither donor runner completes on a local 9B model: Shenbi 51/52 outputs quarantined; Novel Studio fails on schema shape (nested values where strings are expected; a root array requested under `response_format: json_object`, a donor defect on any provider). Runners are therefore not taken; prompt content is.
+- The R2 output contract (one object-rooted JSON per call, validation-error feedback repair, bounded coercion) is recorded as `IMPROVED` against both donors, with a regression fixture for the root-array defect.
+
 ## Plan amendments required (step 2)
 
 1. Approve the Task0 owner-map amendment (`task_repo.py`, `ledger.py`, `budget_guard.py` and their tests) recorded in `R2_STORY_AUTHORING_QUALIFICATION.md`.
