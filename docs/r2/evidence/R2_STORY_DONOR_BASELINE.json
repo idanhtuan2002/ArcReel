@@ -183,7 +183,28 @@
       "intentional_deviations": [
         "Chinese punctuation/lexicon normalization replaced by Vietnamese normalization"
       ],
-      "evidence": "Shenbi seed 2 repeated one 3-sentence block x12"
+      "evidence": "Shenbi seed 2 repeated one 3-sentence block x12",
+      "vendored": {
+        "root": "tests/integration/donor_parity/vendor/huohuo",
+        "entry": "workbench-server/src/services/novel/novel-intra-chapter-dedupe.ts",
+        "files": {
+          "workbench-server/src/services/novel/novel-intra-chapter-dedupe.ts": "2a633d79e0b79620624340067ddb4ec4c4db41aa3d348ffba5f4999887eff393",
+          "workbench-server/src/common/task/task-logger.ts": "ea9197ee3be0ce6433e2ee0f840a36b303865c8292e9a0f23b467b871cbae8a8",
+          "workbench-server/src/common/task/task-log-writer.ts": "de30483ed0e7cad3edaca8e6bf1684217f916155fab13e5e457f1a7f5ee4c483",
+          "workbench-server/src/common/security/log-redact.ts": "80b19db37377521c605c015f06c627e46878c054a42ca5c1d6fe588cb3b7ac1e",
+          "workbench-server/src/services/novel/novel-stakes-restatement.ts": "f9a98861e42331cb725bc729e623650965b054a4b88f98b8be8f2bfb117319dd",
+          "workbench-server/src/common/novel/novel-emotion-beat-meta-strip.ts": "adf078efcb28945646323cddb70de01fb7e310e28cc0f7dde8cf340b14076f31",
+          "workbench-server/src/common/novel/novel-kinship-address-strip.ts": "8bca912c13d08f6e22203240f0f3292b9b6418dfe7398e50b17372e3d2cc4888",
+          "workbench-server/src/common/novel/novel-deadline-day-lock.ts": "45f5188b06806d65726c7bc61a6b23f41be7c2b69a25a0b4316e712d09a2ee57"
+        },
+        "port": "server/story_authoring/checks.py::find_intra_chapter_near_duplicate (DONOR_PUNCTUATION profile)",
+        "exported_under_test": "findIntraChapterNearDuplicate",
+        "intentional_deviations": [
+          "VIETNAMESE_PUNCTUATION profile at runtime (sentence ends . ! ? …; Vietnamese quotes and dashes removed by norm)",
+          "code-point indices (donor mixes code points and UTF-16 units; identical on BMP text, which the fixtures use)",
+          "only the find core and the two-round removal loop; the donor's bridge, stakes, emotion-label, kinship and deadline strippers are Chinese-specific and not taken"
+        ]
+      }
     },
     {
       "id": "S09_output_integrity_gate",
