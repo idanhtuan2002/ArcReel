@@ -308,6 +308,92 @@ No single repository can be the narrative system. Each donor is strong in one la
 - Neither donor runner completes on a local 9B model: Shenbi 51/52 outputs quarantined; Novel Studio fails on schema shape (nested values where strings are expected; a root array requested under `response_format: json_object`, a donor defect on any provider). Runners are therefore not taken; prompt content is.
 - The R2 output contract (one object-rooted JSON per call, validation-error feedback repair, bounded coercion) is recorded as `IMPROVED` against both donors, with a regression fixture for the root-array defect.
 
+## Addendum — small-model failure research and step standardization (2026-10-18, sponsor request)
+
+### Primary sources checked
+
+- Ollama `docs/api/openai-compatibility.mdx`: `/v1` accepts `response_format`, `reasoning_effort` (`"none"` disables thinking), `seed`, `stop`, `max_tokens`; context size cannot be set through `/v1`, only through a Modelfile `num_ctx`.
+- Ollama `docs/capabilities/structured-outputs.mdx`: a JSON schema in `format` (`/api/chat`) or `response_format` (`/v1`); also put the schema in the prompt.
+- Ollama source (`llm/llama_server.go`, `openai/openai.go`, main branch): the schema is converted to a GBNF grammar (constrained decoding), applied after thinking when thinking is on; `presence_penalty` is passed to the sampler.
+- Ollama issue #14645 ("format is ignored when think is disabled for qwen3.5", closed 2026-07-07): re-verified on the installed 0.32.6 below.
+- Qwen3.5-9B model card: thinking is on by default; non-thinking general preset temperature 0.7, top_p 0.8, top_k 20, presence_penalty 1.5; presence_penalty reduces endless repetition but "may occasionally result in language mixing".
+- Installed: Ollama 0.32.6; `ornith-32k:9b` capabilities `completion, tools, thinking`; Modelfile defaults temperature 0.6, top_k 20, top_p 0.95.
+
+### Probe (2026-10-18, `ornith-32k:9b`, `<scratchpad>/probes/smallmodel_probe.py`)
+
+Structured output, two schemas (style bible: string fields; scene beats: object-rooted array of objects with integer/number fields), schema also in the system prompt, n = 4 per cell:
+
+| Mode | Schema-valid | Mean latency | Thinking chars |
+|---|---|---|---|
+| `/v1` `json_object`, thinking default (donor mode) | 8/8 | 18.4 s | 680–1,610 |
+| `/v1` `json_schema` strict, `reasoning_effort: none` | 8/8 | 8.5 s | 0 |
+| `/api/chat` `format` schema, `think: false` | 8/8 | 10.3 s | 0 |
+| `/api/chat` `format` schema, `think: true` | 8/8 | 19.3 s | 610–1,460 |
+
+Facts:
+
+- Constrained decoding works on 0.32.6 with thinking on and off (issue #14645 does not reproduce).
+- Thinking is on by default through `/v1`; every donor call therefore paid about 2× latency for hidden reasoning.
+- With a short prompt that contains the exact schema, even `json_object` stayed valid. The donor failures come from long prompts whose wanted shape is described loosely; the grammar removes that class entirely.
+- CJK leaked into JSON values in 2 of 32 outputs.
+
+Prose (one scene, "about 700 words", `think: false`, n = 3 per preset): every sample stopped normally and was under length (329–683 syllables; Vietnamese `\w+` counts syllables). One CJK leak (`生根`, presence_penalty 1.5 preset). One sample shows several Vietnamese-specific defects at once: kinship/pronoun errors (Minh, the older brother, calls himself "em" to his younger sister and is called "người chị"; Lan says "cha nó" of her own father), age drift (32 → "bốn mươi tuổi"), odd collocations ("tiếng chim hót leng keng"), purple metaphors and tears in nearly every paragraph. n = 3 cannot rank the presets; that is measured again in Task4 with n ≥ 10.
+
+### Failure taxonomy for small local models
+
+O = observed in the 2026-10-18 runs; P = predicted (literature, donor design notes, model card). Each row gets the same four answers: detect, prevent, repair, stop.
+
+| ID | Failure | O/P | Detect | Prevent | Repair / stop |
+|---|---|---|---|---|---|
+| F01 | Silent input truncation | O | reported `prompt_tokens` < local count | `num_ctx` 32k tag; input budget per call | refuse `INPUT_TRUNCATED`; never stored |
+| F02 | Output cut at limit | P | `finish_reason=length` | `num_predict` sized to step | JSON: refuse and retry once; prose: one continuation call |
+| F03 | Hidden thinking eats time/tokens | O | reasoning length | `think:false` by default; thinking only where a differential shows gain | — |
+| F04 | Endpoint down, model unloaded, VRAM OOM | P | preflight `/api/ps`, transport errors | `keep_alive`; one model resident | visible "model unavailable", resumable |
+| F05 | Non-determinism across runs | O | — | record seed, model digest, options | evidence stores exact bytes; never re-derived |
+| F10 | Wrong types, missing fields, wrapped arrays, extra prose | O (5 kinds) | schema validation | grammar-constrained schema, object-rooted schemas, schema text in prompt | one repair call with validation errors; logged bounded coercion; then stop |
+| F11 | Schema field descriptions ignored | P | — | field meaning written in the prompt | — |
+| F12 | Valid but empty/generic JSON (placeholders, copied example) | P | min lengths, placeholder and copy detection | concrete instructions, no literal example values | repair once |
+| F13 | Enum/label drift; values in the wrong language | O (Shenbi Chinese values) | enum in schema; language check on values | Vietnamese prompts | local repair |
+| F20 | CJK leakage | O | Han/CJK regex on every output | Vietnamese prompts | sentence-local repair; accepted manuscript must have 0 |
+| F21 | Token glitches, merged Latin (`bàSix`) | O | merged-case and non-Vietnamese token regex | — | sentence-local repair |
+| F22 | Kinship/pronoun (xưng hô) errors | O | xưng hô matrix check on attributed dialogue; L2 audit | story bible holds a xưng hô matrix (who calls whom what, self-reference), injected into every scene context | span repair |
+| F23 | Calques, odd collocations, purple prose | O | L2 Vietnamese style audit | style bible with Vietnamese examples and banned patterns | style revision; residue recorded as local-model limit |
+| F24 | Diacritic/spelling errors | P | Vietnamese syllable-validity check | — | span repair |
+| F30 | Attribute drift (age, job, relation) | O | extract numbers/attributes vs canon | canon facts in context pack | span repair |
+| F31 | Timeline contradiction | O (language probe) | `story_time` vs stated times; L2 continuity | `story_time` in context | span repair |
+| F32 | Physical/causal impossibility | O | L2 continuity audit | scene contract lists setting state | span repair |
+| F33 | Unplanned names/characters, name drift | P | names not in canon/plan whitelist | entity list in context | span repair |
+| F34 | POV drift | P | L2 POV audit | POV in scene contract | scene repair |
+| F35 | Epistemic leak (secret known too early) | P (central to this plot) | R2 epistemic view + L2 audit | forbidden-knowledge constraints in the writer channel (M5B §144) | scene repair |
+| F40 | Beat skipped, reveal too early, ending missing | P | L1 coverage of required turn; L2 memo compliance | scene contract with required turn and forbidden events | scene repair |
+| F41 | Length undershoot | O (all 9 samples) | length window per scene | scene-sized calls (≈ 600–900 syllables) | targeted expansion (Shenbi length-normalizing), not a blind "write longer" |
+| F42 | Premature summary/closure at scene end | P | closing-pattern detector | contract "end on the turn" | tail repair |
+| F43 | Meta text, headings, notes | P | pattern detector | "content only" instruction | deterministic strip, else repair |
+| F50 | Repetition loops | O (low) / P | repeated n-gram and dedupe core (Huohuo) | presence_penalty (trade-off with F20) | span repair |
+| F51 | Clichés, AI tells, melodrama | O | Shenbi anti-AI audit adapted to Vietnamese with a Vietnamese fatigue list | style bible | style revision |
+| F52 | Telling instead of showing | O | L2 craft audit | drafting skill instructions | revision |
+| F60 | Lenient self-review | P | — | blocking decisions come from L1 and evidence-bearing findings only; L3 uses a separate critic prompt (same local model recorded as a local-model limit) | — |
+| F61 | Hallucinated findings | P | every finding must quote an exact span; quote is verified deterministically | — | unverifiable finding dropped |
+| F62 | Repair damages other parts, oscillates | P | rerun all L1 after each repair; diff outside span | span-local repair (Huohuo); best-version fallback (Shenbi) | max rounds, keep best, record |
+| F70 | Cross-chapter inconsistency | P | R2 `continuity_rules`, canon delta | R2 context compiler with prior accepted content | scene repair |
+| F71 | Chapter seam repeats previous ending | P | seam check (Huohuo normalized-fingerprint core) | — | opening repair |
+
+### Standard step contract (every model-calling step)
+
+Every step uses one shape so that each failure above is handled once, in one place:
+
+1. **Spec:** step id and version, donor prompt reference and translation version, decoding preset, output kind (structured schema or bounded prose), validator list, audit list, repair policy, budget.
+2. **Preflight:** endpoint and model digest, resident model, local token count ≤ input budget.
+3. **Call:** structured → grammar-constrained schema with the schema text in the prompt, `think:false` unless the spec says otherwise; prose → scene-sized, fixed preset, seed recorded.
+4. **Transport checks:** F01, F02, F04.
+5. **L1 deterministic checks:** schema, language (F20, F21, F24), length (F41), meta (F43), repetition (F50), names (F33), attributes/time (F30, F31), xưng hô (F22), coverage (F40).
+6. **L2/L3 audits:** findings must quote exact spans (F61); model findings are advisory unless backed by a verified quote.
+7. **Repair:** span-local, bounded rounds, all L1 rerun after each round, best version kept (F62).
+8. **Evidence:** request digest, prompt and output bytes, reported vs counted tokens, finish reason, seed, options, latency, findings and their status (fixed, open, local-model limit).
+9. **Persist:** the output becomes an unapproved proposal or an R2 candidate exactly as Change 4 of the amendment describes.
+
+Still open (measured in Task4, n ≥ 10): presence_penalty 0 vs 1.5 against F20/F50; thinking on for outline only; best scene size for length compliance.
+
 ## Plan amendments required (step 2)
 
 1. Approve the Task0 owner-map amendment (`task_repo.py`, `ledger.py`, `budget_guard.py` and their tests) recorded in `R2_STORY_AUTHORING_QUALIFICATION.md`.
