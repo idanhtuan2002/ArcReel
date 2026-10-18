@@ -77,6 +77,60 @@ Prompt: open chapter 1 (~350 words) of a Vietnamese family-drama short story.
 - Literary quality across a full three-chapter run. Measured only by the live demonstration and the sponsor's read.
 - Which deployment counts as "real operation": the V2 staging environment (`~/arcreel-v2-staging`) is the candidate. To be confirmed in the plan.
 
+## Addendum — donor decisions re-check (2026-10-18, sponsor request)
+
+The sponsor changed the story touchpoints to two: (1) enter and approve the idea, which is planned to be automated later; (2) receive and approve the final manuscript. Revision requests remain possible on any part at any step. The sponsor also asked for a re-check of every existing research note and donor decision, including documents on other branches, under the rule "take only the best from donors, at least equal to the original".
+
+### Sources found (several are outside the V2 lineage)
+
+| Source | Location | Content |
+|---|---|---|
+| R1.5 `R1_05_NARRATIVE_STACK_REALITY_CHECK.md` (1546 lines) and `R1_05_DECISION_SNAPSHOT.json` | `~/Bản tải về/conten os/content_production_os_r1_evidence_2026-09-06 (3)/` and the R1.1–R1.7 bundle zip; not in any branch | Donor roles for the whole Idea→Story→Canon→Draft→Review→Commit stack; decisions R2-D46…D55; benchmark plan A–E |
+| `docs/research/2026-09-09-r2-donor-reuse-maximization.md` | only on branch `design/r2-m5b-narrative-context` | Donor file survey; sponsor rule of 2026-09-09: port donor modules to Python with quality "equal to or better than the original", proven by donor tests or a self-built corpus plus an exact-source Node harness |
+| `docs/research/2026-09-08-r2-m5b-reuse-and-boundary-research.md`, `2026-09-08-r2-m5c-narrative-production-lifecycle-research.md`, `2026-09-08-r2-m5c-adr-decision-validation.md` | only on `design/r2-m5b-narrative-context` | Donor reuse boundaries for context, extraction, lifecycle. §144 of the M5B note: the writer gets a separately labelled author channel plus explicit forbidden-knowledge constraints; character simulation gets character-visible content only |
+| `docs/research/2026-09-16-r2-m10-quality-evidence-packaging.md` and the M10 spec/plans | only on `design/r2-m5b-narrative-context`; not implemented | Multi-assessor quality evidence; a model cannot satisfy a required Human rubric; locale/cohort-specific rubrics |
+| Frozen `R2_01` §20, `R2_02` §5.1 and §7, `R2_04` R2-DEC-004/005/007/008/031 | V2 lineage | Frozen donor roles and Candidate Writer permissions |
+
+### What is already decided (facts)
+
+- **R2_01 §20 (frozen):**
+  - Novel Studio = narrative workbench: hierarchical planning UX, context-pack patterns, and the draft → continuity → revise → accept workflow.
+  - Shenbi = narrative skill and quality library: genesis, architecture, planning, **writing skills**, **audits**, import, drift/snapshot/revision patterns.
+  - Huohuo = causal change record and novel → screen adaptation.
+- **R1.5:**
+  - **§17 Who writes:** a `CandidateWriter` interface whose candidates are "Novel Studio-derived chapter/scene drafting flow, Shenbi `chapter-drafting` skill, general LLM/model profile". The writer has zero Canon write authority.
+  - **§18 Who reviews:**
+    - L1 R2 deterministic validators;
+    - L2 specialists (Novel Studio `hardRules`, Huohuo causal audit, Shenbi specialist audits);
+    - L3 independent critics (Shenbi motivation, dialogue, pacing, POV, reader pull, resonance, texture, arc payoff), where the evaluator must be independent of the writer;
+    - L4 Human.
+  - **§19:** Shenbi G0–G7 is reused as the NG0–NG7 process concept. The numeric "94" threshold is a diagnostic, not truth.
+  - **§29:** take Huohuo's "strict local repair loop" and "bounded continuity context heuristics".
+  - **§14 / R2-D53:** the scene is the execution and review unit; chapter acceptance groups approved scenes.
+- **2026-09-09 sponsor rule:** every donor module is ported to Python; quality ≥ original; parity proven against the exact pinned donor source.
+- **R2-DEC-031 / ADR-0079:** a `DonorParityContract` per selected surface; every material row must be `PARITY` or `IMPROVED`.
+
+### Gap (fact)
+
+- The writer, planning and review surfaces assigned above were **never implemented or parity-tested**. M5C/M6 ported only parsing/QA pieces: the Huohuo change-record parser, Novel Studio `hardRules`, the Huohuo drama fields and the Take shot vocabulary.
+- The 2026-10-17 spec/plan did not cite R1.5 or R2_01 §20 for the writer. It planned self-written prompts ("no donor writer parity is inferred"), which contradicts the frozen donor roles and the ≥-donor rule.
+- R1.5 benchmarks A–E were never run: R1.7 could not clone upstream repositories. Same-fixture behavioural evidence for the writer donors therefore does not exist yet.
+
+### Consequence for this release (inference)
+
+The CandidateWriter, planning and review layers must be built from the frozen donor roles:
+
+- Shenbi supplies the planning/drafting skills and audits.
+- Novel Studio supplies the workflow shape.
+- Huohuo supplies the strict local repair loop and continuity heuristics.
+
+Each selected surface is ported to Python under a `DonorParityContract`:
+
+- **Deterministic surfaces** get exact-source fixture parity.
+- **Model-calling surfaces** get a same-idea, same-model (`ornith:9b`) quality differential against the donor's own pipeline, scored on one rubric and read by the sponsor.
+
+Next research step: a per-surface inventory of Shenbi, Novel Studio and Huohuo at their pins, then the minimal donor runs needed for that differential.
+
 ## Plan amendments required (step 2)
 
 1. Approve the Task0 owner-map amendment (`task_repo.py`, `ledger.py`, `budget_guard.py` and their tests) recorded in `R2_STORY_AUTHORING_QUALIFICATION.md`.
