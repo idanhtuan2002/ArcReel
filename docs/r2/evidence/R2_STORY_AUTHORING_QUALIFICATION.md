@@ -105,3 +105,58 @@ No `SCHEMA_GAP`: no migration is needed.
    - A new project has no Canon branch. `CanonTransactionService.create_branch` (`r2/narrative/canon_transaction.py:100`, idempotent) and its `commit` (genesis when `head_version_id is None`, `:327`) with an exact `CanonCommitApproval` are the real path; no host caller exists yet.
    - The pre-touchpoint run compiles against a provisional genesis version built from the story bible. The manifest gains a step `canon_genesis` (branch + genesis commit) before the plan step, approved by the same touchpoint-2 Approve. Task3 proves it on PostgreSQL. If the approval contract cannot bind this way, Task3 stops with the exact incompatibility.
    - The Human's `HUMAN_SHOWRUNNER` grant comes only from the existing ADR-0103 activation ceremony (`scripts/r2/governance_ceremony.py`, offline signing). It is an operator setup step in the runbook; a run never creates or signs one.
+
+---
+
+## V2 Task1 qualification (2026-10-18, amendment revision 5.1 Change P)
+
+Status: **QUALIFIED_WITH_RECORDED_LIMITS** for route `ollama-chat` → Ollama 0.32.6, `ornith-32k:9b`, on this host (RTX 2070 8 GB, 23 GB RAM). Only this endpoint is accepted by `AuthoringTextGateway`. Any other provider needs its own qualification.
+
+### Code
+
+- `be085c8c`:
+  - `lib/text_backends/ollama.py`: native `/api/chat`; `stream`, `think`, `truncate` and `shift` all `false`; one HTTP request per call, no retry or fallback; typed over-context, unavailable, outcome-unknown, HTTP and protocol errors.
+  - The `ollama-chat` endpoint in the registry, plus its display keys and API-docs index.
+  - `server/story_authoring/{contracts,generation,script_guard,_cjk_ranges}.py`.
+  - Vendored Unicode 16.0.0 data and transport fixtures (`tests/fixtures/ollama/`, real 0.32.6 responses).
+- `28cc3721`: grammar-pattern fix (below), and the count check moved before the other acceptance checks.
+- The next commit: prose as a bounded paragraph array (below).
+
+Tests run on the final code:
+- `uv run python -m pytest tests/unit/server/story_authoring/ -q` → 91 passed.
+- Earlier on `be085c8c`: `tests/unit/lib/text_backends/ tests/unit/lib/custom_provider/ tests/unit/lib/i18n/test_i18n_consistency.py tests/unit/server/routers/test_custom_providers_api.py tests/unit/server/routers/test_system_config_options.py tests/unit/lib/test_text_generator.py` together with the story tests → 1739 passed. Frontend `pnpm check` → 2594 passed.
+- ruff, `basedpyright --warnings` (0/0/0), `lint-imports` (23 kept), `deptry` and `audit_tests --check` are clean.
+
+### Live results
+
+Scripts and outputs are retained in `.superpowers/sdd/2026-10-18-r2-v2-story-release/` (sha256 prefix…suffix):
+- `task1_live_qualification.py` `31b193e9…daebda7c`
+- run 1 `task1_live_qualification.run1.json` `c49d2d22…fd03eb94` on `be085c8c`
+- run 2 `task1_live_qualification.out.json` `0a1bf69a…e5bb3439`, whose canary, grammar_quality and count phases ran on the `28cc3721` code
+- `task1_paragraph_schema_probe.out.json` `73c5adcb…bb1e2473`
+- `task1_gateway_paragraphs_smoke.out.json` `6865da70…b3213b52`
+
+| Check | Result | Verdict |
+|---|---|---|
+| Count probe = generation input (n = 24: 12 prose, 12 structured, prompts of 150–14,000 tokens, run 2) | 24/24 accepted, 0 `COUNT_MISMATCH`, only `num_predict` differs between the two requests | PASS |
+| Boundary (exact counts) | 24,693 and 27,994 → `INPUT_OVER_LIMIT` after 1 request. 32,994 → HTTP 400 with the exact count → `INPUT_OVER_CONTEXT`, 1 request. 23,985 and 24,546 pass the count and are dispatched; both generations then failed the output shape with `max_out` 200 (run 1, old envelope) | PASS for input enforcement |
+| Generation at the context end (`shift:false`) | prompt 32,614 + output 154 = 32,768, `done:true`, `done_reason:"length"` | PASS: no silent shift; a length stop is never accepted |
+| System prompt | Without a system message: "Tôi là Ornith, trợ lý lập trình…" 3/3. With one: 0/3 | PASS: every call sends a system message |
+| CJK canary, n = 20 per kind (adversarial prompt demanding 突然, 心里, 。, 、 and 𠀀) | Free decoding: 16/20 outputs with CJK. Run 1 BMP-only pattern: BMP CJK 0/40; every leak was U+20000, which the pattern deliberately did not cover. **Run 2 pattern with astral ranges: 0/20 prose, 0/20 structured**; JSON invalid 0/20 and 1/20 (a length stop). | PASS with the shipped pattern |
+| Resource envelope (24,592 in + 4,096 out) | `ollama ps` 100 % GPU; VRAM 6.54/8.19 GB; host RAM available ≥ 10 GB; prefill about 31,900 tok/s (cached prefix), generation 37.5 tok/s; wall time 110.4 s | PASS; per-call worst case about 111 s |
+
+### Defects found and fixed during qualification
+
+1. **The pattern broke JSON strings.** Ollama applies a string `pattern` to the raw characters between the quotes, in place of the JSON-string grammar.
+   - The first pattern `^[^CJK]*$` admitted `"` and raw newlines. With a single-string envelope the model closed the string early and added keys outside the schema (`characters`, `setting`), or emitted raw newlines: 7/20 invalid JSON.
+   - Fix (`28cc3721`): the pattern excludes `"`, `\` and U+0000–U+001F; admits only the escapes `\" \\ \/ \b \f \n \r \t`, with no `\u` escapes, so CJK cannot be spelled as an escape; and covers the astral ranges by default.
+2. **A single-string prose envelope shortens prose.** Same scene prompt, "about 700 words", n = 20: free decoding gave a median of 627 words but 12/20 outputs with CJK. The fixed single-string envelope gave 372 words, 0 CJK, 0 invalid. A paragraph array (8–14 items, each ≥ 20 characters, same pattern) gave a median of 852 words, 10/10 valid, 0 CJK.
+   - Decision: `OutputMode.PROSE` is a bounded paragraph array (`min_paragraphs`/`max_paragraphs` per step), joined by blank lines.
+   - Gateway smoke, 5 scenes: 5/5 accepted, 962–1,228 words, 148 → 1,173–1,483 tokens.
+   - Task4 tunes the paragraph bounds and prompt wording to each scene's length target.
+
+### Recorded limits and facts for later tasks
+
+- **English code-mixing (F25) rises when CJK is blocked**: 12/20 prose and 10/20 structured canary outputs contained English words, against 1/20 in free decoding. In the normal scene prompt it was 1/20 (envelope) against 4/20 (free). The F25 detector in Task4 L1 stays mandatory.
+- **Budget basis**: worst case about 111 s per generate call; a count probe costs one prefill, about 1 s with the cache. `wall_clock_max` is derived from these in Task4.
+- **`StoryLimits` defaults stand**: 24,576 input + 4,096 output inside 32,768. The model stays 100 % on the GPU at the worst case, so no lowering is needed on this host.

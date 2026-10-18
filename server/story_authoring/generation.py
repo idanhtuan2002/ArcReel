@@ -83,16 +83,27 @@ class AttemptSink(Protocol):
     async def unknown(self, attempt_id: str, *, detail: str) -> None: ...
 
 
-class ProseEnvelope(BaseModel):
+PROSE_PARAGRAPH_MIN_CHARS = 20
+
+
+class ProseParagraphs(BaseModel):
     model_config = {"extra": "forbid"}
-    text: str
+    paragraphs: list[str]
 
 
-def prose_envelope_schema() -> dict[str, Any]:
+def prose_schema(*, min_paragraphs: int, max_paragraphs: int) -> dict[str, Any]:
+    """Prose is an array of paragraphs: the paragraph bounds steer length, which a single-string envelope shortens."""
     return {
         "type": "object",
-        "properties": {"text": {"type": "string", "minLength": 1, "pattern": no_cjk_pattern()}},
-        "required": ["text"],
+        "properties": {
+            "paragraphs": {
+                "type": "array",
+                "minItems": min_paragraphs,
+                "maxItems": max_paragraphs,
+                "items": {"type": "string", "minLength": PROSE_PARAGRAPH_MIN_CHARS, "pattern": no_cjk_pattern()},
+            }
+        },
+        "required": ["paragraphs"],
         "additionalProperties": False,
     }
 
@@ -192,7 +203,7 @@ class AuthoringTextGateway:
 
     def _chat_request(self, request: StoryStepRequest, *, num_predict: int) -> OllamaChatRequest:
         if request.output_mode is OutputMode.PROSE:
-            schema = prose_envelope_schema()
+            schema = prose_schema(min_paragraphs=request.min_paragraphs, max_paragraphs=request.max_paragraphs)
         else:
             assert request.response_model is not None
             schema = constrain_strings(resolve_schema(request.response_model))
@@ -294,10 +305,14 @@ class AuthoringTextGateway:
             return StoryFailureCode.CJK_IN_OUTPUT, f"{len(hits)} CJK code points ({sample})", ""
         try:
             if request.output_mode is OutputMode.PROSE:
-                text = ProseEnvelope.model_validate_json(response.content, strict=True).text
-                if not text.strip():
-                    return StoryFailureCode.OUTPUT_INVALID, "empty prose", ""
-                return None, "", text
+                paragraphs = [
+                    p.strip() for p in ProseParagraphs.model_validate_json(response.content, strict=True).paragraphs
+                ]
+                if not request.min_paragraphs <= len(paragraphs) <= request.max_paragraphs:
+                    return StoryFailureCode.OUTPUT_INVALID, f"{len(paragraphs)} paragraphs", ""
+                if any(len(p) < PROSE_PARAGRAPH_MIN_CHARS for p in paragraphs):
+                    return StoryFailureCode.OUTPUT_INVALID, "a paragraph is empty or too short", ""
+                return None, "", "\n\n".join(paragraphs)
             assert request.response_model is not None
             request.response_model.model_validate_json(response.content, strict=True)
         except ValidationError as exc:

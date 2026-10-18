@@ -140,7 +140,11 @@ class StoryDecoding(_Frozen):
 
 
 class StoryStepRequest(BaseModel):
-    """One generation step. ``response_model`` is required for STRUCTURED output and forbidden for PROSE."""
+    """One generation step. ``response_model`` is required for STRUCTURED output and forbidden for PROSE.
+
+    PROSE is generated as an array of paragraphs bounded by ``min_paragraphs``..``max_paragraphs`` and returned
+    joined by blank lines.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
 
@@ -154,11 +158,15 @@ class StoryStepRequest(BaseModel):
     response_model: type[BaseModel] | None = None
     decoding: StoryDecoding
     max_output_tokens: int = Field(gt=0)
+    min_paragraphs: int = Field(default=1, ge=1)
+    max_paragraphs: int = Field(default=40, ge=1)
 
     @model_validator(mode="after")
     def _mode_matches_model(self) -> StoryStepRequest:
         if (self.output_mode is OutputMode.STRUCTURED) != (self.response_model is not None):
             raise ValueError("response_model is required exactly for STRUCTURED output")
+        if self.min_paragraphs > self.max_paragraphs:
+            raise ValueError("min_paragraphs must not exceed max_paragraphs")
         return self
 
 

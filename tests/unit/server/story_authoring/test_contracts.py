@@ -114,6 +114,14 @@ def test_output_mode_and_response_model_must_agree():
         _step(response_model=_Shape)
 
 
+def test_paragraph_bounds_must_be_ordered():
+    assert (_step(min_paragraphs=3, max_paragraphs=3).min_paragraphs) == 3
+    with pytest.raises(ValidationError):
+        _step(min_paragraphs=4, max_paragraphs=3)
+    with pytest.raises(ValidationError):
+        _step(min_paragraphs=0)
+
+
 def test_a_step_needs_a_system_prompt():
     with pytest.raises(ValidationError):
         _step(system_prompt="")

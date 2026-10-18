@@ -124,13 +124,21 @@ async def _fails(server: _Server, sink: _Sink, code: StoryFailureCode, **step) -
     return caught.value
 
 
-async def test_prose_is_counted_then_generated_and_unwrapped():
-    server = _Server(_count_reply(), _reply(json.dumps({"text": "Minh mở cửa."}, ensure_ascii=False)))
+P1 = "Minh mở cửa căn nhà cũ sau mười năm xa cách."
+P2 = "“Anh về rồi à?” Lan hỏi, giọng khẽ run."
+
+
+def _prose(*paragraphs: str) -> str:
+    return json.dumps({"paragraphs": list(paragraphs)}, ensure_ascii=False)
+
+
+async def test_prose_is_counted_then_generated_and_joined_into_paragraphs():
+    server = _Server(_count_reply(), _reply(_prose(P1, P2)))
     sink = _Sink()
 
-    output = await _gateway(server, sink).generate(scope=SCOPE, request=_step())
+    output = await _gateway(server, sink).generate(scope=SCOPE, request=_step(min_paragraphs=2, max_paragraphs=4))
 
-    assert output.text == "Minh mở cửa."
+    assert output.text == P1 + "\n\n" + P2
     assert (output.input_tokens, output.finish_reason, output.model_id) == (900, "stop", MODEL)
     count_body, generate_body = server.bodies
     assert count_body["options"]["num_predict"] == 1
@@ -138,7 +146,9 @@ async def test_prose_is_counted_then_generated_and_unwrapped():
     count_body["options"]["num_predict"] = 3000
     assert count_body == generate_body
     assert generate_body["messages"][0] == {"role": "system", "content": "Bạn là người viết văn tiếng Việt."}
-    assert generate_body["format"]["properties"]["text"]["pattern"] == no_cjk_pattern()
+    paragraphs = generate_body["format"]["properties"]["paragraphs"]
+    assert (paragraphs["minItems"], paragraphs["maxItems"]) == (2, 4)
+    assert paragraphs["items"]["pattern"] == no_cjk_pattern()
     assert generate_body["options"]["seed"] == 7
     assert (generate_body["truncate"], generate_body["shift"], generate_body["think"]) == (False, False, False)
     assert sink.kinds() == ["reserve", "dispatched", "completed", "reserve", "dispatched", "completed"]
@@ -201,16 +211,18 @@ async def test_input_over_the_server_context_is_refused_with_the_exact_count():
 @pytest.mark.parametrize(
     ("generation", "code"),
     [
-        (_reply('{"text": "Minh mở', done_reason="length"), StoryFailureCode.OUTPUT_TRUNCATED),
-        (_reply('{"text": "x"}', done=False), StoryFailureCode.OUTPUT_INVALID),
-        (_reply('{"text": "x"}', done_reason="unload"), StoryFailureCode.OUTPUT_INVALID),
-        (_reply('{"text": "x"}', prompt_tokens=899), StoryFailureCode.COUNT_MISMATCH),
-        (_reply('{"text": "Anh ấy 突然 dừng lại."}'), StoryFailureCode.CJK_IN_OUTPUT),
-        (_reply('{"text": "Mưa rơi。"}'), StoryFailureCode.CJK_IN_OUTPUT),
-        (_reply("Minh mở cửa."), StoryFailureCode.OUTPUT_INVALID),
-        (_reply('{"text": "x", "note": "y"}'), StoryFailureCode.OUTPUT_INVALID),
-        (_reply('{"text": "   "}'), StoryFailureCode.OUTPUT_INVALID),
-        (_reply('{"text": 5}'), StoryFailureCode.OUTPUT_INVALID),
+        (_reply('{"paragraphs": ["Minh mở', done_reason="length"), StoryFailureCode.OUTPUT_TRUNCATED),
+        (_reply(_prose(P1), done=False), StoryFailureCode.OUTPUT_INVALID),
+        (_reply(_prose(P1), done_reason="unload"), StoryFailureCode.OUTPUT_INVALID),
+        (_reply(_prose(P1), prompt_tokens=899), StoryFailureCode.COUNT_MISMATCH),
+        (_reply(_prose(P1, "Anh ấy 突然 dừng lại giữa sân.")), StoryFailureCode.CJK_IN_OUTPUT),
+        (_reply(_prose("Mưa rơi trên mái ngói cũ。")), StoryFailureCode.CJK_IN_OUTPUT),
+        (_reply("Minh mở cửa căn nhà cũ."), StoryFailureCode.OUTPUT_INVALID),
+        (_reply('{"paragraphs": ["' + P1 + '"], "note": "y"}'), StoryFailureCode.OUTPUT_INVALID),
+        (_reply(_prose(P1, "   ")), StoryFailureCode.OUTPUT_INVALID),
+        (_reply(_prose(P1, "Ngắn.")), StoryFailureCode.OUTPUT_INVALID),
+        (_reply('{"paragraphs": [5]}'), StoryFailureCode.OUTPUT_INVALID),
+        (_reply('{"paragraphs": "' + P1 + '"}'), StoryFailureCode.OUTPUT_INVALID),
     ],
 )
 async def test_a_generation_is_accepted_only_when_every_condition_holds(generation, code):
@@ -251,9 +263,20 @@ async def test_an_unusable_count_probe_stops_before_generation(count):
 
 
 async def test_a_stop_count_probe_is_accepted():
-    server = _Server(_count_reply(done_reason="stop"), _reply('{"text": "x"}'))
+    server = _Server(_count_reply(done_reason="stop"), _reply(_prose(P1)))
 
-    assert (await _gateway(server, _Sink()).generate(scope=SCOPE, request=_step())).text == "x"
+    assert (await _gateway(server, _Sink()).generate(scope=SCOPE, request=_step())).text == P1
+
+
+@pytest.mark.parametrize(("min_paragraphs", "max_paragraphs", "given"), [(2, 3, 1), (1, 2, 3)])
+async def test_a_paragraph_count_outside_the_bounds_is_invalid(min_paragraphs, max_paragraphs, given):
+    server = _Server(_count_reply(), _reply(_prose(*([P1] * given))))
+
+    error = await _fails(
+        server, _Sink(), StoryFailureCode.OUTPUT_INVALID, min_paragraphs=min_paragraphs, max_paragraphs=max_paragraphs
+    )
+
+    assert error.detail == f"{given} paragraphs"
 
 
 @pytest.mark.parametrize(
