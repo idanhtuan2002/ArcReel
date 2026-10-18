@@ -367,7 +367,7 @@ def mark_unknown(state: RunState, *, attempt_id: str) -> RunState:
 
 
 def add_intent(state: RunState, *, node_ids: tuple[str, ...], note: str) -> RunState:
-    """Attach a Human revision note to nodes; it enters their fingerprints, so they regenerate."""
+    """Attach a revision note (a Human request or the critic's ending rewrite) to nodes; it enters their fingerprints."""
     intents = dict(state.intents)
     for node_id in node_ids:
         intents[node_id] = (*intents.get(node_id, ()), note)

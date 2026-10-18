@@ -1,0 +1,469 @@
+"""The story run driver end to end on a scripted model: convergence, resume, revision intents and blocked phases.
+
+The model is an ``httpx.MockTransport`` behind the real Ollama client, gateway and durable attempt sink; it answers
+each request by the shape of its JSON schema. Runs on PostgreSQL when DATABASE_URL points at one, else SQLite.
+"""
+
+from __future__ import annotations
+
+import json
+from collections import Counter
+from collections.abc import Callable
+from typing import Any
+
+import httpx
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
+from lib.text_backends.ollama import OllamaChatClient
+from server.story_authoring.artifacts import StoryBlobStore
+from server.story_authoring.commit import load_offered_manifest
+from server.story_authoring.contracts import StoryLimits, StoryModelSelection
+from server.story_authoring.driver import StoryBrief, StoryRunDriver
+from server.story_authoring.generation import AuthoringTextGateway
+from server.story_authoring.pipeline import scene_draft
+from server.story_authoring.runtime import (
+    RunPhase,
+    RunStateStore,
+    StoryAttemptSink,
+    add_intent,
+    new_run_state,
+    set_phase,
+)
+from tests.integration.server.story_authoring.test_narrative import IDENTITY, NOW
+
+type Factory = async_sessionmaker[AsyncSession]
+type Answer = Callable[[str, dict[str, Any]], Any]
+
+MODEL = "ornith-32k:9b"
+SELECTION = StoryModelSelection.create(
+    provider_id="custom-ollama",
+    endpoint="ollama-chat",
+    base_url="http://ollama:1",
+    model_id=MODEL,
+    has_credential=False,
+)
+LIMITS = StoryLimits(input_tokens_max=10**8, output_tokens_max=10**8, wall_clock_max_seconds=10**6)
+BRIEF = StoryBrief(
+    idea="Một người con về làng bán căn nhà của cha và tìm thấy cuốn sổ nợ.",
+    genre="đời thường",
+    gate_a_decision_id="gate-a-1",
+    scene_window=(50, 2000, 3000),
+    selection=SELECTION,
+    limits=LIMITS,
+)
+
+ACTIONS = (
+    "đẩy cánh cổng gỗ",
+    "nhìn giàn mướp khô",
+    "lau mặt bàn thờ",
+    "đếm từng viên gạch",
+    "nghe tiếng gà gáy",
+    "pha một ấm trà",
+    "mở hòm áo cũ",
+    "gấp tấm chăn mỏng",
+    "quét lá trong sân",
+    "rót nước vào chum",
+    "nhóm bếp rơm",
+    "xem tờ lịch treo",
+    "chạm vào mái ngói",
+    "dọn góc nhà kho",
+    "ngồi trên bậc thềm",
+    "vuốt ve con mèo",
+    "kéo rèm cửa sổ",
+    "thắp nén nhang",
+    "lật cuốn sổ nợ",
+    "cầm chiếc đèn dầu",
+)
+TIMES = (
+    "lúc trời vừa sáng",
+    "khi nắng lên cao",
+    "giữa buổi trưa",
+    "lúc chiều tà",
+    "khi trời chạng vạng",
+    "lúc đêm xuống",
+    "trong cơn mưa phùn",
+    "sau bữa cơm",
+)
+NAMES = ("Minh", "Lan")
+
+
+def _scene(index: int) -> dict[str, Any]:
+    return {
+        "summary": f"cảnh thứ {index}",
+        "location": "Căn nhà cũ",
+        "pov": "Minh",
+        "characters": ["Minh", "Lan"],
+        "beats": ["Minh trở về", "Lan chờ"],
+        "emotional_turn": "lặng",
+        "plot_function": "mở",
+        "dialogue_required": False,
+    }
+
+
+STRUCTURED: dict[str, Any] = {
+    "working_title": {
+        "working_title": "Căn nhà cũ",
+        "premise": "Minh về làng bán căn nhà của cha.",
+        "genre": "đời thường",
+        "tone": "lặng",
+        "pov": "ngôi thứ ba",
+        "central_conflict": "bán hay giữ nhà",
+        "ending_direction": "Minh giữ lại nhà",
+        "characters": [
+            {
+                "name": "Minh",
+                "role": "chính",
+                "relation_to_protagonist": "nhân vật chính",
+                "description": "con trai cả",
+                "goal": "bán nhà",
+            },
+            {
+                "name": "Lan",
+                "role": "phụ",
+                "relation_to_protagonist": "em gái Minh",
+                "description": "ở lại làng",
+                "goal": "giữ nhà",
+            },
+        ],
+        "locations": [{"name": "Căn nhà cũ", "description": "nhà ba gian"}],
+    },
+    "logline": {
+        "logline": "Minh về bán nhà.",
+        "core_promise": "tình anh em",
+        "world_rules": ["làng nhỏ"],
+        "major_conflicts": ["bán hay giữ"],
+        "forbidden_contradictions": ["Lan là em"],
+    },
+    "narration_style": {
+        "narration_style": "kể chậm",
+        "sentence_rhythm": "câu ngắn",
+        "emotional_texture": "lặng",
+        "dialogue_style": "ít lời",
+        "forbidden_style": ["sáo rỗng"],
+        "style_rules": ["tả cụ thể", "ít tính từ", "câu ngắn"],
+    },
+    "story_arc": {
+        "story_arc": "về, giằng co, giữ",
+        "opening": "Minh về.",
+        "confrontation": "Lan phản đối.",
+        "resolution": "Minh giữ nhà.",
+        "chapters": [
+            {"core_task": "trở về", "threads_advanced": "nợ", "turning_point": "cuốn sổ"},
+            {"core_task": "giằng co", "threads_advanced": "nợ", "turning_point": "người mua"},
+            {"core_task": "quyết định", "threads_advanced": "nợ", "turning_point": "trả nợ"},
+        ],
+        "ending": "Minh ở lại.",
+        "final_image": "ngọn đèn",
+    },
+    "passed": {"passed": True, "problems": []},
+    "chapter_goal": {
+        "chapter_goal": "Minh về nhà",
+        "reader_expectation": "tò mò",
+        "withheld_cards": [],
+        "required_changes_by_end": ["Minh thấy cuốn sổ"],
+        "do_not": [],
+        "scenes": [_scene(1), _scene(2), _scene(3)],
+    },
+}
+
+
+class ScriptedModel:
+    """Answers by the request's schema; ``overrides`` replace an answer kind, ``failures`` break a call number."""
+
+    def __init__(self) -> None:
+        self.calls: Counter[str] = Counter()
+        self.prompts: list[tuple[str, str]] = []
+        self.paragraphs: list[str] = []
+        self.overrides: dict[str, Answer] = {}
+        self.fail_at: dict[str, int] = {}
+        self._sentence = 0
+
+    def _prose(self, count: int) -> dict[str, Any]:
+        paragraphs = []
+        for _ in range(count):
+            sentences = []
+            for _ in range(2):
+                i = self._sentence
+                self._sentence += 1
+                sentences.append(
+                    f"{NAMES[i % 2]} {ACTIONS[(i // 2) % len(ACTIONS)]} {TIMES[(i // 40) % len(TIMES)]} lần thứ {i + 1}."
+                )
+            paragraphs.append(" ".join(sentences))
+        self.paragraphs.extend(paragraphs)
+        return {"paragraphs": paragraphs}
+
+    def packaging(self) -> dict[str, Any]:
+        return {
+            "titles": [{"title": t, "kind": "k"} for t in ("Căn nhà cũ", "Sổ nợ", "Ngọn đèn")],
+            "blurbs": ["Minh về làng.", "Một cuốn sổ nợ."],
+            "selling_points": [{"point": f"điểm {i}", "evidence_quote": q} for i, q in enumerate(self.paragraphs[-3:])],
+            "tags": ["làng", "nhà", "anh em", "nợ", "đời thường"],
+        }
+
+    def _answer(self, kind: str, schema: dict[str, Any], prompt: str) -> Any:
+        if kind in self.overrides:
+            return self.overrides[kind](prompt, schema)
+        if kind == "prose":
+            return self._prose(schema["properties"]["paragraphs"]["minItems"])
+        if kind in STRUCTURED:
+            return STRUCTURED[kind]
+        if kind == "ending_resolves_conflict":
+            return {"ending_resolves_conflict": True, "ending_quote": self.paragraphs[-1], "issues": []}
+        if kind == "issues":
+            return {"issues": []}
+        if kind == "titles":
+            return self.packaging()
+        if kind == "patches":
+            return {"patches": [], "notes": "không sửa"}
+        if kind == "rewrites":
+            return {"rewrites": []}
+        raise AssertionError(f"unscripted request kind {kind}")
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        schema = body["format"]
+        properties = schema.get("properties", {})
+        kind = (
+            "prose"
+            if "paragraphs" in properties
+            else next(
+                k
+                for k in (*STRUCTURED, "ending_resolves_conflict", "issues", "titles", "patches", "rewrites")
+                if k in properties
+            )
+        )
+        prompt = body["messages"][1]["content"]
+        counting = body["options"]["num_predict"] == 1
+        if counting:
+            content = "{"
+        else:
+            self.calls[kind] += 1
+            self.prompts.append((kind, prompt))
+            if self.fail_at.get(kind) == self.calls[kind]:
+                return httpx.Response(500, json={"error": "model crashed"})
+            content = json.dumps(self._answer(kind, schema, prompt), ensure_ascii=False)
+        return httpx.Response(
+            200,
+            json={
+                "model": MODEL,
+                "message": {"role": "assistant", "content": content},
+                "done": True,
+                "done_reason": "length" if counting else "stop",
+                "prompt_eval_count": 700,
+                "eval_count": 80,
+            },
+        )
+
+
+async def _store(factory: Factory) -> RunStateStore:
+    async with factory() as session:
+        task = await TaskRepository(session).enqueue(
+            project_name=IDENTITY.project_name, task_type=STORY_RUN_TASK_TYPE, media_type="text", resource_id="run1"
+        )
+    store = RunStateStore(factory, task_id=task["task_id"])
+    await store.initialize(new_run_state(run_id=IDENTITY.run_id, limits=LIMITS, now=NOW))
+    return store
+
+
+def _driver(factory: Factory, store: RunStateStore, model: ScriptedModel, blobs: StoryBlobStore) -> StoryRunDriver:
+    client = OllamaChatClient(base_url="http://ollama:1", transport=httpx.MockTransport(model.handler))
+    sink = StoryAttemptSink(store=store, session_factory=factory, provider_id="custom-ollama", model_id=MODEL)
+    gateway = AuthoringTextGateway(selection=SELECTION, limits=LIMITS, client=client, sink=sink)
+    return StoryRunDriver(identity=IDENTITY, brief=BRIEF, store=store, gateway=gateway, blobs=blobs, clock=lambda: NOW)
+
+
+async def _rerun(store: RunStateStore, *, intent: tuple[str, str] | None = None) -> None:
+    def change(state):
+        if intent is not None:
+            state = add_intent(state, node_ids=(intent[0],), note=intent[1])
+        return set_phase(state, RunPhase.RUNNING), None
+
+    await store.apply(change)
+
+
+async def test_a_clean_run_converges_and_offers_one_manifest(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    manifest = load_offered_manifest(blobs, state)
+    assert [(s.chapter, s.scene) for s in manifest.scenes] == [(c, s) for c in (1, 2, 3) for s in (1, 2, 3)]
+    assert manifest.brief_digest == BRIEF.digest()
+    assert manifest.quality_record_digest is not None
+    export = blobs.read_exact(manifest.export_digest).decode("utf-8")
+    assert export.startswith("# Căn nhà cũ\n")
+    assert [line for line in export.splitlines() if line.startswith("## ")] == [
+        "## Chương 1",
+        "## Chương 2",
+        "## Chương 3",
+    ]
+    assert all(s.revision.normalized_content in export for s in manifest.scenes)
+    assert model.calls["prose"] == 9
+    assert model.calls["issues"] == 12
+    assert (model.calls["ending_resolves_conflict"], model.calls["titles"]) == (1, 1)
+
+
+async def test_a_second_run_of_a_converged_story_calls_no_model(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    blobs = StoryBlobStore(tmp_path)
+    await _driver(concurrent_session_factory, store, ScriptedModel(), blobs).run()
+    first = load_offered_manifest(blobs, await store.load())
+    await _rerun(store)
+
+    again = ScriptedModel()
+    state = await _driver(concurrent_session_factory, store, again, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL
+    assert sum(again.calls.values()) == 0
+    assert load_offered_manifest(blobs, state).digest() == first.digest()
+
+
+async def test_a_crash_mid_run_resumes_without_regenerating_converged_nodes(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    blobs = StoryBlobStore(tmp_path)
+    crashing = ScriptedModel()
+    crashing.fail_at["prose"] = 5
+
+    stopped = await _driver(concurrent_session_factory, store, crashing, blobs).run()
+    assert stopped.phase is RunPhase.MODEL_UNAVAILABLE
+    assert stopped.commit is None
+
+    await _rerun(store)
+    healthy = ScriptedModel()
+    state = await _driver(concurrent_session_factory, store, healthy, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert healthy.calls["prose"] == 5
+    assert not {"working_title", "logline", "narration_style", "story_arc", "chapter_goal"} & set(healthy.calls)
+
+
+async def test_a_scene_revision_regenerates_that_scene_and_everything_after_it(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    blobs = StoryBlobStore(tmp_path)
+    await _driver(concurrent_session_factory, store, ScriptedModel(), blobs).run()
+    before = load_offered_manifest(blobs, await store.load())
+
+    await _rerun(store, intent=(scene_draft(3, 1), "Cho Lan nói nhiều hơn."))
+    revised = ScriptedModel()
+    state = await _driver(concurrent_session_factory, store, revised, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    after = load_offered_manifest(blobs, state)
+    assert [a.decision_id for a in after.scenes[:6]] == [b.decision_id for b in before.scenes[:6]]
+    assert all(a.decision_id != b.decision_id for a, b in zip(after.scenes[6:], before.scenes[6:], strict=True))
+    assert revised.calls["prose"] == 3
+    assert revised.calls["issues"] == 4
+    assert "Cho Lan nói nhiều hơn." in next(p for k, p in revised.prompts if k == "prose")
+
+
+async def test_a_quoted_continuity_error_is_repaired_before_the_chapter_is_sealed(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    blobs = StoryBlobStore(tmp_path)
+    model = ScriptedModel()
+    flagged: list[str] = []
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if flagged or "TÍNH LIÊN TỤC" not in prompt:
+            return {"issues": []}
+        flagged.append(model.paragraphs[1])
+        issue = {
+            "severity": "critical",
+            "issue_type": "mâu_thuẫn",
+            "description": "sai thời điểm",
+            "quote": model.paragraphs[1],
+            "suggested_fix": "sửa",
+        }
+        return {"issues": [issue]}
+
+    def patch(_prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        return {"patches": [{"before": flagged[0], "after": "Minh đứng yên rất lâu bên hiên."}], "notes": "sửa"}
+
+    model.overrides["issues"] = audit
+    model.overrides["patches"] = patch
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    manifest = load_offered_manifest(blobs, state)
+    assert "Minh đứng yên rất lâu bên hiên." in manifest.scenes[0].revision.normalized_content
+    assert flagged[0] not in manifest.scenes[0].revision.normalized_content
+    assert model.calls["patches"] == 1
+    assert model.calls["issues"] == 16
+
+
+async def test_an_output_that_never_validates_stops_at_the_node_cap(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    model.overrides["working_title"] = lambda _p, _s: {"working_title": "thiếu trường"}
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.BLOCKED_QUALITY
+    assert "seed" in (state.block_reason or "")
+    assert model.calls["working_title"] == 3
+    assert state.commit is None
+
+
+def _critic(model: ScriptedModel, verdicts: list[bool]) -> Answer:
+    def answer(_prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        resolved = verdicts.pop(0) if len(verdicts) > 1 else verdicts[0]
+        return {"ending_resolves_conflict": resolved, "ending_quote": model.paragraphs[-1], "issues": []}
+
+    return answer
+
+
+async def test_an_unresolved_ending_rewrites_the_final_scene_once(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    model.overrides["ending_resolves_conflict"] = _critic(model, [False, True])
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert (model.calls["prose"], model.calls["ending_resolves_conflict"]) == (10, 2)
+    assert model.calls["issues"] == 16
+    last_prose_prompt = [p for k, p in model.prompts if k == "prose"][-1]
+    assert "chưa khép lại xung đột trung tâm" in last_prose_prompt
+
+
+async def test_an_ending_that_stays_unresolved_is_never_offered(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    model.overrides["ending_resolves_conflict"] = _critic(model, [False])
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.BLOCKED_QUALITY
+    assert "manuscript_review" in (state.block_reason or "")
+    assert (model.calls["prose"], model.calls["ending_resolves_conflict"]) == (10, 2)
+    assert state.commit is None
+
+
+async def test_packaging_needs_three_selling_points_that_quote_the_manuscript(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+
+    def invented(_prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        answer = model.packaging()
+        answer["selling_points"][0]["evidence_quote"] = "Một câu không có trong truyện."
+        return answer
+
+    model.overrides["titles"] = invented
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.BLOCKED_QUALITY
+    assert "packaging" in (state.block_reason or "")
+    assert model.calls["titles"] == 2
