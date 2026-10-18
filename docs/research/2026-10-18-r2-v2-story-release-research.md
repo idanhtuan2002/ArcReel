@@ -131,6 +131,105 @@ Each selected surface is ported to Python under a `DonorParityContract`:
 
 Next research step: a per-surface inventory of Shenbi, Novel Studio and Huohuo at their pins, then the minimal donor runs needed for that differential.
 
+## Addendum — per-surface writer donor inventory (2026-10-18)
+
+Sources: Shenbi `65ddfc26` and Novel Studio `9b690ae2`, both fetched at their pins into the session scratchpad; Huohuo `f104b853` from the local checkout `~/content-os-r1-8/work/huohuo-drama`. Read-only so far.
+
+### Shenbi (Python, 74 skills)
+
+- **Long-form automated pipeline** (`src/shenbi/pipeline/genesis.py`, `chapter_loop.py`, 3442 lines):
+  - 16 genesis steps: worldbuilding → genre-config → character-design → story-architecture → factions → volume-outlining → pacing-design → thread-weaver → foreshadowing-plant → power-system → locations → relationships → book-spine → intent → style-learning → anchor.
+  - 15 chapter steps, in order:
+    1. volume-align (deterministic)
+    2. chapter-planning (an 8-section memo)
+    3. context-prepare (deterministic)
+    4. chapter-drafting
+    5. post-draft-extract (deterministic)
+    6. linguistic-drift-check (deterministic)
+    7. foreshadowing-lifecycle
+    8. state-settling
+    9. audit group: factual (continuity, world rules, pacing)
+    10. audit group: character (consistency, dialogue, motivation, POV)
+    11. audit group: craft (texture, reader-pull, anti-AI)
+    12. audit group: plan (memo compliance, foreshadowing)
+    13. review-resonance
+    14. review-sensitivity
+    15. chapter-revision (conditional)
+- **Short-story track** (skills only, agent-orchestrated, not in the pipeline code):
+  - `shenbi-short-outline`: fewer than 30 chapters → `outline/short_story_map.md`.
+  - `shenbi-short-drafting`: generates chapters strictly in order, runs a per-chapter audit chain (memo-compliance, anti-ai, character, motivation), revises at most 3 rounds and otherwise falls back to the best version, then re-checks the adjacent 2 chapters.
+  - `shenbi-short-packaging`: publication and sales materials.
+- Other: `style-polishing`, `length-normalizing`, `anti-detect`, `review-highpoint`, `review-long-span`. Scoring/gates G0–G7 (`src/shenbi/gates`); `llm_output_integrity.py`.
+- LLM routing is any OpenAI-compatible endpoint (`SHENBI_LLM_BASE_URL`/`MODEL`/`API_KEY`), so Ollama can serve it.
+- Prompts/skills are written in Chinese; genre fatigue-word lists are Chinese.
+
+### Novel Studio (TypeScript, AI layer ≈ 2,000 lines)
+
+- Flow (`src/lib/ai/prompts.ts`, 207 lines; `schemas.ts` zod):
+  1. `projectIdeaPrompt` (brief → seed, `ProjectIdeaSchema`)
+  2. story bible
+  3. style bible
+  4. volume outline
+  5. arc pack (5 chapters)
+  6. chapter outline
+  7. scene beats
+  8. `chapterDraftPrompt` (Context Pack only, no chat memory)
+  9. `continuityPrompt` merged with `hardRules`
+  10. `styleRevisionPrompt`
+  11. `memoryExtractorPrompt`
+- Model client: OpenAI SDK, OpenAI-compatible. Chinese prompts.
+
+### Huohuo (TypeScript, 54 novel services)
+
+- **Writer pipeline** (`novel-chapter-pipeline.ts`):
+  1. generate
+  2. continuity check
+  3. bounded rewrite/patch loop
+  4. outline-compliance gate
+  5. craft hook
+  6. AI-humanize hook
+  7. seam fix
+  8. memory/causal update
+  9. replacement-char repair
+  10. intra-chapter dedupe
+
+  It is coupled to Prisma/DB/billing. Commercial modules: `novel-commercial-appeal-audit.ts` (802 lines, LLM), `novel-prose-polish.ts`.
+- **Deterministic modules** (no I/O, but Chinese-specific punctuation, lexicon and regex):
+
+  | Module | Lines | CJK characters in source | Han regexes |
+  |---|---|---|---|
+  | `novel-continuity-deterministic-fix` | 121 | 272 | 2 |
+  | `novel-intra-chapter-dedupe` | 412 | 402 | 7 |
+  | `novel-chapter-seam` | 1669 | 6658 | 44 |
+  | `novel-continuity-precheck` | 731 | 1645 | 8 |
+  | `novel-chapter-beat-budget` | 233 | 701 | 6 |
+  | `novel-stakes-common-sense` | 186 | 861 | 14 |
+
+  Only the normalized-fingerprint core of the dedupe/seam logic is plausibly language-agnostic.
+
+### Frozen role → candidate surfaces for a Vietnamese short story
+
+| Stage | Candidates (pin) | Question the differential must answer |
+|---|---|---|
+| Idea → seed | Novel Studio `projectIdeaPrompt` | Is the seed specific and commercially hooked? |
+| Bible / style | Novel Studio story+style bible; Shenbi genesis subset (worldbuilding, character-design, story-architecture, style) | Is the compact Novel Studio form enough for 3 chapters? |
+| Outline | Shenbi `short-outline`; Novel Studio chapter outline + scene beats | Beat coverage, ending, hook per chapter |
+| Draft | Shenbi `chapter-drafting`/`short-drafting`; Novel Studio `chapterDraftPrompt` | Prose quality, plan compliance, length |
+| Audit (L2/L3) | Shenbi audit groups + resonance; short chain memo-compliance/anti-ai/character/motivation | Finding precision on the same chapter |
+| Repair | Shenbi `chapter-revision` (≤3 rounds, best-version fallback); Huohuo strict local repair loop | Fixes findings without collateral damage |
+| Polish / anti-AI | Shenbi `style-polishing`, `anti-detect`; Novel Studio style revision; Huohuo humanize | Natural Vietnamese, no AI tells |
+| Packaging | Shenbi `short-packaging` | Title, blurb, commercial readiness |
+| Deterministic checks | Shenbi `linguistic-drift-check`, `llm_output_integrity`; Huohuo dedupe/seam core; R2 L1 + ported `hardRules` | Exact parity on fixtures; Vietnamese adaptation is an intentional deviation |
+
+### Language finding (fact + inference)
+
+Every donor prompt and heuristic is Chinese. `ornith:9b` is a Qwen-family model, and the 2026-10-18 probe already showed CJK leakage from the other Qwen model. The differential must therefore measure two variants of each model-calling surface on the same idea:
+
+- (a) the donor prompt verbatim plus a Vietnamese-output instruction;
+- (b) a faithful Vietnamese translation of the prompt.
+
+Translation is an intentional deviation that has to be recorded in the `DonorParityContract`.
+
 ## Plan amendments required (step 2)
 
 1. Approve the Task0 owner-map amendment (`task_repo.py`, `ledger.py`, `budget_guard.py` and their tests) recorded in `R2_STORY_AUTHORING_QUALIFICATION.md`.
