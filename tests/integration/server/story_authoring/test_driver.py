@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import httpx
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
@@ -48,7 +49,6 @@ BRIEF = StoryBrief(
     idea="Một người con về làng bán căn nhà của cha và tìm thấy cuốn sổ nợ.",
     genre="đời thường",
     gate_a_decision_id="gate-a-1",
-    scene_window=(50, 2000, 3000),
     selection=SELECTION,
     limits=LIMITS,
 )
@@ -86,6 +86,7 @@ TIMES = (
     "sau bữa cơm",
 )
 NAMES = ("Minh", "Lan")
+SENTENCES_PER_PARAGRAPH = 9
 
 
 def _scene(index: int) -> dict[str, Any]:
@@ -169,7 +170,8 @@ STRUCTURED: dict[str, Any] = {
 
 
 class ScriptedModel:
-    """Answers by the request's schema; ``overrides`` replace an answer kind, ``failures`` break a call number."""
+    """Answers by the request's schema. ``overrides`` replace an answer kind, ``fail_at`` breaks a call number of a
+    kind, and ``before`` runs a hook before a call number of a kind is answered."""
 
     def __init__(self) -> None:
         self.calls: Counter[str] = Counter()
@@ -177,13 +179,14 @@ class ScriptedModel:
         self.paragraphs: list[str] = []
         self.overrides: dict[str, Answer] = {}
         self.fail_at: dict[str, int] = {}
+        self.before: dict[tuple[str, int], Callable[[], Awaitable[None]]] = {}
         self._sentence = 0
 
     def _prose(self, count: int) -> dict[str, Any]:
         paragraphs = []
         for _ in range(count):
             sentences = []
-            for _ in range(2):
+            for _ in range(SENTENCES_PER_PARAGRAPH):
                 i = self._sentence
                 self._sentence += 1
                 sentences.append(
@@ -220,7 +223,7 @@ class ScriptedModel:
             return {"rewrites": []}
         raise AssertionError(f"unscripted request kind {kind}")
 
-    def handler(self, request: httpx.Request) -> httpx.Response:
+    async def handler(self, request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         schema = body["format"]
         properties = schema.get("properties", {})
@@ -240,6 +243,9 @@ class ScriptedModel:
         else:
             self.calls[kind] += 1
             self.prompts.append((kind, prompt))
+            hook = self.before.pop((kind, self.calls[kind]), None)
+            if hook is not None:
+                await hook()
             if self.fail_at.get(kind) == self.calls[kind]:
                 return httpx.Response(500, json={"error": "model crashed"})
             content = json.dumps(self._answer(kind, schema, prompt), ensure_ascii=False)
@@ -467,3 +473,61 @@ async def test_packaging_needs_three_selling_points_that_quote_the_manuscript(
     assert state.phase is RunPhase.BLOCKED_QUALITY
     assert "packaging" in (state.block_reason or "")
     assert model.calls["titles"] == 2
+
+
+def test_the_brief_digest_is_what_gate_a_greenlights_and_excludes_the_decision():
+    draft = BRIEF.model_copy(update={"gate_a_decision_id": None})
+    assert draft.digest() == BRIEF.digest()
+    assert BRIEF.model_copy(update={"idea": "Một ý khác."}).digest() != BRIEF.digest()
+
+
+async def test_a_run_needs_its_gate_a_decision(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    driver = _driver(concurrent_session_factory, store, ScriptedModel(), StoryBlobStore(tmp_path))
+    with pytest.raises(ValueError, match="Gate A"):
+        StoryRunDriver(
+            identity=IDENTITY,
+            brief=BRIEF.model_copy(update={"gate_a_decision_id": None}),
+            store=store,
+            gateway=driver._gateway,
+            blobs=StoryBlobStore(tmp_path),
+        )
+
+
+async def test_a_story_far_below_the_length_range_is_never_offered(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    full = model._prose
+
+    def short(_prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
+        answer = full(schema["properties"]["paragraphs"]["minItems"])
+        paragraphs = [p.split(". ")[0] + "." for p in answer["paragraphs"]]
+        model.paragraphs[-len(paragraphs) :] = paragraphs
+        return {"paragraphs": paragraphs}
+
+    model.overrides["prose"] = short
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.BLOCKED_QUALITY
+    assert "STORY_LENGTH" in (state.block_reason or "")
+    assert state.commit is None
+
+
+async def test_a_revision_requested_while_running_is_honoured_before_the_offer(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+
+    async def request_revision() -> None:
+        await store.apply(lambda s: (add_intent(s, node_ids=(scene_draft(1, 1),), note="Thêm mưa."), None))
+
+    model.before[("titles", 1)] = request_revision
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["prose"] == 18
+    assert model.calls["titles"] == 2
+    assert "Thêm mưa." in [p for k, p in model.prompts if k == "prose"][9]

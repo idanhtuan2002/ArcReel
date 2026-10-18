@@ -97,6 +97,8 @@ NODE_CAPS = {
 }
 REVIEW_CYCLES = 2
 MIN_VERIFIED_SELLING_POINTS = 3
+STORY_HARD_RANGE = (6000, 12500)
+STORY_TARGET_RANGE = (7000, 11000)
 ENDING_NOTE = (
     "Biên tập viên thấy cảnh này chưa khép lại xung đột trung tâm. Viết lại để kết thúc giải quyết trọn vẹn xung đột, "
     "trả lời câu hỏi mở đầu và dừng ở hình ảnh cuối đã định trong dàn ý."
@@ -118,19 +120,20 @@ REPAIR = {"temperature": 0.3, "top_p": 0.9, "top_k": 40, "presence_penalty": 0.0
 
 
 class StoryBrief(BaseModel):
-    """The Gate A input of a run; its digest is what the Human greenlit."""
+    """The Gate A input of a run. Its digest, which the Human greenlights, covers everything but the decision id."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     idea: str = Field(min_length=1)
     genre: str = Field(min_length=1)
-    gate_a_decision_id: str = Field(min_length=1)
+    gate_a_decision_id: str | None = Field(default=None, min_length=1)
     story_target_syllables: int = Field(default=9000, ge=7000, le=11000)
     scene_window: tuple[int, int, int] = (600, 1000, 1400)
     selection: StoryModelSelection
     limits: StoryLimits
 
     def digest(self) -> str:
-        raw = json.dumps(self.model_dump(mode="json"), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        content = self.model_dump(mode="json", exclude={"gate_a_decision_id"})
+        raw = json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return "sha256:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -190,8 +193,11 @@ class StoryRunDriver:
         blobs: StoryBlobStore,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
+        if brief.gate_a_decision_id is None:
+            raise ValueError("a story run starts only after its Gate A greenlight")
         self._identity = identity
         self._brief = brief
+        self._gate_a_decision_id = brief.gate_a_decision_id
         self._store = store
         self._gateway = gateway
         self._blobs = blobs
@@ -210,11 +216,13 @@ class StoryRunDriver:
             return state
         try:
             for _ in range(3):
+                intents = (await self._store.load()).intents
                 try:
                     story = await self._converge()
-                    break
                 except _Restart:
                     continue
+                if (await self._store.load()).intents == intents:
+                    break
             else:
                 raise Blocked(RunPhase.BLOCKED_PROPAGATION, "the run kept changing while converging")
             manifest = await self._manifest(story)
@@ -403,7 +411,7 @@ class StoryRunDriver:
         outline = ShortOutline.model_validate(json.loads(outline_raw)["outline"])
         outline_in = ("outline", content_digest(outline_raw))
 
-        names, locations = self._entity_keys(seed)
+        names, locations = entity_keys(seed)
         plans: list[ChapterPlan] = []
         plan_ins: list[tuple[str, str]] = []
         for c in range(1, CHAPTERS + 1):
@@ -420,21 +428,7 @@ class StoryRunDriver:
             plans.append(ChapterPlan.model_validate_json(raw))
             plan_ins.append((node, content_digest(raw)))
 
-        bible_input = StoryBibleInput(
-            title=seed.working_title,
-            premise=seed.premise,
-            characters=tuple(
-                StoryEntityInput(
-                    key=names[c.name], name=c.name, description=f"{c.relation_to_protagonist}. {c.description}"
-                )
-                for c in seed.characters
-            ),
-            locations=tuple(
-                StoryEntityInput(key=locations[loc.name], name=loc.name, description=loc.description)
-                for loc in seed.locations
-            ),
-            style_rules=tuple(style.style_rules),
-        )
+        bible_input = story_bible_input(seed, style)
         outline_input = StoryOutlineInput(
             story_frame=f"{outline.story_arc} {outline.opening} {outline.confrontation}",
             chapters=tuple(
@@ -512,18 +506,6 @@ class StoryRunDriver:
         return json.dumps({"outline": outline.model_dump(), "review_problems": problems}, ensure_ascii=False).encode(
             "utf-8"
         )
-
-    def _entity_keys(self, seed: StorySeed) -> tuple[dict[str, str], dict[str, str]]:
-        taken: list[str] = []
-        names: dict[str, str] = {}
-        for character in seed.characters:
-            names[character.name] = planning.entity_key(character.name, taken)
-            taken.append(names[character.name])
-        locations: dict[str, str] = {}
-        for location in seed.locations:
-            locations[location.name] = planning.entity_key(location.name, taken)
-            taken.append(locations[location.name])
-        return names, locations
 
     async def _chapter_plan(
         self,
@@ -957,6 +939,7 @@ class StoryRunDriver:
         for node in (*(chapter_review(c) for c in chapters), "manuscript_review"):
             findings.extend(_finding_from(f) for f in json.loads(await self._head(node))["findings"])
         packaging = Packaging.model_validate_json(await self._head("packaging"))
+        findings.extend(story_length_findings([chapters[c] for c in sorted(chapters)]))
         blocking = [f for f in findings if f.blocking]
         if blocking:
             raise Blocked(RunPhase.BLOCKED_QUALITY, "; ".join(f"{f.code} {f.node_id}" for f in blocking))
@@ -981,7 +964,7 @@ class StoryRunDriver:
             predecessor_manifest_digest=predecessor,
             committed_prefix=tuple(committed),
             brief_digest=self._brief.digest(),
-            gate_a_decision_id=self._brief.gate_a_decision_id,
+            gate_a_decision_id=self._gate_a_decision_id,
             canon_genesis=delta,
             canon_version_id=version,
             plan=proposal,
@@ -991,6 +974,52 @@ class StoryRunDriver:
             export_digest=export_digest,
             quality_record_digest=quality_digest,
         )
+
+
+def entity_keys(seed: StorySeed) -> tuple[dict[str, str], dict[str, str]]:
+    """Name -> key for the seed's characters and locations, in seed order, keys unique across both."""
+    taken: list[str] = []
+    names: dict[str, str] = {}
+    for character in seed.characters:
+        names[character.name] = planning.entity_key(character.name, taken)
+        taken.append(names[character.name])
+    locations: dict[str, str] = {}
+    for location in seed.locations:
+        locations[location.name] = planning.entity_key(location.name, taken)
+        taken.append(locations[location.name])
+    return names, locations
+
+
+def story_bible_input(seed: StorySeed, style: StyleBibleOut) -> StoryBibleInput:
+    """The bible the narrative owners see; the driver and the approval both derive it from the same heads."""
+    names, locations = entity_keys(seed)
+    return StoryBibleInput(
+        title=seed.working_title,
+        premise=seed.premise,
+        characters=tuple(
+            StoryEntityInput(
+                key=names[c.name], name=c.name, description=f"{c.relation_to_protagonist}. {c.description}"
+            )
+            for c in seed.characters
+        ),
+        locations=tuple(
+            StoryEntityInput(key=locations[loc.name], name=loc.name, description=loc.description)
+            for loc in seed.locations
+        ),
+        style_rules=tuple(style.style_rules),
+    )
+
+
+def story_length_findings(chapters: Sequence[Sequence[str]]) -> tuple[Finding, ...]:
+    """Whole-story length: outside the hard range is structural, outside the target range stylistic."""
+    total = syllables_of(chapters)
+    if not STORY_HARD_RANGE[0] <= total <= STORY_HARD_RANGE[1]:
+        bounds = f"{STORY_HARD_RANGE[0]}-{STORY_HARD_RANGE[1]}"
+        return (Finding("STORY_LENGTH", Severity.HARD_STRUCTURAL, "manuscript", f"{total} syllables outside {bounds}"),)
+    if not STORY_TARGET_RANGE[0] <= total <= STORY_TARGET_RANGE[1]:
+        bounds = f"{STORY_TARGET_RANGE[0]}-{STORY_TARGET_RANGE[1]}"
+        return (Finding("STORY_LENGTH", Severity.STYLISTIC, "manuscript", f"{total} syllables outside {bounds}"),)
+    return ()
 
 
 def render_markdown(*, title: str, blurb: str, chapters: Sequence[Sequence[str]]) -> str:
