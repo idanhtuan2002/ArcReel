@@ -73,6 +73,7 @@ from r2.narrative.canon_state import ResolvedCanonView, apply_canon_delta, empty
 from r2.narrative.errors import CanonNotFoundError
 from r2.narrative.hashing import compute_canon_content_hash, compute_canon_delta_hash
 from r2.narrative_context.compiler import NarrativeContextCompiler
+from r2.narrative_context.ports import CanonVersionReader, NarrativePlanReader
 from r2.narrative_lifecycle.accepted_narrative_adapter import AcceptedNarrativeAdapter
 from r2.narrative_lifecycle.hashing import (
     compute_evidence_semantic_fingerprint,
@@ -645,6 +646,8 @@ class _ProvisionalLifecycleUnitOfWork:
 class ContextReaders:
     compiler: NarrativeContextCompiler
     policy_version: str
+    canon_reader: CanonVersionReader
+    plan_reader: NarrativePlanReader
 
 
 def provisional_readers(
@@ -657,9 +660,11 @@ def provisional_readers(
 ) -> ContextReaders:
     repository = _ProvisionalLifecycleRepository(acceptances)
     policy = _PolicyReader(identity, bible)
+    canon_reader = _StaticCanonReader(canon_view)
+    plan_reader = _StaticPlanReader(plan)
     compiler = NarrativeContextCompiler(
-        canon_reader=_StaticCanonReader(canon_view),
-        plan_reader=_StaticPlanReader(plan),
+        canon_reader=canon_reader,
+        plan_reader=plan_reader,
         policy_reader=policy,
         accepted_reader=AcceptedNarrativeAdapter(
             cast(NarrativeLifecycleUnitOfWorkFactory, lambda: _ProvisionalLifecycleUnitOfWork(repository))
@@ -667,22 +672,28 @@ def provisional_readers(
         snapshot_reader=_NoSnapshots(),
         token_counter=WordTokenCounter(),
     )
-    return ContextReaders(compiler=compiler, policy_version=policy.version)
+    return ContextReaders(
+        compiler=compiler, policy_version=policy.version, canon_reader=canon_reader, plan_reader=plan_reader
+    )
 
 
 def committed_readers(
     identity: StoryIdentity, bible: StoryBibleInput, *, session_factory: async_sessionmaker[AsyncSession]
 ) -> ContextReaders:
     policy = _PolicyReader(identity, bible)
+    canon_reader = _CommittedCanonReader(session_factory)
+    plan_reader = _CommittedPlanReader(session_factory)
     compiler = NarrativeContextCompiler(
-        canon_reader=_CommittedCanonReader(session_factory),
-        plan_reader=_CommittedPlanReader(session_factory),
+        canon_reader=canon_reader,
+        plan_reader=plan_reader,
         policy_reader=policy,
         accepted_reader=AcceptedNarrativeAdapter(narrative_lifecycle_uow_factory(session_factory)),
         snapshot_reader=_NoSnapshots(),
         token_counter=WordTokenCounter(),
     )
-    return ContextReaders(compiler=compiler, policy_version=policy.version)
+    return ContextReaders(
+        compiler=compiler, policy_version=policy.version, canon_reader=canon_reader, plan_reader=plan_reader
+    )
 
 
 async def compile_scene_context(

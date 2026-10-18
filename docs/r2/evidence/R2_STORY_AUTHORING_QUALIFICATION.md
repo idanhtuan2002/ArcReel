@@ -297,3 +297,62 @@ The Human delegated the choice ("nghiên cứu chọn phương án phù hợp nh
 3. per scene in story order: `record_draft_candidate` and `record_revision` (evidence), then `NarrativeAcceptanceService.decide_revision` ACCEPT.
 
 There is no extraction, change-set review or Canon handoff for story scenes. The Huohuo change-record surface is **deferred** to a later version, not rejected. Revision-acceptance decision IDs are content-derived (fact 7). The amendment is updated accordingly.
+
+---
+
+## V2 Task3: touchpoint-2 binding and commit protocol (2026-10-18)
+
+Status: **PASSED (hard gate)** for option A, on disposable PostgreSQL 16 with the real R2 owners and a real signed Showrunner grant. Task4 stays closed until the Human opens it (amendment § Execution).
+
+### Code (owned under `server/story_authoring/`)
+
+- **`narrative.py`:** maps one run onto the R2 owners.
+  - Bible → Canon genesis delta (`ADD_ENTITY` and `ADD_FACT` description facts), with a version id derived from the delta and passed through `CanonTransactionService(version_id_factory=…)`, its existing public parameter.
+  - Outline → v1 `NarrativePlan` revision: CHAPTER nodes, and per scene a `SceneContract` with POV, location, participants, a one-hour story-time window and beats as creative constraints.
+  - Content-derived draft candidate, revision and revision-acceptance decision ids.
+  - The real `NarrativeContextCompiler` over two reader sets:
+    - provisional: genesis view, provisional plan, and earlier acceptances through the real `AcceptedNarrativeAdapter` over an in-memory store;
+    - committed: `CanonResolutionService`, `NarrativePlanService.get_version` and `AcceptedNarrativeAdapter`.
+  - The style bible serves as the creative policy; there is no retrieval snapshot; the word token counter is `story-words-v1`.
+- **`authority.py`:** `GrantNarrativeShowrunnerAuthority` is the production `NarrativeShowrunnerAuthorityPort`. It reads the current `HUMAN_SHOWRUNNER` grant through the existing `CurrentShowrunnerGrantReader` (in production, `app.state.governance_grants`, the checkpointed reader), and denies without a reader, without a grant, or for a command naming another actor. It mints or infers no grant. The same check guards the plan and Canon approvals.
+- **`commit.py`:** `ManuscriptCommitManifest`; its digest is the sha256 of its canonical JSON, which is also its blob id.
+  - `ManuscriptCommitter` provides `offer`, `approve`, `resume`, `abort` and successor offers.
+  - `ApprovalRecord` is persisted in phase `APPROVING` before any decision is sent.
+  - Steps run in order: `canon` (create branch + genesis commit), `plan`, then per scene: recompile and compare the binding → `record_draft_candidate` → `record_revision` → `decide_revision` ACCEPT.
+  - `COMMITTED` follows only a read-back of the Canon content hash, the plan content hash and every accepted revision.
+  - An owner refusal or binding difference moves the run to `COMMIT_BLOCKED` with the step and reason.
+- **`runtime.py`:** `RunState.commit` holds `CommitProgress`: offered digest, approval and completed steps.
+
+### Evidence
+
+`DATABASE_URL=postgresql+asyncpg://…@127.0.0.1:55480/arcreel_story_test uv run python -m pytest tests/integration/server/story_authoring/ -q` → **23 passed**, three consecutive runs. SQLite: `tests/integration/server/story_authoring tests/unit/server/story_authoring` → 149 passed. `test_narrative.py` and `test_commit.py` prove:
+
+| Task3 gate (amendment verification matrix) | Result |
+|---|---|
+| Binding proof: provisional contexts equal committed contexts (`context_pack_id` and `content_hash`), 3 scenes, earlier accepted prose present | PASS |
+| One Approve records genesis, plan and every scene; decisions carry the grant principal | PASS: 1 Canon version, 1 plan version, 3 decisions, `actor_id` = sponsor |
+| Principal without a grant; deployment without grants; command naming another actor | refused; nothing written |
+| Stale manifest digest; unticked critical exception | `STALE_MANIFEST`; `EXCEPTIONS_NOT_ACCEPTED`; Approve succeeds once ticked and records the exception |
+| Two concurrent Approves | exactly one sequence; the other is refused; 3 decisions |
+| Crash after `canon`, `plan`, first scene and last scene (after the owner committed, before the run recorded it), then resume | `COMMITTED`, no duplicates. Only the approver may resume (`NOT_THE_APPROVER`). |
+| A concurrent plan commit between proof and commit | `COMMIT_BLOCKED` at `plan`; only `canon` committed; 0 decisions |
+| Binding difference at scene 3 | `COMMIT_BLOCKED` with the exact step; prefix = `canon`, `plan` and two scenes |
+| Successor with an unchanged prefix | offered and approved → `COMMITTED` |
+| Successor changing a committed scene | `SUCCESSOR_REFUSED` naming the scene; abort → `ABORTED_PARTIAL`; the two accepted scenes stay; a second abort → `NOT_ABORTABLE` |
+| Determinism | rebuilding from the same inputs gives the same manifest digest; changing the last scene changes only its entry |
+
+### Closed review items
+
+- **Fourth-review P0-B (context identity and rebase revision):** with content-derived decision ids, `recent_accepted_refs` changes only when an earlier scene's content changes, and then `content_hash` changes too. So a rebase revision is never needed (proved by the determinism test). No compiler hash or Canon authority was changed.
+- **P0-C (successor inside a chapter):** under option A each scene is one step, and a successor may change only uncommitted steps. Every committed step's subject (the genesis delta, the plan proposal, the scene entry) must be identical, or the offer is refused.
+- **Per-transition idempotency (third-review P1-03):** proved through the owners' exact-retry paths at every step kind.
+
+### Facts
+
+- **Gate A:** `POST /gates/greenlight` appends a decision to a per-project history. No backend code reads it to gate a later step, and the frontend only lists it. The story's Gate A (brief digest) and any later video greenlight are independent history entries, so there is no `GATE_A_SCOPE_CONFLICT`. Video keeps Gates B–D unchanged.
+- **Test fixture timing:** importing the same signed grant twice in different seconds is a different event; the tests import it once per test.
+
+### Regression
+
+- M5C architecture boundary suites (unit and DB) plus `tests/integration/r2/narrative_lifecycle`, `narrative_plan`, `narrative` and `tests/unit/r2/narrative_context` → 230 passed, 7 skipped (PostgreSQL-only concurrency cases; no R2 code changed).
+- ruff, ruff format, `basedpyright --warnings` (0/0/0), `lint-imports` (23 kept), `deptry` and `audit_tests --check` are clean.

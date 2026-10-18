@@ -133,6 +133,23 @@ class Checkpoint(_Frozen):
     digest: str
 
 
+class ApprovalRecord(_Frozen):
+    """The touchpoint-2 Approve, persisted before any decision is sent so every step reuses it exactly."""
+
+    manifest_digest: str
+    actor_id: str
+    grant_event_digest: str
+    approved_at: datetime
+    accepted_exceptions: tuple[str, ...] = ()
+
+
+class CommitProgress(_Frozen):
+    offered_manifest_digest: str
+    approval: ApprovalRecord | None = None
+    completed_steps: tuple[str, ...] = ()
+    blocked_step: str | None = None
+
+
 class RunState(_Frozen):
     schema_id: str = RUN_STATE_SCHEMA
     state_version: int = Field(ge=1)
@@ -146,6 +163,7 @@ class RunState(_Frozen):
     nodes: Mapping[str, NodeHead] = Field(default_factory=dict)
     revisions: Mapping[str, RevisionRecord] = Field(default_factory=dict)
     checkpoint: Checkpoint | None = None
+    commit: CommitProgress | None = None
 
     def attempt(self, attempt_id: str) -> AttemptRecord:
         for record in self.attempts:
