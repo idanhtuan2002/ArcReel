@@ -230,6 +230,46 @@ Every donor prompt and heuristic is Chinese. `ornith:9b` is a Qwen-family model,
 
 Translation is an intentional deviation that has to be recorded in the `DonorParityContract`.
 
+### Language probe result (2026-10-18, n = 3 per case)
+
+Setup: `ornith:9b` via Ollama `/v1/chat/completions`, temperature 0.8, seeds 100–102, `max_tokens` 1500. Prompts: Novel Studio `projectIdeaPrompt`/`chapterDraftPrompt` shapes, (a) Chinese verbatim plus "write in Vietnamese" and (b) Vietnamese translation; same idea and same hand-made context pack. All 12 calls finished with `stop`.
+
+| Case | Valid JSON | Samples with CJK leakage | Leaked characters |
+|---|---|---|---|
+| zh idea | 1/3 (2 broken brackets) | 1/3 | 藏着 |
+| vi idea | 3/3 | 0/3 | — |
+| zh draft | n/a | 1/3 | 台阶 |
+| vi draft | n/a | 2/3 | 留下一, 令他 |
+
+Conclusions:
+
+- **Fact:** CJK leakage is a property of this model with both prompt languages.
+- **Inference:** a deterministic leak detector with local repair is mandatory regardless of which prompt is used.
+- **Fact:** the Vietnamese prompt is more reliable for structured JSON. Use translated prompts for structured stages.
+- **Open:** prose quality is not separable at n = 3. Both variants show 9B-typical continuity slips (e.g. "ten years since the father died" against "the father has just died"; a token glitch "bàSix"). This confirms the need for the L1/L2 audit and repair layers.
+- **Open:** a full-pipeline differential is still required.
+
+Raw output is retained at `<scratchpad>/probes/langprobe.json` (session-local, not evidence for acceptance).
+
+### Shenbi pinned pipeline run (2026-10-18)
+
+Setup: Shenbi `65ddfc26` verbatim, `uv run pipeline next` loop with automatic checkpoint approval, `ornith-32k:9b` via Ollama `/v1`, seed with Vietnamese content (`bench/shenbi-seed.md`). Stopped manually after 27 iterations (about 2 hours).
+
+| Measure | Result |
+|---|---|
+| Model dispatches | 52 |
+| Outputs quarantined by the output-integrity gate | 51 |
+| Outputs written | 1 (worldbuilding, iteration ~20) |
+| Furthest step | genesis step 1 of 16 (`shenbi-worldbuilding`), looping worldbuilding ×3 → escalation review → approve |
+| Language of written world files | Chinese (`language: zh` hard-coded; Chinese skills) |
+
+Conclusions:
+
+- **Fact:** the verbatim Shenbi pipeline cannot run end to end on a local 9B model. The dominant failure is format, not content: the model returns the requested files inside a fenced JSON object, and Shenbi's literal-path parser rejects it ("declared literal paths not in parsed output"). The escalation-review skill fails the same way.
+- **Fact:** Shenbi's output-integrity gate behaved correctly. It never let a malformed output through, so its *gate* is worth porting.
+- **Inference:** Shenbi's role stays as frozen in `R2_01` §20 — skills (planning/drafting prompts, audit dimensions) and audits — not its runner. The R2 host must own the output contract: one structured JSON response per call, validated by schema, with a bounded local repair.
+- **Parity consequence:** Shenbi end-to-end output cannot serve as the quality baseline on this model. Model-calling Shenbi surfaces are compared per surface (same prompt content, same model, same input) instead.
+
 ## Plan amendments required (step 2)
 
 1. Approve the Task0 owner-map amendment (`task_repo.py`, `ledger.py`, `budget_guard.py` and their tests) recorded in `R2_STORY_AUTHORING_QUALIFICATION.md`.
