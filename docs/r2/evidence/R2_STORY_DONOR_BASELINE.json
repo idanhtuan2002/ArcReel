@@ -1,0 +1,191 @@
+{
+  "schema_version": "r2-story-donor-baseline-v1",
+  "generated_for": "R2 V2 story authoring (amendment rev2, Change 3)",
+  "gate": "R2-DEC-031",
+  "status": "SELECTION_PROVISIONAL",
+  "note": "Pins and source hashes of the donor surfaces selected for the V2 writer pipeline. Roles follow R2_01 §20 and R1.5 §17-§19, §26-§29. Selection is provisional until the Task4 same-fixture differential (n >= 10); each selected surface then receives a DonorParityContract bound to the integrated HEAD. Research: docs/research/2026-10-18-r2-v2-story-release-research.md.",
+  "model_under_test": {
+    "runtime": "Ollama 0.32.6",
+    "model": "ornith-32k:9b (ornith:9b + PARAMETER num_ctx 32768; family qwen35, Q4_K_M)",
+    "endpoint": "/v1/chat/completions"
+  },
+  "donors": {
+    "novel_studio": {
+      "repo": "YfengJ/novel-studio-ai",
+      "revision": "9b690ae2e2f6921f9bd2782b42cef53c1662ad3b",
+      "role": "workflow shape, hierarchy, drafting/continuity prompts, acceptance gate pattern",
+      "not_taken": "SQLite memory as truth, project workflow state, acceptance-as-mutation, client.ts retry/JSON handling, json_object response format"
+    },
+    "shenbi": {
+      "repo": "shenbi (pinned fetch)",
+      "revision": "65ddfc261f4e491b07c36e548f78de36109be218",
+      "role": "short-story shape, chapter memo sections, specialist audits, output-integrity gate, packaging",
+      "not_taken": "pipeline runner and state, truth files and state-settling order, numeric 94 threshold, full drafting skill text as the drafting prompt"
+    },
+    "huohuo": {
+      "repo": "appolloqin/huohuo-drama",
+      "revision": "f104b853b3563e124d9cde25f9331d323fb483b9",
+      "role": "strict span-local repair loop, intra-chapter dedupe core",
+      "not_taken": "Prisma/DB runtime, billing, four-layer memory authority, Chinese-specific deterministic heuristics"
+    }
+  },
+  "surfaces": [
+    {
+      "id": "S01_short_story_shape",
+      "donor": "shenbi",
+      "kind": "model_prompt",
+      "source_path": "skills/shenbi-short-outline/SKILL.md",
+      "source_sha256": "ac9fea128be3cbf4a8efb27a37b014761ce6f034afaf9cdda7539db6cf71973a",
+      "taken": "three-act compression, one task per chapter, no transition chapters, mandatory ending, generate -> 6-point review -> revise",
+      "r2_destination": "server/story_authoring/prompts/outline.py + NarrativePlan content",
+      "parity_method": "same-idea differential: ending present, beat coverage, premise fidelity",
+      "intentional_deviations": ["Vietnamese translation", "object-rooted JSON schema instead of markdown file", "3-chapter scale"],
+      "evidence": "Novel Studio serial outline produced no ending in 3 chapters (run 8)"
+    },
+    {
+      "id": "S02_hierarchy_and_scene_beats",
+      "donor": "novel_studio",
+      "kind": "model_prompt",
+      "source_path": "src/lib/ai/prompts.ts",
+      "source_sha256": "e112fbc8da980b741b86c1e0880fc307cf07e82ce1e244246542a24a138ea2f4",
+      "schema_source_path": "src/lib/ai/schemas.ts",
+      "schema_source_sha256": "4881e7bc1da4a70fa9c993d73dfce007ff040dfe20853bafba8bd75ec9dee792",
+      "taken": "story bible, style bible, chapter outline and scene-beat prompt content and field sets (genre-aware subset)",
+      "r2_destination": "server/story_authoring/prompts/planning.py + Pydantic schemas in server/story_authoring/contracts.py",
+      "parity_method": "same-idea differential; schema-valid rate",
+      "intentional_deviations": ["Vietnamese translation", "long-form-only fields dropped (power_system)", "root arrays wrapped in an object (donor defect under json_object)"]
+    },
+    {
+      "id": "S03_chapter_memo_sections",
+      "donor": "shenbi",
+      "kind": "model_prompt",
+      "source_path": "skills/shenbi-chapter-planning/SKILL.md",
+      "source_sha256": "565f17433e90f524ecc3d611cb59c6b32ec53e98237d970f2f42461ad40bef23",
+      "taken": "memo sections: current task, reader expectation, withheld cards, changes required by chapter end, do-not list",
+      "r2_destination": "SceneContract fields (required turn, forbidden events, withheld knowledge) via server/story_authoring/prompts/planning.py",
+      "parity_method": "same-idea differential: reveal pacing (F35, F40)",
+      "intentional_deviations": ["Vietnamese translation", "hook ledger and golden-three-chapter rules omitted (long-form)"]
+    },
+    {
+      "id": "S04_drafting_prompt",
+      "donor": "novel_studio",
+      "kind": "model_prompt",
+      "source_path": "src/lib/ai/prompts.ts#chapterDraftPrompt",
+      "source_sha256": "e112fbc8da980b741b86c1e0880fc307cf07e82ce1e244246542a24a138ea2f4",
+      "secondary_sources": [
+        {"donor": "shenbi", "source_path": "skills/shenbi-chapter-drafting/SKILL.md", "source_sha256": "27e978b3cb1befb3cc40bd876c59c41cddd497ffeca1b4e619855547d81532c7", "taken": "short checkable craft rules: no narrator conclusions, show-don't-tell, dialogue presence"},
+        {"donor": "shenbi", "source_path": "skills/shenbi-chapter-drafting/anti-ai-reference.md", "source_sha256": "264dd9c9f22648172572fa58998983d10dc15ec4f4624afd3eb01c875fae6519", "taken": "AI-tell checklist (adapted to Vietnamese)"}
+      ],
+      "taken": "context-pack-only drafting with hard constraints (no state changes, no early climax, no forbidden knowledge, hook at end)",
+      "r2_destination": "server/story_authoring/prompts/drafting.py (scene-sized CandidateWriter)",
+      "parity_method": "same-context differential on chapter 1 scenes: length window, CJK/English leakage, repetition, dialogue, defects per 1,000 syllables",
+      "intentional_deviations": ["Vietnamese translation", "scene-sized calls instead of whole chapter", "think:false"],
+      "evidence": "chapter 1: Novel Studio stable; Shenbi full skill produced a x12 degenerate loop and leaked sidecar JSON"
+    },
+    {
+      "id": "S05_continuity_review",
+      "donor": "novel_studio",
+      "kind": "model_prompt",
+      "source_path": "src/lib/ai/checkContinuity.ts",
+      "source_sha256": "b8a6ccf57fcb703939fa3dcdffcae1d8207775f70690f20869297ca7d9ca70e4",
+      "taken": "continuity prompt merged with hardRules (hardRules already ported in M5C: r2/narrative_lifecycle/continuity_rules.py); block on high/critical",
+      "r2_destination": "server/story_authoring/audits.py (L2)",
+      "parity_method": "finding precision/recall on seeded-defect fixtures",
+      "intentional_deviations": ["Vietnamese translation", "every finding must quote an exact span (F61)"],
+      "evidence": "caught the real timeline conflict and the CJK leak in run 7/8"
+    },
+    {
+      "id": "S06_specialist_audits",
+      "donor": "shenbi",
+      "kind": "model_prompt",
+      "source_paths": {
+        "skills/shenbi-review-memo-compliance/SKILL.md": "9b10c7f398e5701072899ad123f1017d1d6f09f575f9b99e7e55c6856404152c",
+        "skills/shenbi-review-character/SKILL.md": "6b1d9fe3659c91264b32310e59aa7f81359accb4cc324d58b332a507a3e4772d",
+        "skills/shenbi-review-motivation/SKILL.md": "a50191303994841324ccc8e80c73d2880c355148863e5679bbbaf8a4a7ae2098",
+        "skills/shenbi-review-dialogue/SKILL.md": "95dc1b27d765b70f064267dcd7ab1036f3c9790f5fad894aaaecd550d01eaf5b",
+        "skills/shenbi-review-pov/SKILL.md": "7d653958596e71d755d0f8c866267cd20de3849d51ee25abea2c67b29a254673",
+        "skills/shenbi-review-pacing/SKILL.md": "278c4a4288949f00135213ea371f33a5edf50fa6a579d8e68b8d71d01a7d4ae9",
+        "skills/shenbi-review-texture/SKILL.md": "d9e38afd5ff0b17c7170b1f1798e5eeba83f0dda54dafddecdbfeb9e42ec5012",
+        "skills/shenbi-review-reader-pull/SKILL.md": "aacacbe6deb332cecb3c9d0b5caa3e4268372a922b0f44ea7c799df6c1ecd2fc",
+        "skills/shenbi-review-resonance/SKILL.md": "1b73724d75a018000b21c4bb472281edc52242b7ee965cb6719fe7f02c04d240",
+        "skills/shenbi-review-arc-payoff/SKILL.md": "170f867c07a56b49bd1be8421cec065bd69d02507200f0622813f7adb0847832",
+        "skills/shenbi-review-anti-ai/SKILL.md": "5f1f704fe3a2cbbbf76fc2457500f5724d29ebba07eed07455d490ea283e1f68",
+        "skills/shenbi-review-continuity/SKILL.md": "edca56ef699ccad8a9491e4d05f6f6573f0872b1f7d9edbb6ca217277f984de3"
+      },
+      "taken": "specialist dimensions and their checklists; independent-evaluator rule; short-story audit chain (memo-compliance, anti-ai, character, motivation)",
+      "r2_destination": "server/story_authoring/audits.py (L2 specialists, L3 critic)",
+      "parity_method": "finding precision/recall on seeded-defect fixtures; one dimension per call",
+      "intentional_deviations": ["Vietnamese translation and Vietnamese fatigue list", "findings quote exact spans", "numeric scores diagnostic only (R1.5 §19)"]
+    },
+    {
+      "id": "S07_span_local_repair",
+      "donor": "huohuo",
+      "kind": "deterministic_plus_model_prompt",
+      "source_path": "workbench-server/src/services/novel/novel-continuity-patch.ts",
+      "source_sha256": "4311e814dac0cfc0b12c5cc2f2550b92b9566a9adf0c8898d3f57e3b41e365b2",
+      "selected_exports": ["applyContinuityPatches", "buildConflictExcerptBlock", "PATCH_SYSTEM (prompt)", "length-ratio guard 0.85-1.15"],
+      "taken": "before/after span patches copied verbatim from the text, everything else unchanged, deterministic fixes first, attempt history, length-ratio rejection",
+      "r2_destination": "server/story_authoring/repair.py",
+      "parity_method": "exact-source Node runner on shared fixtures for applyContinuityPatches; prompt via seeded-defect differential",
+      "intentional_deviations": ["buildConflictExcerptBlock word extraction uses Unicode letters instead of [\\u4e00-\\u9fa5a-zA-Z0-9], which drops Vietnamese diacritic letters (IMPROVED, regression fixture)", "Vietnamese translation of PATCH_SYSTEM", "cultivation-genre rules (realm/injury) removed"],
+      "evidence": "Novel Studio whole-chapter style revision changed 1,397 -> 1,396 syllables, introduced a CJK leak and did not converge on chapter 3"
+    },
+    {
+      "id": "S08_intra_chapter_dedupe",
+      "donor": "huohuo",
+      "kind": "deterministic",
+      "source_path": "workbench-server/src/services/novel/novel-intra-chapter-dedupe.ts",
+      "source_sha256": "2a633d79e0b79620624340067ddb4ec4c4db41aa3d348ffba5f4999887eff393",
+      "taken": "normalized-fingerprint paragraph dedupe core only",
+      "r2_destination": "server/story_authoring/checks.py (F50)",
+      "parity_method": "exact-source Node runner on shared fixtures for the selected core",
+      "intentional_deviations": ["Chinese punctuation/lexicon normalization replaced by Vietnamese normalization"],
+      "evidence": "Shenbi seed 2 repeated one 3-sentence block x12"
+    },
+    {
+      "id": "S09_output_integrity_gate",
+      "donor": "shenbi",
+      "kind": "deterministic",
+      "source_path": "src/shenbi/pipeline/llm_output_integrity.py",
+      "source_sha256": "5da15c24e2ae4ecdfc197374fa85d21825f1d64a618c9b1c189043b03f296b15",
+      "taken": "never persist an output that fails its declared contract; quarantine with reason",
+      "r2_destination": "server/story_authoring/generation.py (step contract)",
+      "parity_method": "behavioural fixtures: malformed output is never persisted",
+      "intentional_deviations": ["literal-path markdown contract replaced by object-rooted JSON schema with grammar-constrained decoding (IMPROVED: 51/52 Shenbi quarantines vs 16/16 schema-valid in probe)"]
+    },
+    {
+      "id": "S10_length_normalizing",
+      "donor": "shenbi",
+      "kind": "model_prompt",
+      "source_path": "skills/shenbi-length-normalizing/SKILL.md",
+      "source_sha256": "7b9ee8af574b153b66dbca8d6f09104b57b316afff9a5a7836b194ae5d7130ce",
+      "taken": "targeted expansion/compression to a length window",
+      "r2_destination": "server/story_authoring/repair.py",
+      "parity_method": "length-window hit rate and defect delta",
+      "intentional_deviations": ["Vietnamese translation", "scene-level"],
+      "evidence": "all drafts under length (F41)"
+    },
+    {
+      "id": "S11_packaging",
+      "donor": "shenbi",
+      "kind": "model_prompt",
+      "source_path": "skills/shenbi-short-packaging/SKILL.md",
+      "source_sha256": "f4cb77e024be7bcac23a4b82817812e5b015948d4860699b577a3f7f1c8b2efb",
+      "taken": "title, blurb, commercial readiness",
+      "r2_destination": "server/story_authoring/prompts/packaging.py",
+      "parity_method": "same-manuscript differential",
+      "intentional_deviations": ["Vietnamese translation", "platform-specific Chinese sales channels removed"]
+    }
+  ],
+  "already_integrated": [
+    {"donor": "novel_studio", "source_path": "src/lib/continuity/hardRules.ts", "r2_port": "r2/narrative_lifecycle/continuity_rules.py", "baseline": "docs/r2/evidence/R2_M5C_DONOR_BASELINE.json"},
+    {"donor": "huohuo", "source_path": "workbench-server/src/common/novel/novel-change-record.ts", "r2_port": "r2/narrative_lifecycle/changeset_parser.py", "baseline": "docs/r2/evidence/R2_M5C_DONOR_BASELINE.json"},
+    {"donor": "novel_studio", "source_path": "src/lib/context/contextPack.ts (concept)", "r2_port": "r2/narrative_context/compiler.py", "baseline": "M5B research"}
+  ],
+  "rejected": [
+    {"surface": "Shenbi pipeline runner (genesis/chapter_loop)", "reason": "51/52 outputs quarantined on ornith-32k:9b; truth-file authority conflicts with Candidate != Canon"},
+    {"surface": "Novel Studio client.ts structuredJsonCompletion", "reason": "blind retry without validation feedback; json_object with root-array schemas (defect)"},
+    {"surface": "Shenbi chapter-drafting full skill as drafting prompt", "reason": "degenerate loop and meta leakage on 9B; craft rules taken instead"},
+    {"surface": "Novel Studio whole-chapter styleRevision as repair", "reason": "no measurable change, introduced CJK, no convergence"}
+  ]
+}
