@@ -1,0 +1,1 @@
+Minimal `/api/chat` responses captured from Ollama 0.32.6 serving `ornith-32k:9b` on 2026-10-18 (request bodies used `stream:false`, `think:false`, `truncate:false`, `shift:false`). `status` is the HTTP status; `body` is the exact response text. Source: local server, see docs/research/2026-10-18-r2-v2-story-release-research.md.

@@ -32,6 +32,7 @@ _ENDPOINT_BACKEND_CLASSES = (
     "KlingImageBackend",
     "KlingVideoBackend",
     "MiniMaxImageBackend",
+    "OllamaChatTextBackend",
     "OpenAIAudioBackend",
     "OpenAIImageBackend",
     "OpenAITextBackend",
@@ -84,6 +85,17 @@ class TestEndpointDispatch:
         assert built == {
             "backend": "OpenAITextBackend",
             "kwargs": {"api_key": "sk-test", "base_url": "https://api.example.com/v1", "model": "gpt-4o"},
+        }
+
+    def test_ollama_chat(self):
+        # 原样传 base_url：/v1 兼容后缀由 backend 自己去掉，不补版本路径
+        provider = _make_provider(base_url="http://localhost:11434/v1", api_key="")
+        result, built = _built(provider, "ornith-32k:9b", "ollama-chat")
+        assert isinstance(result, CustomTextBackend)
+        assert result.model == "ornith-32k:9b"
+        assert built == {
+            "backend": "OllamaChatTextBackend",
+            "kwargs": {"base_url": "http://localhost:11434/v1", "api_key": None, "model": "ornith-32k:9b"},
         }
 
     def test_gemini_generate(self):

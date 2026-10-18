@@ -55,6 +55,7 @@ from lib.image_backends.kling import KlingImageBackend
 from lib.image_backends.minimax import MiniMaxImageBackend
 from lib.image_backends.openai import OpenAIImageBackend
 from lib.text_backends.gemini import GeminiTextBackend
+from lib.text_backends.ollama import OLLAMA_CHAT_PATH, OllamaChatTextBackend
 from lib.text_backends.openai import OpenAITextBackend
 from lib.video_backends.ark import ArkVideoBackend
 from lib.video_backends.base import ReferenceAudioMode, VideoCapabilities
@@ -221,6 +222,11 @@ def _build_openai_chat(provider, model_id: str) -> CustomTextBackend:
     return CustomTextBackend(provider_id=provider.provider_id, delegate=delegate, model=model_id)
 
 
+def _build_ollama_chat(provider, model_id: str) -> CustomTextBackend:
+    delegate = OllamaChatTextBackend(base_url=provider.base_url, api_key=provider.api_key or None, model=model_id)
+    return CustomTextBackend(provider_id=provider.provider_id, delegate=delegate, model=model_id)
+
+
 def _build_gemini_generate(provider, model_id: str) -> CustomTextBackend:
     base_url = ensure_google_base_url(provider.base_url) or None
     delegate = GeminiTextBackend(api_key=provider.api_key, base_url=base_url, model=model_id)
@@ -352,6 +358,15 @@ ENDPOINT_REGISTRY: dict[str, EndpointSpec] = {
         request_method="POST",
         request_path_template="/v1/chat/completions",
         build_backend=_build_openai_chat,
+    ),
+    "ollama-chat": EndpointSpec(
+        key="ollama-chat",
+        media_type="text",
+        family="ollama",
+        display_name_key="endpoint_ollama_chat_display",
+        request_method="POST",
+        request_path_template=OLLAMA_CHAT_PATH,
+        build_backend=_build_ollama_chat,
     ),
     "gemini-generate": EndpointSpec(
         key="gemini-generate",

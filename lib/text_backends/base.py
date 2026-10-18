@@ -224,6 +224,8 @@ class TextGenerationResult:
     model: str
     input_tokens: int | None = None
     output_tokens: int | None = None
+    # 供应商原样返回的终止原因（如 stop / length）；未提供该信息的后端保持 None。
+    finish_reason: str | None = None
 
 
 def merge_billed_tokens(kept: int | None, discarded: int | None) -> int | None:

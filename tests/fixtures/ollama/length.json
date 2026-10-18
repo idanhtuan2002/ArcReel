@@ -1,0 +1,4 @@
+{
+ "status": 200,
+ "body": "{\"model\":\"ornith-32k:9b\",\"created_at\":\"2026-10-18T12:25:57.923018917Z\",\"message\":{\"role\":\"assistant\",\"content\":\"Mưa dường như là nguồn cảm hứng\"},\"done\":true,\"done_reason\":\"length\",\"total_duration\":542446816,\"load_duration\":261157394,\"prompt_eval_count\":35,\"prompt_eval_duration\":85467000,\"eval_count\":8,\"eval_duration\":151587000}"
+}

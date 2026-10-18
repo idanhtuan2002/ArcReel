@@ -20,6 +20,7 @@ class TestRegistry:
     def test_endpoint_count(self):
         assert set(ENDPOINT_REGISTRY.keys()) == {
             "openai-chat",
+            "ollama-chat",
             "gemini-generate",
             "openai-images",
             "openai-images-generations",
@@ -46,7 +47,18 @@ class TestRegistry:
         for key, spec in ENDPOINT_REGISTRY.items():
             assert spec.key == key
             assert spec.media_type in {"text", "image", "video", "audio"}
-            assert spec.family in {"openai", "google", "newapi", "v2", "ark", "vidu", "dashscope", "minimax", "kling"}
+            assert spec.family in {
+                "openai",
+                "ollama",
+                "google",
+                "newapi",
+                "v2",
+                "ark",
+                "vidu",
+                "dashscope",
+                "minimax",
+                "kling",
+            }
             # 注册表里的都是内置端点，来源恒为 builtin；用户端点不进注册表，由 ce- 键现构造。
             assert spec.source == "builtin"
             # 显示名两种来源恰有其一：Python 内置走 i18n key，声明式端点走定义里的 meta.name。
@@ -230,7 +242,7 @@ class TestRegistry:
         video_keys = {s.key for s in ENDPOINT_REGISTRY.values() if s.media_type == "video"}
         audio_keys = {s.key for s in ENDPOINT_REGISTRY.values() if s.media_type == "audio"}
         assert audio_keys == {"openai-tts"}
-        assert text_keys == {"openai-chat", "gemini-generate"}
+        assert text_keys == {"openai-chat", "ollama-chat", "gemini-generate"}
         assert image_keys == {
             "openai-images",
             "openai-images-generations",
@@ -274,7 +286,7 @@ class TestHelpers:
 
     def test_list_endpoints_by_media_type(self):
         text = list_endpoints_by_media_type("text")
-        assert {s.key for s in text} == {"openai-chat", "gemini-generate"}
+        assert {s.key for s in text} == {"openai-chat", "ollama-chat", "gemini-generate"}
 
     @pytest.mark.parametrize(
         ("definition", "required"),

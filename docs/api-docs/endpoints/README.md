@@ -15,6 +15,7 @@
 - [minimax-image](minimax-image.md)
 - [minimax-s2v-01](minimax-s2v-01.md)
 - [newapi-video](newapi-video.md)
+- [ollama-chat](ollama-chat.md)
 - [openai-chat](openai-chat.md)
 - [openai-images](openai-images.md)
 - [openai-images-edits](openai-images-edits.md)

@@ -1,0 +1,4 @@
+{
+ "status": 200,
+ "body": "{\"model\":\"ornith-32k:9b\",\"created_at\":\"2026-10-18T12:25:59.235095706Z\",\"message\":{\"role\":\"assistant\",\"content\":\"{\\n  \\\"text\\\": \\\"Mưa như những hạt ngọc rơi xuống, rửa trôi cả bầu trời u ám.\\\"\\n}\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":912176389,\"load_duration\":266175338,\"prompt_eval_count\":38,\"prompt_eval_duration\":90314000,\"eval_count\":27,\"eval_duration\":554393000}"
+}

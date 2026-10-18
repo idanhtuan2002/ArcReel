@@ -1,0 +1,4 @@
+{
+ "status": 200,
+ "body": "{\"model\":\"ornith-32k:9b\",\"created_at\":\"2026-10-18T12:25:57.379817614Z\",\"message\":{\"role\":\"assistant\",\"content\":\"Bọn trẻ thơ chạy ra sân nhảy lên những vũng nước trong veo, reo vui giữa cơn mưa rào mùa hạ vừa tạnh.\"},\"done\":true,\"done_reason\":\"stop\",\"total_duration\":4209706387,\"load_duration\":3468437606,\"prompt_eval_count\":32,\"prompt_eval_duration\":120121000,\"eval_count\":30,\"eval_duration\":620063000}"
+}

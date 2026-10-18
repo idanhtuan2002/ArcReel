@@ -1101,6 +1101,7 @@ export default {
   'endpoint_video_group': '视频',
   'endpoint_audio_group': '语音',
   'endpoint_openai_chat_display': 'OpenAI 文本',
+  'endpoint_ollama_chat_display': 'Ollama 原生对话',
   'endpoint_gemini_generate_display': 'Gemini 文本',
   'endpoint_openai_images_display': 'OpenAI 图片',
   'endpoint_openai_images_generations_display': 'OpenAI 图片（仅文生图）',
