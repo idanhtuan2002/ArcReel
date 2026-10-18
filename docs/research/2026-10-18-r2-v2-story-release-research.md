@@ -460,3 +460,31 @@ Facts, Ollama 0.32.6, `ornith-32k:9b`, `think: false`:
 | Scene 1 | grammar | 5 | 0 | 0 | 43–45 |
 
 Inference: grammar exclusion removes CJK leakage at no speed cost. Unknown: its effect on prose quality and length at scale; Task1 repeats this at n ≥ 20 with the scene rubric.
+
+## Addendum — provider contract probes (2026-10-18, revision 4 basis)
+
+Facts, Ollama 0.32.6, `ornith-32k:9b`:
+
+| Probe | Result |
+|---|---|
+| `/api/chat`, `"truncate": false`, prompt 260,000 bytes | HTTP 400 `exceed_context_size_error`: "request (56071 tokens) exceeds the available context size (32768 tokens)", returned in 0.4 s |
+| Same prompt without `truncate` | 200; `prompt_eval_count` 16,386 (silent cut to about half the context) |
+| `/v1/chat/completions` with `"truncate": false` | 200; `prompt_tokens` 16,386. The field is ignored and the cut is silent. |
+| `/v1` `response_format` `json_schema` with a no-CJK `pattern`, adversarial prompt, n = 5 | 0 CJK, all `stop`. The model substituted English ("Suddenly") in 3/5. |
+| `/api/chat` `format` with the pattern plus `truncate: false` plus `options.num_ctx` | Works; `stop` |
+| `num_predict` 20 on a 300-word request | `done_reason: "length"` |
+| No system message, "who are you?" | "Tôi là Ornith – trợ lý lập trình mở nguồn…" — the Modelfile `SYSTEM` (agentic coding assistant) applies |
+| Explicit system message | It overrides the Modelfile `SYSTEM` |
+
+Repository facts:
+- `lib/text_backends/openai.py` `_generate_native` carries `@with_retry_async(max_attempts=4)`.
+- `generate` falls back to `_instructor_fallback` on a schema error or a non-compliant 200.
+- There is no Ollama-native text backend or endpoint in `lib/custom_provider/endpoints.py`.
+- `NarrativePlanService.commit_revision` resolves exact retries by `plan_revision_id`; `admit_canon_handoff` resolves admission retries before currentness.
+- Gate A (`GreenlightRequest`) binds one `source_digest`.
+
+Inferences, adopted in plan revision 4:
+- Use the native API with `truncate: false` for a fail-closed input guarantee.
+- Send an explicit system message on every call.
+- Use no hidden retries or fallbacks on story calls.
+- Keep the F25 English code-mixing detector, since the grammar shifts leakage from CJK to English.
