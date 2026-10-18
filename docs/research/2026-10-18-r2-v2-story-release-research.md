@@ -488,3 +488,16 @@ Inferences, adopted in plan revision 4:
 - Send an explicit system message on every call.
 - Use no hidden retries or fallbacks on story calls.
 - Keep the F25 English code-mixing detector, since the grammar shifts leakage from CJK to English.
+
+## Addendum — revision 5 probes (2026-10-18)
+
+Facts, Ollama 0.32.6, `ornith-32k:9b`, `/api/chat`, `truncate: false`:
+
+- **Cache does not change the reported count.** The same 5,289-character prompt sent 3 times reports `prompt_eval_count` 1,478 each time; `prompt_eval_duration` falls from 1.33 s to 0.07 s. A prompt sharing that prefix plus 2 tokens reports 1,483 (0.52 s). This corrects revision 4, which assumed a cache hit could lower the count.
+- **Generation at the context end.** With `num_ctx` 256 on `ornith:9b` (prompt 39 tokens, `num_predict` 600), the response has `done: true`, `done_reason: "length"` and `eval_count` 217, both with `shift` absent and with `shift: false`. No silent context shift was observed. Whether 0.32.6 parses `shift` is unknown, because Go's JSON decoding ignores unknown fields.
+- **Worktree check.** Repository root `/home/anhtuan/content-production-os`, commit `dbaf93a6`, 2026-10-18T18:50+07:00.
+  - `git worktree list --porcelain`: 24 worktrees, none named `*native*`.
+  - `find / -maxdepth 5 -iname '*native-narrative*'`: none.
+  - `/home/anhtuan/ArcReel`: one worktree (`main`).
+
+Inference: a `num_predict: 1` probe of the exact request gives the server's exact input count, and the following real call reuses the cache. The count is therefore an exact pre-dispatch input count, which revision 5 adopts.
