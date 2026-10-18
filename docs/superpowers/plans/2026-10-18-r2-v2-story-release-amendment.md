@@ -489,4 +489,4 @@ Criteria:
 
 Main agent, inline and serial: Task0 → Task1 → Task2 → Task3 (hard gate) → Task4 → Task5 → Task6 → Task7.
 
-On conditional approval, only Task0–Task3 are open. Task4 opens only after Task3 passes with P0-B and P0-C closed on PostgreSQL with the real Showrunner authority adapter, and after the Human opens it. A contract that cannot be proven fails closed. There is no manual exception for hard integrity. One progress report per task gate; one final independent review (Codex) and at most one repair.
+Human decision 2026-10-18 after Task3 passed (`946967cd`): "đồng ý mở Task4, tiếp tục" (agree to open Task4, continue). **Task4 is open.** Before that, on conditional approval, only Task0–Task3 were open. Task4 opens only after Task3 passes with P0-B and P0-C closed on PostgreSQL with the real Showrunner authority adapter, and after the Human opens it. A contract that cannot be proven fails closed. There is no manual exception for hard integrity. One progress report per task gate; one final independent review (Codex) and at most one repair.
