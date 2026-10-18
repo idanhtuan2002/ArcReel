@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -82,13 +83,33 @@ def test_hits_report_positions_and_characters():
     assert [(hit.index, hit.char) for hit in hits] == [(7, "突"), (8, "然"), (18, "。")]
 
 
-def test_the_grammar_pattern_rejects_bmp_cjk_and_accepts_vietnamese():
-    pattern = re.compile(no_cjk_pattern().encode("utf-8").decode("unicode_escape"))
-    assert pattern.match(VIETNAMESE)
-    assert not pattern.match("Mưa 突然 rơi")
-    assert not pattern.match("Mưa rơi。")
+def _raw_json_content(text: str) -> str:
+    """The characters a grammar engine sees between the quotes of a JSON string."""
+    return json.dumps(text, ensure_ascii=False)[1:-1]
 
 
-def test_the_default_grammar_pattern_is_bmp_only():
-    assert all(ord(ch) <= 0xFFFF for ch in no_cjk_pattern())
-    assert any(ord(ch) > 0xFFFF for ch in no_cjk_pattern(include_astral=True))
+def test_the_grammar_pattern_admits_vietnamese_json_string_content():
+    pattern = re.compile(no_cjk_pattern())
+    assert pattern.match(_raw_json_content(VIETNAMESE + '\n\n“Anh đi đâu?” — "Về nhà"\t/ \\'))
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        _raw_json_content("Mưa 突然 rơi"),
+        _raw_json_content("Mưa rơi。"),
+        _raw_json_content("Chữ 𠀀 lạ"),
+        _raw_json_content("Hangul 한"),
+        'Minh nói "xong',  # an unescaped quote would end the string early
+        "dòng một\ndòng hai",  # a raw newline is not valid inside a JSON string
+        "\\u7a81",  # a unicode escape could spell CJK
+        "lẻ \\",  # a dangling backslash
+    ],
+)
+def test_the_grammar_pattern_rejects_cjk_and_raw_json_breakers(raw):
+    assert not re.compile(no_cjk_pattern()).match(raw)
+
+
+def test_astral_ranges_can_be_dropped_for_engines_that_reject_them():
+    assert any(ord(ch) > 0xFFFF for ch in no_cjk_pattern())
+    assert all(ord(ch) <= 0xFFFF for ch in no_cjk_pattern(include_astral=False))

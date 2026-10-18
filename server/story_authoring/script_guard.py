@@ -58,19 +58,20 @@ def has_cjk(text: str) -> bool:
     return any(is_cjk(char) for char in text)
 
 
-def no_cjk_pattern(*, include_astral: bool = False) -> str:
-    """A JSON-schema ``pattern`` that matches strings without any CJK code point.
+def no_cjk_pattern(*, include_astral: bool = True) -> str:
+    """A JSON-schema ``pattern`` for grammar-constrained JSON strings that cannot carry CJK.
 
-    Only BMP ranges are written by default: the grammar engine's support for astral escapes is a
-    provider-qualification question. The detector always covers every range regardless.
+    Ollama applies a string ``pattern`` to the raw characters between the quotes, replacing the default
+    JSON-string grammar. The pattern therefore also excludes ``"``, ``\\`` and control characters, and admits
+    only the short JSON escapes; ``\\u`` escapes are excluded so that no CJK can be spelled as an escape.
+    ``include_astral=False`` drops the supplementary-plane ranges, for grammar engines that reject them.
     """
     parts = []
     for start, end in CJK_RANGES:
         if start > _BMP_END and not include_astral:
             continue
-        end = min(end, _BMP_END) if not include_astral else end
         parts.append(_escape(start) if start == end else f"{_escape(start)}-{_escape(end)}")
-    return "^[^" + "".join(parts) + "]*$"
+    return '^([^"\\\\\\u0000-\\u001f' + "".join(parts) + ']|\\\\["\\\\/bfnrt])*$'
 
 
 def _escape(code: int) -> str:

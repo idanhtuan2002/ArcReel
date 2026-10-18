@@ -276,18 +276,18 @@ class AuthoringTextGateway:
     def _judge(
         self, request: StoryStepRequest, response: OllamaChatResponse, counted: int
     ) -> tuple[StoryFailureCode | None, str, str]:
-        if not response.done:
-            return StoryFailureCode.OUTPUT_INVALID, "response not done", ""
-        if response.done_reason == "length":
-            return StoryFailureCode.OUTPUT_TRUNCATED, f"output stopped at {response.eval_count} tokens", ""
-        if response.done_reason != "stop":
-            return StoryFailureCode.OUTPUT_INVALID, f"done_reason {response.done_reason!r}", ""
         if response.prompt_eval_count != counted:
             return (
                 StoryFailureCode.COUNT_MISMATCH,
                 f"generation reported {response.prompt_eval_count} input tokens, count probe {counted}",
                 "",
             )
+        if not response.done:
+            return StoryFailureCode.OUTPUT_INVALID, "response not done", ""
+        if response.done_reason == "length":
+            return StoryFailureCode.OUTPUT_TRUNCATED, f"output stopped at {response.eval_count} tokens", ""
+        if response.done_reason != "stop":
+            return StoryFailureCode.OUTPUT_INVALID, f"done_reason {response.done_reason!r}", ""
         hits = find_cjk(response.content)
         if hits:
             sample = "".join(hit.char for hit in hits[:10])
