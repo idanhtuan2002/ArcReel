@@ -1,161 +1,327 @@
 # R2 V2 story release — amendment to the idea-to-story plan
 
-Status: DRAFT_FOR_HUMAN_REVIEW, revision 3. Supersedes revision 2 (`04f2e2af`), which superseded revision 1 (`e833e27a`). Revision 3 answers the nine review points of 2026-10-18 (touchpoint definition, dependency graph, binding-proof bound, token counter, CJK ladder, LOCAL ledger, probe vs acceptance run, resume checkpoint, discard). Amends `docs/superpowers/plans/2026-10-17-r2-idea-to-story-authoring.md` (approved 2026-10-17). Everything in that plan stays in force unless this document changes it. Research basis: `docs/research/2026-10-18-r2-v2-story-release-research.md` (addenda through `12945df3`).
+Status: DRAFT_FOR_HUMAN_REVIEW, revision 4. Supersedes revision 3 (`92d7eef9`), revision 2 (`04f2e2af`) and revision 1 (`e833e27a`). Amends `docs/superpowers/plans/2026-10-17-r2-idea-to-story-authoring.md` (approved 2026-10-17); everything in that plan stays in force unless this document changes it.
+
+Research basis: `docs/research/2026-10-18-r2-v2-story-release-research.md`, through the addendum "provider contract probes" (revision 4). Revision 4 answers the second review of 2026-10-18 (P0-01…05, P1-01…10, P2) in this order: data model, governance commit protocol, provider qualification, durable execution, acceptance and release. The overall architecture, scope, owners, donors, the two touchpoints, the six stages and the task order are unchanged.
 
 **Goal:** Release V2 = V1 + an automated idea → complete Vietnamese short story flow. The output is an exported manuscript that can also continue into the existing video flow. Run on local Ollama first, then take it to real operation.
 
 ## Decisions recorded (sponsor, 2026-10-18)
 
-- Base: `r2-v2/main` `23cf146a` lineage, worked on `design/r2-story-authoring`. M9 is excluded.
-- Integrate existing owners only. Glue code is authorized; no redesign and no change to accepted ADRs.
-- Model: `ornith:9b` on local Ollama through the existing custom provider `openai_chat` endpoint. Claude and OpenAI stay fixture-qualified only until they are configured.
-- Story: one Vietnamese short story, three chapters, visible ending, with explicit limits. Long-form is out of scope (ADR-0089 §8).
-- Quality: commercial grade. Defects attributable only to the local model's limits are accepted and recorded as such.
-- Donor rule (R2-DEC-031, sponsor rule 2026-09-09): every donor-derived surface is at least equal to its donor on the same fixture (`DonorParityContract`, rows `PARITY` or `IMPROVED`).
-- Human touchpoints. A **touchpoint** is a Human action that the happy path cannot pass without. Only touchpoints are counted.
-  - **Story: 2.** (1) enter and approve the idea (Gate A); (2) receive and approve the final manuscript. Automatic idea entry and approval may replace (1) later; that change is not part of V2.
+- Base: `r2-v2/main` `23cf146a` lineage. Design work happens on `design/r2-story-authoring`; the release branch carries only story-authoring commits (§ Release). M9 is excluded.
+- Integrate existing owners only. Glue code is authorized; no redesign and no change to accepted ADRs. The one new provider surface (the `ollama-chat` endpoint, Change P) is listed for this approval.
+- Model: `ornith:9b` on local Ollama. Claude and OpenAI stay fixture-qualified only until they are configured.
+- Story: one Vietnamese short story, three chapters, visible ending, size envelope in § Size and budget. Long-form is out of scope (ADR-0089 §8).
+- Three separate acceptance classes; none of them can excuse another:
+  1. **Invariants** (zero CJK, zero truncated input or output, binding equality, complete structure). They always block. They can never be labelled "local-model limit".
+  2. **Donor parity** (R2-DEC-031, sponsor rule 2026-09-09). Hard gate: every donor-derived surface is `PARITY` or `IMPROVED` on the same fixture. An exception exists only as an explicit sponsor decision recorded in the parity contract row.
+  3. **Model quality.** Severity policy in Change G. Only the stylistic class may stay open as "local-model limit", and only with Human acceptance at touchpoint 2.
+- Human touchpoints. A **touchpoint** is a Human action that the happy path cannot pass without; only touchpoints are counted.
+  - **Story: 2.** (1) enter and approve the story brief (Gate A); (2) approve the final manuscript. Automatic brief entry and approval may replace (1) later; that change is not part of V2.
   - **Video: 3**, unchanged — Gates B, C and D.
-  - **Not counted:** revision requests and discard (Change 4 §5, §7). They are optional; the run never waits for them and never asks for them. A run that reaches touchpoint 2 with zero optional actions is the acceptance case.
-  - Everything else runs without a human.
+  - **Optional, not counted:** revision requests, discard, withdraw, and a Gate A re-approval caused by a Human edit of the brief. The run never waits for them and never asks for them. The clean acceptance run has zero optional actions.
 
-## Change 1 — close Task0 with the recorded owner-map amendment
+## Change 0 — Task0 closes with owner map, schema sufficiency and lineage proof
 
-Unchanged from revision 1. Add to the owned file map the paths that `R2_STORY_AUTHORING_QUALIFICATION.md` proposes:
+1. Owner-map additions (from `R2_STORY_AUTHORING_QUALIFICATION.md`), unchanged from revision 1:
+   - `lib/db/repositories/task_repo.py`: a dedicated guarded text-task checkpoint transition. Video checkpoint methods and guards stay unchanged.
+   - `lib/ledger.py`: optional explicit input/output token quantities passed into the existing `PricingParams`. Existing callers keep their defaults.
+   - `lib/budget_guard.py`: enforce an explicitly authorized authoring run/step ceiling in every release mode. Legacy DEV behaviour stays unchanged. Missing pricing refuses a paid call; currency `LOCAL` enforces call/token ceilings.
+   - Tests: `tests/integration/lib/db/repositories/test_task_repo.py`, `test_task_command_idempotency.py`, `tests/integration/lib/test_budget_guard.py`, `tests/unit/lib/test_ledger.py`, `tests/unit/lib/test_text_generator.py`.
+2. **Schema sufficiency, proven, not declared.** Task0 maps every record this amendment needs to an existing table and column: proposal revisions, revision intents, attempt ledger, checkpoint, run budget, `ManuscriptCommitManifest`, quality record, export record. Each mapping is tested by a round-trip in an integration test. If any record has no home, Task0 stops with `SCHEMA_GAP` naming the record, and the Human decides on a migration. No migration is assumed either way.
+3. **Lineage proof.** Facts checked 2026-10-18:
+   - `r2-v2/main` and `r2-v1.0.0` are ancestors of `design/r2-story-authoring`.
+   - The 31 commits between them are documents, plus M9 design-verifier scripts and their tests (`scripts/r2/verify_m9_*`, 5 files). There is no runtime M9 code.
+   - No branch, ref, worktree or commit message named "Web Writer" or `r2-v2-native-narrative` exists in this repository.
 
-- `lib/db/repositories/task_repo.py`: a dedicated guarded text-task checkpoint transition. Video checkpoint methods and guards stay unchanged.
-- `lib/ledger.py`: optional explicit input/output token quantities passed into the existing `PricingParams`. Existing callers keep their defaults.
-- `lib/budget_guard.py`: enforce an explicitly authorized authoring run/step ceiling in every release mode. Legacy DEV behaviour stays unchanged. Missing pricing refuses a paid call; a local provider still enforces token/call ceilings.
-- Tests: `tests/integration/lib/db/repositories/test_task_repo.py`, `tests/integration/lib/db/repositories/test_task_command_idempotency.py`, `tests/integration/lib/test_budget_guard.py`, `tests/unit/lib/test_ledger.py`, `tests/unit/lib/test_text_generator.py`.
+   Task0 records this as evidence. At release the branch `release/r2-v2-story` is built from `r2-v2/main` with only the story-authoring commits, so neither M9 files nor any rolled-back code can enter V2. The pre-merge check is in § Release.
 
-No new table, migration, governance authority, frozen R2 contract or capability-profile change.
+## Change D — data model: inputs, generated nodes, revision intents (P0-01, P1-05, P1-08)
 
-## Change 2 — Ollama is the first live provider, with guards
+Three kinds of object, never mixed:
 
-Facts from the research: Ollama silently truncates input above the server context (prompt cut to about 4,098 tokens at `OLLAMA_CONTEXT_LENGTH=8192`); the model leaks CJK characters with both Chinese and Vietnamese prompts; and both donors failed end to end on this model because of structured-output format, not content.
+| Kind | Nodes | Who creates a revision |
+|---|---|---|
+| **Brief** (authoritative, Gate A) | `brief` = idea, genre, language, limits, model selection, scope | Human only |
+| **Generated nodes** | Planning: `seed`, `story_bible`, `style_bible`, `outline`, `scene_contract[c,s]`. Prose: `scene_draft[c,s]`. Checks: `chapter_review[c]`, `manuscript_review`. Output: `packaging` | The run (model call or deterministic step) |
+| **Revision intents** | `intent` (target node, Human note, Human principal, created_at) | Human only |
 
-- Task1 qualifies the custom provider `openai_chat` backend against Ollama `/v1/chat/completions`: exact request, `finish_reason` (`stop`/`length`), usage tokens, timeout, cancellation, unavailable endpoint. Transport fixtures first, then one live probe.
-- **Model tag:** the operator registers `ornith-32k:9b` (`ornith:9b` + `PARAMETER num_ctx 32768`; verified 6.4 GB VRAM, about 40 tok/s, 16,180 prompt tokens accepted). The runbook carries the Modelfile.
-- **Truncation guard.** Ollama 0.32.6 exposes no tokenizer endpoint (`POST /api/tokenize` → 404), so there is no exact local count. The guard uses a calibrated byte bound instead, in two layers:
-  - Preflight (prevention): `estimate_max = ceil(utf8_bytes(rendered messages) / 3.0) + template_overhead` must be ≤ the input limit (24,576), else the call is refused before sending as `INPUT_OVER_LIMIT` and the stage splits or trims its context by its own rule. Measured on `ornith-32k:9b` (2026-10-18, n = 10, Vietnamese prose, Shenbi memos with Chinese, JSON): 3.61–5.04 UTF-8 bytes per token, so the real count is at most `bytes / 3.6` < 24,576 < 32,768 − 4,096 output. Truncation cannot occur while preflight holds.
-  - Post-check (defence in depth): reported `prompt_tokens` < `floor(utf8_bytes / 6.0)` is refused as `INPUT_TRUNCATED` and never stored. The observed truncation cut about 75 % of the prompt, far below this floor.
-  - Task1 recalibrates the two constants on the fixture corpus with `num_predict: 1` probes and records min/max ratio, the constants and the margin in the qualification evidence. A constant changes only through that evidence.
-- **Output contract owned by R2:** each structured call returns exactly one JSON object validated against a Pydantic schema. On failure, one bounded repair call receives the validation errors (not a blind retry), followed by a deterministic coercion of string-expected fields. Prose calls return plain text checked for termination and `finish_reason`.
-- **CJK prevention, then detection.** Zero CJK is an invariant, not a quality finding; it can never be labelled "local-model limit".
-  1. Prevention: every Vietnamese prose and JSON-string output is generated under a grammar that excludes the CJK ranges (Ollama `format` schema, string `pattern` `^[^\u3000-\u303f\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]*$`). Probe 2026-10-18, same model: free decoding leaked CJK in 3/5 adversarial and 2/5 normal scene outputs; under the grammar 0/10, same speed (about 43 tok/s), one JSON-wrapping failure out of 10 handled by the output contract. Task1 repeats this at n ≥ 20 and also checks that the grammar does not lower the scene rubric.
-  2. Detection: the deterministic detector still runs on every output (covers a provider without grammar support, such as cloud later).
-  3. Ladder when a leak is found: span-local repair (Huohuo role) up to `max_repairs` 2 → regenerate the whole scene up to `max_scene_regens` 2 → scene `BLOCKED_QUALITY`. The run then stops before touchpoint 2 and shows the exact scene and spans; the Human may retry or request a revision. A manuscript with a CJK character is never offered.
-- No cloud fallback. A down local endpoint gives a visible, resumable "model unavailable" state.
-- Limits (`StoryLimits` defaults, editable by the operator): output ≤ 4,096 tokens per call, input ≤ 24,576 tokens per call, `max_repairs` 2 per scene, `max_scene_regens` 2 per scene, `max_binding_regens` 2 per scene, and a per-run call ceiling computed from the stage table in Change 3 (fixed in Task4 from measured counts).
-- **Ledger and budget for a local provider.** Price is 0 minor units in currency `LOCAL`. Each call still writes a ledger row with its input/output token quantities (Change 1) for observability: throughput, per-stage usage and the call-ceiling basis. They are not billing. The budget guard enforces calls and tokens for `LOCAL`; money ceilings apply only to priced currencies. `LOCAL` rows are excluded from any money total.
+**Edges** (data dependency; "A → B" means B is produced from A):
 
-## Change 3 — the writer pipeline, built from the frozen donor roles
+- `brief` → `seed` → `story_bible`, `style_bible` → `outline` → `scene_contract[c,s]`.
+- `scene_contract[c,s]`, `story_bible`, `style_bible`, every `scene_draft` before `[c,s]` in story order → `scene_draft[c,s]`.
+- All `scene_draft[c,*]` → `chapter_review[c]`.
+- All `chapter_review[*]` and all `scene_draft` → `manuscript_review` → `packaging`.
+- An `intent` targeting node X → X.
 
-Roles are frozen in `R2_01` §20 and R1.5 §17–§19: Shenbi = planning/drafting skills and audits; Novel Studio = workflow; Huohuo = change record, adaptation and the strict local repair loop. The scene is the execution and review unit (R1.5 §14, R2-D53). Review layers: L1 deterministic (R2), L2 specialist audits, L3 independent critic, L4 Human (touchpoint 2).
+There is no "chapter" content node; a chapter is the ordered list of its scene heads, assembled deterministically at export. `chapter_review[c]` produces findings only. A finding becomes a **repair revision inside the same scene node**: a node has a revision chain r0 (draft), r1, r2 … (repairs), and its *head* is the last accepted revision. Repair findings are not inputs to the node, so there is no `chapter → scene` edge and no cycle. Chapter `c+1` starts only after chapter `c` is **sealed**: its review passed, or its repair budget is spent and the remaining findings are recorded.
 
-Stage order (Novel Studio workflow shape, short-story scale):
+**Fingerprint.** Each node revision records `fingerprint = sha256(canonical JSON)` of its effective inputs:
+- the input revisions and digests, and its intents;
+- prompt template ID and hash, donor source hash;
+- `NarrativeContextCompiler` version and `context_pack_id`/`content_hash` (scenes);
+- model name and Ollama blob digest, Modelfile hash, decoding parameters, schema hash;
+- L1 rule-set version and the relevant `StoryLimits` fields.
 
-1. Idea → story seed (premise, characters with Vietnamese kinship terms, POV, tone, ending direction).
-2. Story bible + style bible (genre-aware schema; no long-form-only fields).
-3. Outline: three chapters → scene contracts (R2 `NarrativePlan` content).
-4. Per scene, sequentially: compile context (R2 `NarrativeContextCompiler`) → draft → L1 checks → L2 audits → bounded repair → candidate.
-5. Per chapter: continuity check (M5C `continuity_rules` + donor continuity prompt) → style revision pass.
-6. Whole manuscript: L3 critic pass (advisory findings), ending check, packaging (title, blurb).
+A node is **stale** when its recomputed fingerprint differs from the one recorded on its head.
 
-Each model-calling stage takes its prompt content from the donor surface that wins the same-fixture differential (`DonorParityContract`); Vietnamese translation of a donor prompt is a recorded intentional deviation. The provisional selection (surfaces S01–S11, pins, source hashes, deviations, rejected surfaces) is `docs/r2/evidence/R2_STORY_DONOR_BASELINE.json`; Task4 confirms it with n ≥ 10.
+**Revision intents map to nodes:**
 
-Every step follows the standard step contract and handles the failure taxonomy F01–F71 from the research (addendum "small-model failure research").
+| Human target | Mapped to |
+|---|---|
+| brief | new `brief` revision → Gate A re-approval (Change C §4) |
+| bible, outline, scene contract | an intent on that node; it is regenerated with the note, or the Human edits it directly |
+| scene | an intent on `scene_draft[c,s]` |
+| chapter `c` | one intent per `scene_draft[c,*]`, all carrying the same note |
+| packaging | an intent on `packaging` |
 
-**Artifact dependency graph.** Staleness is computed from recorded inputs, never inferred from text or from the stage order.
+**Impacted-node algorithm** (`server/story_authoring/pipeline.py`):
+1. The new revision or intent on X defines `impacted = forward_closure(X)` over the static edge table.
+2. Every impacted node whose recomputed fingerprint changed is stale.
+3. Regenerate stale nodes in topological order (story order for scenes). A node is regenerated at most once per revision event.
+4. Fresh nodes are never regenerated.
 
-- Nodes: `idea` → `seed` → `story_bible`, `style_bible` → `outline` → `scene_contract[c,s]` → `scene_draft[c,s]` → `chapter[c]` (continuity + style pass) → `manuscript_review` (L3, ending check) → `packaging`.
-- Every stored proposal revision records `inputs: [(node, revision_id, digest)]`, the exact revisions it was produced from. A `scene_draft` also records its `context_pack_id`/`content_hash`. Because the context compiler includes earlier scenes, `scene_draft[c,s]` depends on every earlier `scene_draft`.
-- A node is **stale** when any recorded input digest differs from the current revision of that input, transitively. A stale node is never offered at touchpoint 2 and never committed. Regeneration walks stale nodes in topological order; a fresh node is never regenerated.
-- The table of edges lives in the stage table (`server/story_authoring/pipeline.py`, below). Task4 tests it table-driven: for each node, a revision stales exactly the expected set. Examples:
-  - `chapter[2]` → its scenes, `chapter[2]`, all of chapter 3, `manuscript_review`, `packaging`. Chapter 1, bibles and outline stay fresh.
-  - `story_bible` → `outline` and everything below it.
-  - `packaging` → nothing else.
-- Over-regeneration is preferred to under-regeneration: when a field-level dependency is uncertain, the edge stays at node level.
+The edge table is static code, checked acyclic by a Kahn sort in a unit test.
 
-Additional owned paths (added to the 2026-10-17 file map):
+**Late results (P1-08).** Every attempt carries the fingerprint it was dispatched with. Its result becomes the head only through a compare-and-set in the same transaction that checks `node.required_fingerprint == attempt.fingerprint`. Otherwise the result is stored as `STALE_RESULT` (record only) and never replaces a newer head. A revision request during a running call does not cancel the call; the late result is simply fenced.
 
-- `server/story_authoring/prompts/` (`outline.py`, `planning.py`, `drafting.py`, `packaging.py`): donor-derived Vietnamese prompt templates, each citing its donor path and hash.
-- `server/story_authoring/checks.py`: L1 deterministic checks (language, length, repetition/dedupe core, names, attributes, xưng hô matrix, coverage, meta).
-- `server/story_authoring/audits.py`: L2 specialists and L3 critic; quote-verified findings.
-- `server/story_authoring/repair.py`: Huohuo span-local repair port and length normalizing.
-- `server/story_authoring/pipeline.py`: stage table, dependency edges, staleness, checkpoint cursor.
-- Tests: `tests/unit/server/story_authoring/test_checks.py`, `test_audits.py`, `test_repair.py`, `test_prompts.py`, `test_pipeline.py`.
-- Donor parity: `tests/integration/donor_parity/huohuo_continuity_patch_runner.mjs`, `huohuo_dedupe_runner.mjs`, fixtures under `tests/integration/donor_parity/fixtures/{huohuo_continuity_patch,huohuo_dedupe}/`, vendored unmodified sources, and `docs/r2/evidence/R2_STORY_*_PARITY.json` per selected surface.
+Owned: `server/story_authoring/pipeline.py`, `tests/unit/server/story_authoring/test_pipeline.py` (acyclicity; for each change type brief, bible, outline, contract, scene, chapter and packaging, the exact stale set; topological order; late-result fencing).
 
-## Change 4 — two touchpoints and revisions at any step
+## Change C — governance commit protocol (P0-02, P0-03, P1-01)
 
-1. **Touchpoint 1 (Gate A).** One form takes the idea, genre and limits. Submit records Gate A greenlight through the existing `POST /gates/greenlight`, bound to the digest of the exact idea text, and enqueues the run.
-2. **Automatic.** Stages 1–6 run. Every output is an unapproved proposal stored as a host artifact with exact digests; nothing is committed to R2 governance yet.
-3. **Pre-touchpoint binding proof.** Before the manuscript is offered, the run simulates the exact commit sequence with provisional in-memory readers (plan as its next version, canon after each chapter's change set) through the *same* `NarrativeContextCompiler`, and checks that every scene's `context_pack_id` and `content_hash` equal those used at generation.
-   - The hashes are pure functions of the compiler inputs, not of model output, so model nondeterminism cannot cause a mismatch. A mismatch means an input changed after generation (for example an earlier scene was regenerated) or a code defect.
-   - On a mismatch the scene is marked stale and regenerated with everything stale after it (dependency graph), then the whole proof runs again from the first regenerated scene.
-   - Bound: `max_binding_regens` 2 per scene. If the same scene still mismatches, the run enters `BLOCKED_BINDING_MISMATCH`: touchpoint 2 is not offered; the UI shows the scene, the expected and actual hashes and the differing input; the record files it as a defect (never "local-model limit"). The Human may retry the run or request a revision.
-4. **Touchpoint 2.** The Human reads the manuscript, the findings and the outline, then chooses **Approve**, **Request revision** (§5) or **Discard** (§7). Approve records, in order, each a Human decision bound to an exact revision:
-   - the `NarrativePlanApproval` through `NarrativePlanService.commit_revision`;
-   - per chapter: `decide_revision` → `review_change_set` → `admit_canon_handoff` (with the exact `CanonCommitApproval`) through `NarrativeAcceptanceService` and the real Showrunner authority adapter.
+1. **Gate A binds the whole brief.** Gate A uses the existing `POST /gates/greenlight` with `source_digest = sha256(canonical JSON of brief)`, not of the idea text alone. Task3 verifies how a later `source/<story>.md` hand-off interacts with the project's Gate A semantics on the video side. If they conflict, Task3 stops with `GATE_A_SCOPE_CONFLICT` before Task4.
+2. **Automatic stages.** Every output is an unapproved proposal stored as a host artifact; nothing is committed to R2 governance.
+3. **Pre-touchpoint binding proof (as-of, P1-01).** Each `scene_draft` head records the exact as-of inputs it was compiled from:
+   - plan version expected;
+   - canon base version and the preceding chapters' change-set IDs;
+   - the compiler input digests.
 
-   After each commit the context is recompiled and compared again; any difference stops the sequence before the next decision and reports the exact scene. Task3 must prove this sequence on PostgreSQL; if a decision family cannot be bound this way, Task3 returns the exact incompatibility before Task4 starts.
-5. **Revisions.** At any time the Human may open the idea, a bible, the outline, a chapter or a scene and request a change with a note.
-   - Before touchpoint 2: the system writes a new proposal revision of that part, marks the stale set from the dependency graph (Change 3), and regenerates only that set automatically. No governance record changes.
-   - After touchpoint 2: a revision is a new R2 candidate/revision through the normal lifecycle and needs a new Human acceptance.
-   - A revision request during the automatic run pauses at the next step boundary (never mid-call), writes the new revision, and the run continues from the stale set.
-6. **Automatic.** The accepted manuscript is exported as Markdown through host artifacts, with exact revision IDs.
-7. **Discard.**
-   - Before touchpoint 2 approval: the Human may discard the run at any time, including at touchpoint 2. The run becomes `DISCARDED` (terminal). The in-flight call finishes or times out, and its result is kept only as a record. Proposals stay as read-only host artifacts for audit. There is no governance record, no export and no hand-off. A new idea starts a new run.
-   - After touchpoint 2 approval: R2 records are append-only and stay. The Human may **withdraw** the manuscript: a host marker that blocks `send_to_video` and further exports and labels the export superseded. A source file already handed to video stays in the project; removing it uses the existing source deletion. Changing the story itself is a new revision (§5).
+   The proof rebuilds each scene's context from those frozen inputs through provisional readers: the plan as its next version, and the canon after each preceding chapter's change set. It uses the same `NarrativeContextCompiler`, never the live current Canon, and requires equal `context_pack_id`/`content_hash`. The hashes depend on inputs only, so model nondeterminism cannot cause a mismatch.
+   - On a mismatch, the scene is marked stale and regenerated (Change D), within the scene's attempt budget (§ Size and budget).
+   - If the budget is spent, the run enters `BLOCKED_BINDING_MISMATCH`. Touchpoint 2 is not offered; the scene, the expected and actual hashes and the differing input are shown, and the case is recorded as a defect.
+4. **Brief revision.** A Human edit of the brief writes a new `brief` revision. The run pauses at `AWAITING_GATE_A` and stales everything (Change D). It resumes only after a new Gate A greenlight on the new digest, and the old greenlight is revoked through the same route. This is optional, so the touchpoint count of the clean run does not change.
+5. **`ManuscriptCommitManifest`.** An immutable host artifact with a digest, built when the run reaches touchpoint 2. It holds:
+   - run ID, brief digest and Gate A decision ID;
+   - plan proposal: revision ID, content hash, expected version;
+   - per chapter, in order: scene revision IDs and digests, change-set IDs, expected canon base version, the `CanonCommitApproval` payload digest, the expected decision heads;
+   - one deterministic idempotency key per step: `sha256(manifest_digest ‖ step_index)`;
+   - unresolved findings and the exceptions offered for Human acceptance (Change G);
+   - the expected export digest.
+6. **Touchpoint 2.** The Human sees the manuscript, findings and outline, all bound to one manifest digest, and chooses **Approve**, **Request revision** or **Discard**. Approve is one authenticated Human request through the existing interactive-auth dependency, bound to the manifest digest and to the list of exceptions the Human ticked. It authorizes exactly the decisions listed in the manifest and nothing else; each decision record carries the Human principal and the manifest digest. Task3 proves that the real Showrunner authority adapter accepts decisions created in one authenticated Human request. If an authority requires one interaction per decision, Task3 returns the exact incompatibility before Task4.
+7. **Commit execution**, through the existing owners only (`NarrativePlanService.commit_revision`, `NarrativeAcceptanceService.decide_revision` → `review_change_set` → `admit_canon_handoff`); no parallel authority. State machine:
+   - `APPROVING` → step k (plan, then per chapter the three decisions) → `PARTIALLY_COMMITTED(k)` after each step → `COMMITTED` after a read-back verifies every receipt against the manifest.
+   - Before each step: check the current versions and heads the manifest expects (optimistic concurrency, using the services' existing `expected_version`/`expected_latest_decision_id` checks), recompile that chapter's context from the real committed state, and compare with the manifest.
+   - Any difference or refusal → `COMMIT_BLOCKED(step, reason)`. No further decision is sent.
+   - Every step uses its idempotency key. The existing exact-retry paths (`get_version_by_revision`, admission retry resolution) return the original receipt for a repeated step.
+   - **Resume** after a crash or block re-reads receipts, skips completed steps by key, and continues from the first incomplete step. A block caused by a concurrent Canon change requires a new manifest: the affected scenes become stale and are regenerated, and a new touchpoint 2 follows. This is optional, so it is not counted. Already-committed steps stay; R2 records are append-only.
+   - Export and video hand-off are allowed only in `COMMITTED`.
+8. **Discard and withdraw.**
+   - Before Approve: `DISCARDED` (terminal). The in-flight attempt is fenced as `STALE_RESULT`; proposals stay read-only; there is no governance record, export or hand-off.
+   - After `COMMITTED`: **withdraw** is a host marker that blocks `send_to_video` and further export, and labels the export superseded. A source already handed to video stays; it is removed only through the existing source deletion.
+   - In `PARTIALLY_COMMITTED` or `COMMIT_BLOCKED`, discard is refused; the Human resumes or withdraws.
 
-**Resume.** A story run persists a checkpoint through the new guarded text-task checkpoint transition in `task_repo.py` (Change 1).
-- When: after each stored proposal revision, i.e. per stage for stages 1–3 and 5–6 and per scene step (draft, repair, candidate) in stage 4.
-- What: the stage cursor (node, attempt) and the digest of every stored node.
-- On restart: nodes whose stored revision exists and is fresh are skipped. A call in flight at the crash is never resent silently: its attempt is recorded as `ABANDONED_UNKNOWN` and a new attempt with a new attempt ID is issued visibly. With price `LOCAL` 0 it costs nothing, and it counts against the call ceiling.
-- Task4 proves this with the "restart during chapter 2" test.
+**Task3 is a hard gate.** Task4 does not start until Task3 passes PostgreSQL integration tests with the real authority adapter:
+- the manifest with plan plus three chapters;
+- a crash after chapter 1 and after chapter 2, then resume with no duplicate decision;
+- a Canon change between the binding proof and the commit → `COMMIT_BLOCKED`, nothing wrong committed;
+- concurrent Approve from two sessions → exactly one sequence;
+- a stale manifest digest refused.
 
-A run never approves anything by itself. Model reviews are recommendations (ADR-0089: an automatic QA score is not an approval).
+## Change P — provider qualification for Ollama (P0-04, P0-05, resource envelope)
 
-## Change 5 — hand-off into the video flow
+Facts from the provider-contract probes (Ollama 0.32.6, `ornith-32k:9b`, 2026-10-18; research addendum):
 
-Unchanged from revision 1. `StoryAuthoringService.send_to_video(scope, manuscript_ref, command_id)` calls `server/tool_runtime.py::upload_source` with the exported `.md` and an explicit `on_conflict`. The existing novel-source pipeline (episode planning → script → storyboard → video) then runs unchanged, followed by Gates B–D. The project must already be `source_kind=novel`. The UI offers this as one button after acceptance; it is not a gate.
+| Fact | Consequence |
+|---|---|
+| `/api/chat` with `"truncate": false` and a 56,071-token prompt returns HTTP 400 `exceed_context_size_error` with the exact token count. Without it, the prompt is silently cut to 16,386 tokens. `/v1/chat/completions` ignores `truncate` and cuts silently. | Only the native API gives a fail-closed, server-side truncation guarantee. |
+| The model's Modelfile carries `SYSTEM You are Ornith, an open-source agentic coding assistant…`. Without our own system message, it answers as a coding assistant. | Every call sends an explicit system message. |
+| The existing `openai_chat` backend retries silently up to 4 times (`with_retry_async`) and silently falls back to Instructor when the native schema fails. | It must not be used for story calls: hidden retries break the budget, and a silent fallback breaks fail-closed structured output. |
+| The grammar `pattern` (no CJK) is honoured on both `/api/chat format` and `/v1 response_format json_schema`: 0 CJK in 15 constrained outputs. The model then code-mixes English instead ("Suddenly"). | The grammar prevents CJK; the F25 code-mixing detector stays mandatory. |
+| `POST /api/tokenize` → 404. | There is no exact local count; the server's 400 is the exact check. |
 
-Owned additions: `server/story_authoring/handoff.py` and `tests/unit/server/story_authoring/test_handoff.py`.
+Decisions:
 
-## Change 6 — release and real operation (new Task7)
+1. **New endpoint `ollama-chat`** in the existing custom-provider registry: `lib/custom_provider/endpoints.py` `EndpointSpec`, plus a backend `lib/text_backends/ollama.py`. Story calls use only this endpoint. `openai_chat` stays as it is for other uses and for cloud later. Before the change, follow `docs/api-docs/AGENTS.md` and `.claude/rules/provider-capabilities.md`.
+2. **Exact request** (`POST {base}/api/chat`):
 
-Unchanged from revision 1, with the touchpoint count updated:
+   ```json
+   {"model": "<tag>", "stream": false, "think": false, "truncate": false,
+    "messages": [{"role": "system", "content": "<stage system prompt>"}, {"role": "user", "content": "<rendered>"}],
+    "format": <JSON schema>,
+    "options": {"num_ctx": 32768, "num_predict": <limit>, "temperature": <t>, "top_p": <p>, "top_k": <k>,
+                "presence_penalty": <pp>, "seed": <seed>},
+    "keep_alive": "<operator setting>"}
+   ```
 
-1. Merge `design/r2-story-authoring` into `r2-v2/main`. Annotate the release tag `r2-v2.0.0` on the exact accepted commit (ADR-0089 §7 lineage rule). Push only with Human confirmation.
-2. Back up the V2 staging environment (`~/arcreel-v2-staging`) with `docs/r2/runbooks/m7-backup-restore.md`. Deploy the tag, run `alembic upgrade head` (expected: no new revision), register the Ollama custom provider and `ornith-32k:9b`, and run one **staging smoke**: one live story plus the video hand-off, evidence `docs/r2/evidence/R2_V2_STAGING_SMOKE.json`. It confirms the deployment; it is not the acceptance run.
-3. Write `docs/r2/runbooks/story-authoring.md`: setup, the 2 + 3 touchpoints, revision requests, resume, limits, the model swap to cloud later, and backup coverage of the authoring artifacts.
-4. Production activation happens only on explicit Human confirmation at that time.
+   - The response fields used are `message.content`, `done_reason`, `prompt_eval_count` and `eval_count`.
+   - No SDK retry, no fallback. One HTTP request is one attempt in the attempt ledger.
+   - Task1 verifies that `options.num_ctx` equal to the tag value does not reload the model.
+3. **Structured calls:** `format` is the Pydantic schema. **Prose calls** use the envelope `{"type":"object","properties":{"text":{"type":"string","minLength":1,"pattern":"<NO_CJK>"}},"required":["text"],"additionalProperties":false}`. The result is unwrapped by `json.loads`, validated with the Pydantic model, then checked by the shared detector. The unwrapped text and the raw envelope digest are stored.
+4. **HTTP 200 but non-compliant** (invalid JSON, a missing field, a schema or pattern violation, or a detector hit): typed `OUTPUT_INVALID`, never stored as a head. One error-feedback repair attempt follows, counted in the budget.
+5. **Grammar ignored or unsupported:** Task1 runs an adversarial canary (the prompt asks for CJK) at n ≥ 20 for every schema kind. Any CJK that passes the grammar means the provider is **not qualified**, and story runs refuse it with `PROVIDER_NOT_QUALIFIED`. A provider without grammar support (cloud later) needs its own qualification; it is never assumed.
+6. **Shared CJK detector** (`server/story_authoring/script_guard.py`, one module for runtime validation and acceptance). It is a range table generated from Unicode `Scripts.txt` and pinned to the Unicode version of the running `unicodedata`:
+   - scripts Han (including Extensions A–H and compatibility ideographs), Hiragana, Katakana, Hangul, Bopomofo;
+   - CJK Symbols and Punctuation, Halfwidth and Fullwidth Forms, CJK Compatibility Forms, Kangxi and CJK radicals, Ideographic Description characters.
 
-## Acceptance additions
+   A unit test cross-checks the table against `unicodedata` names. It applies to every model output, every scene head, the chapter assembly, title, blurb, the manuscript and the exported `.md` bytes; the last check runs immediately before export and again in `send_to_video`. The grammar pattern carries the BMP ranges; Task1 tests whether astral ranges work in the grammar. The detector covers all ranges regardless.
+7. **Truncation, input:** the server-side `truncate: false` is the guarantee; an over-context call is refused as `INPUT_OVER_CONTEXT` with the server's exact count. The byte preflight (`bytes / 3.0` ≤ 24,576) is only a cost-saving heuristic and is never cited as proof. `prompt_eval_count` is recorded for observability only: cached prefixes can lower it, so it is not used as a floor.
+   **Truncation, output:** `done_reason = "length"` or a missing `done_reason` → `OUTPUT_TRUNCATED`, never stored.
+   The acceptance claim "zero truncated calls" rests on the server refusal plus `done_reason`, and is proven by Task1 tests at the boundary: prompts of 24,000–24,576 tokens with the real system prompt, schema and template, and at 32,769 tokens (→ 400).
+8. **Resource envelope (Task1).** Measure at the worst case (24,576 in + 4,096 out): `ollama ps` GPU share (must be 100 % GPU), VRAM, host RAM, prompt and generation tok/s, and wall time per call. These set the per-call timeout and the run's wall-clock budget. If the model spills to CPU at the worst case, the input limit is lowered until it does not, and the new value is recorded.
+9. Operator setup: the `ornith-32k:9b` Modelfile (`FROM ornith:9b`, `PARAMETER num_ctx 32768`) is in the runbook. The blob digest and the Modelfile hash enter every fingerprint and the release evidence.
+10. No cloud fallback. A down endpoint gives a visible, resumable `MODEL_UNAVAILABLE` state.
 
-Three distinct live runs, all on the same local GPU host and `ornith-32k:9b`:
+Owned additions: `lib/custom_provider/endpoints.py`, `lib/text_backends/ollama.py`, `server/story_authoring/script_guard.py`; tests `tests/unit/lib/text_backends/test_ollama.py`, `tests/unit/lib/custom_provider/test_custom_provider_factory.py`, `tests/unit/server/story_authoring/test_script_guard.py`; transport fixtures under `tests/fixtures/ollama/`.
 
-| Run | Task | Purpose | Evidence |
-|---|---|---|---|
-| Transport probe | Task1 | One call per contract case (stop/length/usage/timeout/cancel/unavailable), plus the token and grammar calibration | `R2_STORY_AUTHORING_QUALIFICATION` update |
-| Acceptance run | Task6 | The full idea → manuscript run below, in the dev worktree | `docs/r2/evidence/R2_STORY_ACCEPTANCE_RUN.json` bound to HEAD |
-| Staging smoke | Task7 | Deployment check on the tag | `R2_V2_STAGING_SMOKE.json` |
+## Change E — durable execution (P1-02, P1-03, P1-04)
 
-Acceptance criteria:
+1. **Attempt ledger.** Every model call is one attempt row: `RESERVED → DISPATCHED → COMPLETED | FAILED | UNKNOWN`.
+   - `RESERVED`: written in a transaction that also reserves budget (step 3) before any HTTP request.
+   - `DISPATCHED`: committed immediately before sending.
+   - `COMPLETED` / `FAILED`: written with the response or typed error, token counts, `done_reason` and durations.
+   - `UNKNOWN`: set on restart for every `DISPATCHED` row without an outcome. Its usage is unknown, so it is charged at its reserved maximum (input estimate + `num_predict`).
+2. **Atomic visibility.** The node revision's content is written first, content-addressed by digest; this is immutable and idempotent. Then one database transaction:
+   - inserts the revision row;
+   - sets the attempt to `COMPLETED`;
+   - compare-and-sets the node head (Change D fencing);
+   - advances the run checkpoint (`run_id`, `node_id`, `revision_id`, `attempt_id`, `digest`) through the new guarded `task_repo` transition.
 
-- `DonorParityContract` for every selected surface: deterministic surfaces with exact-source fixtures; model surfaces with the same idea, same model and a scored differential. All material rows `PARITY` or `IMPROVED`.
-- **Acceptance run (clean):** idea → exported three-chapter manuscript with an ending, with zero Human actions besides the two story touchpoints and zero optional actions.
-- **Resume and revision (separate runs, so the clean run stays clean):**
-  - A restart during chapter 2 resumes from the checkpoint without regenerating chapter 1.
-  - A revision request on chapter 2 regenerates exactly the stale set from the dependency graph: chapter 2, chapter 3, `manuscript_review`, `packaging`.
-  - A discard before touchpoint 2 leaves no governance record.
-  - All three are proved by Task4 integration tests with a fixture model, then once live in Task6 (evidence in the same file).
-- Zero CJK characters and zero truncated calls in the accepted manuscript; every call row carries its preflight estimate and reported `prompt_tokens`.
-- The quality record lists every L1/L2/L3 finding, each marked fixed, open, or "local-model limit". CJK, truncation and binding mismatch are never in the last class.
-- The sponsor reads the manuscript; their approval at touchpoint 2 is the quality verdict.
-- The video hand-off creates `source/<story>.md`, and the existing episode-planning step accepts it.
-- Regression: the affected-domain static gates plus the related tests listed in each task. PostgreSQL interleavings for the checkpoint/budget and decision-sequence changes. No full suite unless asked.
+   A revision exists for the run only if that transaction committed.
+3. **Recovery reconciliation** on start:
+   - `DISPATCHED` attempts → `UNKNOWN`;
+   - content blobs with no revision row → recorded as orphans, never used, kept for audit;
+   - checkpoints are verified against revision rows by `(run_id, node_id, revision_id, attempt_id, digest)`. Any disagreement stops the run as `RECOVERY_INCONSISTENT` with the exact rows, never "just run the model again".
+
+   Resume then continues from the stale or missing nodes (Change D). It never resends silently: the replacement attempt has a new attempt ID and is visible.
+4. **`RunBudget`, immutable at run start** and recorded in the run: `calls_max`, `input_tokens_max`, `output_tokens_max`, `wall_clock_max`, `regenerations_max`, plus the per-scene and per-chapter caps from § Size and budget.
+   - Each attempt reserves its maximum (input estimate + `num_predict`) **before** dispatch, under a row lock through the existing `budget_guard` reservation path. Completion releases the unused part; an `UNKNOWN` attempt keeps the full charge.
+   - Every retry layer — schema repair, span repair, scene regeneration, binding regeneration, chapter-review repair — draws from the same caps. Layers never multiply.
+   - Exhausting a cap → `BLOCKED_BUDGET` with the exact cap.
+5. **Ledger for `LOCAL`.** The price is 0 minor units in currency `LOCAL`, so there is no billing. It is not free: every attempt still uses GPU time, wall clock and budget. Ledger rows carry token quantities for observability; `LOCAL` rows are excluded from money totals.
+
+Owned: the attempt ledger, checkpoint and budget glue live in `server/story_authoring/runtime.py` (already in the 2026-10-17 file map) over the Change 0 owners. Tests: `tests/integration/server/story_authoring/test_runtime.py` and `test_resume.py` (already owned).
+
+## Size and budget
+
+| Item | Value (operator-editable `StoryLimits` defaults; Task4 fixes them from measured counts and records the evidence) |
+|---|---|
+| Chapters | 3 |
+| Scenes per chapter | 3–5 |
+| Scene length | target 600–1,000 Vietnamese syllables; hard maximum 1,400 (about 1,800 tokens, inside `num_predict` 4,096 with the envelope) |
+| Story length | 7,000–11,000 syllables |
+| Input per call | ≤ 24,576 tokens (lowered if Task1's resource envelope requires it) |
+| Output per call | ≤ 4,096 tokens |
+| Per-scene attempt cap | 6 model attempts of any kind (draft, schema repair, span repair, regeneration, binding regeneration) |
+| Per-chapter review cycles | 2 |
+| Run `calls_max` | upper bound = planning (≤ 10) + scenes (≤ 15 × 6) + chapter reviews (≤ 3 × 2 × 4) + manuscript review and packaging (≤ 8) = 132. Task4 sets the default to the measured p95 × 1.2, never above the bound. |
+| Run `wall_clock_max` | from Task1's per-call worst-case time × `calls_max` |
+
+A scene over the hard maximum gets one length-normalizing repair (Shenbi S10 role), counted in its cap. A scene contract whose target cannot fit is split at the outline stage, never at drafting time.
+
+## Change W — writer pipeline (unchanged roles)
+
+Roles stay frozen (R2_01 §20, R1.5 §17–§19). Shenbi supplies planning/drafting skills and audits; Novel Studio supplies the workflow; Huohuo supplies the change record, adaptation and the strict local repair loop. The scene is the execution and review unit. Review layers: L1 deterministic, L2 specialist audits, L3 independent critic, L4 Human. Stages:
+1. brief → seed;
+2. bibles;
+3. outline and scene contracts;
+4. per scene: compile context → draft → L1 → L2 → bounded repair;
+5. per chapter: chapter review (continuity, style) → repair revisions inside scene nodes → seal;
+6. manuscript review, ending check, packaging.
+
+Prompt content comes from the donor surfaces in `docs/r2/evidence/R2_STORY_DONOR_BASELINE.json` (S01–S11). Task4 confirms them with n ≥ 10. The **scoring rubric and winning rule are fixed before the benchmark** and committed in the baseline file before any Task4 run:
+- deterministic rubric: words, CJK, English code-mixing, trigram repetition, dialogue, truncation, names, ending present, scene-contract coverage;
+- blind pairwise L3 judgment with quote-verified reasons;
+- winning rule: a surface wins if no invariant fails, its median rubric score is not lower than the donor's, and it is not worse on any blocking criterion.
+
+Owned paths (unchanged from revision 2):
+- `server/story_authoring/prompts/{outline,planning,drafting,packaging}.py`, `checks.py`, `audits.py`, `repair.py`;
+- their unit tests;
+- the donor parity runners and fixtures under `tests/integration/donor_parity/`;
+- `docs/r2/evidence/R2_STORY_*_PARITY.json`.
+
+## Change G — quality severity policy (P1-06, P1-07)
+
+| Class | Examples | Handling |
+|---|---|---|
+| Hard structural | missing chapter or scene, no ending, scene contract not covered | Block. Touchpoint 2 is not offered. |
+| Hard integrity | CJK, truncated input/output, binding mismatch, invalid output, donor parity row below `PARITY` without a sponsor exception | Block. Never "local-model limit". |
+| Narrative critical | serious character contradiction, plot break, xưng hô matrix violation, named-entity drift | Bounded repair. If still open: offered at touchpoint 2 as an explicit exception the Human must tick; otherwise Approve is disabled. |
+| Stylistic | slow pace, unnatural dialogue, repetition below threshold, English code-mixing of a single word | Listed findings; the Human decides. |
+| Local-model limitation | prose not refined enough after bounded repair | Recorded; must be accepted by the Human at touchpoint 2 if still open. |
+
+The Approve record stores the manifest digest plus the exact IDs of every open finding and every ticked exception, so one click never silently clears a critical finding. The classifier and thresholds live in `checks.py`/`audits.py`, and are tested per class.
+
+## Change V — video hand-off with integrity (P1-09)
+
+`StoryAuthoringService.send_to_video(scope, manuscript_ref, command_id)` calls `server/tool_runtime.py::upload_source`. It requires:
+- run state `COMMITTED` and not withdrawn;
+- the exported bytes' digest equal to the manifest's export digest;
+- the shared detector re-run on those bytes.
+
+Further rules:
+- The file name is a sanitized ASCII slug from the title: no path separators or control characters, length ≤ 80, `.md`. A collision gets a short digest suffix.
+- `on_conflict` is explicit and defaults to `fail`.
+- `command_id` makes it idempotent: a repeated call returns the first result, and never writes a second source.
+- The project must be `source_kind=novel`.
+- The existing novel-source pipeline and Gates B–D follow unchanged.
+
+Owned: `server/story_authoring/handoff.py`, `tests/unit/server/story_authoring/test_handoff.py`.
+
+## Verification matrix (added to the task gates)
+
+| Task | Required tests | PASS condition |
+|---|---|---|
+| Task0 | schema round-trips for every new record; lineage evidence | Every record has a home, or `SCHEMA_GAP`; lineage recorded |
+| Task1 | transport fixtures (stop, length, 400 over-context, 200 non-compliant, timeout, cancel, unavailable); boundary prompts 24,000–24,576 and 32,769; adversarial CJK canary n ≥ 20 per schema kind; system-prompt override; resource envelope | Fail closed in every case; no output accepted without proof |
+| Task2 | two workers reserve budget concurrently (PostgreSQL); attempt state machine; crash between content write and transaction; crash after `DISPATCHED` | No ceiling exceeded; reconcile to a consistent state or `RECOVERY_INCONSISTENT` |
+| Task3 | manifest plan + 3 chapters; crash after chapter 1 and 2, then resume; Canon change between proof and commit; concurrent Approve; stale manifest; Gate A rebind; authority adapter batch | Each decision has the right authority, revision and approval digest; no duplicates; blocked, never wrongly committed |
+| Task4 | stale set per change type (brief, bible, outline, contract, scene, chapter, packaging); acyclicity; revision during a running call (late result fenced); restart during chapter 2; donor parity n ≥ 10 | Exact stale sets; chapter 1 not regenerated; parity rows `PARITY`/`IMPROVED` |
+| Task5 | withdraw, re-export, duplicate hand-off, Approve disabled with unticked critical exceptions, two-tab Approve | Withdrawn text is never sent; no wrong or duplicate source |
+| Task6 | clean live run; separate live restart, revision and discard runs; adverse cases (endpoint down mid-run, kill during a call, a CJK-baiting brief, an over-long brief); 3 variation runs with different ideas and genres | Separate evidence per property, bound to HEAD; every variation run ends at touchpoint 2 or a typed blocked state, with no crash or hang; rates recorded |
+| Task7 | deploy from the release tag; staging smoke | Code, model blob digest, Modelfile hash, schema/prompt versions and alembic head match the evidence |
+
+The two hardest cases — concurrent approval with a Canon change, and recovery after a partial commit — run on PostgreSQL with the real authority adapter, not with fixture models alone.
+
+## Acceptance
+
+Live runs, all on the same local GPU host and model, each with its own evidence:
+
+| Run | Task | Evidence |
+|---|---|---|
+| Transport probe and calibration | Task1 | `R2_STORY_AUTHORING_QUALIFICATION` update |
+| Clean acceptance run | Task6 | `docs/r2/evidence/R2_STORY_ACCEPTANCE_RUN.json` |
+| Restart, revision, discard, adverse and variation runs | Task6 | `docs/r2/evidence/R2_STORY_RESILIENCE_RUNS.json` |
+| Staging smoke | Task7 | `docs/r2/evidence/R2_V2_STAGING_SMOKE.json` |
+
+Criteria:
+- All donor parity contracts pass (Decisions, class 2).
+- **Clean run:** brief → `COMMITTED` → exported three-chapter manuscript with an ending; exactly two Human actions; zero optional actions.
+- **Invariants on the accepted manuscript:** zero CJK by the shared detector on the exported bytes; zero `INPUT_OVER_CONTEXT`/`OUTPUT_TRUNCATED` among stored heads; every attempt row has an outcome.
+- Restart during chapter 2 does not regenerate chapter 1. A chapter-2 revision regenerates exactly the Change D stale set. Discard leaves no governance record.
+- The quality record classifies every finding per Change G.
+- **Human verdict:** the sponsor's Approve, bound to the exact manifest digest and the exact open findings and exceptions, is the quality verdict.
+- The video hand-off creates `source/<slug>.md` with the manifest's export digest, and the existing episode-planning step accepts it.
+- **Regression:** the affected-domain static gates. Related tests only, never the full suite unless asked. Explicitly included:
+  - the Change 0 test list;
+  - `tests/integration/server/story_authoring/` (runtime, narrative, resume);
+  - `tests/unit/server/story_authoring/`;
+  - PostgreSQL integration tests for `r2/narrative_plan` and `r2/narrative_lifecycle` touched by Task3;
+  - `tests/unit/lib/custom_provider/`, `tests/unit/lib/text_backends/`;
+  - the gates router tests (Gate A rebind);
+  - the router and auth tests for story authoring.
+
+## Release (Task7)
+
+1. **Pre-merge checks**, recorded in evidence:
+   - the release branch `release/r2-v2-story` has `r2-v2/main` as an ancestor;
+   - `git diff r2-v2/main..release` contains only story-authoring paths and their docs, and no `scripts/r2/verify_m9_*`;
+   - the worktree is clean;
+   - the HEAD equals the accepted commit of the acceptance evidence.
+2. Merge into `r2-v2/main`; annotate tag `r2-v2.0.0` on that exact commit (ADR-0089 §7). The release evidence records the tag object, the commit, the model blob digest, the Modelfile hash, the prompt/schema version table and the alembic head. Push only with Human confirmation.
+3. Back up `~/arcreel-v2-staging` with `docs/r2/runbooks/m7-backup-restore.md`. Deploy the tag, run `alembic upgrade head` (expected: no new revision unless Task0 found a `SCHEMA_GAP` and the Human approved a migration), register the Ollama provider with the `ollama-chat` endpoint and the model, and run the staging smoke.
+4. Write `docs/r2/runbooks/story-authoring.md`: Modelfile and setup, the 2 + 3 touchpoints and the optional actions, revision, resume, recovery states, limits and budget, the severity policy, model swap to cloud later (with its own qualification), and backup coverage.
+5. Production activation only on explicit Human confirmation at that time.
 
 ## Execution
 
-Main agent, inline and serial: Task0 close → Task1 → Task2 → Task3 (including the binding proof) → Task4 (Changes 3–5) → Task5 → Task6 → Task7. One progress report per task gate; one final independent review (Codex) and at most one repair.
+Main agent, inline and serial: Task0 → Task1 → Task2 → Task3 (hard gate) → Task4 → Task5 → Task6 → Task7. One progress report per task gate; one final independent review (Codex) and at most one repair.
