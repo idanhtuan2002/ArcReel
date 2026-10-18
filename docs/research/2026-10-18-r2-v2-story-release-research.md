@@ -443,3 +443,20 @@ Raw outputs: `<scratchpad>/bench/ns-run`, `ns-run7`, `shenbi-surface` (session-l
 3. Replace per-chapter Human steps with the three-touchpoint automation above, plus finite automatic repair.
 4. Add the manuscript → project novel-source hand-off.
 5. Add production activation steps after acceptance.
+
+## Addendum — token-count calibration and grammar CJK ban (2026-10-18)
+
+Facts, Ollama 0.32.6, `ornith-32k:9b`, `think: false`:
+
+- `POST /api/tokenize` returns 404; no exact local token count is available through Ollama.
+- Calibration via `/api/chat` with `num_predict: 1`, subtracting a one-character baseline (n = 10 texts: Vietnamese prose, Shenbi memos containing Chinese, JSON): 1.75–3.77 characters per token, **3.61–5.04 UTF-8 bytes per token**. Bytes are the tighter basis. Chosen constants: preflight upper bound `bytes / 3.0`; post-check floor `bytes / 6.0`.
+- Grammar ban: `format` = object schema whose string has `pattern` `^[^<CJK ranges>]*$`.
+
+| Prompt | Decoding | n | Outputs with CJK | Invalid JSON | tok/s |
+|---|---|---|---|---|---|
+| Adversarial ("insert 突然 and 心里") | free | 5 | 3 | — | 30–37 |
+| Adversarial | grammar | 5 | 0 | 1 | 30–41 |
+| Scene 1, about 700 words | free | 5 | 2 | — | 44–45 |
+| Scene 1 | grammar | 5 | 0 | 0 | 43–45 |
+
+Inference: grammar exclusion removes CJK leakage at no speed cost. Unknown: its effect on prose quality and length at scale; Task1 repeats this at n ≥ 20 with the scene rubric.
