@@ -281,3 +281,19 @@ Status: **STOPPED FOR HUMAN DECISION** (amendment Change C §6–7: "if a decisi
   - A model writes change records → `NarrativeChangeSet`s plus `CanonMutationRule`s. They are pre-computed before touchpoint 2 and shown and bound in the manifest, so the full chain runs in one Approve.
   - This is a large new component outside "integrate existing owners": an extra model step per scene on a 9B model, model-authored Canon operations, and many more items for the Human to review at touchpoint 2.
 - **C — as B, with a third Human touchpoint** after acceptance to review change sets and approve the Canon handoff. This breaks the 2-touchpoint decision.
+
+### Decision (2026-10-18): option A
+
+The Human delegated the choice ("nghiên cứu chọn phương án phù hợp nhất": research and choose the most suitable option). Research basis:
+
+- `AcceptedNarrativeAdapter.get_exact` treats a revision as accepted narrative when its revision-acceptance decision is the current effective ACCEPT for its work scope. Extraction, compilation and Canon handoff play no part in that.
+- The M5C design (`2026-09-09-r2-m5c-narrative-lifecycle-design.md` §1, flow) lists extraction after the Human revision decision and allows a stop without M5A. §2.1 says a revision acceptance decision "cannot mutate prose or Canon". No rule requires every accepted revision to be extracted. The M5C acceptance suite includes `test_an_outcome_only_selection_mutates_no_canon`.
+- The Canon genesis can be expressed with existing operations (`ADD_ENTITY`, `ADD_FACT`, `ADD_EVENT`, …) mapped deterministically from the story bible.
+- Option B would need model-authored `CanonMutationRule`s on a 9B model, which is new authority-adjacent machinery outside "integrate existing owners". Option C breaks the 2-touchpoint decision.
+
+**Chosen: A.** The touchpoint-2 Approve records, in order:
+1. the Canon genesis when the project has no Canon branch: `CanonTransactionService.create_branch`, then `commit` of the bible-derived genesis delta with its exact `CanonCommitApproval`;
+2. the plan: `NarrativePlanService.commit_revision` with the exact `NarrativePlanApproval`;
+3. per scene in story order: `record_draft_candidate` and `record_revision` (evidence), then `NarrativeAcceptanceService.decide_revision` ACCEPT.
+
+There is no extraction, change-set review or Canon handoff for story scenes. The Huohuo change-record surface is **deferred** to a later version, not rejected. Revision-acceptance decision IDs are content-derived (fact 7). The amendment is updated accordingly.

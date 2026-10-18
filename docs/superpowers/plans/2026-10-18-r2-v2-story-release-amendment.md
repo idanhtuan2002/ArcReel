@@ -36,6 +36,23 @@ These changes are applied in the sections below. Task4–Task7 stay closed until
 | P1-03 | Discard creates no Plan or Canon commit; Gate A records follow their owner's retention and revocation policy | Change C §8 |
 | P1-04 | After `COMMITTED`, a change is a new R2 candidate/revision through the existing lifecycle with a new Human acceptance | Change C §8 |
 
+## Task3 decision: outcome-only Canon for story scenes (2026-10-18)
+
+Task3 found `NARRATIVE_CANON_EXTRACTION_GAP` (evidence `R2_STORY_AUTHORING_QUALIFICATION.md`, "V2 Task3 finding"):
+- R2 extraction can start only after the Human revision decision;
+- no production extractor or `CompilerPolicy` mutation rules exist;
+- so a single Approve could not bind change sets that did not yet exist.
+
+The Human delegated the choice. Option A is chosen, and it overrides the per-chapter `review_change_set` and `admit_canon_handoff` steps wherever this amendment names them.
+
+- **Manifest steps:**
+  1. `canon_genesis`, only when the project has no Canon branch: the bible-derived genesis delta with its `CanonCommitApproval`;
+  2. `plan`;
+  3. per scene in story order: draft candidate and revision as evidence, then `decide_revision` ACCEPT.
+- **Canon** stays at the genesis version for the whole run. The binding proof therefore compiles every scene against that one Canon version. Earlier scenes enter context only as accepted narrative, through the deterministic decision IDs of those scenes.
+- **Decision IDs** are content-derived: `sha256("story-decision-v1" ‖ run_id ‖ scene node ‖ revision digest)`. Manifest step keys are host bookkeeping only; deriving decision IDs from the manifest digest would be circular. Unchanged prefix scenes keep their decision IDs in a successor manifest.
+- **The Huohuo change-record/extraction surface is deferred to a later version.** Story events do not enter Canon in V2.
+
 ## Change 0 — Task0 closes with owner map, schema sufficiency and lineage proof
 
 1. Owner-map additions (from `R2_STORY_AUTHORING_QUALIFICATION.md`), unchanged from revision 1:
