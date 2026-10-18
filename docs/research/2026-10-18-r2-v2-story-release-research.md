@@ -359,6 +359,7 @@ O = observed in the 2026-10-18 runs; P = predicted (literature, donor design not
 | F22 | Kinship/pronoun (xưng hô) errors | O | xưng hô matrix check on attributed dialogue; L2 audit | story bible holds a xưng hô matrix (who calls whom what, self-reference), injected into every scene context | span repair |
 | F23 | Calques, odd collocations, purple prose | O | L2 Vietnamese style audit | style bible with Vietnamese examples and banned patterns | style revision; residue recorded as local-model limit |
 | F24 | Diacritic/spelling errors | P | Vietnamese syllable-validity check | — | span repair |
+| F25 | English code-mixing ("cú call", "cánh gate") | O | non-Vietnamese syllable check + allow-list for loanwords | style bible rule | span repair |
 | F30 | Attribute drift (age, job, relation) | O | extract numbers/attributes vs canon | canon facts in context pack | span repair |
 | F31 | Timeline contradiction | O (language probe) | `story_time` vs stated times; L2 continuity | `story_time` in context | span repair |
 | F32 | Physical/causal impossibility | O | L2 continuity audit | scene contract lists setting state | span repair |
@@ -393,6 +394,47 @@ Every step uses one shape so that each failure above is handled once, in one pla
 9. **Persist:** the output becomes an unapproved proposal or an R2 candidate exactly as Change 4 of the amendment describes.
 
 Still open (measured in Task4, n ≥ 10): presence_penalty 0 vs 1.5 against F20/F50; thinking on for outline only; best scene size for length compliance.
+
+## Addendum — same-idea donor differential results (2026-10-18)
+
+Setup: same idea (`bench/idea.txt`), same model `ornith-32k:9b`, same endpoint `/v1`, donor sampling settings. Novel Studio `9b690ae2` run headless in UI order through `scripts/bench-run.ts` (≤ 3 "regenerate" clicks per step and ≤ 3 revise/check rounds, as a user would). Shenbi `65ddfc26` per-surface run (`bench/shenbi_surface.py`): `chapter-planning` → `chapter-drafting` skills verbatim plus a Vietnamese-output instruction, on the Novel Studio run's own story bible, style bible, volume outline and arc.
+
+Bench harness deviations, recorded (not donor code): Novel Studio structured calls use a grammar-constrained `json_schema` generated from the donor's zod schema (root arrays wrapped in an object) plus a logged coercion fallback (used once in 8 runs' worth of calls); without them the donor never got past chapter 1 in six attempts.
+
+### Novel Studio full run (run 8)
+
+| Measure | Result |
+|---|---|
+| Steps | 30, each first click except chapter 3 acceptance |
+| Chapters accepted by the donor's own gate | 2 of 3; chapter 3 refused after 3 revise/check rounds (timeline conflict: the notebook "page 10" repeats page 5 read in chapter 2; revisions did not converge) |
+| Length | 1,069 + 1,804 + 2,630 = 5,503 syllables vs 9,000 target |
+| CJK in final chapters | 0 (run 7: style revision introduced `灶`) |
+| Dialogue lines | 1 / 2 / 2 |
+| Ending | **none** — the volume outline is a longer serial (midpoint at "page 35"); chapter 3 ends mid-discovery |
+| Premise drift | outline says "ba năm xa cách" against the idea's 10 years |
+
+### Chapter 1 drafting surface (same upstream)
+
+| | Novel Studio (run 7) | Shenbi seed 1 | Shenbi seed 2 |
+|---|---|---|---|
+| Syllables (target 3,000) | 1,397 | 1,157 | 3,650 (mostly loop) |
+| CJK | 2 | 0 | 4 |
+| Repetition | motif repetition | one paraphrased paragraph repeated | degenerate loop: one 3-sentence block × 12 |
+| Other defects | English code-mixing ("cú call", "cánh gate"), mother and sister both "Lan", no dialogue | age arithmetic (1985 "anh mới bốn tuổi"), grandmother/mother confusion, decisions-sidecar JSON leaked into prose | — |
+| Planning memo | — | Chinese despite the Vietnamese instruction | Chinese |
+
+### Conclusions (provisional, small n; final selection by the Task4 differential with n ≥ 10)
+
+- **Fact:** neither donor reaches a complete three-chapter story with an ending on this model. Novel Studio's workflow is serial-first (no closure), and its revise loop does not converge on a real timeline conflict. Shenbi's long drafting skill destabilizes the 9B model (loop, meta leakage).
+- **Selection direction:**
+  - Story shape and closure: Shenbi `short-outline` (three-act compression, a task per chapter, mandatory ending, generate → review → revise).
+  - Scene contract fields: Novel Studio chapter outline + scene beats, enriched with Shenbi memo sections "withheld cards" (`压住的底牌`) and "changes required by chapter end" — these carry the secret-reveal pacing that Novel Studio lost (F35, F40).
+  - Drafting prompt: Novel Studio `chapterDraftPrompt` base (more stable on 9B), plus Shenbi craft rules that are short and checkable (no narrator conclusions, show-don't-tell, dialogue presence), not the full skill text.
+  - Review: Novel Studio continuity prompt + `hardRules` (already ported) for L2; Shenbi specialist audits for L3; the donor acceptance gate pattern (block on high/critical) kept.
+  - Repair: span-local (Huohuo) instead of whole-chapter style revision, because whole-chapter revision changed almost nothing (1,397 → 1,396) yet introduced a CJK leak and did not converge.
+- **New failure rows:** F25 English code-mixing (observed); F50 degenerate loop confirmed at paragraph level; F30 age arithmetic; F43 sidecar leakage; F13 memo language.
+
+Raw outputs: `<scratchpad>/bench/ns-run`, `ns-run7`, `shenbi-surface` (session-local).
 
 ## Plan amendments required (step 2)
 
