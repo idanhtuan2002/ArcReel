@@ -1,6 +1,6 @@
 # R2 V2 story release — amendment to the idea-to-story plan
 
-Status: DRAFT_FOR_HUMAN_REVIEW, revision 5.1 (revision 5 plus the fourth-review conditions in § Conditions 5.1). The fourth review recommends `APPROVE_WITH_CONDITIONS — TASK0_TO_TASK3_ONLY`; approval is the Human's decision. Supersedes revision 4 (`9314799c`), revision 3 (`92d7eef9`), revision 2 (`04f2e2af`) and revision 1 (`e833e27a`). Amends `docs/superpowers/plans/2026-10-17-r2-idea-to-story-authoring.md` (approved 2026-10-17); everything in that plan stays in force unless this document changes it.
+Status: **APPROVED_WITH_CONDITIONS — TASK0_TO_TASK3_ONLY**, revision 5.1. Human decision 2026-10-18: "đồng ý duyệt có điều kiện, bắt đầu Task0" (approve with conditions, start Task0), on commit `0f396ac9`. Task4–Task7 stay closed until Task3 passes and the Human opens them (§ Execution). Revision 5.1 = revision 5 plus the fourth-review conditions in § Conditions 5.1.
 
 Research basis: `docs/research/2026-10-18-r2-v2-story-release-research.md`, through the addendum "revision 5 probes". Revision 5 closes the third review (P0-01…04, P1-01…06, P2-01…04). It changes only contracts, state machines and acceptance gates. Revision 4 answered the second review of 2026-10-18 (P0-01…05, P1-01…10, P2) in this order: data model, governance commit protocol, provider qualification, durable execution, acceptance and release. The overall architecture, scope, owners, donors, the two touchpoints, the six stages and the task order are unchanged.
 
