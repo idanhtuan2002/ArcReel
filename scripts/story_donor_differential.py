@@ -19,7 +19,7 @@ generation fails is scored as a window miss with infinite defects, and its pair 
 the judge model runs what the judge route runs in production (outline and plan review, the audit surfaces S05/S06,
 pairwise preference). Both default to the rubric's model.
 
-Usage: uv run python scripts/story_donor_differential.py --donors DIR --huohuo DIR --upstream JSON
+Usage: uv run python -m scripts.story_donor_differential --donors DIR --huohuo DIR --upstream JSON
        --manuscript JSON --out DIR [--model M] [--judge M] [--surface S04 ...]
 """
 

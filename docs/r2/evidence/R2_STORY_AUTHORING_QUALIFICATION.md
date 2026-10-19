@@ -515,5 +515,5 @@ Human decision (2026-10-19): run the differential on the configuration that ship
   every pairwise preference) — the same split as production (ADR 0109);
 - everything else unchanged: seeds 300–309, n = 10 per arm, metrics, `MAPPING`, winning rule, donor pins.
 - Fixture upstream (seed, bibles, outline, chapter-1 plan) and the S11 manuscript come from live run 11
-  (`4845a6db`, offered on `4ee8adc0`); the harness is `scripts/story_donor_differential.py --model
+  (`4845a6db`, offered on `4ee8adc0`); the harness is `uv run python -m scripts.story_donor_differential --model
   qwen3.5-vimax:9b --judge gemma3:12b`.
