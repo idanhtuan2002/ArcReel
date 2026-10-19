@@ -610,7 +610,8 @@ _META_LINE = re.compile(
     r"^\s*(?:#|\*\*|>|\[|\(|chương\s+\d|cảnh\s+\d|ghi chú|lưu ý|tóm tắt|dưới đây|sau đây là|note\b|scene\b|chapter\b)",
     re.IGNORECASE | re.MULTILINE,
 )
-_CLOSING = (".", "!", "?", "…", "”", '"', "»", "’")
+_CLOSING = (".", "!", "?", "…", "”", '"', "»", "’", "'", ")")
+_LAST_CLOSING = re.compile(r"^(.*[.!?…][”\"»’')]*)", re.S)
 _DIALOGUE_LINE = re.compile(r"^\s*(?:—|–|-|“|\")", re.MULTILINE)
 _SENTENCE_START = re.compile(r"(?:^|[.!?…:][”\"’'»)]?\s*|\n\s*|[—–\-“‘\"'(]\s*)$")
 _WORD = re.compile(r"[^\W\d_]+")
@@ -625,6 +626,12 @@ def meta_leaks(text: str) -> list[str]:
 
 def ends_cleanly(text: str) -> bool:
     return text.rstrip().endswith(_CLOSING)
+
+
+def trim_unterminated_tail(text: str) -> str:
+    """Drop the fragment after the last complete sentence; the text is unchanged when nothing complete remains."""
+    match = _LAST_CLOSING.match(text.rstrip())
+    return match.group(1).rstrip() if match else text
 
 
 def dialogue_lines(text: str) -> int:

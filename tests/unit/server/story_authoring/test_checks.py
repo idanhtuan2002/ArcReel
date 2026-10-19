@@ -19,6 +19,7 @@ from server.story_authoring.checks import (
     strip_intra_chapter_near_duplicate,
     strip_markup,
     strip_replayed_sentences,
+    trim_unterminated_tail,
     unknown_names,
 )
 
@@ -198,3 +199,10 @@ def test_assimilated_loanwords_are_not_code_mixing_and_a_foreign_word_is_quoted_
     )
     assert finding.quote == "Anh thấy cánh gate cũ và cái hazy chiều."
     assert "gate, hazy, suddenly" in finding.message
+
+
+def test_a_scene_ending_in_a_single_quote_or_parenthesis_ends_cleanly_and_a_fragment_is_trimmed():
+    assert ends_cleanly("Lan nói: 'Mẹ sẽ buồn nếu biết.'")
+    assert ends_cleanly("Minh gật đầu (lần cuối).")
+    assert trim_unterminated_tail("Minh mở cửa. Lan đứng đó và") == "Minh mở cửa."
+    assert trim_unterminated_tail("chưa xong") == "chưa xong"

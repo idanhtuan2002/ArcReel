@@ -30,9 +30,11 @@ from server.story_authoring.checks import (
     PunctuationProfile,
     SceneLengthWindow,
     count_syllables,
+    ends_cleanly,
     strip_copied_sentences,
     strip_markup,
     strip_replayed_sentences,
+    trim_unterminated_tail,
 )
 from server.story_authoring.contracts import (
     OutputMode,
@@ -242,10 +244,15 @@ class RepairOutcome:
 def deterministic_fixes(
     text: str, findings: Sequence[Finding], *, earlier: Sequence[str] = ()
 ) -> tuple[str, tuple[str, ...]]:
-    """Fixes that need no model: markdown emphasis is dropped, sentences copied from earlier scenes and repeated
-    passages are removed by the dedupe core."""
+    """Fixes that need no model: an unfinished last sentence is cut, markdown emphasis is dropped, sentences copied
+    from earlier scenes and repeated passages are removed by the dedupe core."""
     codes = {f.code for f in findings}
     notes: list[str] = []
+    if "UNTERMINATED" in codes:
+        trimmed = trim_unterminated_tail(text)
+        if trimmed != text and ends_cleanly(trimmed):
+            text = trimmed
+            notes.append("removed an unfinished last sentence")
     if "MARKUP" in codes:
         text = strip_markup(text)
         notes.append("removed markdown emphasis")

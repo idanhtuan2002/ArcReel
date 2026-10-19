@@ -234,3 +234,9 @@ def test_deterministic_fixes_remove_markup_and_copied_sentences():
     fixed, notes = deterministic_fixes(text, findings, earlier=earlier)
     assert fixed == "Cha viết: Ngày mai về. Lan cười."
     assert len(notes) == 2
+
+
+def test_an_unfinished_last_sentence_is_cut_without_a_model():
+    finding = Finding("UNTERMINATED", Severity.HARD_INTEGRITY, "s", "u", "và")
+    fixed, notes = deterministic_fixes("Minh mở cửa. Lan đứng đó và", [finding])
+    assert (fixed, len(notes)) == ("Minh mở cửa.", 1)
