@@ -517,3 +517,25 @@ Human decision (2026-10-19): run the differential on the configuration that ship
 - Fixture upstream (seed, bibles, outline, chapter-1 plan) and the S11 manuscript come from live run 11
   (`4845a6db`, offered on `4ee8adc0`); the harness is `uv run python -m scripts.story_donor_differential --model
   qwen3.5-vimax:9b --judge gemma3:12b`.
+
+## V2 Task5: story authoring page (2026-10-19)
+
+Commits `fcbaced6`, `fbf220a7`. Workspace route `story` (sidebar "Story"), `frontend/src/features/story-authoring/`.
+
+- Flow: idea, genre, writer and optional review model (only enabled `ollama-chat` models are offered), length →
+  brief → Gate A approval of the exact digest → run progress (polled while working) → touchpoint 2 → export and
+  hand-off. Lifecycle actions per phase; Discard, Stop and Withdraw ask twice.
+- Touchpoint 2 is a proof: scene text with the review notes in the margin, packaging above, notes that belong to
+  no scene below; Approve stays disabled until every offered exception is ticked and sends the manifest digest the
+  Human read. A two-tab approval refused as `STALE_MANIFEST` shows localized text and reloads the current one.
+- Typed input survives a reload (session storage until the run starts) and the tab warns before closing with an
+  unsaved idea or revision note. A pending hand-off is finished with its recorded command; a name clash offers
+  "new name" or "replace".
+- Shared change: `ApiRequestError.code` carries a refusal's stable code (`api.ts`); all `story_error_*` codes have
+  en/vi/zh text. Backend: `GET /projects/{p}/story-runs` lists the user's runs.
+- Verification: `pnpm check` (typecheck, lint, knip, 2610 tests) passed on `fcbaced6`; 15 page/client tests and
+  the API test on `fbf220a7`; backend i18n consistency, route/service tests and `audit_tests --check` passed.
+- Visual check: run 11 at touchpoint 2 served from a copy of the disposable database (`arcreel_story_ui`, only
+  run 11's task) with auth off, screenshotted with headless Chromium at 1440 and 390 px; nothing was approved.
+  Found and fixed: exception rows ran the severity label into the text, and exceptions did not name their scene.
+  Not page-specific: at 390 px the host's workspace sidebar covers the viewport (same on every workspace page).
