@@ -124,7 +124,12 @@ def test_scene_findings_carry_the_policy_severities():
     text = _scene("# Cảnh 2", *SENTENCES, "Anh ấy suddenly okay sorry cười 突然", "Hùng tới. Rồi Hùng đi và")
     findings = {
         f.code: f
-        for f in check_scene_prose(text, node_id="s", window=SceneLengthWindow(), allowed_names={"Minh", "Lan"})
+        for f in check_scene_prose(
+            text,
+            node_id="s",
+            window=SceneLengthWindow(minimum=count_syllables(text) + 1),
+            allowed_names={"Minh", "Lan"},
+        )
     }
 
     assert findings["CJK"].severity is Severity.HARD_INTEGRITY
@@ -171,3 +176,25 @@ def test_markdown_emphasis_is_a_structural_finding_with_a_deterministic_fix():
     findings = check_scene_prose(text, node_id="s", window=SceneLengthWindow(1, 1000, 2000), allowed_names=set())
     assert "MARKUP" in {f.code for f in findings}
     assert strip_markup(text) == "Cha viết: 'Ngày mai sẽ gửi thư cho con.' Minh lặng người."
+
+
+def test_a_scene_far_below_the_window_is_not_a_full_scene():
+    short = check_scene_prose(
+        _scene(*SENTENCES), node_id="s", window=SceneLengthWindow(), allowed_names={"Minh", "Lan"}
+    )
+    assert [f.code for f in short if f.code.startswith(("SCENE_TOO_SHORT", "LENGTH"))] == ["SCENE_TOO_SHORT"]
+    assert next(f for f in short if f.code == "SCENE_TOO_SHORT").severity is Severity.HARD_STRUCTURAL
+
+
+def test_assimilated_loanwords_are_not_code_mixing_and_a_foreign_word_is_quoted_in_its_sentence():
+    assert foreign_words("Anh ngồi xuống ghế sofa, nhìn chiếc tivi cũ và cái vali.") == []
+    text = "Minh mở cửa. Anh thấy cánh gate cũ và cái hazy chiều. Lan gọi suddenly."
+    finding = next(
+        f
+        for f in check_scene_prose(
+            text, node_id="s", window=SceneLengthWindow(minimum=1), allowed_names={"Minh", "Lan"}
+        )
+        if f.code == "FOREIGN_WORDS"
+    )
+    assert finding.quote == "Anh thấy cánh gate cũ và cái hazy chiều."
+    assert "gate, hazy, suddenly" in finding.message

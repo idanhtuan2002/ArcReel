@@ -142,9 +142,55 @@ def is_vietnamese_syllable(token: str) -> bool:
     return base == "gi"
 
 
+LOANWORDS = frozenset(
+    {
+        "album",
+        "camera",
+        "chat",
+        "clip",
+        "container",
+        "email",
+        "game",
+        "guitar",
+        "internet",
+        "jeans",
+        "karaoke",
+        "laptop",
+        "logo",
+        "mail",
+        "menu",
+        "online",
+        "piano",
+        "pizza",
+        "radio",
+        "sofa",
+        "taxi",
+        "tivi",
+        "toilet",
+        "vali",
+        "valy",
+        "video",
+        "web",
+        "wifi",
+    }
+)
+
+
 def foreign_words(text: str) -> list[str]:
-    """Latin-letter tokens that cannot be Vietnamese syllables (F25 code-mixing)."""
-    return [token for token in syllable_tokens(text) if token.isascii() and not is_vietnamese_syllable(token)]
+    """Latin-letter tokens that cannot be Vietnamese syllables (F25 code-mixing); assimilated loanwords that
+    Vietnamese prose writes as they are (``LOANWORDS``) are not code-mixing."""
+    return [
+        token
+        for token in syllable_tokens(text)
+        if token.isascii() and not is_vietnamese_syllable(token) and token.lower() not in LOANWORDS
+    ]
+
+
+def _sentence_with(text: str, token: str) -> str:
+    for match in _VI_SENTENCE.finditer(text):
+        if token in syllable_tokens(match.group(0)):
+            return " ".join(match.group(0).split())
+    return token
 
 
 def repeated_trigram_excess(text: str) -> int:
@@ -607,6 +653,9 @@ def unknown_names(text: str, allowed: set[str]) -> Counter[str]:
     return found
 
 
+SHORT_SCENE_SHARE = 0.4
+
+
 @dataclass(frozen=True)
 class SceneLengthWindow:
     minimum: int = 600
@@ -637,7 +686,11 @@ def check_scene_prose(
             )
         )
     syllables = count_syllables(text)
-    if syllables > window.hard_maximum:
+    if syllables < window.minimum * SHORT_SCENE_SHARE:
+        findings.append(
+            Finding("SCENE_TOO_SHORT", Severity.HARD_STRUCTURAL, node_id, f"{syllables} syllables: not a full scene")
+        )
+    elif syllables > window.hard_maximum:
         findings.append(
             Finding("LENGTH_HARD", Severity.HARD_STRUCTURAL, node_id, f"{syllables} syllables > {window.hard_maximum}")
         )
@@ -657,8 +710,15 @@ def check_scene_prose(
     foreign = foreign_words(text)
     if foreign:
         severity = Severity.NARRATIVE_CRITICAL if len(foreign) > 2 else Severity.STYLISTIC
+        words = ", ".join(dict.fromkeys(foreign[:8]))
         findings.append(
-            Finding("FOREIGN_WORDS", severity, node_id, f"{len(foreign)} non-Vietnamese words", " ".join(foreign[:8]))
+            Finding(
+                "FOREIGN_WORDS",
+                severity,
+                node_id,
+                f"{len(foreign)} non-Vietnamese words ({words}); replace them with Vietnamese",
+                _sentence_with(text, foreign[0]),
+            )
         )
     if "*" in text:
         findings.append(Finding("MARKUP", Severity.HARD_STRUCTURAL, node_id, "markdown emphasis in prose", "*"))

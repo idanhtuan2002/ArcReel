@@ -95,7 +95,7 @@ NODE_CAPS = {
     "story_bible": 3,
     "style_bible": 3,
     "outline": 4,
-    "chapter_plan": 3,
+    "chapter_plan": 5,
     "scene_draft": 6,
     "chapter_review": 12,
     "manuscript_review": 4,
@@ -106,6 +106,10 @@ MIN_VERIFIED_SELLING_POINTS = 3
 STORY_HARD_RANGE = (6000, 12500)
 STORY_TARGET_RANGE = (7000, 11000)
 AUTO_NOTE = "Biên tập tự động: "
+REGENERATE_NOTE = (
+    "\n\n[Lưu ý] Bản viết trước quá ngắn hoặc chép lại câu của các cảnh trước. Viết lại toàn bộ cảnh, đủ độ dài, bằng "
+    "câu chữ hoàn toàn mới."
+)
 ENDING_NOTE = AUTO_NOTE + (
     "biên tập viên thấy cảnh này chưa khép lại xung đột trung tâm. Viết lại để kết thúc giải quyết trọn vẹn xung đột, "
     "trả lời câu hỏi mở đầu và dừng ở hình ảnh cuối đã định trong dàn ý."
@@ -516,15 +520,16 @@ class StoryRunDriver:
             location_names=list(locations),
             previous_plans=previous,
         )
-        unknown: list[str] = []
-        for _ in range(2):
+        node = chapter_plan(chapter)
+
+        async def generate(text: str) -> tuple[ChapterPlan, list[str]]:
             plan = ChapterPlan.model_validate_json(
                 await self._step(
-                    chapter_plan(chapter),
+                    node,
                     epoch,
                     kind=StoryStepKind.SCENE_CONTRACT,
                     system=planning.PLANNING_SYSTEM,
-                    prompt=prompt,
+                    prompt=text,
                     decoding=PLANNING,
                     model=ChapterPlan,
                 )
@@ -533,14 +538,32 @@ class StoryRunDriver:
                 {n for s in plan.scenes for n in (s.pov, *s.characters) if planning.resolve_name(n, names) is None}
                 | {s.location for s in plan.scenes if planning.resolve_name(s.location, locations) is None}
             )
-            if not unknown:
-                return plan.model_dump_json().encode("utf-8")
+            return plan, unknown
+
+        plan, unknown = await generate(prompt)
+        if unknown:
             prompt += (
                 f"\n\nLần trước dùng tên không có trong danh sách: {', '.join(unknown)}. Chỉ dùng đúng các tên đã cho."
             )
-        raise Blocked(
-            RunPhase.BLOCKED_QUALITY, f"{chapter_plan(chapter)}: names outside the bible: {', '.join(unknown)}"
+            plan, unknown = await generate(prompt)
+        if unknown:
+            raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: names outside the bible: {', '.join(unknown)}")
+        review = OutlineReview.model_validate_json(
+            await self._step(
+                node,
+                epoch,
+                kind=StoryStepKind.SCENE_CONTRACT,
+                system=planning.PLANNING_SYSTEM,
+                prompt=planning.chapter_plan_review_prompt(plan, chapter),
+                decoding=REVIEW,
+                model=OutlineReview,
+            )
         )
+        if review.problems:
+            revised, unknown = await generate(planning.chapter_plan_revision_prompt(prompt, plan, review.problems))
+            if not unknown:
+                plan = revised
+        return plan.model_dump_json().encode("utf-8")
 
     # --- scenes and the chapter loop ---------------------------------------------------------------
 
@@ -712,6 +735,17 @@ class StoryRunDriver:
             repairable = [f for f in findings if f.severity in REPAIRABLE]
             if not repairable:
                 return prose, findings
+            if any(f.code == "SCENE_TOO_SHORT" for f in repairable):
+                prose = await self._step(
+                    node,
+                    epoch,
+                    kind=StoryStepKind.SCENE_DRAFT,
+                    system=drafting.DRAFT_SYSTEM,
+                    prompt=prompt + REGENERATE_NOTE,
+                    decoding=DRAFT,
+                    paragraphs=bounds,
+                )
+                continue
             fixed, notes = deterministic_fixes(prose, repairable, earlier=earlier)
             if notes:
                 prose = fixed

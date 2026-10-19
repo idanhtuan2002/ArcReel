@@ -140,6 +140,26 @@ Các chương trước:
 {previous}"""
 
 
+def chapter_plan_review_prompt(plan: ChapterPlan, chapter_number: int) -> str:
+    """The plan's own consistency, checked before any scene is written (generate -> review -> revise)."""
+    return f"""Kiểm tra kế hoạch chương {chapter_number} dưới đây và trả về passed cùng danh sách problems:
+1. chapter_goal, reader_expectation hoặc summary/beats của một cảnh có hé lộ điều nằm trong withheld_cards không.
+2. Một mục required_changes_by_end có mâu thuẫn với do_not hoặc withheld_cards không.
+3. Một cảnh có làm điều nằm trong do_not không.
+4. Các cảnh có thực sự dẫn tới mọi mục required_changes_by_end không.
+Mỗi problem nêu cụ thể mục nào mâu thuẫn với mục nào. Nếu không có vấn đề, passed = true và problems rỗng.
+
+{_json(plan.model_dump())}"""
+
+
+def chapter_plan_revision_prompt(base_prompt: str, plan: ChapterPlan, problems: Sequence[str]) -> str:
+    listed = "\n".join(f"- {p}" for p in problems)
+    return (
+        f"{base_prompt}\n\nBản kế hoạch trước:\n{_json(plan.model_dump())}\n\nBản đó có các vấn đề sau; lập lại kế "
+        f"hoạch đầy đủ đã sửa hết các vấn đề này, giữ những phần không bị nêu:\n{listed}"
+    )
+
+
 # --- names to keys ---------------------------------------------------------------------------------
 
 

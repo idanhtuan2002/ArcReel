@@ -496,6 +496,25 @@ async def _chapter_plans(run: Run, surface: str, donor_system: str, donor_prompt
         mine, error = await b.structured(
             f"{surface}-r2-{seed}", planning.PLANNING_SYSTEM, r2_prompt, ChapterPlan, PLANNING, seed
         )
+        if mine is not None:
+            review, _ = await b.structured(
+                f"{surface}-r2r-{seed}",
+                planning.PLANNING_SYSTEM,
+                planning.chapter_plan_review_prompt(mine, 2),
+                OutlineReview,
+                REVIEW,
+                seed,
+            )
+            if review is not None and review.problems:
+                revised, _ = await b.structured(
+                    f"{surface}-r2v-{seed}",
+                    planning.PLANNING_SYSTEM,
+                    planning.chapter_plan_revision_prompt(r2_prompt, mine, review.problems),
+                    ChapterPlan,
+                    PLANNING,
+                    seed,
+                )
+                mine = revised or mine
         donor, derror = await b.structured(
             f"{surface}-d-{seed}", donor_system, donor_prompt, ChapterPlan, PLANNING, seed
         )

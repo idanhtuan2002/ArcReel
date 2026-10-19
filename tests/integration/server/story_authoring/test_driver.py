@@ -504,7 +504,7 @@ async def test_a_story_far_below_the_length_range_is_never_offered(concurrent_se
 
     def short(_prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
         answer = full(schema["properties"]["paragraphs"]["minItems"])
-        paragraphs = [p.split(". ")[0] + "." for p in answer["paragraphs"]]
+        paragraphs = [". ".join(p.split(". ")[:3]).rstrip(".") + "." for p in answer["paragraphs"]]
         model.paragraphs[-len(paragraphs) :] = paragraphs
         return {"paragraphs": paragraphs}
 
@@ -624,3 +624,27 @@ async def test_a_sentence_copied_from_an_earlier_scene_is_removed_without_a_mode
     assert manifest.scenes[0].revision.normalized_content.count(copied[0]) == 1
     assert copied[0] not in manifest.scenes[1].revision.normalized_content
     assert model.calls["prose"] == 9
+
+
+async def test_a_chapter_plan_with_a_contradiction_is_revised_before_any_scene(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    reviews: list[str] = []
+
+    def review(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        reviews.append(prompt)
+        if "Kiểm tra kế hoạch chương 2" in prompt:
+            return {"passed": False, "problems": ["chapter_goal hé lộ cuốn sổ, trái với withheld_cards"]}
+        return {"passed": True, "problems": []}
+
+    model.overrides["passed"] = review
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["chapter_goal"] == 4
+    plan_prompts = [p for k, p in model.prompts if k == "chapter_goal"]
+    assert "chapter_goal hé lộ cuốn sổ, trái với withheld_cards" in plan_prompts[2]
+    assert sum(1 for p in reviews if p.startswith("Kiểm tra kế hoạch chương")) == 3
