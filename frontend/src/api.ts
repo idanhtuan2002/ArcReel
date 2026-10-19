@@ -284,6 +284,8 @@ export class ApiRequestError extends Error {
     public readonly diagnostic?: unknown,
     /** HTTP 状态码；调用方据此区分「资源已不存在」与瞬时网络/服务错误。 */
     public readonly status?: number,
+    /** 后端 detail 为 `{code, ...}` 时的稳定错误码，供调用方映射本地化文案。 */
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -548,6 +550,11 @@ const API_BASE = "/api/v1";
  * 后端把 `{ code, message, ... }` 这样的信封当 detail 抛出的场合（如批量入队中途失败后的
  * 撤销结果），只按字符串与数组取字会把已翻译的说明整段丢掉，用户只收到一句「请求失败」。
  */
+function codeFromDetail(detail: unknown): string | undefined {
+  const code = detail && typeof detail === "object" ? (detail as { code?: unknown }).code : undefined;
+  return typeof code === "string" && code ? code : undefined;
+}
+
 function messageFromDetail(detail: unknown, fallback: string): string {
   if (typeof detail === "string") return detail || fallback;
   if (Array.isArray(detail) && detail.length > 0) {
@@ -585,7 +592,12 @@ async function throwIfNotOk(response: Response, fallbackMsg: string): Promise<vo
     if (isSpeechAdmission(detail)) {
       throw new SpeechAdmissionError(detail);
     }
-    throw new ApiRequestError(messageFromDetail(detail, fallbackMsg), error.diagnostic, response.status);
+    throw new ApiRequestError(
+      messageFromDetail(detail, fallbackMsg),
+      error.diagnostic,
+      response.status,
+      codeFromDetail(detail),
+    );
   }
 }
 
@@ -966,7 +978,12 @@ class API {
       if (isSpeechAdmission(error.detail)) {
         throw new SpeechAdmissionError(error.detail);
       }
-      throw new ApiRequestError(messageFromDetail(error.detail, "请求失败"), error.diagnostic, response.status);
+      throw new ApiRequestError(
+        messageFromDetail(error.detail, "请求失败"),
+        error.diagnostic,
+        response.status,
+        codeFromDetail(error.detail),
+      );
     }
 
     if (response.status === 204) {

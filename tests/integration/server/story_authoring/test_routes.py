@@ -109,6 +109,7 @@ async def test_a_run_started_over_http_is_approved_exported_and_handed_off(
         )
 
         run = (await client.get(f"/api/v1/projects/{PROJECT}/story-runs/{run_id}")).json()
+        listed = (await client.get(f"/api/v1/projects/{PROJECT}/story-runs")).json()
         stale = await client.post(
             f"/api/v1/projects/{PROJECT}/story-runs/{run_id}/approve",
             json={"manifest_digest": "sha256:" + "0" * 64, "accepted_exceptions": run["offered"]["exceptions_offered"]},
@@ -128,6 +129,9 @@ async def test_a_run_started_over_http_is_approved_exported_and_handed_off(
         refused = await client.post(handoff, json={"command_id": "cmd-00000002"})
 
     assert run["phase"] == "READY_FOR_APPROVAL"
+    assert [(r["run_id"], r["phase"], r["genre"]) for r in listed["runs"]] == [
+        (run_id, "READY_FOR_APPROVAL", "đời thường")
+    ]
     assert run["brief_digest"] == drafted["brief_digest"]
     assert len(run["offered"]["scenes"]) == 9
     assert (stale.status_code, stale.json()["detail"]["code"]) == (409, "STALE_MANIFEST")

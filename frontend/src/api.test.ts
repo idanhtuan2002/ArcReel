@@ -120,6 +120,23 @@ describe("API", () => {
       expect((error as ApiRequestError).diagnostic).toBeUndefined();
     });
 
+    it("carries the stable code of a structured refusal", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: false,
+          status: 409,
+          jsonData: { detail: { code: "STALE_MANIFEST", detail: "manifest changed" } },
+          statusText: "Conflict",
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const error = await API.request("/projects/demo/story-runs/r/approve").catch((e: unknown) => e);
+
+      expect((error as ApiRequestError).code).toBe("STALE_MANIFEST");
+      expect((error as ApiRequestError).status).toBe(409);
+    });
+
     it("keeps the backend message of a structured error envelope", async () => {
       // 结构化错误信封带 code 等字段，只按字符串取字会把已翻译的说明整段丢掉，
       // 用户只看到一句「请求失败」。

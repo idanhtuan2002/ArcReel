@@ -142,6 +142,11 @@ async def start_run(project_name: str, req: StartRunRequest, user: InteractiveUs
     return {"run_id": ref.run_id, "brief_digest": ref.brief.digest()}
 
 
+@router.get("/projects/{project_name}/story-runs")
+async def list_runs(project_name: str, user: CurrentUser, service: Service) -> dict:
+    return {"runs": await service.list_runs(user_id=user.id, project_name=project_name)}
+
+
 @router.get("/projects/{project_name}/story-runs/{run_id}")
 async def get_run(project_name: str, run_id: str, user: CurrentUser, service: Service) -> dict:
     try:

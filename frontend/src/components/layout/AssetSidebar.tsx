@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   ChartLine,
   Proportions,
+  BookOpenText,
   BookOpen,
   Users,
   Landmark,
@@ -131,6 +132,7 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
     ...(demoMode
       ? []
       : [
+          { key: "story", path: "/story", label: t("dashboard:workspace_nav_story"), icon: BookOpenText },
           { key: "formats", path: "/formats", label: t("dashboard:workspace_nav_formats"), icon: Proportions },
           { key: "learning", path: "/learning", label: t("dashboard:workspace_nav_learning"), icon: ChartLine },
         ]),

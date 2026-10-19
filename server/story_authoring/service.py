@@ -203,6 +203,36 @@ class StoryAuthoringService:
         ref = await self._require(user_id, project_name, run_id)
         return ref, await RunStateStore(self._factory, task_id=ref.task_id).load()
 
+    async def list_runs(self, *, user_id: str, project_name: str) -> list[dict[str, Any]]:
+        """The user's runs in a project, newest first, with what a picker shows."""
+        async with self._factory() as session:
+            tasks = (
+                await session.execute(
+                    select(Task)
+                    .where(
+                        Task.task_type == STORY_RUN_TASK_TYPE,
+                        Task.project_name == project_name,
+                        Task.user_id == user_id,
+                    )
+                    .order_by(Task.queued_at.desc())
+                )
+            ).scalars()
+            found = [(t.resource_id, t.task_id, t.queued_at, json.loads(t.payload_json or "{}")) for t in tasks]
+        runs = []
+        for run_id, task_id, queued_at, payload in found:
+            state = await RunStateStore(self._factory, task_id=task_id).load()
+            brief = StoryBrief.model_validate(payload["brief"])
+            runs.append(
+                {
+                    "run_id": run_id,
+                    "phase": state.phase.value,
+                    "idea": brief.idea,
+                    "genre": brief.genre,
+                    "started_at": queued_at.isoformat(),
+                }
+            )
+        return runs
+
     def offered(self, project_name: str, state: RunState) -> dict[str, Any] | None:
         """The offered manifest with what touchpoint 2 shows: scenes, findings, exceptions and packaging."""
         if state.commit is None:
