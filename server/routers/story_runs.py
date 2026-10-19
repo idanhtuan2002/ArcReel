@@ -96,6 +96,7 @@ def _view(run_id: str, brief: StoryBrief, state: RunState, offered: dict[str, An
         "run_id": run_id,
         "phase": state.phase.value,
         "block_reason": state.block_reason,
+        "blocked_findings": [dict(f) for f in state.blocked_findings],
         "brief": brief.model_dump(mode="json"),
         "brief_digest": brief.digest(),
         "usage": state.usage.model_dump(),

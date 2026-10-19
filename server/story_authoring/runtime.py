@@ -176,6 +176,8 @@ class RunState(_Frozen):
     commit: CommitProgress | None = None
     intents: Mapping[str, tuple[str, ...]] = Field(default_factory=dict)
     handoff: HandoffRecord | None = None
+    blocked_findings: tuple[Mapping[str, str], ...] = ()
+    retries: int = Field(default=0, ge=0)
 
     def attempt(self, attempt_id: str) -> AttemptRecord:
         for record in self.attempts:
@@ -386,7 +388,8 @@ def add_intent(state: RunState, *, node_ids: tuple[str, ...], note: str) -> RunS
 
 
 def set_phase(state: RunState, phase: RunPhase, *, reason: str | None = None) -> RunState:
-    return state.model_copy(update={"phase": phase, "block_reason": reason})
+    """Change the phase; a new phase replaces the block reason and clears the blocking findings."""
+    return state.model_copy(update={"phase": phase, "block_reason": reason, "blocked_findings": ()})
 
 
 def reopen_unconverged(state: RunState) -> RunState:
@@ -397,7 +400,7 @@ def reopen_unconverged(state: RunState) -> RunState:
         head = state.revisions.get(node.head_revision_id) if node.head_revision_id is not None else None
         if head is None or head.fingerprint != node.required_fingerprint:
             nodes[node_id] = node.model_copy(update={"generation_epoch": node.generation_epoch + 1})
-    return state.model_copy(update={"nodes": nodes})
+    return state.model_copy(update={"nodes": nodes, "retries": state.retries + 1})
 
 
 def require(state: RunState, *, node_id: str, fingerprint: str) -> RunState:

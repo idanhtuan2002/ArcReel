@@ -140,3 +140,8 @@ def test_an_over_long_scene_is_hard_structural():
         _scene(*SENTENCES * 10), node_id="s", window=SceneLengthWindow(hard_maximum=100), allowed_names={"Minh", "Lan"}
     )
     assert [f.code for f in findings if f.severity is Severity.HARD_STRUCTURAL] == ["LENGTH_HARD"]
+
+
+def test_a_sentence_after_a_single_quote_is_not_a_name():
+    text = "Ông nói: 'Nhà này không bán, con à.' Nhưng giọng ấy đã xa. Lan đáp: ‘Dạ.’ Rồi im lặng."
+    assert unknown_names(text, {"Lan"}) == {}

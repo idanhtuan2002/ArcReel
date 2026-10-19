@@ -532,7 +532,7 @@ _META_LINE = re.compile(
 )
 _CLOSING = (".", "!", "?", "…", "”", '"', "»", "’")
 _DIALOGUE_LINE = re.compile(r"^\s*(?:—|–|-|“|\")", re.MULTILINE)
-_SENTENCE_START = re.compile(r"(?:^|[.!?…:][”\"’»)]?\s*|\n\s*|[—–\-“\"(]\s*)$")
+_SENTENCE_START = re.compile(r"(?:^|[.!?…:][”\"’'»)]?\s*|\n\s*|[—–\-“‘\"'(]\s*)$")
 _WORD = re.compile(r"[^\W\d_]+")
 
 

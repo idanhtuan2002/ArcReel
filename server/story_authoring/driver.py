@@ -29,7 +29,13 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from server.story_authoring.artifacts import StoryBlobStore, content_digest
-from server.story_authoring.audits import CHAPTER_DIMENSIONS, anti_ai_findings, audit_chapter, critic_manuscript
+from server.story_authoring.audits import (
+    CHAPTER_DIMENSIONS,
+    AuditDimension,
+    anti_ai_findings,
+    audit_chapter,
+    critic_manuscript,
+)
 from server.story_authoring.checks import Finding, SceneLengthWindow, Severity, check_scene_prose, count_syllables
 from server.story_authoring.commit import ManuscriptCommitManifest, SceneEntry, load_offered_manifest, offer_manifest
 from server.story_authoring.contracts import (
@@ -99,8 +105,9 @@ REVIEW_CYCLES = 2
 MIN_VERIFIED_SELLING_POINTS = 3
 STORY_HARD_RANGE = (6000, 12500)
 STORY_TARGET_RANGE = (7000, 11000)
-ENDING_NOTE = (
-    "Biên tập viên thấy cảnh này chưa khép lại xung đột trung tâm. Viết lại để kết thúc giải quyết trọn vẹn xung đột, "
+AUTO_NOTE = "Biên tập tự động: "
+ENDING_NOTE = AUTO_NOTE + (
+    "biên tập viên thấy cảnh này chưa khép lại xung đột trung tâm. Viết lại để kết thúc giải quyết trọn vẹn xung đột, "
     "trả lời câu hỏi mở đầu và dừng ở hình ảnh cuối đã định trong dàn ý."
 )
 RETRYABLE = frozenset(
@@ -138,9 +145,10 @@ class StoryBrief(BaseModel):
 
 
 class Blocked(Exception):
-    def __init__(self, phase: RunPhase, reason: str) -> None:
+    def __init__(self, phase: RunPhase, reason: str, findings: Sequence[Finding] = ()) -> None:
         self.phase = phase
         self.reason = reason
+        self.findings = tuple(findings)
         super().__init__(f"{phase.value}: {reason}")
 
 
@@ -216,19 +224,19 @@ class StoryRunDriver:
             return state
         try:
             for _ in range(3):
-                intents = (await self._store.load()).intents
+                intents = human_intents(await self._store.load())
                 try:
                     story = await self._converge()
                 except _Restart:
                     continue
-                if (await self._store.load()).intents == intents:
+                if human_intents(await self._store.load()) == intents:
                     break
             else:
                 raise Blocked(RunPhase.BLOCKED_PROPAGATION, "the run kept changing while converging")
             manifest = await self._manifest(story)
             await offer_manifest(self._store, self._blobs, manifest)
         except Blocked as blocked:
-            await self._set_phase(blocked.phase, blocked.reason)
+            await self._set_phase(blocked.phase, blocked.reason, blocked.findings)
         except StoryStepError as error:
             if error.code is StoryFailureCode.MODEL_UNAVAILABLE or error.code is StoryFailureCode.PROVIDER_ERROR:
                 await self._set_phase(RunPhase.MODEL_UNAVAILABLE, str(error))
@@ -239,10 +247,15 @@ class StoryRunDriver:
                 await self._set_phase(RunPhase.BLOCKED_QUALITY, str(error))
         return await self._store.load()
 
-    async def _set_phase(self, phase: RunPhase, reason: str) -> None:
-        await self._store.apply(
-            lambda s: (set_phase(s, phase, reason=reason), None) if s.phase is RunPhase.RUNNING else (s, None)
-        )
+    async def _set_phase(self, phase: RunPhase, reason: str, findings: Sequence[Finding] = ()) -> None:
+        recorded = tuple(_finding_dict(f) for f in findings)
+
+        def change(state: RunState) -> tuple[RunState, None]:
+            if state.phase is not RunPhase.RUNNING:
+                return state, None
+            return set_phase(state, phase, reason=reason).model_copy(update={"blocked_findings": recorded}), None
+
+        await self._store.apply(change)
 
     # --- node mechanics ----------------------------------------------------------------------------
 
@@ -325,7 +338,7 @@ class StoryRunDriver:
         cap = NODE_CAPS[node.split("[", 1)[0]]
         while True:
             state = await self._store.load()
-            prefix = f"{node}@{epoch}#"
+            prefix = step_prefix(state, node)
             used = sum(1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix))
             if used >= cap:
                 raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: call cap {cap} reached without an acceptable output")
@@ -352,9 +365,6 @@ class StoryRunDriver:
             except StoryStepError as error:
                 if error.code not in RETRYABLE:
                     raise
-
-    def _step_prefix(self, node: str, epoch: int) -> str:
-        return f"{node}@{epoch}#"
 
     # --- stages ------------------------------------------------------------------------------------
 
@@ -704,7 +714,7 @@ class StoryRunDriver:
     ) -> str:
         """One bounded repair: length normalizing for length findings, else a span patch, else a regeneration."""
         state = await self._store.load()
-        prefix = self._step_prefix(node, epoch)
+        prefix = step_prefix(state, node)
         used = sum(1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix))
         if used >= NODE_CAPS["scene_draft"]:
             raise Blocked(
@@ -753,15 +763,17 @@ class StoryRunDriver:
         if head.head_revision_id is not None and state.revisions[head.head_revision_id].fingerprint == fp:
             return False
         state, _ = await self._store.apply(lambda s: (require(s, node_id=node, fingerprint=fp), None))
-        epoch = state.node(node).generation_epoch
         scenes = [(n, h["prose"]) for n, h in heads.items()]
         plan = story.plans[chapter - 1]
         facts = "\n".join(f"- {c.name}: {c.relation_to_protagonist}. {c.description}" for c in story.seed.characters)
         previous = " ".join(p.chapter_goal for p in story.plans[: chapter - 1])
         findings: list[Finding] = [f for n, h in heads.items() for f in anti_ai_findings(h["prose"], node_id=n)]
         for dimension in CHAPTER_DIMENSIONS:
-            step_used = sum(1 for a in state.attempts if a.step_id.startswith(f"{node}@{epoch}#"))
-            step_id = f"{node}@{epoch}#{step_used + 1}"
+            prefix = step_prefix(state, node)
+            step_used = sum(
+                1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix)
+            )
+            step_id = f"{prefix}{step_used + 1}"
             result = await audit_chapter(
                 self._gateway,
                 scope=self._scope,
@@ -782,16 +794,24 @@ class StoryRunDriver:
         if not final and repairable:
             changed = False
             for scene_node in sorted({f.node_id for f in repairable}):
+                scene_findings = [f for f in repairable if f.node_id == scene_node]
+                contract = [f for f in scene_findings if f.code.startswith(f"{AuditDimension.MEMO_COMPLIANCE.value}:")]
+                if contract:
+                    note = (
+                        AUTO_NOTE
+                        + f"thẩm định chương {chapter} yêu cầu viết lại cảnh này để sửa: "
+                        + "; ".join(f"{f.message} (trích: “{f.quote}”)" for f in contract)
+                    )
+                    await self._store.apply(
+                        lambda s, n=scene_node, note=note: (add_intent(s, node_ids=(n,), note=note), None)
+                    )
+                    changed = True
+                    continue
                 state = await self._store.load()
                 scene_epoch = state.node(scene_node).generation_epoch
                 scene_head = heads[scene_node]
                 repaired = await self._repair_once(
-                    scene_node,
-                    scene_epoch,
-                    scene_head["prose"],
-                    [f for f in repairable if f.node_id == scene_node],
-                    "",
-                    [],
+                    scene_node, scene_epoch, scene_head["prose"], scene_findings, facts, []
                 )
                 if repaired != scene_head["prose"]:
                     await self._replace_head(
@@ -804,6 +824,7 @@ class StoryRunDriver:
             raise Blocked(
                 RunPhase.BLOCKED_QUALITY,
                 f"{node}: " + "; ".join(f"{f.code} {f.node_id}" for f in findings if f.blocking),
+                [f for f in findings if f.blocking],
             )
         record = json.dumps({"findings": [_finding_dict(f) for f in findings]}, ensure_ascii=False).encode("utf-8")
         await self._promote(
@@ -839,6 +860,7 @@ class StoryRunDriver:
                 raise Blocked(
                     RunPhase.BLOCKED_QUALITY,
                     "manuscript_review: " + "; ".join(f.message for f in result.findings if f.blocking),
+                    blocking,
                 )
             return json.dumps(
                 {
@@ -922,7 +944,7 @@ class StoryRunDriver:
         findings.extend(story_length_findings([chapters[c] for c in sorted(chapters)]))
         blocking = [f for f in findings if f.blocking]
         if blocking:
-            raise Blocked(RunPhase.BLOCKED_QUALITY, "; ".join(f"{f.code} {f.node_id}" for f in blocking))
+            raise Blocked(RunPhase.BLOCKED_QUALITY, "; ".join(f"{f.code} {f.node_id}" for f in blocking), blocking)
         record = [{**_finding_dict(f), "id": f"F{i + 1:03d}"} for i, f in enumerate(findings)]
         quality_digest = self._blobs.put(
             json.dumps({"findings": record, "packaging": packaging.model_dump()}, ensure_ascii=False).encode("utf-8")
@@ -954,6 +976,17 @@ class StoryRunDriver:
             export_digest=export_digest,
             quality_record_digest=quality_digest,
         )
+
+
+def human_intents(state: RunState) -> dict[str, tuple[str, ...]]:
+    """Revision notes from the Human; the driver's own notes (``AUTO_NOTE``) are excluded."""
+    notes = {node: tuple(n for n in found if not n.startswith(AUTO_NOTE)) for node, found in state.intents.items()}
+    return {node: found for node, found in notes.items() if found}
+
+
+def step_prefix(state: RunState, node: str) -> str:
+    """Attempts of a node in one round share its call cap; a round ends only with a Human revision or retry."""
+    return f"{node}@r{len(human_intents(state).get(node, ()))}.{state.retries}#"
 
 
 def entity_keys(seed: StorySeed) -> tuple[dict[str, str], dict[str, str]]:

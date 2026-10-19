@@ -531,3 +531,67 @@ async def test_a_revision_requested_while_running_is_honoured_before_the_offer(
     assert model.calls["prose"] == 18
     assert model.calls["titles"] == 2
     assert "Thêm mưa." in [p for k, p in model.prompts if k == "prose"][9]
+
+
+def _memo_issue(model: ScriptedModel, flagged: list[str]) -> Answer:
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if flagged or "GHI CHÚ CHƯƠNG" not in prompt:
+            return {"issues": []}
+        flagged.append(model.paragraphs[-1])
+        issue = {
+            "severity": "critical",
+            "issue_type": "required_change_missing",
+            "description": "Minh chưa thấy cuốn sổ",
+            "quote": model.paragraphs[-1],
+            "suggested_fix": "cho Minh thấy cuốn sổ",
+        }
+        return {"issues": [issue]}
+
+    return audit
+
+
+async def test_a_contract_finding_regenerates_the_scene_with_an_editor_note_inside_its_cap(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    flagged: list[str] = []
+    model.overrides["issues"] = _memo_issue(model, flagged)
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert len(state.intents[scene_draft(1, 3)]) == 1
+    assert state.intents[scene_draft(1, 3)][0].startswith("Biên tập tự động: ")
+    assert "Minh chưa thấy cuốn sổ" in [p for k, p in model.prompts if k == "prose"][3]
+    assert model.calls["prose"] == 10
+    assert model.calls.get("patches", 0) == 0
+    scene_steps = {a.step_id for a in state.attempts if a.step_id.startswith(scene_draft(1, 3))}
+    assert scene_steps == {f"{scene_draft(1, 3)}@r0.0#1", f"{scene_draft(1, 3)}@r0.0#2"}
+
+
+async def test_a_final_review_that_blocks_keeps_its_findings(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+
+    def always(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if "GHI CHÚ CHƯƠNG" not in prompt or "[Chương 1 cần thẩm định]" not in prompt:
+            return {"issues": []}
+        quote = prompt.rsplit("\n\n", 1)[-1].split(". ")[0] + "."
+        issue = {
+            "severity": "critical",
+            "issue_type": "withheld_card_revealed",
+            "description": "lộ bài",
+            "quote": quote,
+            "suggested_fix": "giấu",
+        }
+        return {"issues": [issue]}
+
+    model.overrides["issues"] = always
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.BLOCKED_QUALITY
+    assert state.blocked_findings
+    assert {f["code"] for f in state.blocked_findings} == {"MEMO_COMPLIANCE:withheld_card_revealed"}
+    assert all(f["quote"] for f in state.blocked_findings)
