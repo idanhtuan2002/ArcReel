@@ -401,3 +401,34 @@ dispatch, worker module and task repository tests → 414 passed. ruff, `basedpy
 - **Intent expiry.** Discard, abort and `COMMITTED` are terminal for the driver, so remaining intents are inert; they are not rewritten to `EXPIRED`.
 - **Default limits** (`DEFAULT_LIMITS`): the Change "Size and budget" upper bounds (132 calls, 132 × 24,576 input tokens, 132 × 4,096 output tokens, 6 h). Task4.6 replaces them with measured p95 × 1.2.
 - The scripted model proves control flow and owners, not prose quality; quality evidence is Task4.6.
+
+## V2 Task4.6 live runs 1–7 on `ornith-32k:9b` (2026-10-19) — in progress, decision needed
+
+Setup: production path on the disposable test PostgreSQL (draft brief → Gate A record → task → executor → driver),
+real Ollama 0.32.6 `/api/chat`, RTX 2070 8 GB, idea "Minh về làng bán nhà cha… cuốn sổ", genre "tâm lý – gia đình".
+The agent never approves; every run stops at touchpoint 2 or a typed blocked phase. Raw output: the ignored
+probe directory `.superpowers/sdd/2026-10-18-r2-v2-story-release/live/run*/summary.json`.
+
+| Run | HEAD | Result | Time | Calls | Cause found | Fix |
+|---|---|---|---|---|---|---|
+| 1 | `c6033eb3` | `BLOCKED_QUALITY` ch1 review | 814 s | 41 | scene cap reset every epoch (9 calls for one scene); memo findings not kept | `2b3b118f` cap per round, contract findings regenerate with an editor note, blocking findings kept |
+| 2 | `2b3b118f` | `BLOCKED_QUALITY` ch1 review | 653 s | 27 | drafting context carried earlier scenes in full; the model copied whole passages; markdown `*` | `0d6e…`/`(commit after 2b3b118f)` tail-only context, L1 `CROSS_SCENE_REPLAY` with deterministic removal, `MARKUP` |
+| 3 | after copy fix | `BLOCKED_QUALITY` scene cap | 598 s | 30 | chapter plan contradicts itself (goal reveals the withheld card); `sofa`/`tivi` taken as English; stub scenes accepted | `c9bf2fa1` plan review→revise, loanword allowlist, `SCENE_TOO_SHORT` regenerates |
+| 4 | `c9bf2fa1` | `BLOCKED_QUALITY` scene cap | 411 s | 22 | dialogue ending in `'` read as truncated | `de7f88fa` `'`/`)` close a sentence, unfinished tail cut deterministically |
+| 5 | `de7f88fa` | `BLOCKED_QUALITY` ch1 review | 740 s | 37 | required dialogue itself breaks the do-not list; the 9B plan review passed it | `a3b3e956` one bounded chapter replan from blocking contract findings |
+| 6 | `a3b3e956` | `BLOCKED_QUALITY` scene cap | 592 s | 34 | 5 scenes/chapter → 600-syllable target met with tiny paragraphs; Ollama ignores `minLength` beside `pattern` (live probe) | `7988c1e1` length floor inside the grammar pattern |
+| 7 | `7988c1e1` | `BLOCKED_QUALITY` scene cap | 1514 s | 62 | 3 review cycles + replan + new round on chapter 1; scene [1,4] `OUTPUT_TRUNCATED` ×3 at 4,096 tokens under the paragraph floor | open |
+
+Facts:
+- No run has sealed chapter 1. Chapter 1 alone used 22–62 of the run's 132-call ceiling and 7–25 minutes.
+- System behaviour held in every run: no crash, no invariant breach, typed blocked phase, findings kept, no CJK.
+- Every blocking finding inspected was real (copying, contradiction, leaked withheld card), except the
+  loanword and single-quote false positives, which are fixed.
+- The 9B planner writes self-contradictory chapter plans and drifts relations (father ↔ grandfather, sister
+  addressed as "bà"/"chị"); its own plan review passed those plans.
+- Prose observed: repeated motifs across scenes, timeline slips ("cha mất mười năm" against "vừa mất"), an
+  incoherent scene (Minh boards a bus back to the city mid-chapter).
+
+Inference: the pipeline's structural defects found so far are fixed, but on this model the remaining blocks come
+from planning coherence and judge variance (each review cycle names new contract issues). Further prompt tuning
+may get runs to touchpoint 2, but the evidence does not support "commercial-grade" prose from this model.
