@@ -13,6 +13,7 @@ from r2.contracts.opportunity import (
     EffectiveCapabilityEvaluation,
     EvidenceDataClassClock,
     PermissionDisposition,
+    SnapshotPage,
     SourceCapabilityGrant,
     SourceDataRule,
     SourcePageResult,
@@ -113,7 +114,7 @@ def validate_capability(
         raise OpportunityError(StopCode.M9_CREDENTIAL_REFERENCE_INVALID)
 
 
-def _page_rules(page: SourcePageResult, grant: SourceCapabilityGrant) -> tuple[SourceDataRule, ...]:
+def _page_rules(page: SourcePageResult | SnapshotPage, grant: SourceCapabilityGrant) -> tuple[SourceDataRule, ...]:
     rules = {rule.data_class: rule for rule in grant.data_rules}
     if (
         len(rules) != len(grant.data_rules)
@@ -125,7 +126,7 @@ def _page_rules(page: SourcePageResult, grant: SourceCapabilityGrant) -> tuple[S
 
 
 def page_clocks(
-    page: SourcePageResult, grant: SourceCapabilityGrant, *, captured_at: datetime
+    page: SourcePageResult | SnapshotPage, grant: SourceCapabilityGrant, *, captured_at: datetime
 ) -> tuple[EvidenceDataClassClock, ...]:
     """Stamp once at DB admission after I/O; callers retain these immutable clocks."""
     if captured_at.tzinfo is None or captured_at.utcoffset() is None:
@@ -162,5 +163,5 @@ def require_clocks_current(clocks: Sequence[EvidenceDataClassClock], *, now: dat
         raise OpportunityError(StopCode.M9_EVIDENCE_STALE)
 
 
-def retain_page_proof(page: SourcePageResult, grant: SourceCapabilityGrant) -> bool:
+def retain_page_proof(page: SourcePageResult | SnapshotPage, grant: SourceCapabilityGrant) -> bool:
     return all(rule.digest_proof_may_be_retained for rule in _page_rules(page, grant))
