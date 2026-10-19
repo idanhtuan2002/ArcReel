@@ -58,6 +58,8 @@ class DraftBriefRequest(_Request):
     provider_id: str = Field(min_length=1)
     model_id: str = Field(min_length=1)
     story_target_syllables: int = Field(default=9000, ge=7000, le=11000)
+    judge_provider_id: str | None = Field(default=None, min_length=1)
+    judge_model_id: str | None = Field(default=None, min_length=1)
 
 
 class StartRunRequest(_Request):
@@ -117,6 +119,8 @@ async def draft_brief(project_name: str, req: DraftBriefRequest, _user: CurrentU
             provider_id=req.provider_id,
             model_id=req.model_id,
             story_target_syllables=req.story_target_syllables,
+            judge_provider_id=req.judge_provider_id,
+            judge_model_id=req.judge_model_id,
         )
     except REFUSALS as error:
         raise _refusal(error) from error

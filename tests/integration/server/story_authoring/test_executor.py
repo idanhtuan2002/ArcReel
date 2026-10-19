@@ -22,14 +22,16 @@ type Factory = async_sessionmaker[AsyncSession]
 BASE_URL = "http://ollama:1"
 
 
-async def _provider(factory: Factory, *, base_url: str = BASE_URL, endpoint: str = "ollama-chat") -> str:
+async def _provider(
+    factory: Factory, *, base_url: str = BASE_URL, endpoint: str = "ollama-chat", model: str = MODEL
+) -> str:
     async with factory() as session:
         provider = await CustomProviderRepository(session).create_provider(
             "Ollama",
             "openai",
             base_url,
             "",
-            models=[{"model_id": MODEL, "display_name": MODEL, "endpoint": endpoint}],
+            models=[{"model_id": model, "display_name": model, "endpoint": endpoint}],
         )
         await session.commit()
         return f"custom-{provider.id}"
@@ -113,3 +115,60 @@ async def test_a_run_waiting_for_approval_is_not_driven_again(concurrent_session
 
     assert result["phase"] == "READY_FOR_APPROVAL"
     assert sum(again.calls.values()) == 0
+
+
+JUDGE_URL = "http://judge:1"
+
+
+async def test_a_judge_route_gets_its_own_gateway_and_reviews_the_run(concurrent_session_factory: Factory, tmp_path):
+    writer_id = await _provider(concurrent_session_factory)
+    judge_id = await _provider(concurrent_session_factory, base_url=JUDGE_URL, model="judge-12b")
+    judge_route = StoryModelSelection.create(
+        provider_id=judge_id, endpoint="ollama-chat", base_url=JUDGE_URL, model_id="judge-12b", has_credential=False
+    )
+    payload = _payload(writer_id)
+    payload["brief"]["judge_selection"] = judge_route.model_dump(mode="json")
+    task_id = await _task(concurrent_session_factory, payload)
+    writer, judge = ScriptedModel(), ScriptedModel("judge-12b")
+    judge.paragraphs = writer.paragraphs
+
+    def client_for(base_url: str, _api_key: str | None) -> OllamaChatClient:
+        model = judge if base_url == JUDGE_URL else writer
+        return OllamaChatClient(base_url=base_url, transport=httpx.MockTransport(model.handler))
+
+    result = await execute_story_run_task(
+        IDENTITY.project_name,
+        IDENTITY.run_id,
+        payload,
+        user_id=IDENTITY.user_id,
+        task_id=task_id,
+        session_factory=concurrent_session_factory,
+        project_dir=tmp_path,
+        client_for=client_for,
+        clock=lambda: NOW,
+    )
+
+    assert result["phase"] == "READY_FOR_APPROVAL"
+    assert judge.calls["issues"] == 12
+    assert "issues" not in writer.calls
+
+
+async def test_an_unconfigured_judge_route_stops_the_run_before_any_call(concurrent_session_factory: Factory, tmp_path):
+    writer_id = await _provider(concurrent_session_factory)
+    payload = _payload(writer_id)
+    payload["brief"]["judge_selection"] = StoryModelSelection.create(
+        provider_id="custom-99999",
+        endpoint="ollama-chat",
+        base_url=JUDGE_URL,
+        model_id="judge-12b",
+        has_credential=False,
+    ).model_dump(mode="json")
+    task_id = await _task(concurrent_session_factory, payload)
+    model = ScriptedModel()
+
+    result = await _execute(concurrent_session_factory, model, tmp_path)(
+        IDENTITY.project_name, IDENTITY.run_id, payload, user_id=IDENTITY.user_id, task_id=task_id
+    )
+
+    assert result["phase"] == "MODEL_UNAVAILABLE"
+    assert sum(model.calls.values()) == 0

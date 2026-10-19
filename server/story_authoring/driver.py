@@ -148,7 +148,13 @@ class StoryBrief(BaseModel):
     story_target_syllables: int = Field(default=9000, ge=7000, le=11000)
     scene_window: tuple[int, int, int] = (600, 1000, 1400)
     selection: StoryModelSelection
+    judge_selection: StoryModelSelection | None = None
     limits: StoryLimits
+
+    @property
+    def judge(self) -> StoryModelSelection:
+        """The route of review calls (audits, confirmation, critic, outline and plan review); the writer's by default."""
+        return self.judge_selection or self.selection
 
     def digest(self) -> str:
         content = self.model_dump(mode="json", exclude={"gate_a_decision_id"})
@@ -211,8 +217,11 @@ class StoryRunDriver:
         store: RunStateStore,
         gateway: AuthoringTextGateway,
         blobs: StoryBlobStore,
+        judge_gateway: AuthoringTextGateway | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
+        if (brief.judge_selection is None) != (judge_gateway is None):
+            raise ValueError("a judge gateway is given exactly when the brief names a judge route")
         if brief.gate_a_decision_id is None:
             raise ValueError("a story run starts only after its Gate A greenlight")
         self._identity = identity
@@ -220,6 +229,7 @@ class StoryRunDriver:
         self._gate_a_decision_id = brief.gate_a_decision_id
         self._store = store
         self._gateway = gateway
+        self._judge_gateway = judge_gateway or gateway
         self._blobs = blobs
         self._clock = clock
         self._scope = StoryScope(
@@ -272,7 +282,10 @@ class StoryRunDriver:
     # --- node mechanics ----------------------------------------------------------------------------
 
     def _route(self) -> str:
-        return self._brief.selection.config_digest
+        writer = self._brief.selection.config_digest
+        if self._brief.judge_selection is None:
+            return writer
+        return writer + "+" + self._brief.judge_selection.config_digest
 
     async def _ensure(
         self,
@@ -344,6 +357,7 @@ class StoryRunDriver:
         decoding: dict[str, float],
         model: type[BaseModel] | None = None,
         max_output_tokens: int = 4096,
+        judge: bool = False,
         paragraphs: tuple[int, int] = (1, 40),
         paragraph_chars: int = 20,
         paragraph_max_chars: int | None = None,
@@ -358,13 +372,14 @@ class StoryRunDriver:
                 raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: call cap {cap} reached without an acceptable output")
             step_id = f"{prefix}{used + 1}"
             try:
-                output = await self._gateway.generate(
+                gateway = self._judge_gateway if judge else self._gateway
+                output = await gateway.generate(
                     scope=self._scope,
                     request=StoryStepRequest(
                         step_id=step_id,
                         kind=kind,
                         context_digest=self._brief.digest(),
-                        selection=self._brief.selection,
+                        selection=self._brief.judge if judge else self._brief.selection,
                         system_prompt=system,
                         prompt=prompt,
                         output_mode=OutputMode.STRUCTURED if model else OutputMode.PROSE,
@@ -499,6 +514,7 @@ class StoryRunDriver:
                 prompt=outline_prompts.outline_review_prompt(seed, outline),
                 decoding=REVIEW,
                 model=OutlineReview,
+                judge=True,
             )
         )
         problems = [*outline_prompts.deterministic_outline_problems(outline), *review.problems]
@@ -572,6 +588,7 @@ class StoryRunDriver:
                 prompt=planning.chapter_plan_review_prompt(plan, chapter),
                 decoding=REVIEW,
                 model=OutlineReview,
+                judge=True,
             )
         )
         if review.problems:
@@ -839,9 +856,9 @@ class StoryRunDriver:
             result = await self._judge(
                 node,
                 lambda step_id, decoding, dimension=dimension: audit_chapter(
-                    self._gateway,
+                    self._judge_gateway,
                     scope=self._scope,
-                    selection=self._brief.selection,
+                    selection=self._brief.judge,
                     step_id=step_id,
                     context_digest=self._brief.digest(),
                     decoding=decoding,
@@ -926,9 +943,9 @@ class StoryRunDriver:
         confirmed = await self._judge(
             node,
             lambda step_id, decoding: confirm_finding(
-                self._gateway,
+                self._judge_gateway,
                 scope=self._scope,
-                selection=self._brief.selection,
+                selection=self._brief.judge,
                 step_id=step_id,
                 context_digest=self._brief.digest(),
                 decoding=decoding,
@@ -962,9 +979,9 @@ class StoryRunDriver:
             result = await self._judge(
                 "manuscript_review",
                 lambda step_id, decoding: critic_manuscript(
-                    self._gateway,
+                    self._judge_gateway,
                     scope=self._scope,
-                    selection=self._brief.selection,
+                    selection=self._brief.judge,
                     step_id=step_id,
                     context_digest=self._brief.digest(),
                     decoding=decoding,

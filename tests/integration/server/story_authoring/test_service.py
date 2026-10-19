@@ -279,3 +279,21 @@ async def test_revise_discard_and_retry_follow_the_lifecycle(
         )
     store = RunStateStore(concurrent_session_factory, task_id=ref.task_id)
     assert (await store.load()).phase is RunPhase.DISCARDED
+
+
+async def test_a_brief_names_a_judge_route_only_when_it_differs_from_the_writer(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    service = _service(concurrent_session_factory, grants, projects)
+    writer_id = await _provider(concurrent_session_factory)
+    judge_id = await _provider(concurrent_session_factory, base_url="http://judge:1", model="judge-12b")
+    common = {"idea": "Một ý.", "genre": "đời thường", "provider_id": writer_id, "model_id": MODEL}
+
+    judged = await service.draft_brief(**common, judge_provider_id=judge_id, judge_model_id="judge-12b")
+    same = await service.draft_brief(**common, judge_provider_id=writer_id, judge_model_id=MODEL)
+
+    assert judged.judge_selection is not None
+    assert (judged.judge.model_id, judged.judge.base_url) == ("judge-12b", "http://judge:1")
+    assert same.judge_selection is None
+    with pytest.raises(StoryActionRefused, match="ROUTE_INCOMPLETE"):
+        await service.draft_brief(**common, judge_provider_id=judge_id)

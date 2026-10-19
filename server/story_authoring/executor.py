@@ -3,7 +3,8 @@
 The task's payload is the brief that Gate A approved; its resource id is the run id. One execution reconciles the
 run after any restart, resolves the frozen model route against the current custom provider, and drives the run
 until it is offered for approval or stops in a typed phase. Finality is the run's phase, never the task status, so
-a run that waits for approval or stopped blocked returns normally.
+a run that waits for approval or stopped blocked returns normally. A brief with a judge route gets a second
+gateway, credential and usage sink for review calls; both routes must resolve before any call.
 """
 
 from __future__ import annotations
@@ -90,25 +91,36 @@ async def execute_story_run_task(
     state, _ = await recover_run(store, session_factory=session_factory, blob_exists=blobs.exists)
     if state.phase is not RunPhase.RUNNING:
         return {"run_id": resource_id, "phase": state.phase.value}
+    routes = [brief.selection] if brief.judge_selection is None else [brief.selection, brief.judge_selection]
     try:
-        api_key = await resolve_route_credential(session_factory, brief.selection)
+        keys = [await resolve_route_credential(session_factory, route) for route in routes]
     except RouteUnavailable as error:
         reason = str(error)
         state, _ = await store.apply(lambda s: (set_phase(s, RunPhase.MODEL_UNAVAILABLE, reason=reason), None))
         return {"run_id": resource_id, "phase": state.phase.value}
-    sink = StoryAttemptSink(
+    gateways = [
+        AuthoringTextGateway(
+            selection=route,
+            limits=brief.limits,
+            client=client_for(route.base_url, key),
+            sink=StoryAttemptSink(
+                store=store,
+                session_factory=session_factory,
+                provider_id=route.provider_id,
+                model_id=route.model_id,
+                clock=clock,
+            ),
+        )
+        for route, key in zip(routes, keys, strict=True)
+    ]
+    driver = StoryRunDriver(
+        identity=identity,
+        brief=brief,
         store=store,
-        session_factory=session_factory,
-        provider_id=brief.selection.provider_id,
-        model_id=brief.selection.model_id,
+        gateway=gateways[0],
+        judge_gateway=gateways[1] if len(gateways) > 1 else None,
+        blobs=blobs,
         clock=clock,
     )
-    gateway = AuthoringTextGateway(
-        selection=brief.selection,
-        limits=brief.limits,
-        client=client_for(brief.selection.base_url, api_key),
-        sink=sink,
-    )
-    driver = StoryRunDriver(identity=identity, brief=brief, store=store, gateway=gateway, blobs=blobs, clock=clock)
     state = await driver.run()
     return {"run_id": resource_id, "phase": state.phase.value}

@@ -114,9 +114,34 @@ class StoryAuthoringService:
     # --- brief and start ---------------------------------------------------------------------------
 
     async def draft_brief(
-        self, *, idea: str, genre: str, provider_id: str, model_id: str, story_target_syllables: int = 9000
+        self,
+        *,
+        idea: str,
+        genre: str,
+        provider_id: str,
+        model_id: str,
+        story_target_syllables: int = 9000,
+        judge_provider_id: str | None = None,
+        judge_model_id: str | None = None,
     ) -> StoryBrief:
-        """The brief with its frozen route; its digest is what the Human greenlights at Gate A."""
+        """The brief with its frozen routes; its digest is what the Human greenlights at Gate A. A judge route is
+        optional; without one the writer's route also reviews."""
+        if (judge_provider_id is None) != (judge_model_id is None):
+            raise StoryActionRefused("ROUTE_INCOMPLETE", "a judge route needs both a provider and a model", status=422)
+        selection = await self._selection(provider_id, model_id)
+        judge = (
+            await self._selection(judge_provider_id, judge_model_id) if judge_provider_id and judge_model_id else None
+        )
+        return StoryBrief(
+            idea=idea,
+            genre=genre,
+            story_target_syllables=story_target_syllables,
+            selection=selection,
+            judge_selection=judge if judge != selection else None,
+            limits=DEFAULT_LIMITS,
+        )
+
+    async def _selection(self, provider_id: str, model_id: str) -> StoryModelSelection:
         if not is_custom_provider(provider_id):
             raise StoryActionRefused("ROUTE_NOT_QUALIFIED", f"{provider_id} is not a custom provider", status=422)
         async with self._factory() as session:
@@ -129,19 +154,12 @@ class StoryAuthoringService:
             raise StoryActionRefused(
                 "ROUTE_NOT_QUALIFIED", f"story authoring needs the {OLLAMA_CHAT_ENDPOINT} endpoint", status=422
             )
-        selection = StoryModelSelection.create(
+        return StoryModelSelection.create(
             provider_id=provider_id,
             endpoint=model.endpoint,
             base_url=provider.base_url,
             model_id=model_id,
             has_credential=bool(provider.api_key),
-        )
-        return StoryBrief(
-            idea=idea,
-            genre=genre,
-            story_target_syllables=story_target_syllables,
-            selection=selection,
-            limits=DEFAULT_LIMITS,
         )
 
     async def start(

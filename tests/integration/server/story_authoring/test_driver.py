@@ -176,7 +176,8 @@ class ScriptedModel:
 
     _instances = 0
 
-    def __init__(self) -> None:
+    def __init__(self, model_name: str = MODEL) -> None:
+        self.model_name = model_name
         self.calls: Counter[str] = Counter()
         self.prompts: list[tuple[str, str]] = []
         self.paragraphs: list[str] = []
@@ -270,7 +271,7 @@ class ScriptedModel:
                 return httpx.Response(
                     200,
                     json={
-                        "model": MODEL,
+                        "model": self.model_name,
                         "message": {"role": "assistant", "content": '{"issues": [{"severity": "crit'},
                         "done": True,
                         "done_reason": "length",
@@ -282,7 +283,7 @@ class ScriptedModel:
         return httpx.Response(
             200,
             json={
-                "model": MODEL,
+                "model": self.model_name,
                 "message": {"role": "assistant", "content": content},
                 "done": True,
                 "done_reason": "length" if counting else "stop",
@@ -793,3 +794,65 @@ async def test_a_truncated_audit_is_retried_under_a_new_step(concurrent_session_
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert model.calls["issues"] == 13
+
+
+JUDGE = StoryModelSelection.create(
+    provider_id="custom-judge",
+    endpoint="ollama-chat",
+    base_url="http://judge:1",
+    model_id="judge-12b",
+    has_credential=False,
+)
+
+
+async def test_review_calls_go_to_the_judge_route_and_drafting_stays_with_the_writer(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    writer, judge = ScriptedModel(), ScriptedModel("judge-12b")
+    judge.paragraphs = writer.paragraphs
+    brief = BRIEF.model_copy(update={"judge_selection": JUDGE})
+
+    def gateway(model: ScriptedModel, selection: StoryModelSelection, base: str) -> AuthoringTextGateway:
+        client = OllamaChatClient(base_url=base, transport=httpx.MockTransport(model.handler))
+        sink = StoryAttemptSink(
+            store=store,
+            session_factory=concurrent_session_factory,
+            provider_id=selection.provider_id,
+            model_id=selection.model_id,
+        )
+        return AuthoringTextGateway(selection=selection, limits=LIMITS, client=client, sink=sink)
+
+    driver = StoryRunDriver(
+        identity=IDENTITY,
+        brief=brief,
+        store=store,
+        gateway=gateway(writer, SELECTION, "http://ollama:1"),
+        judge_gateway=gateway(judge, JUDGE, "http://judge:1"),
+        blobs=StoryBlobStore(tmp_path),
+        clock=lambda: NOW,
+    )
+
+    state = await driver.run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert set(judge.calls) == {"passed", "issues", "ending_resolves_conflict"}
+    assert judge.calls["issues"] == 12
+    assert not {"passed", "issues", "ending_resolves_conflict"} & set(writer.calls)
+    assert writer.calls["prose"] == 9
+
+
+def test_a_judge_gateway_must_match_the_brief():
+    with pytest.raises(ValueError, match="judge"):
+        StoryRunDriver(
+            identity=IDENTITY,
+            brief=BRIEF.model_copy(update={"judge_selection": JUDGE}),
+            store=None,  # type: ignore[arg-type]
+            gateway=None,
+            blobs=None,  # type: ignore[arg-type]
+        )
+
+
+def test_the_judge_route_is_part_of_what_gate_a_greenlights():
+    assert BRIEF.model_copy(update={"judge_selection": JUDGE}).digest() != BRIEF.digest()
+    assert BRIEF.judge == SELECTION
