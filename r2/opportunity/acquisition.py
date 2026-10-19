@@ -4,8 +4,15 @@ from typing import Self
 
 from pydantic import AwareDatetime, Field, model_validator
 
-from r2.contracts.opportunity import M9ContractModel, SnapshotPage, SourceQuery
-from r2.opportunity.digests import digest_source_query
+from r2.contracts.opportunity import (
+    AcquisitionReceipt,
+    CommandContext,
+    M9ContractModel,
+    QueryReceipt,
+    SnapshotPage,
+    SourceQuery,
+)
+from r2.opportunity.digests import digest_command_result, digest_source_query
 from r2.opportunity.errors import OpportunityError, StopCode
 
 
@@ -47,3 +54,53 @@ class PageCheckpoint(M9ContractModel):
         if self.page.payload_ref is None and (not self.terminal_page or self.source_identity_refs):
             raise ValueError("missing page cannot carry resumable content")
         return self
+
+
+def verified_query_receipt(receipt: QueryReceipt, context: CommandContext, request_digest: str) -> QueryReceipt:
+    try:
+        receipt = QueryReceipt.model_validate(receipt.model_dump())
+        query = verified_query(receipt.query)
+        if (
+            (
+                query.user_id,
+                query.project_name,
+                query.created_by,
+                receipt.command_id,
+                receipt.request_digest,
+                receipt.head.query_id,
+                receipt.head.current_revision,
+            )
+            != (
+                context.user_id,
+                context.project_name,
+                context.actor_id,
+                context.command_id,
+                request_digest,
+                query.query_id,
+                query.revision,
+            )
+            or receipt.committed_at < query.created_at
+            or receipt.head.head_version != query.revision
+        ):
+            raise ValueError("query receipt binding differs")
+        if digest_command_result("declare_query", request_digest, receipt) != receipt.result_digest:
+            raise ValueError("query receipt result differs")
+        return receipt
+    except ValueError:
+        raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
+
+
+def verified_acquisition_receipt(
+    receipt: AcquisitionReceipt, context: CommandContext, request_digest: str
+) -> AcquisitionReceipt:
+    try:
+        receipt = AcquisitionReceipt.model_validate(receipt.model_dump())
+        if (receipt.command_id, receipt.request_digest) != (context.command_id, request_digest) or (
+            len(receipt.snapshot_ids) != len(receipt.snapshot_digests)
+        ):
+            raise ValueError("acquisition receipt binding differs")
+        if digest_command_result("acquire", request_digest, receipt) != receipt.result_digest:
+            raise ValueError("acquisition receipt result differs")
+        return receipt
+    except ValueError:
+        raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None

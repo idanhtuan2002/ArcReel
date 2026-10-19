@@ -730,3 +730,164 @@ async def test_snapshot_reader_revalidates_original_consumed_capability_evaluati
     with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
         async with unit_of_work(session_factory).transaction() as tx:
             await tx.snapshots.get_exact(snapshot.snapshot_id, 1)
+
+
+def query_receipt(query, now):
+    from r2.contracts.opportunity import QueryReceipt
+    from r2.opportunity.digests import digest_command_result
+
+    receipt = QueryReceipt(
+        command_id="019a0000-0000-7000-8000-000000000071",
+        request_digest="sha256:" + "a" * 64,
+        query=query,
+        head=SourceQueryHead(query_id=query.query_id, current_revision=1, head_version=1),
+        result_digest="sha256:" + "0" * 64,
+        committed_at=now,
+    )
+    return receipt.model_copy(
+        update={"result_digest": digest_command_result("declare_query", receipt.request_digest, receipt)}
+    )
+
+
+def receipt_context(receipt, project="show-a"):
+    from r2.contracts.opportunity import CommandContext
+
+    return CommandContext(command_id=receipt.command_id, user_id="u1", project_name=project, actor_id="human-a")
+
+
+async def test_typed_query_receipt_reconstructs_verified_immutable_revision_without_renewing_time(session_factory):
+    query = await stage_query(session_factory)
+    async with unit_of_work(session_factory).transaction() as tx:
+        receipt = query_receipt(query, await tx.profiles.database_time())
+        await tx.receipts.stage_query(context=receipt_context(receipt), receipt=receipt)
+    async with unit_of_work(session_factory).transaction() as tx:
+        replay = await tx.receipts.get_query(context=receipt_context(receipt), request_digest=receipt.request_digest)
+        assert replay == receipt
+    for project, digest in (("foreign", receipt.request_digest), ("show-a", "sha256:" + "b" * 64)):
+        with pytest.raises(OpportunityError, match="M9_COMMAND_REPLAY_CONFLICT"):
+            async with unit_of_work(session_factory, project).transaction() as tx:
+                await tx.receipts.get_query(context=receipt_context(receipt, project), request_digest=digest)
+
+
+@pytest.mark.parametrize("fault", ["ref", "digest", "kind", "time"])
+async def test_query_receipt_reconstruction_refuses_malformed_or_substituted_evidence(session_factory, fault):
+    from datetime import timedelta
+
+    from lib.db.models.opportunity import M9CommandReceiptModel
+
+    query = await stage_query(session_factory)
+    async with unit_of_work(session_factory).transaction() as tx:
+        receipt = query_receipt(query, await tx.profiles.database_time())
+        await tx.receipts.stage_query(context=receipt_context(receipt), receipt=receipt)
+    values = {
+        "ref": {"result_ref": "missing:1:1"},
+        "digest": {"result_digest": "sha256:" + "b" * 64},
+        "kind": {"result_kind": "COHORT_PROFILE"},
+        "time": {"committed_at": receipt.committed_at + timedelta(seconds=1)},
+    }[fault]
+    async with session_factory() as session, session.begin():
+        await session.execute(update(M9CommandReceiptModel).values(**values))
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        async with unit_of_work(session_factory).transaction() as tx:
+            await tx.receipts.get_query(context=receipt_context(receipt), request_digest=receipt.request_digest)
+
+
+async def final_acquisition_receipt(factory):
+    from r2.contracts.opportunity import AcquisitionReceipt, AttemptOutcomeReason, AttemptState
+    from r2.opportunity.digests import digest_command_result
+
+    snapshot, _ = await stage_snapshot(factory)
+    async with unit_of_work(factory).transaction() as tx:
+        attempt = await tx.attempts.transition(
+            snapshot.attempt_id,
+            expected_version=2,
+            state=AttemptState.SUCCEEDED,
+            reason=AttemptOutcomeReason.COMPLETED,
+        )
+        receipt = AcquisitionReceipt(
+            command_id=attempt.command_id,
+            request_digest=attempt.request_digest,
+            attempt_id=attempt.attempt_id,
+            attempt_version=attempt.attempt_version,
+            state=attempt.state,
+            snapshot_ids=(snapshot.snapshot_id,),
+            snapshot_digests=(snapshot.snapshot_digest,),
+            result_digest="sha256:" + "0" * 64,
+            committed_at=await tx.profiles.database_time(),
+        )
+        receipt = receipt.model_copy(
+            update={"result_digest": digest_command_result("acquire", receipt.request_digest, receipt)}
+        )
+        await tx.receipts.stage_acquisition(context=receipt_context(receipt), receipt=receipt)
+    return receipt
+
+
+async def test_acquisition_receipt_reconstructs_terminal_attempt_and_its_exact_snapshot(session_factory):
+    receipt = await final_acquisition_receipt(session_factory)
+    async with unit_of_work(session_factory).transaction() as tx:
+        assert (
+            await tx.receipts.get_acquisition(context=receipt_context(receipt), request_digest=receipt.request_digest)
+            == receipt
+        )
+    with pytest.raises(OpportunityError, match="M9_COMMAND_REPLAY_CONFLICT"):
+        async with unit_of_work(session_factory, "foreign").transaction() as tx:
+            await tx.receipts.get_acquisition(
+                context=receipt_context(receipt, "foreign"), request_digest=receipt.request_digest
+            )
+
+
+async def test_acquisition_receipt_fails_when_bound_snapshot_evidence_has_changed(session_factory):
+    from lib.db.models.opportunity_acquisition import M9SourceSnapshotModel
+
+    receipt = await final_acquisition_receipt(session_factory)
+    async with session_factory() as session, session.begin():
+        row = await session.scalar(select(M9SourceSnapshotModel))
+        await session.execute(
+            update(M9SourceSnapshotModel).values(body_json={**row.body_json, "snapshot_digest": "sha256:" + "b" * 64})
+        )
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        async with unit_of_work(session_factory).transaction() as tx:
+            await tx.receipts.get_acquisition(context=receipt_context(receipt), request_digest=receipt.request_digest)
+
+
+@pytest.mark.parametrize("fault", ["actor", "time"])
+async def test_query_declaration_lookup_verifies_receipt_bound_metadata_outside_semantic_digest(session_factory, fault):
+    from datetime import timedelta
+
+    query = await stage_query(session_factory)
+    async with unit_of_work(session_factory).transaction() as tx:
+        receipt = query_receipt(query, await tx.profiles.database_time())
+        await tx.receipts.stage_query(context=receipt_context(receipt), receipt=receipt)
+        assert await tx.receipts.get_query_for_revision(query.query_id, query.revision) == receipt
+    mutated = query.model_copy(
+        update={"created_by": "foreign"}
+        if fault == "actor"
+        else {
+            "created_at": query.created_at + timedelta(seconds=1),
+        }
+    )
+    assert digest_source_query(mutated) == query.query_digest
+    async with session_factory() as session, session.begin():
+        await session.execute(update(M9SourceQueryModel).values(body_json=mutated.model_dump(mode="json")))
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        async with unit_of_work(session_factory).transaction() as tx:
+            await tx.receipts.get_query_for_revision(query.query_id, query.revision)
+
+
+async def test_attempt_command_preflight_returns_retained_state_before_any_new_query_admission(session_factory):
+    from r2.contracts.opportunity import AttemptState
+
+    attempt = await prepare_attempt(session_factory)
+    context = receipt_context(attempt)
+    async with unit_of_work(session_factory).transaction() as tx:
+        running = await tx.attempts.transition(attempt.attempt_id, expected_version=1, state=AttemptState.RUNNING)
+    async with unit_of_work(session_factory).transaction() as tx:
+        assert await tx.attempts.get_for_command(context=context, request_digest=attempt.request_digest) == running
+        current = await tx.receipts.current_acquisition(context=context, request_digest=attempt.request_digest)
+        assert current.attempt_id == running.attempt_id
+        assert current.attempt_version == 2
+        assert current.state == AttemptState.RUNNING
+        assert current.committed_at == running.started_at
+    with pytest.raises(OpportunityError, match="M9_COMMAND_REPLAY_CONFLICT"):
+        async with unit_of_work(session_factory).transaction() as tx:
+            await tx.attempts.get_for_command(context=context, request_digest="sha256:" + "b" * 64)

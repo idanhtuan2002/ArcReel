@@ -5,11 +5,13 @@ from __future__ import annotations
 import struct
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from lib.db.models.opportunity import M9CommandReceiptModel
 from lib.db.models.opportunity_acquisition import (
     M9AcquisitionAttemptModel,
     M9CapabilityEvaluationModel,
@@ -25,23 +27,31 @@ from lib.db.repositories.opportunity import GuardKey, OpportunityProfileReposito
 from r2.advanced_creative.digests import digest_canonical
 from r2.contracts.opportunity import (
     AcquisitionAttempt,
+    AcquisitionReceipt,
     AttemptOutcomeReason,
     AttemptState,
     CommandContext,
     CoverageState,
     EffectiveCapabilityEvaluation,
     NormalizedSourceObservation,
+    QueryReceipt,
     SourceCapabilityGrant,
     SourceQuery,
     SourceQueryHead,
     SourceSnapshot,
 )
-from r2.opportunity.acquisition import PageCheckpoint, verified_query
+from r2.opportunity.acquisition import (
+    PageCheckpoint,
+    verified_acquisition_receipt,
+    verified_query,
+    verified_query_receipt,
+)
 from r2.opportunity.capabilities import page_clocks, retain_page_proof
 from r2.opportunity.digests import (
     command_guard_key,
     digest_capability_evaluation,
     digest_capability_grant,
+    digest_command_result,
     digest_source_observation,
     digest_source_snapshot,
 )
@@ -363,6 +373,29 @@ class AcquisitionAttemptRepository:
     async def get_exact(self, attempt_id: str) -> AcquisitionAttempt | None:
         row = await self._row(attempt_id)
         return None if row is None else await self._verified(row)
+
+    async def get_for_command(self, *, context: CommandContext, request_digest: str) -> AcquisitionAttempt | None:
+        if (context.user_id, context.project_name) != (self.user_id, self.project_name):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN)
+        await self.profiles.lock_command_key(context=context, operation="acquire")
+        row = (
+            await self.session.execute(
+                select(M9AcquisitionAttemptModel)
+                .where(
+                    M9AcquisitionAttemptModel.user_id == self.user_id,
+                    M9AcquisitionAttemptModel.actor_id == context.actor_id,
+                    M9AcquisitionAttemptModel.operation == "acquire",
+                    M9AcquisitionAttemptModel.command_id == context.command_id,
+                )
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        if row.project_name != self.project_name or row.request_digest != request_digest:
+            raise OpportunityError(StopCode.M9_COMMAND_REPLAY_CONFLICT)
+        return await self._verified(row)
 
     async def prepare(self, attempt: AcquisitionAttempt) -> tuple[AcquisitionAttempt, bool]:
         try:
@@ -999,6 +1032,217 @@ class SourceObservationRepository:
         await _flush(self.session)
 
 
+class AcquisitionReceiptRepository:
+    """Typed receipts reconstruct stored aggregates; caller-selected result models are absent."""
+
+    def __init__(
+        self, session: AsyncSession, *, attempts: AcquisitionAttemptRepository, snapshots: SourceSnapshotRepository
+    ) -> None:
+        self.session, self.attempts, self.snapshots = session, attempts, snapshots
+        self.user_id, self.project_name = attempts.user_id, attempts.project_name
+
+    def _scope(self, context: CommandContext) -> None:
+        if (context.user_id, context.project_name) != (self.user_id, self.project_name):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN)
+
+    async def _row(self, context: CommandContext, operation: str, request_digest: str) -> M9CommandReceiptModel | None:
+        self._scope(context)
+        row = (
+            await self.session.execute(
+                select(M9CommandReceiptModel)
+                .where(
+                    M9CommandReceiptModel.user_id == context.user_id,
+                    M9CommandReceiptModel.actor_id == context.actor_id,
+                    M9CommandReceiptModel.operation == operation,
+                    M9CommandReceiptModel.command_id == context.command_id,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if row is not None and (row.project_name != context.project_name or row.request_digest != request_digest):
+            raise OpportunityError(StopCode.M9_COMMAND_REPLAY_CONFLICT)
+        return row
+
+    async def get_query(self, *, context: CommandContext, request_digest: str) -> QueryReceipt | None:
+        row = await self._row(context, "declare_query", request_digest)
+        if row is None:
+            return None
+        try:
+            if row.result_kind != "SOURCE_QUERY":
+                raise ValueError("query receipt kind differs")
+            identity, revision, version = row.result_ref.split(":")
+            query = await self.attempts.queries.get_exact(identity, int(revision))
+            if query is None:
+                raise ValueError("query receipt evidence is absent")
+            receipt = QueryReceipt(
+                command_id=row.command_id,
+                request_digest=row.request_digest,
+                query=query,
+                head=SourceQueryHead(query_id=identity, current_revision=int(revision), head_version=int(version)),
+                result_digest=row.result_digest,
+                committed_at=row.committed_at,
+            )
+            return verified_query_receipt(receipt, context, request_digest)
+        except ValueError:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
+
+    async def get_query_for_revision(self, query_id: str, revision: int) -> QueryReceipt | None:
+        query = await self.attempts.queries.get_exact(query_id, revision)
+        if query is None:
+            return None
+        rows = (
+            (
+                await self.session.execute(
+                    select(M9CommandReceiptModel)
+                    .where(
+                        M9CommandReceiptModel.user_id == self.user_id,
+                        M9CommandReceiptModel.project_name == self.project_name,
+                        M9CommandReceiptModel.operation == "declare_query",
+                        M9CommandReceiptModel.result_kind == "SOURCE_QUERY",
+                        M9CommandReceiptModel.result_ref == f"{query_id}:{revision}:{revision}",
+                    )
+                    .limit(2)
+                    .execution_options(populate_existing=True)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if len(rows) != 1:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        row = rows[0]
+        context = CommandContext(
+            command_id=row.command_id, user_id=self.user_id, project_name=self.project_name, actor_id=row.actor_id
+        )
+        receipt = await self.get_query(context=context, request_digest=row.request_digest)
+        if receipt is None or receipt.query != query:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        return receipt
+
+    async def stage_query(self, *, context: CommandContext, receipt: QueryReceipt) -> None:
+        self._scope(context)
+        receipt = verified_query_receipt(receipt, context, receipt.request_digest)
+        if await self.attempts.queries.get_exact(receipt.query.query_id, receipt.query.revision) != receipt.query:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        self.session.add(
+            M9CommandReceiptModel(
+                user_id=context.user_id,
+                project_name=context.project_name,
+                actor_id=context.actor_id,
+                operation="declare_query",
+                command_id=context.command_id,
+                request_digest=receipt.request_digest,
+                result_kind="SOURCE_QUERY",
+                result_ref=f"{receipt.query.query_id}:{receipt.query.revision}:{receipt.head.head_version}",
+                result_digest=receipt.result_digest,
+                committed_at=receipt.committed_at,
+            )
+        )
+        await _flush(self.session)
+
+    async def _acquisition(
+        self, *, context: CommandContext, request_digest: str, attempt: AcquisitionAttempt, committed_at: datetime
+    ) -> AcquisitionReceipt:
+        if (attempt.user_id, attempt.project_name, attempt.actor_id, attempt.command_id, attempt.request_digest) != (
+            context.user_id,
+            context.project_name,
+            context.actor_id,
+            context.command_id,
+            request_digest,
+        ):
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        snapshot = await self.snapshots.get_for_attempt(attempt.attempt_id)
+        receipt = AcquisitionReceipt(
+            command_id=context.command_id,
+            request_digest=request_digest,
+            attempt_id=attempt.attempt_id,
+            attempt_version=attempt.attempt_version,
+            state=attempt.state,
+            snapshot_ids=() if snapshot is None else (snapshot.snapshot_id,),
+            snapshot_digests=() if snapshot is None else (snapshot.snapshot_digest,),
+            result_digest="sha256:" + "0" * 64,
+            committed_at=committed_at,
+        )
+        return receipt.model_copy(update={"result_digest": digest_command_result("acquire", request_digest, receipt)})
+
+    async def current_acquisition(self, *, context: CommandContext, request_digest: str) -> AcquisitionReceipt | None:
+        self._scope(context)
+        attempt = await self.attempts.get_for_command(context=context, request_digest=request_digest)
+        if attempt is None:
+            return None
+        if attempt.state in (AttemptState.SUCCEEDED, AttemptState.FAILED):
+            # A terminal attempt is published atomically with its immutable receipt.
+            receipt = await self.get_acquisition(context=context, request_digest=request_digest)
+            if receipt is None:
+                raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+            return receipt
+        row = await self.attempts._row(attempt.attempt_id)
+        if row is None:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        return await self._acquisition(
+            context=context, request_digest=request_digest, attempt=attempt, committed_at=row.transitioned_at
+        )
+
+    async def get_acquisition(self, *, context: CommandContext, request_digest: str) -> AcquisitionReceipt | None:
+        row = await self._row(context, "acquire", request_digest)
+        if row is None:
+            return None
+        try:
+            if row.result_kind != "ACQUISITION":
+                raise ValueError("acquisition receipt kind differs")
+            identity, version = row.result_ref.split(":")
+            attempt = await self.attempts.get_exact(identity)
+            if (
+                attempt is None
+                or attempt.attempt_version != int(version)
+                or attempt.state
+                not in (
+                    AttemptState.SUCCEEDED,
+                    AttemptState.FAILED,
+                )
+            ):
+                raise ValueError("acquisition receipt attempt differs")
+            receipt = await self._acquisition(
+                context=context, request_digest=request_digest, attempt=attempt, committed_at=row.committed_at
+            )
+            if not receipt.snapshot_ids or receipt.result_digest != row.result_digest:
+                raise ValueError("acquisition receipt result differs")
+            return verified_acquisition_receipt(receipt, context, request_digest)
+        except ValueError:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
+
+    async def stage_acquisition(self, *, context: CommandContext, receipt: AcquisitionReceipt) -> None:
+        self._scope(context)
+        receipt = verified_acquisition_receipt(receipt, context, receipt.request_digest)
+        attempt = await self.attempts.get_exact(receipt.attempt_id)
+        if (
+            attempt is None
+            or attempt.state not in (AttemptState.SUCCEEDED, AttemptState.FAILED)
+            or not receipt.snapshot_ids
+        ):
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        expected = await self._acquisition(
+            context=context, request_digest=receipt.request_digest, attempt=attempt, committed_at=receipt.committed_at
+        )
+        if expected != receipt:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        self.session.add(
+            M9CommandReceiptModel(
+                user_id=context.user_id,
+                project_name=context.project_name,
+                actor_id=context.actor_id,
+                operation="acquire",
+                command_id=context.command_id,
+                request_digest=receipt.request_digest,
+                result_kind="ACQUISITION",
+                result_ref=f"{receipt.attempt_id}:{receipt.attempt_version}",
+                result_digest=receipt.result_digest,
+                committed_at=receipt.committed_at,
+            )
+        )
+        await _flush(self.session)
+
+
 class AcquisitionTransaction:
     def __init__(
         self, session: AsyncSession, *, user_id: str, project_name: str, guard_key: GuardKey = command_guard_key
@@ -1013,6 +1257,7 @@ class AcquisitionTransaction:
         self.pages = SnapshotPageRepository(session, attempts=self.attempts)
         self.snapshots = SourceSnapshotRepository(session, attempts=self.attempts, pages=self.pages)
         self.observations = SourceObservationRepository(session, snapshots=self.snapshots)
+        self.receipts = AcquisitionReceiptRepository(session, attempts=self.attempts, snapshots=self.snapshots)
 
 
 class OpportunityAcquisitionUnitOfWork:
