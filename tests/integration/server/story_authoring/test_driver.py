@@ -847,9 +847,9 @@ def test_a_judge_gateway_must_match_the_brief():
         StoryRunDriver(
             identity=IDENTITY,
             brief=BRIEF.model_copy(update={"judge_selection": JUDGE}),
-            store=None,  # type: ignore[arg-type]
+            store=None,
             gateway=None,
-            blobs=None,  # type: ignore[arg-type]
+            blobs=None,
         )
 
 
