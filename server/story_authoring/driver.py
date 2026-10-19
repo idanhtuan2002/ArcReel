@@ -429,27 +429,7 @@ class StoryRunDriver:
             plan_ins.append((node, content_digest(raw)))
 
         bible_input = story_bible_input(seed, style)
-        outline_input = StoryOutlineInput(
-            story_frame=f"{outline.story_arc} {outline.opening} {outline.confrontation}",
-            chapters=tuple(
-                ChapterOutlineInput(
-                    intent=plan.chapter_goal,
-                    scenes=tuple(
-                        SceneOutlineInput(
-                            purpose=f"{scene.summary} ({scene.plot_function})",
-                            pov=planning.resolve_name(scene.pov, names),
-                            location=planning.resolve_name(scene.location, locations),
-                            participants=tuple(
-                                k for k in (planning.resolve_name(n, names) for n in scene.characters) if k
-                            ),
-                            beats=tuple(scene.beats),
-                        )
-                        for scene in plan.scenes
-                    ),
-                )
-                for plan in plans
-            ),
-        )
+        outline_input = story_outline_input(outline, plans, names, locations)
         story = _Story(
             seed,
             bible,
@@ -1007,6 +987,31 @@ def story_bible_input(seed: StorySeed, style: StyleBibleOut) -> StoryBibleInput:
             for loc in seed.locations
         ),
         style_rules=tuple(style.style_rules),
+    )
+
+
+def story_outline_input(
+    outline: ShortOutline, plans: Sequence[ChapterPlan], names: dict[str, str], locations: dict[str, str]
+) -> StoryOutlineInput:
+    """The plan the narrative owners see: the outline's frame and each chapter plan's scenes, names as keys."""
+    return StoryOutlineInput(
+        story_frame=f"{outline.story_arc} {outline.opening} {outline.confrontation}",
+        chapters=tuple(
+            ChapterOutlineInput(
+                intent=plan.chapter_goal,
+                scenes=tuple(
+                    SceneOutlineInput(
+                        purpose=f"{scene.summary} ({scene.plot_function})",
+                        pov=planning.resolve_name(scene.pov, names),
+                        location=planning.resolve_name(scene.location, locations),
+                        participants=tuple(k for k in (planning.resolve_name(n, names) for n in scene.characters) if k),
+                        beats=tuple(scene.beats),
+                    )
+                    for scene in plan.scenes
+                ),
+            )
+            for plan in plans
+        ),
     )
 
 

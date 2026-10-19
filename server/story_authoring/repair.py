@@ -262,7 +262,9 @@ async def span_repair(
     context_block: str,
     attempt_history: Sequence[str] = (),
     max_output_tokens: int = 4096,
+    system_prompt: str = PATCH_SYSTEM,
 ) -> RepairOutcome:
+    """One span-local patch call; ``system_prompt`` is the editor instruction (the differential swaps in the donor's)."""
     conflicts = _conflict_lines(findings)
     history = "\n".join(f"- {line}" for line in attempt_history)
     prompt = "\n".join(
@@ -283,7 +285,7 @@ async def span_repair(
             kind=StoryStepKind.REPAIR,
             context_digest=context_digest,
             selection=selection,
-            system_prompt=PATCH_SYSTEM,
+            system_prompt=system_prompt,
             prompt=prompt,
             output_mode=OutputMode.STRUCTURED,
             response_model=PatchResponse,
@@ -334,7 +336,9 @@ async def normalize_length(
     text: str,
     window: SceneLengthWindow,
     max_output_tokens: int = 4096,
+    system_prompt: str = LENGTH_SYSTEM,
 ) -> RepairOutcome:
+    """Rewrite the longest (or shortest) paragraphs toward the window; ``system_prompt`` as in :func:`span_repair`."""
     original = count_syllables(text)
     if window.minimum <= original <= window.maximum:
         return RepairOutcome(text, True, "already inside the window")
@@ -356,7 +360,7 @@ async def normalize_length(
             kind=StoryStepKind.REPAIR,
             context_digest=context_digest,
             selection=selection,
-            system_prompt=LENGTH_SYSTEM,
+            system_prompt=system_prompt,
             prompt=prompt,
             output_mode=OutputMode.STRUCTURED,
             response_model=LengthResponse,

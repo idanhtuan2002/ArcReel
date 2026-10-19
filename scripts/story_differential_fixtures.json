@@ -1,0 +1,71 @@
+{
+  "schema": "story-differential-fixtures-v1",
+  "note": "Seeded-defect chapters for the S05/S06/S07 differential. Each defect lists the exact planted sentence; a finding or repair is scored against those sentences only. Written by hand for the 2026-10-19 Task4.6 differential, before any run.",
+  "facts": "- Minh: anh trai, ba mươi hai tuổi, sống ở thành phố mười năm, hiền và ít nói, mang nỗi day dứt vì bỏ nhà đi.\n- Lan: em gái Minh, hai mươi tám tuổi, ở lại làng chăm mẹ; gọi Minh là anh, xưng em.\n- Bà Hạnh: mẹ của Minh và Lan, đang ốm nằm trên giường.\n- Ông Tư: cha của Minh và Lan, mất cách đây ba ngày.\n- Căn nhà: nhà ba gian ở làng Đông, có giếng nước và gian bếp phía sau.",
+  "plan": {
+    "chapter_goal": "Minh về làng sau đám tang cha, gặp lại Lan và tìm thấy cuốn sổ của cha trong ngăn tủ.",
+    "reader_expectation": "Người đọc chờ xem cuốn sổ chứa điều gì và hai anh em có làm lành không.",
+    "withheld_cards": ["Số tiền cha còn nợ ghi trong cuốn sổ"],
+    "required_changes_by_end": ["Minh đọc trang đầu của cuốn sổ"],
+    "do_not": ["Không để bà Hạnh ngồi dậy đi lại"],
+    "scenes": [
+      {"summary": "Minh về tới cổng nhà", "location": "Căn nhà", "pov": "Minh", "characters": ["Minh"], "beats": ["Minh đứng trước cổng", "Minh bước vào sân"], "emotional_turn": "ngập ngừng", "plot_function": "mở", "dialogue_required": false},
+      {"summary": "Minh gặp Lan trong bếp", "location": "Căn nhà", "pov": "Minh", "characters": ["Minh", "Lan"], "beats": ["Lan nấu cơm", "Hai anh em nói chuyện"], "emotional_turn": "căng", "plot_function": "xung đột", "dialogue_required": true},
+      {"summary": "Minh tìm thấy cuốn sổ", "location": "Căn nhà", "pov": "Minh", "characters": ["Minh"], "beats": ["Minh mở ngăn tủ", "Minh cầm cuốn sổ"], "emotional_turn": "lặng", "plot_function": "móc", "dialogue_required": false}
+    ]
+  },
+  "fixtures": [
+    {
+      "id": "F1_continuity",
+      "dimension": "CONTINUITY",
+      "scenes": [
+        "Chiều muộn, Minh dừng xe trước cánh cổng tre của căn nhà ba gian. Mưa vừa tạnh, mùi đất ẩm bốc lên từ con ngõ. Anh đứng lâu trước cổng, tay vẫn nắm chặt quai túi. Đã mười năm kể từ ngày cha mất, nhưng Minh vẫn nhớ giọng ông gọi anh mỗi sáng. Anh đẩy cổng bước vào sân, qua cái giếng nước phủ rêu.",
+        "Trong gian bếp phía sau, Lan đang thổi lửa nấu cơm. Khói rơm cay xè làm mắt cô đỏ hoe. — Anh về rồi à? — Lan hỏi, không quay lại. Minh gật đầu, đặt túi xuống cạnh chạn bát. Lan đứng giữa chợ huyện, tay xách giỏ cá, chờ anh nói tiếp. — Mẹ ngủ chưa? — Minh hỏi khẽ. — Mẹ vừa ngủ, anh đừng vào làm mẹ thức. — Lan đáp rồi lại cúi xuống bếp lửa.",
+        "Đêm xuống, Minh vào gian giữa, nơi chiếc tủ gỗ của cha kê sát vách. Ngăn tủ kẹt, anh phải lay mấy lần mới mở được. Bên trong có một cuốn sổ bìa xanh đã sờn góc. Minh lật trang đầu, thấy nét chữ nghiêng quen thuộc của cha. Anh ngồi xuống chiếu, đọc từng dòng dưới ánh đèn dầu."
+      ],
+      "defects": [
+        {"kind": "timeline", "sentence": "Đã mười năm kể từ ngày cha mất, nhưng Minh vẫn nhớ giọng ông gọi anh mỗi sáng."},
+        {"kind": "location", "sentence": "Lan đứng giữa chợ huyện, tay xách giỏ cá, chờ anh nói tiếp."}
+      ]
+    },
+    {
+      "id": "F2_memo",
+      "dimension": "MEMO_COMPLIANCE",
+      "scenes": [
+        "Chiều muộn, Minh dừng xe trước cánh cổng tre của căn nhà ba gian. Mưa vừa tạnh, mùi đất ẩm bốc lên từ con ngõ. Anh đứng lâu trước cổng rồi mới đẩy cổng bước vào sân.",
+        "Trong gian bếp phía sau, Lan đang thổi lửa nấu cơm. — Anh về rồi à? — Lan hỏi, không quay lại. Minh gật đầu, đặt túi xuống cạnh chạn bát. — Mẹ vừa ngủ, anh đừng vào làm mẹ thức. — Lan đáp rồi lại cúi xuống bếp lửa.",
+        "Đêm xuống, Minh vào gian giữa, nơi chiếc tủ gỗ của cha kê sát vách. Ngăn tủ kẹt, anh phải lay mấy lần mới mở được. Bên trong có một cuốn sổ bìa xanh đã sờn góc. Trong sổ ghi rõ: cha còn nợ ông Ba ba mươi triệu đồng. Minh đặt cuốn sổ lên bàn thờ rồi tắt đèn đi ngủ mà không mở ra đọc."
+      ],
+      "defects": [
+        {"kind": "withheld_card_revealed", "sentence": "Trong sổ ghi rõ: cha còn nợ ông Ba ba mươi triệu đồng."},
+        {"kind": "required_change_missing", "sentence": "Minh đặt cuốn sổ lên bàn thờ rồi tắt đèn đi ngủ mà không mở ra đọc."}
+      ]
+    },
+    {
+      "id": "F3_character",
+      "dimension": "CHARACTER",
+      "scenes": [
+        "Chiều muộn, Minh dừng xe trước cánh cổng tre của căn nhà ba gian. Mưa vừa tạnh, mùi đất ẩm bốc lên từ con ngõ. Anh đứng lâu trước cổng, ngần ngừ như người có lỗi, rồi mới khẽ đẩy cổng bước vào.",
+        "Trong gian bếp phía sau, Lan đang thổi lửa nấu cơm. — Chị Minh về rồi à? — Lan hỏi, không quay lại. Minh gật đầu, đặt túi xuống cạnh chạn bát. Từ buồng trong vọng ra tiếng mẹ ho khan. Minh đá văng chiếc ghế rồi quát vọng vào buồng bắt mẹ im đi. Lan sững người, que cời rơi khỏi tay.",
+        "Đêm xuống, Minh vào gian giữa, nơi chiếc tủ gỗ của cha kê sát vách. Ngăn tủ kẹt, anh phải lay mấy lần mới mở được. Bên trong có một cuốn sổ bìa xanh đã sờn góc. Minh lật trang đầu, thấy nét chữ nghiêng quen thuộc của cha."
+      ],
+      "defects": [
+        {"kind": "address_term", "sentence": "— Chị Minh về rồi à? — Lan hỏi, không quay lại."},
+        {"kind": "out_of_character", "sentence": "Minh đá văng chiếc ghế rồi quát vọng vào buồng bắt mẹ im đi."}
+      ]
+    },
+    {
+      "id": "F4_anti_ai",
+      "dimension": "ANTI_AI",
+      "scenes": [
+        "Chiều muộn, Minh dừng xe trước cánh cổng tre của căn nhà ba gian. Mưa vừa tạnh, mùi đất ẩm bốc lên từ con ngõ. Anh đẩy cổng bước vào sân, qua cái giếng nước phủ rêu.",
+        "Trong gian bếp phía sau, Lan đang thổi lửa nấu cơm. — Anh về rồi à? — Lan hỏi, không quay lại. Khi Minh bước vào, tất cả mọi người trong nhà đều sững sờ, không ai nói nên lời. Minh đặt túi xuống cạnh chạn bát.",
+        "Đêm xuống, Minh vào gian giữa, mở ngăn tủ gỗ của cha và tìm thấy một cuốn sổ bìa xanh. Anh lật trang đầu, thấy nét chữ nghiêng quen thuộc. Và Minh hiểu rằng, tình thân chính là thứ quý giá nhất trên cuộc đời này."
+      ],
+      "defects": [
+        {"kind": "collective_reaction", "sentence": "Khi Minh bước vào, tất cả mọi người trong nhà đều sững sờ, không ai nói nên lời."},
+        {"kind": "narrator_conclusion", "sentence": "Và Minh hiểu rằng, tình thân chính là thứ quý giá nhất trên cuộc đời này."}
+      ]
+    }
+  ]
+}
