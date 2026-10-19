@@ -121,7 +121,8 @@ _INSTRUCTIONS: dict[AuditDimension, str] = {
         "gian với dữ kiện, người đã mất xuất hiện hoặc được kể như còn sống, nhân vật xuất hiện khi không thể có mặt, mâu "
         "thuẫn địa điểm, nhân vật biết điều chưa thể biết, mâu thuẫn quan hệ hoặc cách xưng hô, mâu thuẫn đồ vật thuộc về "
         "ai, thời gian trong chương chạy ngược hoặc nhảy vô lý, chuyển địa điểm không có chuyển cảnh, sự kiện thiếu nguyên "
-        "nhân, lệch khỏi kế hoạch chương."
+        "nhân, lệch khỏi kế hoạch chương. Mỗi mâu thuẫn chỉ báo một lần, và quote là câu SAI cần sửa: câu trái với "
+        "[Sự thật đã khóa], hoặc câu đến sau trái với điều chương đã kể trước đó; không trích câu đúng."
     ),
     AuditDimension.MEMO_COMPLIANCE: (
         "Thẩm định việc THỰC HIỆN GHI CHÚ CHƯƠNG. Lỗi nghiêm trọng: nhiệm vụ của chương không xảy ra; một thay đổi bắt "
