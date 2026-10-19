@@ -206,3 +206,15 @@ def test_a_scene_ending_in_a_single_quote_or_parenthesis_ends_cleanly_and_a_frag
     assert ends_cleanly("Minh gật đầu (lần cuối).")
     assert trim_unterminated_tail("Minh mở cửa. Lan đứng đó và") == "Minh mở cửa."
     assert trim_unterminated_tail("chưa xong") == "chưa xong"
+
+
+def test_story_length_outside_the_hard_range_is_structural_and_outside_the_target_stylistic():
+    from server.story_authoring.driver import story_length_findings
+
+    def story(syllables: int) -> list[list[str]]:
+        return [[" ".join(["lá"] * syllables)]]
+
+    assert [f.severity for f in story_length_findings(story(5000))] == [Severity.HARD_STRUCTURAL]
+    assert [f.severity for f in story_length_findings(story(13000))] == [Severity.HARD_STRUCTURAL]
+    assert [f.severity for f in story_length_findings(story(6500))] == [Severity.STYLISTIC]
+    assert story_length_findings(story(9000)) == ()

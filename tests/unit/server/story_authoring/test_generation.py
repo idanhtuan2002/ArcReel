@@ -148,7 +148,7 @@ async def test_prose_is_counted_then_generated_and_joined_into_paragraphs():
     assert generate_body["messages"][0] == {"role": "system", "content": "Bạn là người viết văn tiếng Việt."}
     paragraphs = generate_body["format"]["properties"]["paragraphs"]
     assert (paragraphs["minItems"], paragraphs["maxItems"]) == (2, 4)
-    assert paragraphs["items"]["pattern"] == no_cjk_pattern()
+    assert paragraphs["items"]["pattern"] == no_cjk_pattern(min_chars=20)
     assert generate_body["options"]["seed"] == 7
     assert (generate_body["truncate"], generate_body["shift"], generate_body["think"]) == (False, False, False)
     assert sink.kinds() == ["reserve", "dispatched", "completed", "reserve", "dispatched", "completed"]

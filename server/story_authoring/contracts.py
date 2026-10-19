@@ -162,6 +162,7 @@ class StoryStepRequest(BaseModel):
     max_output_tokens: int = Field(gt=0)
     min_paragraphs: int = Field(default=1, ge=1)
     max_paragraphs: int = Field(default=40, ge=1)
+    min_paragraph_chars: int = Field(default=20, ge=1, le=600)
 
     @model_validator(mode="after")
     def _mode_matches_model(self) -> StoryStepRequest:

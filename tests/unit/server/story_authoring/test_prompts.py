@@ -267,3 +267,12 @@ def test_earlier_scenes_render_as_the_last_paragraphs_and_older_openings_only():
     assert "Đoạn một của cảnh hai." not in text
     assert "- Mở đầu cảnh một rất dài." in text
     assert older.strip() not in text
+
+
+def test_paragraph_floors_carry_most_of_the_scene_target():
+    from server.story_authoring.prompts.drafting import paragraph_min_chars
+
+    for target in (600, 750, 1000):
+        low, _ = paragraph_bounds(target)
+        assert 120 <= paragraph_min_chars(target) <= 400
+        assert low * paragraph_min_chars(target) / 4.5 >= 0.5 * target

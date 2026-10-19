@@ -342,6 +342,7 @@ class StoryRunDriver:
         model: type[BaseModel] | None = None,
         max_output_tokens: int = 4096,
         paragraphs: tuple[int, int] = (1, 40),
+        paragraph_chars: int = 20,
     ) -> str:
         """One generation of a node, retried within the node's cap on recoverable output failures."""
         cap = NODE_CAPS[node.split("[", 1)[0]]
@@ -367,6 +368,7 @@ class StoryRunDriver:
                         decoding=_decoding(decoding, step_id),
                         max_output_tokens=max_output_tokens,
                         min_paragraphs=paragraphs[0],
+                        min_paragraph_chars=paragraph_chars,
                         max_paragraphs=paragraphs[1],
                     ),
                 )
@@ -729,6 +731,7 @@ class StoryRunDriver:
             prompt=prompt,
             decoding=DRAFT,
             paragraphs=bounds,
+            paragraph_chars=drafting.paragraph_min_chars(target),
         )
         history: list[str] = []
         while True:
@@ -752,6 +755,7 @@ class StoryRunDriver:
                     prompt=prompt + REGENERATE_NOTE,
                     decoding=DRAFT,
                     paragraphs=bounds,
+                    paragraph_chars=drafting.paragraph_min_chars(target),
                 )
                 continue
             fixed, notes = deterministic_fixes(prose, repairable, earlier=earlier)

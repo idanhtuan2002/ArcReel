@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
 from lib.text_backends.ollama import OllamaChatClient
 from server.story_authoring.artifacts import StoryBlobStore
+from server.story_authoring.checks import count_syllables
 from server.story_authoring.commit import load_offered_manifest
 from server.story_authoring.contracts import StoryLimits, StoryModelSelection
 from server.story_authoring.driver import StoryBrief, StoryRunDriver
@@ -497,24 +498,20 @@ async def test_a_run_needs_its_gate_a_decision(concurrent_session_factory: Facto
         )
 
 
-async def test_a_story_far_below_the_length_range_is_never_offered(concurrent_session_factory: Factory, tmp_path):
+async def test_a_story_outside_the_target_length_is_offered_with_a_stylistic_finding(
+    concurrent_session_factory: Factory, tmp_path
+):
     store = await _store(concurrent_session_factory)
-    model = ScriptedModel()
-    full = model._prose
+    blobs = StoryBlobStore(tmp_path)
 
-    def short(_prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
-        answer = full(schema["properties"]["paragraphs"]["minItems"])
-        paragraphs = [". ".join(p.split(". ")[:3]).rstrip(".") + "." for p in answer["paragraphs"]]
-        model.paragraphs[-len(paragraphs) :] = paragraphs
-        return {"paragraphs": paragraphs}
+    state = await _driver(concurrent_session_factory, store, ScriptedModel(), blobs).run()
 
-    model.overrides["prose"] = short
-
-    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
-
-    assert state.phase is RunPhase.BLOCKED_QUALITY
-    assert "STORY_LENGTH" in (state.block_reason or "")
-    assert state.commit is None
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    manifest = load_offered_manifest(blobs, state)
+    assert manifest.quality_record_digest is not None
+    record = json.loads(blobs.read_exact(manifest.quality_record_digest))
+    assert [f["severity"] for f in record["findings"] if f["code"] == "STORY_LENGTH"] == ["STYLISTIC"]
+    assert sum(count_syllables(s.revision.normalized_content) for s in manifest.scenes) < 7000
 
 
 async def test_a_revision_requested_while_running_is_honoured_before_the_offer(

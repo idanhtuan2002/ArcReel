@@ -111,6 +111,14 @@ def _opening(text: str, limit: int = 200) -> str:
     return flat if len(flat) <= limit else flat[:limit].rsplit(" ", 1)[0] + "…"
 
 
+CHARS_PER_SYLLABLE = 4.5
+
+
+def paragraph_min_chars(target_syllables: int) -> int:
+    """Each paragraph's floor, so that the fewest paragraphs still carry about 80% of the scene target."""
+    return max(120, min(400, int(target_syllables * 0.8 * CHARS_PER_SYLLABLE / paragraph_bounds(target_syllables)[0])))
+
+
 def paragraph_bounds(target_syllables: int) -> tuple[int, int]:
     minimum = max(4, target_syllables // 120)
     return minimum, max(minimum + 2, target_syllables // 60)

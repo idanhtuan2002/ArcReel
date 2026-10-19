@@ -91,8 +91,11 @@ class ProseParagraphs(BaseModel):
     paragraphs: list[str]
 
 
-def prose_schema(*, min_paragraphs: int, max_paragraphs: int) -> dict[str, Any]:
-    """Prose is an array of paragraphs: the paragraph bounds steer length, which a single-string envelope shortens."""
+def prose_schema(
+    *, min_paragraphs: int, max_paragraphs: int, min_paragraph_chars: int = PROSE_PARAGRAPH_MIN_CHARS
+) -> dict[str, Any]:
+    """Prose is an array of paragraphs: the paragraph count and each paragraph's length floor steer length, which a
+    single-string envelope shortens. The floor lives in the pattern because Ollama ignores ``minLength`` there."""
     return {
         "type": "object",
         "properties": {
@@ -100,7 +103,11 @@ def prose_schema(*, min_paragraphs: int, max_paragraphs: int) -> dict[str, Any]:
                 "type": "array",
                 "minItems": min_paragraphs,
                 "maxItems": max_paragraphs,
-                "items": {"type": "string", "minLength": PROSE_PARAGRAPH_MIN_CHARS, "pattern": no_cjk_pattern()},
+                "items": {
+                    "type": "string",
+                    "minLength": min_paragraph_chars,
+                    "pattern": no_cjk_pattern(min_chars=min_paragraph_chars),
+                },
             }
         },
         "required": ["paragraphs"],
@@ -203,7 +210,11 @@ class AuthoringTextGateway:
 
     def _chat_request(self, request: StoryStepRequest, *, num_predict: int) -> OllamaChatRequest:
         if request.output_mode is OutputMode.PROSE:
-            schema = prose_schema(min_paragraphs=request.min_paragraphs, max_paragraphs=request.max_paragraphs)
+            schema = prose_schema(
+                min_paragraphs=request.min_paragraphs,
+                max_paragraphs=request.max_paragraphs,
+                min_paragraph_chars=request.min_paragraph_chars,
+            )
         else:
             assert request.response_model is not None
             schema = constrain_strings(resolve_schema(request.response_model))
@@ -310,7 +321,7 @@ class AuthoringTextGateway:
                 ]
                 if not request.min_paragraphs <= len(paragraphs) <= request.max_paragraphs:
                     return StoryFailureCode.OUTPUT_INVALID, f"{len(paragraphs)} paragraphs", ""
-                if any(len(p) < PROSE_PARAGRAPH_MIN_CHARS for p in paragraphs):
+                if any(len(p) < request.min_paragraph_chars for p in paragraphs):
                     return StoryFailureCode.OUTPUT_INVALID, "a paragraph is empty or too short", ""
                 return None, "", "\n\n".join(paragraphs)
             assert request.response_model is not None

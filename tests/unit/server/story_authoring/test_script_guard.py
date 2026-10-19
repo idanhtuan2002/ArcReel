@@ -113,3 +113,12 @@ def test_the_grammar_pattern_rejects_cjk_and_raw_json_breakers(raw):
 def test_astral_ranges_can_be_dropped_for_engines_that_reject_them():
     assert any(ord(ch) > 0xFFFF for ch in no_cjk_pattern())
     assert all(ord(ch) <= 0xFFFF for ch in no_cjk_pattern(include_astral=False))
+
+
+def test_a_length_floor_lives_in_the_pattern_and_the_default_is_unchanged():
+    import re
+
+    assert no_cjk_pattern().endswith(")*$")
+    floor = re.compile(no_cjk_pattern(min_chars=5))
+    assert floor.fullmatch("Minh ")
+    assert not floor.fullmatch("Minh")
