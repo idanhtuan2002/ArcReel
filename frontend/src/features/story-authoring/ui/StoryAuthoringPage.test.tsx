@@ -291,8 +291,12 @@ describe("other phases", () => {
     };
     render(<StoryAuthoringPage projectName="demo" />);
     expect(await screen.findByText(/does not resolve the central conflict/)).toBeInTheDocument();
+    const loads = () => requests.filter((item) => item.method === "GET" && item.url.endsWith("/story-runs/story-1")).length;
+    const before = loads();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText(/The model is planning, writing and reviewing/)).toBeInTheDocument();
+    // The run is working again, so the page reads it again and keeps polling.
+    await waitFor(() => expect(loads()).toBeGreaterThan(before));
   });
 
   it("finishes a pending hand-off with its own command and offers a new name on a name clash", async () => {

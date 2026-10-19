@@ -516,10 +516,11 @@ function RunView({ projectName, runId, onChanged }: { projectName: string; runId
     };
   }, [projectName, runId, reloadToken, t]);
 
+  // A decision answers with the new state; reloading as well restarts polling when the run is working again.
   const changed = useCallback(
     (next: StoryRun | null) => {
       if (next) setRun(next);
-      else reload();
+      reload();
       onChanged();
     },
     [onChanged, reload],
