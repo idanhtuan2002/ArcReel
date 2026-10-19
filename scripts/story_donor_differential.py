@@ -15,8 +15,12 @@ terms are mapped as declared in ``MAPPING`` before any run: the length-window te
 rate, the defects term its defect measure, and pairwise preference stays where a judge applies. A sample whose
 generation fails is scored as a window miss with infinite defects, and its pair goes to the other arm.
 
+``--model`` and ``--judge`` replace the rubric's model as a recorded deviation: the model arm runs generation, and
+the judge model runs what the judge route runs in production (outline and plan review, the audit surfaces S05/S06,
+pairwise preference). Both default to the rubric's model.
+
 Usage: uv run python scripts/story_donor_differential.py --donors DIR --huohuo DIR --upstream JSON
-       --manuscript JSON --out DIR [--surface S04 ...]
+       --manuscript JSON --out DIR [--model M] [--judge M] [--surface S04 ...]
 """
 
 from __future__ import annotations
@@ -226,9 +230,17 @@ def _render(template: str, values: dict[str, str], donors: Donors) -> str:
 
 
 class Bench:
-    def __init__(self, gateway: AuthoringTextGateway, selection: StoryModelSelection) -> None:
+    def __init__(
+        self,
+        gateway: AuthoringTextGateway,
+        selection: StoryModelSelection,
+        judge_gateway: AuthoringTextGateway,
+        judge_selection: StoryModelSelection,
+    ) -> None:
         self.gateway = gateway
         self.selection = selection
+        self.judge_gateway = judge_gateway
+        self.judge_selection = judge_selection
         self.scope = StoryScope(user_id="bench", project_name="bench", actor_id="bench")
         self.calls = 0
 
@@ -236,17 +248,26 @@ class Bench:
         return StoryDecoding.model_validate({**preset, "seed": seed})
 
     async def structured[T: BaseModel](
-        self, step: str, system: str, prompt: str, model: type[T], preset: dict[str, float], seed: int
+        self,
+        step: str,
+        system: str,
+        prompt: str,
+        model: type[T],
+        preset: dict[str, float],
+        seed: int,
+        *,
+        judge: bool = False,
     ) -> tuple[T | None, str | None]:
         self.calls += 1
+        gateway, selection = (self.judge_gateway, self.judge_selection) if judge else (self.gateway, self.selection)
         try:
-            output = await self.gateway.generate(
+            output = await gateway.generate(
                 scope=self.scope,
                 request=StoryStepRequest(
                     step_id=step,
                     kind=StoryStepKind.OUTLINE,
                     context_digest=DIGEST,
-                    selection=self.selection,
+                    selection=selection,
                     system_prompt=system,
                     prompt=prompt,
                     output_mode=OutputMode.STRUCTURED,
@@ -302,9 +323,9 @@ class Bench:
         self.calls += 1
         try:
             result = await pairwise_judge(
-                self.gateway,
+                self.judge_gateway,
                 scope=self.scope,
-                selection=self.selection,
+                selection=self.judge_selection,
                 step_id=f"judge-{seed}",
                 context_digest=DIGEST,
                 decoding=self.decoding(REVIEW, seed),
@@ -449,6 +470,7 @@ async def s01_outline(run: Run) -> dict[str, Any]:
                 OutlineReview,
                 REVIEW,
                 seed,
+                judge=True,
             )
             problems = [*outline_prompts.deterministic_outline_problems(outline), *(review.problems if review else [])]
             if problems:
@@ -513,6 +535,7 @@ async def _chapter_plans(run: Run, surface: str, donor_system: str, donor_prompt
                 OutlineReview,
                 REVIEW,
                 seed,
+                judge=True,
             )
             if review is not None and review.problems:
                 revised, _ = await b.structured(
@@ -691,7 +714,7 @@ async def _audit_arms(
         )
         for arm, system, prompt in arms:
             report, error = await b.structured(
-                f"{surface}-{len(arm)}-{seed}", system, prompt, AuditReport, REVIEW, seed
+                f"{surface}-{len(arm)}-{seed}", system, prompt, AuditReport, REVIEW, seed, judge=True
             )
             if report is None:
                 arm.append(
@@ -992,21 +1015,32 @@ async def main() -> None:
     parser.add_argument("--upstream", type=Path, required=True)
     parser.add_argument("--manuscript", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--model", default=MODEL)
+    parser.add_argument("--judge", default=MODEL)
     parser.add_argument("--surface", action="append", default=[])
     args = parser.parse_args()
-    selection = StoryModelSelection.create(
-        provider_id="bench", endpoint="ollama-chat", base_url=BASE_URL, model_id=MODEL, has_credential=False
-    )
     limits = StoryLimits(input_tokens_max=10**9, output_tokens_max=10**9, wall_clock_max_seconds=10**7)
-    gateway = AuthoringTextGateway(
-        selection=selection,
-        limits=limits,
-        client=OllamaChatClient(base_url=BASE_URL),
-        sink=_NullSink(),
-        keep_alive="30m",
-    )
+
+    def route(model_id: str) -> tuple[AuthoringTextGateway, StoryModelSelection]:
+        selection = StoryModelSelection.create(
+            provider_id="bench", endpoint="ollama-chat", base_url=BASE_URL, model_id=model_id, has_credential=False
+        )
+        gateway = AuthoringTextGateway(
+            selection=selection,
+            limits=limits,
+            client=OllamaChatClient(base_url=BASE_URL),
+            sink=_NullSink(),
+            keep_alive="30m",
+        )
+        return gateway, selection
+
     manuscript = [s["text"] for s in json.loads(args.manuscript.read_text(encoding="utf-8"))["offered"]["scenes"]]
-    run = Run(Bench(gateway, selection), Donors(args.donors, args.huohuo), Upstream(args.upstream), manuscript)
+    run = Run(
+        Bench(*route(args.model), *route(args.judge)),
+        Donors(args.donors, args.huohuo),
+        Upstream(args.upstream),
+        manuscript,
+    )
     args.out.mkdir(parents=True, exist_ok=True)
     for key in args.surface or list(SURFACES):
         started = time.time()
@@ -1018,7 +1052,9 @@ async def main() -> None:
                 "model_calls": run.bench.calls - calls,
                 "donor_hashes": dict(run.donors.hashes),
                 "seeds": SEEDS,
-                "model": MODEL,
+                "model": args.model,
+                "judge": args.judge,
+                "rubric_model": MODEL,
             }
         )
         (args.out / f"{key}.json").write_text(
