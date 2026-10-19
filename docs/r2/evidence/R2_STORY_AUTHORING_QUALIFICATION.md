@@ -432,3 +432,27 @@ Facts:
 Inference: the pipeline's structural defects found so far are fixed, but on this model the remaining blocks come
 from planning coherence and judge variance (each review cycle names new contract issues). Further prompt tuning
 may get runs to touchpoint 2, but the evidence does not support "commercial-grade" prose from this model.
+
+### Runs 8–10: model comparison and the judge bottleneck (2026-10-19)
+
+Model findings (live probes, same gateway and prompts):
+- `ornith:9b`/`ornith-32k:9b` is a coding-agent fine-tune (Modelfile SYSTEM "You are Ornith, an open-source agentic
+  coding assistant"); its fiction is weak.
+- `gemma3:12b` Q4_K_M (8.2 GB) writes coherent Vietnamese but only ~57–65% fits the 8 GB GPU: 5–7 tok/s, about
+  3–4 h per run.
+- `qwen3.5-vimax:9b` (general `qwen3.5:9b` weights, fully on GPU, ~16 tok/s) writes markedly better prose than
+  ornith; it loops without a repetition penalty.
+- Ollama 0.32.6: `presence_penalty` has no effect on qwen3.5, `repeat_penalty`/`frequency_penalty` do;
+  `repeat_penalty` 1.1 removed the loops. `minLength`/`maxLength` beside a `pattern` are ignored; length bounds work
+  inside the pattern (`{n,m}`).
+
+| Run | Model | HEAD | Result | Time | Calls | Cause | Fix |
+|---|---|---|---|---|---|---|---|
+| 8 | qwen3.5-vimax:9b | `32209195` | `BLOCKED_QUALITY` ch1 review | 2570 s | 64 | two blocking memo claims were wrong (one judged by the last sentence only, one looping and self-contradicting) | `312a37ec` blocking claims need a confirming second reading, looping judgments discarded |
+| 9 | qwen3.5-vimax:9b | `312a37ec` | `BLOCKED_QUALITY` audit truncated | 1139 s | 30 | an audit ran to 2,048 tokens; judgments had no retry; string lengths unbounded | `189e07f1` judgment retry, string ceilings in the pattern |
+| 10 | qwen3.5-vimax:9b | `189e07f1`+test fix | `BLOCKED_QUALITY` ch1 review after a replan | 3193 s | 87 | two memo claims confirmed by the same 9B model, both strained (a notebook line naming "mẹ và Lan" read as revealing Lan's secret; a drawer "locked by habit" read as the required change missing) | open |
+
+Facts: prose on qwen3.5-vimax is coherent, in voice, without copying or loops; every structural defect found so
+far is fixed and tested; chapter 1 alone now costs 64–87 calls of the 132-call run ceiling. Inference: the
+remaining blocker is the memo-compliance hard gate judged and confirmed by a 9B model; the same model confirming
+its own claim is not an independent check.
