@@ -714,11 +714,21 @@ function Lifecycle({
 
 // --- touchpoint 2 ----------------------------------------------------------------------------------
 
-function FindingBody({ finding }: { finding: Finding }) {
+/** "2.3" for a scene node, null for anything else. */
+function sceneLabel(nodeId: string): string | null {
+  const match = /^scene_draft\[(\d+),(\d+)\]$/.exec(nodeId);
+  return match ? `${match[1]}.${match[2]}` : null;
+}
+
+function FindingBody({ finding, showWhere = false }: { finding: Finding; showWhere?: boolean }) {
   const { t } = useTranslation("dashboard");
+  const where = showWhere ? sceneLabel(finding.node_id) : null;
   return (
     <>
-      <span className="sa-note-kind">{t(`story_severity_${finding.severity}`)}</span>
+      <span className="sa-note-kind">
+        {t(`story_severity_${finding.severity}`)}
+        {where ? ` · ${t("story_scene_short", { scene: where })}` : null}
+      </span>
       <span className="sa-note-text">{finding.message}</span>
       {finding.quote ? <q className="sa-note-quote">{finding.quote}</q> : null}
     </>
@@ -892,7 +902,7 @@ function Decision({
                 }}
               />
               <span>
-                <FindingBody finding={finding} />
+                <FindingBody finding={finding} showWhere />
               </span>
             </label>
           ))}

@@ -2606,6 +2606,7 @@ export default {
   'story_packaging': '标题与简介',
   'story_other_titles': '其他标题',
   'story_chapter': '第 {{number}} 章',
+  'story_scene_short': '第 {{scene}} 场',
   'story_scene': '第 {{chapter}} 章第 {{scene}} 场',
   'story_notes_for': '第 {{scene}} 场的意见',
   'story_general_notes': '全篇意见',

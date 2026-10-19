@@ -227,6 +227,7 @@ describe("touchpoint 2", () => {
     render(<StoryAuthoringPage projectName="demo" />);
     const approve = await screen.findByRole("button", { name: "Approve story" });
     expect(approve).toBeDisabled();
+    expect(screen.getByRole("checkbox").closest("label")).toHaveTextContent("Needs your decision · scene 1.1");
 
     fireEvent.click(screen.getByRole("checkbox"));
     expect(approve).toBeEnabled();

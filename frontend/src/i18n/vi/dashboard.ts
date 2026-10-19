@@ -2605,6 +2605,7 @@ export default {
   'story_packaging': 'Tên truyện và giới thiệu',
   'story_other_titles': 'Tên khác',
   'story_chapter': 'Chương {{number}}',
+  'story_scene_short': 'cảnh {{scene}}',
   'story_scene': 'Chương {{chapter}}, cảnh {{scene}}',
   'story_notes_for': 'Ghi chú cảnh {{scene}}',
   'story_general_notes': 'Ghi chú cho cả truyện',

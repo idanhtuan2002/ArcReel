@@ -2607,6 +2607,7 @@ export default {
   'story_packaging': 'Title and blurbs',
   'story_other_titles': 'Other titles',
   'story_chapter': 'Chapter {{number}}',
+  'story_scene_short': 'scene {{scene}}',
   'story_scene': 'Chapter {{chapter}}, scene {{scene}}',
   'story_notes_for': 'Notes on scene {{scene}}',
   'story_general_notes': 'Notes on the whole story',

@@ -275,6 +275,14 @@
   margin-top: 0.2rem;
   accent-color: var(--color-accent);
 }
+.sa-exception > span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--color-text-2);
+}
 .sa-exception .sa-note-kind {
   --mark: var(--color-warm);
 }
