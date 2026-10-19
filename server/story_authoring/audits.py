@@ -115,10 +115,13 @@ CHAPTER_DIMENSIONS = tuple(AuditDimension)
 
 _INSTRUCTIONS: dict[AuditDimension, str] = {
     AuditDimension.CONTINUITY: (
-        "Thẩm định TÍNH LIÊN TỤC. Loại lỗi: nhân vật xuất hiện khi không thể có mặt, mâu thuẫn địa điểm, nhân vật biết "
-        "điều chưa thể biết, mâu thuẫn quan hệ hoặc cách xưng hô, mâu thuẫn đồ vật thuộc về ai, thời gian chạy ngược "
-        "hoặc nhảy vô lý, chuyển địa điểm không có chuyển cảnh, sự kiện thiếu nguyên nhân, lệch khỏi kế hoạch chương. "
-        "So với [Sự thật đã khóa] và [Tóm tắt trước đó]."
+        "Thẩm định TÍNH LIÊN TỤC: chương có vi phạm [Sự thật đã khóa] và [Tóm tắt trước đó] không. Đối chiếu từng câu "
+        "nêu mốc thời gian, tuổi, quan hệ, nơi ở, ai còn sống hay đã mất với [Sự thật đã khóa]; một câu nói khác dữ kiện "
+        "đã khóa (ví dụ 'mất mười năm' khi dữ kiện là 'mất cách đây ba ngày') là lỗi nặng. Loại lỗi: mâu thuẫn mốc thời "
+        "gian với dữ kiện, người đã mất xuất hiện hoặc được kể như còn sống, nhân vật xuất hiện khi không thể có mặt, mâu "
+        "thuẫn địa điểm, nhân vật biết điều chưa thể biết, mâu thuẫn quan hệ hoặc cách xưng hô, mâu thuẫn đồ vật thuộc về "
+        "ai, thời gian trong chương chạy ngược hoặc nhảy vô lý, chuyển địa điểm không có chuyển cảnh, sự kiện thiếu nguyên "
+        "nhân, lệch khỏi kế hoạch chương."
     ),
     AuditDimension.MEMO_COMPLIANCE: (
         "Thẩm định việc THỰC HIỆN GHI CHÚ CHƯƠNG. Lỗi nghiêm trọng: nhiệm vụ của chương không xảy ra; một thay đổi bắt "

@@ -673,7 +673,8 @@ def _scenes(fixture: dict[str, Any]) -> list[tuple[str, str]]:
 
 
 def _audit_sections(dimension: AuditDimension, fixture: dict[str, Any]) -> tuple[str, str]:
-    """The R2 audit prompt split into its instruction head and the shared context sections."""
+    """The R2 audit prompt split into its instruction head and what both arms share: the output format block and
+    the context sections."""
     prompt = chapter_audit_prompt(
         dimension,
         chapter_number=1,
@@ -682,8 +683,8 @@ def _audit_sections(dimension: AuditDimension, fixture: dict[str, Any]) -> tuple
         facts=FIXTURES["facts"],
         previous_summary="",
     )
-    head, sections = prompt.split("[Sự thật đã khóa]", 1)
-    return head, "[Sự thật đã khóa]" + sections
+    head, sections = prompt.split('\n\nTrả về "issues"', 1)
+    return head, '\n\nTrả về "issues"' + sections
 
 
 def _score_findings(findings: Sequence[Finding], defects: Sequence[dict[str, str]]) -> tuple[int, int, int]:
