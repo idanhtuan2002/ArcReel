@@ -95,17 +95,22 @@ NODE_CAPS = {
     "story_bible": 3,
     "style_bible": 3,
     "outline": 4,
-    "chapter_plan": 5,
+    "chapter_plan": 8,
     "scene_draft": 6,
     "chapter_review": 12,
     "manuscript_review": 4,
     "packaging": 3,
 }
 REVIEW_CYCLES = 2
+CONVERGE_PASSES = 6
 MIN_VERIFIED_SELLING_POINTS = 3
 STORY_HARD_RANGE = (6000, 12500)
 STORY_TARGET_RANGE = (7000, 11000)
 AUTO_NOTE = "Biên tập tự động: "
+PLAN_REPAIR_NOTE = (
+    "kế hoạch chương này đã khiến các cảnh không thể đạt yêu cầu: các mục bắt buộc, giữ kín và cấm mâu thuẫn nhau. "
+    "Lập lại kế hoạch sao cho mọi mục bắt buộc làm được mà không phạm mục cấm hay lộ bài giữ kín. Lỗi thẩm định: "
+)
 REGENERATE_NOTE = (
     "\n\n[Lưu ý] Bản viết trước quá ngắn hoặc chép lại câu của các cảnh trước. Viết lại toàn bộ cảnh, đủ độ dài, bằng "
     "câu chữ hoàn toàn mới."
@@ -227,7 +232,7 @@ class StoryRunDriver:
         if state.phase is not RunPhase.RUNNING:
             return state
         try:
-            for _ in range(3):
+            for _ in range(CONVERGE_PASSES):
                 intents = human_intents(await self._store.load())
                 try:
                     story = await self._converge()
@@ -521,6 +526,9 @@ class StoryRunDriver:
             previous_plans=previous,
         )
         node = chapter_plan(chapter)
+        notes = (await self._store.load()).intents.get(node, ())
+        if notes:
+            prompt += "\n\n[Yêu cầu sửa kế hoạch]\n" + "\n".join(f"- {n}" for n in notes)
 
         async def generate(text: str) -> tuple[ChapterPlan, list[str]]:
             plan = ChapterPlan.model_validate_json(
@@ -868,6 +876,21 @@ class StoryRunDriver:
                     changed = True
             if changed:
                 return True
+        blocking = [f for f in findings if f.blocking]
+        contract = f"{AuditDimension.MEMO_COMPLIANCE.value}:"
+        if final and blocking and all(f.code.startswith(contract) for f in blocking):
+            plan_node = chapter_plan(chapter)
+            state = await self._store.load()
+            if not state.intents.get(plan_node):
+                note = AUTO_NOTE + PLAN_REPAIR_NOTE + "; ".join(f"{f.message} (trích: “{f.quote}”)" for f in blocking)
+                scene_nodes = tuple(ref.node_id for ref in refs)
+                await self._store.apply(
+                    lambda s: (
+                        add_intent(drop_auto_intents(s, scene_nodes), node_ids=(plan_node,), note=note),
+                        None,
+                    )
+                )
+                raise _Restart(plan_node)
         if final and any(f.blocking for f in findings):
             raise Blocked(
                 RunPhase.BLOCKED_QUALITY,
@@ -1032,9 +1055,26 @@ def human_intents(state: RunState) -> dict[str, tuple[str, ...]]:
     return {node: found for node, found in notes.items() if found}
 
 
+def drop_auto_intents(state: RunState, node_ids: Sequence[str]) -> RunState:
+    """Remove the driver's own notes from nodes whose contract is about to be replanned."""
+    intents = dict(state.intents)
+    for node_id in node_ids:
+        kept = tuple(n for n in intents.get(node_id, ()) if not n.startswith(AUTO_NOTE))
+        if kept:
+            intents[node_id] = kept
+        else:
+            intents.pop(node_id, None)
+    return state.model_copy(update={"intents": intents})
+
+
 def step_prefix(state: RunState, node: str) -> str:
-    """Attempts of a node in one round share its call cap; a round ends only with a Human revision or retry."""
-    return f"{node}@r{len(human_intents(state).get(node, ()))}.{state.retries}#"
+    """Attempts of a node in one round share its call cap. A round ends with a Human revision or retry; for a
+    scene or chapter review it also ends when its chapter plan is replanned, since the contract is new."""
+    replans = 0
+    if node.startswith(("scene_draft[", "chapter_review[")):
+        chapter = node.split("[", 1)[1].split(",", 1)[0].rstrip("]")
+        replans = len(state.intents.get(chapter_plan(int(chapter)), ()))
+    return f"{node}@r{len(human_intents(state).get(node, ()))}.{state.retries}.{replans}#"
 
 
 def entity_keys(seed: StorySeed) -> tuple[dict[str, str], dict[str, str]]:

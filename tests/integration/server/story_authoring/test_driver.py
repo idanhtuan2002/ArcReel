@@ -570,7 +570,7 @@ async def test_a_contract_finding_regenerates_the_scene_with_an_editor_note_insi
     assert model.calls["prose"] == 10
     assert model.calls.get("patches", 0) == 0
     scene_steps = {a.step_id for a in state.attempts if a.step_id.startswith(scene_draft(1, 3))}
-    assert scene_steps == {f"{scene_draft(1, 3)}@r0.0#1", f"{scene_draft(1, 3)}@r0.0#2"}
+    assert scene_steps == {f"{scene_draft(1, 3)}@r0.0.0#1", f"{scene_draft(1, 3)}@r0.0.0#2"}
 
 
 async def test_a_final_review_that_blocks_keeps_its_findings(concurrent_session_factory: Factory, tmp_path):
@@ -648,3 +648,68 @@ async def test_a_chapter_plan_with_a_contradiction_is_revised_before_any_scene(
     plan_prompts = [p for k, p in model.prompts if k == "chapter_goal"]
     assert "chapter_goal hé lộ cuốn sổ, trái với withheld_cards" in plan_prompts[2]
     assert sum(1 for p in reviews if p.startswith("Kiểm tra kế hoạch chương")) == 3
+
+
+async def test_a_contract_that_stays_unmet_replans_the_chapter_once(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    replanned: list[str] = []
+
+    def plan(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if "[Yêu cầu sửa kế hoạch]" in prompt:
+            replanned.append(prompt)
+            return {**STRUCTURED["chapter_goal"], "chapter_goal": "Minh về nhà và thấy cuốn sổ"}
+        return STRUCTURED["chapter_goal"]
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if replanned or "GHI CHÚ CHƯƠNG" not in prompt or "[Chương 1 cần thẩm định]" not in prompt:
+            return {"issues": []}
+        quote = model.paragraphs[-1].split(". ")[0] + "."
+        issue = {
+            "severity": "critical",
+            "issue_type": "do_not_violated",
+            "description": "mục bắt buộc phạm mục cấm",
+            "quote": quote,
+            "suggested_fix": "lập lại kế hoạch",
+        }
+        return {"issues": [issue]}
+
+    model.overrides["chapter_goal"] = plan
+    model.overrides["issues"] = audit
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert len(replanned) == 1
+    assert "mục bắt buộc phạm mục cấm" in replanned[0]
+    assert len(state.intents["chapter_plan[1]"]) == 1
+    assert not any(n.startswith("scene_draft[1,") for n in state.intents)
+    assert any(a.step_id.startswith("scene_draft[1,1]@r0.0.1#") for a in state.attempts)
+
+
+async def test_a_replanned_chapter_that_still_fails_is_blocked_with_its_findings(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if "GHI CHÚ CHƯƠNG" not in prompt or "[Chương 1 cần thẩm định]" not in prompt:
+            return {"issues": []}
+        quote = prompt.rsplit("\n\n", 1)[-1].split(". ")[0] + "."
+        issue = {
+            "severity": "critical",
+            "issue_type": "withheld_card_revealed",
+            "description": "lộ bài",
+            "quote": quote,
+            "suggested_fix": "giấu",
+        }
+        return {"issues": [issue]}
+
+    model.overrides["issues"] = audit
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.BLOCKED_QUALITY
+    assert len(state.intents["chapter_plan[1]"]) == 1
+    assert state.blocked_findings

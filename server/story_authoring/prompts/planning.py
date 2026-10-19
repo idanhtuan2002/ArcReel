@@ -122,7 +122,9 @@ Quy tắc:
 - Không tóm tắt lướt qua nhiều ngày hay nhiều sự kiện lớn; tách thành hành động, lời thoại, hiểu lầm, phản ứng.
 - Nhân vật không được biết điều họ chưa thể biết.
 - required_changes_by_end, withheld_cards và do_not không được mâu thuẫn nhau: điều bắt buộc xảy ra không được
-  nằm trong danh sách cấm hay bài giữ kín.
+  nằm trong danh sách cấm hay bài giữ kín, và lời thoại hay hành động bắt buộc không được để lộ bài giữ kín.
+- withheld_cards và do_not tối đa 3 mục mỗi loại, ngắn gọn; chapter_goal và summary của cảnh không được kể ra nội
+  dung của bài giữ kín.
 - location chỉ được chọn trong: {", ".join(location_names)}.
 - pov và characters chỉ được chọn trong: {", ".join(character_names)}.{ending}
 
