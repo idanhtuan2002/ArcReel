@@ -248,3 +248,22 @@ def test_selling_points_need_a_verbatim_quote():
         tags=["a", "b", "c", "d", "e"],
     )
     assert unverified_selling_points(packaging, "Minh mở cửa. Lan cười.") == ["bịa"]
+
+
+def test_earlier_scenes_render_as_the_last_paragraphs_and_older_openings_only():
+    from r2.contracts.narrative_context import ContextChannel
+
+    pack = _pack()
+    template = pack.segments[0]
+    latest = "Đoạn một của cảnh hai.\n\nĐoạn hai của cảnh hai.\n\nĐoạn ba của cảnh hai.\n\nĐoạn bốn kết cảnh hai."
+    older = "Mở đầu cảnh một rất dài. " + "Câu tiếp theo của cảnh một. " * 20
+    earlier = tuple(
+        template.model_copy(update={"channel": ContextChannel.RECENT_ACCEPTED, "content": text})
+        for text in (latest, older)
+    )
+    text = render_context(pack.model_copy(update={"recent_accepted_context": earlier}), {})
+
+    assert "Đoạn ba của cảnh hai.\n\nĐoạn bốn kết cảnh hai." in text
+    assert "Đoạn một của cảnh hai." not in text
+    assert "- Mở đầu cảnh một rất dài." in text
+    assert older.strip() not in text

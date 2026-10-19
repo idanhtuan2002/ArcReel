@@ -222,3 +222,15 @@ async def test_a_scene_inside_the_window_is_left_alone_without_a_call():
         window=SceneLengthWindow(minimum=1, maximum=500),
     )
     assert (outcome.accepted, outcome.text, bodies) == (True, TEXT, [])
+
+
+def test_deterministic_fixes_remove_markup_and_copied_sentences():
+    earlier = ["Minh ngồi yên trên bậc thềm chính, tay vẫn ôm chặt phong thư bên người."]
+    text = "Cha viết: *Ngày mai về.* Minh ngồi yên trên bậc thềm chính, tay vẫn ôm chặt phong thư bên người. Lan cười."
+    findings = [
+        Finding("MARKUP", Severity.HARD_STRUCTURAL, "s", "m", "*"),
+        Finding("CROSS_SCENE_REPLAY", Severity.NARRATIVE_CRITICAL, "s", "c", earlier[0]),
+    ]
+    fixed, notes = deterministic_fixes(text, findings, earlier=earlier)
+    assert fixed == "Cha viết: Ngày mai về. Lan cười."
+    assert len(notes) == 2

@@ -173,6 +173,8 @@ class ScriptedModel:
     """Answers by the request's schema. ``overrides`` replace an answer kind, ``fail_at`` breaks a call number of a
     kind, and ``before`` runs a hook before a call number of a kind is answered."""
 
+    _instances = 0
+
     def __init__(self) -> None:
         self.calls: Counter[str] = Counter()
         self.prompts: list[tuple[str, str]] = []
@@ -180,7 +182,8 @@ class ScriptedModel:
         self.overrides: dict[str, Answer] = {}
         self.fail_at: dict[str, int] = {}
         self.before: dict[tuple[str, int], Callable[[], Awaitable[None]]] = {}
-        self._sentence = 0
+        ScriptedModel._instances += 1
+        self._sentence = ScriptedModel._instances * 100_000
 
     def _prose(self, count: int) -> dict[str, Any]:
         paragraphs = []
@@ -595,3 +598,29 @@ async def test_a_final_review_that_blocks_keeps_its_findings(concurrent_session_
     assert state.blocked_findings
     assert {f["code"] for f in state.blocked_findings} == {"MEMO_COMPLIANCE:withheld_card_revealed"}
     assert all(f["quote"] for f in state.blocked_findings)
+
+
+async def test_a_sentence_copied_from_an_earlier_scene_is_removed_without_a_model_call(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    full = model._prose
+    copied: list[str] = []
+
+    def copying(_prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
+        answer = full(schema["properties"]["paragraphs"]["minItems"])
+        if model.calls["prose"] == 2:
+            copied.append(model.paragraphs[0].split(". ")[0] + ".")
+            answer["paragraphs"][0] = copied[0] + " " + answer["paragraphs"][0]
+        return answer
+
+    model.overrides["prose"] = copying
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    manifest = load_offered_manifest(StoryBlobStore(tmp_path), state)
+    assert manifest.scenes[0].revision.normalized_content.count(copied[0]) == 1
+    assert copied[0] not in manifest.scenes[1].revision.normalized_content
+    assert model.calls["prose"] == 9

@@ -44,6 +44,8 @@ HARD_RULES = (
     "Không giải quyết trước cao trào của các cảnh sau.",
     "Nhân vật không được biết điều họ chưa thể biết.",
     "Không thêm nhân vật có tên hay địa danh mới ngoài những tên đã có trong bối cảnh.",
+    "Không chép lại câu nào của các cảnh trước; chỉ viết tiếp mạch truyện bằng câu chữ mới.",
+    "Không dùng ký hiệu định dạng như dấu sao; lời trích hay chữ viết trong thư, sổ đặt trong ngoặc kép.",
 )
 
 
@@ -70,7 +72,8 @@ def _constraint_lines(segment: NarrativeContextSegment) -> list[str]:
 
 
 def render_context(pack: NarrativeContextPack, names: Mapping[str, str]) -> str:
-    """The pack as labelled Vietnamese text: locked facts, scene intent, style rules, earlier accepted scenes."""
+    """The pack as labelled Vietnamese text: locked facts, scene intent, style rules, then the last paragraphs of
+    the scene just before and the openings of older ones (the full earlier text invites copying)."""
     facts: list[str] = []
     intent: list[str] = []
     beats: list[str] = []
@@ -95,8 +98,17 @@ def render_context(pack: NarrativeContextPack, names: Mapping[str, str]) -> str:
         "[Quy tắc văn phong]\n" + ("\n".join(style) or "(không có)"),
     ]
     if earlier:
-        parts.append("[Các cảnh đã viết trước đó, mới nhất trước]\n" + "\n\n---\n\n".join(earlier))
+        latest = [p for p in earlier[0].split("\n\n") if p.strip()]
+        parts.append("[Đoạn cuối cảnh liền trước — để nối mạch, không chép lại]\n" + "\n\n".join(latest[-2:]))
+    if len(earlier) > 1:
+        openings = [_opening(text) for text in earlier[1:]]
+        parts.append("[Mở đầu các cảnh trước đó, mới nhất trước]\n" + "\n".join(f"- {o}" for o in openings))
     return "\n\n".join(parts)
+
+
+def _opening(text: str, limit: int = 200) -> str:
+    flat = " ".join(text.split())
+    return flat if len(flat) <= limit else flat[:limit].rsplit(" ", 1)[0] + "…"
 
 
 def paragraph_bounds(target_syllables: int) -> tuple[int, int]:

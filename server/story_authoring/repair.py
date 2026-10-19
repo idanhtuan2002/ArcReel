@@ -30,6 +30,8 @@ from server.story_authoring.checks import (
     PunctuationProfile,
     SceneLengthWindow,
     count_syllables,
+    strip_copied_sentences,
+    strip_markup,
     strip_replayed_sentences,
 )
 from server.story_authoring.contracts import (
@@ -237,12 +239,23 @@ class RepairOutcome:
     skipped: int = 0
 
 
-def deterministic_fixes(text: str, findings: Sequence[Finding]) -> tuple[str, tuple[str, ...]]:
-    """Fixes that need no model: near-duplicate passages are removed by the dedupe core."""
-    if not any(f.code == "NEAR_DUPLICATE" for f in findings):
-        return text, ()
-    cleaned, hits = strip_replayed_sentences(text)
-    return cleaned, tuple(f"removed repeated passage: {hit.excerpt}" for hit in hits)
+def deterministic_fixes(
+    text: str, findings: Sequence[Finding], *, earlier: Sequence[str] = ()
+) -> tuple[str, tuple[str, ...]]:
+    """Fixes that need no model: markdown emphasis is dropped, sentences copied from earlier scenes and repeated
+    passages are removed by the dedupe core."""
+    codes = {f.code for f in findings}
+    notes: list[str] = []
+    if "MARKUP" in codes:
+        text = strip_markup(text)
+        notes.append("removed markdown emphasis")
+    if "CROSS_SCENE_REPLAY" in codes:
+        text, copied = strip_copied_sentences(text, earlier)
+        notes.extend(f"removed sentence copied from an earlier scene: {c[:56]}" for c in copied)
+    if "NEAR_DUPLICATE" in codes:
+        text, hits = strip_replayed_sentences(text)
+        notes.extend(f"removed repeated passage: {hit.excerpt}" for hit in hits)
+    return text, tuple(notes)
 
 
 def _conflict_lines(findings: Sequence[Finding]) -> list[str]:

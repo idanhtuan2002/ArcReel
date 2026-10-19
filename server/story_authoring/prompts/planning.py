@@ -121,6 +121,8 @@ Quy tắc:
 - Thứ tự cảnh có nhân quả rõ: mục tiêu → xung đột → bước ngoặt → móc nối sang cảnh sau.
 - Không tóm tắt lướt qua nhiều ngày hay nhiều sự kiện lớn; tách thành hành động, lời thoại, hiểu lầm, phản ứng.
 - Nhân vật không được biết điều họ chưa thể biết.
+- required_changes_by_end, withheld_cards và do_not không được mâu thuẫn nhau: điều bắt buộc xảy ra không được
+  nằm trong danh sách cấm hay bài giữ kín.
 - location chỉ được chọn trong: {", ".join(location_names)}.
 - pov và characters chỉ được chọn trong: {", ".join(character_names)}.{ending}
 

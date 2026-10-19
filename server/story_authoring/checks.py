@@ -21,6 +21,7 @@ import math
 import re
 import unicodedata
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -491,6 +492,48 @@ _VI_NORM_DROP = re.compile(r"[\W_]+")
 REPLAY_MIN_SYLLABLES = 8
 
 
+def _sentence_key(sentence: str) -> str:
+    return _VI_NORM_DROP.sub("", sentence.lower())
+
+
+def _remove_spans(content: str, removals: Sequence[tuple[int, int]]) -> str:
+    pieces: list[str] = []
+    cursor = 0
+    for start, end in removals:
+        pieces.append(content[cursor:start])
+        cursor = end
+    pieces.append(content[cursor:])
+    text = re.sub(r"[ \t]{2,}", " ", "".join(pieces))
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    return _TRIPLE_NEWLINES.sub("\n\n", text).strip()
+
+
+def strip_copied_sentences(content: str, earlier: Sequence[str]) -> tuple[str, tuple[str, ...]]:
+    """Remove sentences of at least ``REPLAY_MIN_SYLLABLES`` syllables that already occur in earlier scenes: the
+    Vietnamese replay rule of the dedupe core applied across the scenes before this one."""
+    known = {
+        _sentence_key(m.group(0))
+        for text in earlier
+        for m in _VI_SENTENCE.finditer(text)
+        if count_syllables(m.group(0)) >= REPLAY_MIN_SYLLABLES
+    }
+    removals: list[tuple[int, int]] = []
+    copied: list[str] = []
+    for match in _VI_SENTENCE.finditer(content):
+        sentence = match.group(0)
+        if count_syllables(sentence) >= REPLAY_MIN_SYLLABLES and _sentence_key(sentence) in known:
+            removals.append((match.start(), match.end()))
+            copied.append(" ".join(sentence.split()))
+    if not removals:
+        return content, ()
+    return _remove_spans(content, removals), tuple(copied)
+
+
+def strip_markup(content: str) -> str:
+    """Markdown emphasis never belongs in the prose."""
+    return re.sub(r"[ \t]{2,}", " ", content.replace("*", "")).strip()
+
+
 def strip_replayed_sentences(content: str) -> tuple[str, tuple[DupHit, ...]]:
     """Vietnamese runtime form of the dedupe core: a sentence of at least ``REPLAY_MIN_SYLLABLES`` syllables whose
     normalized fingerprint already occurred earlier is removed; the first occurrence always stays.
@@ -504,24 +547,15 @@ def strip_replayed_sentences(content: str) -> tuple[str, tuple[DupHit, ...]]:
         sentence = match.group(0)
         if count_syllables(sentence) < REPLAY_MIN_SYLLABLES:
             continue
-        key = _VI_NORM_DROP.sub("", sentence.lower())
+        key = _sentence_key(sentence)
         if key in seen:
             removals.append((match.start(), match.end()))
         else:
             seen.add(key)
     if not removals:
         return content, ()
-    pieces: list[str] = []
-    cursor = 0
-    hits: list[DupHit] = []
-    for start, end in removals:
-        pieces.append(content[cursor:start])
-        cursor = end
-        hits.append(DupHit(start, end, end - start, " ".join(content[start:end].split())[:56]))
-    pieces.append(content[cursor:])
-    text = re.sub(r"[ \t]{2,}", " ", "".join(pieces))
-    text = re.sub(r"[ \t]+\n", "\n", text)
-    return _TRIPLE_NEWLINES.sub("\n\n", text).strip(), tuple(hits)
+    hits = [DupHit(start, end, end - start, " ".join(content[start:end].split())[:56]) for start, end in removals]
+    return _remove_spans(content, removals), tuple(hits)
 
 
 # --- surface checks --------------------------------------------------------------------------------
@@ -581,8 +615,15 @@ class SceneLengthWindow:
 
 
 def check_scene_prose(
-    text: str, *, node_id: str, window: SceneLengthWindow, allowed_names: set[str], requires_dialogue: bool = False
+    text: str,
+    *,
+    node_id: str,
+    window: SceneLengthWindow,
+    allowed_names: set[str],
+    requires_dialogue: bool = False,
+    earlier: Sequence[str] = (),
 ) -> tuple[Finding, ...]:
+    """L1 checks of one scene; ``earlier`` holds the accepted text of every scene before it."""
     findings: list[Finding] = [
         Finding(
             "CJK", Severity.HARD_INTEGRITY, node_id, "CJK character in prose", text[max(0, h.index - 20) : h.index + 20]
@@ -619,6 +660,13 @@ def check_scene_prose(
         findings.append(
             Finding("FOREIGN_WORDS", severity, node_id, f"{len(foreign)} non-Vietnamese words", " ".join(foreign[:8]))
         )
+    if "*" in text:
+        findings.append(Finding("MARKUP", Severity.HARD_STRUCTURAL, node_id, "markdown emphasis in prose", "*"))
+    _, copied = strip_copied_sentences(text, earlier)
+    findings.extend(
+        Finding("CROSS_SCENE_REPLAY", Severity.NARRATIVE_CRITICAL, node_id, "a sentence copies an earlier scene", c)
+        for c in copied[:3]
+    )
     _, duplicates = strip_replayed_sentences(text)
     findings.extend(
         Finding("NEAR_DUPLICATE", Severity.NARRATIVE_CRITICAL, node_id, "a passage repeats", hit.excerpt)

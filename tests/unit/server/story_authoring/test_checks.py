@@ -15,7 +15,9 @@ from server.story_authoring.checks import (
     is_vietnamese_syllable,
     meta_leaks,
     repeated_trigram_excess,
+    strip_copied_sentences,
     strip_intra_chapter_near_duplicate,
+    strip_markup,
     strip_replayed_sentences,
     unknown_names,
 )
@@ -145,3 +147,27 @@ def test_an_over_long_scene_is_hard_structural():
 def test_a_sentence_after_a_single_quote_is_not_a_name():
     text = "Ông nói: 'Nhà này không bán, con à.' Nhưng giọng ấy đã xa. Lan đáp: ‘Dạ.’ Rồi im lặng."
     assert unknown_names(text, {"Lan"}) == {}
+
+
+EARLIER = "Minh ngồi yên trên bậc thềm chính, tay vẫn ôm chặt phong thư bên người. Gió thổi."
+
+
+def test_a_sentence_copied_from_an_earlier_scene_is_found_and_removed():
+    text = (
+        "Lan bước vào sân và đặt giỏ xuống. Minh ngồi yên trên bậc thềm chính, tay vẫn ôm chặt phong thư bên người.\n\n"
+        "Gió thổi. Hai anh em im lặng rất lâu dưới hiên nhà."
+    )
+    findings = check_scene_prose(
+        text, node_id="s", window=SceneLengthWindow(1, 1000, 2000), allowed_names={"Minh", "Lan"}, earlier=[EARLIER]
+    )
+    assert [f.code for f in findings if f.code == "CROSS_SCENE_REPLAY"] == ["CROSS_SCENE_REPLAY"]
+    cleaned, copied = strip_copied_sentences(text, [EARLIER])
+    assert copied == ("Minh ngồi yên trên bậc thềm chính, tay vẫn ôm chặt phong thư bên người.",)
+    assert cleaned == "Lan bước vào sân và đặt giỏ xuống.\n\nGió thổi. Hai anh em im lặng rất lâu dưới hiên nhà."
+
+
+def test_markdown_emphasis_is_a_structural_finding_with_a_deterministic_fix():
+    text = "Cha viết: *'Ngày mai sẽ gửi thư cho con.'* Minh lặng người."
+    findings = check_scene_prose(text, node_id="s", window=SceneLengthWindow(1, 1000, 2000), allowed_names=set())
+    assert "MARKUP" in {f.code for f in findings}
+    assert strip_markup(text) == "Cha viết: 'Ngày mai sẽ gửi thư cho con.' Minh lặng người."

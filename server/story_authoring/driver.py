@@ -647,6 +647,7 @@ class StoryRunDriver:
             chapter.scenes, story_target=self._brief.story_target_syllables, chapters=CHAPTERS
         )
         allowed = set(story.names.values())
+        earlier = [a.revision.normalized_content for a in acceptances]
 
         async def produce(epoch: int) -> bytes:
             state = await self._store.load()
@@ -663,7 +664,7 @@ class StoryRunDriver:
                 revision_note=note,
             )
             prose, findings = await self._draft_until_clean(
-                ref.node_id, epoch, prompt, context, allowed, planned.dialogue_required, target
+                ref.node_id, epoch, prompt, context, allowed, planned.dialogue_required, target, earlier
             )
             return json.dumps(
                 {**binding, "prose": prose, "findings": [_finding_dict(f) for f in findings]}, ensure_ascii=False
@@ -678,7 +679,15 @@ class StoryRunDriver:
         )
 
     async def _draft_until_clean(
-        self, node: str, epoch: int, prompt: str, context: str, allowed: set[str], dialogue: bool, target: int
+        self,
+        node: str,
+        epoch: int,
+        prompt: str,
+        context: str,
+        allowed: set[str],
+        dialogue: bool,
+        target: int,
+        earlier: Sequence[str],
     ) -> tuple[str, tuple[Finding, ...]]:
         bounds = drafting.paragraph_bounds(target)
         prose = await self._step(
@@ -693,12 +702,17 @@ class StoryRunDriver:
         history: list[str] = []
         while True:
             findings = check_scene_prose(
-                prose, node_id=node, window=self._window, allowed_names=allowed, requires_dialogue=dialogue
+                prose,
+                node_id=node,
+                window=self._window,
+                allowed_names=allowed,
+                requires_dialogue=dialogue,
+                earlier=earlier,
             )
             repairable = [f for f in findings if f.severity in REPAIRABLE]
             if not repairable:
                 return prose, findings
-            fixed, notes = deterministic_fixes(prose, repairable)
+            fixed, notes = deterministic_fixes(prose, repairable, earlier=earlier)
             if notes:
                 prose = fixed
                 continue
