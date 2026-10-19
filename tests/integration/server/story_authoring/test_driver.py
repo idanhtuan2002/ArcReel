@@ -215,6 +215,8 @@ class ScriptedModel:
             return self._prose(schema["properties"]["paragraphs"]["minItems"])
         if kind in STRUCTURED:
             return STRUCTURED[kind]
+        if kind == "confirmed":
+            return {"confirmed": True, "quote": self.paragraphs[-1]}
         if kind == "ending_resolves_conflict":
             return {"ending_resolves_conflict": True, "ending_quote": self.paragraphs[-1], "issues": []}
         if kind == "issues":
@@ -236,7 +238,15 @@ class ScriptedModel:
             if "paragraphs" in properties
             else next(
                 k
-                for k in (*STRUCTURED, "ending_resolves_conflict", "issues", "titles", "patches", "rewrites")
+                for k in (
+                    *STRUCTURED,
+                    "confirmed",
+                    "ending_resolves_conflict",
+                    "issues",
+                    "titles",
+                    "patches",
+                    "rewrites",
+                )
                 if k in properties
             )
         )
@@ -720,3 +730,39 @@ async def test_a_replanned_chapter_that_still_fails_is_blocked_with_its_findings
     assert state.phase is RunPhase.BLOCKED_QUALITY
     assert len(state.intents["chapter_plan[1]"]) == 1
     assert state.blocked_findings
+
+
+async def test_an_unconfirmed_blocking_claim_reaches_the_human_as_an_exception(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if "GHI CHÚ CHƯƠNG" not in prompt or "[Chương 1 cần thẩm định]" not in prompt:
+            return {"issues": []}
+        quote = prompt.rsplit("\n\n", 1)[-1].split(". ")[0] + "."
+        issue = {
+            "severity": "critical",
+            "issue_type": "withheld_card_revealed",
+            "description": "lộ bài",
+            "quote": quote,
+            "suggested_fix": "giấu",
+        }
+        return {"issues": [issue]}
+
+    model.overrides["issues"] = audit
+    model.overrides["confirmed"] = lambda _p, _s: {"confirmed": False, "quote": model.paragraphs[-1]}
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert not state.intents
+    manifest = load_offered_manifest(blobs, state)
+    assert manifest.quality_record_digest is not None
+    record = json.loads(blobs.read_exact(manifest.quality_record_digest))
+    exceptions = [f for f in record["findings"] if f["id"] in manifest.exceptions_offered]
+    assert {f["code"] for f in exceptions} == {"MEMO_COMPLIANCE:withheld_card_revealed"}
+    assert all(f["message"].startswith("[chưa kiểm chứng] ") for f in exceptions)
+    assert all(f["severity"] == "NARRATIVE_CRITICAL" for f in exceptions)

@@ -257,3 +257,46 @@ def test_uniform_paragraphs_are_flagged_and_varied_ones_are_not():
     )
     assert [f.code for f in anti_ai_findings(uniform, node_id="s")] == ["UNIFORM_PARAGRAPHS"]
     assert anti_ai_findings(varied, node_id="s") == ()
+
+
+def test_a_looping_judgment_is_discarded():
+    looping = "Lỗi thực sự là Minh đã đọc sâu hơn vào cuốn sổ của cha. " * 3
+    findings, discarded = verified_findings(
+        [
+            AuditIssue(
+                severity="critical", issue_type="x", description=looping, quote="Bữa cơm im lặng.", suggested_fix="f"
+            )
+        ],
+        dimension=AuditDimension.MEMO_COMPLIANCE,
+        scenes=SCENES,
+    )
+    assert (findings, discarded) == ((), 1)
+
+
+async def test_a_blocking_claim_holds_only_when_the_second_reading_confirms_it_with_a_quote():
+    from server.story_authoring.audits import confirm_finding, unconfirmed
+    from server.story_authoring.checks import Finding
+
+    claim = Finding("MEMO_COMPLIANCE:x", Severity.HARD_STRUCTURAL, "scene_draft[1,2]", "thiếu", "Bữa cơm im lặng.")
+    outcomes = []
+    for payload in (
+        {"confirmed": True, "quote": "Bữa cơm im lặng."},
+        {"confirmed": True, "quote": "Một câu không có."},
+        {"confirmed": False, "quote": "Bữa cơm im lặng."},
+    ):
+        gateway, _ = _gateway(payload)
+        outcomes.append(
+            await confirm_finding(
+                gateway,
+                scope=SCOPE,
+                selection=SELECTION,
+                step_id="v",
+                context_digest=DIGEST,
+                decoding=DECODING,
+                finding=claim,
+                scenes=SCENES,
+                plan=_plan(),
+            )
+        )
+    assert outcomes == [True, False, False]
+    assert unconfirmed(claim).severity is Severity.NARRATIVE_CRITICAL

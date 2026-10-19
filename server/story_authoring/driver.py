@@ -34,7 +34,9 @@ from server.story_authoring.audits import (
     AuditDimension,
     anti_ai_findings,
     audit_chapter,
+    confirm_finding,
     critic_manuscript,
+    unconfirmed,
 )
 from server.story_authoring.checks import Finding, SceneLengthWindow, Severity, check_scene_prose, count_syllables
 from server.story_authoring.commit import ManuscriptCommitManifest, SceneEntry, load_offered_manifest, offer_manifest
@@ -854,12 +856,17 @@ class StoryRunDriver:
             )
             findings.extend(result.findings)
             state = await self._store.load()
+        findings = [
+            await self._confirmed(node, f, scenes, plan) if f.blocking and ":" in f.code else f for f in findings
+        ]
         repairable = [f for f in findings if f.severity in REPAIRABLE]
         if not final and repairable:
             changed = False
             for scene_node in sorted({f.node_id for f in repairable}):
                 scene_findings = [f for f in repairable if f.node_id == scene_node]
-                contract = [f for f in scene_findings if f.code.startswith(f"{AuditDimension.MEMO_COMPLIANCE.value}:")]
+                memo = [f for f in scene_findings if f.code.startswith(f"{AuditDimension.MEMO_COMPLIANCE.value}:")]
+                contract = [f for f in memo if f.blocking]
+                scene_findings = [f for f in scene_findings if f not in memo]
                 if contract:
                     note = (
                         AUTO_NOTE
@@ -870,6 +877,8 @@ class StoryRunDriver:
                         lambda s, n=scene_node, note=note: (add_intent(s, node_ids=(n,), note=note), None)
                     )
                     changed = True
+                    continue
+                if not scene_findings:
                     continue
                 state = await self._store.load()
                 scene_epoch = state.node(scene_node).generation_epoch
@@ -910,6 +919,27 @@ class StoryRunDriver:
             node, record, fp, expected=state.node(node).head_revision_id, epoch=state.node(node).generation_epoch
         )
         return False
+
+    async def _confirmed(
+        self, node: str, finding: Finding, scenes: Sequence[tuple[str, str]], plan: ChapterPlan
+    ) -> Finding:
+        """A blocking audit claim stays blocking only if an independent second reading confirms it."""
+        state = await self._store.load()
+        prefix = step_prefix(state, node)
+        used = sum(1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix))
+        step_id = f"{prefix}{used + 1}"
+        confirmed = await confirm_finding(
+            self._gateway,
+            scope=self._scope,
+            selection=self._brief.selection,
+            step_id=step_id,
+            context_digest=self._brief.digest(),
+            decoding=_decoding(REVIEW, step_id),
+            finding=finding,
+            scenes=scenes,
+            plan=plan,
+        )
+        return finding if confirmed else unconfirmed(finding)
 
     async def _manuscript_review(self, story: _Story, outline_in: tuple[str, str]) -> None:
         refs = scene_refs(story.outline_input)

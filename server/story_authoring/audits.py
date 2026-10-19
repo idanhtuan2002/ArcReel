@@ -33,7 +33,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from server.story_authoring.checks import Finding, Severity, count_syllables
+from server.story_authoring.checks import Finding, Severity, count_syllables, strip_replayed_sentences
 from server.story_authoring.contracts import (
     OutputMode,
     StoryDecoding,
@@ -157,7 +157,7 @@ def verified_findings(
     name = dimension.value if isinstance(dimension, AuditDimension) else dimension
     for issue in issues:
         node = _place(issue.quote, scenes)
-        if node is None:
+        if node is None or degenerate(issue.description):
             discarded += 1
             continue
         kept.append(
@@ -170,6 +170,73 @@ def verified_findings(
             )
         )
     return tuple(kept), discarded
+
+
+def degenerate(text: str) -> bool:
+    """A judgment whose own explanation repeats itself is a looping generation, not evidence."""
+    return bool(strip_replayed_sentences(text)[1])
+
+
+class Verdict(_Out):
+    confirmed: bool
+    quote: str = Field(min_length=1)
+
+
+async def confirm_finding(
+    gateway: AuthoringTextGateway,
+    *,
+    scope: StoryScope,
+    selection: StoryModelSelection,
+    step_id: str,
+    context_digest: str,
+    decoding: StoryDecoding,
+    finding: Finding,
+    scenes: Sequence[tuple[str, str]],
+    plan: ChapterPlan,
+    max_output_tokens: int = 1024,
+) -> bool:
+    """An independent second reading of one blocking claim over the whole chapter; true only when the claim
+    holds and the verdict quotes the chapter verbatim."""
+    chapter_text = "\n\n".join(text for _, text in scenes)
+    prompt = f"""Kiểm chứng một nhận định của người thẩm định trước. Đọc TOÀN BỘ chương và ghi chú chương rồi trả lời:
+- confirmed = true chỉ khi lỗi dưới đây thật sự có trong chương;
+- confirmed = false nếu yêu cầu đã được đáp ứng ở bất kỳ chỗ nào trong chương, hoặc nhận định tự mâu thuẫn;
+- quote: một câu chép NGUYÊN VĂN từ chương làm bằng chứng cho câu trả lời.
+
+[Nhận định cần kiểm chứng]
+Loại: {finding.code}
+Mô tả: {finding.message}
+Trích dẫn: “{finding.quote}”
+
+[Ghi chú chương]
+{_memo_block(plan)}
+
+[Chương]
+{chapter_text}"""
+    verdict = await _structured(
+        gateway,
+        scope=scope,
+        selection=selection,
+        step_id=step_id,
+        kind=StoryStepKind.CHAPTER_REVIEW,
+        context_digest=context_digest,
+        decoding=decoding,
+        prompt=prompt,
+        model=Verdict,
+        max_output_tokens=max_output_tokens,
+    )
+    return verdict.confirmed and _place(verdict.quote, scenes) is not None
+
+
+def unconfirmed(finding: Finding) -> Finding:
+    """A blocking claim the second reading did not confirm goes to the Human as a narrative-critical exception."""
+    return Finding(
+        finding.code,
+        Severity.NARRATIVE_CRITICAL,
+        finding.node_id,
+        "[chưa kiểm chứng] " + finding.message,
+        finding.quote,
+    )
 
 
 def _memo_block(plan: ChapterPlan) -> str:
