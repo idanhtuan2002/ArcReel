@@ -120,13 +120,19 @@ def prose_schema(
 
 
 def constrain_strings(schema: dict[str, Any]) -> dict[str, Any]:
-    """Copy of a JSON schema in which every string without its own ``pattern`` excludes CJK."""
+    """Copy of a JSON schema in which every string without its own ``pattern`` excludes CJK. A string's
+    ``maxLength`` moves into the pattern, since Ollama ignores length keywords beside a pattern."""
     constrained = copy.deepcopy(schema)
 
     def visit(node: object) -> None:
         if isinstance(node, dict):
             if node.get("type") == "string" and "pattern" not in node and "enum" not in node:
-                node["pattern"] = no_cjk_pattern()
+                ceiling = node.get("maxLength")
+                node["pattern"] = (
+                    no_cjk_pattern(min_chars=node.get("minLength", 0), max_chars=ceiling)
+                    if ceiling is not None
+                    else no_cjk_pattern()
+                )
             for value in node.values():
                 visit(value)
         elif isinstance(node, list):

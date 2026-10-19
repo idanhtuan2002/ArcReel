@@ -182,6 +182,7 @@ class ScriptedModel:
         self.paragraphs: list[str] = []
         self.overrides: dict[str, Answer] = {}
         self.fail_at: dict[str, int] = {}
+        self.truncate_at: dict[str, int] = {}
         self.before: dict[tuple[str, int], Callable[[], Awaitable[None]]] = {}
         ScriptedModel._instances += 1
         self._sentence = ScriptedModel._instances * 100_000
@@ -200,6 +201,9 @@ class ScriptedModel:
         self.paragraphs.extend(paragraphs)
         return {"paragraphs": paragraphs}
 
+    def last_sentence(self) -> str:
+        return self.paragraphs[-1].rsplit(". ", 1)[-1]
+
     def packaging(self) -> dict[str, Any]:
         return {
             "titles": [{"title": t, "kind": "k"} for t in ("Căn nhà cũ", "Sổ nợ", "Ngọn đèn")],
@@ -216,9 +220,9 @@ class ScriptedModel:
         if kind in STRUCTURED:
             return STRUCTURED[kind]
         if kind == "confirmed":
-            return {"confirmed": True, "quote": self.paragraphs[-1]}
+            return {"confirmed": True, "quote": self.last_sentence()}
         if kind == "ending_resolves_conflict":
-            return {"ending_resolves_conflict": True, "ending_quote": self.paragraphs[-1], "issues": []}
+            return {"ending_resolves_conflict": True, "ending_quote": self.last_sentence(), "issues": []}
         if kind == "issues":
             return {"issues": []}
         if kind == "titles":
@@ -262,6 +266,18 @@ class ScriptedModel:
                 await hook()
             if self.fail_at.get(kind) == self.calls[kind]:
                 return httpx.Response(500, json={"error": "model crashed"})
+            if self.truncate_at.get(kind) == self.calls[kind]:
+                return httpx.Response(
+                    200,
+                    json={
+                        "model": MODEL,
+                        "message": {"role": "assistant", "content": '{"issues": [{"severity": "crit'},
+                        "done": True,
+                        "done_reason": "length",
+                        "prompt_eval_count": 700,
+                        "eval_count": 2048,
+                    },
+                )
             content = json.dumps(self._answer(kind, schema, prompt), ensure_ascii=False)
         return httpx.Response(
             200,
@@ -395,12 +411,12 @@ async def test_a_quoted_continuity_error_is_repaired_before_the_chapter_is_seale
     def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
         if flagged or "TÍNH LIÊN TỤC" not in prompt:
             return {"issues": []}
-        flagged.append(model.paragraphs[1])
+        flagged.append(model.paragraphs[1].split(". ")[0] + ".")
         issue = {
             "severity": "critical",
             "issue_type": "mâu_thuẫn",
             "description": "sai thời điểm",
-            "quote": model.paragraphs[1],
+            "quote": flagged[0],
             "suggested_fix": "sửa",
         }
         return {"issues": [issue]}
@@ -437,7 +453,7 @@ async def test_an_output_that_never_validates_stops_at_the_node_cap(concurrent_s
 def _critic(model: ScriptedModel, verdicts: list[bool]) -> Answer:
     def answer(_prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
         resolved = verdicts.pop(0) if len(verdicts) > 1 else verdicts[0]
-        return {"ending_resolves_conflict": resolved, "ending_quote": model.paragraphs[-1], "issues": []}
+        return {"ending_resolves_conflict": resolved, "ending_quote": model.last_sentence(), "issues": []}
 
     return answer
 
@@ -557,12 +573,12 @@ def _memo_issue(model: ScriptedModel, flagged: list[str]) -> Answer:
     def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
         if flagged or "GHI CHÚ CHƯƠNG" not in prompt:
             return {"issues": []}
-        flagged.append(model.paragraphs[-1])
+        flagged.append(model.last_sentence())
         issue = {
             "severity": "critical",
             "issue_type": "required_change_missing",
             "description": "Minh chưa thấy cuốn sổ",
-            "quote": model.paragraphs[-1],
+            "quote": model.last_sentence(),
             "suggested_fix": "cho Minh thấy cuốn sổ",
         }
         return {"issues": [issue]}
@@ -753,7 +769,7 @@ async def test_an_unconfirmed_blocking_claim_reaches_the_human_as_an_exception(
         return {"issues": [issue]}
 
     model.overrides["issues"] = audit
-    model.overrides["confirmed"] = lambda _p, _s: {"confirmed": False, "quote": model.paragraphs[-1]}
+    model.overrides["confirmed"] = lambda _p, _s: {"confirmed": False, "quote": model.last_sentence()}
 
     state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
@@ -766,3 +782,14 @@ async def test_an_unconfirmed_blocking_claim_reaches_the_human_as_an_exception(
     assert {f["code"] for f in exceptions} == {"MEMO_COMPLIANCE:withheld_card_revealed"}
     assert all(f["message"].startswith("[chưa kiểm chứng] ") for f in exceptions)
     assert all(f["severity"] == "NARRATIVE_CRITICAL" for f in exceptions)
+
+
+async def test_a_truncated_audit_is_retried_under_a_new_step(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    model.truncate_at["issues"] = 2
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["issues"] == 13

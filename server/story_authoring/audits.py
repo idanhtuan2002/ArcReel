@@ -57,10 +57,10 @@ class _Out(BaseModel):
 
 class AuditIssue(_Out):
     severity: Literal["critical", "major", "minor"]
-    issue_type: str = Field(min_length=1)
-    description: str = Field(min_length=1)
-    quote: str = Field(min_length=1)
-    suggested_fix: str = Field(min_length=1)
+    issue_type: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=500)
+    quote: str = Field(min_length=1, max_length=400)
+    suggested_fix: str = Field(min_length=1, max_length=300)
 
 
 class AuditReport(_Out):
@@ -69,14 +69,14 @@ class AuditReport(_Out):
 
 class CriticReport(_Out):
     ending_resolves_conflict: bool
-    ending_quote: str = Field(min_length=1)
+    ending_quote: str = Field(min_length=1, max_length=400)
     issues: list[AuditIssue] = Field(max_length=6)
 
 
 class PairwiseReason(_Out):
     side: Literal["A", "B"]
-    reason: str = Field(min_length=1)
-    quote: str = Field(min_length=1)
+    reason: str = Field(min_length=1, max_length=300)
+    quote: str = Field(min_length=1, max_length=400)
 
 
 class PairwiseJudgment(_Out):
@@ -179,7 +179,7 @@ def degenerate(text: str) -> bool:
 
 class Verdict(_Out):
     confirmed: bool
-    quote: str = Field(min_length=1)
+    quote: str = Field(min_length=1, max_length=400)
 
 
 async def confirm_finding(

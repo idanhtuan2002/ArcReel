@@ -105,6 +105,7 @@ NODE_CAPS = {
 }
 REVIEW_CYCLES = 2
 CONVERGE_PASSES = 6
+JUDGE_ATTEMPTS = 3
 MIN_VERIFIED_SELLING_POINTS = 3
 STORY_HARD_RANGE = (6000, 12500)
 STORY_TARGET_RANGE = (7000, 11000)
@@ -835,24 +836,22 @@ class StoryRunDriver:
         previous = " ".join(p.chapter_goal for p in story.plans[: chapter - 1])
         findings: list[Finding] = [f for n, h in heads.items() for f in anti_ai_findings(h["prose"], node_id=n)]
         for dimension in CHAPTER_DIMENSIONS:
-            prefix = step_prefix(state, node)
-            step_used = sum(
-                1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix)
-            )
-            step_id = f"{prefix}{step_used + 1}"
-            result = await audit_chapter(
-                self._gateway,
-                scope=self._scope,
-                selection=self._brief.selection,
-                step_id=step_id,
-                context_digest=self._brief.digest(),
-                decoding=_decoding(REVIEW, step_id),
-                dimension=dimension,
-                chapter_number=chapter,
-                scenes=scenes,
-                plan=plan,
-                facts=facts,
-                previous_summary=previous,
+            result = await self._judge(
+                node,
+                lambda step_id, decoding, dimension=dimension: audit_chapter(
+                    self._gateway,
+                    scope=self._scope,
+                    selection=self._brief.selection,
+                    step_id=step_id,
+                    context_digest=self._brief.digest(),
+                    decoding=decoding,
+                    dimension=dimension,
+                    chapter_number=chapter,
+                    scenes=scenes,
+                    plan=plan,
+                    facts=facts,
+                    previous_summary=previous,
+                ),
             )
             findings.extend(result.findings)
             state = await self._store.load()
@@ -924,22 +923,35 @@ class StoryRunDriver:
         self, node: str, finding: Finding, scenes: Sequence[tuple[str, str]], plan: ChapterPlan
     ) -> Finding:
         """A blocking audit claim stays blocking only if an independent second reading confirms it."""
-        state = await self._store.load()
-        prefix = step_prefix(state, node)
-        used = sum(1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix))
-        step_id = f"{prefix}{used + 1}"
-        confirmed = await confirm_finding(
-            self._gateway,
-            scope=self._scope,
-            selection=self._brief.selection,
-            step_id=step_id,
-            context_digest=self._brief.digest(),
-            decoding=_decoding(REVIEW, step_id),
-            finding=finding,
-            scenes=scenes,
-            plan=plan,
+        confirmed = await self._judge(
+            node,
+            lambda step_id, decoding: confirm_finding(
+                self._gateway,
+                scope=self._scope,
+                selection=self._brief.selection,
+                step_id=step_id,
+                context_digest=self._brief.digest(),
+                decoding=decoding,
+                finding=finding,
+                scenes=scenes,
+                plan=plan,
+            ),
         )
         return finding if confirmed else unconfirmed(finding)
+
+    async def _judge[T](self, node: str, call: Callable[[str, StoryDecoding], Awaitable[T]]) -> T:
+        """One judgment of a review node, retried under a new step id on a recoverable output failure."""
+        for attempt in range(JUDGE_ATTEMPTS):
+            state = await self._store.load()
+            prefix = step_prefix(state, node)
+            used = sum(1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix))
+            step_id = f"{prefix}{used + 1}"
+            try:
+                return await call(step_id, _decoding(REVIEW, step_id))
+            except StoryStepError as error:
+                if error.code not in RETRYABLE or attempt == JUDGE_ATTEMPTS - 1:
+                    raise
+        raise AssertionError("unreachable")
 
     async def _manuscript_review(self, story: _Story, outline_in: tuple[str, str]) -> None:
         refs = scene_refs(story.outline_input)
@@ -947,16 +959,18 @@ class StoryRunDriver:
         inputs = [outline_in, *((n, content_digest(p.encode())) for n, p in heads)]
 
         async def produce(epoch: int) -> bytes:
-            step_id = f"manuscript_review@{epoch}#1"
-            result = await critic_manuscript(
-                self._gateway,
-                scope=self._scope,
-                selection=self._brief.selection,
-                step_id=step_id,
-                context_digest=self._brief.digest(),
-                decoding=_decoding(REVIEW, step_id),
-                scenes=heads,
-                outline=story.outline,
+            result = await self._judge(
+                "manuscript_review",
+                lambda step_id, decoding: critic_manuscript(
+                    self._gateway,
+                    scope=self._scope,
+                    selection=self._brief.selection,
+                    step_id=step_id,
+                    context_digest=self._brief.digest(),
+                    decoding=decoding,
+                    scenes=heads,
+                    outline=story.outline,
+                ),
             )
             blocking = [f for f in result.findings if f.blocking]
             final_scene = heads[-1][0]

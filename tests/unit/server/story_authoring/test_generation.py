@@ -21,7 +21,7 @@ from server.story_authoring.contracts import (
     StoryStepKind,
     StoryStepRequest,
 )
-from server.story_authoring.generation import AuthoringTextGateway, StoryStepError
+from server.story_authoring.generation import AuthoringTextGateway, StoryStepError, constrain_strings
 from server.story_authoring.script_guard import no_cjk_pattern
 
 MODEL = "ornith-32k:9b"
@@ -335,3 +335,10 @@ def test_only_the_ollama_chat_endpoint_is_qualified():
     with pytest.raises(StoryStepError) as caught:
         _gateway(_Server(), _Sink(), selection=openai)
     assert caught.value.code is StoryFailureCode.PROVIDER_NOT_QUALIFIED
+
+
+def test_a_string_length_ceiling_moves_into_the_pattern():
+    schema = constrain_strings(
+        {"type": "object", "properties": {"q": {"type": "string", "minLength": 1, "maxLength": 9}}}
+    )
+    assert schema["properties"]["q"]["pattern"] == no_cjk_pattern(min_chars=1, max_chars=9)
