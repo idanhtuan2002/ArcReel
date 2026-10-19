@@ -456,3 +456,39 @@ Facts: prose on qwen3.5-vimax is coherent, in voice, without copying or loops; e
 far is fixed and tested; chapter 1 alone now costs 64–87 calls of the 132-call run ceiling. Inference: the
 remaining blocker is the memo-compliance hard gate judged and confirmed by a 9B model; the same model confirming
 its own claim is not an independent check.
+
+### Run 11: separate judge route (2026-10-19)
+
+Writer `qwen3.5-vimax:9b`, judge `gemma3:12b` (ADR 0109 route split, `0b7f18cc`), same idea and fixture as runs 8–10.
+
+| Run | Writer / judge | HEAD | Result | Time | Calls | Tokens in / out | Cause | Fix |
+|---|---|---|---|---|---|---|---|---|
+| 11 | vimax / gemma3 | `4845a6db` | `BLOCKED_QUALITY` manuscript review | 11032 s | 111 | 791 k / 82 k | critic `NO_ENDING` with an empty quote, after one ending rewrite | `4ee8adc0` critic quotes before its verdict; `NO_ENDING` gets the confirming second reading |
+
+Facts:
+- First run to seal all three chapter reviews and write the whole story: 11 scenes, 7,871 syllables (inside the
+  7,000–11,000 target). Chapter 1 sealed without any intent; chapter 2 needed one plan repair; chapter 3 two
+  scene rewrites from contract findings.
+- Review dominated the cost: `chapter_review[2]` 21 calls / 46 min, `chapter_review[3]` 31 calls / 63 min, on a
+  judge that runs at 5–7 tok/s on this GPU.
+- The block was wrong. Replaying the critic on the run's head scenes (`task4_critic_replay.py`, judge
+  `gemma3:12b`, 2 of 2) reproduced it: the judge answered `false` and copied the outline's `ending` field as its
+  "quote", which is not in the manuscript. The last chapter states the decision to keep the house, the
+  reconciliation and the planned final image.
+- With the quote first in the schema (constrained decoding emits fields in order) the same replay answered `true`
+  with a verbatim quote from the last chapter, 2 of 2.
+- Quality defects a reader sees in chapter 3 that no gate blocked: kinship terms drift (Lan is "em gái", then
+  "chị em"; "Ba"/"cha" in one line); Minh "signs the sale offer" as the act of refusing it; the line "Cha đã về
+  đây rồi, trong gió và trong cây" breaks the chapter's do-not item ("cha trong gió"); meta narration ("khép lại
+  chương ba", "Xung đột chính khép lại"); 7 of 11 scenes without dialogue (stylistic finding only).
+
+Inference: an independent judge route lets a run converge; the remaining distance to commercial quality is prose
+craft and contract adherence by the 9B writer, which a stronger writer or judge (the cloud readiness plan) targets.
+
+Resume on `4ee8adc0` (`task4_resume.py`, the operator's Retry transition): manuscript review passed and packaging
+completed in 308 s and 2 calls. The run is `READY_FOR_APPROVAL` (touchpoint 2): 113 calls, 830 k / 84 k tokens,
+about 3 h 9 min of model time in total. The agent did not approve it. Offered: 52 findings (47 stylistic, 5
+narrative-critical exceptions: a chapter-2 do-not claim, a chapter-3 location jump, an unconfirmed missing-change
+claim, a withheld-card claim, critic pacing), 5 titles, blurbs, selling points and tags. Observed packaging
+defect: a blurb invents facts absent from the manuscript (the house "awaiting demolition for an urban project",
+the father "sold the house and land"); only selling points are checked against the manuscript today.
