@@ -645,7 +645,7 @@ async def test_a_sentence_copied_from_an_earlier_scene_is_removed_without_a_mode
         answer = full(schema["properties"]["paragraphs"]["minItems"])
         if model.calls["prose"] == 2:
             copied.append(model.paragraphs[0].split(". ")[0] + ".")
-            answer["paragraphs"][0] = copied[0] + " " + answer["paragraphs"][0]
+            answer["paragraphs"][0] = copied[0] + " " + answer["paragraphs"][0].split(". ", 1)[1]
         return answer
 
     model.overrides["prose"] = copying
