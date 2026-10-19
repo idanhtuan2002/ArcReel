@@ -114,3 +114,59 @@ Decision needed from the Human before an adapter is built: which cloud provider 
 first. Recommendation: Anthropic Claude (Sonnet 5.5 as judge; Opus 5.5 to compare) because it supports the
 no-CJK `pattern`, has a free count endpoint, and its price sits at the low end of the flagship tier; OpenAI is
 the alternative with `pattern` and item bounds.
+
+## 8. Existing decisions and reusable configuration (sponsor question, 2026-10-19)
+
+The sponsor asked whether the project already decided anything here and what existing configuration, including
+the donors', can be reused.
+
+### Decisions already on record (facts)
+
+| Source | What it settles |
+|---|---|
+| Research 2026-10-18 §1 | "local Ollama first, cloud models later. Commercial quality is required; defects caused only by local-model limits are accepted." |
+| Amendment rev5.1, decisions + Change P §1, §5 + Task7 runbook | Claude and OpenAI stay fixture-qualified until configured; `openai_chat` stays "for cloud later"; a provider without grammar support "needs its own qualification; it is never assumed"; the runbook covers "model swap to cloud later (with its own qualification)". |
+| ADR 0051 | Text models are configured per task tier (simple / complex) with a default fallback and project-before-global resolution; every call site is mapped to a tier in code; the Agent SDK model is a separate configuration (ADR 0017). |
+| ADR 0013, 0014 | Capabilities are declared per model; structured output falls back selectively (Instructor for OpenAI-compatible, prompt injection for Gemini) and is re-validated after a 200. |
+| ADR 0039 | `assemble_backend(provider_id, media_type, model_id)` is the one seam that builds a backend from provider configuration, for built-in and custom providers. |
+| ADR 0027, 0037 | Provider secrets live only in the database; built-in providers have typed secret columns. |
+| ADR 0108 | Precedent for judging with independent models (two reviewers, disagreement retained). |
+
+No ADR yet chooses a cloud provider for story authoring.
+
+### Reusable configuration in this repository (facts)
+
+- Built-in text backends already implemented: OpenAI (native `json_schema` strict + Instructor fallback),
+  Gemini (response schema + prompt fallback), Grok, Ark, Agnes; custom-provider endpoints `openai-chat`,
+  `gemini-generate`, `ollama-chat`. They report usage tokens and the finish reason.
+- Credentials, base URLs and rate limiters for those providers are already configured through the settings UI
+  and `assemble_backend`; nothing new is needed to reach OpenAI or Gemini.
+- There is no Anthropic text backend: Anthropic credentials serve only the Claude Agent SDK (ADR 0017, 0051).
+  Using Claude for story calls needs a new text backend or an adapter.
+
+### Donor configuration (facts, pinned revisions)
+
+| Donor | Model configuration |
+|---|---|
+| Novel Studio `9b690ae2` | one `default_model` per project, an OpenAI-compatible `baseURL`, `json_schema` strict structured calls |
+| Shenbi `65ddfc26` | one model from environment (`SHENBI_LLM_MODEL`, default `deepseek-v4-flash` on an OpenAI-compatible base URL), `json_object` responses, per-skill temperature and max tokens in `executor_config.toml` |
+| Huohuo `f104b85` | a **writer** text model and a separate **audit** model (`text_audit`): judging calls use the audit model when enabled and fall back to the writer model otherwise; an unresolvable audit model falls back with a warning; a "cross-model" flag warns when the writer and the detector are the same family |
+
+### Inferences
+
+- The writer/judge split is already a donor pattern (Huohuo `chatCompletionTextAudit`) and matches the tier
+  idea of ADR 0051; it is the natural place to plug a stronger model.
+- OpenAI and Gemini can be reached through backends and credentials that already exist (ADR 0039), so preparing
+  them costs an adapter around an existing backend; Anthropic costs a new backend. This changes the effort
+  comparison in §6, not the capability comparison in §3.
+- Huohuo's silent fallback to the writer model must not be copied as is: a judge route that falls back must be
+  recorded in the run (selection digest) so the Human sees that the check was not independent.
+
+### Plan for the provider-neutral preparation (no vendor needed)
+
+1. Writer and judge routes in the brief (judge defaults to the writer, recorded in the brief digest and the
+   manifest), the driver using the judge route for audits, confirmation, critic, outline and plan review.
+2. A model-client boundary in the gateway with a capability profile, so that an adapter around an existing
+   backend (OpenAI, Gemini) or a new one (Anthropic) can be added and qualified without touching the driver.
+3. The qualification harness (`task46_model_smoke`, the Task1 canaries) made provider-neutral, to run after a
+   credential is configured.
