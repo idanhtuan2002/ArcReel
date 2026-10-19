@@ -187,12 +187,36 @@ async def test_length_normalizing_rewrites_only_the_selected_paragraphs():
     assert outcome.accepted
     assert outcome.text == "\n\n".join([paragraphs[0], paragraphs[1], longer])
     assert count_syllables(outcome.text) > count_syllables(text)
-    assert "MỞ RỘNG" in bodies[-1]["messages"][1]["content"]
+    prompt = bodies[-1]["messages"][1]["content"]
+    assert "MỞ RỘNG" in prompt
+    # The nearest edge of the window with a margin, split over the paragraphs in proportion to their length.
+    assert "cần khoảng 44 âm tiết" in prompt
+    assert "- đoạn [2]: hiện 2 âm tiết → viết lại khoảng 6 âm tiết" in prompt
+
+
+async def test_length_normalizing_compresses_toward_the_upper_edge_but_not_below_the_floor():
+    text = "\n\n".join(["Một hai ba bốn năm sáu bảy tám chín mười."] * 4)
+    gateway, bodies = _gateway(json.dumps({"rewrites": []}))
+
+    await normalize_length(
+        gateway,
+        scope=SCOPE,
+        selection=SELECTION,
+        step_id="len-4",
+        context_digest="sha256:" + "0" * 64,
+        decoding=DECODING,
+        text=text,
+        window=SceneLengthWindow(minimum=10, maximum=20, hard_maximum=60),
+    )
+
+    assert "cần khoảng 28 âm tiết" in bodies[-1]["messages"][1]["content"]
 
 
 async def test_length_normalizing_rejects_a_compression_below_the_floor():
     text = "\n\n".join(["Một hai ba bốn năm sáu bảy tám chín mười."] * 4)
-    gateway, _ = _gateway(json.dumps({"rewrites": [{"index": 0, "text": "Một."}]}, ensure_ascii=False))
+    gateway, _ = _gateway(
+        json.dumps({"rewrites": [{"index": 0, "text": "Một."}, {"index": 1, "text": "Hai."}]}, ensure_ascii=False)
+    )
 
     outcome = await normalize_length(
         gateway,

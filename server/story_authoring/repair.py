@@ -18,6 +18,7 @@ paragraphs are rewritten; the others stay byte-identical.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -47,7 +48,9 @@ from server.story_authoring.contracts import (
 from server.story_authoring.generation import AuthoringTextGateway
 
 PATCH_LENGTH_RATIO = (0.85, 1.15)
-COMPRESSION_FLOOR = 0.8
+# Surface compression only: Shenbi's length skill treats 15-20% as safe and rejects below 25% of the original.
+COMPRESSION_FLOOR = 0.7
+MAX_LENGTH_REWRITES = 6
 MAX_PATCHES = 6
 
 # --- JS String.prototype.replace(string, string) ---------------------------------------------------
@@ -229,7 +232,7 @@ class _ParagraphRewrite(BaseModel):
 
 class LengthResponse(BaseModel):
     model_config = {"extra": "forbid"}
-    rewrites: list[_ParagraphRewrite] = Field(max_length=4)
+    rewrites: list[_ParagraphRewrite] = Field(max_length=MAX_LENGTH_REWRITES)
 
 
 @dataclass(frozen=True)
@@ -365,20 +368,28 @@ async def normalize_length(
     max_output_tokens: int = 4096,
     system_prompt: str = LENGTH_SYSTEM,
 ) -> RepairOutcome:
-    """Rewrite the longest (or shortest) paragraphs toward the window; ``system_prompt`` as in :func:`span_repair`."""
+    """Rewrite the longest (or shortest) paragraphs toward the nearest edge of the window, each to a stated
+    syllable count in proportion to its length; ``system_prompt`` as in :func:`span_repair`."""
     original = count_syllables(text)
     if window.minimum <= original <= window.maximum:
         return RepairOutcome(text, True, "already inside the window")
     paragraphs = _paragraphs(text)
+    sizes = [count_syllables(p) for p in paragraphs]
     expand = original < window.minimum
-    order = sorted(range(len(paragraphs)), key=lambda i: count_syllables(paragraphs[i]), reverse=not expand)
-    targets = sorted(order[: min(3, len(paragraphs))])
-    goal = (window.minimum + window.maximum) // 2
+    if expand:
+        goal = min(window.maximum, round(window.minimum * 1.1))
+    else:
+        goal = max(window.minimum, round(window.maximum * 0.95), math.ceil(original * COMPRESSION_FLOOR))
+    order = sorted(range(len(paragraphs)), key=lambda i: sizes[i], reverse=not expand)
+    targets = sorted(order[:MAX_LENGTH_REWRITES])
+    selected = sum(sizes[i] for i in targets) or 1
+    wanted = {i: max(1, round(sizes[i] + (goal - original) * sizes[i] / selected)) for i in targets}
+    plan = "\n".join(f"- đoạn [{i}]: hiện {sizes[i]} âm tiết → viết lại khoảng {wanted[i]} âm tiết" for i in targets)
     numbered = "\n\n".join(f"[{i}] {p}" for i, p in enumerate(paragraphs))
     prompt = (
-        f"Văn bản hiện có {original} âm tiết; mục tiêu khoảng {goal} âm tiết "
-        f"({window.minimum}–{window.maximum}). Hãy {'MỞ RỘNG' if expand else 'NÉN'} các đoạn số "
-        f"{', '.join(str(i) for i in targets)}.\n\n{numbered}"
+        f"Văn bản hiện có {original} âm tiết; cần khoảng {goal} âm tiết (khoảng cho phép {window.minimum}–"
+        f"{window.maximum}). Hãy {'MỞ RỘNG' if expand else 'NÉN'} đúng các đoạn sau, mỗi đoạn tới số âm tiết ghi "
+        f"kèm:\n{plan}\n\n{numbered}"
     )
     output = await gateway.generate(
         scope=scope,

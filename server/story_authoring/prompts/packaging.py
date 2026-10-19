@@ -21,11 +21,14 @@ PACKAGING_SYSTEM = (
 def packaging_prompt(*, manuscript: str, working_title: str, premise: str) -> str:
     return f"""Làm phần đóng gói xuất bản cho truyện ngắn dưới đây.
 
-- titles: 3–5 tên truyện, mỗi tên kèm kind (thẳng thắn, ẩn dụ, gây tò mò, cảm xúc); tên dài 2–8 chữ.
-- blurbs: 2–3 bản giới thiệu, mỗi bản 60–150 chữ: câu mở gây tò mò, nhân vật chính, xung đột trung tâm, gợi ý
-  bước ngoặt mà KHÔNG tiết lộ kết thúc.
-- selling_points: 3–5 điểm hấp dẫn, mỗi điểm ngắn gọn, kèm evidence_quote chép NGUYÊN VĂN một câu trong truyện.
-- tags: 5–10 thẻ (thể loại, kiểu nhân vật, cảm xúc, yếu tố truyện).
+- titles: 3–5 tên truyện, mỗi tên một kiểu khác nhau, ghi trong kind (thẳng thắn, ẩn dụ, gây tò mò, cảm xúc); tên
+  dài 2–6 chữ, là tiếng Việt tự nhiên, đọc lên trôi chảy, không lặp chữ, không ghép từ vô nghĩa.
+- blurbs: 2–3 bản giới thiệu, mỗi bản một giọng (thẳng thắn, gây tò mò, cảm xúc), 60–150 chữ: câu mở móc người
+  đọc, nhân vật chính, xung đột trung tâm, gợi ý bước ngoặt mà KHÔNG tiết lộ kết thúc. Chỉ nêu điều truyện thật sự kể.
+- selling_points: 3–5 điểm hấp dẫn, mỗi điểm một khía cạnh khác nhau (thể loại, nhân vật chính, xung đột, bối cảnh,
+  cảm xúc, điểm mới), viết như một câu chào mời người đọc, tối đa 15 chữ, không tóm tắt cốt truyện; mỗi điểm kèm
+  evidence_quote chép NGUYÊN VĂN một câu trong truyện chứng minh điểm đó.
+- tags: 5–10 thẻ (thể loại, kiểu nhân vật, cảm xúc, yếu tố truyện, điểm hấp dẫn).
 
 Tên tạm: {working_title}
 Tóm lược: {premise}
