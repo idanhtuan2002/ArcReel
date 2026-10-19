@@ -989,7 +989,12 @@ class StoryRunDriver:
                     outline=story.outline,
                 ),
             )
-            blocking = [f for f in result.findings if f.blocking]
+            last_chapter = [h for ref, h in zip(refs, heads, strict=True) if ref.chapter == refs[-1].chapter]
+            findings = [
+                await self._ending_confirmed(f, last_chapter, story) if f.code == "NO_ENDING" else f
+                for f in result.findings
+            ]
+            blocking = [f for f in findings if f.blocking]
             final_scene = heads[-1][0]
             if [f.code for f in blocking] == ["NO_ENDING"]:
                 state = await self._store.load()
@@ -999,18 +1004,33 @@ class StoryRunDriver:
             if blocking:
                 raise Blocked(
                     RunPhase.BLOCKED_QUALITY,
-                    "manuscript_review: " + "; ".join(f.message for f in result.findings if f.blocking),
+                    "manuscript_review: " + "; ".join(f.message for f in blocking),
                     blocking,
                 )
             return json.dumps(
                 {
-                    "findings": [_finding_dict(f) for f in result.findings],
+                    "findings": [_finding_dict(f) for f in findings],
                     "discarded_unquoted": result.discarded_unquoted,
                 },
                 ensure_ascii=False,
             ).encode("utf-8")
 
         await self._ensure("manuscript_review", inputs=inputs, decoding=REVIEW, produce=produce)
+
+    async def _ending_confirmed(
+        self, finding: Finding, last_chapter: Sequence[tuple[str, str]], story: _Story
+    ) -> Finding:
+        """The critic's unresolved-ending claim stays blocking only if a second reading of the last chapter, against
+        the approved ending, confirms it."""
+        claim = Finding(
+            finding.code,
+            finding.severity,
+            finding.node_id,
+            f"Chương cuối chưa giải quyết xung đột trung tâm theo kết thúc đã duyệt: {story.outline.ending}",
+            finding.quote,
+        )
+        checked = await self._confirmed("manuscript_review", claim, last_chapter, story.plans[-1])
+        return finding if checked.blocking else unconfirmed(finding)
 
     async def _packaging(self, story: _Story, seed_in: tuple[str, str]) -> None:
         refs = scene_refs(story.outline_input)

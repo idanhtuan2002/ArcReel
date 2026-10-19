@@ -486,6 +486,27 @@ async def test_an_ending_that_stays_unresolved_is_never_offered(concurrent_sessi
     assert state.commit is None
 
 
+async def test_an_unconfirmed_unresolved_ending_reaches_the_human_as_an_exception(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    model.overrides["ending_resolves_conflict"] = _critic(model, [False])
+    model.overrides["confirmed"] = lambda _prompt, _schema: {"confirmed": False, "quote": model.last_sentence()}
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert (model.calls["prose"], model.calls["ending_resolves_conflict"], model.calls["confirmed"]) == (9, 1, 1)
+    confirm_prompt = [p for k, p in model.prompts if k == "confirmed"][-1]
+    assert "theo kết thúc đã duyệt" in confirm_prompt
+    blobs = StoryBlobStore(tmp_path)
+    manifest = load_offered_manifest(blobs, state)
+    assert manifest.quality_record_digest is not None
+    record = json.loads(blobs.read_exact(manifest.quality_record_digest))
+    assert [f["severity"] for f in record["findings"] if f["code"] == "NO_ENDING"] == ["NARRATIVE_CRITICAL"]
+
+
 async def test_packaging_needs_three_selling_points_that_quote_the_manuscript(
     concurrent_session_factory: Factory, tmp_path
 ):

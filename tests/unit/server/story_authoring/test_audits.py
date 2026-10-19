@@ -11,6 +11,7 @@ from lib.text_backends.ollama import OllamaChatClient
 from server.story_authoring.audits import (
     AuditDimension,
     AuditIssue,
+    CriticReport,
     anti_ai_findings,
     audit_chapter,
     critic_manuscript,
@@ -202,6 +203,10 @@ async def _critic(payload: dict):
 async def test_a_resolved_and_quoted_ending_passes_the_critic():
     result = await _critic({"ending_resolves_conflict": True, "ending_quote": "Bữa cơm im lặng.", "issues": []})
     assert (result.ending_resolves_conflict, result.ending_quote_verified, result.findings) == (True, True, ())
+
+
+def test_the_critic_quotes_its_ending_evidence_before_its_verdict():
+    assert list(CriticReport.model_json_schema()["properties"])[:2] == ["ending_quote", "ending_resolves_conflict"]
 
 
 async def test_an_unresolved_or_unquoted_ending_is_hard_structural():

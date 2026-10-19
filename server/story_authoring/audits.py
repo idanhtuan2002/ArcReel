@@ -68,8 +68,8 @@ class AuditReport(_Out):
 
 
 class CriticReport(_Out):
-    ending_resolves_conflict: bool
     ending_quote: str = Field(min_length=1, max_length=400)
+    ending_resolves_conflict: bool
     issues: list[AuditIssue] = Field(max_length=6)
 
 
@@ -374,8 +374,9 @@ async def critic_manuscript(
     manuscript = "\n\n".join(text for _, text in scenes)
     prompt = f"""Thẩm định toàn bộ truyện ngắn như một biên tập viên xuất bản.
 
-1. ending_resolves_conflict: chương cuối có giải quyết trọn vẹn xung đột trung tâm không; ending_quote: chép nguyên văn
-   câu thể hiện rõ nhất kết thúc.
+1. ending_quote: chép NGUYÊN VĂN từ chương cuối của [Truyện] (không chép từ dàn ý) câu thể hiện rõ nhất cách xung đột
+   trung tâm được giải quyết; ending_resolves_conflict: dựa trên chương cuối, xung đột trung tâm đã được giải quyết
+   trọn vẹn theo kết thúc trong dàn ý chưa.
 2. issues: tối đa 6 lỗi lớn nhất của cả truyện (mạch truyện đứt, nhân vật mâu thuẫn, kết thúc hụt, nhịp quá chậm/vội),
    mỗi lỗi kèm quote nguyên văn.
 
