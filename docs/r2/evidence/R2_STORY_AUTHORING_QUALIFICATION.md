@@ -412,8 +412,8 @@ probe directory `.superpowers/sdd/2026-10-18-r2-v2-story-release/live/run*/summa
 | Run | HEAD | Result | Time | Calls | Cause found | Fix |
 |---|---|---|---|---|---|---|
 | 1 | `c6033eb3` | `BLOCKED_QUALITY` ch1 review | 814 s | 41 | scene cap reset every epoch (9 calls for one scene); memo findings not kept | `2b3b118f` cap per round, contract findings regenerate with an editor note, blocking findings kept |
-| 2 | `2b3b118f` | `BLOCKED_QUALITY` ch1 review | 653 s | 27 | drafting context carried earlier scenes in full; the model copied whole passages; markdown `*` | `0d6e…`/`(commit after 2b3b118f)` tail-only context, L1 `CROSS_SCENE_REPLAY` with deterministic removal, `MARKUP` |
-| 3 | after copy fix | `BLOCKED_QUALITY` scene cap | 598 s | 30 | chapter plan contradicts itself (goal reveals the withheld card); `sofa`/`tivi` taken as English; stub scenes accepted | `c9bf2fa1` plan review→revise, loanword allowlist, `SCENE_TOO_SHORT` regenerates |
+| 2 | `2b3b118f` | `BLOCKED_QUALITY` ch1 review | 653 s | 27 | drafting context carried earlier scenes in full; the model copied whole passages; markdown `*` | `ce0b37c9` tail-only context, L1 `CROSS_SCENE_REPLAY` with deterministic removal, `MARKUP` |
+| 3 | `ce0b37c9` | `BLOCKED_QUALITY` scene cap | 598 s | 30 | chapter plan contradicts itself (goal reveals the withheld card); `sofa`/`tivi` taken as English; stub scenes accepted | `c9bf2fa1` plan review→revise, loanword allowlist, `SCENE_TOO_SHORT` regenerates |
 | 4 | `c9bf2fa1` | `BLOCKED_QUALITY` scene cap | 411 s | 22 | dialogue ending in `'` read as truncated | `de7f88fa` `'`/`)` close a sentence, unfinished tail cut deterministically |
 | 5 | `de7f88fa` | `BLOCKED_QUALITY` ch1 review | 740 s | 37 | required dialogue itself breaks the do-not list; the 9B plan review passed it | `a3b3e956` one bounded chapter replan from blocking contract findings |
 | 6 | `a3b3e956` | `BLOCKED_QUALITY` scene cap | 592 s | 34 | 5 scenes/chapter → 600-syllable target met with tiny paragraphs; Ollama ignores `minLength` beside `pattern` (live probe) | `7988c1e1` length floor inside the grammar pattern |
