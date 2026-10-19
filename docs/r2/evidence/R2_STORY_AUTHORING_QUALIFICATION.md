@@ -492,3 +492,15 @@ narrative-critical exceptions: a chapter-2 do-not claim, a chapter-3 location ju
 claim, a withheld-card claim, critic pacing), 5 titles, blurbs, selling points and tags. Observed packaging
 defect: a blurb invents facts absent from the manuscript (the house "awaiting demolition for an urban project",
 the father "sold the house and land"); only selling points are checked against the manuscript today.
+
+### Blurb faithfulness (2026-10-19)
+
+The export put `blurbs[0]` above the manuscript unchecked, and run 11's second blurb invents facts. A judge-route
+check now lists claims each blurb makes that the manuscript lacks (claim copied verbatim from the blurb), and a
+second reading dismisses a claim when it quotes a manuscript sentence that supports it. Replays on run 11's
+blurbs with `gemma3:12b` (`task4_blurb_replay.py`): without the second reading 2 of 2 flagged all three blurbs
+(the true premise "Minh về làng bán nhà" among them); with it, 3 replays gave {2} (correct), {} (the invented
+claim dismissed by an unrelated quote) and {1, 2, 3}. Because the 9B judge is this noisy, the check neither
+blocks nor drops blurbs: each remaining claim is a `BLURB_UNSUPPORTED` narrative-critical exception at
+touchpoint 2, and the export leads with an unflagged blurb when one exists. The packaging record is now
+`{"packaging", "findings"}` (template `packaging-v2`).

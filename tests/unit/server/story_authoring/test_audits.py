@@ -16,6 +16,7 @@ from server.story_authoring.audits import (
     audit_chapter,
     critic_manuscript,
     pairwise_judge,
+    unfaithful_blurbs,
     verified_findings,
 )
 from server.story_authoring.checks import Severity
@@ -55,20 +56,23 @@ class _Sink:
         return None
 
 
-def _gateway(payload: dict) -> tuple[AuthoringTextGateway, list[dict]]:
+def _gateway(payload: dict, *later: dict) -> tuple[AuthoringTextGateway, list[dict]]:
+    """Answers each generation with the next payload; the last one repeats."""
     bodies: list[dict] = []
+    answers = [payload, *later]
 
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         bodies.append(body)
         counting = body["options"]["num_predict"] == 1
+        answer = answers.pop(0) if not counting and len(answers) > 1 else answers[0]
         return httpx.Response(
             200,
             json={
                 "model": MODEL,
                 "message": {
                     "role": "assistant",
-                    "content": "{" if counting else json.dumps(payload, ensure_ascii=False),
+                    "content": "{" if counting else json.dumps(answer, ensure_ascii=False),
                 },
                 "done": True,
                 "done_reason": "length" if counting else "stop",
@@ -305,3 +309,52 @@ async def test_a_blocking_claim_holds_only_when_the_second_reading_confirms_it_w
         )
     assert outcomes == [True, False, False]
     assert unconfirmed(claim).severity is Severity.NARRATIVE_CRITICAL
+
+
+async def test_a_blurb_claim_counts_only_when_copied_from_the_blurb_and_unsupported_by_the_manuscript():
+    gateway, bodies = _gateway(
+        {
+            "unsupported": [
+                {"blurb": 1, "claim": "nhà sắp bị phá dỡ", "reason": "truyện không nói vậy"},
+                {"blurb": 2, "claim": "Minh về làng", "reason": "r"},
+                {"blurb": 2, "claim": "cha bán đất", "reason": "không có trong bản 2"},
+                {"blurb": 3, "claim": "x", "reason": "không có bản 3"},
+            ]
+        },
+        {
+            "checks": [
+                {"claim": 1, "quote": "Căn nhà sắp bị phá dỡ.", "supported": True},
+                {"claim": 2, "quote": "Minh về làng.", "supported": True},
+            ]
+        },
+    )
+    claims = await unfaithful_blurbs(
+        gateway,
+        scope=SCOPE,
+        selection=SELECTION,
+        step_id="blurbs",
+        context_digest=DIGEST,
+        decoding=DECODING,
+        blurbs=["Căn nhà sắp bị phá dỡ.", "Minh về làng."],
+        manuscript="Minh về làng.",
+    )
+    assert [(c.blurb, c.claim) for c in claims] == [(1, "nhà sắp bị phá dỡ")]
+    review, support = (b["messages"][1]["content"] for b in bodies if b["options"]["num_predict"] != 1)
+    assert "[Bản 2]\nMinh về làng." in review
+    assert "1. nhà sắp bị phá dỡ\n2. Minh về làng" in support
+
+
+async def test_blurbs_without_claims_need_no_second_reading():
+    gateway, bodies = _gateway({"unsupported": []})
+    claims = await unfaithful_blurbs(
+        gateway,
+        scope=SCOPE,
+        selection=SELECTION,
+        step_id="blurbs",
+        context_digest=DIGEST,
+        decoding=DECODING,
+        blurbs=["Minh về làng.", "Một cuốn sổ."],
+        manuscript="Minh về làng.",
+    )
+    assert claims == ()
+    assert sum(b["options"]["num_predict"] != 1 for b in bodies) == 1

@@ -37,6 +37,7 @@ from server.story_authoring.audits import (
     confirm_finding,
     critic_manuscript,
     unconfirmed,
+    unfaithful_blurbs,
 )
 from server.story_authoring.checks import Finding, SceneLengthWindow, Severity, check_scene_prose, count_syllables
 from server.story_authoring.commit import ManuscriptCommitManifest, SceneEntry, load_offered_manifest, offer_manifest
@@ -1054,9 +1055,41 @@ class StoryRunDriver:
                 )
                 unverified = packaging_prompts.unverified_selling_points(packaging, manuscript)
                 kept = [p.model_dump() for p in packaging.selling_points if p.point not in unverified]
-                if len(kept) >= MIN_VERIFIED_SELLING_POINTS:
-                    verified = Packaging.model_validate({**packaging.model_dump(), "selling_points": kept})
-                    return verified.model_dump_json().encode("utf-8")
+                if len(kept) < MIN_VERIFIED_SELLING_POINTS:
+                    continue
+                claims = await self._judge(
+                    "packaging",
+                    lambda step_id, decoding, blurbs=packaging.blurbs: unfaithful_blurbs(
+                        self._judge_gateway,
+                        scope=self._scope,
+                        selection=self._brief.judge,
+                        step_id=step_id,
+                        context_digest=self._brief.digest(),
+                        decoding=decoding,
+                        blurbs=blurbs,
+                        manuscript=manuscript,
+                    ),
+                )
+                flagged = {c.blurb - 1 for c in claims}
+                order = sorted(range(len(packaging.blurbs)), key=lambda i: i in flagged)
+                blurbs = [packaging.blurbs[i] for i in order]
+                verified = Packaging.model_validate(
+                    {**packaging.model_dump(), "selling_points": kept, "blurbs": blurbs}
+                )
+                findings = [
+                    Finding(
+                        "BLURB_UNSUPPORTED",
+                        Severity.NARRATIVE_CRITICAL,
+                        "packaging",
+                        f"bản giới thiệu nêu chi tiết không có trong truyện: {c.reason}",
+                        c.claim,
+                    )
+                    for c in claims
+                ]
+                return json.dumps(
+                    {"packaging": verified.model_dump(), "findings": [_finding_dict(f) for f in findings]},
+                    ensure_ascii=False,
+                ).encode("utf-8")
             raise Blocked(RunPhase.BLOCKED_QUALITY, "packaging: fewer than three selling points quote the manuscript")
 
         await self._ensure("packaging", inputs=inputs, decoding=PLANNING, produce=produce)
@@ -1100,7 +1133,9 @@ class StoryRunDriver:
             chapters.setdefault(ref.chapter, []).append(revision.normalized_content)
         for node in (*(chapter_review(c) for c in chapters), "manuscript_review"):
             findings.extend(_finding_from(f) for f in json.loads(await self._head(node))["findings"])
-        packaging = Packaging.model_validate_json(await self._head("packaging"))
+        packaged = json.loads(await self._head("packaging"))
+        packaging = Packaging.model_validate(packaged["packaging"])
+        findings.extend(_finding_from(f) for f in packaged["findings"])
         findings.extend(story_length_findings([chapters[c] for c in sorted(chapters)]))
         blocking = [f for f in findings if f.blocking]
         if blocking:

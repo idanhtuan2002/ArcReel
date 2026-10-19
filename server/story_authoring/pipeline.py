@@ -28,7 +28,7 @@ TEMPLATE_VERSIONS = {
     "scene_draft": "scene-draft-v1",
     "chapter_review": "chapter-review-v1",
     "manuscript_review": "manuscript-review-v1",
-    "packaging": "packaging-v1",
+    "packaging": "packaging-v2",
 }
 
 PLANNING_NODES = ("seed", "story_bible", "style_bible", "outline")

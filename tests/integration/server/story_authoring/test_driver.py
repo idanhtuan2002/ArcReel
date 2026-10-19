@@ -228,6 +228,10 @@ class ScriptedModel:
             return {"issues": []}
         if kind == "titles":
             return self.packaging()
+        if kind == "unsupported":
+            return {"unsupported": []}
+        if kind == "checks":
+            return {"checks": []}
         if kind == "patches":
             return {"patches": [], "notes": "không sửa"}
         if kind == "rewrites":
@@ -249,6 +253,8 @@ class ScriptedModel:
                     "ending_resolves_conflict",
                     "issues",
                     "titles",
+                    "unsupported",
+                    "checks",
                     "patches",
                     "rewrites",
                 )
@@ -525,6 +531,36 @@ async def test_packaging_needs_three_selling_points_that_quote_the_manuscript(
     assert state.phase is RunPhase.BLOCKED_QUALITY
     assert "packaging" in (state.block_reason or "")
     assert model.calls["titles"] == 2
+
+
+async def test_a_blurb_claim_the_manuscript_lacks_reaches_the_human_and_stays_out_of_the_export(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    model.overrides["unsupported"] = lambda _prompt, _schema: {
+        "unsupported": [{"blurb": 1, "claim": "Nhà sắp bị phá dỡ", "reason": "truyện không có"}]
+    }
+    model.overrides["checks"] = lambda _prompt, _schema: {"checks": [{"claim": 1, "quote": "", "supported": False}]}
+    model.overrides["titles"] = lambda _prompt, _schema: {
+        **model.packaging(),
+        "blurbs": ["Nhà sắp bị phá dỡ. Minh về làng.", "Minh tìm thấy cuốn sổ."],
+    }
+    blobs = StoryBlobStore(tmp_path)
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert (model.calls["titles"], model.calls["unsupported"], model.calls["checks"]) == (1, 1, 1)
+    manifest = load_offered_manifest(blobs, state)
+    export = blobs.read_exact(manifest.export_digest).decode("utf-8")
+    assert "> Minh tìm thấy cuốn sổ." in export
+    assert manifest.quality_record_digest is not None
+    record = json.loads(blobs.read_exact(manifest.quality_record_digest))
+    flagged = [f for f in record["findings"] if f["code"] == "BLURB_UNSUPPORTED"]
+    assert [(f["severity"], f["quote"]) for f in flagged] == [("NARRATIVE_CRITICAL", "Nhà sắp bị phá dỡ")]
+    assert flagged[0]["id"] in manifest.exceptions_offered
+    assert record["packaging"]["blurbs"] == ["Minh tìm thấy cuốn sổ.", "Nhà sắp bị phá dỡ. Minh về làng."]
 
 
 def test_the_brief_digest_is_what_gate_a_greenlights_and_excludes_the_decision():
@@ -857,9 +893,9 @@ async def test_review_calls_go_to_the_judge_route_and_drafting_stays_with_the_wr
     state = await driver.run()
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
-    assert set(judge.calls) == {"passed", "issues", "ending_resolves_conflict"}
+    assert set(judge.calls) == {"passed", "issues", "ending_resolves_conflict", "unsupported"}
     assert judge.calls["issues"] == 12
-    assert not {"passed", "issues", "ending_resolves_conflict"} & set(writer.calls)
+    assert not {"passed", "issues", "ending_resolves_conflict", "unsupported"} & set(writer.calls)
     assert writer.calls["prose"] == 9
 
 

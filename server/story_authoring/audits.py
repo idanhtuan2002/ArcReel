@@ -84,6 +84,26 @@ class PairwiseJudgment(_Out):
     reasons: list[PairwiseReason] = Field(min_length=1, max_length=4)
 
 
+class BlurbClaim(_Out):
+    blurb: int = Field(ge=1, le=3)
+    claim: str = Field(min_length=1, max_length=300)
+    reason: str = Field(min_length=1, max_length=300)
+
+
+class BlurbReview(_Out):
+    unsupported: list[BlurbClaim] = Field(max_length=6)
+
+
+class ClaimSupport(_Out):
+    claim: int = Field(ge=1, le=6)
+    quote: str = Field(max_length=400)
+    supported: bool
+
+
+class SupportReview(_Out):
+    checks: list[ClaimSupport] = Field(max_length=6)
+
+
 class AuditDimension(StrEnum):
     CONTINUITY = "CONTINUITY"
     MEMO_COMPLIANCE = "MEMO_COMPLIANCE"
@@ -500,3 +520,79 @@ def anti_ai_findings(text: str, *, node_id: str) -> tuple[Finding, ...]:
             Finding("UNIFORM_PARAGRAPHS", Severity.STYLISTIC, node_id, "paragraph lengths are nearly equal")
         )
     return tuple(findings)
+
+
+async def unfaithful_blurbs(
+    gateway: AuthoringTextGateway,
+    *,
+    scope: StoryScope,
+    selection: StoryModelSelection,
+    step_id: str,
+    context_digest: str,
+    decoding: StoryDecoding,
+    blurbs: Sequence[str],
+    manuscript: str,
+    max_output_tokens: int = 1024,
+) -> tuple[BlurbClaim, ...]:
+    """Claims the blurbs make that the manuscript does not. A claim counts only when it is copied verbatim from the
+    blurb it names and a second reading finds no manuscript sentence, quoted verbatim, that supports it."""
+    listed = "\n\n".join(f"[Bản {i}]\n{b}" for i, b in enumerate(blurbs, start=1))
+    prompt = f"""Đối chiếu từng bản giới thiệu với truyện. Liệt kê trong unsupported mọi chi tiết (sự kiện, nhân vật,
+quan hệ, nơi chốn, hoàn cảnh) mà bản giới thiệu nêu nhưng truyện KHÔNG có hoặc nói ngược lại:
+- blurb: số thứ tự bản giới thiệu;
+- claim: chép NGUYÊN VĂN cụm từ đó từ bản giới thiệu;
+- reason: truyện thật sự kể gì.
+Không liệt kê lời gợi tò mò, câu hỏi hay nhận xét chung. Nếu mọi bản đều đúng với truyện, để unsupported rỗng.
+
+[Bản giới thiệu]
+{listed}
+
+[Truyện]
+{manuscript}"""
+    review = await _structured(
+        gateway,
+        scope=scope,
+        selection=selection,
+        step_id=step_id,
+        kind=StoryStepKind.PACKAGING,
+        context_digest=context_digest,
+        decoding=decoding,
+        prompt=prompt,
+        model=BlurbReview,
+        max_output_tokens=max_output_tokens,
+    )
+    claims = [
+        c
+        for c in review.unsupported
+        if c.blurb <= len(blurbs) and _normalize(c.claim) and _normalize(c.claim) in _normalize(blurbs[c.blurb - 1])
+    ]
+    if not claims:
+        return ()
+    listed_claims = "\n".join(f"{i}. {c.claim}" for i, c in enumerate(claims, start=1))
+    support = await _structured(
+        gateway,
+        scope=scope,
+        selection=selection,
+        step_id=f"{step_id}.support",
+        kind=StoryStepKind.PACKAGING,
+        context_digest=context_digest,
+        decoding=decoding,
+        prompt=f"""Với từng nhận định dưới đây, tìm trong truyện một câu cho thấy nhận định đó ĐÚNG (truyện kể hoặc
+ngụ ý rõ điều đó). Ghi trong checks cho mỗi nhận định:
+- claim: số thứ tự nhận định;
+- quote: chép NGUYÊN VĂN câu đó từ truyện, để trống nếu truyện không có câu nào như vậy;
+- supported: true nếu câu đó cho thấy nhận định đúng.
+
+[Nhận định]
+{listed_claims}
+
+[Truyện]
+{manuscript}""",
+        model=SupportReview,
+        max_output_tokens=max_output_tokens,
+    )
+    normalized = _normalize(manuscript)
+    supported = {
+        c.claim - 1 for c in support.checks if c.supported and _normalize(c.quote) and _normalize(c.quote) in normalized
+    }
+    return tuple(c for i, c in enumerate(claims) if i not in supported)

@@ -4,7 +4,9 @@ Donor surface S11 Shenbi ``skills/shenbi-short-packaging/SKILL.md`` (sha256 ``f4
 for the Human to choose from, a blurb that hooks without spoiling the core reversal, every selling point backed
 by evidence found in the text. Recorded deviations: Vietnamese; the cover prompt and platform-specific tag
 systems are not taken (the video flow designs its own visuals); evidence is a verbatim quote that
-:func:`unverified_selling_points` checks against the manuscript, so an invented quote is dropped.
+:func:`unverified_selling_points` checks against the manuscript, so an invented quote is dropped; blurbs are
+checked by the judge route (``audits.unfaithful_blurbs``), and a claim the manuscript lacks reaches the Human as a
+finding while the export leads with an unflagged blurb.
 """
 
 from __future__ import annotations

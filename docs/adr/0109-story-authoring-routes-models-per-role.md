@@ -13,7 +13,7 @@ sponsor asked (2026-10-19) to prepare for a stronger cloud model later, without 
 
 1. **Two routes per run.** A brief names a writer route (drafting, planning, repair, packaging) and may name a
    judge route (outline and chapter-plan review, chapter audits, the confirming second reading, the manuscript
-   critic). Without a judge route the writer route reviews. This follows Huohuo's writer/`text_audit` split
+   critic, the blurb check). Without a judge route the writer route reviews. This follows Huohuo's writer/`text_audit` split
    (`f104b85`, `chatCompletionTextAudit`), minus its silent fallback: the judge route is part of the brief digest
    that Gate A greenlights and of every review node's fingerprint, so the Human sees whether review was
    independent, and changing it stales exactly the review nodes.
