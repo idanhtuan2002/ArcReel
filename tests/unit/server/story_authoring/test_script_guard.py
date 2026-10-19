@@ -122,3 +122,11 @@ def test_a_length_floor_lives_in_the_pattern_and_the_default_is_unchanged():
     floor = re.compile(no_cjk_pattern(min_chars=5))
     assert floor.fullmatch("Minh ")
     assert not floor.fullmatch("Minh")
+
+
+def test_a_length_ceiling_bounds_the_pattern():
+    import re
+
+    bounded = re.compile(no_cjk_pattern(min_chars=2, max_chars=4))
+    assert bounded.fullmatch("abcd")
+    assert not bounded.fullmatch("abcde")

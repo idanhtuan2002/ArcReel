@@ -58,7 +58,7 @@ def has_cjk(text: str) -> bool:
     return any(is_cjk(char) for char in text)
 
 
-def no_cjk_pattern(*, include_astral: bool = True, min_chars: int = 0) -> str:
+def no_cjk_pattern(*, include_astral: bool = True, min_chars: int = 0, max_chars: int | None = None) -> str:
     """A JSON-schema ``pattern`` for grammar-constrained JSON strings that cannot carry CJK.
 
     Ollama applies a string ``pattern`` to the raw characters between the quotes, replacing the default
@@ -66,15 +66,20 @@ def no_cjk_pattern(*, include_astral: bool = True, min_chars: int = 0) -> str:
     only the short JSON escapes; ``\\u`` escapes are excluded so that no CJK can be spelled as an escape.
     ``include_astral=False`` drops the supplementary-plane ranges, for grammar engines that reject them.
     ``min_chars`` puts a length floor into the pattern itself: Ollama ignores ``minLength`` on a string that has
-    a ``pattern`` (Task4.6 probe), while a ``{n,}`` repetition is enforced.
+    a ``pattern`` (Task4.6 probe), while a ``{n,}`` repetition is enforced; ``max_chars`` adds a ceiling.
     """
     parts = []
     for start, end in CJK_RANGES:
         if start > _BMP_END and not include_astral:
             continue
         parts.append(_escape(start) if start == end else f"{_escape(start)}-{_escape(end)}")
-    repeat = f"{{{min_chars},}}" if min_chars > 0 else "*"
-    return '^([^"\\\\\\u0000-\\u001f' + "".join(parts) + ']|\\\\["\\\\/bfnrt])' + repeat + "$"
+    return '^([^"\\\\\\u0000-\\u001f' + "".join(parts) + ']|\\\\["\\\\/bfnrt])' + _repeat(min_chars, max_chars) + "$"
+
+
+def _repeat(min_chars: int, max_chars: int | None) -> str:
+    if max_chars is not None:
+        return f"{{{min_chars},{max_chars}}}"
+    return f"{{{min_chars},}}" if min_chars > 0 else "*"
 
 
 def _escape(code: int) -> str:

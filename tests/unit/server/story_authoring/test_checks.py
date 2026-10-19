@@ -218,3 +218,10 @@ def test_story_length_outside_the_hard_range_is_structural_and_outside_the_targe
     assert [f.severity for f in story_length_findings(story(13000))] == [Severity.HARD_STRUCTURAL]
     assert [f.severity for f in story_length_findings(story(6500))] == [Severity.STYLISTIC]
     assert story_length_findings(story(9000)) == ()
+
+
+def test_a_paragraph_ending_mid_sentence_is_an_integrity_finding():
+    text = "Minh đứng trước cổng. Gió lùa qua hàng\n\nLan bước ra sân và gọi anh vào nhà."
+    findings = check_scene_prose(text, node_id="s", window=SceneLengthWindow(minimum=1), allowed_names={"Minh", "Lan"})
+    cut = next(f for f in findings if f.code == "PARAGRAPH_CUT")
+    assert cut.severity is Severity.HARD_INTEGRITY

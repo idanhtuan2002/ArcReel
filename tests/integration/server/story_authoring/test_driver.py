@@ -503,8 +503,18 @@ async def test_a_story_outside_the_target_length_is_offered_with_a_stylistic_fin
 ):
     store = await _store(concurrent_session_factory)
     blobs = StoryBlobStore(tmp_path)
+    model = ScriptedModel()
+    full = model._prose
 
-    state = await _driver(concurrent_session_factory, store, ScriptedModel(), blobs).run()
+    def lean(_prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
+        answer = full(schema["properties"]["paragraphs"]["minItems"])
+        paragraphs = [". ".join(p.split(". ")[:6]).rstrip(".") + "." for p in answer["paragraphs"]]
+        model.paragraphs[-len(paragraphs) :] = paragraphs
+        return {"paragraphs": paragraphs}
+
+    model.overrides["prose"] = lean
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
     assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     manifest = load_offered_manifest(blobs, state)

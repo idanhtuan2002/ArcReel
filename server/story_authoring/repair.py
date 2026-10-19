@@ -248,6 +248,13 @@ def deterministic_fixes(
     from earlier scenes and repeated passages are removed by the dedupe core."""
     codes = {f.code for f in findings}
     notes: list[str] = []
+    if "PARAGRAPH_CUT" in codes:
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        trimmed = [trim_unterminated_tail(p) for p in paragraphs[:-1]] + paragraphs[-1:]
+        kept = [p for i, p in enumerate(trimmed) if ends_cleanly(p) or i == len(trimmed) - 1]
+        if kept != paragraphs:
+            text = "\n\n".join(kept)
+            notes.append("cut the unfinished end of paragraphs that stopped mid-sentence")
     if "UNTERMINATED" in codes:
         trimmed = trim_unterminated_tail(text)
         if trimmed != text and ends_cleanly(trimmed):

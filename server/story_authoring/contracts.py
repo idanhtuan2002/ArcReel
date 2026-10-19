@@ -135,6 +135,9 @@ class StoryDecoding(_Frozen):
     top_p: float = Field(default=0.8, gt=0.0, le=1.0)
     top_k: int = Field(default=20, gt=0)
     presence_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
+    # Ollama 0.32.6 ignores presence_penalty for qwen3.5; repeat_penalty and frequency_penalty take effect.
+    repeat_penalty: float = Field(default=1.0, ge=1.0, le=2.0)
+    frequency_penalty: float = Field(default=0.0, ge=0.0, le=2.0)
     seed: int
 
     def options(self) -> dict[str, float | int]:
@@ -163,6 +166,7 @@ class StoryStepRequest(BaseModel):
     min_paragraphs: int = Field(default=1, ge=1)
     max_paragraphs: int = Field(default=40, ge=1)
     min_paragraph_chars: int = Field(default=20, ge=1, le=600)
+    max_paragraph_chars: int | None = Field(default=None, ge=1, le=4000)
 
     @model_validator(mode="after")
     def _mode_matches_model(self) -> StoryStepRequest:
@@ -170,6 +174,8 @@ class StoryStepRequest(BaseModel):
             raise ValueError("response_model is required exactly for STRUCTURED output")
         if self.min_paragraphs > self.max_paragraphs:
             raise ValueError("min_paragraphs must not exceed max_paragraphs")
+        if self.max_paragraph_chars is not None and self.max_paragraph_chars < self.min_paragraph_chars:
+            raise ValueError("max_paragraph_chars must not be below min_paragraph_chars")
         return self
 
 

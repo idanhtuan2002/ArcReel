@@ -210,8 +210,8 @@ def test_the_context_renders_decoded_facts_beats_and_style():
 
 
 def test_paragraph_bounds_and_scene_targets():
-    assert paragraph_bounds(800) == (6, 13)
-    assert paragraph_bounds(300) == (4, 6)
+    assert paragraph_bounds(800) == (8, 8)
+    assert paragraph_bounds(300) == (4, 4)
     assert target_syllables_for([_scene()] * 3) == 1000
     assert target_syllables_for([_scene()] * 5) == 600
 
@@ -269,10 +269,10 @@ def test_earlier_scenes_render_as_the_last_paragraphs_and_older_openings_only():
     assert older.strip() not in text
 
 
-def test_paragraph_floors_carry_most_of_the_scene_target():
-    from server.story_authoring.prompts.drafting import paragraph_min_chars
+def test_paragraph_length_bounds_keep_every_scene_inside_its_window():
+    from server.story_authoring.prompts.drafting import paragraph_max_chars, paragraph_min_chars
 
     for target in (600, 750, 1000):
-        low, _ = paragraph_bounds(target)
-        assert 120 <= paragraph_min_chars(target) <= 400
-        assert low * paragraph_min_chars(target) / 4.5 >= 0.5 * target
+        count, _ = paragraph_bounds(target)
+        assert count * paragraph_min_chars(target) / 4.5 >= 0.4 * 600
+        assert count * paragraph_max_chars(target) / 4.5 <= 1400

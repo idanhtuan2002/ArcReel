@@ -260,7 +260,14 @@ class Bench:
         return model.model_validate_json(output.text), None
 
     async def prose(
-        self, step: str, system: str, prompt: str, preset: dict[str, float], seed: int, bounds: tuple[int, int]
+        self,
+        step: str,
+        system: str,
+        prompt: str,
+        preset: dict[str, float],
+        seed: int,
+        bounds: tuple[int, int],
+        chars: tuple[int, int | None] = (20, None),
     ) -> tuple[str | None, str | None]:
         self.calls += 1
         try:
@@ -278,6 +285,8 @@ class Bench:
                     max_output_tokens=4096,
                     min_paragraphs=bounds[0],
                     max_paragraphs=bounds[1],
+                    min_paragraph_chars=chars[0],
+                    max_paragraph_chars=chars[1],
                 ),
             )
         except StoryStepError as error:
@@ -599,6 +608,7 @@ async def s04_drafting(run: Run) -> dict[str, Any]:
     refs = [r for r in scene_refs(outline_input) if r.chapter == 1]
     target = drafting.target_syllables_for(up.plan1.scenes)
     bounds = drafting.paragraph_bounds(target)
+    chars = (drafting.paragraph_min_chars(target), drafting.paragraph_max_chars(target))
     donor_system = run.donors.ns_constant("draftSystemPrompt") + VI
     criteria = "cảnh văn tốt hơn: tiếng Việt tự nhiên, cụ thể, có hành động và lời thoại, không lặp, không lộ chuyện chưa đến lúc, bám đúng bối cảnh"
     r2_samples, donor_samples, prefs = [], [], []
@@ -627,8 +637,8 @@ async def s04_drafting(run: Run) -> dict[str, Any]:
                 "JSON.stringify(contextPack, null, 2)": _json(pack.model_dump(mode="json")),
             },
         )
-        mine, error = await b.prose(f"s04-r2-{seed}", drafting.DRAFT_SYSTEM, r2_prompt, DRAFT, seed, bounds)
-        donor, derror = await b.prose(f"s04-d-{seed}", donor_system, donor_prompt, DRAFT, seed, bounds)
+        mine, error = await b.prose(f"s04-r2-{seed}", drafting.DRAFT_SYSTEM, r2_prompt, DRAFT, seed, bounds, chars)
+        donor, derror = await b.prose(f"s04-d-{seed}", donor_system, donor_prompt, DRAFT, seed, bounds, chars)
         r2_samples.append({**prose_metrics(mine, up.allowed), "scene": ref.node_id, "error": error, "text": mine})
         donor_samples.append({**prose_metrics(donor, up.allowed), "scene": ref.node_id, "error": derror, "text": donor})
         prefs.append(await b.judge(mine, donor, criteria, seed))

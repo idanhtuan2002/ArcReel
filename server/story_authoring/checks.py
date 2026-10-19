@@ -692,6 +692,17 @@ def check_scene_prose(
                 "UNTERMINATED", Severity.HARD_INTEGRITY, node_id, "prose does not end a sentence", text.rstrip()[-40:]
             )
         )
+    cut = [p.strip() for p in text.split("\n\n")[:-1] if p.strip() and not ends_cleanly(p)]
+    if cut:
+        findings.append(
+            Finding(
+                "PARAGRAPH_CUT",
+                Severity.HARD_INTEGRITY,
+                node_id,
+                f"{len(cut)} paragraphs end mid-sentence",
+                cut[0][-40:],
+            )
+        )
     syllables = count_syllables(text)
     if syllables < window.minimum * SHORT_SCENE_SHARE:
         findings.append(

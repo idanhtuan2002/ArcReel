@@ -240,3 +240,13 @@ def test_an_unfinished_last_sentence_is_cut_without_a_model():
     finding = Finding("UNTERMINATED", Severity.HARD_INTEGRITY, "s", "u", "và")
     fixed, notes = deterministic_fixes("Minh mở cửa. Lan đứng đó và", [finding])
     assert (fixed, len(notes)) == ("Minh mở cửa.", 1)
+
+
+def test_paragraphs_cut_mid_sentence_lose_only_their_unfinished_end():
+    text = (
+        "Minh đứng trước cổng. Gió lùa qua hàng\n\nLan bước ra sân.\n\nmột mẩu không có câu nào trọn\n\nTrời tối dần."
+    )
+    finding = Finding("PARAGRAPH_CUT", Severity.HARD_INTEGRITY, "s", "c", "hàng")
+    fixed, notes = deterministic_fixes(text, [finding])
+    assert fixed == "Minh đứng trước cổng.\n\nLan bước ra sân.\n\nTrời tối dần."
+    assert len(notes) == 1

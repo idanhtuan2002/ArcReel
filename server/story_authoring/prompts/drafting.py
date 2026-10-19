@@ -114,14 +114,26 @@ def _opening(text: str, limit: int = 200) -> str:
 CHARS_PER_SYLLABLE = 4.5
 
 
-def paragraph_min_chars(target_syllables: int) -> int:
-    """Each paragraph's floor, so that the fewest paragraphs still carry about 80% of the scene target."""
-    return max(120, min(400, int(target_syllables * 0.8 * CHARS_PER_SYLLABLE / paragraph_bounds(target_syllables)[0])))
+SYLLABLES_PER_PARAGRAPH = 95
+PARAGRAPH_MIN_CHARS = 280
+PARAGRAPH_MAX_CHARS = 700
+HARD_MAXIMUM_SYLLABLES = 1350
 
 
 def paragraph_bounds(target_syllables: int) -> tuple[int, int]:
-    minimum = max(4, target_syllables // 120)
-    return minimum, max(minimum + 2, target_syllables // 60)
+    """A fixed paragraph count: with each paragraph's length bounded, the scene length is bounded too."""
+    count = max(4, round(target_syllables / SYLLABLES_PER_PARAGRAPH))
+    return count, count
+
+
+def paragraph_min_chars(target_syllables: int) -> int:
+    return PARAGRAPH_MIN_CHARS
+
+
+def paragraph_max_chars(target_syllables: int) -> int:
+    """The ceiling, lowered for long scenes so that every paragraph at its ceiling stays under the hard maximum."""
+    count = paragraph_bounds(target_syllables)[0]
+    return min(PARAGRAPH_MAX_CHARS, int(HARD_MAXIMUM_SYLLABLES * CHARS_PER_SYLLABLE / count))
 
 
 def scene_draft_prompt(
@@ -159,7 +171,8 @@ def scene_draft_prompt(
 - Điểm nhìn: {scene.pov}; nhân vật: {", ".join(scene.characters)}; nơi chốn: {scene.location}
 - Chuyển biến cảm xúc: {scene.emotional_turn}
 - Chức năng trong truyện: {scene.plot_function}
-- Độ dài: khoảng {target_syllables} chữ.
+- Độ dài: khoảng {target_syllables} chữ, đúng {paragraph_bounds(target_syllables)[0]} đoạn; mỗi đoạn 3–5 câu và kết
+  thúc trọn câu.
 {chr(10).join("- " + duty for duty in duties)}
 {note}
 [Quy tắc cứng]

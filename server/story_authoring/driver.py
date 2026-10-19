@@ -131,7 +131,7 @@ RETRYABLE = frozenset(
 REPAIRABLE = frozenset({Severity.HARD_INTEGRITY, Severity.HARD_STRUCTURAL, Severity.NARRATIVE_CRITICAL})
 PLANNING = {"temperature": 0.6, "top_p": 0.9, "top_k": 40, "presence_penalty": 0.0}
 REVIEW = {"temperature": 0.2, "top_p": 0.9, "top_k": 40, "presence_penalty": 0.0}
-DRAFT = {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 0.0}
+DRAFT = {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 0.0, "repeat_penalty": 1.1}
 REPAIR = {"temperature": 0.3, "top_p": 0.9, "top_k": 40, "presence_penalty": 0.0}
 
 
@@ -343,6 +343,7 @@ class StoryRunDriver:
         max_output_tokens: int = 4096,
         paragraphs: tuple[int, int] = (1, 40),
         paragraph_chars: int = 20,
+        paragraph_max_chars: int | None = None,
     ) -> str:
         """One generation of a node, retried within the node's cap on recoverable output failures."""
         cap = NODE_CAPS[node.split("[", 1)[0]]
@@ -369,6 +370,7 @@ class StoryRunDriver:
                         max_output_tokens=max_output_tokens,
                         min_paragraphs=paragraphs[0],
                         min_paragraph_chars=paragraph_chars,
+                        max_paragraph_chars=paragraph_max_chars,
                         max_paragraphs=paragraphs[1],
                     ),
                 )
@@ -732,6 +734,7 @@ class StoryRunDriver:
             decoding=DRAFT,
             paragraphs=bounds,
             paragraph_chars=drafting.paragraph_min_chars(target),
+            paragraph_max_chars=drafting.paragraph_max_chars(target),
         )
         history: list[str] = []
         while True:
@@ -756,6 +759,7 @@ class StoryRunDriver:
                     decoding=DRAFT,
                     paragraphs=bounds,
                     paragraph_chars=drafting.paragraph_min_chars(target),
+                    paragraph_max_chars=drafting.paragraph_max_chars(target),
                 )
                 continue
             fixed, notes = deterministic_fixes(prose, repairable, earlier=earlier)
