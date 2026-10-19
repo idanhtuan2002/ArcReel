@@ -683,3 +683,100 @@ async def test_query_profile_superseded_while_capability_port_is_outside_transac
         await service.declare_query(command)
     async with unit_of_work(session_factory).transaction() as tx:
         assert await tx.queries.get_exact(command.query_id, 1) is None
+
+
+async def test_query_locks_capability_before_cohort_head_as_required_by_global_rank(
+    session_factory, tmp_path, monkeypatch
+):
+    from lib.db.models.opportunity import M9ProfileHeadModel
+    from server.services.opportunity import HostAcquisitionTransaction
+
+    service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
+    entered = asyncio.Event()
+    pids = {}
+    original = HostAcquisitionTransaction.creative_policy_identity
+
+    async def observed_policy(self):
+        value = await original(self)
+        pids["service"] = await self.session.scalar(text("SELECT pg_backend_pid()"))
+        entered.set()
+        return value
+
+    monkeypatch.setattr(HostAcquisitionTransaction, "creative_policy_identity", observed_policy)
+    task = None
+    try:
+        async with unit_of_work(session_factory).transaction() as writer:
+            pids["writer"] = await writer.session.scalar(text("SELECT pg_backend_pid()"))
+            await writer.capabilities.consume(capabilities.grant, capabilities.evaluation, actor_id="human-a")
+            task = asyncio.create_task(service.declare_query(command))
+            await asyncio.wait_for(entered.wait(), timeout=10)
+            await observe_blocked(session_factory, pids["service"], pids["writer"])
+            row = await writer.session.scalar(
+                select(M9ProfileHeadModel.profile_id)
+                .where(
+                    M9ProfileHeadModel.user_id == "u1",
+                    M9ProfileHeadModel.project_name == "show-a",
+                    M9ProfileHeadModel.profile_id == command.draft.cohort_profile_id,
+                )
+                .with_for_update(nowait=True)
+            )
+            assert row == command.draft.cohort_profile_id
+    finally:
+        results = [] if task is None else await asyncio.gather(task, return_exceptions=True)
+    assert len(results) == 1
+    assert not isinstance(results[0], BaseException)
+
+
+async def test_capability_admission_guards_follow_evidence_id_order(session_factory):
+    import struct
+
+    from r2.advanced_creative.digests import digest_canonical
+    from tests.unit.r2.opportunity.test_capabilities import _authority, _resign
+
+    grant, evaluation, request = _authority()
+    grant = grant.model_copy(update={"grant_id": "z-native-grant"})
+    evaluation = evaluation.model_copy(update={"evaluation_id": "a-native-evaluation", "grant_id": grant.grant_id})
+    request = request.model_copy(update={"grant_id": grant.grant_id})
+    grant, evaluation, _ = _resign(grant, evaluation, request)
+
+    def key(identity):
+        digest = digest_canonical(
+            {
+                "domain": "m9.capability-admission-lock.v1",
+                "user_id": "u1",
+                "project_name": "show-a",
+                "identity": identity,
+            }
+        )
+        return struct.unpack(">ii", bytes.fromhex(digest.removeprefix("sha256:"))[:8])
+
+    grant_key = key(("grant", grant.grant_id, str(grant.grant_version)))
+    evaluation_key = key(("evaluation", evaluation.evaluation_id))
+    entered = asyncio.Event()
+    pids = {}
+
+    async def consume():
+        async with unit_of_work(session_factory).transaction() as tx:
+            pids["consumer"] = await tx.session.scalar(text("SELECT pg_backend_pid()"))
+            entered.set()
+            await tx.capabilities.consume(grant, evaluation, actor_id="human-a")
+
+    task = None
+    try:
+        async with session_factory() as gate, gate.begin():
+            gate_pid = await gate.scalar(text("SELECT pg_backend_pid()"))
+            await gate.execute(
+                text("SELECT pg_advisory_xact_lock(:first,:second)"),
+                {"first": evaluation_key[0], "second": evaluation_key[1]},
+            )
+            task = asyncio.create_task(consume())
+            await asyncio.wait_for(entered.wait(), timeout=10)
+            await observe_blocked(session_factory, pids["consumer"], gate_pid)
+            acquired = await gate.scalar(
+                text("SELECT pg_try_advisory_xact_lock(:first,:second)"),
+                {"first": grant_key[0], "second": grant_key[1]},
+            )
+            assert acquired is True
+    finally:
+        results = [] if task is None else await asyncio.gather(task, return_exceptions=True)
+    assert results == [None]

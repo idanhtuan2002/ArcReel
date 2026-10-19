@@ -321,6 +321,7 @@ class OpportunityAcquisitionService:
             if replay is not None:
                 return verified_query_receipt(replay, context, request_digest)
             policy = await tx.creative_policy_identity()
+            await tx.capabilities.consume(grant, evaluation, actor_id=self.actor_id)
             profile_head = await tx.profiles.get_head_for_update(
                 user_id=self.user_id, project_name=self.project_name, profile_id=draft.cohort_profile_id
             )
@@ -361,7 +362,6 @@ class OpportunityAcquisitionService:
                 or ({rule.data_class for rule in grant.data_rules} - set(rules[0].allowed_data_classes))
             ):
                 raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN)
-            await tx.capabilities.consume(grant, evaluation, actor_id=self.actor_id)
             old = await tx.queries.get_head(command.query_id)
             if old is None:
                 if command.parent_revision is not None or command.expected_head_version is not None:

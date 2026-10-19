@@ -156,7 +156,8 @@ class CapabilityEvidenceRepository:
             raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
         # Advisory guards cover absent immutable rows before INSERT; actual rows
         # and complete envelopes remain authority even when guard hashes collide.
-        for identity in (("grant", grant.grant_id, str(grant.grant_version)), ("evaluation", evaluation.evaluation_id)):
+        identities = (("grant", grant.grant_id, str(grant.grant_version)), ("evaluation", evaluation.evaluation_id))
+        for identity in sorted(identities, key=lambda item: (item[1], item[0], item[2:])):
             guard = digest_canonical(
                 {
                     "domain": "m9.capability-admission-lock.v1",
