@@ -243,3 +243,443 @@ async def test_cross_snapshot_corrections_lock_both_attempts_in_identity_order(s
     async with unit_of_work(session_factory).transaction() as tx:
         for corrected in corrections:
             assert await tx.observations.get_current(corrected.observation_id) == corrected
+
+
+async def acquisition_service_fixture(factory, tmp_path):
+    import hashlib
+    import importlib
+    from datetime import UTC, datetime
+
+    from lib.db.repositories.opportunity import OpportunityUnitOfWork
+    from r2.advanced_creative.lineage import host_policy_digest
+    from r2.contracts.opportunity import OpportunityCohortProfileHead
+    from r2.opportunity.digests import digest_cohort_profile, digest_cohort_profile_payload
+    from r2.opportunity.manual_import import ManualImportSource
+    from server.services.m9_evidence_store import FileSnapshotEvidenceStore
+    from tests.integration.lib.db.repositories.test_opportunity_profiles import make_profile
+    from tests.unit.r2.opportunity.test_capabilities import NOW, _resign
+    from tests.unit.r2.opportunity.test_manual_import import ORIGIN, UPLOAD, source_inputs
+
+    module = importlib.import_module("r2.opportunity.acquisition")
+    assert hasattr(module, "OpportunityAcquisitionService"), "B3 acquisition application is missing"
+    from contextlib import asynccontextmanager
+    from contextvars import ContextVar
+
+    from server.services.opportunity import HostAcquisitionUnitOfWork
+
+    active_transactions = ContextVar("m9_test_active_transactions", default=0)
+
+    class ObservedStore(HostAcquisitionUnitOfWork):
+        lose_ack = False
+
+        @property
+        def active_transactions(self):
+            return active_transactions.get()
+
+        @asynccontextmanager
+        async def transaction(self):
+            token = active_transactions.set(active_transactions.get() + 1)
+            try:
+                async with super().transaction() as tx:
+                    yield tx
+                if self.lose_ack:
+                    self.lose_ack = False
+                    raise ConnectionError("injected lost commit acknowledgement")
+            finally:
+                active_transactions.reset(token)
+
+    store = ObservedStore(factory, user_id="u1", project_name="show-a")
+    profile = make_profile()
+    rule = profile.payload.source_rules[0].model_copy(
+        update={
+            "allowed_data_classes": ("manual-excerpt", "manual-public-metadata"),
+        }
+    )
+    payload = profile.payload.model_copy(
+        update={
+            "creative_profile_id": "arcreel.host",
+            "creative_profile_version": "1",
+            "creative_policy_pack_digest": host_policy_digest(),
+            "source_rules": (rule,),
+        }
+    )
+    profile = profile.model_copy(update={"payload": payload, "payload_digest": digest_cohort_profile_payload(payload)})
+    profile = profile.model_copy(update={"profile_digest": digest_cohort_profile(profile)})
+    async with OpportunityUnitOfWork(factory).transaction() as repo:
+        await repo.stage_profile(profile)
+        await repo.stage_head(
+            user_id="u1",
+            project_name="show-a",
+            head=OpportunityCohortProfileHead(
+                profile_id=profile.profile_id,
+                current_revision=1,
+                head_version=1,
+            ),
+            expected_head_version=None,
+        )
+    raw, grant, evaluation = source_inputs()
+    offset = datetime.now(UTC) - NOW
+    documents = tuple(
+        doc.model_copy(
+            update={
+                "assessed_at": doc.assessed_at + offset,
+                "expires_at": doc.expires_at + offset,
+                "effective_at": None if doc.effective_at is None else doc.effective_at + offset,
+            }
+        )
+        for doc in grant.policy_documents
+    )
+    grant = grant.model_copy(
+        update={
+            "issued_at": grant.issued_at + offset,
+            "expires_at": grant.expires_at + offset,
+            "refresh_after": grant.refresh_after + offset,
+            "policy_documents": documents,
+        }
+    )
+    evaluation = evaluation.model_copy(
+        update={
+            "evaluated_at": evaluation.evaluated_at + offset,
+            "expires_at": evaluation.expires_at + offset,
+        }
+    )
+    from r2.contracts.opportunity import CapabilityEvaluationRequest
+
+    request = CapabilityEvaluationRequest(
+        user_id="u1",
+        project_name="show-a",
+        actor_id="human-a",
+        grant_id=grant.grant_id,
+        grant_version=grant.grant_version,
+        grant_digest=grant.grant_digest,
+        source_kind=grant.source_kind,
+        operation="import",
+        purpose="LANDSCAPE",
+        account_binding_digest=None,
+    )
+    grant, evaluation, request = _resign(grant, evaluation, request)
+
+    class CapabilityFixture:
+        calls = 0
+
+        async def resolve_grant(self, ref):
+            assert store.active_transactions == 0
+            self.calls += 1
+            assert ref == grant.grant_id
+            return self.grant
+
+        async def evaluate(self, request):
+            assert store.active_transactions == 0
+            self.calls += 1
+            return self.evaluation
+
+    capabilities = CapabilityFixture()
+    capabilities.grant, capabilities.evaluation = grant, evaluation
+    source = ManualImportSource(
+        payload=raw,
+        grant=grant,
+        evaluation=evaluation,
+        actor_id="human-a",
+        upload_ref=UPLOAD,
+        origin_ref=ORIGIN,
+        declared_origin="synthetic-fixture",
+        uploader_id="fixture-human",
+        payload_digest="sha256:" + hashlib.sha256(raw).hexdigest(),
+    )
+    evidence = FileSnapshotEvidenceStore(tmp_path / "evidence", user_id="u1", project_name="show-a")
+    service = module.OpportunityAcquisitionService(
+        store=store,
+        capabilities=capabilities,
+        source=source,
+        evidence=evidence,
+        user_id="u1",
+        project_name="show-a",
+        actor_id="human-a",
+    )
+    from r2.contracts.opportunity import CommandContext, DeclareSourceQuery, SourceQueryDraft
+
+    command = DeclareSourceQuery(
+        context=CommandContext(
+            command_id="019a0000-0000-7000-8000-000000000081", user_id="u1", project_name="show-a", actor_id="human-a"
+        ),
+        query_id="019a0000-0000-7000-8000-000000000082",
+        parent_revision=None,
+        expected_head_version=None,
+        draft=SourceQueryDraft(
+            source_kind="manual-import",
+            source_contract_version="manual-import.v1",
+            operation="import",
+            intent="LANDSCAPE",
+            parameters={"import_ref": UPLOAD},
+            cohort_id=profile.payload.cohort_id,
+            cohort_version=profile.payload.cohort_version,
+            cohort_profile_id=profile.profile_id,
+            cohort_profile_revision=1,
+            cohort_profile_digest=profile.profile_digest,
+            capability_grant_id=grant.grant_id,
+            capability_grant_version=grant.grant_version,
+            capability_grant_digest=grant.grant_digest,
+            capability_evaluation_id=evaluation.evaluation_id,
+            capability_evaluation_digest=evaluation.evaluation_digest,
+            credential_ref=None,
+            max_pages=1,
+            max_records=1000,
+            max_quota_units=0,
+        ),
+    )
+    return service, command, capabilities
+
+
+async def test_declare_query_runs_real_host_policy_and_replays_without_new_capability_calls(session_factory, tmp_path):
+    service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
+    receipt = await service.declare_query(command)
+    calls = capabilities.calls
+    assert calls == 2
+    assert receipt.query.created_by == "human-a"
+    assert receipt.head.current_revision == 1
+    assert await service.declare_query(command) == receipt
+    assert capabilities.calls == calls
+    async with unit_of_work(session_factory).transaction() as tx:
+        assert await tx.receipts.get_query_for_revision(command.query_id, 1) == receipt
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["scope", "profile_digest", "profile_revision", "grant_digest", "evaluation_digest", "intent", "external_source"],
+)
+async def test_declare_query_refuses_scope_and_admission_drift_before_query_commit(session_factory, tmp_path, fault):
+    service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
+    updates = {
+        "profile_digest": {"cohort_profile_digest": "sha256:" + "b" * 64},
+        "profile_revision": {"cohort_profile_revision": 2},
+        "grant_digest": {"capability_grant_digest": "sha256:" + "b" * 64},
+        "evaluation_digest": {"capability_evaluation_digest": "sha256:" + "b" * 64},
+        "intent": {"intent": "AUDIENCE"},
+        "external_source": {"source_kind": "youtube-data"},
+    }
+    if fault == "scope":
+        command = command.model_copy(update={"context": command.context.model_copy(update={"project_name": "foreign"})})
+    else:
+        command = command.model_copy(update={"draft": command.draft.model_copy(update=updates[fault])})
+    with pytest.raises(OpportunityError):
+        await service.declare_query(command)
+    async with unit_of_work(session_factory).transaction() as tx:
+        assert await tx.queries.get_exact(command.query_id, 1) is None
+    if fault in {"scope", "external_source"}:
+        assert capabilities.calls == 0
+
+
+@pytest.mark.parametrize("fault", ["missing_evidence", "condition_shape", "port_canary"])
+async def test_declare_query_missing_host_seam_and_malformed_policy_fail_closed_without_raw_errors(
+    session_factory, tmp_path, fault
+):
+    from r2.contracts.advanced_creative import CanonicalJsonObject
+    from r2.contracts.opportunity import CapabilityEvaluationRequest
+    from tests.unit.r2.opportunity.test_capabilities import _resign
+
+    service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
+    if fault == "missing_evidence":
+        service.evidence = None
+    elif fault == "port_canary":
+
+        async def unavailable(ref):
+            raise RuntimeError("m9-secret-canary-do-not-log")
+
+        capabilities.resolve_grant = unavailable
+    else:
+        grant, evaluation = capabilities.grant, capabilities.evaluation
+        condition = {**grant.conditions[0].model_dump(), "data_classes": 7}
+        grant = grant.model_copy(update={"conditions": (CanonicalJsonObject.model_validate(condition),)})
+        evaluation = evaluation.model_copy(
+            update={
+                "condition_evidence": (CanonicalJsonObject.model_validate({"condition": condition, "satisfied": True}),)
+            }
+        )
+        request = CapabilityEvaluationRequest(
+            user_id="u1",
+            project_name="show-a",
+            actor_id="human-a",
+            grant_id=grant.grant_id,
+            grant_version=grant.grant_version,
+            grant_digest=grant.grant_digest,
+            source_kind=grant.source_kind,
+            operation="import",
+            purpose="LANDSCAPE",
+            account_binding_digest=None,
+        )
+        grant, evaluation, _ = _resign(grant, evaluation, request)
+        capabilities.grant, capabilities.evaluation = grant, evaluation
+        command = command.model_copy(
+            update={
+                "draft": command.draft.model_copy(
+                    update={
+                        "capability_grant_digest": grant.grant_digest,
+                        "capability_evaluation_digest": evaluation.evaluation_digest,
+                    }
+                )
+            }
+        )
+    with pytest.raises(OpportunityError) as error:
+        await service.declare_query(command)
+    assert "m9-secret-canary" not in str(error.value)
+    async with unit_of_work(session_factory).transaction() as tx:
+        assert await tx.queries.get_exact(command.query_id, 1) is None
+
+
+@pytest.mark.parametrize("mode", ["equal", "divergent"])
+async def test_query_application_race_rechecks_receipt_before_any_metadata_write(session_factory, tmp_path, mode):
+    from lib.db.models.opportunity import M9CommandReceiptModel, M9EventModel
+    from lib.db.models.opportunity_acquisition import M9SourceQueryModel
+
+    service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
+    both_evaluating = asyncio.Event()
+    arrivals = 0
+    original = capabilities.evaluate
+
+    async def evaluate(request):
+        nonlocal arrivals
+        arrivals += 1
+        if arrivals == 2:
+            both_evaluating.set()
+        await asyncio.wait_for(both_evaluating.wait(), timeout=10)
+        return await original(request)
+
+    capabilities.evaluate = evaluate
+    other = (
+        command
+        if mode == "equal"
+        else command.model_copy(
+            update={
+                "query_id": "019a0000-0000-7000-8000-000000000083",
+            }
+        )
+    )
+    results = await asyncio.gather(service.declare_query(command), service.declare_query(other), return_exceptions=True)
+    if mode == "equal":
+        assert results[0] == results[1]
+        assert not isinstance(results[0], BaseException)
+    else:
+        errors = [item for item in results if isinstance(item, OpportunityError)]
+        assert len(errors) == 1
+        assert errors[0].code == StopCode.M9_COMMAND_REPLAY_CONFLICT
+    async with session_factory() as session:
+        for model in (M9SourceQueryModel, M9CommandReceiptModel, M9EventModel):
+            assert await session.scalar(select(func.count()).select_from(model)) == 1
+
+
+async def test_query_revision_and_receipt_history_survive_later_host_unavailability(session_factory, tmp_path):
+    service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
+    first = await service.declare_query(command)
+    next_command = command.model_copy(
+        update={
+            "context": command.context.model_copy(update={"command_id": "019a0000-0000-7000-8000-000000000084"}),
+            "parent_revision": 1,
+            "expected_head_version": 1,
+        }
+    )
+    second = await service.declare_query(next_command)
+    assert second.query.parent_revision == 1
+    assert second.query.revision == 2
+    calls = capabilities.calls
+    service.capabilities = None
+    service.source = None
+    service.evidence = None
+    assert await service.declare_query(command) == first
+    assert await service.declare_query(next_command) == second
+    assert capabilities.calls == calls
+    async with unit_of_work(session_factory).transaction() as tx:
+        assert await tx.receipts.get_query_for_revision(command.query_id, 1) == first
+        assert await tx.receipts.get_query_for_revision(command.query_id, 2) == second
+
+
+async def test_query_application_rolls_back_every_staged_row_if_receipt_commit_fails(
+    session_factory, tmp_path, monkeypatch
+):
+    from lib.db.models.opportunity import M9CommandReceiptModel, M9EventModel
+    from lib.db.models.opportunity_acquisition import (
+        M9CapabilityEvaluationModel,
+        M9ConsumedCapabilityGrantModel,
+        M9SourceQueryHeadModel,
+        M9SourceQueryModel,
+    )
+    from lib.db.repositories.opportunity_acquisition import AcquisitionReceiptRepository
+
+    service, command, _ = await acquisition_service_fixture(session_factory, tmp_path)
+    original = AcquisitionReceiptRepository.stage_query
+
+    async def interrupted(self, *, context, receipt):
+        await original(self, context=context, receipt=receipt)
+        raise RuntimeError("injected after receipt flush")
+
+    monkeypatch.setattr(AcquisitionReceiptRepository, "stage_query", interrupted)
+    with pytest.raises(RuntimeError, match="injected after receipt flush"):
+        await service.declare_query(command)
+    async with session_factory() as session:
+        for model in (
+            M9CapabilityEvaluationModel,
+            M9ConsumedCapabilityGrantModel,
+            M9SourceQueryHeadModel,
+            M9SourceQueryModel,
+            M9CommandReceiptModel,
+            M9EventModel,
+        ):
+            assert await session.scalar(select(func.count()).select_from(model)) == 0
+
+
+async def test_query_commit_ack_loss_is_recovered_by_original_receipt_without_repeating_ports(
+    session_factory, tmp_path
+):
+    service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
+    original = capabilities.evaluate
+
+    async def lose_ack_after_resolve(request):
+        result = await original(request)
+        service.store.lose_ack = True
+        return result
+
+    capabilities.evaluate = lose_ack_after_resolve
+    with pytest.raises(ConnectionError, match="injected lost commit acknowledgement"):
+        await service.declare_query(command)
+    calls = capabilities.calls
+    replay = await service.declare_query(command)
+    assert capabilities.calls == calls
+    async with unit_of_work(session_factory).transaction() as tx:
+        assert await tx.receipts.get_query_for_revision(command.query_id, 1) == replay
+
+
+async def test_query_profile_superseded_while_capability_port_is_outside_transaction_refuses_admission(
+    session_factory, tmp_path
+):
+    from lib.db.repositories.opportunity import OpportunityUnitOfWork
+    from r2.contracts.opportunity import OpportunityCohortProfileHead
+    from r2.opportunity.digests import digest_cohort_profile
+
+    service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
+    original = capabilities.evaluate
+
+    async def supersede(request):
+        result = await original(request)
+        async with OpportunityUnitOfWork(session_factory).transaction() as repo:
+            profile = await repo.get_exact(
+                user_id="u1", project_name="show-a", profile_id=command.draft.cohort_profile_id, revision=1
+            )
+            newer = profile.model_copy(update={"revision": 2, "parent_revision": 1})
+            newer = newer.model_copy(update={"profile_digest": digest_cohort_profile(newer)})
+            await repo.stage_profile(newer)
+            await repo.stage_head(
+                user_id="u1",
+                project_name="show-a",
+                head=OpportunityCohortProfileHead(
+                    profile_id=profile.profile_id,
+                    current_revision=2,
+                    head_version=2,
+                ),
+                expected_head_version=1,
+            )
+        return result
+
+    capabilities.evaluate = supersede
+    with pytest.raises(OpportunityError, match="M9_COHORT_LEAKAGE"):
+        await service.declare_query(command)
+    async with unit_of_work(session_factory).transaction() as tx:
+        assert await tx.queries.get_exact(command.query_id, 1) is None

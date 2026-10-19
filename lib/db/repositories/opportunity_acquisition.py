@@ -11,7 +11,7 @@ from sqlalchemy import select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from lib.db.models.opportunity import M9CommandReceiptModel
+from lib.db.models.opportunity import M9CommandReceiptModel, M9EventModel
 from lib.db.models.opportunity_acquisition import (
     M9AcquisitionAttemptModel,
     M9CapabilityEvaluationModel,
@@ -1248,6 +1248,7 @@ class AcquisitionTransaction:
         self, session: AsyncSession, *, user_id: str, project_name: str, guard_key: GuardKey = command_guard_key
     ) -> None:
         self.session = session
+        self.user_id, self.project_name = user_id, project_name
         self.profiles = OpportunityProfileRepository(session, guard_key=guard_key)
         self.capabilities = CapabilityEvidenceRepository(session, user_id=user_id, project_name=project_name)
         self.queries = SourceQueryRepository(session, user_id=user_id, project_name=project_name)
@@ -1258,6 +1259,20 @@ class AcquisitionTransaction:
         self.snapshots = SourceSnapshotRepository(session, attempts=self.attempts, pages=self.pages)
         self.observations = SourceObservationRepository(session, snapshots=self.snapshots)
         self.receipts = AcquisitionReceiptRepository(session, attempts=self.attempts, snapshots=self.snapshots)
+
+    async def stage_query_event(self, *, query: SourceQuery, committed_at: datetime) -> None:
+        self.session.add(
+            M9EventModel(
+                user_id=self.user_id,
+                project_name=self.project_name,
+                event_kind="SOURCE_QUERY_DECLARED",
+                aggregate_id=query.query_id,
+                aggregate_revision=query.revision,
+                payload_digest=query.query_digest,
+                committed_at=committed_at,
+            )
+        )
+        await _flush(self.session)
 
 
 class OpportunityAcquisitionUnitOfWork:
