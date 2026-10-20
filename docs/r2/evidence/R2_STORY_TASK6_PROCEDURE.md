@@ -86,3 +86,6 @@ observations only. Evidence: `R2_STORY_ACCEPTANCE_RUN.json` (clean run) and `R2_
 - Rebuilt at HEAD `ab89da20` (T `0b7f869f` + evidence-only commits; frontend build from T unchanged): container
   restarted, `setup_accept.py` re-created both providers and the 11 grants; proxy and server started; login works and
   every `accept-*` project lists zero runs.
+- Then, before any new run, the disposable container was re-created on a named volume (`arcreel-story-accept-pgdata`,
+  restart policy `unless-stopped`) so a host restart no longer loses acceptance state; `setup_accept.py` re-ran and the
+  checks above passed again.
