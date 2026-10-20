@@ -73,3 +73,16 @@ observations only. Evidence: `R2_STORY_ACCEPTANCE_RUN.json` (clean run) and `R2_
   `audit_tests --check` 0 violations; `pnpm check` (typecheck, lint, knip, 2,610 tests) passed.
 - Frontend built at T; acceptance server started from T with the proxy on 11500. Briefs for the Human:
   `~/arcreel-v2-story-accept/BRIEFS.md`.
+
+## Lost first attempt and rebuilt environment (2026-10-20)
+
+- The Human gave Gate A on `accept-restart` at about 12:22 and run `story-4085c8f44a8bd42a52ddc7bf` started. The
+  server log ends abruptly at 13:28 (zero-filled tail); the host came back at 18:49. The database container runs on
+  tmpfs, so the run state, grants and providers were lost. No fault had been injected and no evidence was collected,
+  so that attempt counts for nothing.
+- Part of that run's calls went to `127.0.0.1:11500` (the proxy provider), although the case should run entirely on
+  `custom-1`. The rerun must select **Ollama local** for both writer and review model.
+- The run's blobs and the log up to 13:28 are kept outside the repository in `~/arcreel-v2-story-accept/lost-run-2026-10-20/`.
+- Rebuilt at HEAD `ab89da20` (T `0b7f869f` + evidence-only commits; frontend build from T unchanged): container
+  restarted, `setup_accept.py` re-created both providers and the 11 grants; proxy and server started; login works and
+  every `accept-*` project lists zero runs.
