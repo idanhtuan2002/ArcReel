@@ -60,3 +60,16 @@ observations only. Evidence: `R2_STORY_ACCEPTANCE_RUN.json` (clean run) and `R2_
    cjk, long. Discard `accept-discard` once it shows "Đang viết".
 3. Agent: inject the faults when their run reaches the right point; collect evidence per run.
 4. Human: at each touchpoint 2, read and decide (Approve / revise / discard). The agent never approves.
+
+## Tested code head and gates (2026-10-20)
+
+- **T = `0b7f869f`** (`tested_code_head`). Later commits touch only `docs/r2/evidence/`.
+- Donor parity: `R2_STORY_DONOR_PARITY.json` — PASS, every surface PARITY or IMPROVED at T or at an unchanged
+  earlier code head (see its `recorded_deviations`).
+- Gates on T: `ruff check .`, `ruff format --check .` (1,966 files), `basedpyright --warnings` (0/0/0),
+  `lint-imports` (23 kept), `deptry` (no issues); related pytest — story authoring unit and integration,
+  `tests/integration/r2/narrative_plan`, `tests/integration/r2/narrative_lifecycle`, `tests/unit/lib/custom_provider`,
+  `tests/unit/lib/text_backends`, gates router and export tests, i18n consistency — 2,028 passed on PostgreSQL;
+  `audit_tests --check` 0 violations; `pnpm check` (typecheck, lint, knip, 2,610 tests) passed.
+- Frontend built at T; acceptance server started from T with the proxy on 11500. Briefs for the Human:
+  `~/arcreel-v2-story-accept/BRIEFS.md`.
