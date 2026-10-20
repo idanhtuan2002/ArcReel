@@ -1,0 +1,492 @@
+{
+ "schema": "r2.story.donor_parity.v1",
+ "rule": "R2-DEC-031: every donor-derived surface PARITY or IMPROVED on the same fixture (winning rule fixed in R2_STORY_DONOR_BASELINE.json before any run)",
+ "sample": {
+  "n_per_arm": 10,
+  "seeds": [
+   300,
+   301,
+   302,
+   303,
+   304,
+   305,
+   306,
+   307,
+   308,
+   309
+  ]
+ },
+ "recorded_deviations": [
+  "Human decision 2026-10-19, recorded before the run: generation in both arms on qwen3.5-vimax:9b (the writer route) instead of the rubric's ornith-32k:9b; judge-route work in both arms (R2 outline and plan review, the audit surfaces S05/S06, every pairwise preference) on gemma3:12b, as in production (ADR 0109).",
+  "Fixture upstream (seed, bibles, outline, chapter-1 plan) and the S11 manuscript come from live run 11.",
+  "Harness fix before run v2b (9af5cb9c): the R2 audit prompt was split at the first '[Sự thật đã khóa]', which leaked a fragment of the R2 instruction into the donor arm's shared sections; it is now split at the output format block, so the donor arm shares only the format and context. S05/S06 were measured again after the fix.",
+  "A surface measured REGRESSED was fixed and measured again on the same fixture and seeds; every measurement is kept below. Surfaces whose code did not change after run v2 (S01-S04, S07) keep their v2 verdict (git diff c204b002..0b7f869f touches only audits.py continuity text, repair.py normalize_length and prompts/packaging.py)."
+ ],
+ "deterministic_surfaces": "S08 dedupe core and S09 are deterministic and proved by unit tests (baseline: deterministic_surfaces)",
+ "observations": [
+  "Pairwise judgments are discarded unless every reason quotes the preferred text verbatim; gemma3:12b often fails this on long texts, so the number of valid pairs is recorded per measurement.",
+  "S10 after the fix: no arm brings a text into the 600-1000 window reliably (R2 0/10, donor 1/10); R2 moves every text toward the window without failures (compressions 1261-1409 -> 1020-1205, expansions 215-284 -> 369-489) and wins on defects. In the run, scene length is held by the paragraph-count and length grammar; LENGTH_WINDOW stays a stylistic finding.",
+  "S11 after the fix: most packagings carry one unverifiable selling point among five; the run drops it and needs three verified points."
+ ],
+ "surfaces": [
+  {
+   "surface": "S01_short_story_shape",
+   "donor": "shenbi",
+   "source_path": "skills/shenbi-short-outline/SKILL.md",
+   "source_sha256": "ac9fea128be3cbf4a8efb27a37b014761ce6f034afaf9cdda7539db6cf71973a",
+   "r2_destination": "server/story_authoring/prompts/outline.py + NarrativePlan content",
+   "verdict": "IMPROVED",
+   "verdict_code_head": "c204b002",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "donor": {
+      "n": 10,
+      "failed": 1,
+      "invariant_failures": 0,
+      "success_rate": 0.9,
+      "median_defects": 0.0
+     },
+     "pairwise_r2_preference": 1.0,
+     "pairwise_valid_pairs": 7,
+     "seconds": 4423,
+     "model_calls": 46
+    }
+   ]
+  },
+  {
+   "surface": "S02_hierarchy_and_scene_beats",
+   "donor": "novel_studio",
+   "source_path": "src/lib/ai/prompts.ts",
+   "source_sha256": "e112fbc8da980b741b86c1e0880fc307cf07e82ce1e244246542a24a138ea2f4",
+   "r2_destination": "server/story_authoring/prompts/planning.py + Pydantic schemas in server/story_authoring/contracts.py",
+   "verdict": "IMPROVED",
+   "verdict_code_head": "c204b002",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "pairwise_r2_preference": 1.0,
+     "pairwise_valid_pairs": 3,
+     "seconds": 7132,
+     "model_calls": 50
+    }
+   ]
+  },
+  {
+   "surface": "S03_chapter_memo_sections",
+   "donor": "shenbi",
+   "source_path": "skills/shenbi-chapter-planning/SKILL.md",
+   "source_sha256": "565f17433e90f524ecc3d611cb59c6b32ec53e98237d970f2f42461ad40bef23",
+   "r2_destination": "SceneContract fields (required turn, forbidden events, withheld knowledge) via server/story_authoring/prompts/planning.py",
+   "verdict": "IMPROVED",
+   "verdict_code_head": "c204b002",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "pairwise_r2_preference": 1.0,
+     "pairwise_valid_pairs": 5,
+     "seconds": 5974,
+     "model_calls": 50
+    }
+   ]
+  },
+  {
+   "surface": "S04_drafting_prompt",
+   "donor": "novel_studio",
+   "source_path": "src/lib/ai/prompts.ts#chapterDraftPrompt",
+   "source_sha256": "e112fbc8da980b741b86c1e0880fc307cf07e82ce1e244246542a24a138ea2f4",
+   "r2_destination": "server/story_authoring/prompts/drafting.py (scene-sized CandidateWriter)",
+   "verdict": "IMPROVED",
+   "verdict_code_head": "c204b002",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.8,
+      "median_defects": 2.1844955579895338
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.9,
+      "median_defects": 4.20076377523186
+     },
+     "pairwise_r2_preference": 0.8888888888888888,
+     "pairwise_valid_pairs": 9,
+     "seconds": 2059,
+     "model_calls": 30
+    }
+   ]
+  },
+  {
+   "surface": "S05_continuity_review",
+   "donor": "novel_studio",
+   "source_path": "src/lib/ai/checkContinuity.ts",
+   "source_sha256": "b8a6ccf57fcb703939fa3dcdffcae1d8207775f70690f20869297ca7d9ca70e4",
+   "r2_destination": "server/story_authoring/audits.py (L2)",
+   "verdict": "PARITY",
+   "verdict_code_head": "0b7f869f",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "REGRESSED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.5,
+      "precision": 0.45454545454545453,
+      "median_defects": 0.5454545454545454
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.95,
+      "precision": 0.5263157894736842,
+      "median_defects": 0.4736842105263158
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 1744,
+     "model_calls": 20
+    },
+    {
+     "run": "v2b",
+     "code_head": "9af5cb9c",
+     "verdict": "REGRESSED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "precision": 0.5526315789473685,
+      "median_defects": 0.4473684210526315
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.9,
+      "precision": 0.6875,
+      "median_defects": 0.3125
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 2068,
+     "model_calls": 20
+    },
+    {
+     "run": "v2c",
+     "code_head": "0b7f869f",
+     "verdict": "PARITY",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "precision": 0.625,
+      "median_defects": 0.375
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.9,
+      "precision": 0.6875,
+      "median_defects": 0.3125
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 2500,
+     "model_calls": 20
+    }
+   ]
+  },
+  {
+   "surface": "S06_specialist_audits",
+   "donor": "shenbi",
+   "source_path": null,
+   "source_sha256": null,
+   "r2_destination": "server/story_authoring/audits.py (L2 specialists, L3 critic)",
+   "verdict": "IMPROVED",
+   "verdict_code_head": "0b7f869f",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.85,
+      "precision": 0.6296296296296297,
+      "median_defects": 0.37037037037037035
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.3,
+      "precision": 0.6666666666666666,
+      "median_defects": 0.33333333333333337
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 1531,
+     "model_calls": 20
+    },
+    {
+     "run": "v2b",
+     "code_head": "9af5cb9c",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "precision": 0.6060606060606061,
+      "median_defects": 0.3939393939393939
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.5,
+      "precision": 0.5263157894736842,
+      "median_defects": 0.4736842105263158
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 1811,
+     "model_calls": 20
+    },
+    {
+     "run": "v2c",
+     "code_head": "0b7f869f",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "precision": 0.6666666666666666,
+      "median_defects": 0.33333333333333337
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.5,
+      "precision": 0.5263157894736842,
+      "median_defects": 0.4736842105263158
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 1967,
+     "model_calls": 20
+    }
+   ]
+  },
+  {
+   "surface": "S07_span_local_repair",
+   "donor": "huohuo",
+   "source_path": "workbench-server/src/services/novel/novel-continuity-patch.ts",
+   "source_sha256": "4311e814dac0cfc0b12c5cc2f2550b92b9566a9adf0c8898d3f57e3b41e365b2",
+   "r2_destination": "server/story_authoring/repair.py",
+   "verdict": "PARITY",
+   "verdict_code_head": "c204b002",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "PARITY",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "precision": 1.0,
+      "median_defects": 0.0
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.9,
+      "precision": 0.9862068965517241,
+      "median_defects": 0.01379310344827589
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 355,
+     "model_calls": 20
+    }
+   ]
+  },
+  {
+   "surface": "S10_length_normalizing",
+   "donor": "shenbi",
+   "source_path": "skills/shenbi-length-normalizing/SKILL.md",
+   "source_sha256": "7b9ee8af574b153b66dbca8d6f09104b57b316afff9a5a7836b194ae5d7130ce",
+   "r2_destination": "server/story_authoring/repair.py",
+   "verdict": "IMPROVED",
+   "verdict_code_head": "0b7f869f",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "REGRESSED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.0,
+      "median_defects": 7.627118644067797
+     },
+     "donor": {
+      "n": 10,
+      "failed": 5,
+      "invariant_failures": 0,
+      "success_rate": 0.4,
+      "median_defects": Infinity
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 752,
+     "model_calls": 20
+    },
+    {
+     "run": "v2c",
+     "code_head": "0b7f869f",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.0,
+      "median_defects": 5.968747904231775
+     },
+     "donor": {
+      "n": 10,
+      "failed": 1,
+      "invariant_failures": 0,
+      "success_rate": 0.1,
+      "median_defects": 21.437253459467186
+     },
+     "pairwise_r2_preference": null,
+     "pairwise_valid_pairs": null,
+     "seconds": 1723,
+     "model_calls": 20
+    }
+   ]
+  },
+  {
+   "surface": "S11_packaging",
+   "donor": "shenbi",
+   "source_path": "skills/shenbi-short-packaging/SKILL.md",
+   "source_sha256": "f4cb77e024be7bcac23a4b82817812e5b015948d4860699b577a3f7f1c8b2efb",
+   "r2_destination": "server/story_authoring/prompts/packaging.py",
+   "verdict": "IMPROVED",
+   "verdict_code_head": "0b7f869f",
+   "measurements": [
+    {
+     "run": "v2",
+     "code_head": "c204b002",
+     "verdict": "REGRESSED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.6,
+      "median_defects": 0.0
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.1,
+      "median_defects": 4.0
+     },
+     "pairwise_r2_preference": 0.3333333333333333,
+     "pairwise_valid_pairs": 6,
+     "seconds": 1967,
+     "model_calls": 30
+    },
+    {
+     "run": "v2c",
+     "code_head": "0b7f869f",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 0.2,
+      "median_defects": 1.0
+     },
+     "donor": {
+      "n": 10,
+      "failed": 1,
+      "invariant_failures": 0,
+      "success_rate": 0.0,
+      "median_defects": 5.0
+     },
+     "pairwise_r2_preference": 0.6,
+     "pairwise_valid_pairs": 5,
+     "seconds": 3009,
+     "model_calls": 29
+    }
+   ]
+  }
+ ],
+ "result": "PASS"
+}
