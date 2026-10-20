@@ -1,0 +1,121 @@
+{
+  "schema_version": "m9.b-recovery-release.v1",
+  "status": "M9_B_RECOVERY_V2_RELEASED",
+  "packet": "M9-B",
+  "original_release": "5b7a4be9f4b083f1d00db8005b49d7ba664658b8",
+  "baseline": "4c4861e9ae6fe74ca6828d676791ae203252e139",
+  "accepted_predecessor": "04b1b92184a5d5b0643256be533332de6ed8b009",
+  "approval": {
+    "spec_human_instruction": "duyet",
+    "plan_human_instruction": "tiep tuc cong viec",
+    "received_on": "2026-10-20",
+    "spec_approved": true,
+    "plan_approved": true,
+    "execution_method": "native-inline"
+  },
+  "artifacts": {
+    "docs/superpowers/specs/2026-10-20-r2-m9b-manual-recovery-v2-design.md": "9aaf6e65103a7e15be1c87f2f9d972b4fbc60eca0016eff0c6df71a3000ac520",
+    "docs/superpowers/plans/2026-10-20-r2-m9b-manual-recovery-v2.md": "486d13bc154849b1aa426120e136e5bc735e6d040428736ddb7cd3851fe3bf8f",
+    "docs/research/2026-10-20-r2-m9b-upload-custody.md": "da5d72a1b3dafbfed13ff42500273e409f33ad29a74f4fc55dcbc92facc50e07"
+  },
+  "owned_create_paths": [
+    "docs/superpowers/specs/2026-10-20-r2-m9b-manual-recovery-v2-design.md",
+    "docs/superpowers/plans/2026-10-20-r2-m9b-manual-recovery-v2.md",
+    "docs/research/2026-10-20-r2-m9b-upload-custody.md",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2_RELEASE.json",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2.json",
+    "docs/r2/evidence/schemas/R2_M9_B_RECOVERY_V2.schema.json",
+    "docs/r2/evidence/R2_M9_B_RECOVERY_V2_E_CLOSURE_HANDOFF.md",
+    "r2/contracts/opportunity_acquisition_v2.py",
+    "r2/opportunity/acquisition_v2.py",
+    "r2/opportunity/acquisition_v2_digests.py",
+    "r2/opportunity/manual_admission.py",
+    "r2/opportunity/manual_admission_ports.py",
+    "lib/db/models/opportunity_manual_admission.py",
+    "lib/db/repositories/opportunity_manual_admission.py",
+    "server/services/m9_manual_publication.py",
+    "server/services/m9_manual_authenticity.py",
+    "server/services/opportunity_acquisition_v2.py",
+    "alembic/versions/9b9c4a0e0002_add_m9_manual_admission.py",
+    "scripts/r2/verify_m9b_recovery_scope.py",
+    "scripts/r2/verify_m9b_recovery_evidence.py",
+    "scripts/r2/run_m9b_recovery_gate.py",
+    "tests/fixtures/r2/opportunity/manual_admission_custodian.py",
+    "tests/fixtures/r2/opportunity/manual_recovery_worker.py",
+    "tests/fixtures/r2/opportunity/manual_recovery_restarts.json",
+    "tests/unit/r2/contracts/test_opportunity_acquisition_v2.py",
+    "tests/unit/r2/opportunity/test_acquisition_v2_digests.py",
+    "tests/unit/r2/opportunity/test_manual_admission.py",
+    "tests/unit/server/services/test_m9_manual_authenticity.py",
+    "tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py",
+    "tests/unit/scripts/r2/test_verify_m9b_recovery_evidence.py",
+    "tests/unit/scripts/r2/test_run_m9b_recovery_gate.py",
+    "tests/integration/lib/db/migrations/test_alembic_m9_manual_admission.py",
+    "tests/integration/lib/db/repositories/test_opportunity_manual_admission.py",
+    "tests/integration/r2/opportunity/test_acquisition_v2.py",
+    "tests/integration/r2/opportunity/test_acquisition_v2_restarts.py",
+    "tests/integration/server/services/test_m9_manual_publication.py",
+    "tests/integration/server/services/test_m9_manual_custody_isolation.py"
+  ],
+  "owned_modify_paths": [
+    "lib/db/models/__init__.py",
+    "lib/db/models/opportunity_acquisition.py",
+    "lib/db/repositories/opportunity_acquisition.py",
+    "server/services/opportunity.py",
+    "server/app.py",
+    "lib/i18n/en/errors.py",
+    "lib/i18n/vi/errors.py",
+    "lib/i18n/zh/errors.py",
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+    "tests/integration/lib/db/migrations/test_alembic_m9_acquisition.py",
+    "tests/integration/lib/db/migrations/test_alembic_m9_foundation.py",
+    "tests/integration/lib/db/migrations/test_format_projections.py",
+    "tests/integration/lib/db/migrations/test_learning_observations.py",
+    "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+    "tests/integration/lib/db/migrations/test_production_target_registry.py",
+    "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+    "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+    "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+    "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+    "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+    "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+    "tests/integration/lib/db/migrations/test_spatial_review_custody.py"
+  ],
+  "inherited_unimplemented_create_paths": [
+    "server/routers/opportunity_acquisition.py",
+    "tests/unit/server/routers/test_opportunity_acquisition_router.py"
+  ],
+  "frozen_baseline_paths": [
+    "scripts/r2/verify_m9b_scope.py",
+    "alembic/versions/9b9c4a0e0001_add_m9_acquisition_observations.py"
+  ],
+  "migration": {
+    "revision": "9b9c4a0e0002",
+    "down_revision": "9b9c4a0e0001"
+  },
+  "implementation_branch": "impl/r2-m9b-acquisition-observations",
+  "fixture": {
+    "scope": "OFFLINE_SYNTHETIC_ONLY",
+    "metadata_refresh_seconds": 60,
+    "metadata_retention_seconds": 120,
+    "metadata_retained_proof": true,
+    "excerpt_refresh_seconds": 30,
+    "excerpt_retention_seconds": 90,
+    "excerpt_retained_proof": false,
+    "production_issuer_provisioned": false
+  },
+  "review_budget": {
+    "independent_acceptance_passes": 1,
+    "repair_passes": 1,
+    "automatic_rereview": false
+  },
+  "execution_rulings": [
+    {
+      "task": "T0",
+      "decision": "Place real-Git scope tests at tests/integration/scripts/r2/test_verify_m9b_recovery_scope.py instead of the unit path in the reviewed plan.",
+      "reason": "CONTRIBUTING forbids subprocesses in unit tests. Test assertions and release authority remain unchanged."
+    }
+  ],
+  "private_key_in_runtime": false,
+  "production_activation_authorized": false
+}
