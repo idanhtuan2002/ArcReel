@@ -27,8 +27,8 @@ def unit_of_work(factory, project="show-a"):
     return module.OpportunityAcquisitionUnitOfWork(factory, user_id="u1", project_name=project)
 
 
-async def fixture_query(factory):
-    profile = make_profile()
+async def fixture_query(factory, *, profile=None):
+    profile = make_profile() if profile is None else profile
     async with OpportunityUnitOfWork(factory).transaction() as repo:
         await repo.stage_profile(profile)
     grant, evaluation, request = _authority()
