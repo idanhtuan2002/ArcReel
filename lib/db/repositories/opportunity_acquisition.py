@@ -307,6 +307,8 @@ class AcquisitionAttemptRepository:
 
     async def _verified(self, row: M9AcquisitionAttemptModel) -> AcquisitionAttempt:
         try:
+            if row.protocol_version != "m9.acquisition.v1":
+                raise ValueError("legacy attempt reader requires the explicit V1 protocol")
             value = AcquisitionAttempt.model_validate(row.body_json)
             if row.operation != "acquire" or any(
                 getattr(row, name) != getattr(value, name)

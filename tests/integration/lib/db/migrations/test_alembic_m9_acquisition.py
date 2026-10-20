@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import SimpleNamespace
 
 from alembic.config import Config
 from alembic.migration import MigrationContext
@@ -25,7 +26,7 @@ TABLES = {
 }
 
 
-def migration():
+def migration(*, include_successors: bool = True):
     path = ROOT / "alembic/versions/9b9c4a0e0001_add_m9_acquisition_observations.py"
     assert path.is_file(), "B3 nine-table migration is missing"
     spec = spec_from_file_location("m9b_migration", path)
@@ -33,11 +34,32 @@ def migration():
     assert spec.loader is not None
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    if not include_successors:
+        return module
+    from tests.integration.lib.db.migrations.test_alembic_m9_manual_admission import successor
+
+    manual = successor()
+
+    def downgrade() -> None:
+        manual.downgrade()
+        module.downgrade()
+
+    def upgrade() -> None:
+        module.upgrade()
+        manual.upgrade()
+
+    return SimpleNamespace(
+        revision=module.revision,
+        down_revision=module.down_revision,
+        branch_labels=module.branch_labels,
+        depends_on=module.depends_on,
+        upgrade=upgrade,
+        downgrade=downgrade,
+    )
 
 
 def test_exact_linear_migration_and_singleton_head():
-    module = migration()
+    module = migration(include_successors=False)
     assert (module.revision, module.down_revision, module.branch_labels, module.depends_on) == (
         "9b9c4a0e0001",
         "9a9c4a0e0001",
@@ -46,7 +68,7 @@ def test_exact_linear_migration_and_singleton_head():
     )
     cfg = Config()
     cfg.set_main_option("script_location", str(ROOT / "alembic"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["9b9c4a0e0001"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["9b9c4a0e0002"]
 
 
 async def test_nine_table_round_trip_preserves_every_predecessor_table(session_factory):
@@ -58,12 +80,14 @@ async def test_nine_table_round_trip_preserves_every_predecessor_table(session_f
         connection = await session.connection()
 
         def prove(sync_connection):
+            from tests.integration.lib.db.migrations.test_alembic_m9_manual_admission import TABLES as MANUAL_TABLES
+
             before = set(inspect(sync_connection).get_table_names())
             assert before >= TABLES
             with Operations.context(MigrationContext.configure(sync_connection)):
                 for _ in range(2):
                     module.downgrade()
-                    assert set(inspect(sync_connection).get_table_names()) == before - TABLES
+                    assert set(inspect(sync_connection).get_table_names()) == before - TABLES - MANUAL_TABLES
                     module.upgrade()
                     assert set(inspect(sync_connection).get_table_names()) == before
             inspector = inspect(sync_connection)

@@ -181,7 +181,12 @@ class M9AcquisitionAttemptModel(Base):
         UniqueConstraint("user_id", "project_name", "attempt_id", "query_id", "query_revision"),
         CheckConstraint("attempt_version >= 1"),
         CheckConstraint("operation = 'acquire'"),
-        CheckConstraint("state IN ('PLANNED','RUNNING','SUCCEEDED','FAILED','OUTCOME_UNKNOWN','NEEDS_OPERATOR')"),
+        CheckConstraint("protocol_version IN ('m9.acquisition.v1','m9.acquisition.v2')", name="ck_m9_attempt_protocol"),
+        CheckConstraint(
+            "(protocol_version = 'm9.acquisition.v1' AND state IN ('PLANNED','RUNNING','SUCCEEDED','FAILED','OUTCOME_UNKNOWN','NEEDS_OPERATOR')) OR "
+            "(protocol_version = 'm9.acquisition.v2' AND state IN ('PLANNED','RUNNING','SUCCEEDED','FAILED','OUTCOME_UNKNOWN','NEEDS_OPERATOR','EXPIRED_UNRECOVERABLE'))",
+            name="ck_m9_attempt_state_protocol",
+        ),
     )
 
     user_id: Mapped[str] = mapped_column(String(255), ForeignKey("users.id", ondelete="RESTRICT"))
@@ -203,6 +208,10 @@ class M9AcquisitionAttemptModel(Base):
     query_revision: Mapped[int] = mapped_column(Integer)
 
     attempt_version: Mapped[int] = mapped_column(Integer)
+
+    protocol_version: Mapped[str] = mapped_column(
+        String(32), default="m9.acquisition.v1", server_default="m9.acquisition.v1"
+    )
 
     state: Mapped[str] = mapped_column(String(255))
 

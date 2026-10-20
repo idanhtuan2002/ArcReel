@@ -55,7 +55,7 @@ def test_migration_extends_the_accepted_singleton_with_one_linear_revision():
     )
     cfg = Config()
     cfg.set_main_option("script_location", str(ROOT / "alembic"))
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["9b9c4a0e0001"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["9b9c4a0e0002"]
 
 
 async def test_five_table_round_trip_preserves_every_existing_table(session_factory):

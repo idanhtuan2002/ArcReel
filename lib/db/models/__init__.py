@@ -99,6 +99,13 @@ from lib.db.models.opportunity_acquisition import (
     M9SourceQueryModel,
     M9SourceSnapshotModel,
 )
+from lib.db.models.opportunity_manual_admission import (
+    M9ManualAdmissionModel,
+    M9ManualClosureIntentModel,
+    M9ManualPublicationIntentModel,
+    M9ManualReadLeaseModel,
+    M9ManualUploadLeaseModel,
+)
 from lib.db.models.production_binding import (
     ProductionBindingCommandModel,
     ProductionBindingHeadModel,
@@ -197,6 +204,11 @@ __all__ = [
     "M9CommandReceiptModel",
     "M9ConsumedCapabilityGrantModel",
     "M9EventModel",
+    "M9ManualAdmissionModel",
+    "M9ManualClosureIntentModel",
+    "M9ManualPublicationIntentModel",
+    "M9ManualReadLeaseModel",
+    "M9ManualUploadLeaseModel",
     "M9ObservationHeadModel",
     "M9ProfileHeadModel",
     "M9SnapshotPageModel",
