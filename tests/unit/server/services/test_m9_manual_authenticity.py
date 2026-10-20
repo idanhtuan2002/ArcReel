@@ -197,3 +197,122 @@ def test_sql_expectation_rejects_unbound_source_or_class_semantics(changes):
     c, _ = modules()
     with pytest.raises(ValidationError):
         c.SealExpectation.model_validate({**expectation(), **changes})
+
+
+@pytest.mark.parametrize("deadline", [None, "2026-10-17T00:02:00Z"])
+def test_material_expectation_cannot_drop_or_extend_bounded_original_clock(deadline):
+    c, _ = modules()
+    data = expectation()
+    data["original_clocks"][0]["retention_due_at"] = deadline
+    with pytest.raises(ValidationError):
+        c.SealExpectation.model_validate(data)
+
+
+def receipt_metadata() -> dict[str, Any]:
+    expected = expectation()
+    obj = {
+        name: expected[name]
+        for name in (
+            "payload_ref",
+            "integrity_ref",
+            "attestation_ref",
+            "evidence_kind",
+            "data_classes",
+            "data_rules",
+            "original_clocks",
+        )
+    }
+    return {
+        "schema_version": "m9.manual-publication-receipt.v1",
+        **{
+            name: expected[name]
+            for name in (
+                "context",
+                "source_kind",
+                "source_contract_version",
+                "verification_key_id",
+                "request_digest",
+                "query_id",
+                "query_revision",
+                "query_digest",
+                "attempt_id",
+                "attempt_version",
+                "publication_key",
+                "claim_ref",
+                "upload_version",
+                "descriptor_digest",
+            )
+        },
+        "objects": [obj],
+    }
+
+
+def publication_receipt(metadata: dict[str, Any], *, domain: bytes = b"m9.manual-publication-receipt.v1\x00") -> bytes:
+    body = {
+        "metadata": metadata,
+        "metadata_digest": "sha256:"
+        + hashlib.sha256(b"m9.manual-publication-metadata.v1\x00" + canonical(metadata)).hexdigest(),
+    }
+    signature = base64.urlsafe_b64encode(PRIVATE.sign(domain + canonical(body))).decode().rstrip("=")
+    return canonical({**body, "signature": signature})
+
+
+def test_independent_metadata_receipt_verifies_without_content_or_expiry_reads():
+    c, v = modules()
+    metadata = c.PublicationReceiptMetadata.model_validate(receipt_metadata())
+    header = v.verify_publication_receipt(publication_receipt(receipt_metadata()), public_key=PUBLIC, expected=metadata)
+    assert header.metadata == metadata
+    assert "material_digest" not in header.model_dump_json()
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "wrong_ref",
+        "wrong_scope",
+        "wrong_claim",
+        "wrong_key",
+        "wrong_domain",
+        "forbidden_proof",
+        "rehashed",
+        "noncanonical",
+        "duplicate",
+        "malformed",
+    ],
+)
+def test_metadata_receipt_cannot_forge_or_hide_orphan_cleanup_authority(fault):
+    c, v = modules()
+    metadata = receipt_metadata()
+    expected = c.PublicationReceiptMetadata.model_validate(metadata)
+    key = PUBLIC
+    domain = b"m9.manual-publication-receipt.v1\x00"
+    if fault == "wrong_ref":
+        metadata["objects"][0]["payload_ref"] = "foreign-object"
+    elif fault == "wrong_scope":
+        metadata["context"]["project_name"] = "foreign-project"
+    elif fault == "wrong_claim":
+        metadata["claim_ref"] = "foreign-claim"
+    elif fault == "wrong_key":
+        key = b"q" * 32
+    elif fault == "wrong_domain":
+        domain = DOMAIN
+    elif fault == "forbidden_proof":
+        metadata["objects"][0]["material_digest"] = H
+    raw = publication_receipt(metadata, domain=domain)
+    if fault == "rehashed":
+        body = json.loads(raw)
+        body["metadata"]["claim_ref"] = "foreign-claim"
+        body["metadata_digest"] = (
+            "sha256:"
+            + hashlib.sha256(b"m9.manual-publication-metadata.v1\x00" + canonical(body["metadata"])).hexdigest()
+        )
+        raw = canonical(body)
+    elif fault == "noncanonical":
+        raw = json.dumps(json.loads(raw), indent=2).encode()
+    elif fault == "duplicate":
+        raw = raw.replace(b'{"metadata":', b'{"metadata":{},"metadata":', 1)
+    elif fault == "malformed":
+        raw = b'{"CANARY_PRIVATE_MATERIAL":'
+    with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH") as raised:
+        v.verify_publication_receipt(raw, public_key=key, expected=expected)
+    assert "CANARY_PRIVATE_MATERIAL" not in "".join(traceback.format_exception(raised.value))
