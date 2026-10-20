@@ -137,7 +137,15 @@ async def materialize_manual_page(
     for ordinal, draft in enumerate(drafts, start=1):
         missing = draft["missing_reason"] is not None
         data_class = str(draft["data_class"])
-        body = {"missing_reason": draft["missing_reason"]} if missing else {"value": draft["value"]}
+        body = {
+            "schema": "m9.manual-native-value.v1",
+            "source_kind": request.source_kind,
+            "source_contract_version": request.source_contract_version,
+            **{
+                key: value for key, value in draft.items() if key not in ("source_native_id", "value", "missing_reason")
+            },
+            **({"missing_reason": draft["missing_reason"]} if missing else {"value": draft["value"]}),
+        }
         material = await put(
             f"native-field-{ordinal}",
             canonical_json_bytes(body),
@@ -1073,6 +1081,11 @@ class OpportunityAcquisitionService:
             return await self._fail_running(
                 command, request_digest, query, attempt, AttemptOutcomeReason.POLICY_FORBIDDEN
             )
+        except Exception:
+            try:
+                return await self._current_acquisition(command, request_digest)
+            except Exception:
+                raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
 
     async def _finish_acquisition(
         self,

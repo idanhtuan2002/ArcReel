@@ -108,10 +108,12 @@ async def test_manual_materials_bind_each_identity_and_erase_missing_descriptors
         assert metric.value_integrity_ref is None
         assert metric.retained_normalized_value_digest is None
         assert metric.missing_reason == "NOT_RETURNED"
-        assert json.loads(metric_bytes) == {"missing_reason": "NOT_RETURNED"}
+        assert json.loads(metric_bytes)["missing_reason"] == "NOT_RETURNED"
+        assert "value" not in json.loads(metric_bytes)
     else:
         assert metric.value_ref == metric.material_ref
-        assert json.loads(metric_bytes) == {"value": 125}
+        assert json.loads(metric_bytes)["value"] == 125
+        assert "missing_reason" not in json.loads(metric_bytes)
         assert metric.retained_normalized_value_digest is not None
     assert await acquisition.materialize_manual_page(request(), page, grant, _store(tmp_path)) == materials
     await store.delete_exact(
@@ -161,6 +163,31 @@ async def test_manual_materialization_rejects_forged_permitted_digest(tmp_path: 
     page = await source().fetch_page(request())
     with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH"):
         await materialize_manual_page(request(), page, grant, ForgedDigest())
+
+
+async def test_native_value_object_contains_original_source_shape_and_qualifiers(tmp_path: Path) -> None:
+    from r2.opportunity.acquisition import materialize_manual_page
+    from tests.unit.r2.opportunity.test_manual_import import request, source, source_inputs
+
+    _, grant, _ = source_inputs()
+    store = _store(tmp_path)
+    materials = await materialize_manual_page(request(), await source().fetch_page(request()), grant, store)
+    metric = next(field for field in materials.fields if field.native_field_name == "views")
+    value = json.loads(await store.verify_and_read(metric.value_ref, metric.value_integrity_ref))
+    assert value == {
+        "schema": "m9.manual-native-value.v1",
+        "source_kind": "manual-import",
+        "source_contract_version": "manual-import.v1",
+        "native_field_name": "views",
+        "native_field_definition": "Synthetic view count within the declared window.",
+        "native_field_version": "synthetic-count.v1",
+        "normalization_version": "manual-import.v1",
+        "data_class": "manual-public-metadata",
+        "unit": "count",
+        "window_start": "2026-10-15T00:00:00Z",
+        "window_end": "2026-10-16T00:00:00Z",
+        "value": 125,
+    }
 
 
 async def test_equal_and_divergent_concurrent_publication_never_overwrite(tmp_path: Path) -> None:

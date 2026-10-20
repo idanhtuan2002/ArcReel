@@ -639,10 +639,11 @@ async def test_acquire_lost_commit_ack_replays_retained_state_without_port_io(
         assert (await tx.pages.list_for_attempt(result.attempt_id))[0].page.captured_at == captured
 
 
+@pytest.mark.parametrize("lose_final_ack", [False, True])
 async def test_manual_checkpoint_reconciliation_uses_only_retained_bytes_and_original_clocks(
-    session_factory, tmp_path, monkeypatch
+    session_factory, tmp_path, monkeypatch, lose_final_ack
 ):
-    from lib.db.repositories.opportunity_acquisition import SnapshotPageRepository
+    from lib.db.repositories.opportunity_acquisition import AcquisitionReceiptRepository, SnapshotPageRepository
 
     service, command, _caps = await acquisition_service_fixture(session_factory, tmp_path)
     acquire = acquire_command(await service.declare_query(command))
@@ -658,6 +659,14 @@ async def test_manual_checkpoint_reconciliation_uses_only_retained_bytes_and_ori
     assert retained.state == AttemptState.RUNNING
     async with service.store.transaction() as tx:
         checkpoint = (await tx.pages.list_for_attempt(retained.attempt_id))[0]
+    if lose_final_ack:
+        original_receipt = AcquisitionReceiptRepository.stage_acquisition
+
+        async def lose_receipt_ack(self, **kwargs):
+            await original_receipt(self, **kwargs)
+            service.store.lose_ack = True
+
+        monkeypatch.setattr(AcquisitionReceiptRepository, "stage_acquisition", lose_receipt_ack)
 
     class ForbiddenSource:
         async def fetch_page(self, request):
@@ -666,8 +675,11 @@ async def test_manual_checkpoint_reconciliation_uses_only_retained_bytes_and_ori
     service.source = ForbiddenSource()
     assert hasattr(service, "reconcile_manual_checkpoint"), "B3 checkpoint recovery is missing"
     results = await asyncio.gather(
-        service.reconcile_manual_checkpoint(acquire), service.reconcile_manual_checkpoint(acquire)
+        service.reconcile_manual_checkpoint(acquire),
+        service.reconcile_manual_checkpoint(acquire),
+        return_exceptions=True,
     )
+    assert all(not isinstance(result, BaseException) for result in results), results
     assert results[0] == results[1]
     assert results[0].state == AttemptState.SUCCEEDED
     async with service.store.transaction() as tx:
@@ -810,11 +822,13 @@ async def test_acquire_preserves_zero_and_missingness_without_inline_native_mate
         assert observation.value_ref is None
         assert observation.value_integrity_ref is None
         assert observation.retained_normalized_value_digest is None
-        assert stored == {"missing_reason": "NOT_RETURNED"}
+        assert stored["missing_reason"] == "NOT_RETURNED"
+        assert "value" not in stored
     else:
         assert observation.missing_reason is None
         assert observation.value_ref == field.material_ref
-        assert stored == {"value": 0}
+        assert stored["value"] == 0
+        assert stored["unit"] == "count"
 
 
 @pytest.mark.parametrize(
