@@ -10,6 +10,7 @@ from lib.db.repositories.adaptation import AdaptationRepository
 from lib.db.repositories.opportunity import OpportunityProfileRepository, OpportunityUnitOfWork
 from lib.db.repositories.opportunity_acquisition import AcquisitionTransaction, OpportunityAcquisitionUnitOfWork
 from r2.advanced_creative.errors import LineageAmbiguousError
+from r2.advanced_creative.exploration import uuid7
 from r2.advanced_creative.lineage import project_profile
 from r2.opportunity.acquisition import OpportunityAcquisitionService
 from r2.opportunity.errors import OpportunityError, StopCode
@@ -90,6 +91,7 @@ def build_acquisition_service(
         capabilities=capabilities,
         source=source,
         evidence=evidence,
+        new_id=uuid7,
         user_id=current_user.id,
         project_name=project_name,
         actor_id=current_user.sub,

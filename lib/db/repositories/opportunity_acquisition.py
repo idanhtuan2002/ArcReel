@@ -1275,6 +1275,20 @@ class AcquisitionTransaction:
         )
         await _flush(self.session)
 
+    async def stage_snapshot_event(self, *, snapshot: SourceSnapshot, committed_at: datetime) -> None:
+        self.session.add(
+            M9EventModel(
+                user_id=self.user_id,
+                project_name=self.project_name,
+                event_kind="SOURCE_SNAPSHOT_CAPTURED",
+                aggregate_id=snapshot.snapshot_id,
+                aggregate_revision=snapshot.revision,
+                payload_digest=snapshot.snapshot_digest,
+                committed_at=committed_at,
+            )
+        )
+        await _flush(self.session)
+
 
 class OpportunityAcquisitionUnitOfWork:
     def __init__(

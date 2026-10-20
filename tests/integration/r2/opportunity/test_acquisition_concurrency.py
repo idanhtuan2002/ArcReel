@@ -7,7 +7,7 @@ from sqlalchemy import func, select, text
 
 from lib.db.models.opportunity_acquisition import M9AcquisitionAttemptModel
 from lib.db.repositories.opportunity_acquisition import OpportunityAcquisitionUnitOfWork
-from r2.contracts.opportunity import AttemptState
+from r2.contracts.opportunity import AttemptState, PermissionDisposition
 from r2.opportunity.errors import OpportunityError, StopCode
 from tests.integration.lib.db.repositories.test_opportunity_acquisition import (
     planned_attempt,
@@ -245,12 +245,15 @@ async def test_cross_snapshot_corrections_lock_both_attempts_in_identity_order(s
             assert await tx.observations.get_current(corrected.observation_id) == corrected
 
 
-async def acquisition_service_fixture(factory, tmp_path):
+async def acquisition_service_fixture(
+    factory, tmp_path, *, retention_seconds: int | None = None, native_value: int | str | None = "fixture"
+):
     import hashlib
     import importlib
     from datetime import UTC, datetime
 
     from lib.db.repositories.opportunity import OpportunityUnitOfWork
+    from r2.advanced_creative.exploration import uuid7
     from r2.advanced_creative.lineage import host_policy_digest
     from r2.contracts.opportunity import OpportunityCohortProfileHead
     from r2.opportunity.digests import digest_cohort_profile, digest_cohort_profile_payload
@@ -318,6 +321,24 @@ async def acquisition_service_fixture(factory, tmp_path):
             expected_head_version=None,
         )
     raw, grant, evaluation = source_inputs()
+    if native_value != "fixture":
+        import json
+
+        body = json.loads(raw)
+        if native_value is None:
+            del body["records"][0]["value"]
+            body["records"][0]["missing_reason"] = "NOT_RETURNED"
+        else:
+            body["records"][0]["value"] = native_value
+        raw = json.dumps(body).encode()
+    if retention_seconds is not None:
+        grant = grant.model_copy(
+            update={
+                "data_rules": tuple(
+                    rule.model_copy(update={"retention_seconds": retention_seconds}) for rule in grant.data_rules
+                )
+            }
+        )
     offset = datetime.now(UTC) - NOW
     documents = tuple(
         doc.model_copy(
@@ -392,6 +413,7 @@ async def acquisition_service_fixture(factory, tmp_path):
         capabilities=capabilities,
         source=source,
         evidence=evidence,
+        new_id=uuid7,
         user_id="u1",
         project_name="show-a",
         actor_id="human-a",
@@ -430,6 +452,325 @@ async def acquisition_service_fixture(factory, tmp_path):
     return service, command, capabilities
 
 
+def acquire_command(declaration):
+    from r2.contracts.opportunity import AcquireSourceQuery
+
+    return AcquireSourceQuery(
+        context={
+            "command_id": "019a0000-0000-7000-8000-000000000091",
+            "user_id": "u1",
+            "project_name": "show-a",
+            "actor_id": "human-a",
+        },
+        query_id=declaration.query.query_id,
+        query_revision=declaration.query.revision,
+        query_digest=declaration.query.query_digest,
+        expected_query_head_version=declaration.head.head_version,
+    )
+
+
+@pytest.mark.parametrize("source_timeout", [False, True])
+async def test_acquire_commits_before_io_and_never_redispatches_same_command(session_factory, tmp_path, source_timeout):
+    service, command, _caps = await acquisition_service_fixture(session_factory, tmp_path)
+    declaration = await service.declare_query(command)
+    acquire = acquire_command(declaration)
+    source = service.source
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls = 0
+
+    class GatedSource:
+        async def fetch_page(self, request):
+            nonlocal calls
+            calls += 1
+            assert service.store.active_transactions == 0
+            async with service.store.transaction() as tx:
+                attempt = await tx.attempts.get_exact(request.attempt_id)
+                assert attempt.state == AttemptState.RUNNING
+                assert attempt.query_digest == acquire.query_digest
+            entered.set()
+            await release.wait()
+            if source_timeout:
+                raise TimeoutError("canary-private-source-failure")
+            return await source.fetch_page(request)
+
+    service.source = GatedSource()
+    assert hasattr(service, "acquire"), "B3 acquire application is missing"
+    task = asyncio.create_task(service.acquire(acquire))
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=8)
+        concurrent = await service.acquire(acquire)
+        assert concurrent.state == AttemptState.RUNNING
+        assert calls == 1
+        release.set()
+        result = await task
+    finally:
+        release.set()
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    assert result.state == (AttemptState.OUTCOME_UNKNOWN if source_timeout else AttemptState.SUCCEEDED)
+    assert len(result.snapshot_ids) == (0 if source_timeout else 1)
+    async with service.store.transaction() as tx:
+        attempt = await tx.attempts.get_exact(result.attempt_id)
+        assert attempt.state == result.state
+        if not source_timeout:
+            from lib.db.models.opportunity_acquisition import M9SourceObservationModel
+
+            snapshot = await tx.snapshots.get_for_attempt(result.attempt_id)
+            assert snapshot.returned_record_count == 2
+            observations = (await tx.session.execute(select(M9SourceObservationModel))).scalars().all()
+            assert len(observations) == 2
+            assert all("synthetic-metric-001" not in str(row.body_json) for row in observations)
+            for row in observations:
+                observation = await tx.observations.get_exact(row.observation_id, 1)
+                assert observation.snapshot_digest == snapshot.snapshot_digest
+    service.capabilities = service.source = service.evidence = None
+    assert await service.acquire(acquire) == result
+    assert calls == 1
+
+
+@pytest.mark.parametrize(
+    "fault", ["bounds", "source-rejection", "request-identity", "policy-after-response", "payload-before-finalize"]
+)
+async def test_acquire_known_failure_retains_explicit_partial_snapshot(session_factory, tmp_path, fault):
+    service, command, caps = await acquisition_service_fixture(session_factory, tmp_path)
+    declaration = await service.declare_query(command)
+    acquire = acquire_command(declaration)
+    source, evidence = service.source, service.evidence
+
+    class FaultSource:
+        async def fetch_page(self, request):
+            if fault == "source-rejection":
+                raise OpportunityError(StopCode.M9_OPERATIONAL_ENVELOPE_EXCEEDED)
+            result = await source.fetch_page(request)
+            if fault == "bounds":
+                return result.model_copy(update={"quota_units_observed": 1})
+            if fault == "request-identity":
+                return result.model_copy(update={"provider_request_id": "canary-raw-native-id"})
+            if fault == "policy-after-response":
+                caps.evaluation = caps.evaluation.model_copy(
+                    update={"effective_permission": PermissionDisposition.FORBIDDEN}
+                )
+            return result
+
+    class FaultEvidence:
+        calls = 0
+
+        async def put_if_absent(self, payload):
+            assert service.store.active_transactions == 0
+            return await evidence.put_if_absent(payload)
+
+        async def verify_and_read(self, payload_ref, integrity_ref):
+            assert service.store.active_transactions == 0
+            self.calls += 1
+            if fault == "payload-before-finalize" and self.calls == 4:
+                raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+            return await evidence.verify_and_read(payload_ref, integrity_ref)
+
+        async def delete_exact(self, request):
+            return await evidence.delete_exact(request)
+
+    service.source, service.evidence = FaultSource(), FaultEvidence()
+    result = await service.acquire(acquire)
+    assert result.state == AttemptState.FAILED
+    assert len(result.snapshot_ids) == 1
+    async with service.store.transaction() as tx:
+        snapshot = await tx.snapshots.get_for_attempt(result.attempt_id)
+        assert snapshot.coverage_state == "PARTIAL"
+        assert len(snapshot.pages) == (1 if fault == "payload-before-finalize" else 0)
+        assert snapshot.returned_record_count == (2 if fault == "payload-before-finalize" else 0)
+        from lib.db.models.opportunity_acquisition import M9SourceObservationModel
+
+        assert await tx.session.scalar(select(func.count()).select_from(M9SourceObservationModel)) == 0
+    service.capabilities = service.source = service.evidence = None
+    assert await service.acquire(acquire) == result
+
+
+async def test_acquire_rechecks_host_capability_after_prepare_before_dispatch(session_factory, tmp_path, monkeypatch):
+    from lib.db.repositories.opportunity_acquisition import AcquisitionAttemptRepository
+
+    service, command, caps = await acquisition_service_fixture(session_factory, tmp_path)
+    acquire = acquire_command(await service.declare_query(command))
+    original = AcquisitionAttemptRepository.prepare
+
+    async def revoke_after_prepare(self, attempt):
+        result = await original(self, attempt)
+        caps.evaluation = caps.evaluation.model_copy(update={"effective_permission": PermissionDisposition.FORBIDDEN})
+        return result
+
+    class ForbiddenSource:
+        async def fetch_page(self, request):
+            pytest.fail("source dispatch started after host permission changed")
+
+    monkeypatch.setattr(AcquisitionAttemptRepository, "prepare", revoke_after_prepare)
+    service.source = ForbiddenSource()
+    result = await service.acquire(acquire)
+    assert result.state == AttemptState.FAILED
+    async with service.store.transaction() as tx:
+        assert (await tx.snapshots.get_for_attempt(result.attempt_id)).pages == ()
+
+
+@pytest.mark.parametrize("boundary", ["checkpoint", "final-commit"])
+async def test_acquire_lost_commit_ack_replays_retained_state_without_port_io(
+    session_factory, tmp_path, boundary, monkeypatch
+):
+    from lib.db.repositories.opportunity_acquisition import AcquisitionReceiptRepository, SnapshotPageRepository
+
+    service, command, _caps = await acquisition_service_fixture(session_factory, tmp_path)
+    acquire = acquire_command(await service.declare_query(command))
+    target = SnapshotPageRepository if boundary == "checkpoint" else AcquisitionReceiptRepository
+    method = "append" if boundary == "checkpoint" else "stage_acquisition"
+    original = getattr(target, method)
+
+    async def lose_ack(self, *args, **kwargs):
+        result = await original(self, *args, **kwargs)
+        service.store.lose_ack = True
+        return result
+
+    monkeypatch.setattr(target, method, lose_ack)
+    result = await service.acquire(acquire)
+    assert result.state == (AttemptState.RUNNING if boundary == "checkpoint" else AttemptState.SUCCEEDED)
+    async with service.store.transaction() as tx:
+        checkpoint = (await tx.pages.list_for_attempt(result.attempt_id))[0]
+        captured = checkpoint.page.captured_at
+    service.capabilities = service.source = service.evidence = None
+    assert await service.acquire(acquire) == result
+    async with service.store.transaction() as tx:
+        assert (await tx.pages.list_for_attempt(result.attempt_id))[0].page.captured_at == captured
+
+
+async def test_manual_checkpoint_reconciliation_uses_only_retained_bytes_and_original_clocks(
+    session_factory, tmp_path, monkeypatch
+):
+    from lib.db.repositories.opportunity_acquisition import SnapshotPageRepository
+
+    service, command, _caps = await acquisition_service_fixture(session_factory, tmp_path)
+    acquire = acquire_command(await service.declare_query(command))
+    original = SnapshotPageRepository.append
+
+    async def lose_ack(self, *args, **kwargs):
+        result = await original(self, *args, **kwargs)
+        service.store.lose_ack = True
+        return result
+
+    monkeypatch.setattr(SnapshotPageRepository, "append", lose_ack)
+    retained = await service.acquire(acquire)
+    assert retained.state == AttemptState.RUNNING
+    async with service.store.transaction() as tx:
+        checkpoint = (await tx.pages.list_for_attempt(retained.attempt_id))[0]
+
+    class ForbiddenSource:
+        async def fetch_page(self, request):
+            pytest.fail("reconciliation must not redispatch a verified retained response")
+
+    service.source = ForbiddenSource()
+    assert hasattr(service, "reconcile_manual_checkpoint"), "B3 checkpoint recovery is missing"
+    results = await asyncio.gather(
+        service.reconcile_manual_checkpoint(acquire), service.reconcile_manual_checkpoint(acquire)
+    )
+    assert results[0] == results[1]
+    assert results[0].state == AttemptState.SUCCEEDED
+    async with service.store.transaction() as tx:
+        snapshot = await tx.snapshots.get_for_attempt(retained.attempt_id)
+        assert snapshot.pages[0].captured_at == checkpoint.page.captured_at
+        assert snapshot.pages[0].data_class_clocks == checkpoint.page.data_class_clocks
+        from lib.db.models.opportunity_acquisition import M9SourceObservationModel, M9SourceSnapshotModel
+
+        assert await tx.session.scalar(select(func.count()).select_from(M9SourceSnapshotModel)) == 1
+        assert await tx.session.scalar(select(func.count()).select_from(M9SourceObservationModel)) == 2
+
+
+async def test_acquire_finalization_rolls_back_snapshot_observations_event_and_receipt_together(
+    session_factory, tmp_path, monkeypatch
+):
+    from lib.db.models.opportunity import M9CommandReceiptModel, M9EventModel
+    from lib.db.models.opportunity_acquisition import (
+        M9ObservationHeadModel,
+        M9SourceObservationModel,
+        M9SourceSnapshotModel,
+    )
+    from lib.db.repositories.opportunity_acquisition import AcquisitionReceiptRepository
+
+    service, command, _caps = await acquisition_service_fixture(session_factory, tmp_path)
+    acquire = acquire_command(await service.declare_query(command))
+    original = AcquisitionReceiptRepository.stage_acquisition
+
+    async def interrupted(self, **kwargs):
+        await original(self, **kwargs)
+        raise RuntimeError("canary-private-rollback")
+
+    monkeypatch.setattr(AcquisitionReceiptRepository, "stage_acquisition", interrupted)
+    retained = await service.acquire(acquire)
+    assert retained.state == AttemptState.RUNNING
+    async with service.store.transaction() as tx:
+        assert len(await tx.pages.list_for_attempt(retained.attempt_id)) == 1
+        for model in (M9SourceSnapshotModel, M9SourceObservationModel, M9ObservationHeadModel):
+            assert await tx.session.scalar(select(func.count()).select_from(model)) == 0
+        assert (
+            await tx.session.scalar(
+                select(func.count())
+                .select_from(M9EventModel)
+                .where(M9EventModel.event_kind == "SOURCE_SNAPSHOT_CAPTURED")
+            )
+            == 0
+        )
+        assert (
+            await tx.session.scalar(
+                select(func.count())
+                .select_from(M9CommandReceiptModel)
+                .where(M9CommandReceiptModel.operation == "acquire")
+            )
+            == 0
+        )
+    monkeypatch.setattr(AcquisitionReceiptRepository, "stage_acquisition", original)
+    recovered = await service.reconcile_manual_checkpoint(acquire)
+    assert recovered.state == AttemptState.SUCCEEDED
+
+
+async def test_acquire_retention_boundary_refuses_finalization_before_any_content_reread(
+    session_factory, tmp_path, monkeypatch
+):
+    from lib.db.repositories.opportunity import OpportunityProfileRepository
+    from lib.db.repositories.opportunity_acquisition import SnapshotPageRepository
+
+    service, command, caps = await acquisition_service_fixture(session_factory, tmp_path, retention_seconds=2)
+    acquire = acquire_command(await service.declare_query(command))
+    original_append, original_time = SnapshotPageRepository.append, OpportunityProfileRepository.database_time
+    deadline = None
+    evidence = service.evidence
+
+    async def accepted(self, attempt_id, checkpoint, **kwargs):
+        nonlocal deadline
+        result = await original_append(self, attempt_id, checkpoint, **kwargs)
+        deadline = min(c.retention_due_at for c in checkpoint.page.data_class_clocks)
+        assert deadline < caps.evaluation.expires_at
+        return result
+
+    async def boundary_time(self):
+        return deadline if deadline is not None else await original_time(self)
+
+    class GuardedEvidence:
+        async def put_if_absent(self, payload):
+            return await evidence.put_if_absent(payload)
+
+        async def verify_and_read(self, payload_ref, integrity_ref):
+            assert deadline is None, "retention-expired content reached the store reader"
+            return await evidence.verify_and_read(payload_ref, integrity_ref)
+
+        async def delete_exact(self, request):
+            return await evidence.delete_exact(request)
+
+    monkeypatch.setattr(SnapshotPageRepository, "append", accepted)
+    monkeypatch.setattr(OpportunityProfileRepository, "database_time", boundary_time)
+    service.evidence = GuardedEvidence()
+    result = await service.acquire(acquire)
+    assert result.state == AttemptState.FAILED
+    async with service.store.transaction() as tx:
+        snapshot = await tx.snapshots.get_for_attempt(result.attempt_id)
+        assert snapshot.coverage_state == "PARTIAL"
+        assert snapshot.pages[0].data_class_clocks[0].retention_due_at == deadline
+
+
 async def test_declare_query_runs_real_host_policy_and_replays_without_new_capability_calls(session_factory, tmp_path):
     service, command, capabilities = await acquisition_service_fixture(session_factory, tmp_path)
     receipt = await service.declare_query(command)
@@ -441,6 +782,39 @@ async def test_declare_query_runs_real_host_policy_and_replays_without_new_capab
     assert capabilities.calls == calls
     async with unit_of_work(session_factory).transaction() as tx:
         assert await tx.receipts.get_query_for_revision(command.query_id, 1) == receipt
+
+
+@pytest.mark.parametrize("native_value", [0, None])
+async def test_acquire_preserves_zero_and_missingness_without_inline_native_material(
+    session_factory, tmp_path, native_value
+):
+    import json
+
+    from lib.db.models.opportunity_acquisition import M9SourceObservationModel
+
+    service, command, _caps = await acquisition_service_fixture(session_factory, tmp_path, native_value=native_value)
+    result = await service.acquire(acquire_command(await service.declare_query(command)))
+    assert result.state == AttemptState.SUCCEEDED
+    async with service.store.transaction() as tx:
+        rows = (await tx.session.execute(select(M9SourceObservationModel))).scalars().all()
+        row = next(row for row in rows if row.body_json["native_field_name"] == "views")
+        observation = await tx.observations.get_exact(row.observation_id, 1)
+        checkpoint = (await tx.pages.list_for_attempt(result.attempt_id))[0]
+        assert "synthetic-metric-001" not in str(row.body_json)
+        assert "value" not in row.body_json
+        assert observation.unit == "count"
+    field = next(field for field in checkpoint.native_fields if field.native_field_name == "views")
+    stored = json.loads(await service.evidence.verify_and_read(field.material_ref, field.material_integrity_ref))
+    if native_value is None:
+        assert observation.missing_reason == "NOT_RETURNED"
+        assert observation.value_ref is None
+        assert observation.value_integrity_ref is None
+        assert observation.retained_normalized_value_digest is None
+        assert stored == {"missing_reason": "NOT_RETURNED"}
+    else:
+        assert observation.missing_reason is None
+        assert observation.value_ref == field.material_ref
+        assert stored == {"value": 0}
 
 
 @pytest.mark.parametrize(

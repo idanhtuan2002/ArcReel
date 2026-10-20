@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib
 import importlib.util
 import json
@@ -74,6 +75,92 @@ async def test_same_key_replay_is_immutable_and_survives_reopen(tmp_path: Path) 
     assert await asyncio.to_thread(
         lambda: all("canary" not in str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*"))
     )
+
+
+@pytest.mark.parametrize("missing", [False, True])
+async def test_manual_materials_bind_each_identity_and_erase_missing_descriptors(tmp_path: Path, missing: bool) -> None:
+    from r2.opportunity import acquisition
+    from tests.unit.r2.opportunity.test_manual_import import request, source, source_inputs
+
+    assert hasattr(acquisition, "materialize_manual_page"), "B3 manual materialization is missing"
+    raw, grant, _ = source_inputs()
+    if missing:
+        body = json.loads(raw)
+        del body["records"][0]["value"]
+        body["records"][0]["missing_reason"] = "NOT_RETURNED"
+        raw = json.dumps(body).encode()
+    page = await source(payload=raw, payload_digest="sha256:" + hashlib.sha256(raw).hexdigest()).fetch_page(request())
+    store = _store(tmp_path)
+    materials = await acquisition.materialize_manual_page(request(), page, grant, store)
+    assert await store.verify_and_read(materials.raw.payload_ref, materials.raw.payload_integrity_ref) == raw
+    assert materials.raw.retained_content_digest is None
+    assert len(materials.fields) == 2
+    fields = {field.native_field_name: field for field in materials.fields}
+    metric, excerpt = fields["views"], fields["excerpt"]
+    assert metric.source_identity_ref != excerpt.source_identity_ref
+    assert {metric.source_identity_ref, excerpt.source_identity_ref} == set(materials.raw.source_identity_refs)
+    assert metric.native_field_name == "views"
+    assert excerpt.native_field_name == "excerpt"
+    assert excerpt.retained_normalized_value_digest is None
+    metric_bytes = await store.verify_and_read(metric.material_ref, metric.material_integrity_ref)
+    if missing:
+        assert metric.value_ref is None
+        assert metric.value_integrity_ref is None
+        assert metric.retained_normalized_value_digest is None
+        assert metric.missing_reason == "NOT_RETURNED"
+        assert json.loads(metric_bytes) == {"missing_reason": "NOT_RETURNED"}
+    else:
+        assert metric.value_ref == metric.material_ref
+        assert json.loads(metric_bytes) == {"value": 125}
+        assert metric.retained_normalized_value_digest is not None
+    assert await acquisition.materialize_manual_page(request(), page, grant, _store(tmp_path)) == materials
+    await store.delete_exact(
+        PayloadDeletionRequest(
+            user_id="u1",
+            project_name="show-a",
+            invalidation_job_id=JOB,
+            payload_refs=(materials.raw.payload_ref, *(f.material_ref for f in materials.fields)),
+            payload_integrity_refs=(
+                materials.raw.payload_integrity_ref,
+                *(f.material_integrity_ref for f in materials.fields),
+            ),
+            source_identity_refs=materials.raw.source_identity_refs,
+            retain_permitted_digest_proofs=False,
+        )
+    )
+    for field in materials.fields:
+        with pytest.raises(OpportunityError):
+            await _store(tmp_path).verify_and_read(field.material_ref, field.material_integrity_ref)
+    contents = await asyncio.to_thread(lambda: tuple(path.read_text() for path in tmp_path.rglob("*.json")))
+    assert all("synthetic-metric-001" not in value for value in contents)
+    assert all("synthetic-text-001" not in value for value in contents)
+
+
+async def test_manual_materialization_rejects_forged_permitted_digest(tmp_path: Path) -> None:
+    from r2.opportunity.acquisition import materialize_manual_page
+    from tests.unit.r2.opportunity.test_manual_import import request, source, source_inputs
+
+    _, grant, _ = source_inputs()
+    store = _store(tmp_path)
+
+    class ForgedDigest:
+        async def put_if_absent(self, payload):
+            ref = await store.put_if_absent(payload)
+            return (
+                ref.model_copy(update={"retained_content_digest": "sha256:" + "a" * 64})
+                if payload.retain_digest_proof
+                else ref
+            )
+
+        async def verify_and_read(self, payload_ref, integrity_ref):
+            return await store.verify_and_read(payload_ref, integrity_ref)
+
+        async def delete_exact(self, request):
+            return await store.delete_exact(request)
+
+    page = await source().fetch_page(request())
+    with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH"):
+        await materialize_manual_page(request(), page, grant, ForgedDigest())
 
 
 async def test_equal_and_divergent_concurrent_publication_never_overwrite(tmp_path: Path) -> None:
