@@ -13,7 +13,10 @@ from sqlalchemy.exc import IntegrityError
 from lib.db.models.opportunity_acquisition import M9AcquisitionAttemptModel
 from r2.contracts.opportunity import AttemptState
 from r2.opportunity.errors import OpportunityError
-from tests.integration.lib.db.repositories.test_opportunity_acquisition import prepare_attempt, unit_of_work
+from tests.integration.lib.db.repositories.test_opportunity_acquisition import (
+    prepare_attempt,
+    unit_of_work,
+)
 
 
 def manual_module() -> Any:
@@ -198,9 +201,24 @@ def publication_for(command, descriptor, running, *, suffix="one"):
     )
 
 
-async def ready_manual(factory):
+async def ready_manual(factory, *, retention_seconds=None):
     command, descriptor, _grant, running = await start_manual(factory)
     publication = publication_for(command, descriptor, running)
+    if retention_seconds is not None:
+        clocks = tuple(
+            c.model_copy(
+                update={
+                    "refresh_due_at": running.started_at + timedelta(seconds=retention_seconds - 1),
+                    "retention_due_at": running.started_at + timedelta(seconds=retention_seconds),
+                }
+            )
+            for c in publication.request.original_clocks
+        )
+        request = publication.request.model_copy(update={"original_clocks": clocks})
+        objects = tuple(o.model_copy(update={"original_clocks": clocks}) for o in publication.objects)
+        publication = type(publication).model_validate(
+            {**publication.model_dump(), "request": request, "objects": objects}
+        )
     async with factory() as session, session.begin():
         reserved = await manual_repo(session).reserve(publication.request, expected_attempt_version=2)
     async with factory() as session, session.begin():
@@ -2183,3 +2201,524 @@ async def test_v2_known_terminal_native_contender_returns_winner_without_reinter
             await asyncio.gather(task, return_exceptions=True)
         await contender.close()
         await holder.close()
+
+
+async def closure_plan(factory, attempt_id):
+    async with factory() as session:
+        return await manual_repo(session).plan_closure(attempt_id)
+
+
+async def test_v2_closure_fences_exact_original_refs_then_completes_only_after_authorized_deletion(session_factory):
+    from r2.opportunity.manual_admission import AdmissionDeletionReceipt
+
+    _, publication, envelope = await ready_manual(session_factory)
+    attempt_id = envelope.request.attempt_id
+    plan = await closure_plan(session_factory, attempt_id)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session, policy=None)
+        pending = await repo.begin_closure(attempt_id, expected_envelope_version=2, dependency_plan=plan)
+        assert pending.phase == "CLEANUP_PENDING"
+        assert pending.object_refs == tuple(
+            sorted(
+                (
+                    publication.publication_key,
+                    *(r for o in publication.objects for r in (o.payload_ref, o.integrity_ref, o.attestation_ref)),
+                )
+            )
+        )
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        fenced = await repo.get_envelope(attempt_id)
+        assert fenced.phase == "CLEANUP_PENDING"
+        assert fenced.admitted_at == envelope.admitted_at
+        assert fenced.objects == envelope.objects
+        authorized = await repo.authorize_deletion(pending.closure_id, expected_closure_version=1)
+        assert authorized.version == 2
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        receipt = AdmissionDeletionReceipt(
+            closure=authorized,
+            absent_refs=authorized.object_refs,
+            retained_proofs=(),
+            deleted_at=await repo.profiles.database_time(),
+        )
+        erased = await repo.finish_closure(receipt, expected_closure_version=2)
+        assert (erased.phase, erased.version) == ("ERASED", 3)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        assert await repo.get_closure(pending.closure_id) == erased
+        assert await repo.begin_closure(attempt_id, expected_envelope_version=1) == erased
+        assert await repo.finish_closure(receipt, expected_closure_version=1) == erased
+        assert (await repo.get_envelope(attempt_id)).phase == "ERASED"
+        assert (await repo.get_attempt(attempt_id)).state == "RUNNING"
+
+
+async def test_v2_closure_fence_blocks_new_reads_but_allows_existing_lease_release_before_delete(session_factory):
+    _, _, envelope = await ready_manual(session_factory)
+    attempt_id = envelope.request.attempt_id
+    async with session_factory() as session, session.begin():
+        permit = await manual_repo(session).begin_read(attempt_id, expected_envelope_version=2, operational=True)
+    plan = await closure_plan(session_factory, attempt_id)
+    async with session_factory() as session, session.begin():
+        pending = await manual_repo(session).begin_closure(
+            attempt_id, expected_envelope_version=2, dependency_plan=plan
+        )
+
+    async def authorize():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).authorize_deletion(pending.closure_id, expected_closure_version=1)
+
+    with pytest.raises(OpportunityError, match="M9_INVALIDATION_INCOMPLETE"):
+        await authorize()
+
+    async def read():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).begin_read(attempt_id, expected_envelope_version=3, operational=False)
+
+    with pytest.raises(OpportunityError):
+        await read()
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).release_read(permit.lease_id)
+    authorized = await authorize()
+    assert authorized.version == 2
+
+
+@pytest.mark.parametrize("fault", ["same_transaction", "changed_version", "absent_plan"])
+async def test_v2_closure_requires_separate_unchanged_dependency_plan(session_factory, fault):
+    from lib.db.models.opportunity_manual_admission import M9ManualClosureIntentModel
+
+    _, _, envelope = await ready_manual(session_factory)
+    attempt_id = envelope.request.attempt_id
+    plan = await closure_plan(session_factory, attempt_id)
+    if fault == "changed_version":
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).claim_dispatch(
+                attempt_id, expected_attempt_version=2, expected_envelope_version=2
+            )
+
+    async def begin():
+        async with session_factory() as session, session.begin():
+            repo = manual_repo(session)
+            if fault == "same_transaction":
+                same_plan = await repo.plan_closure(attempt_id)
+                return await repo.begin_closure(attempt_id, expected_envelope_version=2, dependency_plan=same_plan)
+            if fault == "absent_plan":
+                return await repo.begin_closure(attempt_id, expected_envelope_version=2)
+            return await repo.begin_closure(attempt_id, expected_envelope_version=2, dependency_plan=plan)
+
+    with pytest.raises(OpportunityError):
+        await begin()
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9ManualClosureIntentModel)) == 0
+        assert (await manual_repo(session).get_envelope(attempt_id)).phase == "READY"
+
+
+async def test_v2_closure_fence_and_dependency_leases_rollback_together(session_factory):
+    from lib.db.models.opportunity_manual_admission import M9ManualClosureIntentModel, M9ManualUploadLeaseModel
+
+    _, _, envelope = await ready_manual(session_factory)
+    plan = await closure_plan(session_factory, envelope.request.attempt_id)
+
+    async def interrupted():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).begin_closure(
+                envelope.request.attempt_id, expected_envelope_version=2, dependency_plan=plan
+            )
+            raise RuntimeError("before fence commit")
+
+    with pytest.raises(RuntimeError, match="before fence commit"):
+        await interrupted()
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9ManualClosureIntentModel)) == 0
+        assert (await manual_repo(session).get_envelope(envelope.request.attempt_id)) == envelope
+        assert (await session.scalars(select(M9ManualUploadLeaseModel))).one().state == "ACTIVE"
+
+
+@pytest.mark.parametrize("fault", ["shortened", "released", "deleted"])
+async def test_v2_closure_lease_drain_rejects_rehashed_or_missing_read_authority(session_factory, fault):
+    from lib.db.models.opportunity_manual_admission import M9ManualReadLeaseModel
+
+    _, _, envelope = await ready_manual(session_factory)
+    async with session_factory() as session, session.begin():
+        permit = await manual_repo(session).begin_read(
+            envelope.request.attempt_id, expected_envelope_version=2, operational=False
+        )
+    plan = await closure_plan(session_factory, envelope.request.attempt_id)
+    async with session_factory() as session, session.begin():
+        pending = await manual_repo(session).begin_closure(
+            envelope.request.attempt_id, expected_envelope_version=2, dependency_plan=plan
+        )
+    async with session_factory() as session, session.begin():
+        module = manual_module()
+        row = (await session.scalars(select(M9ManualReadLeaseModel))).one()
+        value = module._read_lease(row)
+        if fault == "deleted":
+            await session.delete(row)
+        elif fault == "shortened":
+            changed = value.model_copy(
+                update={
+                    "permit": permit.model_copy(update={"expires_at": permit.issued_at + timedelta(microseconds=1)})
+                }
+            )
+            row.expires_at = changed.permit.expires_at
+            row.body_json, row.metadata_digest = module._pack(changed), module._record_digest(changed)
+        else:
+            changed = value.model_copy(update={"released_at": await manual_repo(session).profiles.database_time()})
+            row.released_at = changed.released_at
+            row.body_json, row.metadata_digest = module._pack(changed), module._record_digest(changed)
+
+    async def authorize():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).authorize_deletion(pending.closure_id, expected_closure_version=1)
+
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        await authorize()
+
+
+async def test_v2_closure_cannot_remove_fence_by_rehashing_all_mutable_admission_rows(session_factory):
+    from lib.db.models.opportunity_manual_admission import (
+        M9ManualAdmissionModel,
+        M9ManualPublicationIntentModel,
+        M9ManualUploadLeaseModel,
+    )
+
+    _, _, envelope = await ready_manual(session_factory)
+    plan = await closure_plan(session_factory, envelope.request.attempt_id)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).begin_closure(
+            envelope.request.attempt_id, expected_envelope_version=2, dependency_plan=plan
+        )
+    async with session_factory() as session, session.begin():
+        for model in (M9ManualAdmissionModel, M9ManualPublicationIntentModel):
+            row = (await session.scalars(select(model))).one()
+            row.phase, row.version = "READY", envelope.version
+            row.body_json, row.metadata_digest = envelope.model_dump(mode="json"), envelope.metadata_digest
+            if isinstance(row, M9ManualAdmissionModel):
+                row.erasure_fenced_at = row.erasure_version = None
+        module = manual_module()
+        row = (await session.scalars(select(M9ManualUploadLeaseModel))).one()
+        value = module._upload_lease(row).model_copy(update={"state": "ACTIVE", "version": 1, "closure_id": None})
+        row.state, row.version, row.closure_id = "ACTIVE", 1, None
+        row.body_json, row.metadata_digest = module._pack(value), module._record_digest(value)
+    async with session_factory() as session:
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await manual_repo(session).get_envelope(envelope.request.attempt_id)
+
+
+async def test_v2_closure_refuses_header_only_reserved_cleanup_without_original_publication_refs(session_factory):
+    from lib.db.models.opportunity_manual_admission import M9ManualClosureIntentModel
+
+    command, descriptor, _, running = await start_manual(session_factory)
+    publication = publication_for(command, descriptor, running)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).reserve(publication.request, expected_attempt_version=2)
+    plan = await closure_plan(session_factory, running.attempt_id)
+
+    async def begin():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).begin_closure(
+                running.attempt_id, expected_envelope_version=1, dependency_plan=plan
+            )
+
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        await begin()
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9ManualClosureIntentModel)) == 0
+        assert (await manual_repo(session).get_envelope(running.attempt_id)).phase == "RESERVED"
+
+
+async def closure_subject(factory, *, permit=False, retention_seconds=None):
+    _, _, envelope = await ready_manual(factory, retention_seconds=retention_seconds)
+    lease = None
+    if permit:
+        async with factory() as session, session.begin():
+            lease = await manual_repo(session).begin_read(
+                envelope.request.attempt_id, expected_envelope_version=2, operational=False
+            )
+    plan = await closure_plan(factory, envelope.request.attempt_id)
+    async with factory() as session, session.begin():
+        pending = await manual_repo(session).begin_closure(
+            envelope.request.attempt_id, expected_envelope_version=2, dependency_plan=plan
+        )
+    return envelope, pending, lease
+
+
+async def blocked_by_owner(factory, contender_pid, holder_pid, task):
+    import asyncio
+
+    from sqlalchemy import text
+
+    async with asyncio.timeout(10):
+        while True:
+            async with factory() as observer:
+                blockers = await observer.scalar(text("SELECT pg_blocking_pids(:pid)"), {"pid": contender_pid})
+            if holder_pid in blockers:
+                return
+            if task.done():
+                pytest.fail("contender did not wait on the retained SQL guard")
+
+
+@pytest.mark.parametrize("changed", [False, True])
+async def test_v2_closure_native_finalizers_return_exact_retained_winner(session_factory, changed):
+    import asyncio
+
+    from sqlalchemy import text
+
+    from r2.opportunity.manual_admission import AdmissionDeletionReceipt
+
+    envelope, pending, _ = await closure_subject(session_factory)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        authorized = await repo.authorize_deletion(pending.closure_id, expected_closure_version=1)
+        receipt = AdmissionDeletionReceipt(
+            closure=authorized,
+            absent_refs=authorized.object_refs,
+            retained_proofs=(),
+            deleted_at=await repo.profiles.database_time(),
+        )
+    candidate = receipt
+    if changed:
+        async with session_factory() as session:
+            candidate = receipt.model_copy(update={"deleted_at": await manual_repo(session).profiles.database_time()})
+    holder, contender = session_factory(), session_factory()
+    task = None
+    try:
+        await holder.begin()
+        holder_pid = await holder.scalar(text("SELECT pg_backend_pid()"))
+        winner = await manual_repo(holder).finish_closure(receipt, expected_closure_version=2)
+        await contender.begin()
+        contender_pid = await contender.scalar(text("SELECT pg_backend_pid()"))
+        task = asyncio.create_task(manual_repo(contender).finish_closure(candidate, expected_closure_version=2))
+        await blocked_by_owner(session_factory, contender_pid, holder_pid, task)
+        assert not task.done()
+        await holder.commit()
+        if changed:
+            with pytest.raises(OpportunityError, match="M9_COMMAND_REPLAY_CONFLICT"):
+                await task
+        else:
+            assert await task == winner
+        await contender.rollback()
+        async with session_factory() as session:
+            assert await manual_repo(session).get_closure(pending.closure_id) == winner
+            assert (await manual_repo(session).get_envelope(envelope.request.attempt_id)).phase == "ERASED"
+    finally:
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        await contender.close()
+        await holder.close()
+
+
+@pytest.mark.parametrize("fault", ["provider_identity", "unaudited_version"])
+async def test_v2_closure_rejects_rehashed_attempt_changes_outside_original_fence_authority(session_factory, fault):
+    _, pending, _ = await closure_subject(session_factory)
+    async with session_factory() as session, session.begin():
+        module = manual_module()
+        row = (await session.scalars(select(M9AcquisitionAttemptModel))).one()
+        value = module._unpack(module._AttemptRecord, row.body_json)
+        changes = (
+            {"provider_request_id": "invented-provider-request"}
+            if fault == "provider_identity"
+            else {"attempt_version": value.attempt.attempt_version + 1}
+        )
+        attempt = value.attempt.model_copy(update=changes)
+        row.attempt_version = attempt.attempt_version
+        row.body_json = module._pack(value.model_copy(update={"attempt": attempt}))
+
+    async def authorize():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).authorize_deletion(pending.closure_id, expected_closure_version=1)
+
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        await authorize()
+
+
+async def wait_database_deadline(factory, deadline):
+    import asyncio
+
+    async with asyncio.timeout(12):
+        async with factory() as session:
+            while await manual_repo(session).profiles.database_time() < deadline:
+                arrived = asyncio.Event()
+                timer = asyncio.get_running_loop().call_later(0.05, arrived.set)
+                try:
+                    await arrived.wait()
+                finally:
+                    timer.cancel()
+
+
+async def test_v2_closure_authorizes_expired_original_read_lease_without_fabricating_release(session_factory):
+    from lib.db.models.opportunity_manual_admission import M9ManualReadLeaseModel
+
+    _, pending, permit = await closure_subject(session_factory, permit=True, retention_seconds=5)
+    assert permit is not None
+    await wait_database_deadline(session_factory, permit.expires_at)
+    async with session_factory() as session, session.begin():
+        authorized = await manual_repo(session).authorize_deletion(pending.closure_id, expected_closure_version=1)
+        assert authorized.version == 2
+        row = (await session.scalars(select(M9ManualReadLeaseModel))).one()
+        assert row.released_at is None
+        assert row.expires_at == permit.expires_at
+
+
+@pytest.mark.parametrize("fault", ["not_authorized", "future", "version", "changed_refs"])
+async def test_v2_closure_completion_requires_exact_authorized_deletion_receipt(session_factory, fault):
+    from r2.opportunity.manual_admission import AdmissionDeletionReceipt
+
+    _, pending, _ = await closure_subject(session_factory)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        authorized = (
+            pending
+            if fault == "not_authorized"
+            else await repo.authorize_deletion(pending.closure_id, expected_closure_version=1)
+        )
+        now = await repo.profiles.database_time()
+        if fault == "changed_refs":
+            authorized = authorized.model_copy(update={"object_refs": ("different-object",)})
+        receipt = AdmissionDeletionReceipt(
+            closure=authorized,
+            absent_refs=authorized.object_refs,
+            retained_proofs=(),
+            deleted_at=now + timedelta(minutes=1) if fault == "future" else now,
+        )
+
+    async def finish():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).finish_closure(
+                receipt, expected_closure_version=17 if fault == "version" else authorized.version
+            )
+
+    with pytest.raises(OpportunityError):
+        await finish()
+    async with session_factory() as session:
+        assert (await manual_repo(session).get_closure(pending.closure_id)).phase == "CLEANUP_PENDING"
+
+
+async def test_v2_closure_deletion_receipt_survives_sql_rollback_without_reopening_access(session_factory):
+    from r2.opportunity.manual_admission import AdmissionDeletionReceipt
+
+    envelope, pending, _ = await closure_subject(session_factory)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        authorized = await repo.authorize_deletion(pending.closure_id, expected_closure_version=1)
+        receipt = AdmissionDeletionReceipt(
+            closure=authorized,
+            absent_refs=authorized.object_refs,
+            retained_proofs=(),
+            deleted_at=await repo.profiles.database_time(),
+        )
+
+    async def interrupted():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).finish_closure(receipt, expected_closure_version=2)
+            raise RuntimeError("after deletion before SQL completion")
+
+    with pytest.raises(RuntimeError, match="after deletion before SQL completion"):
+        await interrupted()
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        assert await repo.get_closure(pending.closure_id) == authorized
+        assert (await repo.get_envelope(envelope.request.attempt_id)).phase == "CLEANUP_PENDING"
+        erased = await repo.finish_closure(receipt, expected_closure_version=2)
+    async with session_factory() as session:
+        assert await manual_repo(session).get_closure(pending.closure_id) == erased
+
+
+async def test_v2_closure_read_order_is_independent_of_operational_access_deadline(session_factory):
+    _, _, envelope = await ready_manual(session_factory)
+    leases = []
+    for operational in (False, True):
+        async with session_factory() as session, session.begin():
+            leases.append(
+                await manual_repo(session).begin_read(
+                    envelope.request.attempt_id, expected_envelope_version=2, operational=operational
+                )
+            )
+    plan = await closure_plan(session_factory, envelope.request.attempt_id)
+    async with session_factory() as session, session.begin():
+        pending = await manual_repo(session).begin_closure(
+            envelope.request.attempt_id, expected_envelope_version=2, dependency_plan=plan
+        )
+    for lease in leases:
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).release_read(lease.lease_id)
+    async with session_factory() as session, session.begin():
+        assert (
+            await manual_repo(session).authorize_deletion(pending.closure_id, expected_closure_version=1)
+        ).version == 2
+
+
+async def test_v2_closure_plan_read_transaction_must_end_before_the_mutation_transaction(session_factory):
+    _, _, envelope = await ready_manual(session_factory)
+    async with session_factory() as planning_session, planning_session.begin():
+        plan = await manual_repo(planning_session).plan_closure(envelope.request.attempt_id)
+
+        async def mutate():
+            async with session_factory() as session, session.begin():
+                return await manual_repo(session).begin_closure(
+                    envelope.request.attempt_id, expected_envelope_version=2, dependency_plan=plan
+                )
+
+        with pytest.raises(OpportunityError, match="M9_STALE_HEAD"):
+            await mutate()
+
+
+@pytest.mark.parametrize("fault", ["rehashed_reads", "audit", "missing_marker", "missing_envelope"])
+async def test_v2_closure_refuses_completion_after_independent_authority_loss_or_tamper(session_factory, fault):
+    from lib.db.models.opportunity import M9EventModel
+    from lib.db.models.opportunity_manual_admission import M9ManualAdmissionModel, M9ManualClosureIntentModel
+
+    _, pending, _ = await closure_subject(session_factory, permit=True)
+    async with session_factory() as session, session.begin():
+        if fault == "rehashed_reads":
+            module = manual_module()
+            row = (await session.scalars(select(M9ManualClosureIntentModel))).one()
+            value = module._unpack(module._ClosureRecord, row.body_json).model_copy(update={"reads": ()})
+            row.body_json, row.metadata_digest = module._pack(value), module._record_digest(value)
+        elif fault == "audit":
+            row = (
+                await session.scalars(select(M9EventModel).where(M9EventModel.event_kind == "MANUAL_CLOSURE_STATE"))
+            ).one()
+            row.payload_digest = "sha256:" + "a" * 64
+        elif fault == "missing_marker":
+            row = (
+                await session.scalars(select(M9EventModel).where(M9EventModel.event_kind == "MANUAL_ADMISSION_FENCED"))
+            ).one()
+            await session.delete(row)
+        else:
+            row = (await session.scalars(select(M9ManualAdmissionModel))).one()
+            await session.delete(row)
+
+    async def authorize():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).authorize_deletion(pending.closure_id, expected_closure_version=1)
+
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        await authorize()
+    async with session_factory() as session:
+        row = (await session.scalars(select(M9ManualClosureIntentModel))).one()
+        assert row.phase == "CLEANUP_PENDING"
+
+
+@pytest.mark.parametrize("carrier", [None, "finished"])
+async def test_v2_closure_refuses_a_forged_planning_transaction_carrier(session_factory, carrier):
+    from dataclasses import replace
+
+    from lib.db.models.opportunity_manual_admission import M9ManualClosureIntentModel
+
+    _, _, envelope = await ready_manual(session_factory)
+    plan = await closure_plan(session_factory, envelope.request.attempt_id)
+    forged = replace(plan, planning_transaction=carrier)
+
+    async def begin():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).begin_closure(
+                envelope.request.attempt_id, expected_envelope_version=2, dependency_plan=forged
+            )
+
+    with pytest.raises(OpportunityError, match="M9_STALE_HEAD"):
+        await begin()
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9ManualClosureIntentModel)) == 0
+        assert (await manual_repo(session).get_envelope(envelope.request.attempt_id)).phase == "READY"

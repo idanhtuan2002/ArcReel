@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import struct
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from itertools import pairwise
 from typing import Any, Literal, Self
@@ -12,6 +13,7 @@ from pydantic import AwareDatetime, Field, model_validator
 from sqlalchemy import select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import SessionTransaction
 
 from lib.db.models.opportunity import M9CommandReceiptModel, M9EventModel
 from lib.db.models.opportunity_acquisition import (
@@ -23,6 +25,7 @@ from lib.db.models.opportunity_acquisition import (
 )
 from lib.db.models.opportunity_manual_admission import (
     M9ManualAdmissionModel,
+    M9ManualClosureIntentModel,
     M9ManualPublicationIntentModel,
     M9ManualReadLeaseModel,
     M9ManualUploadLeaseModel,
@@ -63,6 +66,8 @@ from r2.opportunity.capabilities import validate_capability
 from r2.opportunity.digests import digest_source_observation, digest_source_snapshot
 from r2.opportunity.errors import OpportunityError, StopCode
 from r2.opportunity.manual_admission import (
+    AdmissionClosureIntent,
+    AdmissionDeletionReceipt,
     AdmissionEnvelope,
     AdmissionPhase,
     AdmissionReadPermit,
@@ -153,6 +158,76 @@ class _ObservationRecord(M9ContractModel):
     snapshot_provenance_digest: str
     attempt_version: int = Field(ge=1, strict=True)
     stored_at: AwareDatetime
+
+
+class _ClosureMember(M9ContractModel):
+    record: _AttemptRecord
+    admission: AdmissionEnvelope
+
+
+@dataclass(frozen=True)
+class ManualClosurePlan:
+    """Read-transaction snapshot, revalidated under all dependency guards."""
+
+    attempt_id: str
+    members: tuple[_ClosureMember, ...]
+    planning_transaction: object
+
+
+class _ClosureRecord(M9ContractModel):
+    schema_version: Literal["m9.manual-closure.v1"] = "m9.manual-closure.v1"
+    fence: AdmissionClosureIntent
+    intent: AdmissionClosureIntent
+    members: tuple[_ClosureMember, ...]
+    reads: tuple[_ReadLeaseRecord, ...]
+    authorized_at: AwareDatetime | None = None
+    receipt: AdmissionDeletionReceipt | None = None
+    finished_at: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def validate_phases(self) -> Self:
+        object.__setattr__(self, "members", tuple(sorted(self.members, key=lambda m: m.record.attempt.attempt_id)))
+        object.__setattr__(self, "reads", tuple(sorted(self.reads, key=lambda r: r.permit.lease_id)))
+        if self.fence.phase != "CLEANUP_PENDING" or self.fence.version != 1:
+            raise ValueError("closure fence must be its original intent")
+        if self.intent.model_dump(exclude={"phase", "version"}) != self.fence.model_dump(exclude={"phase", "version"}):
+            raise ValueError("closure authority cannot change after fencing")
+        if self.intent.version == 1:
+            valid = (
+                self.intent == self.fence
+                and self.authorized_at is None
+                and self.receipt is None
+                and self.finished_at is None
+            )
+        elif self.intent.version == 2:
+            valid = (
+                self.intent.phase == "CLEANUP_PENDING"
+                and self.authorized_at is not None
+                and self.receipt is None
+                and self.finished_at is None
+            )
+        elif self.intent.version == 3:
+            valid = (
+                self.intent.phase == "ERASED"
+                and self.authorized_at is not None
+                and self.receipt is not None
+                and self.finished_at is not None
+            )
+        else:
+            valid = False
+        if not valid or (self.authorized_at is not None and self.authorized_at < self.fence.fenced_at):
+            raise ValueError("closure phase and authorization differ")
+        if self.receipt is not None and (
+            self.authorized_at is None
+            or self.finished_at is None
+            or (
+                self.receipt.closure != self.fence.model_copy(update={"version": 2})
+                or self.receipt.deleted_at < self.authorized_at
+                or self.finished_at < self.receipt.deleted_at
+            )
+        ):
+            raise ValueError("deletion must follow authorization and precede SQL completion")
+        return self
 
 
 def _record_digest(record: M9ContractModel) -> str:
@@ -493,7 +568,12 @@ class ManualAdmissionRepository:
         )
 
     async def _guard(
-        self, attempt_id: str, *, operational: bool, claim: tuple[str, int] | None = None
+        self,
+        attempt_id: str,
+        *,
+        operational: bool,
+        claim: tuple[str, int] | None = None,
+        object_refs: Sequence[str] = (),
     ) -> tuple[M9AcquisitionAttemptModel, _AttemptRecord]:
         row = await self._row(attempt_id)
         if row is None:
@@ -511,6 +591,7 @@ class ManualAdmissionRepository:
             claims.add((hint.claim_ref, hint.request.upload_version))
         for identity in sorted(claims):
             await self._upload_guard(*identity)
+        await self._object_guards((*object_refs, *(self._admission_refs(hint) if hint is not None else ())))
         row = await self._row(attempt_id, lock=True)
         if row is None:
             raise OpportunityError(_MISSING)
@@ -720,6 +801,7 @@ class ManualAdmissionRepository:
                 raise ValueError("original request differs from the frozen attempt")
             if row.erasure_fenced_at is not None and envelope.phase == AdmissionPhase.READY:
                 raise ValueError("ready admission cannot ignore a SQL erasure fence")
+            witness = await self._closure_witness(envelope, row)
             if envelope.claim_ref is not None:
                 lease_row = await self.session.get(
                     M9ManualUploadLeaseModel,
@@ -742,6 +824,8 @@ class ManualAdmissionRepository:
                 }.get(envelope.phase)
                 if lease.request != envelope.request or lease.state != expected_state:
                     raise ValueError("admission upload lease differs")
+                if witness is not None and lease.closure_id != witness.intent.closure_id:
+                    raise ValueError("admission upload closure differs")
             return envelope
         except (ValueError, TypeError):
             raise OpportunityError(_MISSING) from None
@@ -861,7 +945,13 @@ class ManualAdmissionRepository:
                 raise OpportunityError(_CONFLICT)
             return existing
         _, record = await self._guard(
-            publication.request.attempt_id, operational=True, claim=(publication.claim_ref, publication.upload_version)
+            publication.request.attempt_id,
+            operational=True,
+            claim=(publication.claim_ref, publication.upload_version),
+            object_refs=(
+                publication.publication_key,
+                *(r for o in publication.objects for r in (o.payload_ref, o.integrity_ref, o.attestation_ref)),
+            ),
         )
         envelope = await self._envelope(record, lock=True)
         if (
@@ -871,6 +961,30 @@ class ManualAdmissionRepository:
         ):
             raise OpportunityError(_STALE)
         now = await self.profiles.database_time()
+        proposed_refs = {
+            publication.publication_key,
+            *(r for o in publication.objects for r in (o.payload_ref, o.integrity_ref, o.attestation_ref)),
+        }
+        await self._reject_fenced_refs(proposed_refs)
+        prior_intents = (
+            await self.session.scalars(
+                select(M9ManualPublicationIntentModel)
+                .where(
+                    M9ManualPublicationIntentModel.user_id == self.user_id,
+                    M9ManualPublicationIntentModel.project_name == self.project_name,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        for prior in prior_intents:
+            try:
+                value = AdmissionEnvelope.model_validate(prior.body_json)
+            except ValueError:
+                raise OpportunityError(_MISSING) from None
+            if value.phase in (AdmissionPhase.CLEANUP_PENDING, AdmissionPhase.ERASED) and proposed_refs.intersection(
+                self._admission_refs(value)
+            ):
+                raise OpportunityError(_CONFLICT)
         if record.attempt.started_at is None or now < record.attempt.started_at:
             raise OpportunityError(_MISSING)
         query = await self.queries.get_exact(record.attempt.query_id, record.attempt.query_revision)
@@ -1426,7 +1540,9 @@ class ManualAdmissionRepository:
         )
         await _flush(self.session)
 
-    async def _guard_dependencies(self, records: dict[str, _AttemptRecord], *, operational_attempt_id: str) -> None:
+    async def _guard_dependencies(
+        self, records: dict[str, _AttemptRecord], *, operational_attempt_id: str | None
+    ) -> None:
         """Prelock every rank across the dependency set before validating subjects."""
         await self.lock_commands(tuple(record.command.context for record in records.values()))
         self.session.info["m9_manual_command_plan"]["lower"] = True
@@ -1463,12 +1579,16 @@ class ManualAdmissionRepository:
         for attempt_id, record in sorted(records.items()):
             await self._subject(record, operational=attempt_id == operational_attempt_id)
         claims = set()
+        object_refs = set()
         for record in records.values():
             envelope = await self._envelope(record)
             if envelope is not None and envelope.claim_ref is not None:
                 claims.add((envelope.claim_ref, envelope.request.upload_version))
+            if envelope is not None:
+                object_refs.update(self._admission_refs(envelope))
         for identity in sorted(claims):
             await self._upload_guard(*identity)
+        await self._object_guards(tuple(object_refs))
         for attempt_id, expected in sorted(records.items()):
             row = await self._row(attempt_id, lock=True)
             if row is None or await self._record(row) != expected:
@@ -1799,6 +1919,654 @@ class ManualAdmissionRepository:
             head.current_revision = head.head_version = observation.revision
         await _flush(self.session)
 
+    @staticmethod
+    def _admission_refs(envelope: AdmissionEnvelope) -> tuple[str, ...]:
+        refs = tuple(r for o in envelope.objects for r in (o.payload_ref, o.integrity_ref, o.attestation_ref))
+        if envelope.request.publication_key in refs:
+            raise OpportunityError(_MISSING)
+        return tuple(sorted((envelope.request.publication_key, *refs)))
+
+    async def _object_guards(self, refs: Sequence[str]) -> None:
+        for ref in sorted(set(refs)):
+            digest = digest_canonical(
+                {
+                    "domain": "m9.manual-object-lock.v1",
+                    "user_id": self.user_id,
+                    "project_name": self.project_name,
+                    "ref": ref,
+                }
+            )
+            first, second = struct.unpack(">ii", bytes.fromhex(digest.removeprefix("sha256:"))[:8])
+            await self.session.execute(
+                text("SELECT pg_advisory_xact_lock(:first,:second)"), {"first": first, "second": second}
+            )
+
+    async def _reject_fenced_refs(self, refs: set[str]) -> None:
+        rows = (
+            await self.session.scalars(
+                select(M9ManualClosureIntentModel)
+                .where(
+                    M9ManualClosureIntentModel.user_id == self.user_id,
+                    M9ManualClosureIntentModel.project_name == self.project_name,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        markers = (
+            await self.session.scalars(
+                select(M9EventModel).where(
+                    M9EventModel.user_id == self.user_id,
+                    M9EventModel.project_name == self.project_name,
+                    M9EventModel.event_kind == "MANUAL_ADMISSION_FENCED",
+                )
+            )
+        ).all()
+        expected = {}
+        blocked = False
+        for row in rows:
+            stored = await self._closure_value(row)
+            blocked |= bool(refs.intersection(stored.intent.object_refs))
+            for member in stored.members:
+                key = member.record.attempt.attempt_id
+                if key in expected:
+                    raise OpportunityError(_MISSING)
+                expected[key] = (
+                    member.admission.version + 1,
+                    self._fence_digest(stored, member),
+                    stored.fence.fenced_at,
+                )
+        seen = set()
+        for marker in markers:
+            if marker.aggregate_id in seen or expected.get(marker.aggregate_id) != (
+                marker.aggregate_revision,
+                marker.payload_digest,
+                marker.committed_at,
+            ):
+                raise OpportunityError(_MISSING)
+            seen.add(marker.aggregate_id)
+        if seen != set(expected):
+            raise OpportunityError(_MISSING)
+        if blocked:
+            raise OpportunityError(_CONFLICT)
+
+    async def _closure_members(self, attempt_id: str) -> tuple[_ClosureMember, ...]:
+        rows = (
+            await self.session.scalars(
+                select(M9ManualPublicationIntentModel)
+                .where(
+                    M9ManualPublicationIntentModel.user_id == self.user_id,
+                    M9ManualPublicationIntentModel.project_name == self.project_name,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        envelopes = {}
+        for row in rows:
+            try:
+                envelope = AdmissionEnvelope.model_validate(row.body_json)
+            except ValueError:
+                raise OpportunityError(_MISSING) from None
+            if (row.attempt_id, row.publication_key, row.phase, row.version, row.metadata_digest) != (
+                envelope.request.attempt_id,
+                envelope.request.publication_key,
+                envelope.phase,
+                envelope.version,
+                envelope.metadata_digest,
+            ) or (envelope.request.context.user_id, envelope.request.context.project_name) != (
+                self.user_id,
+                self.project_name,
+            ):
+                raise OpportunityError(_MISSING)
+            envelopes[row.attempt_id] = envelope
+        if attempt_id not in envelopes:
+            raise OpportunityError(_MISSING)
+        selected = {attempt_id}
+        while True:
+            refs = {r for key in selected for r in self._admission_refs(envelopes[key])}
+            claims = {
+                (envelopes[key].claim_ref, envelopes[key].request.upload_version)
+                for key in selected
+                if envelopes[key].claim_ref is not None
+            }
+            expanded = selected | {
+                key
+                for key, value in envelopes.items()
+                if (
+                    refs.intersection(self._admission_refs(value))
+                    or (value.claim_ref is not None and (value.claim_ref, value.request.upload_version) in claims)
+                )
+            }
+            if expanded == selected:
+                break
+            selected = expanded
+        members = []
+        for key in sorted(selected):
+            row = await self._row(key)
+            if row is None:
+                raise OpportunityError(_MISSING)
+            record = await self._record(row)
+            envelope = await self._envelope(record)
+            if envelope is None or envelope != envelopes[key]:
+                raise OpportunityError(_STALE)
+            members.append(_ClosureMember(record=record, admission=envelope))
+        return tuple(members)
+
+    async def plan_closure(self, attempt_id: str) -> ManualClosurePlan:
+        members = await self._closure_members(attempt_id)
+        transaction = self.session.sync_session.get_transaction()
+        if transaction is None:
+            raise OpportunityError(_MISSING)
+        return ManualClosurePlan(attempt_id, members, transaction)
+
+    async def _closure_row(self, closure_id: str, *, lock: bool = False) -> M9ManualClosureIntentModel | None:
+        statement = (
+            select(M9ManualClosureIntentModel)
+            .where(
+                M9ManualClosureIntentModel.user_id == self.user_id,
+                M9ManualClosureIntentModel.project_name == self.project_name,
+                M9ManualClosureIntentModel.closure_id == closure_id,
+            )
+            .execution_options(populate_existing=True)
+        )
+        if lock:
+            statement = statement.with_for_update()
+        return (await self.session.scalars(statement)).one_or_none()
+
+    async def _require_event(self, *, aggregate_id: str, version: int, kind: str, digest: str, at: datetime) -> None:
+        events = (
+            await self.session.scalars(
+                select(M9EventModel).where(
+                    M9EventModel.user_id == self.user_id,
+                    M9EventModel.project_name == self.project_name,
+                    M9EventModel.aggregate_id == aggregate_id,
+                    M9EventModel.aggregate_revision == version,
+                    M9EventModel.event_kind == kind,
+                )
+            )
+        ).all()
+        if len(events) != 1 or (events[0].payload_digest, events[0].committed_at) != (digest, at):
+            raise OpportunityError(_MISSING)
+
+    def _add_event(self, *, aggregate_id: str, version: int, kind: str, digest: str, at: datetime) -> None:
+        self.session.add(
+            M9EventModel(
+                user_id=self.user_id,
+                project_name=self.project_name,
+                aggregate_id=aggregate_id,
+                aggregate_revision=version,
+                event_kind=kind,
+                payload_digest=digest,
+                committed_at=at,
+            )
+        )
+
+    async def _closure_value(self, row: M9ManualClosureIntentModel) -> _ClosureRecord:
+        stored = _unpack(_ClosureRecord, row.body_json, digest=row.metadata_digest)
+        intent = stored.intent
+        if any(
+            getattr(row, key) != getattr(intent, key)
+            for key in (
+                "user_id",
+                "project_name",
+                "closure_id",
+                "attempt_id",
+                "attempt_version",
+                "envelope_version",
+                "phase",
+                "version",
+                "fenced_at",
+            )
+        ) or (intent.user_id, intent.project_name) != (self.user_id, self.project_name):
+            raise OpportunityError(_MISSING)
+        keys = tuple(m.record.attempt.attempt_id for m in stored.members)
+        root = next((m for m in stored.members if m.record.attempt.attempt_id == intent.attempt_id), None)
+        refs = tuple(sorted({r for m in stored.members for r in self._admission_refs(m.admission)}))
+        if (
+            not keys
+            or keys != tuple(sorted(set(keys)))
+            or root is None
+            or intent.attempt_version != root.record.attempt.attempt_version
+            or intent.envelope_version != root.admission.version + 1
+            or intent.object_refs != refs
+            or any(m.admission.phase != AdmissionPhase.READY for m in stored.members)
+        ):
+            raise OpportunityError(_MISSING)
+        at = stored.finished_at or stored.authorized_at or intent.fenced_at
+        await self._require_event(
+            aggregate_id=intent.closure_id,
+            version=intent.version,
+            kind="MANUAL_CLOSURE_STATE",
+            digest=_record_digest(stored),
+            at=at,
+        )
+        return stored
+
+    def _fence_digest(self, stored: _ClosureRecord, member: _ClosureMember) -> str:
+        return digest_canonical({"domain": "m9.manual-fence.v1", "fence": stored.fence, "member": member})
+
+    async def _closure_witness(self, envelope: AdmissionEnvelope, row: M9ManualAdmissionModel) -> _ClosureRecord | None:
+        markers = (
+            await self.session.scalars(
+                select(M9EventModel).where(
+                    M9EventModel.user_id == self.user_id,
+                    M9EventModel.project_name == self.project_name,
+                    M9EventModel.aggregate_id == row.attempt_id,
+                    M9EventModel.event_kind == "MANUAL_ADMISSION_FENCED",
+                )
+            )
+        ).all()
+        if not markers:
+            if row.erasure_fenced_at is not None or envelope.phase in (
+                AdmissionPhase.CLEANUP_PENDING,
+                AdmissionPhase.ERASED,
+            ):
+                raise OpportunityError(_MISSING)
+            return None
+        if len(markers) != 1:
+            raise OpportunityError(_MISSING)
+        closures = (
+            await self.session.scalars(
+                select(M9ManualClosureIntentModel)
+                .where(
+                    M9ManualClosureIntentModel.user_id == self.user_id,
+                    M9ManualClosureIntentModel.project_name == self.project_name,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        matches = []
+        for closure_row in closures:
+            stored = await self._closure_value(closure_row)
+            for member in stored.members:
+                if member.record.attempt.attempt_id != row.attempt_id:
+                    continue
+                marker = markers[0]
+                erased = stored.intent.phase == "ERASED"
+                if (
+                    (marker.aggregate_revision, marker.payload_digest, marker.committed_at)
+                    != (member.admission.version + 1, self._fence_digest(stored, member), stored.fence.fenced_at)
+                    or (row.erasure_fenced_at, row.erasure_version) != (stored.fence.fenced_at, 1)
+                    or (envelope.phase, envelope.version)
+                    != (
+                        AdmissionPhase.ERASED if erased else AdmissionPhase.CLEANUP_PENDING,
+                        member.admission.version + (2 if erased else 1),
+                    )
+                    or envelope.model_dump(exclude={"phase", "version", "metadata_digest"})
+                    != member.admission.model_dump(exclude={"phase", "version", "metadata_digest"})
+                ):
+                    raise OpportunityError(_MISSING)
+                matches.append(stored)
+        if len(matches) != 1:
+            raise OpportunityError(_MISSING)
+        return matches[0]
+
+    async def _store_closure(self, stored: _ClosureRecord, row: M9ManualClosureIntentModel | None = None) -> None:
+        values = {
+            key: getattr(stored.intent, key)
+            for key in (
+                "user_id",
+                "project_name",
+                "closure_id",
+                "attempt_id",
+                "attempt_version",
+                "envelope_version",
+                "phase",
+                "version",
+                "fenced_at",
+            )
+        }
+        values.update(body_json=_pack(stored), metadata_digest=_record_digest(stored))
+        if row is None:
+            self.session.add(M9ManualClosureIntentModel(**values))
+        else:
+            for key, value in values.items():
+                setattr(row, key, value)
+        self._add_event(
+            aggregate_id=stored.intent.closure_id,
+            version=stored.intent.version,
+            kind="MANUAL_CLOSURE_STATE",
+            digest=_record_digest(stored),
+            at=stored.finished_at or stored.authorized_at or stored.intent.fenced_at,
+        )
+        await _flush(self.session)
+
+    async def _verified_read(self, row: M9ManualReadLeaseModel) -> _ReadLeaseRecord:
+        lease = _read_lease(row)
+        issued = lease.model_copy(update={"released_at": None})
+        await self._require_event(
+            aggregate_id=lease.permit.lease_id,
+            version=1,
+            kind="MANUAL_READ_ISSUED",
+            digest=_record_digest(issued),
+            at=lease.permit.issued_at,
+        )
+        if lease.released_at is not None:
+            await self._require_event(
+                aggregate_id=lease.permit.lease_id,
+                version=2,
+                kind="MANUAL_READ_RELEASED",
+                digest=_record_digest(lease),
+                at=lease.released_at,
+            )
+        return lease
+
+    async def _closure_reads(self, members: tuple[_ClosureMember, ...], *, lock: bool) -> tuple[_ReadLeaseRecord, ...]:
+        orphan = await self.session.scalar(
+            select(M9EventModel.event_id)
+            .outerjoin(
+                M9ManualReadLeaseModel,
+                (
+                    (M9ManualReadLeaseModel.user_id == M9EventModel.user_id)
+                    & (M9ManualReadLeaseModel.project_name == M9EventModel.project_name)
+                    & (M9ManualReadLeaseModel.lease_id == M9EventModel.aggregate_id)
+                ),
+            )
+            .where(
+                M9EventModel.user_id == self.user_id,
+                M9EventModel.project_name == self.project_name,
+                M9EventModel.event_kind == "MANUAL_READ_ISSUED",
+                M9ManualReadLeaseModel.lease_id.is_(None),
+            )
+            .limit(1)
+        )
+        if orphan is not None:
+            raise OpportunityError(_MISSING)
+        statement = (
+            select(M9ManualReadLeaseModel)
+            .where(
+                M9ManualReadLeaseModel.user_id == self.user_id,
+                M9ManualReadLeaseModel.project_name == self.project_name,
+                M9ManualReadLeaseModel.attempt_id.in_([m.record.attempt.attempt_id for m in members]),
+            )
+            .order_by(M9ManualReadLeaseModel.lease_id)
+            .execution_options(populate_existing=True)
+        )
+        if lock:
+            statement = statement.with_for_update()
+        rows = (await self.session.scalars(statement)).all()
+        return tuple([await self._verified_read(row) for row in rows])
+
+    async def begin_closure(
+        self, attempt_id: str, *, expected_envelope_version: int, dependency_plan: ManualClosurePlan | None = None
+    ) -> AdmissionClosureIntent:
+        existing = (
+            await self.session.scalars(
+                select(M9ManualClosureIntentModel)
+                .where(
+                    M9ManualClosureIntentModel.user_id == self.user_id,
+                    M9ManualClosureIntentModel.project_name == self.project_name,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        for row in existing:
+            stored = await self._closure_value(row)
+            if any(m.record.attempt.attempt_id == attempt_id for m in stored.members):
+                return await self.get_closure(stored.intent.closure_id)
+        if not isinstance(dependency_plan, ManualClosurePlan) or dependency_plan.attempt_id != attempt_id:
+            raise OpportunityError(_MISSING)
+        planning = dependency_plan.planning_transaction
+        if (
+            not isinstance(planning, SessionTransaction)
+            or planning.is_active
+            or planning.session.get_transaction() is planning
+            or planning is self.session.sync_session.get_transaction()
+        ):
+            raise OpportunityError(_STALE)
+        records = {m.record.attempt.attempt_id: m.record for m in dependency_plan.members}
+        await self._guard_dependencies(records, operational_attempt_id=None)
+        current = await self._closure_members(attempt_id)
+        if current != dependency_plan.members:
+            raise OpportunityError(_STALE)
+        root = next(m for m in current if m.record.attempt.attempt_id == attempt_id)
+        if root.admission.version != expected_envelope_version:
+            raise OpportunityError(_STALE)
+        now = await self.profiles.database_time()
+        for member in current:
+            if member.admission.phase != AdmissionPhase.READY:
+                raise OpportunityError(_MISSING)
+            if member is not root:
+                deadline = None if member.admission.deadlines is None else member.admission.deadlines.retention_due_at
+                if deadline is None or now < deadline:
+                    raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
+        reads = await self._closure_reads(current, lock=True)
+        intent = AdmissionClosureIntent(
+            closure_id=uuid7(),
+            user_id=self.user_id,
+            project_name=self.project_name,
+            attempt_id=attempt_id,
+            attempt_version=root.record.attempt.attempt_version,
+            envelope_version=expected_envelope_version + 1,
+            phase="CLEANUP_PENDING",
+            version=1,
+            object_refs=tuple(sorted({r for m in current for r in self._admission_refs(m.admission)})),
+            fenced_at=now,
+        )
+        stored = _ClosureRecord(fence=intent, intent=intent, members=current, reads=reads)
+        for member in current:
+            await self._phase_member(
+                member, phase=AdmissionPhase.CLEANUP_PENDING, closure_id=intent.closure_id, now=now
+            )
+            self._add_event(
+                aggregate_id=member.record.attempt.attempt_id,
+                version=member.admission.version + 1,
+                kind="MANUAL_ADMISSION_FENCED",
+                digest=self._fence_digest(stored, member),
+                at=now,
+            )
+        await self._store_closure(stored)
+        return intent
+
+    async def _phase_member(
+        self, member: _ClosureMember, *, phase: AdmissionPhase, closure_id: str, now: datetime
+    ) -> None:
+        original = member.admission
+        pending = phase == AdmissionPhase.CLEANUP_PENDING
+        version = original.version + (1 if pending else 2)
+        body = {**original.model_dump(), "phase": phase, "version": version}
+        envelope = AdmissionEnvelope.model_validate({**body, "metadata_digest": admission_metadata_digest(body)})
+        if original.claim_ref is not None:
+            row = await self.session.get(
+                M9ManualUploadLeaseModel,
+                (
+                    self.user_id,
+                    self.project_name,
+                    original.claim_ref,
+                    original.request.upload_version,
+                    original.request.attempt_id,
+                ),
+                populate_existing=True,
+            )
+            if row is None:
+                raise OpportunityError(_MISSING)
+            lease = _upload_lease(row)
+            if (lease.state, lease.version, lease.closure_id) != (
+                ("ACTIVE", 1, None) if pending else ("CLOSING", 2, closure_id)
+            ):
+                raise OpportunityError(_STALE)
+            updated = lease.model_copy(
+                update={
+                    "state": "CLOSING" if pending else "SPENT",
+                    "version": 2 if pending else 3,
+                    "closure_id": closure_id,
+                }
+            )
+            row.state, row.version, row.closure_id = updated.state, updated.version, closure_id
+            row.body_json, row.metadata_digest = _pack(updated), _record_digest(updated)
+        if pending:
+            await self.session.execute(
+                update(M9ManualAdmissionModel)
+                .where(
+                    M9ManualAdmissionModel.user_id == self.user_id,
+                    M9ManualAdmissionModel.project_name == self.project_name,
+                    M9ManualAdmissionModel.attempt_id == original.request.attempt_id,
+                )
+                .values(erasure_fenced_at=now, erasure_version=1)
+            )
+        await self._save_envelope(envelope, expected_version=original.version if pending else original.version + 1)
+
+    async def _locked_closure(
+        self, closure_id: str, *, mutation: bool
+    ) -> tuple[M9ManualClosureIntentModel, _ClosureRecord]:
+        row = await self._closure_row(closure_id)
+        if row is None:
+            raise OpportunityError(_MISSING)
+        initial = await self._closure_value(row)
+        records = {}
+        for member in initial.members:
+            attempt_row = await self._row(member.record.attempt.attempt_id)
+            if attempt_row is None:
+                raise OpportunityError(_MISSING)
+            current = await self._record(attempt_row)
+            original = member.record
+            history = tuple(sorted(current.transitions, key=lambda e: e.to_version))
+            original_history = tuple(sorted(original.transitions, key=lambda e: e.to_version))
+            added = history[len(original_history) :]
+            if (
+                current.command != original.command
+                or current.descriptor != original.descriptor
+                or current.request != original.request
+                or current.attempt.attempt_version < original.attempt.attempt_version
+                or history[: len(original_history)] != original_history
+                or any(
+                    getattr(current.attempt, key) != getattr(original.attempt, key)
+                    for key in (
+                        "user_id",
+                        "project_name",
+                        "actor_id",
+                        "command_id",
+                        "request_digest",
+                        "query_id",
+                        "query_revision",
+                        "query_digest",
+                        "adapter_version",
+                        "started_at",
+                        "provider_request_id",
+                        "quota_disposition",
+                        "quota_units_observed",
+                        "page_cursor_digest",
+                    )
+                )
+                or (
+                    current.attempt.attempt_version == original.attempt.attempt_version
+                    and current.attempt != original.attempt
+                )
+                or (
+                    current.attempt.attempt_version > original.attempt.attempt_version
+                    and (
+                        not added
+                        or (added[0].from_version, added[0].from_state)
+                        != (original.attempt.attempt_version, original.attempt.state)
+                        or added[0].at < initial.fence.fenced_at
+                    )
+                )
+            ):
+                raise OpportunityError(_MISSING)
+            records[current.attempt.attempt_id] = current
+        await self.lock_commands(tuple(r.command.context for r in records.values()))
+        if mutation:
+            await self._guard_dependencies(records, operational_attempt_id=None)
+        row = await self._closure_row(closure_id, lock=mutation)
+        if row is None:
+            raise OpportunityError(_MISSING)
+        stored = await self._closure_value(row)
+        if (
+            stored.fence != initial.fence
+            or stored.members != initial.members
+            or stored.reads != initial.reads
+            or stored.intent.version < initial.intent.version
+        ):
+            raise OpportunityError(_STALE)
+        current_members = await self._closure_members(stored.intent.attempt_id)
+        if tuple(m.record.attempt.attempt_id for m in current_members) != tuple(records):
+            raise OpportunityError(_STALE)
+        for member in current_members:
+            await self._envelope(member.record)
+        return row, stored
+
+    async def get_closure(self, closure_id: str) -> AdmissionClosureIntent:
+        _, stored = await self._locked_closure(closure_id, mutation=False)
+        return stored.intent
+
+    async def authorize_deletion(self, closure_id: str, *, expected_closure_version: int) -> AdmissionClosureIntent:
+        row, stored = await self._locked_closure(closure_id, mutation=True)
+        if stored.authorized_at is not None:
+            return stored.intent
+        if stored.intent.version != expected_closure_version:
+            raise OpportunityError(_STALE)
+        now = await self.profiles.database_time()
+        reads = await self._closure_reads(stored.members, lock=True)
+        if len(reads) != len(stored.reads) or any(
+            (a.permit, a.attempt_version) != (b.permit, b.attempt_version)
+            for a, b in zip(reads, stored.reads, strict=True)
+        ):
+            raise OpportunityError(_MISSING)
+        if any(r.released_at is None and now < r.permit.expires_at for r in reads):
+            raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
+        updated = stored.model_copy(
+            update={"intent": stored.intent.model_copy(update={"version": 2}), "authorized_at": now}
+        )
+        await self._store_closure(updated, row)
+        return updated.intent
+
+    async def finish_closure(
+        self, receipt: AdmissionDeletionReceipt, *, expected_closure_version: int
+    ) -> AdmissionClosureIntent:
+        try:
+            receipt = AdmissionDeletionReceipt.model_validate(receipt.model_dump())
+        except ValueError:
+            raise OpportunityError(_MISSING) from None
+        row, stored = await self._locked_closure(receipt.closure.closure_id, mutation=True)
+        if stored.receipt is not None:
+            if stored.receipt != receipt:
+                raise OpportunityError(_CONFLICT)
+            return stored.intent
+        now = await self.profiles.database_time()
+        if (
+            stored.authorized_at is None
+            or receipt.closure != stored.intent
+            or (
+                stored.intent.version != expected_closure_version
+                or receipt.deleted_at < stored.authorized_at
+                or receipt.deleted_at > now
+            )
+        ):
+            raise OpportunityError(_STALE)
+        reads = await self._closure_reads(stored.members, lock=True)
+        if len(reads) != len(stored.reads) or any(
+            (a.permit, a.attempt_version) != (b.permit, b.attempt_version)
+            for a, b in zip(reads, stored.reads, strict=True)
+        ):
+            raise OpportunityError(_MISSING)
+        if any(r.released_at is None and now < r.permit.expires_at for r in reads):
+            raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
+        objects = [o for m in stored.members for o in m.admission.objects]
+        if len({p.payload_ref for p in receipt.retained_proofs}) != len(receipt.retained_proofs):
+            raise OpportunityError(_MISSING)
+        for proof in receipt.retained_proofs:
+            if proof not in objects or proof.retained_material_digest is None:
+                raise OpportunityError(_MISSING)
+            refs = {proof.payload_ref, proof.integrity_ref, proof.attestation_ref}
+            while True:
+                aliases = [o for o in objects if refs.intersection((o.payload_ref, o.integrity_ref, o.attestation_ref))]
+                expanded = refs | {r for o in aliases for r in (o.payload_ref, o.integrity_ref, o.attestation_ref)}
+                if expanded == refs:
+                    break
+                refs = expanded
+            if any(not r.digest_proof_may_be_retained for o in aliases for r in o.data_rules):
+                raise OpportunityError(_MISSING)
+        for member in stored.members:
+            await self._phase_member(member, phase=AdmissionPhase.ERASED, closure_id=stored.intent.closure_id, now=now)
+        updated = stored.model_copy(
+            update={
+                "intent": stored.intent.model_copy(update={"phase": "ERASED", "version": 3}),
+                "receipt": receipt,
+                "finished_at": now,
+            }
+        )
+        await self._store_closure(updated, row)
+        return updated.intent
+
     async def claim_dispatch(
         self, attempt_id: str, *, expected_attempt_version: int, expected_envelope_version: int
     ) -> DispatchClaim:
@@ -1883,6 +2651,13 @@ class ManualAdmissionRepository:
                 metadata_digest=_record_digest(lease),
             )
         )
+        self._add_event(
+            aggregate_id=permit.lease_id,
+            version=1,
+            kind="MANUAL_READ_ISSUED",
+            digest=_record_digest(lease),
+            at=permit.issued_at,
+        )
         await _flush(self.session)
         return permit
 
@@ -1906,13 +2681,21 @@ class ManualAdmissionRepository:
                 .execution_options(populate_existing=True)
             )
         ).one()
-        lease = _read_lease(row)
+        lease = await self._verified_read(row)
         if lease.released_at is not None:
             return
-        lease = lease.model_copy(update={"released_at": await self.profiles.database_time()})
+        released_at = await self.profiles.database_time()
+        lease = lease.model_copy(update={"released_at": released_at})
         row.released_at = lease.released_at
         row.body_json = _pack(lease)
         row.metadata_digest = _record_digest(lease)
+        self._add_event(
+            aggregate_id=lease_id,
+            version=2,
+            kind="MANUAL_READ_RELEASED",
+            digest=_record_digest(lease),
+            at=released_at,
+        )
         await _flush(self.session)
 
     def _event_digest(self, record: _AttemptRecord, event: _Transition) -> str:
