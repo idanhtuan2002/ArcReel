@@ -34,6 +34,7 @@ from server.story_authoring.checks import (
     ends_cleanly,
     strip_copied_sentences,
     strip_markup,
+    strip_meta_narration,
     strip_replayed_sentences,
     trim_unterminated_tail,
 )
@@ -247,7 +248,7 @@ class RepairOutcome:
 def deterministic_fixes(
     text: str, findings: Sequence[Finding], *, earlier: Sequence[str] = ()
 ) -> tuple[str, tuple[str, ...]]:
-    """Fixes that need no model: an unfinished last sentence is cut, markdown emphasis is dropped, sentences copied
+    """Fixes that need no model: an unfinished last sentence is cut, markdown emphasis and narration about the story itself are dropped, sentences copied
     from earlier scenes and repeated passages are removed by the dedupe core."""
     codes = {f.code for f in findings}
     notes: list[str] = []
@@ -266,6 +267,9 @@ def deterministic_fixes(
     if "MARKUP" in codes:
         text = strip_markup(text)
         notes.append("removed markdown emphasis")
+    if "META_NARRATION" in codes:
+        text, removed = strip_meta_narration(text)
+        notes.extend(f"removed narration about the story itself: {r[:56]}" for r in removed)
     if "CROSS_SCENE_REPLAY" in codes:
         text, copied = strip_copied_sentences(text, earlier)
         notes.extend(f"removed sentence copied from an earlier scene: {c[:56]}" for c in copied)

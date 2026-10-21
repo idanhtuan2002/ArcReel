@@ -4,7 +4,7 @@ Every model-calling donor surface is run in two arms on the same fixture, the sa
 (native ``/api/chat``, grammar-constrained, no-CJK pattern, same decoding preset, seeds 300-309): the R2 arm uses
 the shipped R2 prompt; the donor arm uses the donor's prompt text verbatim, read from the pinned donor checkout and
 checked against the baseline's sha256, plus a Vietnamese-output instruction. Only the prompt differs; output
-schema, paragraph bounds, quote verification and patch application are shared (recorded harness deviation).
+schema (the chapter plan's bound POV/location enums included), paragraph bounds, quote verification and patch application are shared (recorded harness deviation).
 
 Surfaces: S01 outline, S02 chapter plan vs Novel Studio, S03 chapter plan vs Shenbi, S04 scene drafting, S05
 continuity audit vs Novel Studio, S06 specialist audits vs Shenbi, S07 span repair vs Huohuo, S10 length
@@ -103,6 +103,7 @@ from server.story_authoring.prompts.schemas import (
     StoryBibleOut,
     StorySeed,
     StyleBibleOut,
+    bound_chapter_plan,
 )
 from server.story_authoring.repair import normalize_length, span_repair
 from server.story_authoring.script_guard import find_cjk
@@ -522,10 +523,11 @@ async def _chapter_plans(run: Run, surface: str, donor_system: str, donor_prompt
         location_names=list(up.locations),
         previous_plans=[up.plan1],
     )
+    plan_model = bound_chapter_plan(list(up.names), list(up.locations))
     r2_samples, donor_samples, prefs = [], [], []
     for seed in SEEDS:
         mine, error = await b.structured(
-            f"{surface}-r2-{seed}", planning.PLANNING_SYSTEM, r2_prompt, ChapterPlan, PLANNING, seed
+            f"{surface}-r2-{seed}", planning.PLANNING_SYSTEM, r2_prompt, plan_model, PLANNING, seed
         )
         if mine is not None:
             review, _ = await b.structured(
@@ -542,13 +544,13 @@ async def _chapter_plans(run: Run, surface: str, donor_system: str, donor_prompt
                     f"{surface}-r2v-{seed}",
                     planning.PLANNING_SYSTEM,
                     planning.chapter_plan_revision_prompt(r2_prompt, mine, review.problems),
-                    ChapterPlan,
+                    plan_model,
                     PLANNING,
                     seed,
                 )
                 mine = revised or mine
         donor, derror = await b.structured(
-            f"{surface}-d-{seed}", donor_system, donor_prompt, ChapterPlan, PLANNING, seed
+            f"{surface}-d-{seed}", donor_system, donor_prompt, plan_model, PLANNING, seed
         )
         for arm, value, err in ((r2_samples, mine, error), (donor_samples, donor, derror)):
             unknown = (

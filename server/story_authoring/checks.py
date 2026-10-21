@@ -51,6 +51,30 @@ class Finding:
     def blocking(self) -> bool:
         return self.severity in BLOCKING
 
+    @property
+    def escalable(self) -> bool:
+        """A blocking quality finding that goes to the Human, on the best version, once automatic repair is spent;
+        integrity findings never do."""
+        return self.blocking and (self.code in ESCALABLE_CODES or self.code.startswith(ESCALABLE_PREFIX))
+
+
+ESCALABLE_CODES = frozenset({"NO_ENDING", "SCENE_TOO_SHORT", "LENGTH_HARD", "STORY_LENGTH"})
+ESCALABLE_PREFIX = "MEMO_COMPLIANCE:"
+ESCALATED_MARK = "[hết lượt sửa tự động] "
+
+
+def escalated(finding: Finding) -> Finding:
+    """The narrative-critical exception the Human decides at touchpoint 2."""
+    return Finding(
+        finding.code, Severity.NARRATIVE_CRITICAL, finding.node_id, ESCALATED_MARK + finding.message, finding.quote
+    )
+
+
+def escalate_or_block(findings: Sequence[Finding]) -> tuple[list[Finding], list[Finding]]:
+    """Findings with every escalable one turned into an exception, and the blocking findings that remain."""
+    out = [escalated(f) if f.escalable else f for f in findings]
+    return out, [f for f in out if f.blocking]
+
 
 # --- ECMAScript whitespace -------------------------------------------------------------------------
 
@@ -624,6 +648,31 @@ def meta_leaks(text: str) -> list[str]:
     return [lines[i].strip() for i in sorted(starts) if i < len(lines)]
 
 
+_META_NARRATION = re.compile(
+    r"\b(?:chương|hồi)\s+(?:một|hai|ba|bốn|năm|\d+)\b"
+    r"|\bkhép lại chương\b"
+    r"|\bxung đột (?:chính|trung tâm)\b"
+    r"|\bnhân vật chính\b"
+    r"|\bcâu chuyện (?:khép lại|kết thúc|đến đây)\b",
+    re.IGNORECASE,
+)
+
+
+def meta_narration(text: str) -> list[str]:
+    """Sentences in which the narration talks about the story itself: chapter numbers, the central conflict, the
+    protagonist as a role, the story ending."""
+    return [" ".join(m.group(0).split()) for m in _VI_SENTENCE.finditer(text) if _META_NARRATION.search(m.group(0))]
+
+
+def strip_meta_narration(content: str) -> tuple[str, tuple[str, ...]]:
+    """Remove the sentences :func:`meta_narration` finds."""
+    removals = [(m.start(), m.end()) for m in _VI_SENTENCE.finditer(content) if _META_NARRATION.search(m.group(0))]
+    if not removals:
+        return content, ()
+    removed = tuple(" ".join(content[a:b].split()) for a, b in removals)
+    return re.sub(r"[ \t]{2,}", " ", _remove_spans(content, removals)).strip(), removed
+
+
 def ends_cleanly(text: str) -> bool:
     return text.rstrip().endswith(_CLOSING)
 
@@ -724,6 +773,10 @@ def check_scene_prose(
     findings.extend(
         Finding("META_LEAK", Severity.HARD_STRUCTURAL, node_id, "heading, label or note in prose", leak)
         for leak in meta_leaks(text)[:3]
+    )
+    findings.extend(
+        Finding("META_NARRATION", Severity.HARD_STRUCTURAL, node_id, "the narration talks about the story itself", s)
+        for s in meta_narration(text)[:3]
     )
     foreign = foreign_words(text)
     if foreign:

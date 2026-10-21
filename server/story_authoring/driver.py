@@ -18,6 +18,7 @@ Canon genesis, the plan and every scene's evidence for the Human's single approv
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import uuid
@@ -39,7 +40,15 @@ from server.story_authoring.audits import (
     unconfirmed,
     unfaithful_blurbs,
 )
-from server.story_authoring.checks import Finding, SceneLengthWindow, Severity, check_scene_prose, count_syllables
+from server.story_authoring.checks import (
+    ESCALATED_MARK,
+    Finding,
+    SceneLengthWindow,
+    Severity,
+    check_scene_prose,
+    count_syllables,
+    escalate_or_block,
+)
 from server.story_authoring.commit import ManuscriptCommitManifest, SceneEntry, load_offered_manifest, offer_manifest
 from server.story_authoring.contracts import (
     AttemptKind,
@@ -88,6 +97,7 @@ from server.story_authoring.prompts.schemas import (
     StoryBibleOut,
     StorySeed,
     StyleBibleOut,
+    bound_chapter_plan,
 )
 from server.story_authoring.repair import deterministic_fixes, normalize_length, span_repair
 from server.story_authoring.runtime import RunPhase, RunState, RunStateStore, add_intent, promote, require, set_phase
@@ -104,6 +114,8 @@ NODE_CAPS = {
     "manuscript_review": 4,
     "packaging": 3,
 }
+TRANSPORT = frozenset({StoryFailureCode.MODEL_UNAVAILABLE, StoryFailureCode.PROVIDER_ERROR})
+TRANSPORT_RETRY_DELAYS = (5.0, 20.0)
 REVIEW_CYCLES = 2
 CONVERGE_PASSES = 6
 JUDGE_ATTEMPTS = 3
@@ -220,6 +232,7 @@ class StoryRunDriver:
         blobs: StoryBlobStore,
         judge_gateway: AuthoringTextGateway | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        retry_delays: Sequence[float] = TRANSPORT_RETRY_DELAYS,
     ) -> None:
         if (brief.judge_selection is None) != (judge_gateway is None):
             raise ValueError("a judge gateway is given exactly when the brief names a judge route")
@@ -233,6 +246,8 @@ class StoryRunDriver:
         self._judge_gateway = judge_gateway or gateway
         self._blobs = blobs
         self._clock = clock
+        self._retry_delays = tuple(retry_delays)
+        self._outages = 0
         self._scope = StoryScope(
             user_id=identity.user_id, project_name=identity.project_name, actor_id=f"run:{identity.run_id}"
         )
@@ -393,9 +408,12 @@ class StoryRunDriver:
                         max_paragraphs=paragraphs[1],
                     ),
                 )
+                self._outages = 0
                 return output.text
             except StoryStepError as error:
-                if error.code not in RETRYABLE:
+                if error.code in TRANSPORT:
+                    await self._outage(error)
+                elif error.code not in RETRYABLE:
                     raise
 
     # --- stages ------------------------------------------------------------------------------------
@@ -554,6 +572,8 @@ class StoryRunDriver:
         if notes:
             prompt += "\n\n[Yêu cầu sửa kế hoạch]\n" + "\n".join(f"- {n}" for n in notes)
 
+        bound = bound_chapter_plan(list(names), list(locations))
+
         async def generate(text: str) -> tuple[ChapterPlan, list[str]]:
             plan = ChapterPlan.model_validate_json(
                 await self._step(
@@ -563,11 +583,11 @@ class StoryRunDriver:
                     system=planning.PLANNING_SYSTEM,
                     prompt=text,
                     decoding=PLANNING,
-                    model=ChapterPlan,
+                    model=bound,
                 )
             )
             unknown = sorted(
-                {n for s in plan.scenes for n in (s.pov, *s.characters) if planning.resolve_name(n, names) is None}
+                {s.pov for s in plan.scenes if planning.resolve_name(s.pov, names) is None}
                 | {s.location for s in plan.scenes if planning.resolve_name(s.location, locations) is None}
             )
             return plan, unknown
@@ -579,7 +599,7 @@ class StoryRunDriver:
             )
             plan, unknown = await generate(prompt)
         if unknown:
-            raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: names outside the bible: {', '.join(unknown)}")
+            raise Blocked(RunPhase.BLOCKED_QUALITY, f"{node}: POV or location outside the bible: {', '.join(unknown)}")
         review = OutlineReview.model_validate_json(
             await self._step(
                 node,
@@ -702,7 +722,7 @@ class StoryRunDriver:
         target = drafting.target_syllables_for(
             chapter.scenes, story_target=self._brief.story_target_syllables, chapters=CHAPTERS
         )
-        allowed = set(story.names.values())
+        allowed = _allowed_names(story)
         earlier = [a.revision.normalized_content for a in acceptances]
 
         async def produce(epoch: int) -> bytes:
@@ -758,6 +778,7 @@ class StoryRunDriver:
             paragraph_max_chars=drafting.paragraph_max_chars(target),
         )
         history: list[str] = []
+        best: tuple[str, tuple[Finding, ...]] | None = None
         while True:
             findings = check_scene_prose(
                 prose,
@@ -767,32 +788,35 @@ class StoryRunDriver:
                 requires_dialogue=dialogue,
                 earlier=earlier,
             )
+            if best is None or _weight(findings) <= _weight(best[1]):
+                best = (prose, findings)
             repairable = [f for f in findings if f.severity in REPAIRABLE]
             if not repairable:
                 return prose, findings
-            if any(f.code == "SCENE_TOO_SHORT" for f in repairable):
-                prose = await self._step(
-                    node,
-                    epoch,
-                    kind=StoryStepKind.SCENE_DRAFT,
-                    system=drafting.DRAFT_SYSTEM,
-                    prompt=prompt + REGENERATE_NOTE,
-                    decoding=DRAFT,
-                    paragraphs=bounds,
-                    paragraph_chars=drafting.paragraph_min_chars(target),
-                    paragraph_max_chars=drafting.paragraph_max_chars(target),
-                )
-                continue
-            fixed, notes = deterministic_fixes(prose, repairable, earlier=earlier)
-            if notes:
-                prose = fixed
-                continue
             try:
+                if any(f.code == "SCENE_TOO_SHORT" for f in repairable):
+                    prose = await self._step(
+                        node,
+                        epoch,
+                        kind=StoryStepKind.SCENE_DRAFT,
+                        system=drafting.DRAFT_SYSTEM,
+                        prompt=prompt + REGENERATE_NOTE,
+                        decoding=DRAFT,
+                        paragraphs=bounds,
+                        paragraph_chars=drafting.paragraph_min_chars(target),
+                        paragraph_max_chars=drafting.paragraph_max_chars(target),
+                    )
+                    continue
+                fixed, notes = deterministic_fixes(prose, repairable, earlier=earlier)
+                if notes:
+                    prose = fixed
+                    continue
                 prose = await self._repair_once(node, epoch, prose, repairable, context, history)
             except Blocked:
-                if any(f.blocking for f in repairable):
+                kept, blocking = escalate_or_block(best[1])
+                if blocking:
                     raise
-                return prose, findings
+                return best[0], tuple(kept)
 
     async def _repair_once(
         self, node: str, epoch: int, prose: str, findings: Sequence[Finding], context: str, history: list[str]
@@ -828,10 +852,14 @@ class StoryRunDriver:
                     **common,
                 )
         except StoryStepError as error:
+            if error.code in TRANSPORT:
+                await self._outage(error)
+                return prose
             if error.code not in RETRYABLE:
                 raise
             history.append(f"{error.code.value}")
             return prose
+        self._outages = 0
         history.append(outcome.reason)
         return outcome.text
 
@@ -882,8 +910,8 @@ class StoryRunDriver:
             for scene_node in sorted({f.node_id for f in repairable}):
                 scene_findings = [f for f in repairable if f.node_id == scene_node]
                 memo = [f for f in scene_findings if f.code.startswith(f"{AuditDimension.MEMO_COMPLIANCE.value}:")]
-                contract = [f for f in memo if f.blocking]
-                scene_findings = [f for f in scene_findings if f not in memo]
+                contract = [f for f in memo if f.blocking and not _excess(f)]
+                scene_findings = [f for f in scene_findings if f not in memo or _excess(f)]
                 if contract:
                     note = (
                         AUTO_NOTE
@@ -900,16 +928,21 @@ class StoryRunDriver:
                 state = await self._store.load()
                 scene_epoch = state.node(scene_node).generation_epoch
                 scene_head = heads[scene_node]
-                repaired = await self._repair_once(
-                    scene_node, scene_epoch, scene_head["prose"], scene_findings, facts, []
-                )
-                if repaired != scene_head["prose"]:
+                try:
+                    repaired = await self._repair_once(
+                        scene_node, scene_epoch, scene_head["prose"], scene_findings, facts, []
+                    )
+                except Blocked:
+                    continue
+                if repaired != scene_head["prose"] and self._no_worse(story, scene_head["prose"], repaired):
                     await self._replace_head(
                         scene_node, json.dumps({**scene_head, "prose": repaired}, ensure_ascii=False).encode("utf-8")
                     )
                     changed = True
             if changed:
                 return True
+            # Automatic repair changed nothing: seal now, as a later cycle would audit the same text.
+            final = True
         blocking = [f for f in findings if f.blocking]
         contract = f"{AuditDimension.MEMO_COMPLIANCE.value}:"
         if final and blocking and all(f.code.startswith(contract) for f in blocking):
@@ -925,17 +958,29 @@ class StoryRunDriver:
                     )
                 )
                 raise _Restart(plan_node)
-        if final and any(f.blocking for f in findings):
-            raise Blocked(
-                RunPhase.BLOCKED_QUALITY,
-                f"{node}: " + "; ".join(f"{f.code} {f.node_id}" for f in findings if f.blocking),
-                [f for f in findings if f.blocking],
-            )
+        if final:
+            findings, blocking = escalate_or_block(findings)
+            if blocking:
+                raise Blocked(
+                    RunPhase.BLOCKED_QUALITY,
+                    f"{node}: " + "; ".join(f"{f.code} {f.node_id}" for f in blocking),
+                    blocking,
+                )
         record = json.dumps({"findings": [_finding_dict(f) for f in findings]}, ensure_ascii=False).encode("utf-8")
         await self._promote(
             node, record, fp, expected=state.node(node).head_revision_id, epoch=state.node(node).generation_epoch
         )
         return False
+
+    def _no_worse(self, story: _Story, before: str, after: str) -> bool:
+        """Shenbi's revision acceptance: a repair is kept only if it adds no integrity or structural finding."""
+
+        def weight(text: str) -> tuple[int, int, int]:
+            return _weight(
+                check_scene_prose(text, node_id="", window=self._window, allowed_names=_allowed_names(story))
+            )
+
+        return weight(after)[:2] <= weight(before)[:2]
 
     async def _confirmed(
         self, node: str, finding: Finding, scenes: Sequence[tuple[str, str]], plan: ChapterPlan
@@ -959,17 +1004,33 @@ class StoryRunDriver:
 
     async def _judge[T](self, node: str, call: Callable[[str, StoryDecoding], Awaitable[T]]) -> T:
         """One judgment of a review node, retried under a new step id on a recoverable output failure."""
-        for attempt in range(JUDGE_ATTEMPTS):
+        attempt = 0
+        while True:
             state = await self._store.load()
             prefix = step_prefix(state, node)
             used = sum(1 for a in state.attempts if a.kind is AttemptKind.GENERATE and a.step_id.startswith(prefix))
             step_id = f"{prefix}{used + 1}"
             try:
-                return await call(step_id, _decoding(REVIEW, step_id))
+                result = await call(step_id, _decoding(REVIEW, step_id))
+                self._outages = 0
+                return result
             except StoryStepError as error:
-                if error.code not in RETRYABLE or attempt == JUDGE_ATTEMPTS - 1:
+                if error.code in TRANSPORT:
+                    await self._outage(error)
+                    continue
+                attempt += 1
+                if error.code not in RETRYABLE or attempt == JUDGE_ATTEMPTS:
                     raise
-        raise AssertionError("unreachable")
+
+    async def _outage(self, error: StoryStepError) -> None:
+        """Shenbi's dispatch rule: a transport failure is retried after a pause, at most ``len(retry_delays)`` times
+        in a row; then the run stops at ``MODEL_UNAVAILABLE`` for the Human's Retry."""
+        if self._outages >= len(self._retry_delays):
+            raise error
+        delay = self._retry_delays[self._outages]
+        self._outages += 1
+        if delay:
+            await asyncio.sleep(delay)
 
     async def _manuscript_review(self, story: _Story, outline_in: tuple[str, str]) -> None:
         refs = scene_refs(story.outline_input)
@@ -1002,6 +1063,7 @@ class StoryRunDriver:
                 if ENDING_NOTE not in state.intents.get(final_scene, ()):
                     await self._store.apply(lambda s: (add_intent(s, node_ids=(final_scene,), note=ENDING_NOTE), None))
                     raise _Restart(final_scene)
+            findings, blocking = escalate_or_block(findings)
             if blocking:
                 raise Blocked(
                     RunPhase.BLOCKED_QUALITY,
@@ -1039,6 +1101,7 @@ class StoryRunDriver:
         inputs = [seed_in, ("manuscript", content_digest(manuscript.encode()))]
 
         async def produce(epoch: int) -> bytes:
+            attempts: list[tuple[Packaging, set[str]]] = []
             for _ in range(2):
                 packaging = Packaging.model_validate_json(
                     await self._step(
@@ -1053,44 +1116,61 @@ class StoryRunDriver:
                         model=Packaging,
                     )
                 )
-                unverified = packaging_prompts.unverified_selling_points(packaging, manuscript)
-                kept = [p.model_dump() for p in packaging.selling_points if p.point not in unverified]
-                if len(kept) < MIN_VERIFIED_SELLING_POINTS:
-                    continue
-                claims = await self._judge(
-                    "packaging",
-                    lambda step_id, decoding, blurbs=packaging.blurbs: unfaithful_blurbs(
-                        self._judge_gateway,
-                        scope=self._scope,
-                        selection=self._brief.judge,
-                        step_id=step_id,
-                        context_digest=self._brief.digest(),
-                        decoding=decoding,
-                        blurbs=blurbs,
-                        manuscript=manuscript,
-                    ),
-                )
-                flagged = {c.blurb - 1 for c in claims}
-                order = sorted(range(len(packaging.blurbs)), key=lambda i: i in flagged)
-                blurbs = [packaging.blurbs[i] for i in order]
-                verified = Packaging.model_validate(
-                    {**packaging.model_dump(), "selling_points": kept, "blurbs": blurbs}
-                )
-                findings = [
+                attempts.append((packaging, set(packaging_prompts.unverified_selling_points(packaging, manuscript))))
+                if len(packaging.selling_points) - len(attempts[-1][1]) >= MIN_VERIFIED_SELLING_POINTS:
+                    break
+            packaging, unverified = min(attempts, key=lambda a: len(a[1]))
+            verified_points = [p for p in packaging.selling_points if p.point not in unverified]
+            if len(verified_points) >= MIN_VERIFIED_SELLING_POINTS:
+                kept = [p.model_dump() for p in verified_points]
+                point_findings: list[Finding] = []
+            else:
+                kept = [p.model_dump() for p in packaging.selling_points]
+                point_findings = [
                     Finding(
-                        "BLURB_UNSUPPORTED",
+                        "SELLING_POINT_UNVERIFIED",
                         Severity.NARRATIVE_CRITICAL,
                         "packaging",
-                        f"bản giới thiệu nêu chi tiết không có trong truyện: {c.reason}",
-                        c.claim,
+                        f"{ESCALATED_MARK}điểm bán hàng không trích được câu nào trong truyện: {p.point}",
+                        p.evidence_quote,
                     )
-                    for c in claims
+                    for p in packaging.selling_points
+                    if p.point in unverified
                 ]
-                return json.dumps(
-                    {"packaging": verified.model_dump(), "findings": [_finding_dict(f) for f in findings]},
-                    ensure_ascii=False,
-                ).encode("utf-8")
-            raise Blocked(RunPhase.BLOCKED_QUALITY, "packaging: fewer than three selling points quote the manuscript")
+            claims = await self._judge(
+                "packaging",
+                lambda step_id, decoding, blurbs=packaging.blurbs: unfaithful_blurbs(
+                    self._judge_gateway,
+                    scope=self._scope,
+                    selection=self._brief.judge,
+                    step_id=step_id,
+                    context_digest=self._brief.digest(),
+                    decoding=decoding,
+                    blurbs=blurbs,
+                    manuscript=manuscript,
+                ),
+            )
+            flagged = {c.blurb - 1 for c in claims}
+            order = sorted(range(len(packaging.blurbs)), key=lambda i: i in flagged)
+            blurbs = [packaging.blurbs[i] for i in order]
+            verified = Packaging.model_validate({**packaging.model_dump(), "selling_points": kept, "blurbs": blurbs})
+            findings = [
+                Finding(
+                    "BLURB_UNSUPPORTED",
+                    Severity.NARRATIVE_CRITICAL,
+                    "packaging",
+                    f"bản giới thiệu nêu chi tiết không có trong truyện: {c.reason}",
+                    c.claim,
+                )
+                for c in claims
+            ]
+            return json.dumps(
+                {
+                    "packaging": verified.model_dump(),
+                    "findings": [_finding_dict(f) for f in (*point_findings, *findings)],
+                },
+                ensure_ascii=False,
+            ).encode("utf-8")
 
         await self._ensure("packaging", inputs=inputs, decoding=PLANNING, produce=produce)
 
@@ -1137,7 +1217,7 @@ class StoryRunDriver:
         packaging = Packaging.model_validate(packaged["packaging"])
         findings.extend(_finding_from(f) for f in packaged["findings"])
         findings.extend(story_length_findings([chapters[c] for c in sorted(chapters)]))
-        blocking = [f for f in findings if f.blocking]
+        findings, blocking = escalate_or_block(findings)
         if blocking:
             raise Blocked(RunPhase.BLOCKED_QUALITY, "; ".join(f"{f.code} {f.node_id}" for f in blocking), blocking)
         record = [{**_finding_dict(f), "id": f"F{i + 1:03d}"} for i, f in enumerate(findings)]
@@ -1257,6 +1337,29 @@ def story_outline_input(
             )
             for plan in plans
         ),
+    )
+
+
+_EXCESS_MARKERS = ("withheld", "reveal", "do_not", "forbidden", "broken", "violat", "leak")
+
+
+def _excess(finding: Finding) -> bool:
+    """A memo finding about a sentence that must not be there (a revealed card, a broken do-not item): Shenbi's
+    spot-fix and Huohuo's span patch remove it; a missing change still needs the scene rewritten."""
+    return any(marker in finding.code.lower() for marker in _EXCESS_MARKERS)
+
+
+def _allowed_names(story: _Story) -> set[str]:
+    """Bible names plus every participant the chapter plans name (minor and collective characters)."""
+    return set(story.names.values()) | {n for p in story.plans for s in p.scenes for n in s.characters}
+
+
+def _weight(findings: Sequence[Finding]) -> tuple[int, int, int]:
+    """Shenbi's best-version order: fewer integrity, then structural, then narrative-critical findings."""
+    return (
+        sum(f.severity is Severity.HARD_INTEGRITY for f in findings),
+        sum(f.severity is Severity.HARD_STRUCTURAL for f in findings),
+        sum(f.severity is Severity.NARRATIVE_CRITICAL for f in findings),
     )
 
 

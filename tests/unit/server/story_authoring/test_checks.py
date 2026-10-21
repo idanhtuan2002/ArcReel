@@ -4,16 +4,19 @@ import pytest
 
 from server.story_authoring.checks import (
     VIETNAMESE_PUNCTUATION,
+    Finding,
     SceneLengthWindow,
     Severity,
     check_scene_prose,
     count_syllables,
     dialogue_lines,
     ends_cleanly,
+    escalate_or_block,
     find_intra_chapter_near_duplicate,
     foreign_words,
     is_vietnamese_syllable,
     meta_leaks,
+    meta_narration,
     repeated_trigram_excess,
     strip_copied_sentences,
     strip_intra_chapter_near_duplicate,
@@ -95,6 +98,23 @@ def test_meta_leaks_and_endings():
     assert meta_leaks(" ".join(SENTENCES)) == []
     assert ends_cleanly("Anh về rồi.”")
     assert not ends_cleanly("Anh về rồi và")
+
+
+def test_meta_narration_finds_sentences_that_talk_about_the_story_itself():
+    text = _scene(
+        SENTENCES[0],
+        "Cuộc trò chuyện ấy khép lại chương ba trong im lặng.",
+        SENTENCES[1],
+        "Xung đột chính của câu chuyện cuối cùng cũng được giải quyết.",
+        "Nhân vật chính hiểu ra mình phải ở lại.",
+    )
+    assert meta_narration(text) == [
+        "Cuộc trò chuyện ấy khép lại chương ba trong im lặng.",
+        "Xung đột chính của câu chuyện cuối cùng cũng được giải quyết.",
+        "Nhân vật chính hiểu ra mình phải ở lại.",
+    ]
+    assert meta_narration(_scene(*SENTENCES)) == []
+    assert meta_narration("Ông giở cuốn sách cũ, đọc lại chương đầu về làng biển.") == []
 
 
 def test_dialogue_lines_count_dash_and_quote_openers():
@@ -225,3 +245,46 @@ def test_a_paragraph_ending_mid_sentence_is_an_integrity_finding():
     findings = check_scene_prose(text, node_id="s", window=SceneLengthWindow(minimum=1), allowed_names={"Minh", "Lan"})
     cut = next(f for f in findings if f.code == "PARAGRAPH_CUT")
     assert cut.severity is Severity.HARD_INTEGRITY
+
+
+def test_meta_narration_in_a_scene_is_a_structural_finding():
+    findings = {
+        f.code: f
+        for f in check_scene_prose(
+            _scene(*SENTENCES, "Xung đột trung tâm khép lại từ đây."),
+            node_id="s",
+            window=SceneLengthWindow(minimum=50, maximum=200),
+            allowed_names={"Minh", "Lan"},
+        )
+    }
+    assert findings["META_NARRATION"].severity is Severity.HARD_STRUCTURAL
+    assert findings["META_NARRATION"].quote == "Xung đột trung tâm khép lại từ đây."
+
+
+@pytest.mark.parametrize(
+    ("code", "severity", "escalable"),
+    [
+        ("MEMO_COMPLIANCE:withheld_card_revealed", Severity.HARD_STRUCTURAL, True),
+        ("NO_ENDING", Severity.HARD_STRUCTURAL, True),
+        ("SCENE_TOO_SHORT", Severity.HARD_STRUCTURAL, True),
+        ("LENGTH_HARD", Severity.HARD_STRUCTURAL, True),
+        ("STORY_LENGTH", Severity.HARD_STRUCTURAL, True),
+        ("META_LEAK", Severity.HARD_STRUCTURAL, False),
+        ("META_NARRATION", Severity.HARD_STRUCTURAL, False),
+        ("MARKUP", Severity.HARD_STRUCTURAL, False),
+        ("CJK", Severity.HARD_INTEGRITY, False),
+        ("UNTERMINATED", Severity.HARD_INTEGRITY, False),
+        ("STORY_LENGTH", Severity.STYLISTIC, False),
+    ],
+)
+def test_only_quality_findings_go_to_the_human_when_repair_is_spent(code, severity, escalable):
+    finding = Finding(code, severity, "s", "m", "q")
+    kept, blocking = escalate_or_block([finding])
+    assert finding.escalable is escalable
+    if escalable:
+        assert blocking == []
+        assert kept[0].severity is Severity.NARRATIVE_CRITICAL
+        assert kept[0].message == "[hết lượt sửa tự động] m"
+    else:
+        assert kept == [finding]
+        assert blocking == ([finding] if finding.blocking else [])

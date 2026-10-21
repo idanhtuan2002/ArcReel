@@ -9,7 +9,10 @@ are derived from names by :func:`server.story_authoring.prompts.planning.entity_
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from collections.abc import Sequence
+from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 
 class _Out(BaseModel):
@@ -97,6 +100,19 @@ class ChapterPlan(_Out):
     required_changes_by_end: list[str] = Field(min_length=1, max_length=3)
     do_not: list[str] = Field(max_length=4)
     scenes: list[PlannedScene] = Field(min_length=3, max_length=5)
+
+
+def bound_chapter_plan(characters: Sequence[str], locations: Sequence[str]) -> type[ChapterPlan]:
+    """The chapter plan of one story: a scene's POV and location are enums of the bible's names, so the grammar
+    cannot emit others; the scene's other participants stay free text (minor or collective characters)."""
+    pov = StrEnum("BoundPov", {f"v{i}": name for i, name in enumerate(characters)})
+    location = StrEnum("BoundLocation", {f"v{i}": name for i, name in enumerate(locations)})
+    scene = create_model("BoundPlannedScene", __base__=PlannedScene, pov=(pov, Field()), location=(location, Field()))
+    return create_model(
+        "BoundChapterPlan",
+        __base__=ChapterPlan,
+        scenes=(list[scene], Field(min_length=3, max_length=5)),
+    )
 
 
 class TitleCandidate(_Out):

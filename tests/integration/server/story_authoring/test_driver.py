@@ -172,7 +172,8 @@ STRUCTURED: dict[str, Any] = {
 
 class ScriptedModel:
     """Answers by the request's schema. ``overrides`` replace an answer kind, ``fail_at`` breaks a call number of a
-    kind, and ``before`` runs a hook before a call number of a kind is answered."""
+    kind, ``fail_from`` breaks every call of a kind from a call number on, and ``before`` runs a hook before a call
+    number of a kind is answered."""
 
     _instances = 0
 
@@ -183,6 +184,7 @@ class ScriptedModel:
         self.paragraphs: list[str] = []
         self.overrides: dict[str, Answer] = {}
         self.fail_at: dict[str, int] = {}
+        self.fail_from: dict[str, int] = {}
         self.truncate_at: dict[str, int] = {}
         self.before: dict[tuple[str, int], Callable[[], Awaitable[None]]] = {}
         ScriptedModel._instances += 1
@@ -271,7 +273,7 @@ class ScriptedModel:
             hook = self.before.pop((kind, self.calls[kind]), None)
             if hook is not None:
                 await hook()
-            if self.fail_at.get(kind) == self.calls[kind]:
+            if self.fail_at.get(kind) == self.calls[kind] or self.calls[kind] >= self.fail_from.get(kind, 10**9):
                 return httpx.Response(500, json={"error": "model crashed"})
             if self.truncate_at.get(kind) == self.calls[kind]:
                 return httpx.Response(
@@ -313,7 +315,15 @@ def _driver(factory: Factory, store: RunStateStore, model: ScriptedModel, blobs:
     client = OllamaChatClient(base_url="http://ollama:1", transport=httpx.MockTransport(model.handler))
     sink = StoryAttemptSink(store=store, session_factory=factory, provider_id="custom-ollama", model_id=MODEL)
     gateway = AuthoringTextGateway(selection=SELECTION, limits=LIMITS, client=client, sink=sink)
-    return StoryRunDriver(identity=IDENTITY, brief=BRIEF, store=store, gateway=gateway, blobs=blobs, clock=lambda: NOW)
+    return StoryRunDriver(
+        identity=IDENTITY,
+        brief=BRIEF,
+        store=store,
+        gateway=gateway,
+        blobs=blobs,
+        clock=lambda: NOW,
+        retry_delays=(0, 0),
+    )
 
 
 async def _rerun(store: RunStateStore, *, intent: tuple[str, str] | None = None) -> None:
@@ -371,11 +381,12 @@ async def test_a_crash_mid_run_resumes_without_regenerating_converged_nodes(
     store = await _store(concurrent_session_factory)
     blobs = StoryBlobStore(tmp_path)
     crashing = ScriptedModel()
-    crashing.fail_at["prose"] = 5
+    crashing.fail_from["prose"] = 5
 
     stopped = await _driver(concurrent_session_factory, store, crashing, blobs).run()
     assert stopped.phase is RunPhase.MODEL_UNAVAILABLE
     assert stopped.commit is None
+    assert crashing.calls["prose"] == 7
 
     await _rerun(store)
     healthy = ScriptedModel()
@@ -479,17 +490,28 @@ async def test_an_unresolved_ending_rewrites_the_final_scene_once(concurrent_ses
     assert "chưa khép lại xung đột trung tâm" in last_prose_prompt
 
 
-async def test_an_ending_that_stays_unresolved_is_never_offered(concurrent_session_factory: Factory, tmp_path):
+def _exceptions(blobs: StoryBlobStore, state) -> list[dict[str, Any]]:
+    manifest = load_offered_manifest(blobs, state)
+    assert manifest.quality_record_digest is not None
+    record = json.loads(blobs.read_exact(manifest.quality_record_digest))
+    return [f for f in record["findings"] if f["id"] in manifest.exceptions_offered]
+
+
+async def test_an_ending_that_stays_unresolved_reaches_the_human_after_the_rewrite(
+    concurrent_session_factory: Factory, tmp_path
+):
     store = await _store(concurrent_session_factory)
     model = ScriptedModel()
     model.overrides["ending_resolves_conflict"] = _critic(model, [False])
+    blobs = StoryBlobStore(tmp_path)
 
-    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
-    assert state.phase is RunPhase.BLOCKED_QUALITY
-    assert "manuscript_review" in (state.block_reason or "")
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert (model.calls["prose"], model.calls["ending_resolves_conflict"]) == (10, 2)
-    assert state.commit is None
+    flagged = [f for f in _exceptions(blobs, state) if f["code"] == "NO_ENDING"]
+    assert [f["severity"] for f in flagged] == ["NARRATIVE_CRITICAL"]
+    assert flagged[0]["message"].startswith("[hết lượt sửa tự động] ")
 
 
 async def test_an_unconfirmed_unresolved_ending_reaches_the_human_as_an_exception(
@@ -513,11 +535,12 @@ async def test_an_unconfirmed_unresolved_ending_reaches_the_human_as_an_exceptio
     assert [f["severity"] for f in record["findings"] if f["code"] == "NO_ENDING"] == ["NARRATIVE_CRITICAL"]
 
 
-async def test_packaging_needs_three_selling_points_that_quote_the_manuscript(
+async def test_packaging_without_three_quoted_selling_points_reaches_the_human_after_its_tries(
     concurrent_session_factory: Factory, tmp_path
 ):
     store = await _store(concurrent_session_factory)
     model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
 
     def invented(_prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
         answer = model.packaging()
@@ -526,11 +549,12 @@ async def test_packaging_needs_three_selling_points_that_quote_the_manuscript(
 
     model.overrides["titles"] = invented
 
-    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
-    assert state.phase is RunPhase.BLOCKED_QUALITY
-    assert "packaging" in (state.block_reason or "")
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert model.calls["titles"] == 2
+    flagged = [f for f in _exceptions(blobs, state) if f["code"] == "SELLING_POINT_UNVERIFIED"]
+    assert [(f["severity"], f["quote"]) for f in flagged] == [("NARRATIVE_CRITICAL", "Một câu không có trong truyện.")]
 
 
 async def test_a_blurb_claim_the_manuscript_lacks_reaches_the_human_and_stays_out_of_the_export(
@@ -664,9 +688,12 @@ async def test_a_contract_finding_regenerates_the_scene_with_an_editor_note_insi
     assert scene_steps == {f"{scene_draft(1, 3)}@r0.0.0#1", f"{scene_draft(1, 3)}@r0.0.0#2"}
 
 
-async def test_a_final_review_that_blocks_keeps_its_findings(concurrent_session_factory: Factory, tmp_path):
+async def test_a_withheld_card_that_stays_revealed_is_patched_replanned_then_offered_to_the_human(
+    concurrent_session_factory: Factory, tmp_path
+):
     store = await _store(concurrent_session_factory)
     model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
 
     def always(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
         if "GHI CHÚ CHƯƠNG" not in prompt or "[Chương 1 cần thẩm định]" not in prompt:
@@ -683,12 +710,15 @@ async def test_a_final_review_that_blocks_keeps_its_findings(concurrent_session_
 
     model.overrides["issues"] = always
 
-    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
-    assert state.phase is RunPhase.BLOCKED_QUALITY
-    assert state.blocked_findings
-    assert {f["code"] for f in state.blocked_findings} == {"MEMO_COMPLIANCE:withheld_card_revealed"}
-    assert all(f["quote"] for f in state.blocked_findings)
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["patches"] >= 1
+    assert not any(n.startswith("scene_draft[") for n in state.intents)
+    assert len(state.intents["chapter_plan[1]"]) == 1
+    exceptions = _exceptions(blobs, state)
+    assert {f["code"] for f in exceptions} == {"MEMO_COMPLIANCE:withheld_card_revealed"}
+    assert all(f["message"].startswith("[hết lượt sửa tự động] ") and f["quote"] for f in exceptions)
 
 
 async def test_a_sentence_copied_from_an_earlier_scene_is_removed_without_a_model_call(
@@ -778,11 +808,12 @@ async def test_a_contract_that_stays_unmet_replans_the_chapter_once(concurrent_s
     assert any(a.step_id.startswith("scene_draft[1,1]@r0.0.1#") for a in state.attempts)
 
 
-async def test_a_replanned_chapter_that_still_fails_is_blocked_with_its_findings(
+async def test_a_required_change_that_stays_missing_reaches_the_human_after_the_replan(
     concurrent_session_factory: Factory, tmp_path
 ):
     store = await _store(concurrent_session_factory)
     model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
 
     def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
         if "GHI CHÚ CHƯƠNG" not in prompt or "[Chương 1 cần thẩm định]" not in prompt:
@@ -790,20 +821,20 @@ async def test_a_replanned_chapter_that_still_fails_is_blocked_with_its_findings
         quote = prompt.rsplit("\n\n", 1)[-1].split(". ")[0] + "."
         issue = {
             "severity": "critical",
-            "issue_type": "withheld_card_revealed",
-            "description": "lộ bài",
+            "issue_type": "required_change_missing",
+            "description": "Minh chưa thấy cuốn sổ",
             "quote": quote,
-            "suggested_fix": "giấu",
+            "suggested_fix": "cho Minh thấy cuốn sổ",
         }
         return {"issues": [issue]}
 
     model.overrides["issues"] = audit
 
-    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
 
-    assert state.phase is RunPhase.BLOCKED_QUALITY
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
     assert len(state.intents["chapter_plan[1]"]) == 1
-    assert state.blocked_findings
+    assert {f["code"] for f in _exceptions(blobs, state)} == {"MEMO_COMPLIANCE:required_change_missing"}
 
 
 async def test_an_unconfirmed_blocking_claim_reaches_the_human_as_an_exception(
@@ -913,3 +944,148 @@ def test_a_judge_gateway_must_match_the_brief():
 def test_the_judge_route_is_part_of_what_gate_a_greenlights():
     assert BRIEF.model_copy(update={"judge_selection": JUDGE}).digest() != BRIEF.digest()
     assert BRIEF.judge == SELECTION
+
+
+async def test_a_collective_character_outside_the_bible_does_not_stop_the_plan(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    schemas: list[dict[str, Any]] = []
+
+    def plan(_prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
+        schemas.append(schema)
+        scenes = [{**_scene(i), "characters": ["Minh", "Lũ trẻ"]} for i in (1, 2, 3)]
+        return {**STRUCTURED["chapter_goal"], "scenes": scenes}
+
+    model.overrides["chapter_goal"] = plan
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["chapter_goal"] == 3
+    planned = schemas[0]["properties"]["scenes"]["items"]
+    assert planned["properties"]["pov"]["enum"] == ["Minh", "Lan"]
+    assert planned["properties"]["location"]["enum"] == ["Căn nhà cũ"]
+    assert "Lũ trẻ" in next(p for k, p in model.prompts if k == "prose")
+
+
+async def test_a_revealed_withheld_card_is_patched_in_place_instead_of_regenerating_the_scene(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    blobs = StoryBlobStore(tmp_path)
+    model = ScriptedModel()
+    flagged: list[str] = []
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if flagged or "GHI CHÚ CHƯƠNG" not in prompt:
+            return {"issues": []}
+        flagged.append(model.paragraphs[1].split(". ")[0] + ".")
+        issue = {
+            "severity": "critical",
+            "issue_type": "withheld_card_revealed",
+            "description": "lộ bí mật cuốn sổ",
+            "quote": flagged[0],
+            "suggested_fix": "bỏ câu này",
+        }
+        return {"issues": [issue]}
+
+    model.overrides["issues"] = audit
+    model.overrides["patches"] = lambda _p, _s: {
+        "patches": [{"before": flagged[0], "after": "Minh đứng yên rất lâu bên hiên."}],
+        "notes": "giấu bí mật",
+    }
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["patches"] == 1
+    assert not state.intents
+    assert not any("lộ bí mật cuốn sổ" in p for k, p in model.prompts if k == "prose")
+    first_scene = [a for a in state.attempts if a.step_id.startswith(scene_draft(1, 1)) and a.kind.value == "GENERATE"]
+    assert len(first_scene) == 2
+    manifest = load_offered_manifest(blobs, state)
+    assert flagged[0] not in manifest.scenes[0].revision.normalized_content
+
+
+async def test_a_patch_that_adds_a_blocking_defect_is_not_kept(concurrent_session_factory: Factory, tmp_path):
+    store = await _store(concurrent_session_factory)
+    blobs = StoryBlobStore(tmp_path)
+    model = ScriptedModel()
+    flagged: list[str] = []
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if flagged or "TÍNH LIÊN TỤC" not in prompt:
+            return {"issues": []}
+        flagged.append(model.paragraphs[1].split(". ")[0] + ".")
+        issue = {
+            "severity": "critical",
+            "issue_type": "mâu_thuẫn",
+            "description": "sai thời điểm",
+            "quote": flagged[0],
+            "suggested_fix": "sửa",
+        }
+        return {"issues": [issue]}
+
+    model.overrides["issues"] = audit
+    model.overrides["patches"] = lambda _p, _s: {
+        "patches": [{"before": flagged[0], "after": "Minh đứng dậy và\n\nrồi"}],
+        "notes": "sửa",
+    }
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["patches"] == 1
+    manifest = load_offered_manifest(blobs, state)
+    assert flagged[0] in manifest.scenes[0].revision.normalized_content
+    assert "Minh đứng dậy và" not in manifest.scenes[0].revision.normalized_content
+
+
+async def test_a_story_that_stays_under_the_hard_length_reaches_the_human_as_an_exception(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    blobs = StoryBlobStore(tmp_path)
+    model = ScriptedModel()
+    full = model._prose
+
+    def at_the_floor(_prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
+        answer = full(schema["properties"]["paragraphs"]["minItems"])
+        paragraphs = []
+        for paragraph in answer["paragraphs"]:
+            kept = ""
+            for sentence in paragraph.split(". "):
+                kept = f"{kept} {sentence.rstrip('.')}.".strip()
+                if len(kept) >= 280:
+                    break
+            paragraphs.append(kept)
+        model.paragraphs[-len(paragraphs) :] = paragraphs
+        return {"paragraphs": paragraphs}
+
+    model.overrides["prose"] = at_the_floor
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    flagged = [f for f in _exceptions(blobs, state) if f["code"] == "STORY_LENGTH"]
+    assert [f["severity"] for f in flagged] == ["NARRATIVE_CRITICAL"]
+    assert flagged[0]["message"].startswith("[hết lượt sửa tự động] ")
+
+
+async def test_a_transient_model_outage_is_retried_without_stopping_the_run(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    model.fail_at["prose"] = 5
+    model.fail_at["issues"] = 3
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert model.calls["prose"] == 10
+    failed = [a for a in state.attempts if a.failure_code is not None]
+    assert {a.failure_code.value for a in failed} == {"PROVIDER_ERROR"}
+    assert len(failed) == 2

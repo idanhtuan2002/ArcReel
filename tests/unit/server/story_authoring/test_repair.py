@@ -274,3 +274,13 @@ def test_paragraphs_cut_mid_sentence_lose_only_their_unfinished_end():
     fixed, notes = deterministic_fixes(text, [finding])
     assert fixed == "Minh đứng trước cổng.\n\nLan bước ra sân.\n\nTrời tối dần."
     assert len(notes) == 1
+
+
+def test_deterministic_fixes_drop_sentences_that_talk_about_the_story_itself():
+    text = "Minh đứng dậy. Xung đột chính khép lại từ đây. Lan cười."
+    finding = Finding("META_NARRATION", Severity.HARD_STRUCTURAL, "s", "m", "Xung đột chính khép lại từ đây.")
+
+    fixed, notes = deterministic_fixes(text, [finding])
+
+    assert fixed == "Minh đứng dậy. Lan cười."
+    assert notes
