@@ -106,3 +106,15 @@ observations only. Evidence: `R2_STORY_ACCEPTANCE_RUN.json` (clean run) and `R2_
 The pass condition "`project_rows` only the grant" is read as: the run leaves no Narrative or governance record. A
 discarded run still has its `api_calls` rows (observability of the calls it made) and the Human's own Gate A row in
 `gate_greenlight_decisions`, which precedes the run; neither is created by the run's authority path.
+
+## Human decision: reduced Task6 (2026-10-21)
+
+After the donor-recheck fixes (`81e165fd`), the Human chose a reduced Task6 over rerunning all eleven cases: only
+`accept-clean` runs on the new T (brief → Gate A → `COMMITTED` → export, exactly two Human actions, zero CJK, no stored
+head from a truncated or over-context call, every attempt with an outcome). Recorded deviation from "run every case":
+
+- Restart, kill, endpoint and discard keep their real-run passes on the previous T (`0b7f869f`, sections above) and
+  are covered at the new T by the PostgreSQL driver tests (crash and resume without regenerating converged nodes, a
+  transient and a persistent model outage, discard and late-result fencing in the runtime/service tests).
+- The variation, revision, CJK and long-brief cases are not run; their invariants rest on the automated tests
+  (grammar CJK ban, Change D propagation, over-context refusal). Completion rate across ideas stays unmeasured.
