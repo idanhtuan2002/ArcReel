@@ -1046,6 +1046,11 @@ class ManualAdmissionRepository:
         if row is None:
             raise OpportunityError(_MISSING)
         record = await self._record(row)
+        return await self._checkpoints(record)
+
+    async def _checkpoints(self, record: _AttemptRecord) -> tuple[PageCheckpoint, ...]:
+        attempt = record.attempt
+        attempt_id = attempt.attempt_id
         envelope = await self._envelope(record)
         rows = (
             await self.session.scalars(
@@ -1225,7 +1230,7 @@ class ManualAdmissionRepository:
             )
         ):
             raise OpportunityError(_MISSING)
-        checkpoints = await self.list_checkpoints(attempt.attempt_id)
+        checkpoints = await self._checkpoints(record)
         identities = tuple(sorted({ref for c in checkpoints for ref in c.source_identity_refs}))
         if snapshot.pages != tuple(c.page for c in checkpoints) or snapshot.source_identity_refs != identities:
             raise OpportunityError(_MISSING)
@@ -1249,14 +1254,17 @@ class ManualAdmissionRepository:
         ):
             raise OpportunityError(_MISSING)
 
-    async def _snapshot_record(self, row: M9SourceSnapshotModel) -> _SnapshotRecord:
-        attempt = await self.get_attempt(row.attempt_id)
-        if attempt is None:
-            raise OpportunityError(_MISSING)
-        attempt_row = await self._row(attempt.attempt_id)
-        if attempt_row is None:
-            raise OpportunityError(_MISSING)
-        record = await self._record(attempt_row)
+    async def _snapshot_record(
+        self, row: M9SourceSnapshotModel, *, record: _AttemptRecord | None = None
+    ) -> _SnapshotRecord:
+        if record is None:
+            attempt = await self.get_attempt(row.attempt_id)
+            if attempt is None:
+                raise OpportunityError(_MISSING)
+            attempt_row = await self._row(attempt.attempt_id)
+            if attempt_row is None:
+                raise OpportunityError(_MISSING)
+            record = await self._record(attempt_row)
         stored = _unpack(_SnapshotRecord, row.body_json)
         snapshot = stored.snapshot
         if any(
@@ -1958,11 +1966,26 @@ class ManualAdmissionRepository:
             ):
                 raise OpportunityError(_MISSING)
 
+    async def _receipt_snapshots(
+        self, record: _AttemptRecord
+    ) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+        await self._checkpoints(record)
+        row = await self._snapshot_row_for_attempt(record.attempt.attempt_id)
+        if row is None:
+            return (), (), ()
+        stored = await self._snapshot_record(row, record=record)
+        return (
+            (stored.snapshot.snapshot_id,),
+            (stored.snapshot.snapshot_digest,),
+            (stored.provenance_digest,),
+        )
+
     async def _verify_expiry_receipt(self, record: _AttemptRecord) -> None:
         receipt, attempt = record.receipt, record.attempt
+        snapshots = await self._receipt_snapshots(record)
         if (
             receipt is None
-            or receipt.snapshot_ids
+            or (receipt.snapshot_ids, receipt.snapshot_digests, receipt.snapshot_provenance_digests) != snapshots
             or digest_acquisition_result_v2(receipt) != receipt.result_digest
             or (
                 receipt.command_id,
@@ -2123,24 +2146,7 @@ class ManualAdmissionRepository:
             disposition, deadline = ExpiryDispositionV2.OPERATIONAL_EVIDENCE_STALE, refresh
         else:
             raise OpportunityError(_STALE)
-        for kind, column in (
-            (M9SourceSnapshotModel, M9SourceSnapshotModel.snapshot_id),
-            (M9SnapshotPageModel, M9SnapshotPageModel.ordinal),
-        ):
-            if (
-                await self.session.scalar(
-                    select(column)
-                    .where(
-                        kind.user_id == self.user_id,
-                        kind.project_name == self.project_name,
-                        kind.attempt_id == attempt_id,
-                    )
-                    .limit(1)
-                )
-                is not None
-            ):
-                # Checkpoint-bearing expiry needs the qualified V2 provenance writer.
-                raise OpportunityError(_MISSING)
+        snapshot_ids, snapshot_digests, provenance_digests = await self._receipt_snapshots(record)
         events = []
         if record.attempt.state == AttemptStateV2.RUNNING:
             unknown = AcquisitionAttemptV2.model_validate(
@@ -2183,9 +2189,9 @@ class ManualAdmissionRepository:
             attempt_version=expired.attempt_version,
             state=expired.state,
             outcome_reason=expired.outcome_reason,
-            snapshot_ids=(),
-            snapshot_digests=(),
-            snapshot_provenance_digests=(),
+            snapshot_ids=snapshot_ids,
+            snapshot_digests=snapshot_digests,
+            snapshot_provenance_digests=provenance_digests,
             closure=closure,
             quota_disposition=expired.quota_disposition,
             quota_units_observed=expired.quota_units_observed,

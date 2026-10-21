@@ -1120,12 +1120,14 @@ async def test_v2_checkpoint_prepared_before_expiry_cannot_publish_after_closure
         assert await manual_repo(session).get_receipt(command) == receipt
 
 
-async def snapshot_subject(factory, *, origin="SOURCE_RESPONSE_VERIFIED", persist_checkpoint=True, missing=False):
+async def snapshot_subject(
+    factory, *, origin="SOURCE_RESPONSE_VERIFIED", persist_checkpoint=True, missing=False, refresh_seconds=None
+):
     from r2.contracts.opportunity import SourceSnapshot
     from r2.contracts.opportunity_acquisition_v2 import SnapshotOriginV2, SnapshotProvenanceV2
     from r2.opportunity.digests import digest_source_snapshot
 
-    command, envelope, checkpoint = await checkpoint_subject(factory, native=True)
+    command, envelope, checkpoint = await checkpoint_subject(factory, native=True, refresh_seconds=refresh_seconds)
     if missing:
         from r2.contracts.opportunity import MissingReason
 
@@ -1799,3 +1801,153 @@ async def test_v2_observation_native_contender_serializes_correction_and_replay(
             await asyncio.gather(task, return_exceptions=True)
         await contender.close()
         await holder.close()
+
+
+async def await_original_refresh(factory, envelope):
+    import asyncio
+
+    assert envelope.deadlines is not None
+    deadline = envelope.deadlines.refresh_due_at
+    assert deadline is not None
+    async with asyncio.timeout(10):
+        async with factory() as session:
+            while await manual_repo(session).profiles.database_time() < deadline:
+                # A fresh DB statement establishes expiry; the timer only paces polling.
+                arrived = asyncio.Event()
+                timer = asyncio.get_running_loop().call_later(0.05, arrived.set)
+                try:
+                    await arrived.wait()
+                finally:
+                    timer.cancel()
+
+
+@pytest.mark.parametrize("origin", ["SOURCE_RESPONSE_VERIFIED", "LOCAL_ADMISSION_RECONSTRUCTION"])
+async def test_v2_expiry_preserves_existing_snapshot_provenance_and_unknown_outcome(session_factory, origin):
+    from r2.opportunity.acquisition_v2_digests import digest_snapshot_provenance_v2
+
+    command, envelope, snapshot, provenance = await snapshot_subject(session_factory, origin=origin, refresh_seconds=5)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        await repo.append_snapshot(snapshot, provenance, expected_attempt_version=provenance.attempt_version)
+        original_checkpoints = await repo.list_checkpoints(snapshot.attempt_id)
+    await await_original_refresh(session_factory, envelope)
+    async with session_factory() as session, session.begin():
+        receipt = await manual_repo(session, policy=None).close_expired(
+            snapshot.attempt_id, expected_attempt_version=provenance.attempt_version, resolver_id="snapshot-expiry"
+        )
+    assert receipt.state == "EXPIRED_UNRECOVERABLE"
+    assert receipt.outcome_reason == "RESPONSE_OUTCOME_UNKNOWN"
+    assert receipt.snapshot_ids == (snapshot.snapshot_id,)
+    assert receipt.snapshot_digests == (snapshot.snapshot_digest,)
+    assert receipt.snapshot_provenance_digests == (digest_snapshot_provenance_v2(provenance),)
+    assert receipt.quota_disposition == "POSSIBLY_CONSUMED"
+    assert receipt.quota_units_observed is None
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session, policy=None)
+        assert await repo.get_receipt(command) == receipt
+        assert await repo.close_expired(snapshot.attempt_id, expected_attempt_version=1, resolver_id="late") == receipt
+        assert await repo.get_snapshot_for_attempt(snapshot.attempt_id) == (snapshot, provenance)
+        assert await repo.list_checkpoints(snapshot.attempt_id) == original_checkpoints
+        await repo.append_snapshot(snapshot, provenance, expected_attempt_version=1)
+        assert (await repo.get_envelope(snapshot.attempt_id)).admitted_at == envelope.admitted_at
+
+
+async def test_v2_expiry_preserves_checkpoints_without_manufacturing_a_snapshot(session_factory):
+    from lib.db.models.opportunity_acquisition import M9SourceSnapshotModel
+
+    command, envelope, checkpoint = await checkpoint_subject(session_factory, native=True, refresh_seconds=5)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).append_checkpoint(
+            envelope.request.attempt_id, checkpoint, expected_attempt_version=3
+        )
+    await await_original_refresh(session_factory, envelope)
+    async with session_factory() as session, session.begin():
+        receipt = await manual_repo(session, policy=None).close_expired(
+            envelope.request.attempt_id, expected_attempt_version=3, resolver_id="checkpoint-expiry"
+        )
+    assert receipt.snapshot_ids == ()
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        assert await repo.get_receipt(command) == receipt
+        assert await repo.list_checkpoints(envelope.request.attempt_id) == (checkpoint,)
+        assert await session.scalar(select(func.count()).select_from(M9SourceSnapshotModel)) == 0
+
+
+async def test_v2_expiry_refuses_to_drop_unverifiable_existing_snapshot(session_factory):
+    from lib.db.models.opportunity import M9EventModel
+
+    command, envelope, snapshot, provenance = await snapshot_subject(session_factory, refresh_seconds=5)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).append_snapshot(snapshot, provenance, expected_attempt_version=3)
+        await session.execute(update(M9EventModel).values(payload_digest="sha256:" + "a" * 64))
+    await await_original_refresh(session_factory, envelope)
+
+    async def close():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session, policy=None).close_expired(
+                snapshot.attempt_id, expected_attempt_version=3, resolver_id="corrupt"
+            )
+
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        await close()
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        assert (await repo.get_attempt(snapshot.attempt_id)).state == "RUNNING"
+        assert await repo.get_receipt(command) is None
+
+
+async def test_v2_expiry_reader_cannot_drop_retained_snapshot_by_rehashing_receipt(session_factory):
+    from lib.db.models.opportunity import M9CommandReceiptModel
+    from r2.opportunity.acquisition_v2_digests import digest_acquisition_result_v2
+
+    command, envelope, snapshot, provenance = await snapshot_subject(session_factory, refresh_seconds=5)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).append_snapshot(snapshot, provenance, expected_attempt_version=3)
+    await await_original_refresh(session_factory, envelope)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session, policy=None).close_expired(
+            snapshot.attempt_id, expected_attempt_version=3, resolver_id="original"
+        )
+    async with session_factory() as session, session.begin():
+        module = manual_module()
+        row = (await session.scalars(select(M9AcquisitionAttemptModel))).one()
+        record = module._unpack(module._AttemptRecord, row.body_json)
+        changed = record.receipt.model_copy(
+            update={"snapshot_ids": (), "snapshot_digests": (), "snapshot_provenance_digests": ()}
+        )
+        changed = changed.model_copy(update={"result_digest": digest_acquisition_result_v2(changed)})
+        row.body_json = module._pack(record.model_copy(update={"receipt": changed}))
+        receipt_row = (await session.scalars(select(M9CommandReceiptModel))).one()
+        receipt_row.result_digest = changed.result_digest
+    async with session_factory() as session, session.begin():
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await manual_repo(session).get_receipt(command)
+
+
+async def test_v2_snapshot_expiry_transaction_rollback_preserves_original_attempt_and_audits(session_factory):
+    from lib.db.models.opportunity import M9CommandReceiptModel, M9EventModel
+
+    command, envelope, snapshot, provenance = await snapshot_subject(session_factory, refresh_seconds=5)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).append_snapshot(snapshot, provenance, expected_attempt_version=3)
+    await await_original_refresh(session_factory, envelope)
+
+    async def interrupted():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session, policy=None).close_expired(
+                snapshot.attempt_id, expected_attempt_version=3, resolver_id="rolled-back"
+            )
+            raise RuntimeError("before expiry snapshot commit")
+
+    with pytest.raises(RuntimeError, match="before expiry snapshot commit"):
+        await interrupted()
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        attempt = await repo.get_attempt(snapshot.attempt_id)
+        assert (attempt.state, attempt.attempt_version) == ("RUNNING", 3)
+        assert await repo.get_snapshot(snapshot.snapshot_id) == (snapshot, provenance)
+        assert await session.scalar(select(func.count()).select_from(M9CommandReceiptModel)) == 0
+        assert await session.scalar(select(func.count()).select_from(M9EventModel)) == 1
+        receipt = await repo.close_expired(snapshot.attempt_id, expected_attempt_version=3, resolver_id="committed")
+    async with session_factory() as session, session.begin():
+        assert await manual_repo(session).get_receipt(command) == receipt
