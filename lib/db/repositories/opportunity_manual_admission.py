@@ -92,7 +92,11 @@ class _Transition(M9ContractModel):
     @model_validator(mode="after")
     def validate_transition(self) -> Self:
         allowed = {
-            AttemptStateV2.RUNNING: {AttemptStateV2.OUTCOME_UNKNOWN},
+            AttemptStateV2.RUNNING: {
+                AttemptStateV2.OUTCOME_UNKNOWN,
+                AttemptStateV2.SUCCEEDED,
+                AttemptStateV2.FAILED,
+            },
             AttemptStateV2.OUTCOME_UNKNOWN: {AttemptStateV2.NEEDS_OPERATOR, AttemptStateV2.EXPIRED_UNRECOVERABLE},
             AttemptStateV2.NEEDS_OPERATOR: {AttemptStateV2.EXPIRED_UNRECOVERABLE},
         }
@@ -371,8 +375,8 @@ class ManualAdmissionRepository:
         ):
             raise OpportunityError(_MISSING)
         await self._verify_history(record)
-        if attempt.state == AttemptStateV2.EXPIRED_UNRECOVERABLE:
-            await self._verify_expiry_receipt(record)
+        if attempt.state in (AttemptStateV2.EXPIRED_UNRECOVERABLE, AttemptStateV2.SUCCEEDED, AttemptStateV2.FAILED):
+            await self._verify_terminal_receipt(record)
         elif record.receipt is not None or attempt.state in (AttemptStateV2.SUCCEEDED, AttemptStateV2.FAILED):
             raise OpportunityError(_MISSING)
         return record
@@ -1912,15 +1916,16 @@ class ManualAdmissionRepository:
         await _flush(self.session)
 
     def _event_digest(self, record: _AttemptRecord, event: _Transition) -> str:
-        return digest_canonical(
-            {
-                "domain": "m9.manual-attempt-transition.v1",
-                "context": record.command.context,
-                "request_digest": record.attempt.request_digest,
-                "attempt_id": record.attempt.attempt_id,
-                "transition": event,
-            }
-        )
+        body: dict[str, Any] = {
+            "domain": "m9.manual-attempt-transition.v1",
+            "context": record.command.context,
+            "request_digest": record.attempt.request_digest,
+            "attempt_id": record.attempt.attempt_id,
+            "transition": event,
+        }
+        if event.to_state in (AttemptStateV2.SUCCEEDED, AttemptStateV2.FAILED, AttemptStateV2.EXPIRED_UNRECOVERABLE):
+            body.update(terminal_attempt=record.attempt, terminal_receipt=record.receipt)
+        return digest_canonical(body)
 
     def _event_kind(self, event: _Transition) -> str:
         return (
@@ -1936,6 +1941,8 @@ class ManualAdmissionRepository:
                 AttemptStateV2.OUTCOME_UNKNOWN,
                 AttemptStateV2.NEEDS_OPERATOR,
                 AttemptStateV2.EXPIRED_UNRECOVERABLE,
+                AttemptStateV2.SUCCEEDED,
+                AttemptStateV2.FAILED,
             ):
                 raise OpportunityError(_MISSING)
             return
@@ -1980,9 +1987,11 @@ class ManualAdmissionRepository:
             (stored.provenance_digest,),
         )
 
-    async def _verify_expiry_receipt(self, record: _AttemptRecord) -> None:
+    async def _verify_terminal_receipt(self, record: _AttemptRecord) -> None:
         receipt, attempt = record.receipt, record.attempt
         snapshots = await self._receipt_snapshots(record)
+        if attempt.state in (AttemptStateV2.SUCCEEDED, AttemptStateV2.FAILED):
+            await self._known_response_snapshot(record, state=attempt.state)
         if (
             receipt is None
             or (receipt.snapshot_ids, receipt.snapshot_digests, receipt.snapshot_provenance_digests) != snapshots
@@ -2115,6 +2124,114 @@ class ManualAdmissionRepository:
         if row is None:
             raise OpportunityError(_MISSING)
         return (await self._record(row)).receipt
+
+    async def _known_response_snapshot(self, record: _AttemptRecord, *, state: AttemptStateV2) -> _SnapshotRecord:
+        row = await self._snapshot_row_for_attempt(record.attempt.attempt_id)
+        if row is None:
+            raise OpportunityError(_MISSING)
+        stored = await self._snapshot_record(row, record=record)
+        complete = stored.snapshot.coverage_state == CoverageState.COMPLETE_WITHIN_DECLARED_BOUNDS
+        if stored.provenance.origin != SnapshotOriginV2.SOURCE_RESPONSE_VERIFIED or complete != (
+            state == AttemptStateV2.SUCCEEDED
+        ):
+            raise OpportunityError(_MISSING)
+        return stored
+
+    async def finish_acquisition(
+        self,
+        attempt_id: str,
+        *,
+        expected_attempt_version: int,
+        state: AttemptStateV2,
+        reason: AttemptOutcomeReason,
+        resolver_id: str,
+    ) -> AcquisitionReceiptV2:
+        if state not in (AttemptStateV2.SUCCEEDED, AttemptStateV2.FAILED):
+            raise OpportunityError(_MISSING)
+        if await self.get_attempt(attempt_id) is None:
+            raise OpportunityError(_MISSING)
+        row = await self._row(attempt_id)
+        if row is None:
+            raise OpportunityError(_MISSING)
+        initial = await self._record(row)
+        if initial.receipt is not None:
+            return initial.receipt
+        row, record = await self._guard(attempt_id, operational=True)
+        if record.attempt.attempt_version != expected_attempt_version:
+            raise OpportunityError(_STALE)
+        if record.attempt.state in (AttemptStateV2.OUTCOME_UNKNOWN, AttemptStateV2.NEEDS_OPERATOR):
+            raise OpportunityError(StopCode.M9_ACQUISITION_OUTCOME_UNKNOWN)
+        if record.attempt.state != AttemptStateV2.RUNNING:
+            raise OpportunityError(_STALE)
+        envelope = await self._envelope(record, lock=True)
+        if envelope is None:
+            raise OpportunityError(_MISSING)
+        now = await self.profiles.database_time()
+        require_admission_access(envelope, now=now, operational=True)
+        stored = await self._known_response_snapshot(record, state=state)
+        checkpoints = await self._checkpoints(record)
+        observed = bool(checkpoints) and all(c.quota_units_observed is not None for c in checkpoints)
+        try:
+            attempt = AcquisitionAttemptV2.model_validate(
+                {
+                    **record.attempt.model_dump(),
+                    "attempt_version": expected_attempt_version + 1,
+                    "state": state,
+                    "outcome_reason": reason,
+                    "completed_at": now,
+                    "provider_request_id": next(
+                        (
+                            c.page.provider_request_id
+                            for c in reversed(checkpoints)
+                            if c.page.provider_request_id is not None
+                        ),
+                        record.attempt.provider_request_id,
+                    ),
+                    "quota_disposition": QuotaDispositionV2.OBSERVED if observed else record.attempt.quota_disposition,
+                    "quota_units_observed": sum(c.quota_units_observed or 0 for c in checkpoints)
+                    if observed
+                    else record.attempt.quota_units_observed,
+                }
+            )
+            updated, event = self._transition_record(record, attempt, now=now, resolver_id=resolver_id)
+            receipt = AcquisitionReceiptV2(
+                protocol_version="m9.acquisition.v2",
+                command_id=attempt.command_id,
+                request_digest=attempt.request_digest,
+                attempt_id=attempt_id,
+                attempt_version=attempt.attempt_version,
+                state=attempt.state,
+                outcome_reason=attempt.outcome_reason,
+                snapshot_ids=(stored.snapshot.snapshot_id,),
+                snapshot_digests=(stored.snapshot.snapshot_digest,),
+                snapshot_provenance_digests=(stored.provenance_digest,),
+                closure=None,
+                quota_disposition=attempt.quota_disposition,
+                quota_units_observed=attempt.quota_units_observed,
+                result_digest="sha256:" + "0" * 64,
+                committed_at=now,
+            )
+        except ValueError:
+            raise OpportunityError(_MISSING) from None
+        receipt = receipt.model_copy(update={"result_digest": digest_acquisition_result_v2(receipt)})
+        updated = updated.model_copy(update={"receipt": receipt})
+        await self._save_attempt(row, updated, transitioned_at=now)
+        self.session.add(
+            M9CommandReceiptModel(
+                user_id=self.user_id,
+                project_name=self.project_name,
+                actor_id=attempt.actor_id,
+                operation="acquire",
+                command_id=attempt.command_id,
+                request_digest=attempt.request_digest,
+                result_kind="ACQUISITION_V2",
+                result_ref=f"{attempt_id}:{attempt.attempt_version}",
+                result_digest=receipt.result_digest,
+                committed_at=now,
+            )
+        )
+        await self._stage_transition(updated, event)
+        return receipt
 
     async def close_expired(
         self, attempt_id: str, *, expected_attempt_version: int, resolver_id: str

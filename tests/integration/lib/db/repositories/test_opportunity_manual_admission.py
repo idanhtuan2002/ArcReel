@@ -1121,13 +1121,21 @@ async def test_v2_checkpoint_prepared_before_expiry_cannot_publish_after_closure
 
 
 async def snapshot_subject(
-    factory, *, origin="SOURCE_RESPONSE_VERIFIED", persist_checkpoint=True, missing=False, refresh_seconds=None
+    factory,
+    *,
+    origin="SOURCE_RESPONSE_VERIFIED",
+    persist_checkpoint=True,
+    missing=False,
+    refresh_seconds=None,
+    quota_units=None,
 ):
     from r2.contracts.opportunity import SourceSnapshot
     from r2.contracts.opportunity_acquisition_v2 import SnapshotOriginV2, SnapshotProvenanceV2
     from r2.opportunity.digests import digest_source_snapshot
 
     command, envelope, checkpoint = await checkpoint_subject(factory, native=True, refresh_seconds=refresh_seconds)
+    if quota_units is not None:
+        checkpoint = checkpoint.model_copy(update={"quota_units_observed": quota_units})
     if missing:
         from r2.contracts.opportunity import MissingReason
 
@@ -1951,3 +1959,227 @@ async def test_v2_snapshot_expiry_transaction_rollback_preserves_original_attemp
         receipt = await repo.close_expired(snapshot.attempt_id, expected_attempt_version=3, resolver_id="committed")
     async with session_factory() as session, session.begin():
         assert await manual_repo(session).get_receipt(command) == receipt
+
+
+@pytest.mark.parametrize("measured", [False, True])
+@pytest.mark.parametrize("state", ["SUCCEEDED", "FAILED"])
+async def test_v2_known_terminal_receipt_is_atomic_and_replays_exact_original_result(session_factory, state, measured):
+    from r2.contracts.opportunity import AttemptOutcomeReason, CoverageState
+    from r2.contracts.opportunity_acquisition_v2 import AttemptStateV2
+    from r2.opportunity.acquisition_v2_digests import digest_snapshot_provenance_v2
+    from r2.opportunity.digests import digest_source_snapshot
+
+    command, envelope, snapshot, provenance = await snapshot_subject(
+        session_factory, quota_units=0 if measured else None
+    )
+    if state == "FAILED":
+        snapshot = snapshot.model_copy(update={"coverage_state": CoverageState.PARTIAL})
+        snapshot = snapshot.model_copy(update={"snapshot_digest": digest_source_snapshot(snapshot)})
+        provenance = provenance.model_copy(update={"snapshot_digest": snapshot.snapshot_digest})
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        await repo.append_snapshot(snapshot, provenance, expected_attempt_version=3)
+        receipt = await repo.finish_acquisition(
+            snapshot.attempt_id,
+            expected_attempt_version=3,
+            state=AttemptStateV2(state),
+            reason=AttemptOutcomeReason.COMPLETED if state == "SUCCEEDED" else AttemptOutcomeReason.PROVIDER_REJECTED,
+            resolver_id="verified-response",
+        )
+    assert receipt.state == state
+    assert receipt.attempt_version == 4
+    assert receipt.snapshot_provenance_digests == (digest_snapshot_provenance_v2(provenance),)
+    assert receipt.quota_disposition == ("OBSERVED" if measured else "POSSIBLY_CONSUMED")
+    assert receipt.quota_units_observed == (0 if measured else None)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session, policy=None)
+        assert await repo.get_receipt(command) == receipt
+        assert (
+            await repo.finish_acquisition(
+                snapshot.attempt_id,
+                expected_attempt_version=1,
+                state=AttemptStateV2.SUCCEEDED,
+                reason=AttemptOutcomeReason.COMPLETED,
+                resolver_id="replay",
+            )
+            == receipt
+        )
+        assert await repo.close_expired(snapshot.attempt_id, expected_attempt_version=1, resolver_id="late") == receipt
+        assert (await repo.get_envelope(snapshot.attempt_id)).admitted_at == envelope.admitted_at
+
+
+@pytest.mark.parametrize(
+    "fault", ["no_snapshot", "version", "partial_success", "complete_failure", "reason", "uncertain"]
+)
+async def test_v2_known_terminal_refuses_missing_or_uncertain_response_authority(session_factory, fault):
+    from r2.contracts.opportunity import AttemptOutcomeReason, CoverageState
+    from r2.contracts.opportunity_acquisition_v2 import AttemptStateV2
+    from r2.opportunity.digests import digest_source_snapshot
+
+    command, _, snapshot, provenance = await snapshot_subject(
+        session_factory, origin="LOCAL_ADMISSION_RECONSTRUCTION" if fault == "uncertain" else "SOURCE_RESPONSE_VERIFIED"
+    )
+    if fault in ("partial_success", "reason"):
+        snapshot = snapshot.model_copy(update={"coverage_state": CoverageState.PARTIAL})
+        snapshot = snapshot.model_copy(update={"snapshot_digest": digest_source_snapshot(snapshot)})
+        provenance = provenance.model_copy(update={"snapshot_digest": snapshot.snapshot_digest})
+    async with session_factory() as session, session.begin():
+        if fault != "no_snapshot":
+            await manual_repo(session).append_snapshot(
+                snapshot, provenance, expected_attempt_version=provenance.attempt_version
+            )
+
+    async def finish():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).finish_acquisition(
+                snapshot.attempt_id,
+                expected_attempt_version=17 if fault == "version" else provenance.attempt_version,
+                state=AttemptStateV2.FAILED if fault in ("complete_failure", "reason") else AttemptStateV2.SUCCEEDED,
+                reason=AttemptOutcomeReason.PROVIDER_REJECTED
+                if fault == "complete_failure"
+                else AttemptOutcomeReason.COMPLETED,
+                resolver_id="invalid-terminal",
+            )
+
+    with pytest.raises(OpportunityError):
+        await finish()
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        assert await repo.get_receipt(command) is None
+        assert (await repo.get_attempt(snapshot.attempt_id)).state == (
+            "OUTCOME_UNKNOWN" if fault == "uncertain" else "RUNNING"
+        )
+
+
+async def test_v2_known_terminal_receipt_attempt_and_audit_roll_back_with_snapshot(session_factory):
+    from lib.db.models.opportunity import M9CommandReceiptModel, M9EventModel
+    from lib.db.models.opportunity_acquisition import M9SourceSnapshotModel
+    from r2.contracts.opportunity import AttemptOutcomeReason
+    from r2.contracts.opportunity_acquisition_v2 import AttemptStateV2
+
+    command, _, snapshot, provenance = await snapshot_subject(session_factory)
+
+    async def interrupted():
+        async with session_factory() as session, session.begin():
+            repo = manual_repo(session)
+            await repo.append_snapshot(snapshot, provenance, expected_attempt_version=3)
+            await repo.finish_acquisition(
+                snapshot.attempt_id,
+                expected_attempt_version=3,
+                state=AttemptStateV2.SUCCEEDED,
+                reason=AttemptOutcomeReason.COMPLETED,
+                resolver_id="rolled-back",
+            )
+            raise RuntimeError("before known terminal commit")
+
+    with pytest.raises(RuntimeError, match="before known terminal commit"):
+        await interrupted()
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        attempt = await repo.get_attempt(snapshot.attempt_id)
+        assert (attempt.state, attempt.attempt_version) == ("RUNNING", 3)
+        assert await repo.get_receipt(command) is None
+        for model in (M9SourceSnapshotModel, M9CommandReceiptModel, M9EventModel):
+            assert await session.scalar(select(func.count()).select_from(model)) == 0
+
+
+@pytest.mark.parametrize("lifecycle", ["known", "expired"])
+async def test_v2_terminal_independent_audit_refuses_rehashed_fake_observed_zero_quota(session_factory, lifecycle):
+    from lib.db.models.opportunity import M9CommandReceiptModel
+    from r2.contracts.opportunity import AttemptOutcomeReason
+    from r2.contracts.opportunity_acquisition_v2 import AttemptStateV2, QuotaDispositionV2
+    from r2.opportunity.acquisition_v2_digests import digest_acquisition_result_v2
+
+    command, envelope, snapshot, provenance = await snapshot_subject(
+        session_factory, refresh_seconds=5 if lifecycle == "expired" else None
+    )
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        await repo.append_snapshot(snapshot, provenance, expected_attempt_version=3)
+    if lifecycle == "expired":
+        await await_original_refresh(session_factory, envelope)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        if lifecycle == "expired":
+            await repo.close_expired(snapshot.attempt_id, expected_attempt_version=3, resolver_id="original")
+        else:
+            await repo.finish_acquisition(
+                snapshot.attempt_id,
+                expected_attempt_version=3,
+                state=AttemptStateV2.SUCCEEDED,
+                reason=AttemptOutcomeReason.COMPLETED,
+                resolver_id="original",
+            )
+    async with session_factory() as session, session.begin():
+        module = manual_module()
+        row = (await session.scalars(select(M9AcquisitionAttemptModel))).one()
+        record = module._unpack(module._AttemptRecord, row.body_json)
+        updates = {"quota_disposition": QuotaDispositionV2.OBSERVED, "quota_units_observed": 0}
+        changed_receipt = record.receipt.model_copy(update=updates)
+        changed_receipt = changed_receipt.model_copy(
+            update={"result_digest": digest_acquisition_result_v2(changed_receipt)}
+        )
+        row.body_json = module._pack(
+            record.model_copy(update={"attempt": record.attempt.model_copy(update=updates), "receipt": changed_receipt})
+        )
+        receipt_row = (await session.scalars(select(M9CommandReceiptModel))).one()
+        receipt_row.result_digest = changed_receipt.result_digest
+    async with session_factory() as session, session.begin():
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await manual_repo(session).get_receipt(command)
+
+
+async def test_v2_known_terminal_native_contender_returns_winner_without_reinterpreting_outcome(session_factory):
+    import asyncio
+
+    from sqlalchemy import text
+
+    from r2.contracts.opportunity import AttemptOutcomeReason
+    from r2.contracts.opportunity_acquisition_v2 import AttemptStateV2
+
+    command, _, snapshot, provenance = await snapshot_subject(session_factory)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).append_snapshot(snapshot, provenance, expected_attempt_version=3)
+    holder, contender = session_factory(), session_factory()
+    task = None
+    try:
+        await holder.begin()
+        holder_pid = await holder.scalar(text("SELECT pg_backend_pid()"))
+        receipt = await manual_repo(holder).finish_acquisition(
+            snapshot.attempt_id,
+            expected_attempt_version=3,
+            state=AttemptStateV2.SUCCEEDED,
+            reason=AttemptOutcomeReason.COMPLETED,
+            resolver_id="winner",
+        )
+        await contender.begin()
+        contender_pid = await contender.scalar(text("SELECT pg_backend_pid()"))
+        task = asyncio.create_task(
+            manual_repo(contender).finish_acquisition(
+                snapshot.attempt_id,
+                expected_attempt_version=3,
+                state=AttemptStateV2.FAILED,
+                reason=AttemptOutcomeReason.PROVIDER_ERROR,
+                resolver_id="loser",
+            )
+        )
+        async with asyncio.timeout(10):
+            while True:
+                async with session_factory() as observer:
+                    blockers = await observer.scalar(text("SELECT pg_blocking_pids(:pid)"), {"pid": contender_pid})
+                if holder_pid in blockers:
+                    break
+                if task.done():
+                    pytest.fail("terminal contender did not wait on the original command owner")
+        assert not task.done()
+        await holder.commit()
+        assert await task == receipt
+        await contender.commit()
+        async with session_factory() as session, session.begin():
+            assert await manual_repo(session).get_receipt(command) == receipt
+    finally:
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        await contender.close()
+        await holder.close()
