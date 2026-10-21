@@ -806,9 +806,10 @@ def check_scene_prose(
     excess = repeated_trigram_excess(text)
     if syllables and excess * 1000 / syllables > 15:
         findings.append(Finding("REPETITION", Severity.STYLISTIC, node_id, f"repeated trigram excess {excess}"))
-    for name, count in unknown_names(text, allowed_names).items():
-        severity = Severity.NARRATIVE_CRITICAL if count >= 2 else Severity.STYLISTIC
-        findings.append(Finding("UNKNOWN_NAME", severity, node_id, f"name not in the story bible ({count}x)", name))
+    findings.extend(
+        Finding("UNKNOWN_NAME", Severity.STYLISTIC, node_id, f"name not in the story bible ({count}x)", name)
+        for name, count in unknown_names(text, allowed_names).items()
+    )
     if requires_dialogue and dialogue_lines(text) == 0:
         findings.append(Finding("NO_DIALOGUE", Severity.STYLISTIC, node_id, "the scene contract asks for dialogue"))
     return tuple(findings)

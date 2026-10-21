@@ -1280,13 +1280,18 @@ def drop_auto_intents(state: RunState, node_ids: Sequence[str]) -> RunState:
 def step_prefix(state: RunState, node: str) -> str:
     """Attempts of a node in one round share its call cap. A round ends with a Human revision or retry; for a
     scene or chapter review it also ends when its chapter plan is replanned, since the contract is new; for a chapter
-    plan it ends when that plan or an earlier one is replanned, since each regenerates it."""
+    plan it ends when that plan or an earlier one is replanned, since each regenerates it; for a scene it also ends
+    with each rewrite the driver asks for (its own notes)."""
     replans = 0
     if node.startswith(("scene_draft[", "chapter_review[", "chapter_plan[")):
         chapter = int(node.split("[", 1)[1].split(",", 1)[0].rstrip("]"))
         first = 1 if node.startswith("chapter_plan[") else chapter
         replans = sum(len(state.intents.get(chapter_plan(c), ())) for c in range(first, chapter + 1))
-    return f"{node}@r{len(human_intents(state).get(node, ()))}.{state.retries}.{replans}#"
+    rewrites = 0
+    if node.startswith("scene_draft["):
+        rewrites = sum(1 for n in state.intents.get(node, ()) if n.startswith(AUTO_NOTE))
+    suffix = f"+{rewrites}" if rewrites else ""
+    return f"{node}@r{len(human_intents(state).get(node, ()))}.{state.retries}.{replans}{suffix}#"
 
 
 def run_call_bound(chapters: int = CHAPTERS, scenes_per_chapter: int = SCENES_PER_CHAPTER_MAX) -> int:

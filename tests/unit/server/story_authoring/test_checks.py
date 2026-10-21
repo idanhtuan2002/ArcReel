@@ -170,6 +170,12 @@ def test_an_over_long_scene_is_hard_structural():
     assert [f.code for f in findings if f.severity is Severity.HARD_STRUCTURAL] == ["LENGTH_HARD"]
 
 
+def test_a_repeated_name_outside_the_bible_is_recorded_and_not_repaired():
+    text = _scene(*SENTENCES, "Lan nhớ những ngày ở Hà Nội.", "Lan chưa quay lại Hà Nội lần nào.")
+    findings = check_scene_prose(text, node_id="s", window=SceneLengthWindow(minimum=10), allowed_names={"Minh", "Lan"})
+    assert [(f.code, f.severity, f.quote) for f in findings] == [("UNKNOWN_NAME", Severity.STYLISTIC, "Hà Nội")]
+
+
 def test_a_sentence_after_a_single_quote_is_not_a_name():
     text = "Ông nói: 'Nhà này không bán, con à.' Nhưng giọng ấy đã xa. Lan đáp: ‘Dạ.’ Rồi im lặng."
     assert unknown_names(text, {"Lan"}) == {}

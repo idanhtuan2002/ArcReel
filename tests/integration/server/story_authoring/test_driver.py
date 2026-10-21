@@ -686,7 +686,7 @@ async def test_a_contract_finding_regenerates_the_scene_with_an_editor_note_insi
     assert model.calls["prose"] == 10
     assert model.calls.get("patches", 0) == 0
     scene_steps = {a.step_id for a in state.attempts if a.step_id.startswith(scene_draft(1, 3))}
-    assert scene_steps == {f"{scene_draft(1, 3)}@r0.0.0#1", f"{scene_draft(1, 3)}@r0.0.0#2"}
+    assert scene_steps == {f"{scene_draft(1, 3)}@r0.0.0#1", f"{scene_draft(1, 3)}@r0.0.0+1#1"}
 
 
 async def test_a_withheld_card_that_stays_revealed_is_patched_replanned_then_offered_to_the_human(
@@ -1128,3 +1128,44 @@ async def test_a_story_whose_every_review_fails_reaches_the_human_inside_the_def
     assert state.usage.generate_calls <= run_call_bound(scenes_per_chapter=3)
     reviews = {a.step_id.rsplit("#", 1)[0] for a in state.attempts if a.step_id.startswith("chapter_review[")}
     assert model.calls["confirmed"] <= len(reviews) * (REVIEW_CYCLES + 1) * CONFIRM_MAX
+
+
+async def test_a_scene_the_review_asks_to_rewrite_twice_has_calls_for_each_rewrite(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory)
+    model = ScriptedModel()
+    full = model._prose
+    memo_calls: list[str] = []
+    broken: list[int] = []
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if "GHI CHÚ CHƯƠNG" not in prompt or "[Chương 1 cần thẩm định]" not in prompt:
+            return {"issues": []}
+        memo_calls.append(prompt)
+        if len(memo_calls) > 2:
+            return {"issues": []}
+        issue = {
+            "severity": "critical",
+            "issue_type": "required_change_missing",
+            "description": "Minh chưa thấy cuốn sổ",
+            "quote": prompt.rsplit("\n\n", 1)[-1].split(". ")[0] + ".",
+            "suggested_fix": "cho Minh thấy cuốn sổ",
+        }
+        return {"issues": [issue]}
+
+    def prose(prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
+        if "yêu cầu viết lại cảnh này" in prompt and len(broken) < 4:
+            broken.append(1)
+            return {"paragraphs": ["ngắn"] * schema["properties"]["paragraphs"]["minItems"]}
+        return full(schema["properties"]["paragraphs"]["minItems"])
+
+    model.overrides["issues"] = audit
+    model.overrides["prose"] = prose
+
+    state = await _driver(concurrent_session_factory, store, model, StoryBlobStore(tmp_path)).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert len(state.intents[scene_draft(1, 3)]) == 2
+    rounds = {a.step_id.rsplit("#", 1)[0] for a in state.attempts if a.step_id.startswith(scene_draft(1, 3))}
+    assert rounds == {f"{scene_draft(1, 3)}@r0.0.0", f"{scene_draft(1, 3)}@r0.0.0+1", f"{scene_draft(1, 3)}@r0.0.0+2"}
