@@ -14,7 +14,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.opportunity import M9CommandReceiptModel, M9EventModel
-from lib.db.models.opportunity_acquisition import M9AcquisitionAttemptModel, M9SnapshotPageModel, M9SourceSnapshotModel
+from lib.db.models.opportunity_acquisition import (
+    M9AcquisitionAttemptModel,
+    M9ObservationHeadModel,
+    M9SnapshotPageModel,
+    M9SourceObservationModel,
+    M9SourceSnapshotModel,
+)
 from lib.db.models.opportunity_manual_admission import (
     M9ManualAdmissionModel,
     M9ManualPublicationIntentModel,
@@ -32,6 +38,7 @@ from r2.contracts.opportunity import (
     CoverageState,
     EvidenceDataClassClock,
     M9ContractModel,
+    NormalizedSourceObservation,
     SourceQuery,
     SourceSnapshot,
 )
@@ -53,7 +60,7 @@ from r2.opportunity.acquisition_v2_digests import (
     digest_snapshot_provenance_v2,
 )
 from r2.opportunity.capabilities import validate_capability
-from r2.opportunity.digests import digest_source_snapshot
+from r2.opportunity.digests import digest_source_observation, digest_source_snapshot
 from r2.opportunity.errors import OpportunityError, StopCode
 from r2.opportunity.manual_admission import (
     AdmissionEnvelope,
@@ -133,6 +140,14 @@ class _SnapshotRecord(M9ContractModel):
     snapshot: SourceSnapshot
     provenance: SnapshotProvenanceV2
     provenance_digest: str
+    stored_at: AwareDatetime
+
+
+class _ObservationRecord(M9ContractModel):
+    schema_version: Literal["m9.manual-observation.v1"] = "m9.manual-observation.v1"
+    observation: NormalizedSourceObservation
+    snapshot_provenance_digest: str
+    attempt_version: int = Field(ge=1, strict=True)
     stored_at: AwareDatetime
 
 
@@ -1397,6 +1412,379 @@ class ManualAdmissionRepository:
                 committed_at=now,
             )
         )
+        await _flush(self.session)
+
+    async def _guard_dependencies(self, records: dict[str, _AttemptRecord], *, operational_attempt_id: str) -> None:
+        """Prelock every rank across the dependency set before validating subjects."""
+        await self.lock_commands(tuple(record.command.context for record in records.values()))
+        self.session.info["m9_manual_command_plan"]["lower"] = True
+        await self.session.execute(text("LOCK TABLE adaptation_heads IN SHARE MODE"))
+        queries = {}
+        identities = set()
+        for attempt_id, record in sorted(records.items()):
+            query = await self.queries.get_exact(record.command.query_id, record.command.query_revision)
+            if query is None:
+                raise OpportunityError(_MISSING)
+            queries[attempt_id] = query
+            identities.add(("grant", query.capability_grant_id, str(query.capability_grant_version)))
+            identities.add(("evaluation", query.capability_evaluation_id))
+        # Match CapabilityEvidenceRepository.consume's existing advisory identities.
+        for identity in sorted(identities, key=lambda item: (item[1], item[0], item[2:])):
+            guard = digest_canonical(
+                {
+                    "domain": "m9.capability-admission-lock.v1",
+                    "user_id": self.user_id,
+                    "project_name": self.project_name,
+                    "identity": identity,
+                }
+            )
+            first, second = struct.unpack(">ii", bytes.fromhex(guard.removeprefix("sha256:"))[:8])
+            await self.session.execute(
+                text("SELECT pg_advisory_xact_lock(:first,:second)"), {"first": first, "second": second}
+            )
+        for profile_id in sorted({q.cohort_profile_id for q in queries.values()}):
+            await self.profiles.get_head_for_update(
+                user_id=self.user_id, project_name=self.project_name, profile_id=profile_id
+            )
+        for query_id in sorted({q.query_id for q in queries.values()}):
+            await self.queries.get_head(query_id)
+        for attempt_id, record in sorted(records.items()):
+            await self._subject(record, operational=attempt_id == operational_attempt_id)
+        claims = set()
+        for record in records.values():
+            envelope = await self._envelope(record)
+            if envelope is not None and envelope.claim_ref is not None:
+                claims.add((envelope.claim_ref, envelope.request.upload_version))
+        for identity in sorted(claims):
+            await self._upload_guard(*identity)
+        for attempt_id, expected in sorted(records.items()):
+            row = await self._row(attempt_id, lock=True)
+            if row is None or await self._record(row) != expected:
+                raise OpportunityError(_STALE)
+        for record in records.values():
+            await self._envelope(record, lock=True)
+
+    async def _observation_rows(self, observation_id: str) -> tuple[M9SourceObservationModel, ...]:
+        return tuple(
+            (
+                await self.session.scalars(
+                    select(M9SourceObservationModel)
+                    .where(
+                        M9SourceObservationModel.user_id == self.user_id,
+                        M9SourceObservationModel.project_name == self.project_name,
+                        M9SourceObservationModel.observation_id == observation_id,
+                    )
+                    .order_by(M9SourceObservationModel.revision)
+                    .execution_options(populate_existing=True)
+                )
+            ).all()
+        )
+
+    async def _observation_head(self, observation_id: str, *, lock: bool = False) -> M9ObservationHeadModel | None:
+        statement = (
+            select(M9ObservationHeadModel)
+            .where(
+                M9ObservationHeadModel.user_id == self.user_id,
+                M9ObservationHeadModel.project_name == self.project_name,
+                M9ObservationHeadModel.observation_id == observation_id,
+            )
+            .execution_options(populate_existing=True)
+        )
+        if lock:
+            statement = statement.with_for_update()
+        return (await self.session.scalars(statement)).one_or_none()
+
+    async def _observation_plan(
+        self, observation_id: str, *, snapshot_id: str | None = None
+    ) -> tuple[tuple[M9SourceObservationModel, ...], dict[str, _AttemptRecord]]:
+        rows = await self._observation_rows(observation_id)
+        initial = tuple((r.revision, r.snapshot_id, r.observation_digest) for r in rows)
+        snapshot_ids = {r.snapshot_id for r in rows}
+        if snapshot_id is not None:
+            snapshot_ids.add(snapshot_id)
+        records = {}
+        dependencies = {}
+        for identity in sorted(snapshot_ids):
+            snapshot_row = await self.session.get(
+                M9SourceSnapshotModel, (self.user_id, self.project_name, identity, 1), populate_existing=True
+            )
+            if snapshot_row is None:
+                raise OpportunityError(_MISSING)
+            row = await self._row(snapshot_row.attempt_id)
+            if row is None:
+                raise OpportunityError(_MISSING)
+            record = await self._record(row)
+            records[row.attempt_id] = record
+            dependencies[identity] = row.attempt_id
+        await self.lock_commands(tuple(record.command.context for record in records.values()))
+        for identity, attempt_id in dependencies.items():
+            snapshot_row = await self.session.get(
+                M9SourceSnapshotModel, (self.user_id, self.project_name, identity, 1), populate_existing=True
+            )
+            if snapshot_row is None or snapshot_row.attempt_id != attempt_id:
+                raise OpportunityError(_STALE)
+        rows = await self._observation_rows(observation_id)
+        if tuple((r.revision, r.snapshot_id, r.observation_digest) for r in rows) != initial:
+            raise OpportunityError(_STALE)
+        for attempt_id in records:
+            row = await self._row(attempt_id)
+            if row is None:
+                raise OpportunityError(_MISSING)
+            records[attempt_id] = await self._record(row)
+        return rows, records
+
+    async def _validate_observation(self, stored: _ObservationRecord) -> None:
+        observation = stored.observation
+        pair = await self.get_snapshot(observation.snapshot_id)
+        if pair is None:
+            raise OpportunityError(_MISSING)
+        snapshot, provenance = pair
+        attempt = await self.get_attempt(snapshot.attempt_id)
+        if (
+            attempt is None
+            or digest_source_observation(observation) != observation.observation_digest
+            or (observation.user_id, observation.project_name) != (self.user_id, self.project_name)
+            or (observation.snapshot_digest, observation.source_kind)
+            != (snapshot.snapshot_digest, snapshot.source_kind)
+            or not 1 <= observation.page_ordinal <= len(snapshot.pages)
+            or stored.snapshot_provenance_digest != digest_snapshot_provenance_v2(provenance)
+            or not provenance.attempt_version <= stored.attempt_version <= attempt.attempt_version
+            or not snapshot.created_at <= stored.stored_at
+        ):
+            raise OpportunityError(_MISSING)
+        checkpoints = await self.list_checkpoints(snapshot.attempt_id)
+        checkpoint = checkpoints[observation.page_ordinal - 1]
+        page = checkpoint.page
+        qualifiers = (
+            "source_identity_ref",
+            "native_field_name",
+            "native_field_definition",
+            "native_field_version",
+            "data_class",
+            "unit",
+            "window_start",
+            "window_end",
+            "missing_reason",
+            "normalization_version",
+            "value_ref",
+            "value_integrity_ref",
+            "retained_normalized_value_digest",
+        )
+        fields = [
+            f
+            for f in checkpoint.native_fields
+            if all(getattr(f, key) == getattr(observation, key) for key in qualifiers)
+        ]
+        if (
+            len(fields) != 1
+            or observation.source_identity_ref not in checkpoint.source_identity_refs
+            or observation.data_class not in page.data_classes
+            or (
+                observation.payload_integrity_ref,
+                observation.retained_source_payload_digest,
+                observation.observed_at,
+            )
+            != (page.payload_integrity_ref, page.retained_source_payload_digest, page.captured_at)
+        ):
+            raise OpportunityError(_MISSING)
+        query = await self.queries.get_exact(snapshot.query_id, snapshot.query_revision)
+        if query is None:
+            raise OpportunityError(_MISSING)
+        grant = await self.capabilities.get_grant(query.capability_grant_id, query.capability_grant_version)
+        rule = (
+            None
+            if grant is None
+            else next((r for r in grant.data_rules if r.data_class == observation.data_class), None)
+        )
+        if rule is None or (
+            observation.retained_normalized_value_digest is not None and not rule.digest_proof_may_be_retained
+        ):
+            raise OpportunityError(_MISSING)
+
+    @staticmethod
+    def _require_observation_parent(
+        observation: NormalizedSourceObservation, prior: NormalizedSourceObservation | None
+    ) -> None:
+        if (observation.revision, observation.parent_revision) != (
+            (1, None) if prior is None else (prior.revision + 1, prior.revision)
+        ):
+            raise OpportunityError(_STALE)
+        if prior is not None and any(
+            getattr(prior, name) != getattr(observation, name)
+            for name in (
+                "source_kind",
+                "source_identity_ref",
+                "native_field_name",
+                "native_field_definition",
+                "native_field_version",
+                "data_class",
+                "unit",
+                "window_start",
+                "window_end",
+            )
+        ):
+            raise OpportunityError(StopCode.M9_NORMALIZATION_LOSSY)
+
+    async def _observation_history(
+        self, rows: tuple[M9SourceObservationModel, ...], *, observation_id: str
+    ) -> tuple[NormalizedSourceObservation, ...]:
+        values = []
+        for row in rows:
+            stored = _unpack(_ObservationRecord, row.body_json)
+            value = stored.observation
+            if any(
+                getattr(row, name) != getattr(value, name)
+                for name in (
+                    "user_id",
+                    "project_name",
+                    "observation_id",
+                    "revision",
+                    "parent_revision",
+                    "snapshot_id",
+                    "snapshot_digest",
+                    "source_identity_ref",
+                    "observation_digest",
+                )
+            ):
+                raise OpportunityError(_MISSING)
+            await self._validate_observation(stored)
+            self._require_observation_parent(value, values[-1] if values else None)
+            events = (
+                await self.session.scalars(
+                    select(M9EventModel).where(
+                        M9EventModel.user_id == self.user_id,
+                        M9EventModel.project_name == self.project_name,
+                        M9EventModel.aggregate_id == value.observation_id,
+                        M9EventModel.aggregate_revision == value.revision,
+                        M9EventModel.event_kind == "MANUAL_OBSERVATION_STORED",
+                    )
+                )
+            ).all()
+            if len(events) != 1 or (events[0].payload_digest, events[0].committed_at) != (
+                _record_digest(stored),
+                stored.stored_at,
+            ):
+                raise OpportunityError(_MISSING)
+            values.append(value)
+        head = await self._observation_head(observation_id)
+        if (head is None) != (not values) or (
+            head is not None and (head.current_revision, head.head_version) != (len(values), len(values))
+        ):
+            raise OpportunityError(_MISSING)
+        return tuple(values)
+
+    async def get_observation(self, observation_id: str, revision: int) -> NormalizedSourceObservation | None:
+        rows, _ = await self._observation_plan(observation_id)
+        values = await self._observation_history(rows, observation_id=observation_id)
+        return next((value for value in values if value.revision == revision), None)
+
+    async def get_current_observation(self, observation_id: str) -> NormalizedSourceObservation | None:
+        rows, _ = await self._observation_plan(observation_id)
+        values = await self._observation_history(rows, observation_id=observation_id)
+        return values[-1] if values else None
+
+    async def append_observation(
+        self, observation: NormalizedSourceObservation, *, expected_attempt_version: int
+    ) -> None:
+        try:
+            observation = NormalizedSourceObservation.model_validate(observation.model_dump())
+        except ValueError:
+            raise OpportunityError(_MISSING) from None
+        if (observation.user_id, observation.project_name) != (self.user_id, self.project_name):
+            raise OpportunityError(_MISSING)
+        rows, records = await self._observation_plan(observation.observation_id, snapshot_id=observation.snapshot_id)
+        values = await self._observation_history(rows, observation_id=observation.observation_id)
+        existing = next((v for v in values if v.revision == observation.revision), None)
+        if existing is not None:
+            if existing != observation:
+                raise OpportunityError(_CONFLICT)
+            return
+        self._require_observation_parent(observation, values[-1] if values else None)
+        pair = await self.get_snapshot(observation.snapshot_id)
+        if pair is None:
+            raise OpportunityError(_MISSING)
+        snapshot, provenance = pair
+        await self._guard_dependencies(records, operational_attempt_id=snapshot.attempt_id)
+        record = records[snapshot.attempt_id]
+        if record.attempt.attempt_version != expected_attempt_version or record.attempt.state not in (
+            AttemptStateV2.RUNNING,
+            AttemptStateV2.OUTCOME_UNKNOWN,
+            AttemptStateV2.NEEDS_OPERATOR,
+        ):
+            raise OpportunityError(_STALE)
+        envelope = await self._envelope(record, lock=True)
+        if envelope is None:
+            raise OpportunityError(_MISSING)
+        now = await self.profiles.database_time()
+        require_admission_access(envelope, now=now, operational=True)
+        stored = _ObservationRecord(
+            observation=observation,
+            snapshot_provenance_digest=digest_snapshot_provenance_v2(provenance),
+            attempt_version=expected_attempt_version,
+            stored_at=now,
+        )
+        await self._validate_observation(stored)
+        # A guard also serializes an absent head across different first-attempt owners.
+        guard = digest_canonical(
+            {
+                "domain": "m9.manual-observation-lock.v1",
+                "user_id": self.user_id,
+                "project_name": self.project_name,
+                "observation_id": observation.observation_id,
+            }
+        )
+        first, second = struct.unpack(">ii", bytes.fromhex(guard.removeprefix("sha256:"))[:8])
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:first,:second)"), {"first": first, "second": second}
+        )
+        head = await self._observation_head(observation.observation_id, lock=True)
+        if (None if head is None else (head.current_revision, head.head_version)) != (
+            None if not values else (values[-1].revision, values[-1].revision)
+        ):
+            raise OpportunityError(_STALE)
+        self.session.add(
+            M9SourceObservationModel(
+                **{
+                    name: getattr(observation, name)
+                    for name in (
+                        "user_id",
+                        "project_name",
+                        "observation_id",
+                        "revision",
+                        "parent_revision",
+                        "snapshot_id",
+                        "snapshot_digest",
+                        "source_identity_ref",
+                        "observation_digest",
+                    )
+                },
+                body_json=_pack(stored),
+            )
+        )
+        self.session.add(
+            M9EventModel(
+                user_id=self.user_id,
+                project_name=self.project_name,
+                event_kind="MANUAL_OBSERVATION_STORED",
+                aggregate_id=observation.observation_id,
+                aggregate_revision=observation.revision,
+                payload_digest=_record_digest(stored),
+                committed_at=now,
+            )
+        )
+        await _flush(self.session)
+        if head is None:
+            self.session.add(
+                M9ObservationHeadModel(
+                    user_id=self.user_id,
+                    project_name=self.project_name,
+                    observation_id=observation.observation_id,
+                    current_revision=1,
+                    head_version=1,
+                )
+            )
+        else:
+            head.current_revision = head.head_version = observation.revision
         await _flush(self.session)
 
     async def claim_dispatch(
