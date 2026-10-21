@@ -29,6 +29,7 @@ from r2.contracts.opportunity import (
     AttemptOutcomeReason,
     CapabilityEvaluationRequest,
     CommandContext,
+    EvidenceDataClassClock,
     M9ContractModel,
     SourceQuery,
 )
@@ -41,6 +42,7 @@ from r2.contracts.opportunity_acquisition_v2 import (
     ExpiryDispositionV2,
     QuotaDispositionV2,
 )
+from r2.opportunity.acquisition import PageCheckpoint
 from r2.opportunity.acquisition_v2_digests import digest_acquisition_request_v2, digest_acquisition_result_v2
 from r2.opportunity.capabilities import validate_capability
 from r2.opportunity.errors import OpportunityError, StopCode
@@ -108,6 +110,12 @@ class _ReadLeaseRecord(M9ContractModel):
     permit: AdmissionReadPermit
     attempt_version: int = Field(ge=1, strict=True)
     released_at: AwareDatetime | None
+
+
+class _CheckpointRecord(M9ContractModel):
+    schema_version: Literal["m9.manual-checkpoint.v1"] = "m9.manual-checkpoint.v1"
+    admission: AdmissionEnvelope
+    checkpoint: PageCheckpoint
 
 
 def _record_digest(record: M9ContractModel) -> str:
@@ -895,6 +903,209 @@ class ManualAdmissionRepository:
         )
         await self._save_envelope(ready, expected_version=envelope.version)
         return ready
+
+    def _validate_checkpoint_binding(self, checkpoint: PageCheckpoint, admission: AdmissionEnvelope) -> None:
+        if (
+            admission.phase != AdmissionPhase.READY
+            or admission.deadlines is None
+            or admission.dispatch_claim is None
+            or admission.admitted_at is None
+        ):
+            raise OpportunityError(_MISSING)
+        page = checkpoint.page
+        deadlines = {c.data_class: c for c in admission.deadlines.classes}
+        try:
+            expected_clocks = tuple(
+                EvidenceDataClassClock(
+                    data_class=name,
+                    captured_at=admission.admitted_at,
+                    refresh_due_at=deadlines[name].refresh_due_at,
+                    retention_due_at=deadlines[name].retention_due_at,
+                )
+                for name in page.data_classes
+            )
+            if page.captured_at != admission.admitted_at or page.data_class_clocks != expected_clocks:
+                raise ValueError("checkpoint must preserve original admission clocks")
+            if page.payload_ref is not None:
+                objects = [
+                    o
+                    for o in admission.objects
+                    if (o.payload_ref, o.integrity_ref, o.evidence_kind)
+                    == (page.payload_ref, page.payload_integrity_ref, "raw-page")
+                ]
+                if len(objects) != 1 or (objects[0].data_classes, objects[0].retained_material_digest) != (
+                    page.data_classes,
+                    page.retained_source_payload_digest,
+                ):
+                    raise ValueError("checkpoint raw object differs from original publication")
+            elif checkpoint.native_fields or page.raw_media_type is not None:
+                raise ValueError("missing page cannot carry native material")
+            identities = set()
+            material_refs = set()
+            for field in checkpoint.native_fields:
+                objects = [
+                    o
+                    for o in admission.objects
+                    if (o.payload_ref, o.integrity_ref) == (field.material_ref, field.material_integrity_ref)
+                ]
+                key = (
+                    field.source_identity_ref,
+                    field.native_field_name,
+                    field.native_field_definition,
+                    field.native_field_version,
+                    field.data_class,
+                    field.unit,
+                    field.window_start,
+                    field.window_end,
+                    field.normalization_version,
+                )
+                missing = field.missing_reason is not None
+                if (
+                    key in identities
+                    or field.material_ref in material_refs
+                    or field.source_identity_ref not in checkpoint.source_identity_refs
+                    or field.data_class not in page.data_classes
+                    or len(objects) != 1
+                    or not objects[0].evidence_kind.startswith("native-field-")
+                    or objects[0].data_classes != (field.data_class,)
+                    or (field.value_ref, field.value_integrity_ref)
+                    != ((None, None) if missing else (field.material_ref, field.material_integrity_ref))
+                    or field.retained_normalized_value_digest
+                    != (None if missing else objects[0].retained_material_digest)
+                ):
+                    raise ValueError("checkpoint native object differs from original publication")
+                identities.add(key)
+                material_refs.add(field.material_ref)
+        except (KeyError, ValueError, TypeError):
+            raise OpportunityError(_MISSING) from None
+
+    def _validate_checkpoint_chain(self, checkpoints: tuple[PageCheckpoint, ...], query: SourceQuery) -> None:
+        previous = None
+        refs = set()
+        for index, item in enumerate(checkpoints, start=1):
+            if (
+                item.page.ordinal != index
+                or item.page.request_cursor_digest != (previous.page.response_cursor_digest if previous else None)
+                or (previous is not None and previous.terminal_page)
+                or (item.page.payload_ref is not None and item.page.payload_ref in refs)
+                or (
+                    item.page.response_cursor_digest is not None
+                    and item.page.response_cursor_digest in {c.page.request_cursor_digest for c in checkpoints}
+                )
+            ):
+                raise OpportunityError(_MISSING)
+            if item.page.payload_ref is not None:
+                refs.add(item.page.payload_ref)
+            previous = item
+        if (
+            len(checkpoints) > query.max_pages
+            or sum(c.page.record_count for c in checkpoints) > query.max_records
+            or sum(c.page.raw_size_bytes for c in checkpoints) > 41_943_040
+            or sum(c.quota_units_observed or 0 for c in checkpoints) > query.max_quota_units
+        ):
+            raise OpportunityError(StopCode.M9_OPERATIONAL_ENVELOPE_EXCEEDED)
+
+    async def list_checkpoints(self, attempt_id: str) -> tuple[PageCheckpoint, ...]:
+        attempt = await self.get_attempt(attempt_id)
+        if attempt is None:
+            return ()
+        row = await self._row(attempt_id)
+        if row is None:
+            raise OpportunityError(_MISSING)
+        record = await self._record(row)
+        envelope = await self._envelope(record)
+        rows = (
+            await self.session.scalars(
+                select(M9SnapshotPageModel)
+                .where(
+                    M9SnapshotPageModel.user_id == self.user_id,
+                    M9SnapshotPageModel.project_name == self.project_name,
+                    M9SnapshotPageModel.attempt_id == attempt_id,
+                )
+                .order_by(M9SnapshotPageModel.ordinal)
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        checkpoints = []
+        for page_row in rows:
+            stored = _unpack(_CheckpointRecord, page_row.checkpoint_json)
+            original, checkpoint = stored.admission, stored.checkpoint
+            if (
+                envelope is None
+                or any(
+                    getattr(original, name) != getattr(envelope, name)
+                    for name in ("request", "claim_ref", "objects", "admitted_at", "deadlines", "dispatch_claim")
+                )
+                or (page_row.user_id, page_row.project_name, page_row.attempt_id, page_row.ordinal, page_row.body_json)
+                != (
+                    self.user_id,
+                    self.project_name,
+                    attempt_id,
+                    checkpoint.page.ordinal,
+                    checkpoint.page.model_dump(mode="json"),
+                )
+            ):
+                raise OpportunityError(_MISSING)
+            self._validate_checkpoint_binding(checkpoint, original)
+            checkpoints.append(checkpoint)
+        query = await self.queries.get_exact(attempt.query_id, attempt.query_revision)
+        if query is None:
+            raise OpportunityError(_MISSING)
+        result = tuple(checkpoints)
+        self._validate_checkpoint_chain(result, query)
+        return result
+
+    async def append_checkpoint(
+        self, attempt_id: str, checkpoint: PageCheckpoint, *, expected_attempt_version: int
+    ) -> PageCheckpoint:
+        try:
+            checkpoint = PageCheckpoint.model_validate(checkpoint.model_dump())
+        except ValueError:
+            raise OpportunityError(_MISSING) from None
+        existing = await self.list_checkpoints(attempt_id)
+        ordinal = checkpoint.page.ordinal
+        if ordinal <= len(existing):
+            if existing[ordinal - 1] != checkpoint:
+                raise OpportunityError(_CONFLICT)
+            return existing[ordinal - 1]
+        _, record = await self._guard(attempt_id, operational=True)
+        if record.attempt.attempt_version != expected_attempt_version or record.attempt.state not in (
+            AttemptStateV2.RUNNING,
+            AttemptStateV2.OUTCOME_UNKNOWN,
+            AttemptStateV2.NEEDS_OPERATOR,
+        ):
+            raise OpportunityError(_STALE)
+        envelope = await self._envelope(record, lock=True)
+        if envelope is None:
+            raise OpportunityError(_MISSING)
+        now = await self.profiles.database_time()
+        require_admission_access(envelope, now=now, operational=True)
+        if checkpoint.page.captured_at > now:
+            raise OpportunityError(_STALE)
+        self._validate_checkpoint_binding(checkpoint, envelope)
+        if record.attempt.state != AttemptStateV2.RUNNING and (
+            checkpoint.provider_observed_at is not None
+            or checkpoint.page.provider_request_id is not None
+            or checkpoint.quota_units_observed is not None
+        ):
+            raise OpportunityError(_MISSING)
+        query = await self.queries.get_exact(record.command.query_id, record.command.query_revision)
+        if query is None:
+            raise OpportunityError(_MISSING)
+        self._validate_checkpoint_chain((*existing, checkpoint), query)
+        stored = _CheckpointRecord(admission=envelope, checkpoint=checkpoint)
+        self.session.add(
+            M9SnapshotPageModel(
+                user_id=self.user_id,
+                project_name=self.project_name,
+                attempt_id=attempt_id,
+                ordinal=ordinal,
+                body_json=checkpoint.page.model_dump(mode="json"),
+                checkpoint_json=_pack(stored),
+            )
+        )
+        await _flush(self.session)
+        return checkpoint
 
     async def claim_dispatch(
         self, attempt_id: str, *, expected_attempt_version: int, expected_envelope_version: int

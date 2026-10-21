@@ -401,17 +401,21 @@ async def test_read_admission_requires_its_complete_active_upload_lease(session_
         await read_corrupt()
 
 
-@pytest.mark.parametrize("boundary", ["attach", "claim"])
+@pytest.mark.parametrize("boundary", ["attach", "claim", "checkpoint"])
 async def test_native_blocking_contenders_preserve_one_admission_or_dispatch_winner(session_factory, boundary):
     import asyncio
 
     from sqlalchemy import text
 
+    publication = None
+    checkpoint = None
     if boundary == "attach":
         command, descriptor, _grant, running = await start_manual(session_factory)
         publication = publication_for(command, descriptor, running)
         async with session_factory() as session, session.begin():
             ready = await manual_repo(session).reserve(publication.request, expected_attempt_version=2)
+    elif boundary == "checkpoint":
+        command, ready, checkpoint = await checkpoint_subject(session_factory)
     else:
         command, publication, ready = await ready_manual(session_factory)
     holder, contender = session_factory(), session_factory()
@@ -420,7 +424,13 @@ async def test_native_blocking_contenders_preserve_one_admission_or_dispatch_win
         await holder.begin()
         holder_pid = await holder.scalar(text("SELECT pg_backend_pid()"))
         if boundary == "attach":
+            assert publication is not None
             winner = await manual_repo(holder).attach(publication, expected_envelope_version=1)
+        elif boundary == "checkpoint":
+            assert checkpoint is not None
+            winner = await manual_repo(holder).append_checkpoint(
+                ready.request.attempt_id, checkpoint, expected_attempt_version=3
+            )
         else:
             winner = await manual_repo(holder).claim_dispatch(
                 ready.request.attempt_id, expected_attempt_version=2, expected_envelope_version=2
@@ -430,7 +440,13 @@ async def test_native_blocking_contenders_preserve_one_admission_or_dispatch_win
 
         async def compete():
             if boundary == "attach":
+                assert publication is not None
                 return await manual_repo(contender).attach(publication, expected_envelope_version=1)
+            if boundary == "checkpoint":
+                assert checkpoint is not None
+                return await manual_repo(contender).append_checkpoint(
+                    ready.request.attempt_id, checkpoint, expected_attempt_version=3
+                )
             return await manual_repo(contender).claim_dispatch(
                 ready.request.attempt_id, expected_attempt_version=2, expected_envelope_version=2
             )
@@ -446,7 +462,7 @@ async def test_native_blocking_contenders_preserve_one_admission_or_dispatch_win
                     pytest.fail("contender did not wait on the retained command guard")
         assert not task.done()
         await holder.commit()
-        if boundary == "attach":
+        if boundary in ("attach", "checkpoint"):
             assert await task == winner
         else:
             with pytest.raises(OpportunityError, match="M9_STALE_HEAD"):
@@ -456,6 +472,8 @@ async def test_native_blocking_contenders_preserve_one_admission_or_dispatch_win
             retained = await manual_repo(session).get_envelope(ready.request.attempt_id)
             if boundary == "attach":
                 assert retained == winner
+            elif boundary == "checkpoint":
+                assert await manual_repo(session).list_checkpoints(ready.request.attempt_id) == (winner,)
             else:
                 assert retained.dispatch_claim == winner
     finally:
@@ -784,3 +802,319 @@ async def test_prepare_refuses_query_contract_different_from_frozen_manual_bindi
         await wrong_contract()
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(M9AcquisitionAttemptModel)) == 0
+
+
+async def checkpoint_subject(factory, *, dispatch=True, native=False, refresh_seconds=None):
+    from r2.contracts.opportunity import EvidenceDataClassClock, SnapshotPage
+    from r2.opportunity.acquisition import PageCheckpoint
+
+    if native or refresh_seconds is not None:
+        from r2.opportunity.manual_admission import AdmissionRequest, PublishedAdmission
+
+        command, descriptor, _, running = await start_manual(factory)
+        publication = publication_for(command, descriptor, running)
+        if refresh_seconds is not None:
+            clocks = tuple(
+                c.model_copy(update={"refresh_due_at": running.started_at + timedelta(seconds=refresh_seconds)})
+                for c in publication.request.original_clocks
+            )
+            request = AdmissionRequest.model_validate({**publication.request.model_dump(), "original_clocks": clocks})
+            objects = tuple(o.model_copy(update={"original_clocks": clocks}) for o in publication.objects)
+            publication = PublishedAdmission.model_validate(
+                {**publication.model_dump(), "request": request, "objects": objects}
+            )
+        if native:
+            native_object = publication.objects[0].model_copy(
+                update={
+                    "payload_ref": "original-native",
+                    "integrity_ref": "original-native-proof",
+                    "attestation_ref": "original-native-seal",
+                    "evidence_kind": "native-field-1",
+                }
+            )
+            publication = PublishedAdmission.model_validate(
+                {
+                    **publication.model_dump(),
+                    "objects": (*publication.objects, native_object),
+                }
+            )
+        async with factory() as session, session.begin():
+            repo = manual_repo(session)
+            await repo.reserve(publication.request, expected_attempt_version=2)
+            envelope = await repo.attach(publication, expected_envelope_version=1)
+    else:
+        command, _, envelope = await ready_manual(factory)
+    if dispatch:
+        async with factory() as session, session.begin():
+            repo = manual_repo(session)
+            await repo.claim_dispatch(
+                envelope.request.attempt_id, expected_attempt_version=2, expected_envelope_version=2
+            )
+            envelope = await repo.get_envelope(envelope.request.attempt_id)
+    obj = next(o for o in envelope.objects if o.evidence_kind == "raw-page")
+    clocks = tuple(
+        EvidenceDataClassClock(
+            data_class=c.data_class,
+            captured_at=envelope.admitted_at,
+            refresh_due_at=c.refresh_due_at,
+            retention_due_at=c.retention_due_at,
+        )
+        for c in envelope.deadlines.classes
+        if c.data_class in obj.data_classes
+    )
+    page = SnapshotPage(
+        ordinal=1,
+        request_cursor_digest=None,
+        response_cursor_digest=None,
+        provider_request_id=None,
+        payload_ref=obj.payload_ref,
+        payload_integrity_ref=obj.integrity_ref,
+        retained_source_payload_digest=obj.retained_material_digest,
+        raw_media_type="application/json",
+        raw_size_bytes=2,
+        data_classes=obj.data_classes,
+        data_class_clocks=clocks,
+        record_count=1,
+        captured_at=envelope.admitted_at,
+        missing_reason=None,
+    )
+    checkpoint = PageCheckpoint(
+        page=page,
+        source_identity_refs=("identity:original",),
+        quota_units_observed=None,
+        next_cursor_ref=None,
+        next_cursor_integrity_ref=None,
+        terminal_page=True,
+        provider_observed_at=None,
+    )
+    if native:
+        from r2.opportunity.acquisition import NativeFieldMaterial
+
+        checkpoint = checkpoint.model_copy(
+            update={
+                "native_fields": (
+                    NativeFieldMaterial(
+                        source_identity_ref="identity:original",
+                        native_field_name="excerpt",
+                        native_field_definition="Original text.",
+                        native_field_version="manual.v1",
+                        data_class="manual-excerpt",
+                        unit=None,
+                        window_start=None,
+                        window_end=None,
+                        missing_reason=None,
+                        normalization_version="manual.v1",
+                        material_ref="original-native",
+                        material_integrity_ref="original-native-proof",
+                        value_ref="original-native",
+                        value_integrity_ref="original-native-proof",
+                        retained_normalized_value_digest=None,
+                    ),
+                )
+            }
+        )
+    return command, envelope, checkpoint
+
+
+@pytest.mark.parametrize("native", [False, True])
+async def test_v2_checkpoint_reopen_and_ack_replay_preserve_original_admission_clocks(session_factory, native):
+    command, envelope, checkpoint = await checkpoint_subject(session_factory, native=native)
+    attempt_id = envelope.request.attempt_id
+    async with session_factory() as session, session.begin():
+        retained = await manual_repo(session).append_checkpoint(attempt_id, checkpoint, expected_attempt_version=3)
+        assert retained == checkpoint
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session, policy=None)
+        assert await repo.list_checkpoints(attempt_id) == (checkpoint,)
+        assert await repo.append_checkpoint(attempt_id, checkpoint, expected_attempt_version=2) == checkpoint
+        assert (await repo.get_envelope(attempt_id)).admitted_at == envelope.admitted_at
+    async with unit_of_work(session_factory).transaction() as tx:
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await tx.pages.list_for_attempt(attempt_id)
+    async with session_factory() as session, session.begin():
+        assert await manual_repo(session).get_for_command(command) is not None
+
+
+@pytest.mark.parametrize("fault", ["ref", "clock", "proof", "cursor", "native", "version", "unclaimed"])
+async def test_v2_checkpoint_rejects_unbound_material_or_execution(session_factory, fault):
+    from r2.opportunity.acquisition import NativeFieldMaterial
+
+    _, envelope, checkpoint = await checkpoint_subject(session_factory, dispatch=fault != "unclaimed")
+    page = checkpoint.page
+    if fault == "ref":
+        page = page.model_copy(update={"payload_ref": "replacement-payload"})
+    elif fault == "proof":
+        page = page.model_copy(update={"retained_source_payload_digest": "sha256:" + "a" * 64})
+    elif fault == "clock":
+        clocks = []
+        for clock in page.data_class_clocks:
+            assert clock.retention_due_at is not None
+            clocks.append(clock.model_copy(update={"retention_due_at": clock.retention_due_at + timedelta(seconds=1)}))
+        page = page.model_copy(update={"data_class_clocks": tuple(clocks)})
+    elif fault == "cursor":
+        page = page.model_copy(update={"request_cursor_digest": "sha256:" + "a" * 64})
+    elif fault == "native":
+        field = NativeFieldMaterial(
+            source_identity_ref="identity:original",
+            native_field_name="excerpt",
+            native_field_definition="Original text.",
+            native_field_version="manual.v1",
+            data_class="manual-excerpt",
+            unit=None,
+            window_start=None,
+            window_end=None,
+            missing_reason=None,
+            normalization_version="manual.v1",
+            material_ref="replacement-native",
+            material_integrity_ref="replacement-native-proof",
+            value_ref="replacement-native",
+            value_integrity_ref="replacement-native-proof",
+            retained_normalized_value_digest=None,
+        )
+        checkpoint = checkpoint.model_copy(update={"native_fields": (field,)})
+    checkpoint = checkpoint.model_copy(update={"page": page})
+
+    async def unbound():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).append_checkpoint(
+                envelope.request.attempt_id,
+                checkpoint,
+                expected_attempt_version=17 if fault == "version" else 2 if fault == "unclaimed" else 3,
+            )
+
+    with pytest.raises(OpportunityError):
+        await unbound()
+    async with session_factory() as session:
+        assert await manual_repo(session).list_checkpoints(envelope.request.attempt_id) == ()
+
+
+async def test_v2_checkpoint_rolls_back_with_application_transaction(session_factory):
+    _, envelope, checkpoint = await checkpoint_subject(session_factory)
+
+    async def interrupted():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).append_checkpoint(
+                envelope.request.attempt_id, checkpoint, expected_attempt_version=3
+            )
+            raise RuntimeError("before checkpoint commit")
+
+    with pytest.raises(RuntimeError, match="before checkpoint commit"):
+        await interrupted()
+    async with session_factory() as session:
+        assert await manual_repo(session).list_checkpoints(envelope.request.attempt_id) == ()
+
+
+@pytest.mark.parametrize("fault", ["page_column", "rehashed_original_refs"])
+async def test_v2_checkpoint_reader_revalidates_independent_original_admission(session_factory, fault):
+    from lib.db.models.opportunity_acquisition import M9SnapshotPageModel
+    from r2.opportunity.manual_admission import admission_metadata_digest
+
+    _, envelope, checkpoint = await checkpoint_subject(session_factory)
+    attempt_id = envelope.request.attempt_id
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).append_checkpoint(attempt_id, checkpoint, expected_attempt_version=3)
+    async with session_factory() as session, session.begin():
+        row = (await session.scalars(select(M9SnapshotPageModel))).one()
+        if fault == "page_column":
+            row.body_json = {**row.body_json, "raw_size_bytes": 3}
+        else:
+            import copy
+
+            metadata = copy.deepcopy(row.checkpoint_json["metadata"])
+            metadata["admission"]["objects"][0]["payload_ref"] = "replacement-raw"
+            metadata["admission"]["metadata_digest"] = admission_metadata_digest(metadata["admission"])
+            metadata["checkpoint"]["page"]["payload_ref"] = "replacement-raw"
+            module = manual_module()
+            row.checkpoint_json = module._pack(module._CheckpointRecord.model_validate(metadata))
+            row.body_json = metadata["checkpoint"]["page"]
+    async with session_factory() as session:
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await manual_repo(session).list_checkpoints(attempt_id)
+
+
+@pytest.mark.parametrize("claim", ["none", "quota", "provider_time"])
+async def test_v2_reconstruction_checkpoint_preserves_uncertainty_without_provider_claims(session_factory, claim):
+    _, envelope, checkpoint = await checkpoint_subject(session_factory)
+    attempt_id = envelope.request.attempt_id
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).mark_outcome_unknown(attempt_id, expected_attempt_version=3)
+    if claim == "quota":
+        checkpoint = checkpoint.model_copy(update={"quota_units_observed": 0})
+    elif claim == "provider_time":
+        checkpoint = checkpoint.model_copy(update={"provider_observed_at": envelope.admitted_at})
+
+    async def stage():
+        async with session_factory() as session, session.begin():
+            return await manual_repo(session).append_checkpoint(attempt_id, checkpoint, expected_attempt_version=4)
+
+    if claim == "none":
+        assert await stage() == checkpoint
+    else:
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await stage()
+    async with session_factory() as session:
+        attempt = await manual_repo(session).get_attempt(attempt_id)
+        assert attempt.state == "OUTCOME_UNKNOWN"
+        assert attempt.quota_disposition == "POSSIBLY_CONSUMED"
+        assert attempt.quota_units_observed is None
+
+
+async def test_v2_checkpoint_paused_before_sql_erasure_fence_cannot_publish(session_factory):
+    from lib.db.models.opportunity_acquisition import M9SnapshotPageModel
+    from lib.db.models.opportunity_manual_admission import M9ManualAdmissionModel
+    from lib.db.repositories.opportunity import OpportunityProfileRepository
+
+    _, envelope, checkpoint = await checkpoint_subject(session_factory)
+    async with session_factory() as session, session.begin():
+        now = await OpportunityProfileRepository(session).database_time()
+        await session.execute(update(M9ManualAdmissionModel).values(erasure_fenced_at=now, erasure_version=1))
+
+    async def resume():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).append_checkpoint(
+                envelope.request.attempt_id, checkpoint, expected_attempt_version=3
+            )
+
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        await resume()
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9SnapshotPageModel)) == 0
+
+
+async def test_v2_checkpoint_prepared_before_expiry_cannot_publish_after_closure(session_factory):
+    import asyncio
+
+    from lib.db.models.opportunity_acquisition import M9SnapshotPageModel
+    from lib.db.repositories.opportunity import OpportunityProfileRepository
+
+    command, envelope, checkpoint = await checkpoint_subject(session_factory, refresh_seconds=5)
+    async with asyncio.timeout(10):
+        async with session_factory() as session:
+            while True:
+                now = await OpportunityProfileRepository(session).database_time()
+                if now >= envelope.deadlines.refresh_due_at:
+                    break
+                arrived = asyncio.Event()
+                timer = asyncio.get_running_loop().call_later(
+                    (envelope.deadlines.refresh_due_at - now).total_seconds(), arrived.set
+                )
+                try:
+                    await arrived.wait()
+                finally:
+                    timer.cancel()
+    async with session_factory() as session, session.begin():
+        receipt = await manual_repo(session, policy=None).close_expired(
+            envelope.request.attempt_id, expected_attempt_version=3, resolver_id="expiry-winner"
+        )
+
+    async def resume():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).append_checkpoint(
+                envelope.request.attempt_id, checkpoint, expected_attempt_version=3
+            )
+
+    with pytest.raises(OpportunityError):
+        await resume()
+    async with session_factory() as session, session.begin():
+        assert await session.scalar(select(func.count()).select_from(M9SnapshotPageModel)) == 0
+        assert await manual_repo(session).get_receipt(command) == receipt
