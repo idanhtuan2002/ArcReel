@@ -29,9 +29,11 @@ from r2.contracts.opportunity import (
     AttemptOutcomeReason,
     CapabilityEvaluationRequest,
     CommandContext,
+    CoverageState,
     EvidenceDataClassClock,
     M9ContractModel,
     SourceQuery,
+    SourceSnapshot,
 )
 from r2.contracts.opportunity_acquisition_v2 import (
     AcquireSourceQueryV2,
@@ -41,10 +43,17 @@ from r2.contracts.opportunity_acquisition_v2 import (
     ExpiryClosureV2,
     ExpiryDispositionV2,
     QuotaDispositionV2,
+    SnapshotOriginV2,
+    SnapshotProvenanceV2,
 )
 from r2.opportunity.acquisition import PageCheckpoint
-from r2.opportunity.acquisition_v2_digests import digest_acquisition_request_v2, digest_acquisition_result_v2
+from r2.opportunity.acquisition_v2_digests import (
+    digest_acquisition_request_v2,
+    digest_acquisition_result_v2,
+    digest_snapshot_provenance_v2,
+)
 from r2.opportunity.capabilities import validate_capability
+from r2.opportunity.digests import digest_source_snapshot
 from r2.opportunity.errors import OpportunityError, StopCode
 from r2.opportunity.manual_admission import (
     AdmissionEnvelope,
@@ -116,6 +125,15 @@ class _CheckpointRecord(M9ContractModel):
     schema_version: Literal["m9.manual-checkpoint.v1"] = "m9.manual-checkpoint.v1"
     admission: AdmissionEnvelope
     checkpoint: PageCheckpoint
+
+
+class _SnapshotRecord(M9ContractModel):
+    schema_version: Literal["m9.manual-snapshot.v1"] = "m9.manual-snapshot.v1"
+    admission: AdmissionEnvelope
+    snapshot: SourceSnapshot
+    provenance: SnapshotProvenanceV2
+    provenance_digest: str
+    stored_at: AwareDatetime
 
 
 def _record_digest(record: M9ContractModel) -> str:
@@ -1106,6 +1124,280 @@ class ManualAdmissionRepository:
         )
         await _flush(self.session)
         return checkpoint
+
+    async def _validate_snapshot_binding(
+        self, stored: _SnapshotRecord, record: _AttemptRecord, envelope: AdmissionEnvelope
+    ) -> None:
+        snapshot, provenance, original = stored.snapshot, stored.provenance, stored.admission
+        attempt = record.attempt
+        query = await self.queries.get_exact(attempt.query_id, attempt.query_revision)
+        if (
+            original.phase != AdmissionPhase.READY
+            or original.admitted_at is None
+            or original.dispatch_claim is None
+            or original.version > envelope.version
+            or any(
+                getattr(original, name) != getattr(envelope, name)
+                for name in ("request", "claim_ref", "objects", "admitted_at", "deadlines", "dispatch_claim")
+            )
+            or digest_source_snapshot(snapshot) != snapshot.snapshot_digest
+            or digest_snapshot_provenance_v2(provenance) != stored.provenance_digest
+            or (snapshot.user_id, snapshot.project_name, snapshot.attempt_id)
+            != (self.user_id, self.project_name, attempt.attempt_id)
+            or (
+                provenance.snapshot_id,
+                provenance.snapshot_digest,
+                provenance.attempt_id,
+                provenance.admission_metadata_digest,
+                provenance.admitted_at,
+            )
+            != (
+                snapshot.snapshot_id,
+                snapshot.snapshot_digest,
+                attempt.attempt_id,
+                original.metadata_digest,
+                original.admitted_at,
+            )
+            or not original.dispatch_claim.attempt_version <= provenance.attempt_version <= attempt.attempt_version
+            or snapshot.capture_completed_at != original.admitted_at
+            or snapshot.capture_started_at != attempt.started_at
+            or snapshot.adapter_version != attempt.adapter_version
+            or snapshot.revision != 1
+            or snapshot.parent_revision is not None
+            or not original.admitted_at <= snapshot.created_at <= stored.stored_at
+            or any(page.captured_at != original.admitted_at for page in snapshot.pages)
+            or query is None
+        ):
+            raise OpportunityError(_MISSING)
+        if (
+            snapshot.query_id,
+            snapshot.query_revision,
+            snapshot.query_digest,
+            snapshot.source_kind,
+            snapshot.source_contract_version,
+            snapshot.requested_record_limit,
+            snapshot.capability_grant_digest,
+            snapshot.capability_evaluation_digest,
+        ) != (
+            query.query_id,
+            query.revision,
+            query.query_digest,
+            query.source_kind,
+            query.source_contract_version,
+            query.max_records,
+            query.capability_grant_digest,
+            query.capability_evaluation_digest,
+        ):
+            raise OpportunityError(_MISSING)
+        grant = await self.capabilities.get_grant(query.capability_grant_id, query.capability_grant_version)
+        evaluation = await self.capabilities.get_evaluation(query.capability_evaluation_id)
+        if (
+            grant is None
+            or evaluation is None
+            or (
+                grant.grant_digest,
+                evaluation.evaluation_digest,
+                evaluation.grant_id,
+                evaluation.grant_version,
+                evaluation.grant_digest,
+            )
+            != (
+                query.capability_grant_digest,
+                query.capability_evaluation_digest,
+                grant.grant_id,
+                grant.grant_version,
+                grant.grant_digest,
+            )
+        ):
+            raise OpportunityError(_MISSING)
+        checkpoints = await self.list_checkpoints(attempt.attempt_id)
+        identities = tuple(sorted({ref for c in checkpoints for ref in c.source_identity_refs}))
+        if snapshot.pages != tuple(c.page for c in checkpoints) or snapshot.source_identity_refs != identities:
+            raise OpportunityError(_MISSING)
+        complete = snapshot.coverage_state == CoverageState.COMPLETE_WITHIN_DECLARED_BOUNDS
+        if complete and (
+            not checkpoints or not checkpoints[-1].terminal_page or any(c.page.payload_ref is None for c in checkpoints)
+        ):
+            raise OpportunityError(_MISSING)
+        if provenance.origin == SnapshotOriginV2.LOCAL_ADMISSION_RECONSTRUCTION:
+            if (
+                snapshot.provider_observed_at is not None
+                or not checkpoints
+                or any(c.page.payload_ref is None for c in checkpoints)
+            ):
+                raise OpportunityError(_MISSING)
+        elif (
+            provenance.response_recorded_at is None
+            or provenance.response_recorded_at > snapshot.created_at
+            or snapshot.provider_observed_at
+            != max((c.provider_observed_at for c in checkpoints if c.provider_observed_at is not None), default=None)
+        ):
+            raise OpportunityError(_MISSING)
+
+    async def _snapshot_record(self, row: M9SourceSnapshotModel) -> _SnapshotRecord:
+        attempt = await self.get_attempt(row.attempt_id)
+        if attempt is None:
+            raise OpportunityError(_MISSING)
+        attempt_row = await self._row(attempt.attempt_id)
+        if attempt_row is None:
+            raise OpportunityError(_MISSING)
+        record = await self._record(attempt_row)
+        stored = _unpack(_SnapshotRecord, row.body_json)
+        snapshot = stored.snapshot
+        if any(
+            getattr(row, name) != getattr(snapshot, name)
+            for name in (
+                "user_id",
+                "project_name",
+                "snapshot_id",
+                "revision",
+                "parent_revision",
+                "attempt_id",
+                "query_id",
+                "query_revision",
+                "snapshot_digest",
+            )
+        ):
+            raise OpportunityError(_MISSING)
+        envelope = await self._envelope(record)
+        if envelope is None:
+            raise OpportunityError(_MISSING)
+        await self._validate_snapshot_binding(stored, record, envelope)
+        events = (
+            await self.session.scalars(
+                select(M9EventModel).where(
+                    M9EventModel.user_id == self.user_id,
+                    M9EventModel.project_name == self.project_name,
+                    M9EventModel.aggregate_id == snapshot.snapshot_id,
+                    M9EventModel.aggregate_revision == 1,
+                    M9EventModel.event_kind == "MANUAL_SNAPSHOT_STORED",
+                )
+            )
+        ).all()
+        if len(events) != 1 or (events[0].payload_digest, events[0].committed_at) != (
+            _record_digest(stored),
+            stored.stored_at,
+        ):
+            raise OpportunityError(_MISSING)
+        return stored
+
+    async def get_snapshot(
+        self, snapshot_id: str, revision: int = 1
+    ) -> tuple[SourceSnapshot, SnapshotProvenanceV2] | None:
+        row = await self.session.get(
+            M9SourceSnapshotModel, (self.user_id, self.project_name, snapshot_id, revision), populate_existing=True
+        )
+        if row is None:
+            return None
+        stored = await self._snapshot_record(row)
+        return stored.snapshot, stored.provenance
+
+    async def _snapshot_row_for_attempt(self, attempt_id: str) -> M9SourceSnapshotModel | None:
+        return (
+            await self.session.scalars(
+                select(M9SourceSnapshotModel)
+                .where(
+                    M9SourceSnapshotModel.user_id == self.user_id,
+                    M9SourceSnapshotModel.project_name == self.project_name,
+                    M9SourceSnapshotModel.attempt_id == attempt_id,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).one_or_none()
+
+    async def get_snapshot_for_attempt(self, attempt_id: str) -> tuple[SourceSnapshot, SnapshotProvenanceV2] | None:
+        if await self.get_attempt(attempt_id) is None:
+            return None
+        row = await self._snapshot_row_for_attempt(attempt_id)
+        if row is None:
+            return None
+        stored = await self._snapshot_record(row)
+        return stored.snapshot, stored.provenance
+
+    async def append_snapshot(
+        self, snapshot: SourceSnapshot, provenance: SnapshotProvenanceV2, *, expected_attempt_version: int
+    ) -> None:
+        try:
+            snapshot = SourceSnapshot.model_validate(snapshot.model_dump())
+            provenance = SnapshotProvenanceV2.model_validate(provenance.model_dump())
+        except ValueError:
+            raise OpportunityError(_MISSING) from None
+        if (snapshot.user_id, snapshot.project_name) != (self.user_id, self.project_name):
+            raise OpportunityError(_MISSING)
+        if await self.get_attempt(snapshot.attempt_id) is None:
+            raise OpportunityError(_MISSING)
+        existing = await self._snapshot_row_for_attempt(snapshot.attempt_id)
+        if existing is not None:
+            stored = await self._snapshot_record(existing)
+            if (stored.snapshot, stored.provenance) != (snapshot, provenance):
+                raise OpportunityError(_CONFLICT)
+            return
+        collision = await self.session.get(
+            M9SourceSnapshotModel, (self.user_id, self.project_name, snapshot.snapshot_id, snapshot.revision)
+        )
+        if collision is not None:
+            raise OpportunityError(_CONFLICT)
+        _, record = await self._guard(snapshot.attempt_id, operational=True)
+        if (
+            record.attempt.attempt_version != expected_attempt_version
+            or provenance.attempt_version != expected_attempt_version
+        ):
+            raise OpportunityError(_STALE)
+        if record.attempt.state not in (
+            AttemptStateV2.RUNNING,
+            AttemptStateV2.OUTCOME_UNKNOWN,
+            AttemptStateV2.NEEDS_OPERATOR,
+        ):
+            raise OpportunityError(_STALE)
+        if (
+            provenance.origin == SnapshotOriginV2.SOURCE_RESPONSE_VERIFIED
+            and record.attempt.state != AttemptStateV2.RUNNING
+        ):
+            raise OpportunityError(_MISSING)
+        envelope = await self._envelope(record, lock=True)
+        if envelope is None:
+            raise OpportunityError(_MISSING)
+        now = await self.profiles.database_time()
+        require_admission_access(envelope, now=now, operational=True)
+        stored = _SnapshotRecord(
+            admission=envelope,
+            snapshot=snapshot,
+            provenance=provenance,
+            provenance_digest=digest_snapshot_provenance_v2(provenance),
+            stored_at=now,
+        )
+        await self._validate_snapshot_binding(stored, record, envelope)
+        self.session.add(
+            M9SourceSnapshotModel(
+                **{
+                    name: getattr(snapshot, name)
+                    for name in (
+                        "user_id",
+                        "project_name",
+                        "snapshot_id",
+                        "revision",
+                        "parent_revision",
+                        "attempt_id",
+                        "query_id",
+                        "query_revision",
+                        "snapshot_digest",
+                    )
+                },
+                body_json=_pack(stored),
+            )
+        )
+        self.session.add(
+            M9EventModel(
+                user_id=self.user_id,
+                project_name=self.project_name,
+                event_kind="MANUAL_SNAPSHOT_STORED",
+                aggregate_id=snapshot.snapshot_id,
+                aggregate_revision=1,
+                payload_digest=_record_digest(stored),
+                committed_at=now,
+            )
+        )
+        await _flush(self.session)
 
     async def claim_dispatch(
         self, attempt_id: str, *, expected_attempt_version: int, expected_envelope_version: int

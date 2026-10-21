@@ -1118,3 +1118,252 @@ async def test_v2_checkpoint_prepared_before_expiry_cannot_publish_after_closure
     async with session_factory() as session, session.begin():
         assert await session.scalar(select(func.count()).select_from(M9SnapshotPageModel)) == 0
         assert await manual_repo(session).get_receipt(command) == receipt
+
+
+async def snapshot_subject(factory, *, origin="SOURCE_RESPONSE_VERIFIED", persist_checkpoint=True):
+    from r2.contracts.opportunity import SourceSnapshot
+    from r2.contracts.opportunity_acquisition_v2 import SnapshotOriginV2, SnapshotProvenanceV2
+    from r2.opportunity.digests import digest_source_snapshot
+
+    command, envelope, checkpoint = await checkpoint_subject(factory, native=True)
+    async with factory() as session, session.begin():
+        repo = manual_repo(session)
+        if persist_checkpoint:
+            await repo.append_checkpoint(envelope.request.attempt_id, checkpoint, expected_attempt_version=3)
+        if origin == "LOCAL_ADMISSION_RECONSTRUCTION":
+            await repo.mark_outcome_unknown(envelope.request.attempt_id, expected_attempt_version=3)
+        attempt = await repo.get_attempt(envelope.request.attempt_id)
+        query = await repo.queries.get_exact(command.query_id, command.query_revision)
+        now = await repo.profiles.database_time()
+        assert attempt.started_at is not None
+        snapshot = SourceSnapshot(
+            snapshot_id="019a0000-0000-7000-8000-000000000071",
+            revision=1,
+            parent_revision=None,
+            user_id=command.context.user_id,
+            project_name=command.context.project_name,
+            query_id=query.query_id,
+            query_revision=query.revision,
+            query_digest=query.query_digest,
+            attempt_id=attempt.attempt_id,
+            source_kind=query.source_kind,
+            source_contract_version=query.source_contract_version,
+            source_identity_refs=checkpoint.source_identity_refs,
+            pages=(checkpoint.page,),
+            coverage_state="COMPLETE_WITHIN_DECLARED_BOUNDS",
+            requested_record_limit=query.max_records,
+            returned_record_count=checkpoint.page.record_count,
+            coverage_note="Original admitted manual material.",
+            provider_observed_at=None,
+            capture_started_at=attempt.started_at,
+            capture_completed_at=envelope.admitted_at,
+            adapter_version=attempt.adapter_version,
+            capability_grant_digest=query.capability_grant_digest,
+            capability_evaluation_digest=query.capability_evaluation_digest,
+            snapshot_digest="sha256:" + "0" * 64,
+            created_at=now,
+        )
+        snapshot = snapshot.model_copy(update={"snapshot_digest": digest_source_snapshot(snapshot)})
+        provenance = SnapshotProvenanceV2(
+            snapshot_id=snapshot.snapshot_id,
+            snapshot_digest=snapshot.snapshot_digest,
+            attempt_id=attempt.attempt_id,
+            attempt_version=attempt.attempt_version,
+            admission_metadata_digest=envelope.metadata_digest,
+            origin=SnapshotOriginV2(origin),
+            admitted_at=envelope.admitted_at,
+            response_recorded_at=now if origin == "SOURCE_RESPONSE_VERIFIED" else None,
+        )
+    return command, envelope, snapshot, provenance
+
+
+@pytest.mark.parametrize("origin", ["SOURCE_RESPONSE_VERIFIED", "LOCAL_ADMISSION_RECONSTRUCTION"])
+async def test_v2_snapshot_persists_exact_original_admission_and_provenance(session_factory, origin):
+    command, envelope, snapshot, provenance = await snapshot_subject(session_factory, origin=origin)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).append_snapshot(
+            snapshot, provenance, expected_attempt_version=provenance.attempt_version
+        )
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session, policy=None)
+        assert await repo.get_snapshot(snapshot.snapshot_id, 1) == (snapshot, provenance)
+        assert await repo.get_snapshot_for_attempt(snapshot.attempt_id) == (snapshot, provenance)
+        await repo.append_snapshot(snapshot, provenance, expected_attempt_version=1)
+        assert (await repo.get_envelope(snapshot.attempt_id)).admitted_at == envelope.admitted_at
+    async with unit_of_work(session_factory).transaction() as tx:
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await tx.snapshots.get_exact(snapshot.snapshot_id, 1)
+    async with session_factory() as session, session.begin():
+        assert await manual_repo(session).get_for_command(command) is not None
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "anchor",
+        "query",
+        "adapter",
+        "admission",
+        "version",
+        "provenance_version",
+        "future",
+        "uncheckpointed",
+        "local_provider_time",
+        "verified_unknown",
+    ],
+)
+async def test_v2_snapshot_refuses_unbound_snapshot_or_provenance(session_factory, fault):
+    from lib.db.models.opportunity_acquisition import M9SourceSnapshotModel
+    from r2.contracts.opportunity_acquisition_v2 import SnapshotProvenanceV2
+    from r2.opportunity.digests import digest_source_snapshot
+
+    local = fault in ("local_provider_time", "verified_unknown")
+    _, envelope, snapshot, provenance = await snapshot_subject(
+        session_factory,
+        origin="LOCAL_ADMISSION_RECONSTRUCTION" if local else "SOURCE_RESPONSE_VERIFIED",
+        persist_checkpoint=fault != "uncheckpointed",
+    )
+    if fault == "anchor":
+        snapshot = snapshot.model_copy(update={"capture_completed_at": snapshot.created_at})
+    elif fault == "query":
+        snapshot = snapshot.model_copy(update={"query_digest": "sha256:" + "b" * 64})
+    elif fault == "adapter":
+        snapshot = snapshot.model_copy(update={"adapter_version": "replacement-decoder"})
+    elif fault == "future":
+        snapshot = snapshot.model_copy(update={"created_at": snapshot.created_at + timedelta(minutes=1)})
+    elif fault == "local_provider_time":
+        snapshot = snapshot.model_copy(update={"provider_observed_at": envelope.admitted_at})
+    snapshot = snapshot.model_copy(update={"snapshot_digest": digest_source_snapshot(snapshot)})
+    body = {**provenance.model_dump(), "snapshot_digest": snapshot.snapshot_digest}
+    if fault == "admission":
+        body["admission_metadata_digest"] = "sha256:" + "b" * 64
+    elif fault == "provenance_version":
+        body["attempt_version"] = 1
+    elif fault == "verified_unknown":
+        body.update(origin="SOURCE_RESPONSE_VERIFIED", response_recorded_at=snapshot.created_at)
+    provenance = SnapshotProvenanceV2.model_validate(body)
+
+    async def unbound():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).append_snapshot(
+                snapshot, provenance, expected_attempt_version=17 if fault == "version" else (4 if local else 3)
+            )
+
+    with pytest.raises(OpportunityError):
+        await unbound()
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9SourceSnapshotModel)) == 0
+
+
+async def test_v2_snapshot_and_its_audit_rollback_together(session_factory):
+    from lib.db.models.opportunity import M9EventModel
+    from lib.db.models.opportunity_acquisition import M9SourceSnapshotModel
+
+    _, _, snapshot, provenance = await snapshot_subject(session_factory)
+
+    async def interrupted():
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).append_snapshot(snapshot, provenance, expected_attempt_version=3)
+            raise RuntimeError("before snapshot commit")
+
+    with pytest.raises(RuntimeError, match="before snapshot commit"):
+        await interrupted()
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9SourceSnapshotModel)) == 0
+        assert await session.scalar(select(func.count()).select_from(M9EventModel)) == 0
+
+
+@pytest.mark.parametrize("fault", ["scalar", "rehashed_body", "audit"])
+async def test_v2_snapshot_reader_checks_independent_audit_and_columns(session_factory, fault):
+    from lib.db.models.opportunity import M9EventModel
+    from lib.db.models.opportunity_acquisition import M9SourceSnapshotModel
+    from r2.opportunity.acquisition_v2_digests import digest_snapshot_provenance_v2
+    from r2.opportunity.digests import digest_source_snapshot
+
+    _, _, snapshot, provenance = await snapshot_subject(session_factory)
+    async with session_factory() as session, session.begin():
+        await manual_repo(session).append_snapshot(snapshot, provenance, expected_attempt_version=3)
+    async with session_factory() as session, session.begin():
+        row = (await session.scalars(select(M9SourceSnapshotModel))).one()
+        if fault == "scalar":
+            row.snapshot_digest = "sha256:" + "a" * 64
+        elif fault == "audit":
+            event = (await session.scalars(select(M9EventModel))).one()
+            event.payload_digest = "sha256:" + "a" * 64
+        else:
+            module = manual_module()
+            stored = module._unpack(module._SnapshotRecord, row.body_json)
+            replacement = snapshot.model_copy(update={"coverage_note": "Replaced metadata."})
+            replacement = replacement.model_copy(update={"snapshot_digest": digest_source_snapshot(replacement)})
+            changed_provenance = provenance.model_copy(update={"snapshot_digest": replacement.snapshot_digest})
+            row.body_json = module._pack(
+                stored.model_copy(
+                    update={
+                        "snapshot": replacement,
+                        "provenance": changed_provenance,
+                        "provenance_digest": digest_snapshot_provenance_v2(changed_provenance),
+                    }
+                )
+            )
+            row.snapshot_digest = replacement.snapshot_digest
+    async with session_factory() as session:
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await manual_repo(session).get_snapshot(snapshot.snapshot_id)
+
+
+@pytest.mark.parametrize("changed", [False, True])
+async def test_v2_snapshot_native_contender_retains_one_snapshot_and_audit(session_factory, changed):
+    import asyncio
+
+    from sqlalchemy import text
+
+    from lib.db.models.opportunity import M9EventModel
+    from lib.db.models.opportunity_acquisition import M9SourceSnapshotModel
+    from r2.opportunity.digests import digest_source_snapshot
+
+    _, _, snapshot, provenance = await snapshot_subject(session_factory)
+    candidate = snapshot
+    candidate_provenance = provenance
+    if changed:
+        candidate = snapshot.model_copy(update={"snapshot_id": "019a0000-0000-7000-8000-000000000072"})
+        candidate = candidate.model_copy(update={"snapshot_digest": digest_source_snapshot(candidate)})
+        candidate_provenance = provenance.model_copy(
+            update={"snapshot_id": candidate.snapshot_id, "snapshot_digest": candidate.snapshot_digest}
+        )
+    holder, contender = session_factory(), session_factory()
+    task = None
+    try:
+        await holder.begin()
+        holder_pid = await holder.scalar(text("SELECT pg_backend_pid()"))
+        await manual_repo(holder).append_snapshot(snapshot, provenance, expected_attempt_version=3)
+        await contender.begin()
+        contender_pid = await contender.scalar(text("SELECT pg_backend_pid()"))
+        task = asyncio.create_task(
+            manual_repo(contender).append_snapshot(candidate, candidate_provenance, expected_attempt_version=3)
+        )
+        async with asyncio.timeout(10):
+            while True:
+                async with session_factory() as observer:
+                    blockers = await observer.scalar(text("SELECT pg_blocking_pids(:pid)"), {"pid": contender_pid})
+                if holder_pid in blockers:
+                    break
+                if task.done():
+                    pytest.fail("snapshot contender did not wait on the command guard")
+        assert not task.done()
+        await holder.commit()
+        if changed:
+            with pytest.raises(OpportunityError, match="M9_COMMAND_REPLAY_CONFLICT"):
+                await task
+        else:
+            assert await task is None
+        await contender.commit()
+        async with session_factory() as session:
+            assert await manual_repo(session).get_snapshot_for_attempt(snapshot.attempt_id) == (snapshot, provenance)
+            assert await session.scalar(select(func.count()).select_from(M9SourceSnapshotModel)) == 1
+            assert await session.scalar(select(func.count()).select_from(M9EventModel)) == 1
+    finally:
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        await contender.close()
+        await holder.close()
