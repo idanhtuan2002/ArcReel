@@ -21,7 +21,7 @@ from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.checks import count_syllables
 from server.story_authoring.commit import load_offered_manifest
 from server.story_authoring.contracts import StoryLimits, StoryModelSelection
-from server.story_authoring.driver import StoryBrief, StoryRunDriver
+from server.story_authoring.driver import CONFIRM_MAX, REVIEW_CYCLES, StoryBrief, StoryRunDriver, run_call_bound
 from server.story_authoring.generation import AuthoringTextGateway
 from server.story_authoring.pipeline import scene_draft
 from server.story_authoring.runtime import (
@@ -32,6 +32,7 @@ from server.story_authoring.runtime import (
     new_run_state,
     set_phase,
 )
+from server.story_authoring.service import DEFAULT_LIMITS
 from tests.integration.server.story_authoring.test_narrative import IDENTITY, NOW
 
 type Factory = async_sessionmaker[AsyncSession]
@@ -301,13 +302,13 @@ class ScriptedModel:
         )
 
 
-async def _store(factory: Factory) -> RunStateStore:
+async def _store(factory: Factory, limits: StoryLimits = LIMITS) -> RunStateStore:
     async with factory() as session:
         task = await TaskRepository(session).enqueue(
             project_name=IDENTITY.project_name, task_type=STORY_RUN_TASK_TYPE, media_type="text", resource_id="run1"
         )
     store = RunStateStore(factory, task_id=task["task_id"])
-    await store.initialize(new_run_state(run_id=IDENTITY.run_id, limits=LIMITS, now=NOW))
+    await store.initialize(new_run_state(run_id=IDENTITY.run_id, limits=limits, now=NOW))
     return store
 
 
@@ -1089,3 +1090,41 @@ async def test_a_transient_model_outage_is_retried_without_stopping_the_run(
     failed = [a for a in state.attempts if a.failure_code is not None]
     assert {a.failure_code.value for a in failed} == {"PROVIDER_ERROR"}
     assert len(failed) == 2
+
+
+async def test_a_story_whose_every_review_fails_reaches_the_human_inside_the_default_budget(
+    concurrent_session_factory: Factory, tmp_path
+):
+    store = await _store(concurrent_session_factory, DEFAULT_LIMITS)
+    model = ScriptedModel()
+    blobs = StoryBlobStore(tmp_path)
+
+    def audit(prompt: str, _schema: dict[str, Any]) -> dict[str, Any]:
+        if "GHI CHÚ CHƯƠNG" not in prompt:
+            return {"issues": []}
+        paragraphs = prompt.split("cần thẩm định]\n", 1)[1].split("\n\n")
+        issue = {
+            "severity": "critical",
+            "issue_type": "required_change_missing",
+            "description": "Minh chưa thấy cuốn sổ",
+            "suggested_fix": "cho Minh thấy cuốn sổ",
+        }
+        return {"issues": [{**issue, "quote": p.split(". ")[0] + "."} for p in paragraphs[:6]]}
+
+    model.overrides["issues"] = audit
+    model.overrides["passed"] = lambda _p, _s: {"passed": False, "problems": ["mục cấm mâu thuẫn mục bắt buộc"]}
+    model.overrides["chapter_goal"] = lambda _p, _s: {
+        **STRUCTURED["chapter_goal"],
+        "chapter_goal": f"mục tiêu lần {model.calls['chapter_goal']}",
+    }
+
+    state = await _driver(concurrent_session_factory, store, model, blobs).run()
+
+    assert state.phase is RunPhase.READY_FOR_APPROVAL, state.block_reason
+    assert all(len(state.intents[f"chapter_plan[{c}]"]) == 1 for c in (1, 2, 3))
+    plan_3 = {a.step_id.rsplit("#", 1)[0] for a in state.attempts if a.step_id.startswith("chapter_plan[3]")}
+    assert len(plan_3) == 4
+    assert {f["code"] for f in _exceptions(blobs, state)} == {"MEMO_COMPLIANCE:required_change_missing"}
+    assert state.usage.generate_calls <= run_call_bound(scenes_per_chapter=3)
+    reviews = {a.step_id.rsplit("#", 1)[0] for a in state.attempts if a.step_id.startswith("chapter_review[")}
+    assert model.calls["confirmed"] <= len(reviews) * (REVIEW_CYCLES + 1) * CONFIRM_MAX

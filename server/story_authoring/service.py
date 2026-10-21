@@ -36,7 +36,7 @@ from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.commit import ManuscriptCommitter, load_offered_manifest
 from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, StoryLimits, StoryModelSelection
-from server.story_authoring.driver import CHAPTERS, StoryBrief, story_bible_input
+from server.story_authoring.driver import CHAPTERS, StoryBrief, run_call_bound, story_bible_input
 from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video
 from server.story_authoring.narrative import StoryIdentity
 from server.story_authoring.pipeline import intent_targets, node_kind
@@ -54,10 +54,14 @@ from server.story_authoring.runtime import (
 
 type Factory = async_sessionmaker[AsyncSession]
 
+RUN_CALLS = run_call_bound()
+SECONDS_PER_CALL = 120
 DEFAULT_LIMITS = StoryLimits(
-    input_tokens_max=132 * 24576,
-    output_tokens_max=132 * 4096,
-    wall_clock_max_seconds=6 * 3600,
+    generate_calls_max=RUN_CALLS,
+    count_calls_max=RUN_CALLS,
+    input_tokens_max=RUN_CALLS * 24576,
+    output_tokens_max=RUN_CALLS * 4096,
+    wall_clock_max_seconds=RUN_CALLS * SECONDS_PER_CALL,
 )
 BLOCKED_PHASES = frozenset(
     {

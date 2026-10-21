@@ -93,13 +93,16 @@ class PlannedScene(_Out):
     dialogue_required: bool
 
 
+SCENES_PER_CHAPTER_MAX = 5
+
+
 class ChapterPlan(_Out):
     chapter_goal: str = Field(min_length=1)
     reader_expectation: str = Field(min_length=1)
     withheld_cards: list[str] = Field(max_length=3)
     required_changes_by_end: list[str] = Field(min_length=1, max_length=3)
     do_not: list[str] = Field(max_length=4)
-    scenes: list[PlannedScene] = Field(min_length=3, max_length=5)
+    scenes: list[PlannedScene] = Field(min_length=3, max_length=SCENES_PER_CHAPTER_MAX)
 
 
 def bound_chapter_plan(characters: Sequence[str], locations: Sequence[str]) -> type[ChapterPlan]:
@@ -111,7 +114,7 @@ def bound_chapter_plan(characters: Sequence[str], locations: Sequence[str]) -> t
     return create_model(
         "BoundChapterPlan",
         __base__=ChapterPlan,
-        scenes=(list[scene], Field(min_length=3, max_length=5)),
+        scenes=(list[scene], Field(min_length=3, max_length=SCENES_PER_CHAPTER_MAX)),
     )
 
 

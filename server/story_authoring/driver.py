@@ -90,6 +90,7 @@ from server.story_authoring.prompts import drafting, planning
 from server.story_authoring.prompts import outline as outline_prompts
 from server.story_authoring.prompts import packaging as packaging_prompts
 from server.story_authoring.prompts.schemas import (
+    SCENES_PER_CHAPTER_MAX,
     ChapterPlan,
     OutlineReview,
     Packaging,
@@ -119,6 +120,8 @@ TRANSPORT_RETRY_DELAYS = (5.0, 20.0)
 REVIEW_CYCLES = 2
 CONVERGE_PASSES = 6
 JUDGE_ATTEMPTS = 3
+CONFIRM_MAX = 3
+PLAN_CALLS = 4
 MIN_VERIFIED_SELLING_POINTS = 3
 STORY_HARD_RANGE = (6000, 12500)
 STORY_TARGET_RANGE = (7000, 11000)
@@ -901,8 +904,11 @@ class StoryRunDriver:
             )
             findings.extend(result.findings)
             state = await self._store.load()
+        claims = [i for i, f in enumerate(findings) if f.blocking and ":" in f.code]
+        claims.sort(key=lambda i: findings[i].severity is not Severity.HARD_STRUCTURAL)
+        second_reading = set(claims[:CONFIRM_MAX])
         findings = [
-            await self._confirmed(node, f, scenes, plan) if f.blocking and ":" in f.code else f for f in findings
+            await self._confirmed(node, f, scenes, plan) if i in second_reading else f for i, f in enumerate(findings)
         ]
         repairable = [f for f in findings if f.severity in REPAIRABLE]
         if not final and repairable:
@@ -1273,12 +1279,30 @@ def drop_auto_intents(state: RunState, node_ids: Sequence[str]) -> RunState:
 
 def step_prefix(state: RunState, node: str) -> str:
     """Attempts of a node in one round share its call cap. A round ends with a Human revision or retry; for a
-    scene or chapter review it also ends when its chapter plan is replanned, since the contract is new."""
+    scene or chapter review it also ends when its chapter plan is replanned, since the contract is new; for a chapter
+    plan it ends when that plan or an earlier one is replanned, since each regenerates it."""
     replans = 0
-    if node.startswith(("scene_draft[", "chapter_review[")):
-        chapter = node.split("[", 1)[1].split(",", 1)[0].rstrip("]")
-        replans = len(state.intents.get(chapter_plan(int(chapter)), ()))
+    if node.startswith(("scene_draft[", "chapter_review[", "chapter_plan[")):
+        chapter = int(node.split("[", 1)[1].split(",", 1)[0].rstrip("]"))
+        first = 1 if node.startswith("chapter_plan[") else chapter
+        replans = sum(len(state.intents.get(chapter_plan(c), ())) for c in range(first, chapter + 1))
     return f"{node}@r{len(human_intents(state).get(node, ()))}.{state.retries}.{replans}#"
+
+
+def run_call_bound(chapters: int = CHAPTERS, scenes_per_chapter: int = SCENES_PER_CHAPTER_MAX) -> int:
+    """Generate calls of a run whose every chapter review fails until repair is spent: each chapter replanned once
+    (regenerating its plan and every later one), every scene drafted and repaired in each review cycle of both
+    contracts, each review with all its audits and second readings, and the final scene rewritten for its ending.
+    Output retries come out of the margin left by nodes that need fewer calls."""
+    contracts = 2
+    review = len(CHAPTER_DIMENSIONS) + CONFIRM_MAX
+    planning = 3 + 3  # seed and bibles; outline, its review and revision
+    plans = sum(1 + c for c in range(1, chapters + 1)) * PLAN_CALLS
+    scenes = chapters * scenes_per_chapter * (1 + REVIEW_CYCLES) * contracts
+    reviews = chapters * contracts * (1 + REVIEW_CYCLES) * review
+    ending = 1 + (1 + REVIEW_CYCLES) * review
+    late = 2 * NODE_CAPS["manuscript_review"] + NODE_CAPS["packaging"] + 1
+    return planning + plans + scenes + reviews + ending + late
 
 
 def entity_keys(seed: StorySeed) -> tuple[dict[str, str], dict[str, str]]:
