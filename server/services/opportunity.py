@@ -1,7 +1,10 @@
 """Host composition: scoped PostgreSQL profiles and read-only accepted M8 lineage."""
 
+from __future__ import annotations
+
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -19,6 +22,10 @@ from r2.opportunity.profiles import OpportunityProfileService
 from server.auth import CurrentUserInfo
 from server.services.governance_grants import CurrentShowrunnerGrantReader
 from server.services.m9_custodian import M9ProfileCustodian
+
+if TYPE_CHECKING:
+    from r2.opportunity.acquisition_v2 import ManualUploadMetadata, OpportunityAcquisitionServiceV2
+    from r2.opportunity.manual_admission import ManualBindingDescriptor, ManualBindingRegistry
 
 
 class HostProfileTransaction(OpportunityProfileRepository):
@@ -96,3 +103,44 @@ def build_acquisition_service(
         project_name=project_name,
         actor_id=current_user.sub,
     )
+
+
+def build_acquisition_service_for_protocol(
+    sessions: async_sessionmaker[AsyncSession],
+    *,
+    protocol_version: str,
+    current_user: CurrentUserInfo,
+    project_name: str,
+    capabilities: SourceCapabilityPort | None = None,
+    source: MarketSourcePort | None = None,
+    evidence: SnapshotEvidenceStore | None = None,
+    registry: ManualBindingRegistry | None = None,
+    descriptor: ManualBindingDescriptor | None = None,
+    upload: ManualUploadMetadata | None = None,
+) -> OpportunityAcquisitionService | OpportunityAcquisitionServiceV2:
+    if protocol_version == "m9.acquisition.v1":
+        if registry is not None or descriptor is not None or upload is not None:
+            raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)
+        return build_acquisition_service(
+            sessions,
+            current_user=current_user,
+            project_name=project_name,
+            capabilities=capabilities,
+            source=source,
+            evidence=evidence,
+        )
+    if protocol_version == "m9.acquisition.v2":
+        from server.services.opportunity_acquisition_v2 import build_acquisition_service_v2
+
+        if source is not None or evidence is not None:
+            raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)
+        return build_acquisition_service_v2(
+            sessions,
+            current_user=current_user,
+            project_name=project_name,
+            capabilities=capabilities,
+            registry=registry,
+            descriptor=descriptor,
+            upload=upload,
+        )
+    raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)

@@ -655,6 +655,16 @@ class ManualAdmissionRepository:
         record = await self._record(row)
         return await self.get_for_command(record.command)
 
+    async def get_descriptor(self, attempt_id: str) -> ManualBindingDescriptor | None:
+        """Read the original deployment identity even before an envelope exists."""
+        attempt = await self.get_attempt(attempt_id)
+        if attempt is None:
+            return None
+        row = await self._row(attempt.attempt_id)
+        if row is None:
+            raise OpportunityError(_MISSING)
+        return (await self._record(row)).descriptor
+
     async def prepare(
         self, command: AcquireSourceQueryV2, *, attempt_id: str, descriptor: ManualBindingDescriptor
     ) -> tuple[AcquisitionAttemptV2, bool]:
@@ -2907,6 +2917,37 @@ class ManualAdmissionRepository:
         if row is None:
             raise OpportunityError(_MISSING)
         return (await self._record(row)).receipt
+
+    async def get_current_receipt(self, command: AcquireSourceQueryV2) -> AcquisitionReceiptV2 | None:
+        """Project the retained transition without changing clocks or outcome authority."""
+        attempt = await self.get_for_command(command)
+        if attempt is None:
+            return None
+        row = await self._row(attempt.attempt_id)
+        if row is None:
+            raise OpportunityError(_MISSING)
+        record = await self._record(row)
+        if record.receipt is not None:
+            return record.receipt
+        ids, digests, provenance = await self._receipt_snapshots(record)
+        receipt = AcquisitionReceiptV2(
+            protocol_version="m9.acquisition.v2",
+            command_id=attempt.command_id,
+            request_digest=attempt.request_digest,
+            attempt_id=attempt.attempt_id,
+            attempt_version=attempt.attempt_version,
+            state=attempt.state,
+            outcome_reason=attempt.outcome_reason,
+            snapshot_ids=ids,
+            snapshot_digests=digests,
+            snapshot_provenance_digests=provenance,
+            closure=attempt.closure,
+            quota_disposition=attempt.quota_disposition,
+            quota_units_observed=attempt.quota_units_observed,
+            result_digest="sha256:" + "0" * 64,
+            committed_at=record.changed_at,
+        )
+        return receipt.model_copy(update={"result_digest": digest_acquisition_result_v2(receipt)})
 
     async def _known_response_snapshot(self, record: _AttemptRecord, *, state: AttemptStateV2) -> _SnapshotRecord:
         row = await self._snapshot_row_for_attempt(record.attempt.attempt_id)

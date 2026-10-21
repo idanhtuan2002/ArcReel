@@ -2722,3 +2722,51 @@ async def test_v2_closure_refuses_a_forged_planning_transaction_carrier(session_
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(M9ManualClosureIntentModel)) == 0
         assert (await manual_repo(session).get_envelope(envelope.request.attempt_id)).phase == "READY"
+
+
+async def test_v2_planned_descriptor_survives_restart_before_admission(session_factory):
+    command, descriptor, _ = await manual_subject(session_factory)
+    attempt_id = "019a0000-0000-7000-8000-000000000052"
+    async with session_factory() as session, session.begin():
+        attempt, created = await manual_repo(session).prepare(command, attempt_id=attempt_id, descriptor=descriptor)
+        assert created
+        assert attempt.state == "PLANNED"
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        assert await repo.get_envelope(attempt_id) is None
+        assert await repo.get_descriptor(attempt_id) == descriptor
+        assert await repo.get_descriptor("019a0000-0000-7000-8000-000000000099") is None
+        assert await manual_repo(session, project="other-show").get_descriptor(attempt_id) is None
+        assert (await repo.get_attempt(attempt_id)).attempt_version == 1
+
+
+async def test_v2_descriptor_read_revalidates_original_attempt_authority(session_factory):
+    _, descriptor, _, running = await start_manual(session_factory)
+    async with session_factory() as session, session.begin():
+        await session.execute(
+            update(M9AcquisitionAttemptModel)
+            .where(M9AcquisitionAttemptModel.attempt_id == running.attempt_id)
+            .values(request_digest="sha256:" + "f" * 64)
+        )
+    async with session_factory() as session, session.begin():
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await manual_repo(session).get_descriptor(running.attempt_id)
+    assert descriptor.source_kind == "manual-import"
+
+
+async def test_v2_current_receipt_replays_nonterminal_committed_state(session_factory):
+    from r2.opportunity.acquisition_v2_digests import digest_acquisition_result_v2
+
+    command, _, _, running = await start_manual(session_factory)
+    async with session_factory() as session, session.begin():
+        receipt = await manual_repo(session).get_current_receipt(command)
+        assert receipt.attempt_id == running.attempt_id
+        assert receipt.attempt_version == running.attempt_version
+        assert receipt.state == "RUNNING"
+        assert receipt.quota_disposition == "UNKNOWN"
+        assert receipt.quota_units_observed is None
+        assert receipt.snapshot_ids == ()
+        assert receipt.result_digest == digest_acquisition_result_v2(receipt)
+        assert await manual_repo(session).get_receipt(command) is None
+    async with session_factory() as session, session.begin():
+        assert await manual_repo(session).get_current_receipt(command) == receipt

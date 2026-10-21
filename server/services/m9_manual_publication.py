@@ -415,6 +415,9 @@ def _sha(raw: bytes) -> str:
 
 
 def manual_publication_measurements() -> dict[str, str]:
+    from r2.opportunity.acquisition_v2 import OpportunityAcquisitionServiceV2
+    from r2.opportunity.normalization import normalize_manual_page
+
     root = Path(__file__).resolve().parents[2]
     components = (
         "server/services/m9_manual_publication.py",
@@ -425,6 +428,9 @@ def manual_publication_measurements() -> dict[str, str]:
         "r2/advanced_creative/digests.py",
         "r2/contracts/opportunity.py",
         "r2/opportunity/manual_admission.py",
+        "r2/opportunity/acquisition_v2.py",
+        "server/services/opportunity_acquisition_v2.py",
+        "server/services/opportunity.py",
     )
     dependency_files = {}
     for name in (
@@ -460,6 +466,10 @@ def manual_publication_measurements() -> dict[str, str]:
                 "decoder": decoder,
                 "material_code": _sha(canonical_json_bytes(_code_state(original_manual_materials.__code__))),
                 "object_code": _sha(canonical_json_bytes(_code_state(original_manual_object_specs.__code__))),
+                "response_normalizer": _sha(canonical_json_bytes(_code_state(normalize_manual_page.__code__))),
+                "checkpoint_verifier": _sha(
+                    canonical_json_bytes(_code_state(OpportunityAcquisitionServiceV2._checkpoint.__code__))
+                ),
             }
         )
     )
