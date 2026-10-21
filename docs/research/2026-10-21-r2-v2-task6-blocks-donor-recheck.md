@@ -101,3 +101,72 @@ Needs the Human (changes the approved severity policy, Change G):
   exception. Without N5, runs still end at `BLOCKED_QUALITY` whenever the judge holds a memo finding, as Huohuo does.
 
 Any of N1–N5 changes code after T, so Task6 restarts on a new T with all eleven cases.
+
+**Human decision (2026-10-21):** N5 approved, following Shenbi. The Human also asked for a full review of every stop
+case, the errors that can occur and how the donors handle each (§6–§9).
+
+## 6. How each donor ends a step that keeps failing (facts)
+
+| Donor | Rule | Source |
+|---|---|---|
+| Shenbi | Dispatch/gate failure: 2 retries, then an escalation checkpoint (pipeline paused, Human decides). Audit BLOCKING: at most 3 revision rounds, then escalation. Short-story drafting: a chapter still failing after 3 rounds **falls back to its best version, is marked "回退" in the batch summary, and drafting continues**; the summary goes to the Human. Packaging: the Human picks title and blurb (Step 6). Quality never ends a run. | `src/shenbi/pipeline/error_handler.py` header; `revision_router.py`; `skills/shenbi-short-drafting/SKILL.md` §铁律 3, §修订规则, summary table; `skills/shenbi-short-packaging/SKILL.md` Step 6; `skills/shenbi-escalation-review/SKILL.md` |
+| Novel Studio | No automatic repair loop. A model call is tried twice (`client.ts`, `attempt <= 2`). A chapter cannot be accepted into memory while the latest continuity report has a `high`/`critical` issue; the Human edits the text (`finalText`) or regenerates, then re-checks. | `src/lib/ai/client.ts`; `src/lib/memory/memoryService.ts` `getChapterAcceptanceGate`; accept route (409) |
+| Huohuo | Strict mode: span patch, regenerate on stagnation, then `ContinuityRewriteAbortError` on `max_attempts` or `stagnant_rewrite`; the batch stops at that chapter (`mustAbortBatchOnContinuityError`) and shows the conflicts. Outline hard rejects deliver no content. | `novel-chapter-pipeline.ts` L795–L900; `services/batch/batch-generation.ts` L516–L539; `novel-continuity-errors.ts` |
+
+Summary: Shenbi escalates to the Human with the best version; Novel Studio leaves repair to the Human; Huohuo stops.
+None of the three ends on a model-judged quality claim without a Human path to accept, edit or redo.
+
+## 7. Live-run history (facts)
+
+`R2_STORY_AUTHORING_QUALIFICATION.md` runs 1–11 plus Task6: 14 runs, every one ended `BLOCKED_QUALITY` on its first
+pass; only run 11 reached touchpoint 2, after an operator Retry on a fixed critic. Causes in order: scene cap per epoch
+(1), copied passages (2), self-contradicting plan (3), quote read as truncation (4), required dialogue breaking a
+do-not item (5), length/paragraph floor and `OUTPUT_TRUNCATED` (6, 7), wrong memo claims (8, 10, Task6 restart),
+truncated audit (9), wrong `NO_ENDING` (11), true memo reveal (Task6 kill), names (Task6 clean). Each fix moved the
+stop to the next judge-dependent gate. Run 11 also carried reader-visible defects no gate stopped: kinship drift,
+meta narration ("khép lại chương ba"), a broken do-not line, 7 of 11 scenes without dialogue.
+
+## 8. Every stop point in R2 at T, against the donors
+
+| # | Stop (code site at T) | Kind | Donor behaviour | Decision |
+|---|---|---|---|---|
+| B1 | `BLOCKED_PROPAGATION` — convergence passes exhausted (`driver.run`) | R2 integrity | none comparable | keep |
+| B2 | `MODEL_UNAVAILABLE` / `PROVIDER_ERROR` | transport | Shenbi pause + resume; NS 2 tries then error; Huohuo error | keep (typed, Retry) — parity |
+| B3 | other `StoryStepError` (over-context, over-limit, not qualified, selection changed) | integrity | Shenbi escalation (pause) | keep — hard integrity, Retry/Revise/Discard |
+| B4 | node call cap reached without a valid output (invalid JSON, truncated, CJK) | output integrity | Shenbi 2 retries → escalation | keep; caps (3–12) already exceed Shenbi's 3 attempts |
+| B5 | outline: deterministic problems after one revision (not 3 chapters, empty task, no ending, duplicate tasks) | structure | Shenbi generate → 6-point review → revise, then escalation | keep — later nodes cannot be built without it |
+| B6 | chapter plan: names outside the bible | structure | NS ignores unknown names; Shenbi allows new characters | **N1** |
+| B7a | scene L1 after cap: `CJK`, `UNTERMINATED`, `PARAGRAPH_CUT`, `META_LEAK`, `MARKUP` | output integrity | Shenbi output-integrity → retry → escalation | keep (zero-CJK and no cut prose are release invariants) |
+| B7b | scene L1 after cap: `SCENE_TOO_SHORT`, `LENGTH_HARD` | quality (deterministic) | Shenbi length-normalizing, then best version recorded and continue | **N7** |
+| B8 | chapter review final: memo-compliance `HARD_STRUCTURAL` after scene repair and one replan | quality (judged) | Shenbi best version + escalation; Huohuo stop | **N5 (approved)** with N2, N3 |
+| B9 | manuscript review: `NO_ENDING` confirmed after one ending rewrite | quality (judged) | Shenbi best version + Human | **N6** |
+| B10 | packaging: fewer than 3 selling points quote the manuscript after 2 tries | quality (deterministic) | Shenbi Human selects | **N8** |
+| B11 | manifest: `STORY_LENGTH` outside the hard bounds | quality (deterministic) | Shenbi records under-floor chapters in the summary | **N7** |
+| B12 | `BLOCKED_BUDGET` | R2 safety cap | none | keep |
+| B13 | `BLOCKED_BINDING_MISMATCH`, `COMMIT_BLOCKED`, `RECOVERY_INCONSISTENT` | authority / commit integrity | none (R2-owned) | keep |
+
+Proposed extensions of the approved N5 principle (need the Human, same policy change class):
+
+- **N6** — `NO_ENDING` after the ending rewrite and the confirming reading: the best version goes to touchpoint 2 with
+  the claim as a narrative-critical exception; the Human reads the ending.
+- **N7** — `SCENE_TOO_SHORT`/`LENGTH_HARD` after the scene cap and `STORY_LENGTH` at the manifest: the best version goes on
+  with a narrative-critical exception stating the measured length and the bound.
+- **N8** — packaging with fewer than 3 verified selling points after its tries: keep the best attempt, drop unverified
+  points, carry an exception; the Human sees titles, blurbs and points before Approve.
+
+Kept hard in every case: CJK, cut or unterminated prose, meta/markup in prose, over-context/truncation, unresolved POV
+or location, transport, budget, authority and commit integrity.
+
+## 9. Planned failure rows not implemented at T (facts) and donor coverage
+
+| Row | Planned | At T | Donor | Decision |
+|---|---|---|---|---|
+| F62 | best-version fallback | absent | Shenbi chapter-revision (no worsening, best version) | **N3**, implement now |
+| F43 | meta text | headings/labels only; narration such as "khép lại chương ba" passes | Shenbi `llm_output_integrity.check_prose_leakage` (pattern detection) | extend the detector's patterns with chapter/story self-reference; keep `META_LEAK` hard |
+| F34 | POV audit | no POV dimension | Shenbi `group-character` Dimension 4 | defer: one more judge call per chapter on a 5–7 tok/s judge; recorded as open |
+| F22 | xưng hô matrix in the bible | prompt rule + continuity audit only | no donor (Huohuo: prompt rules only) | defer: Vietnamese-specific design; local-model limit until the cloud model |
+| F30/F31 | deterministic age/time checks | continuity audit only | Huohuo `novel-stable-cast-facts.ts` (Chinese numerals) | defer: needs a Vietnamese port |
+| F42 | premature closure | absent | Huohuo `novel-brief-compliance.ts` (unfinished-state markers) | defer |
+| F71 | chapter seam replay | `CROSS_SCENE_REPLAY` covers copied sentences across scenes | Huohuo `novel-chapter-seam.ts` | covered for copies; structure part deferred |
+
+Deferred rows remain reader-visible risks that the Human sees at touchpoint 2; they are not gates in V2.
