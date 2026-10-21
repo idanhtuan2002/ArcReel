@@ -89,3 +89,20 @@ observations only. Evidence: `R2_STORY_ACCEPTANCE_RUN.json` (clean run) and `R2_
 - Then, before any new run, the disposable container was re-created on a named volume (`arcreel-story-accept-pgdata`,
   restart policy `unless-stopped`) so a host restart no longer loses acceptance state; `setup_accept.py` re-ran and the
   checks above passed again.
+
+## Restart case: script defect and the real kill (2026-10-21)
+
+- `stop.sh` signalled only the `uv` wrapper and its direct children; the server's Python process (started 2026-10-20
+  19:22:49) survived every stop. Consequences: the container re-creation happened under that same process (it
+  reconnected to the new database; no run existed yet), the second `start.sh` failed to bind without saying so, and
+  the first `stop.sh --kill` at 00:52:52 killed nothing.
+- Fixed outside the repository: `stop.sh` also kills by the launcher path and fails if the server survives;
+  `start.sh` refuses to start while a server process exists and fully detaches the server.
+- Real fault: heads snapshot `before-kill`, then SIGKILL at 2026-10-21 00:53:58 +07 while `scene_draft[2,1]#1`
+  GENERATE was in flight; fresh server up at about 00:56. Every later run uses a server process started after the fix.
+
+## Discard case reading (2026-10-21)
+
+The pass condition "`project_rows` only the grant" is read as: the run leaves no Narrative or governance record. A
+discarded run still has its `api_calls` rows (observability of the calls it made) and the Human's own Gate A row in
+`gate_greenlight_decisions`, which precedes the run; neither is created by the run's authority path.
