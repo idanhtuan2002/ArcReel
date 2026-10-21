@@ -118,3 +118,13 @@ head from a truncated or over-context call, every attempt with an outcome). Reco
   transient and a persistent model outage, discard and late-result fencing in the runtime/service tests).
 - The variation, revision, CJK and long-brief cases are not run; their invariants rest on the automated tests
   (grammar CJK ban, Change D propagation, over-context refusal). Completion rate across ideas stays unmeasured.
+
+## accept-clean at `81e165fd`: BLOCKED_BUDGET (2026-10-21)
+
+Gate A 16:39, stopped 19:21 at `cap count_calls 132 reached` in chapter 2 (132 generate calls: plans 18, scenes 52,
+chapter reviews 57). Chapters 1 and 2 each spent their review cycles, were replanned once and reviewed again; no
+integrity finding. The 132 ceiling counted two four-audit reviews per chapter and missed the second readings, the
+sealing review, the replan and the ending rewrite. Fixed in `21780e87` (ceiling = `run_call_bound()`, 292; at most
+three second readings per review; a chapter plan's cap per generation). Evidence of the stopped run is kept outside
+the repository with the acceptance environment (`prior-T-81e165fd/`). New T = `21780e87`; donor parity unchanged
+(no prompt or schema text changed).
