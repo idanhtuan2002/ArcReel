@@ -147,7 +147,33 @@
         "Vietnamese translation and Vietnamese fatigue list",
         "findings quote exact spans",
         "numeric scores diagnostic only (R1.5 §19)"
-      ]
+      ],
+      "provenance_correction_2026_10_21": {
+        "finding": "10 of the 12 pinned specialist skills carry DEPRECATED at the pin; Shenbi supersedes them dimension by dimension with four grouped audits. Rules are unchanged (memo compliance: same five rules), so R2 prompts and the measured verdict stand; the pin moves to the grouped skills.",
+        "deprecated_pins": [
+          "memo-compliance",
+          "character",
+          "motivation",
+          "dialogue",
+          "pov",
+          "pacing",
+          "texture",
+          "reader-pull",
+          "anti-ai",
+          "continuity"
+        ],
+        "current_sources": {
+          "skills/shenbi-review-group-plan/SKILL.md": "12bfec41fedf1b5e0b8a8c90a0dcc93b9b2739e7c424bdc18caa3de7573d3f74",
+          "skills/shenbi-review-group-character/SKILL.md": "2940ecea0db1a5cb3c50598c019ab17984a407fdb6076f363b6f2585534f31a2",
+          "skills/shenbi-review-group-factual/SKILL.md": "108a7c61c5491e139f61a34d1ea68325c5ec0a7342c8e7015fa93fa1d78cc60b",
+          "skills/shenbi-review-group-craft/SKILL.md": "2f9308bc8ab6b20316dd588674c58ad44e394393486643ea570659976e3c67f8"
+        },
+        "still_current": [
+          "skills/shenbi-review-resonance/SKILL.md",
+          "skills/shenbi-review-arc-payoff/SKILL.md"
+        ],
+        "research": "docs/research/2026-10-21-r2-v2-task6-blocks-donor-recheck.md"
+      }
     },
     {
       "id": "S07_span_local_repair",
