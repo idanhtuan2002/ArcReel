@@ -54,7 +54,7 @@ from r2.opportunity.manual_admission import (
     ManualBindingRegistry,
     PublishedAdmission,
 )
-from r2.opportunity.normalization import normalize_manual_page
+from r2.opportunity.normalization import decode_manual_payload, normalize_manual_page
 from r2.opportunity.ports import SourceCapabilityPort
 
 
@@ -186,7 +186,7 @@ class OpportunityAcquisitionServiceV2:
         command = self._command(command)
         try:
             return await self._acquire_command(command)
-        except OpportunityError:
+        except OpportunityError as error:
             try:
                 retained = await self._current(command)
                 if retained.state in (
@@ -194,6 +194,8 @@ class OpportunityAcquisitionServiceV2:
                     AttemptStateV2.FAILED,
                     AttemptStateV2.EXPIRED_UNRECOVERABLE,
                 ):
+                    return retained
+                if error.code == StopCode.M9_STALE_HEAD and retained.snapshot_ids:
                     return retained
             except Exception:
                 pass
@@ -388,6 +390,17 @@ class OpportunityAcquisitionServiceV2:
 
     async def reconcile_publication(self, command: AcquireSourceQueryV2) -> AcquisitionReceiptV2:
         command = self._command(command)
+        try:
+            return await self._reconcile_publication(command)
+        except OpportunityError:
+            raise
+        except Exception:
+            try:
+                return await self._current(command)
+            except Exception:
+                raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
+
+    async def _reconcile_publication(self, command: AcquireSourceQueryV2) -> AcquisitionReceiptV2:
         async with self.store.transaction() as tx:
             receipt = await tx.manual.get_current_receipt(command)
             if receipt is None:
@@ -409,7 +422,116 @@ class OpportunityAcquisitionServiceV2:
             await tx.manual.attach(publication, expected_envelope_version=envelope.version)
         return await self._current(command)
 
-    async def _checkpoint(self, envelope: AdmissionEnvelope, response: SourcePageResult) -> PageCheckpoint:
+    async def reconcile_manual_admission(self, command: AcquireSourceQueryV2) -> AcquisitionReceiptV2:
+        command = self._command(command)
+        try:
+            return await self._reconstruct_manual_admission(command)
+        except OpportunityError as error:
+            try:
+                return await self.expire_admission(command)
+            except OpportunityError:
+                raise error from None
+        except Exception:
+            try:
+                return await self._current(command)
+            except Exception:
+                raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
+
+    async def expire_admission(self, command: AcquireSourceQueryV2) -> AcquisitionReceiptV2:
+        command = self._command(command)
+        try:
+            async with self.store.transaction() as tx:
+                receipt = await tx.manual.get_current_receipt(command)
+                if receipt is None:
+                    raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+                if receipt.state in (
+                    AttemptStateV2.SUCCEEDED,
+                    AttemptStateV2.FAILED,
+                    AttemptStateV2.EXPIRED_UNRECOVERABLE,
+                ):
+                    return receipt
+                receipt = await tx.manual.close_expired(
+                    receipt.attempt_id,
+                    expected_attempt_version=receipt.attempt_version,
+                    resolver_id="manual-recovery-expiry-v2",
+                )
+            await self._at("expiry-committed")
+            return receipt
+        except OpportunityError:
+            raise
+        except Exception:
+            try:
+                receipt = await self._current(command)
+                if receipt.state in (
+                    AttemptStateV2.SUCCEEDED,
+                    AttemptStateV2.FAILED,
+                    AttemptStateV2.EXPIRED_UNRECOVERABLE,
+                ):
+                    return receipt
+            except Exception:
+                pass
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
+
+    async def _reconstruct_manual_admission(self, command: AcquireSourceQueryV2) -> AcquisitionReceiptV2:
+        async with self.store.transaction() as tx:
+            receipt = await tx.manual.get_current_receipt(command)
+            if receipt is None:
+                raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+            if receipt.snapshot_ids or receipt.state in (
+                AttemptStateV2.SUCCEEDED,
+                AttemptStateV2.FAILED,
+                AttemptStateV2.EXPIRED_UNRECOVERABLE,
+            ):
+                return receipt
+            descriptor = await tx.manual.get_descriptor(receipt.attempt_id)
+        self._binding(descriptor)
+        async with self.store.transaction() as tx:
+            attempt = await tx.manual.get_for_command(command)
+            envelope = await tx.manual.get_envelope(receipt.attempt_id)
+            if attempt is None or envelope is None or envelope.phase != "READY":
+                raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+            if attempt.state == AttemptStateV2.RUNNING:
+                if envelope.dispatch_claim is None:
+                    claim = await tx.manual.claim_dispatch(
+                        attempt.attempt_id,
+                        expected_attempt_version=attempt.attempt_version,
+                        expected_envelope_version=envelope.version,
+                    )
+                    version = claim.attempt_version
+                else:
+                    version = attempt.attempt_version
+                attempt = await tx.manual.mark_outcome_unknown(attempt.attempt_id, expected_attempt_version=version)
+                envelope = await tx.manual.get_envelope(attempt.attempt_id)
+            if envelope is None or attempt.state not in (AttemptStateV2.OUTCOME_UNKNOWN, AttemptStateV2.NEEDS_OPERATOR):
+                raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+            checkpoints = await tx.manual.list_checkpoints(attempt.attempt_id)
+        await self._at("reconstruction-fenced")
+        checkpoint = await self._checkpoint(envelope, None)
+        if checkpoints:
+            if len(checkpoints) != 1:
+                raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+            original = checkpoints[0]
+            normalized = original.model_copy(
+                update={
+                    "page": original.page.model_copy(update={"provider_request_id": None}),
+                    "provider_observed_at": None,
+                    "quota_units_observed": None,
+                }
+            )
+            if normalized != checkpoint:
+                raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+            checkpoint = original
+        else:
+            async with self.store.transaction() as tx:
+                await tx.manual.append_checkpoint(
+                    attempt.attempt_id, checkpoint, expected_attempt_version=attempt.attempt_version
+                )
+        await self._at("reconstruction-checkpoint-committed")
+        return await self._finalize(
+            command, attempt, envelope, checkpoint, None, origin=SnapshotOriginV2.LOCAL_ADMISSION_RECONSTRUCTION
+        )
+
+    async def _checkpoint(self, envelope: AdmissionEnvelope, response: SourcePageResult | None) -> PageCheckpoint:
         binding = self._binding(envelope.request.descriptor)
         async with self.store.transaction() as tx:
             permit = await tx.manual.begin_read(
@@ -423,6 +545,22 @@ class OpportunityAcquisitionServiceV2:
                     envelope, object_ref=obj.payload_ref, permit=permit
                 )
                 self._binding(envelope.request.descriptor)
+            if response is None:
+                raw = materials["raw-page"]
+                _, rows = decode_manual_payload(raw)
+                raw_object = next(o for o in envelope.objects if o.evidence_kind == "raw-page")
+                response = SourcePageResult(
+                    provider_request_id=None,
+                    next_cursor=None,
+                    raw_payload=raw,
+                    raw_media_type="application/json",
+                    source_native_ids=tuple(sorted({str(row["source_native_id"]) for row in rows})),
+                    data_classes=raw_object.data_classes,
+                    returned_record_count=len(rows),
+                    quota_units_observed=None,
+                    provider_observed_at=None,
+                    terminal_page=True,
+                )
             if materials.get("raw-page") != response.raw_payload:
                 raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
             rows = normalize_manual_page(response)
@@ -523,10 +661,17 @@ class OpportunityAcquisitionServiceV2:
         attempt: AcquisitionAttemptV2,
         envelope: AdmissionEnvelope,
         checkpoint: PageCheckpoint,
-        response_at: datetime,
+        response_at: datetime | None,
+        *,
+        origin: SnapshotOriginV2 = SnapshotOriginV2.SOURCE_RESPONSE_VERIFIED,
     ) -> AcquisitionReceiptV2:
         self._binding(envelope.request.descriptor)
         async with self.store.transaction() as tx:
+            retained = await tx.manual.get_current_receipt(command)
+            if retained is not None and (
+                retained.snapshot_ids or retained.state == AttemptStateV2.EXPIRED_UNRECOVERABLE
+            ):
+                return retained
             query = await tx.queries.get_exact(command.query_id, command.query_revision)
             if query is None or attempt.started_at is None or envelope.admitted_at is None:
                 raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
@@ -549,7 +694,9 @@ class OpportunityAcquisitionServiceV2:
                 requested_record_limit=query.max_records,
                 returned_record_count=checkpoint.page.record_count,
                 coverage_note="Original admitted manual material.",
-                provider_observed_at=checkpoint.provider_observed_at,
+                provider_observed_at=(
+                    checkpoint.provider_observed_at if origin == SnapshotOriginV2.SOURCE_RESPONSE_VERIFIED else None
+                ),
                 capture_started_at=attempt.started_at,
                 capture_completed_at=envelope.admitted_at,
                 adapter_version=attempt.adapter_version,
@@ -565,7 +712,7 @@ class OpportunityAcquisitionServiceV2:
                 attempt_id=attempt.attempt_id,
                 attempt_version=attempt.attempt_version,
                 admission_metadata_digest=envelope.metadata_digest,
-                origin=SnapshotOriginV2.SOURCE_RESPONSE_VERIFIED,
+                origin=origin,
                 admitted_at=envelope.admitted_at,
                 response_recorded_at=response_at,
             )
@@ -593,12 +740,17 @@ class OpportunityAcquisitionServiceV2:
                     update={"observation_digest": digest_source_observation(observation)}
                 )
                 await tx.manual.append_observation(observation, expected_attempt_version=attempt.attempt_version)
-            receipt = await tx.manual.finish_acquisition(
-                attempt.attempt_id,
-                expected_attempt_version=attempt.attempt_version,
-                state=AttemptStateV2.SUCCEEDED,
-                reason=AttemptOutcomeReason.COMPLETED,
-                resolver_id="manual-acquisition-v2",
-            )
+            if origin == SnapshotOriginV2.SOURCE_RESPONSE_VERIFIED:
+                receipt = await tx.manual.finish_acquisition(
+                    attempt.attempt_id,
+                    expected_attempt_version=attempt.attempt_version,
+                    state=AttemptStateV2.SUCCEEDED,
+                    reason=AttemptOutcomeReason.COMPLETED,
+                    resolver_id="manual-acquisition-v2",
+                )
+            else:
+                receipt = await tx.manual.get_current_receipt(command)
+                if receipt is None:
+                    raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
         await self._at("finalization-committed")
         return receipt

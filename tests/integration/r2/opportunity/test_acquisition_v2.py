@@ -27,7 +27,7 @@ from tests.integration.server.services.test_m9_manual_custody_isolation import i
 from tests.integration.server.services.test_m9_manual_publication import prepare_publication
 
 
-async def service_subject(factory, tmp_path, *, boundary=None):
+async def service_subject(factory, tmp_path, *, boundary=None, refresh_seconds=60, retention_seconds=120):
     module = importlib.import_module("r2.opportunity.acquisition_v2")
     host = importlib.import_module("server.services.opportunity_acquisition_v2")
     old, declaration, capabilities = await acquisition_service_fixture(factory, tmp_path)
@@ -44,8 +44,12 @@ async def service_subject(factory, tmp_path, *, boundary=None):
         {
             "data_class": r.data_class,
             "captured_at": now.isoformat(),
-            "refresh_due_at": (now + timedelta(seconds=min(r.refresh_interval_seconds or 60, 60))).isoformat(),
-            "retention_due_at": (now + timedelta(seconds=min(r.retention_seconds or 120, 120))).isoformat(),
+            "refresh_due_at": (
+                now + timedelta(seconds=min(r.refresh_interval_seconds or refresh_seconds, refresh_seconds))
+            ).isoformat(),
+            "retention_due_at": (
+                now + timedelta(seconds=min(r.retention_seconds or retention_seconds, retention_seconds))
+            ).isoformat(),
         }
         for r in capabilities.grant.data_rules
     ]
@@ -423,3 +427,442 @@ async def test_explicit_acquisition_factory_selects_v2_without_downgrade(session
         )
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(M9AcquisitionAttemptModel)) == 0
+
+
+@pytest.mark.parametrize("stage", ["ready-committed", "claim-committed"])
+async def test_v2_no_checkpoint_reconstruction_preserves_original_refs_without_source(session_factory, tmp_path, stage):
+    async def stop_after_commit(name):
+        if name == stage:
+            raise ConnectionError("restart before source response")
+
+    service, command, calls, _publication = await service_subject(session_factory, tmp_path, boundary=stop_after_commit)
+    await service.acquire(command)
+    before = list(calls)
+    async with service.store.transaction() as tx:
+        attempt = await tx.manual.get_for_command(command)
+        original = await tx.manual.get_envelope(attempt.attempt_id)
+        assert await tx.manual.list_checkpoints(attempt.attempt_id) == ()
+    receipt = await service.reconcile_manual_admission(command)
+    assert receipt.state == "OUTCOME_UNKNOWN"
+    assert len(receipt.snapshot_ids) == 1
+    assert receipt.quota_disposition == "POSSIBLY_CONSUMED"
+    assert calls.count("fetch") == before.count("fetch") == 0
+    async with service.store.transaction() as tx:
+        retained = await tx.manual.get_envelope(attempt.attempt_id)
+        snapshot, provenance = await tx.manual.get_snapshot_for_attempt(attempt.attempt_id)
+        assert retained.admitted_at == original.admitted_at
+        assert retained.objects == original.objects
+        assert retained.deadlines == original.deadlines
+        assert provenance.origin == "LOCAL_ADMISSION_RECONSTRUCTION"
+        assert provenance.response_recorded_at is None
+        assert snapshot.provider_observed_at is None
+        assert snapshot.pages[0].provider_request_id is None
+        assert snapshot.pages[0].payload_ref in {o.payload_ref for o in original.objects}
+    before = list(calls)
+    service.registry = None
+    assert await service.reconcile_manual_admission(command) == receipt
+    assert calls == before
+
+
+async def wait_for_original_deadline(service, command, *, retention=False):
+    async with service.store.transaction() as tx:
+        attempt = await tx.manual.get_for_command(command)
+        envelope = await tx.manual.get_envelope(attempt.attempt_id)
+        deadline = envelope.deadlines.retention_due_at if retention else envelope.deadlines.refresh_due_at
+    async with asyncio.timeout(15):
+        while True:
+            async with service.store.transaction() as tx:
+                now = await tx.profiles.database_time()
+            if now >= deadline:
+                return envelope, now
+            await asyncio.sleep(min((deadline - now).total_seconds(), 0.2))
+
+
+@pytest.mark.parametrize("retention", [False, True])
+async def test_v2_expiry_uses_original_deadline_without_any_content_or_port_call(session_factory, tmp_path, retention):
+    async def stop_claim(name):
+        if name in ("claim-committed", "expiry-committed"):
+            raise ConnectionError("lost original acknowledgement")
+
+    service, command, calls, _ = await service_subject(
+        session_factory,
+        tmp_path,
+        boundary=stop_claim,
+        refresh_seconds=60 if retention else 6,
+        retention_seconds=6 if retention else 120,
+    )
+    running = await service.acquire(command)
+    assert running.state == "RUNNING"
+    original, now = await wait_for_original_deadline(service, command, retention=retention)
+    before = list(calls)
+    service.registry = service.capabilities = None
+    receipt = await service.expire_admission(command)
+    assert receipt.state == "EXPIRED_UNRECOVERABLE"
+    assert receipt.outcome_reason == "RESPONSE_OUTCOME_UNKNOWN"
+    assert receipt.quota_disposition == "POSSIBLY_CONSUMED"
+    assert receipt.quota_units_observed is None
+    assert receipt.snapshot_ids == ()
+    assert receipt.closure.original_deadline == (
+        original.deadlines.retention_due_at if retention else original.deadlines.refresh_due_at
+    )
+    assert receipt.closure.closed_at >= now
+    assert calls == before
+    assert await service.expire_admission(command) == receipt
+    assert await service.acquire(command) == receipt
+    assert calls == before
+
+
+async def test_v2_reconstruction_fences_an_original_worker_paused_before_dispatch(session_factory, tmp_path):
+    reached, release = asyncio.Event(), asyncio.Event()
+
+    async def pause(name):
+        if name == "before-source-dispatch":
+            reached.set()
+            await release.wait()
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, boundary=pause)
+    task = asyncio.create_task(service.acquire(command))
+    try:
+        await asyncio.wait_for(reached.wait(), 15)
+        reconstructed = await service.reconcile_manual_admission(command)
+        assert reconstructed.state == "OUTCOME_UNKNOWN"
+        assert len(reconstructed.snapshot_ids) == 1
+    finally:
+        release.set()
+        results = await asyncio.gather(task, return_exceptions=True)
+    assert results == [reconstructed]
+    assert "fetch" not in calls
+    async with service.store.transaction() as tx:
+        assert await tx.manual.get_current_receipt(command) == reconstructed
+
+
+async def test_v2_reconstruction_expiry_during_original_read_discards_operational_work(session_factory, tmp_path):
+    from dataclasses import replace
+
+    async def stop_claim(name):
+        if name == "claim-committed":
+            raise ConnectionError("restart with original claim")
+
+    service, command, calls, _ = await service_subject(
+        session_factory, tmp_path, boundary=stop_claim, retention_seconds=6
+    )
+    await service.acquire(command)
+    original = service.registry.bindings[0]
+
+    class DelayedRead:
+        first = True
+
+        async def lookup_receipt(self, key):
+            return await original.publication.lookup_receipt(key)
+
+        async def read_verified(self, envelope, *, object_ref, permit):
+            data = await original.publication.read_verified(envelope, object_ref=object_ref, permit=permit)
+            if self.first:
+                self.first = False
+                await wait_for_original_deadline(service, command, retention=True)
+            return data
+
+        async def delete_exact(self, closure):
+            return await original.publication.delete_exact(closure)
+
+    service.registry = ManualBindingRegistry((replace(original, publication=DelayedRead()),))
+    receipt = await service.reconcile_manual_admission(command)
+    assert receipt.state == "EXPIRED_UNRECOVERABLE"
+    assert receipt.snapshot_ids == ()
+    assert "fetch" not in calls
+    async with service.store.transaction() as tx:
+        assert await tx.manual.list_checkpoints(receipt.attempt_id) == ()
+        assert await tx.manual.get_snapshot_for_attempt(receipt.attempt_id) is None
+
+
+async def test_v2_concurrent_reconstruction_returns_one_original_snapshot(session_factory, tmp_path):
+    arrived, release = asyncio.Event(), asyncio.Event()
+    arrivals = 0
+
+    async def hold_finalizers(name):
+        nonlocal arrivals
+        if name == "claim-committed":
+            raise ConnectionError("restart after original claim")
+        if name == "reconstruction-checkpoint-committed":
+            arrivals += 1
+            if arrivals == 2:
+                arrived.set()
+            await release.wait()
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, boundary=hold_finalizers)
+    await service.acquire(command)
+    tasks = [asyncio.create_task(service.reconcile_manual_admission(command)) for _ in range(2)]
+    try:
+        await asyncio.wait_for(arrived.wait(), 15)
+    finally:
+        release.set()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+    assert results[0] == results[1]
+    assert results[0].state == "OUTCOME_UNKNOWN"
+    assert len(results[0].snapshot_ids) == 1
+    assert "fetch" not in calls
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9SourceSnapshotModel)) == 1
+
+
+async def test_v2_expired_ready_without_claim_closes_without_fabricating_dispatch(session_factory, tmp_path):
+    async def stop_ready(name):
+        if name == "ready-committed":
+            raise ConnectionError("restart with original READY and no claim")
+
+    service, command, calls, _ = await service_subject(
+        session_factory, tmp_path, boundary=stop_ready, refresh_seconds=6
+    )
+    initial = await service.acquire(command)
+    assert initial.state == "RUNNING"
+    original, _ = await wait_for_original_deadline(service, command)
+    assert original.dispatch_claim is None
+    before = list(calls)
+    service.registry = service.capabilities = None
+    receipt = await service.expire_admission(command)
+    assert receipt.state == "EXPIRED_UNRECOVERABLE"
+    assert receipt.quota_disposition == "UNKNOWN"
+    assert receipt.quota_units_observed is None
+    assert receipt.snapshot_ids == ()
+    assert receipt.outcome_reason == "RESPONSE_OUTCOME_UNKNOWN"
+    assert calls == before
+    async with service.store.transaction() as tx:
+        retained = await tx.manual.get_envelope(receipt.attempt_id)
+        assert retained == original
+        assert retained.dispatch_claim is None
+    assert await service.acquire(command) == receipt
+
+
+async def test_v2_reconstruction_uses_original_refs_after_ingest_path_replacement(session_factory, tmp_path):
+    async def stop_ready(name: str) -> None:
+        if name == "ready-committed":
+            raise ConnectionError("restart with original admission")
+
+    service, command, calls, publication = await service_subject(session_factory, tmp_path, boundary=stop_ready)
+    initial = await service.acquire(command)
+    ingest = tmp_path / "issuer" / "original.json"
+    original_bytes = ingest.read_bytes()
+    ingest.rename(tmp_path / "relocated-original.json")
+    ingest.write_bytes(original_bytes.replace(b'"value": 125', b'"value": 126'))
+    receipt = await service.reconcile_manual_admission(command)
+    assert receipt.attempt_id == initial.attempt_id
+    assert calls.count("admit") == 1
+    assert "fetch" not in calls
+    async with service.store.transaction() as tx:
+        envelope = await tx.manual.get_envelope(receipt.attempt_id)
+        snapshot, provenance = await tx.manual.get_snapshot_for_attempt(receipt.attempt_id)
+        assert provenance.origin == "LOCAL_ADMISSION_RECONSTRUCTION"
+        raw_object = next(o for o in envelope.objects if o.evidence_kind == "raw-page")
+        assert snapshot.pages[0].payload_ref == raw_object.payload_ref
+        permit = await tx.manual.begin_read(
+            receipt.attempt_id, expected_envelope_version=envelope.version, operational=True
+        )
+    try:
+        admitted = await publication.read_verified(envelope, object_ref=raw_object.payload_ref, permit=permit)
+        assert admitted == original_bytes
+        assert json.loads(admitted)["records"][0]["value"] == 125
+    finally:
+        async with service.store.transaction() as tx:
+            await tx.manual.release_read(permit.lease_id)
+
+
+async def test_v2_reconstruction_rejects_changed_original_refs_even_with_new_ordinary_hash(session_factory, tmp_path):
+    import hashlib
+
+    from r2.advanced_creative.digests import canonical_json_bytes
+
+    async def stop_ready(name: str) -> None:
+        if name == "ready-committed":
+            raise ConnectionError("restart with original admission")
+
+    service, command, calls, publication = await service_subject(session_factory, tmp_path, boundary=stop_ready)
+    initial = await service.acquire(command)
+    async with service.store.transaction() as tx:
+        envelope = await tx.manual.get_envelope(initial.attempt_id)
+    raw = next(o for o in envelope.objects if o.evidence_kind == "raw-page")
+    scope = hashlib.sha256(canonical_json_bytes({"user_id": "u1", "project_name": "show-a"})).hexdigest()
+    base = publication.root / "manual-publications" / scope
+    target = base / "payloads" / (raw.payload_ref.rsplit(":", 1)[1] + ".bin")
+    changed = target.read_bytes().replace(b'"value": 125', b'"value": 126')
+    target.write_bytes(changed)
+    (base / "integrities" / (raw.integrity_ref.rsplit(":", 1)[1] + ".json")).write_bytes(
+        canonical_json_bytes(
+            {
+                "payload_ref": raw.payload_ref,
+                "integrity_ref": raw.integrity_ref,
+                "digest": "sha256:" + hashlib.sha256(changed).hexdigest(),
+            }
+        )
+    )
+    with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH"):
+        await service.reconcile_manual_admission(command)
+    assert calls.count("admit") == 1
+    assert "fetch" not in calls
+    async with service.store.transaction() as tx:
+        assert await tx.manual.get_snapshot_for_attempt(initial.attempt_id) is None
+        assert await tx.manual.list_checkpoints(initial.attempt_id) == ()
+
+
+@pytest.mark.parametrize("field", ["decoder_digest", "config_digest"])
+async def test_v2_reconstruction_refuses_same_label_changed_measurement_before_content(
+    session_factory, tmp_path, field
+):
+    from dataclasses import replace
+
+    async def stop_ready(name: str) -> None:
+        if name == "ready-committed":
+            raise ConnectionError("restart with original admission")
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, boundary=stop_ready)
+    initial = await service.acquire(command)
+    binding = service.registry.bindings[0]
+    changed = binding.descriptor.model_copy(update={field: "sha256:" + "f" * 64})
+    service.registry = ManualBindingRegistry((replace(binding, measure=lambda: changed),))
+    before = list(calls)
+    with pytest.raises(OpportunityError, match="M9_SOURCE_CAPABILITY_UNAVAILABLE"):
+        await service.reconcile_manual_admission(command)
+    assert calls == before
+    async with service.store.transaction() as tx:
+        assert await tx.manual.get_descriptor(initial.attempt_id) == binding.descriptor
+        assert await tx.manual.get_snapshot_for_attempt(initial.attempt_id) is None
+
+
+async def test_v2_reconstruction_expiry_after_checkpoint_wins_before_snapshot(session_factory, tmp_path):
+    async def expire_before_finalize(name: str) -> None:
+        if name == "claim-committed":
+            raise ConnectionError("restart with original claim")
+        if name == "reconstruction-checkpoint-committed":
+            await wait_for_original_deadline(service, command)
+
+    service, command, calls, _ = await service_subject(
+        session_factory, tmp_path, boundary=expire_before_finalize, refresh_seconds=6
+    )
+    await service.acquire(command)
+    receipt = await service.reconcile_manual_admission(command)
+    assert receipt.state == "EXPIRED_UNRECOVERABLE"
+    assert receipt.snapshot_ids == ()
+    assert "fetch" not in calls
+    async with service.store.transaction() as tx:
+        assert len(await tx.manual.list_checkpoints(receipt.attempt_id)) == 1
+        assert await tx.manual.get_snapshot_for_attempt(receipt.attempt_id) is None
+
+
+async def test_v2_operator_expiry_exception_never_resolves_provider_outcome(session_factory, tmp_path):
+    from r2.contracts.opportunity import AttemptOutcomeReason
+    from r2.contracts.opportunity_acquisition_v2 import AttemptStateV2
+
+    async def stop_claim(name: str) -> None:
+        if name == "claim-committed":
+            raise ConnectionError("restart with original claim")
+
+    service, command, calls, _ = await service_subject(
+        session_factory, tmp_path, boundary=stop_claim, refresh_seconds=6
+    )
+    initial = await service.acquire(command)
+    async with service.store.transaction() as tx:
+        unknown = await tx.manual.mark_outcome_unknown(
+            initial.attempt_id, expected_attempt_version=initial.attempt_version
+        )
+        operator = await tx.manual.mark_needs_operator(
+            initial.attempt_id, expected_attempt_version=unknown.attempt_version
+        )
+        assert operator.state == "NEEDS_OPERATOR"
+    await wait_for_original_deadline(service, command)
+    before = list(calls)
+    service.registry = service.capabilities = None
+    receipt = await service.expire_admission(command)
+    assert receipt.state == "EXPIRED_UNRECOVERABLE"
+    assert receipt.outcome_reason == "RESPONSE_OUTCOME_UNKNOWN"
+    assert receipt.quota_disposition == "POSSIBLY_CONSUMED"
+    assert receipt.quota_units_observed is None
+    assert calls == before
+    async with service.store.transaction() as tx:
+        assert (
+            await tx.manual.finish_acquisition(
+                receipt.attempt_id,
+                expected_attempt_version=operator.attempt_version,
+                state=AttemptStateV2.SUCCEEDED,
+                reason=AttemptOutcomeReason.COMPLETED,
+                resolver_id="qualified-expiry-only",
+            )
+            == receipt
+        )
+        assert await tx.manual.get_snapshot_for_attempt(receipt.attempt_id) is None
+
+
+async def test_v2_publication_recovery_sanitizes_issuer_failure(session_factory, tmp_path):
+    from dataclasses import replace
+
+    async def stop_publication(name):
+        if name == "publication-returned":
+            raise ConnectionError("restart before SQL attachment")
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, boundary=stop_publication)
+    initial = await service.acquire(command)
+    original = service.registry.bindings[0]
+
+    class FailedIssuer:
+        async def admit(self, request):
+            raise RuntimeError("CANARY_PRIVATE_ISSUER_CREDENTIAL_MUST_NOT_ESCAPE")
+
+    service.registry = ManualBindingRegistry((replace(original, upload_admission=FailedIssuer()),))
+    receipt = await service.reconcile_publication(command)
+    assert receipt == initial
+    assert "CANARY" not in receipt.model_dump_json()
+    assert "fetch" not in calls
+    async with service.store.transaction() as tx:
+        assert (await tx.manual.get_envelope(initial.attempt_id)).phase == "RESERVED"
+        assert await tx.manual.get_snapshot_for_attempt(initial.attempt_id) is None
+
+
+async def test_v2_worker_paused_through_expiry_cannot_dispatch_after_resume(session_factory, tmp_path):
+    arrived, release = asyncio.Event(), asyncio.Event()
+
+    async def pause(name):
+        if name == "before-source-dispatch":
+            arrived.set()
+            await release.wait()
+
+    service, command, calls, _ = await service_subject(session_factory, tmp_path, boundary=pause, refresh_seconds=6)
+    task = asyncio.create_task(service.acquire(command))
+    try:
+        await asyncio.wait_for(arrived.wait(), 15)
+        await wait_for_original_deadline(service, command)
+        expired = await service.expire_admission(command)
+    finally:
+        release.set()
+        results = await asyncio.gather(task, return_exceptions=True)
+    assert results == [expired]
+    assert expired.state == "EXPIRED_UNRECOVERABLE"
+    assert expired.snapshot_ids == ()
+    assert "fetch" not in calls
+
+
+async def test_v2_missing_original_deadlines_are_custody_failure_even_after_expiry(session_factory, tmp_path):
+    from lib.db.models.opportunity_manual_admission import M9ManualAdmissionModel, M9ManualPublicationIntentModel
+    from r2.opportunity.manual_admission import admission_metadata_digest
+
+    async def stop_claim(name):
+        if name == "claim-committed":
+            raise ConnectionError("restart after original claim")
+
+    service, command, calls, _ = await service_subject(
+        session_factory, tmp_path, boundary=stop_claim, refresh_seconds=6
+    )
+    initial = await service.acquire(command)
+    await wait_for_original_deadline(service, command)
+    async with session_factory() as session, session.begin():
+        for kind in (M9ManualAdmissionModel, M9ManualPublicationIntentModel):
+            row = (await session.scalars(select(kind))).one()
+            body = {**row.body_json, "deadlines": None}
+            body["metadata_digest"] = admission_metadata_digest(body)
+            row.body_json, row.metadata_digest = body, body["metadata_digest"]
+            assert admission_metadata_digest(body) == row.metadata_digest
+    before = list(calls)
+    with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+        await service.expire_admission(command)
+    assert calls == before
+    async with session_factory() as session:
+        row = (await session.scalars(select(M9AcquisitionAttemptModel))).one()
+        assert row.state == initial.state == "RUNNING"
+        assert row.attempt_version == initial.attempt_version

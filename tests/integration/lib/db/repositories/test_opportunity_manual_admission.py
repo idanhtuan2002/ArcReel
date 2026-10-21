@@ -2770,3 +2770,19 @@ async def test_v2_current_receipt_replays_nonterminal_committed_state(session_fa
         assert await manual_repo(session).get_receipt(command) is None
     async with session_factory() as session, session.begin():
         assert await manual_repo(session).get_current_receipt(command) == receipt
+
+
+async def test_v2_current_receipt_cannot_precede_its_local_snapshot_commit(session_factory):
+    command, _, snapshot, provenance = await snapshot_subject(session_factory, origin="LOCAL_ADMISSION_RECONSTRUCTION")
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        before = await repo.get_current_receipt(command)
+        assert before.snapshot_ids == ()
+        await repo.append_snapshot(snapshot, provenance, expected_attempt_version=provenance.attempt_version)
+    async with session_factory() as session, session.begin():
+        after = await manual_repo(session).get_current_receipt(command)
+        assert after.snapshot_ids == (snapshot.snapshot_id,)
+        assert after.committed_at >= snapshot.created_at
+        assert after.committed_at >= before.committed_at
+    async with session_factory() as session, session.begin():
+        assert await manual_repo(session).get_current_receipt(command) == after

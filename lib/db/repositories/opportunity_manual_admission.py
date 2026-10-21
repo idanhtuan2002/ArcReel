@@ -2930,6 +2930,11 @@ class ManualAdmissionRepository:
         if record.receipt is not None:
             return record.receipt
         ids, digests, provenance = await self._receipt_snapshots(record)
+        committed_at = record.changed_at
+        snapshot_row = await self._snapshot_row_for_attempt(attempt.attempt_id)
+        if snapshot_row is not None:
+            stored = await self._snapshot_record(snapshot_row, record=record)
+            committed_at = max(committed_at, stored.stored_at)
         receipt = AcquisitionReceiptV2(
             protocol_version="m9.acquisition.v2",
             command_id=attempt.command_id,
@@ -2945,7 +2950,7 @@ class ManualAdmissionRepository:
             quota_disposition=attempt.quota_disposition,
             quota_units_observed=attempt.quota_units_observed,
             result_digest="sha256:" + "0" * 64,
-            committed_at=record.changed_at,
+            committed_at=committed_at,
         )
         return receipt.model_copy(update={"result_digest": digest_acquisition_result_v2(receipt)})
 
@@ -3077,7 +3082,16 @@ class ManualAdmissionRepository:
         ):
             raise OpportunityError(_STALE)
         envelope = await self._envelope(record, lock=True)
-        if envelope is None or envelope.deadlines is None or envelope.dispatch_claim is None:
+        if envelope is None or envelope.deadlines is None:
+            raise OpportunityError(_MISSING)
+        if envelope.dispatch_claim is None and (
+            record.attempt.state != AttemptStateV2.RUNNING
+            or record.attempt.attempt_version != envelope.request.attempt_version
+            or envelope.version != 2
+            or record.attempt.quota_disposition != QuotaDispositionV2.UNKNOWN
+            or record.attempt.quota_units_observed is not None
+            or record.transitions
+        ):
             raise OpportunityError(_MISSING)
         now = await self.profiles.database_time()
         retention, refresh = envelope.deadlines.retention_due_at, envelope.deadlines.refresh_due_at
