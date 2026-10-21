@@ -38,6 +38,13 @@ try:
         result={'public_key':issuer.public_key.hex()}
     elif body['operation']=='claim':
         result={'claim_ref':issuer.claim_original(AdmissionRequest.model_validate(body['request']))}
+    elif body['operation']=='admit':
+        import asyncio
+        def boundary(name):
+            if body.get('crash_at')==name:
+                __import__('os')._exit(73)
+        issuer=FixtureManualUploadCustodian(Path(sys.argv[1]),publication_root=Path(body['publication_root']),boundary=boundary)
+        result={'publication':asyncio.run(issuer.admit(AdmissionRequest.model_validate(body['request']))).model_dump(mode='json')}
     else:
         issuer.mark_spent(AdmissionRequest.model_validate(body['request']),claim_ref=body['claim_ref'])
         result={'spent':True}
@@ -61,6 +68,8 @@ async def issuer_process(root: Path, operation: str, **body: object) -> tuple[in
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await process.communicate(json.dumps({"operation": operation, **body}).encode())
+    if process.returncode == 73 and body.get("crash_at") is not None:
+        return 73, {"crashed": True, "pid": process.pid}
     assert process.returncode in (0, 2), stderr.decode()
     assert process.returncode is not None
     return process.returncode, json.loads(stdout)
