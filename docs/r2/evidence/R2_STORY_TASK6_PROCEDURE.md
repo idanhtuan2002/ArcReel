@@ -128,3 +128,12 @@ sealing review, the replan and the ending rewrite. Fixed in `21780e87` (ceiling 
 three second readings per review; a chapter plan's cap per generation). Evidence of the stopped run is kept outside
 the repository with the acceptance environment (`prior-T-81e165fd/`). New T = `21780e87`; donor parity unchanged
 (no prompt or schema text changed).
+
+## accept-clean at `21780e87`: BLOCKED_QUALITY (2026-10-21)
+
+Gate A 21:46, stopped 22:46 at `scene_draft[1,3]: call cap 6 reached without an acceptable output` (78 generate
+calls). The scene spent its six calls in the first review cycle (the rewrite with the review's note, then four span
+repairs that kept "Hà Nội", a real place the name heuristic flagged), leaving none for the second cycle's rewrite.
+Fixed in `e40f2c0c` (each driver rewrite of a scene is its own round; a name outside the bible is stylistic and not
+repaired, per N1). Stopped-run evidence: `prior-T-21780e87/` with the acceptance environment. New T = `e40f2c0c`;
+donor parity unchanged (no prompt or schema text changed).
