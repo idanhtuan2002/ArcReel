@@ -20,7 +20,8 @@
   "Human decision 2026-10-19, recorded before the run: generation in both arms on qwen3.5-vimax:9b (the writer route) instead of the rubric's ornith-32k:9b; judge-route work in both arms (R2 outline and plan review, the audit surfaces S05/S06, every pairwise preference) on gemma3:12b, as in production (ADR 0109).",
   "Fixture upstream (seed, bibles, outline, chapter-1 plan) and the S11 manuscript come from live run 11.",
   "Harness fix before run v2b (9af5cb9c): the R2 audit prompt was split at the first '[Sự thật đã khóa]', which leaked a fragment of the R2 instruction into the donor arm's shared sections; it is now split at the output format block, so the donor arm shares only the format and context. S05/S06 were measured again after the fix.",
-  "A surface measured REGRESSED was fixed and measured again on the same fixture and seeds; every measurement is kept below. Surfaces whose code did not change after run v2 (S01-S04, S07) keep their v2 verdict (git diff c204b002..0b7f869f touches only audits.py continuity text, repair.py normalize_length and prompts/packaging.py)."
+  "A surface measured REGRESSED was fixed and measured again on the same fixture and seeds; every measurement is kept below. Surfaces whose code did not change after run v2 (S01-S04, S07) keep their v2 verdict (git diff c204b002..0b7f869f touches only audits.py continuity text, repair.py normalize_length and prompts/packaging.py).",
+  "Run v3 after 81e165fd (measured at 9a81dd1f): the chapter plan uses a schema whose scene POV and location are enums of bible names, so S02/S03 were measured again with the bound schema in both arms. The other surfaces keep their verdict: git diff 0b7f869f..9a81dd1f changes no prompt text (prompts/schemas.py only adds bound_chapter_plan; driver, checks and repair change control flow and deterministic fixes outside S01, S04-S07, S10, S11). The S06 re-pin to Shenbi's grouped audits keeps the same rules (R2_STORY_DONOR_BASELINE.json provenance_correction_2026_10_21), so its verdict stands."
  ],
  "deterministic_surfaces": "S08 dedupe core and S09 are deterministic and proved by unit tests (baseline: deterministic_surfaces)",
  "observations": [
@@ -70,7 +71,7 @@
    "source_sha256": "e112fbc8da980b741b86c1e0880fc307cf07e82ce1e244246542a24a138ea2f4",
    "r2_destination": "server/story_authoring/prompts/planning.py + Pydantic schemas in server/story_authoring/contracts.py",
    "verdict": "IMPROVED",
-   "verdict_code_head": "c204b002",
+   "verdict_code_head": "9a81dd1f",
    "measurements": [
     {
      "run": "v2",
@@ -94,6 +95,29 @@
      "pairwise_valid_pairs": 3,
      "seconds": 7132,
      "model_calls": 50
+    },
+    {
+     "run": "v3",
+     "code_head": "9a81dd1f",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "pairwise_r2_preference": 1.0,
+     "pairwise_valid_pairs": 5,
+     "seconds": 7420,
+     "model_calls": 50
     }
    ]
   },
@@ -104,7 +128,7 @@
    "source_sha256": "565f17433e90f524ecc3d611cb59c6b32ec53e98237d970f2f42461ad40bef23",
    "r2_destination": "SceneContract fields (required turn, forbidden events, withheld knowledge) via server/story_authoring/prompts/planning.py",
    "verdict": "IMPROVED",
-   "verdict_code_head": "c204b002",
+   "verdict_code_head": "9a81dd1f",
    "measurements": [
     {
      "run": "v2",
@@ -127,6 +151,29 @@
      "pairwise_r2_preference": 1.0,
      "pairwise_valid_pairs": 5,
      "seconds": 5974,
+     "model_calls": 50
+    },
+    {
+     "run": "v3",
+     "code_head": "9a81dd1f",
+     "verdict": "IMPROVED",
+     "r2": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "donor": {
+      "n": 10,
+      "failed": 0,
+      "invariant_failures": 0,
+      "success_rate": 1.0,
+      "median_defects": 0.0
+     },
+     "pairwise_r2_preference": 1.0,
+     "pairwise_valid_pairs": 4,
+     "seconds": 8179,
      "model_calls": 50
     }
    ]
