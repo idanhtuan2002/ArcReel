@@ -1,0 +1,41 @@
+{
+  "evidence": "r2-v2.0.1 deploy to the V2 production environment (staging designated production)",
+  "date": "2026-10-22",
+  "release_tag": "r2-v2.0.1",
+  "release_commit": "0782bfa9",
+  "previous_release": "r2-v2.0.0 (34d06475)",
+  "change_scope": "lib/episode_planner.py only (plus tests and docs); no frontend, migration or dependency change",
+  "confirmation": "Human said 'ok lam luon' to deploying r2-v2.0.1 on 2026-10-22",
+  "procedure": {
+    "script": "~/arcreel-v2-staging/v2.0.1-deploy.sh (run by Human with sudo): stop attestor, offline backup as anhtuan, start attestor, checkout r2-v2.0.1, uv sync --frozen, v2-release-start.sh",
+    "pre_stop": "Human ran m8e-review-stop.sh"
+  },
+  "backup_before_deploy": {
+    "id": "bs-20261022T093142Z",
+    "state": "COMPLETE",
+    "size": "60 MB",
+    "release_git_sha": "34d06475 (r2-v2.0.0)",
+    "release_image_digest": "sha256:4c59456d... (git archive of r2-v2.0.0)"
+  },
+  "incidents_during_deploy": [
+    "First backup attempt refused OFFLINE_FENCE_VIOLATED: arcreel-attestor.service held a database session. The deploy script now stops the attestor during the backup and restarts it (also on failure or interrupt).",
+    "Second attempt stopped (state T) because pgbin/pg_dump runs `docker run -i` and read the terminal under nested sudo. Fixed by giving every owner command stdin from /dev/null. The stuck process kept a DB session and blocked the third attempt until Human killed it.",
+    "Two partial backup sets (PREPARING, REJECTED) were removed; earlier COMPLETE sets are untouched."
+  ],
+  "migration": "alembic current 918c4a0e0001 (head), unchanged",
+  "smoke": {
+    "health": "200 status ok",
+    "login": "admin token issued",
+    "unauthenticated_story_runs": 401,
+    "provider": "custom-1 Ollama local: qwen3.5-vimax:9b and gemma3:12b, ollama-chat, enabled",
+    "story_runs_list": "200, 0 runs",
+    "draft_brief": "200, brief_digest sha256:356a0cd6... (same as the r2-v2.0.0 smoke)",
+    "unqualified_model": "422 ROUTE_NOT_FOUND",
+    "deployed_code": "lib.episode_planner exposes _AnchorLocator and _finalize_ends",
+    "db_side_effects": "tasks 0, batch_tasks 0, no new gate decisions",
+    "app_log": "0 ERROR/CRITICAL/Traceback lines"
+  },
+  "not_covered": "No story run or episode planning was executed on production; the first run needs Human Gate A approval. Backup restore was not exercised.",
+  "rollback": "stop the app, restore bs-20261022T093142Z, checkout r2-v2.0.0 in .worktrees/r2-v2-release-staging, start with v2-release-start.sh",
+  "verdict": "PASS"
+}
