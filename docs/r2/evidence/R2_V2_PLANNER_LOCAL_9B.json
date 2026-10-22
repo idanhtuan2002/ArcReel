@@ -17,15 +17,67 @@
   ],
   "offline_replay_of_diagnosis_anchors": "attempt 1: all 11 anchors located; rejected only for a real ordering error at #11. attempt 2: 2 rejections left (changed word; ellipsis).",
   "live_runs_on_fixed_code": [
-    {"batch": 1, "seconds": 665, "outcome": "3 attempts rejected (hallucinated sentence at #2; later attempts degenerated into one repeated invented anchor); longest valid prefix committed: episode 1, [0, 7044), ends at a closing quote + paragraph break"},
-    {"batch": 2, "seconds": 311, "outcome": "attempt 1 rejected (ordering, invented sentence); attempt 2 passed: episodes 2-6, cursor 33,993 / 36,774"}
+    {
+      "batch": 1,
+      "seconds": 665,
+      "outcome": "3 attempts rejected (hallucinated sentence at #2; later attempts degenerated into one repeated invented anchor); longest valid prefix committed: episode 1, [0, 7044), ends at a closing quote + paragraph break"
+    },
+    {
+      "batch": 2,
+      "seconds": 311,
+      "outcome": "attempt 1 rejected (ordering, invented sentence); attempt 2 passed: episodes 2-6, cursor 33,993 / 36,774"
+    }
   ],
   "tests": "tests/integration/lib/test_episode_planner.py, test_episode_reset.py, server/agent_runtime/sdk_tools/test_episode_planning.py, server/test_text_task_queue.py, unit/lib/project_migrations/test_project_migration_v2_v3.py: 198 passed (6 new tests, each seen failing first). ruff check/format, basedpyright 0/0/0 on changed files, lint-imports 23 kept, audit_tests 0 violations.",
   "remaining_quality_limits": [
-    "The 9B model often picks anchors that end mid-sentence (at a comma or before the speech tag), so episodes 2, 3 and 4 end mid-sentence. This is allowed by the existing planner rules for every model.",
-    "Episode lengths are uneven (622 to 13,988 chars).",
-    "About 1 in 3 attempts includes an invented sentence; batches can commit fewer episodes than planned and need more plan calls.",
-    "The diagnosis skipped the overview step, so source_language was unset and reading_units reported 0; the normal V1 flow sets it at overview."
+    "Superseded by revision_2.remaining_limits."
   ],
-  "not_deployed": "The fix is not in tag r2-v2.0.0 and is not deployed to the production (staging) environment."
+  "not_deployed": "The fix is not in tag r2-v2.0.0 and is not deployed to the production (staging) environment.",
+  "revision_2": {
+    "date": "2026-10-22",
+    "trigger": "Human asked for a review of related donors and coverage of all anchor failure cases.",
+    "research": "docs/research/2026-10-22-episode-anchor-tolerance-donors.md (ArcReel upstream, ai-short-film 3dc93a62, DramaClaw b299bfd9, Jellyfish a9678194, Huohuo f104b853, ViMax 63bb9c7)",
+    "matcher_tiers": [
+      "exact",
+      "NFC + punctuation width + quote kind + whitespace width fold",
+      "strip added edge quotes / trailing punctuation",
+      "letters-and-digits skeleton (case-insensitive)",
+      "ellipsis segments (leading/middle -> last segment; trailing -> previous segment + cut at sentence end)",
+      "sentence-aligned near match: whole anchor >= 0.85 and 0.08 ahead of non-overlapping rivals; last sentence alone only when the leading sentences do not strongly match after it"
+    ],
+    "boundaries": "every end snaps forward to the next sentence end or paragraph break (<= 400 chars); two consecutive anchors inside one sentence reject the later one; abbreviations, decimals, pause ellipses and opening straight quotes are not sentence ends",
+    "feedback": "rejection reasons name the closest source sentence (similarity >= 0.5); prompt asks for anchors ending at a sentence end, without added quotes or ellipsis",
+    "independent_review": "Codex (read-only) found 5 defects (1 High, 3 Medium, 1 Low); all fixed test-first, mutation check on the order guard",
+    "replay_of_all_captured_anchors": "3 diagnosis runs + 6-batch loop: every located anchor lands on its quoted text; remaining rejections are model ordering errors, invented sentences, and same-sentence pairs",
+    "final_live_run": {
+      "project": "planner-diag3 (copy of accept-clean, source_language vi, qwen3.5-vimax:9b)",
+      "batches": [
+        {
+          "batch": 1,
+          "seconds": 518,
+          "attempts": "rejected (prefix 5), passed",
+          "episodes": 15
+        },
+        {
+          "batch": 2,
+          "seconds": 276,
+          "attempts": "3 rejected, longest prefix kept",
+          "episodes": 2
+        },
+        {
+          "batch": 3,
+          "seconds": 159,
+          "attempts": "rejected (prefix 10), passed",
+          "episodes": 15
+        }
+      ],
+      "result": "whole source planned: 32 contiguous episodes covering 0..36,774, 0 episodes ending mid-sentence"
+    },
+    "tests": "226 passed across test_episode_planner.py (110), test_episode_reset.py, sdk_tools/test_episode_planning.py, test_text_task_queue.py, test_project_migration_v2_v3.py; ruff, basedpyright 0/0/0, lint-imports 23 kept, deptry, audit_tests clean",
+    "remaining_limits": [
+      "Episode length is uneven (22 to 1,393 words) because accept-clean sets no episode target duration; set the project target duration in the real flow.",
+      "Model titles can contain stray CJK characters (one title in the 6-batch run); the planner has no CJK guard on titles.",
+      "Out-of-order and invented anchors are still model errors; batches with three failed attempts commit fewer episodes."
+    ]
+  }
 }

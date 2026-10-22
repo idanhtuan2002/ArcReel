@@ -22,10 +22,12 @@ from lib.episode_ledger import discover_sources as _real_discover_sources
 from lib.episode_planner import (
     EpisodePlanner,
     EpisodePlanningError,
+    NarrationEpisodeDraft,
     NarrationPlanDraft,
     PlanningConflictError,
     _DraftRejected,
     _find_all_overlapping,
+    _resolve_boundaries,
 )
 from lib.episode_reset import EpisodeResetResult, reset_episode_planning
 from lib.formal_write import FormalWriteReceipt
@@ -72,6 +74,7 @@ def _expected_planning_prompt(target_volume_line: str, *, content_mode: str = "n
         "- 每一集给出 title（吸引人的短标题）、hook（集尾钩子说明：这一刀为什么切在这、给观众留了什么悬念）、",
         "  end_anchor（本集结尾处的原文片段，10~30 个字符，必须从下方原文中逐字摘抄、含标点，且在整段原文中唯一出现；",
         "  本集内容 = 上一集结尾之后到该片段末尾为止的全部原文）。",
+        "  片段须止于句末标点或段落结尾，不要在片段外另加引号，不要用省略号缩写。",
     ]
     if content_mode == "drama":
         lines.append(
@@ -156,6 +159,187 @@ class TestFindAllOverlapping:
         # 空 needle 防御边界：直接返回 []，不进入逐位滑动（调用方 anchor 受 min_length=2 约束）
         assert _find_all_overlapping("abcabc", "") == []
         assert _find_all_overlapping("", "") == []
+
+
+def _ends(window: str, *anchors: str, final: bool = False) -> list[int]:
+    drafts = [NarrationEpisodeDraft(title="t", hook="h", end_anchor=a) for a in anchors]
+    return _resolve_boundaries(window, drafts, snap_whitespace_tail=final)
+
+
+def _end_after(window: str, fragment: str) -> int:
+    return window.index(fragment) + len(fragment)
+
+
+class TestResolveBoundariesTolerance:
+    """锚点容错各层：只断言解析出的结束偏移或拒绝原因。"""
+
+    def test_internal_punctuation_mismatch_resolves_by_letters_and_digits(self):
+        window = "Cô nói — giọng run run — rằng cô sẽ ở lại. Hết chuyện."
+        assert _ends(window, "Cô nói - giọng run run - rằng cô sẽ ở lại.") == [_end_after(window, "ở lại.")]
+
+    def test_whitespace_run_and_paragraph_break_mismatch_resolves(self):
+        window = "Bà Lan khóc.\n\nHạnh im lặng hồi lâu. Hết chuyện."
+        assert _ends(window, "Bà Lan khóc. Hạnh im lặng hồi lâu.") == [_end_after(window, "hồi lâu.")]
+
+    def test_letter_case_mismatch_resolves(self):
+        window = "Bà Lan khóc. Hạnh im lặng hồi lâu. Hết chuyện."
+        assert _ends(window, "hạnh im lặng hồi lâu.") == [_end_after(window, "hồi lâu.")]
+
+    def test_trailing_ellipsis_resolves_to_end_of_quoted_sentence(self):
+        window = '"Con đừng bỏ mẹ," bà thì thầm, giọng vỡ vụn. Hạnh lặng im.'
+        assert _ends(window, '"Con đừng bỏ mẹ," bà thì thầm...') == [_end_after(window, "vỡ vụn.")]
+
+    def test_leading_ellipsis_resolves_by_the_quoted_tail(self):
+        window = '"Con đừng bỏ mẹ," bà thì thầm, giọng vỡ vụn. Hạnh lặng im.'
+        assert _ends(window, "...giọng vỡ vụn.") == [_end_after(window, "vỡ vụn.")]
+
+    def test_middle_ellipsis_resolves_by_the_last_segment(self):
+        window = '"Con đừng bỏ mẹ," bà thì thầm, giọng vỡ vụn. Hạnh lặng im.'
+        assert _ends(window, '"Con đừng bỏ mẹ," … giọng vỡ vụn.') == [_end_after(window, "vỡ vụn.")]
+
+    def test_mid_sentence_anchor_snaps_to_sentence_end(self):
+        window = "Cô làm đúng, ông nói với giọng khàn đặc, đầy tôn trọng. Hạnh cười."
+        assert _ends(window, "ông nói với giọng khàn đặc,") == [_end_after(window, "tôn trọng.")]
+
+    def test_sentence_snap_includes_closing_quote(self):
+        window = "Bà nói: 'Con đừng bỏ lũ trẻ này, chúng sẽ đói.' Tiếng khóc vang lên."
+        assert _ends(window, "Con đừng bỏ lũ trẻ này") == [_end_after(window, "đói.'")]
+
+    def test_sentence_snap_stops_at_paragraph_break(self):
+        window = "Một câu dài không có dấu chấm\nĐoạn mới bắt đầu. Hết chuyện."
+        assert _ends(window, "không có dấu") == [window.index("\n")]
+
+    def test_two_anchors_inside_one_sentence_reject_the_later_one(self):
+        window = "Gió thổi qua bản, mưa rơi trên mái, trời tối dần. Đêm xuống."
+        with pytest.raises(_DraftRejected) as exc_info:
+            _ends(window, "Gió thổi qua bản,", "mưa rơi trên mái,")
+        assert "第 2 条" in exc_info.value.reasons[0]
+        assert "同一句" in exc_info.value.reasons[0]
+        assert exc_info.value.valid_prefix_ends == []
+
+    def test_duplicate_anchor_split_by_a_comma_does_not_leave_a_punctuation_only_episode(self):
+        window = "Bà nói: Mẹ chỉ muốn con ở lại thêm một năm nữa thôi, bà nài nỉ. Cô im lặng. Hết."
+        with pytest.raises(_DraftRejected) as exc_info:
+            _ends(
+                window,
+                "'Mẹ chỉ muốn con ở lại thêm một năm nữa thôi'",
+                '"Mẹ chỉ muốn con ở lại thêm một năm nữa thôi,',
+                "Cô im lặng.",
+            )
+        assert "第 2 条" in exc_info.value.reasons[0]
+        assert exc_info.value.valid_prefix_ends == []
+
+    def test_valid_prefix_stops_before_a_same_sentence_pair(self):
+        window = "Một. Gió thổi qua bản, mưa rơi trên mái, trời tối dần. Đêm xuống."
+        with pytest.raises(_DraftRejected) as exc_info:
+            _ends(window, "Một.", "Gió thổi qua bản,", "mưa rơi trên mái,")
+        assert exc_info.value.valid_prefix_ends == [_end_after(window, "Một.")]
+
+    def test_period_inside_a_number_is_not_a_sentence_end(self):
+        window = "Giá là 3.5 triệu đồng cho cả lớp. Hết chuyện."
+        assert _ends(window, "Giá là 3") == [_end_after(window, "cả lớp.")]
+
+    def test_near_verbatim_sentence_with_changed_word_resolves(self):
+        window = (
+            "Ánh đèn dầu leo lét. Con đừng bỏ mẹ, bà thì thầm, giọng nói vỡ vụn như cành tre khô. "
+            "Ánh mắt hai người phụ nữ giao nhau."
+        )
+        anchor = "Cô đừng bỏ mẹ, bà thì thầm, giọng nói vỡ vụn như cành tre khô."
+        assert _ends(window, anchor) == [_end_after(window, "cành tre khô.")]
+
+    def test_invented_sentence_is_rejected_with_closest_source_hint(self):
+        window = "Bà nói: 'Con ơi, đừng bỏ lũ trẻ này, chúng sẽ đói.' Tiếng khóc vang lên. Hết chuyện."
+        with pytest.raises(_DraftRejected) as exc_info:
+            _ends(window, "giọng khàn khản vì nước mặn và nỗi sợ hãi lẫn lộn.")
+        assert "不存在" in exc_info.value.reasons[0]
+
+    def test_near_verbatim_rejection_names_the_closest_source_sentence(self):
+        window = "Ánh đèn dầu leo lét trong gian nhà sàn. Thầy Tuấn bước vào lớp học. Hết chuyện."
+        with pytest.raises(_DraftRejected) as exc_info:
+            _ends(window, "Thầy Tuấn chậm rãi bước vào trong lớp học cũ.")
+        assert "最接近" in exc_info.value.reasons[0]
+        assert "Thầy Tuấn bước vào lớp học." in exc_info.value.reasons[0]
+
+    def test_near_verbatim_match_in_two_places_is_rejected_as_ambiguous(self):
+        window = (
+            "Con đừng bỏ mẹ mà đi xa, bà thì thầm trong đêm lạnh. Trời đổ mưa. "
+            "Con đừng bỏ mẹ mà đi xa, bà thì thầm trong đêm lạnh. Hết chuyện."
+        )
+        with pytest.raises(_DraftRejected) as exc_info:
+            _ends(window, "Cô đừng bỏ mẹ mà đi xa, bà thì thầm trong đêm lạnh.")
+        assert "无法唯一定位" in exc_info.value.reasons[0]
+
+    def test_multi_sentence_near_match_uses_the_whole_anchor(self):
+        window = (
+            "A child quietly closed the red door. Prelude ends. At the old lighthouse, every villager gathered "
+            "beneath the broken clock while the storm crossed the bay and the keeper read the final warning twice. "
+            "A child loudly opened the blue gate. Aftermath."
+        )
+        anchor = (
+            "At the old lighthouse, every villager gathered beneath the broken clock while the storm crossed the bay "
+            "and the keeper read the final warning twice. A child quietly closed the red door."
+        )
+        assert _ends(window, anchor) == [_end_after(window, "the blue gate.")]
+
+    def test_anchor_merging_two_ordered_sentences_resolves_by_its_last_sentence(self):
+        window = (
+            "Sáng sớm. Tiếng cười trẻ thơ vang vọng từ lớp học kèm theo tiếng chim hót. "
+            "Gió lạnh thổi qua những mái nhà sàn phủ sương trắng xóa của bản làng vùng cao. "
+            "Những tờ giấy hành chính khô khan nằm im trên bàn làm việc bằng gỗ cũ kỹ. "
+            "Bà Lan nhóm bếp lửa hồng, khói bay lên quyện vào mùi cơm mới thơm lừng. "
+            "Cô nhìn thấy Cao Minh đang chờ đợi cô giữa mùa xuân. Hết chuyện."
+        )
+        anchor = (
+            "Tiếng cười trẻ thơ vang vọng từ lớp kèm theo tiếng chim hót. "
+            "Cô nhìn thấy Cao Minh đang chờ đợi cô giữa mùa xuân."
+        )
+        assert _ends(window, anchor) == [_end_after(window, "giữa mùa xuân.")]
+
+    def test_last_sentence_matching_before_the_leading_context_is_rejected(self):
+        window = (
+            "A small child quietly closed the heavy red door of the school. Prelude ends here. "
+            "At the old lighthouse, every villager gathered beneath the broken clock while the storm crossed the bay "
+            "and the keeper read the final warning twice. Aftermath."
+        )
+        anchor = (
+            "At the old lighthouse, every villager gathered beneath the broken clock while the storm crossed the bay "
+            "and the keeper read the final warning twice. A small child quietly closed the heavy red door of the school."
+        )
+        with pytest.raises(_DraftRejected):
+            _ends(window, anchor)
+
+    def test_near_match_before_trailing_whitespace_counts_once(self):
+        assert _ends("Target sentence. ", "Targxt sentence.", final=True) == [17]
+        assert _ends("Target sentence.\n\n", "Targxt sentence.", final=True) == [18]
+
+    def test_abbreviation_period_is_not_a_sentence_end(self):
+        window = "Dr. Smith entered the room. He sat down."
+        assert _ends(window, "Dr.", "He sat down.") == [_end_after(window, "the room."), len(window)]
+
+    def test_vietnamese_abbreviation_period_is_not_a_sentence_end(self):
+        window = "Cô về TP. Hồ Chí Minh vào sáng nay. Hết chuyện."
+        assert _ends(window, "Cô về TP") == [_end_after(window, "sáng nay.")]
+
+    def test_pause_ellipsis_inside_a_sentence_is_not_a_sentence_end(self):
+        window = "他说：“我们……不知道该怎么办。”然后离开。"
+        assert _ends(window, "我们") == [_end_after(window, "怎么办。”")]
+
+    def test_pause_ellipsis_followed_by_lowercase_is_not_a_sentence_end(self):
+        window = "Cô ngập ngừng... rồi nói tiếp về lũ trẻ. Hết chuyện."
+        assert _ends(window, "Cô ngập ngừng") == [_end_after(window, "lũ trẻ.")]
+
+    def test_straight_quote_opening_the_next_sentence_stays_with_the_next_episode(self):
+        window = 'First ends."Second begins and continues." Tail.'
+        assert _ends(window, "FIRST ENDS", "Second begins and continues.") == [11, 41]
+
+    def test_valid_prefix_in_final_window_takes_the_whitespace_tail(self):
+        with pytest.raises(_DraftRejected) as exc_info:
+            _ends("First sentence.   ", "First sentence.", "missing anchor", final=True)
+        assert exc_info.value.valid_prefix_ends == [18]
+
+    def test_exact_anchor_at_sentence_end_is_unchanged(self):
+        window = "第一章 山村少年。李恒在山村长大。第二章 下山。"
+        assert _ends(window, "李恒在山村长大。") == [_end_after(window, "李恒在山村长大。")]
 
 
 class TestParseDraft:
@@ -579,7 +763,7 @@ class TestPlan:
         # 源文已是存储坐标系形态（NFC + \n）；窗口与切片均在此坐标系上
         source = "Tôi yêu tiếng Việt.\nHôm nay trời đẹp lắm. Mọi thứ thật tuyệt vời."
         project_dir = _write_project(tmp_path, source_text=source)
-        nfc_sub = "Tôi yêu tiếng Việt.\nHôm nay"  # 源文中的精确子串（NFC + \n）
+        nfc_sub = "Tôi yêu tiếng Việt.\nHôm nay trời đẹp lắm."  # 源文中的精确子串（NFC + \n），止于句末
         # 模型回显：组合字符分解（NFD，变长）+ 换行写成 \r\n（再 +1）
         crlf_nfd_anchor = unicodedata.normalize("NFD", nfc_sub).replace("\n", "\r\n")
         assert "\r\n" in crlf_nfd_anchor
@@ -737,7 +921,7 @@ class TestPlan:
         assert ep1.startswith('"')
 
     async def test_plan_resolves_anchor_with_added_closing_quote(self, tmp_path: Path):
-        """模型给片段补了源文没有的收尾引号：去掉锚两端引号后唯一命中，结束于片段正文末尾。"""
+        """模型给片段补了源文没有的收尾引号：去掉锚两端引号后唯一命中，结束点贴齐到所在句末（含收尾引号）。"""
         source = "Bà nói: 'Con đừng bỏ lũ trẻ này, chúng sẽ đói.' Tiếng khóc vang lên."
         anchor = "'Con đừng bỏ lũ trẻ này'"
         project_dir = _write_project(tmp_path, source_text=source)
@@ -746,7 +930,7 @@ class TestPlan:
         await EpisodePlanner(project_dir, generator=fake).plan()
 
         assert len(fake.requests) == 1
-        end = source.index("lũ trẻ này") + len("lũ trẻ này")
+        end = source.index("đói.'") + len("đói.'")
         eps = _load_project(project_dir)["episodes"]
         assert eps[0]["source_range"] == {"source_file": "source/novel.txt", "start": 0, "end": end}
 
@@ -765,12 +949,12 @@ class TestPlan:
         assert ep1 == source[:end]
 
     async def test_plan_rejects_ellipsis_shortened_anchor_with_specific_reason(self, tmp_path: Path):
-        """锚以省略号缩写：不按前缀截断定位，拒绝并在重试 prompt 里点明不得用省略号缩写。"""
+        """锚以省略号缩写且省略号前后的片段都不在原文里：拒绝，并在重试 prompt 里点明不得用省略号缩写。"""
         source = '"Con đừng bỏ mẹ," bà thì thầm, giọng vỡ vụn. Hạnh lặng im.'
         project_dir = _write_project(tmp_path, source_text=source)
         fake = _FakeTextGenerator(
             [
-                _plan_response([{"title": "A", "hook": "A", "end_anchor": '"Con đừng bỏ mẹ," bà thì thầm...'}]),
+                _plan_response([{"title": "A", "hook": "A", "end_anchor": "Bà bảo rằng mọi chuyện rồi sẽ..."}]),
                 _plan_response([{"title": "B", "hook": "B", "end_anchor": "Hạnh lặng im."}]),
             ]
         )

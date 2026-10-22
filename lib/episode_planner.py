@@ -19,9 +19,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import statistics
+from bisect import bisect_left
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -193,10 +196,6 @@ _PUNCT_FOLD: dict[str, str] = {
     "＇": '"',  # U+FF07 全角直单引号
     "'": '"',  # 半角直单引号
 }
-# 锚两端可剥离的字符：模型回显时常在片段外补引号、颠倒收尾引号与句末标点（折叠后的形态）
-_EDGE_QUOTES = '"'
-_EDGE_TAIL = '"' + ".,!?;:"
-_ELLIPSIS_TAILS = ("...", "…")
 # 折叠值必须是单字符：_fold_for_match 的逐字符 1:1 等长依赖于此。一旦某条映射折成多字符，
 # 折叠串偏移就相对 NFC 原文漂移，end = start + len(anchor) 会算出错误切点。导入期即拦截违例。
 assert all(len(dst) == 1 for dst in _PUNCT_FOLD.values()), "折叠表的值必须是单字符以保证等长映射"
@@ -238,6 +237,33 @@ def _find_all_overlapping(haystack: str, needle: str) -> list[int]:
     return starts
 
 
+# 锚两端可剥离的字符（折叠后的形态）：模型回显时常在片段外补引号、颠倒收尾引号与句末标点
+_EDGE_QUOTES = '"'
+_EDGE_TAIL = '"' + ".,!?;:"
+# 省略号：模型常用它在锚首 / 锚中 / 锚尾缩写原文
+_ELLIPSIS_RE = re.compile(r"\.{3,}|…+|。{3,}")
+_SENTENCE_TERMINATORS = frozenset("。！？!?….")
+# 句末标点之后仍属于本句的收尾引号与括号；其中直引号可能是下一句的开引号，需看上下文
+_CLOSING_MARKS = frozenset("\"'”’»）)」』】＂＇")
+_STRAIGHT_QUOTES = frozenset("\"'＂＇")
+# 只由这些字符构成的句末标点串要看上下文才能判定收句（半角句点、省略号）
+_PAUSE_CHARS = frozenset(".…")
+# 句点之后不收句的常见缩写（小写比较）：英文称谓 / 拉丁缩写与越南语机构、头衔缩写
+_ABBREVIATIONS = frozenset(
+    {"dr", "mr", "mrs", "ms", "st", "jr", "sr", "prof", "vs", "etc", "no", "tp", "ts", "ths", "gs", "pgs", "bs", "ks"}
+)
+# 结束点不在句末时向后贴齐句末 / 段落换行的最大距离（字符）；超出则保留原结束点
+_SENTENCE_SNAP_LIMIT = 400
+# 字母数字骨架层的最短骨架长度；更短的锚只走逐字 / 折叠 / 剥边层
+_MIN_SKELETON_LEN = 6
+# 近似层：最短骨架长度、接受阈值、与次优候选的最小差距、拒绝时给出最接近原文的阈值
+_FUZZY_MIN_LEN = 12
+_FUZZY_ACCEPT = 0.85
+_FUZZY_MARGIN = 0.08
+_FUZZY_HINT = 0.5
+_HINT_MAX_CHARS = 80
+
+
 def _edge_trimmed(folded_anchor: str) -> tuple[int, str, str] | None:
     """剥掉折叠锚首部的引号与尾部的引号 / 句末标点，返回（首部剥离长度, 正文, 尾部剥离串）。
 
@@ -251,6 +277,317 @@ def _edge_trimmed(folded_anchor: str) -> tuple[int, str, str] | None:
     return lead, core, body[len(core) :]
 
 
+def _absorb_closing_marks(text: str, j: int) -> int:
+    """从 j 起越过收尾引号 / 括号；紧贴字母数字的直引号是下一句的开引号，不吸收。"""
+    while j < len(text) and text[j] in _CLOSING_MARKS:
+        if text[j] in _STRAIGHT_QUOTES and j + 1 < len(text) and text[j + 1].isalnum():
+            break
+        j += 1
+    return j
+
+
+def _sentence_close_at(text: str, i: int) -> int | None:
+    """text[i] 所在的句末标点串确实收句时，返回句子结束偏移（越过标点串与收尾引号 / 括号），否则 None。
+
+    半角句点与省略号要看上下文：句点之后紧跟非空白（3.5、TP.HCM）、句点前是常见缩写或单个大写首字母
+    （Dr.、TP.、A.）、或之后的下一个字是小写字母时都不收句；只由省略号构成的标点串紧贴下文
+    （我们……不知道）或下一个字是小写字母时视为句中停顿。
+    """
+    if text[i] not in _SENTENCE_TERMINATORS:
+        return None
+    start = i
+    while start > 0 and text[start - 1] in _SENTENCE_TERMINATORS:
+        start -= 1
+    j = i + 1
+    while j < len(text) and text[j] in _SENTENCE_TERMINATORS:
+        j += 1
+    run = text[start:j]
+    close = _absorb_closing_marks(text, j)
+    if close >= len(text):
+        return close
+    if set(run) <= _PAUSE_CHARS or run.startswith("。。。"):
+        nxt = text[close]
+        if close == j and not nxt.isspace() and nxt not in _CLOSING_MARKS:
+            return None
+        if run == ".":
+            token_start = start
+            while token_start > 0 and text[token_start - 1].isalpha():
+                token_start -= 1
+            token = text[token_start:start]
+            if token.lower() in _ABBREVIATIONS or (len(token) == 1 and token.isupper()):
+                return None
+        following = text[close:].lstrip()
+        if following and following[0].islower():
+            return None
+    return close
+
+
+def _ends_at_sentence_close(text: str) -> bool:
+    """text（去掉尾部空白）是否以收句的句末标点（可带收尾引号 / 括号）结尾。"""
+    stripped = text.rstrip()
+    k = len(stripped)
+    while k > 0 and stripped[k - 1] in _CLOSING_MARKS:
+        k -= 1
+    return k > 0 and _sentence_close_at(stripped, k - 1) is not None
+
+
+def _sentence_pieces(text: str) -> list[str]:
+    """按收句的句末标点（含收尾引号 / 括号）把 text 切成句子，末尾不成句的残段单独成一段。"""
+    pieces: list[str] = []
+    start = 0
+    i = 0
+    while i < len(text):
+        close = _sentence_close_at(text, i)
+        if close is not None and (i + 1 >= len(text) or text[i + 1] not in _SENTENCE_TERMINATORS):
+            pieces.append(text[start:close])
+            start = i = close
+            continue
+        i += 1
+    if text[start:].strip():
+        pieces.append(text[start:])
+    return [piece for piece in pieces if piece.strip()]
+
+
+def _snap_to_sentence_end(text: str, end: int) -> int | None:
+    """返回 end 处或其后最近的句子结束偏移（含收尾引号 / 括号）或段落换行位置。
+
+    end 已在句末时只补齐紧随其后的收尾引号 / 括号；_SENTENCE_SNAP_LIMIT 内找不到时返回 None。
+    """
+    if end >= len(text) or text[end] == "\n" or (end > 0 and text[end - 1] == "\n"):
+        return end
+    k = end
+    while k > 0 and text[k - 1] in _CLOSING_MARKS:
+        k -= 1
+    if k > 0 and (close := _sentence_close_at(text, k - 1)) is not None:
+        return max(end, close)
+    for i in range(end, min(len(text), end + _SENTENCE_SNAP_LIMIT)):
+        if text[i] == "\n":
+            return i
+        if (close := _sentence_close_at(text, i)) is not None:
+            return close
+    return None
+
+
+def _skeleton(text: str) -> tuple[str, list[int]]:
+    """只保留字母与数字（小写）的骨架串，以及骨架每个字符在 text 中的偏移。"""
+    chars: list[str] = []
+    origin: list[int] = []
+    for i, ch in enumerate(text):
+        if ch.isalnum():
+            low = ch.lower()
+            chars.append(low if len(low) == 1 else ch)
+            origin.append(i)
+    return "".join(chars), origin
+
+
+@dataclass
+class _AnchorHit:
+    """单条锚点的定位结果。``count`` 为命中处数，唯一命中时 ``end`` 为窗口内结束偏移。"""
+
+    count: int = 0
+    end: int = 0
+    tolerant: bool = False  # 经容错层命中（拒绝话术须点明计数口径）
+    sentence_end_required: bool = False  # 锚以省略号收尾：结束点必须贴齐到句末
+    hint: str | None = None  # 落空时原文中最接近的片段
+
+
+class _AnchorLocator:
+    """在一个窗口内定位 end_anchor，逐层放宽，首个命中（≥1 处）的层决定结果。
+
+    1. 逐字精确；2. 归一 + 标点全/半角、引号种类、空白宽度折叠；3. 剥去锚两端补加的引号 / 句末标点；
+    4. 只比对字母数字骨架（忽略全部标点与空白、不分大小写）；5. 锚含省略号时取省略号之后（锚尾省略时取之前）
+    的片段重走 1–4；6. 按句子近似匹配（相似度 ≥ _FUZZY_ACCEPT 且领先次优候选 _FUZZY_MARGIN），结束于该句句末。
+    折叠与骨架都保留到原文的偏移映射，切片始终取原文，不改写源文。
+    """
+
+    def __init__(self, window: str):
+        self.window = window
+        self._folded: str | None = None
+        self._skeleton: tuple[str, list[int]] | None = None
+        self._sentence_ends: list[int] | None = None
+
+    @property
+    def folded(self) -> str:
+        if self._folded is None:
+            self._folded = _fold_for_match(self.window)
+        return self._folded
+
+    @property
+    def skeleton(self) -> tuple[str, list[int]]:
+        if self._skeleton is None:
+            self._skeleton = _skeleton(self.window)
+        return self._skeleton
+
+    @property
+    def sentence_ends(self) -> list[int]:
+        if self._sentence_ends is None:
+            text = self.window
+            found: set[int] = set()
+            for i, ch in enumerate(text):
+                if ch == "\n":
+                    if i > 0 and text[i - 1] != "\n":
+                        found.add(i)
+                elif (
+                    not (i + 1 < len(text) and text[i + 1] in _SENTENCE_TERMINATORS)
+                    and (close := _sentence_close_at(text, i)) is not None
+                ):
+                    found.add(close)
+            found.add(len(text))
+            self._sentence_ends = sorted(found)
+        return self._sentence_ends
+
+    def locate(self, anchor: str) -> _AnchorHit:
+        hit = self._locate_text(anchor)
+        if hit.count:
+            return hit
+        normalized = normalize_source_text(anchor)
+        fuzzy_target = normalized
+        segments = _ELLIPSIS_RE.split(normalized)
+        if len(segments) > 1:
+            if len(_skeleton(segments[-1])[0]) >= _MIN_SKELETON_LEN:
+                fuzzy_target = segments[-1]
+                hit = self._locate_text(segments[-1])
+                if hit.count:
+                    hit.tolerant = True
+                    return hit
+            else:
+                body = next((seg for seg in reversed(segments) if len(_skeleton(seg)[0]) >= _MIN_SKELETON_LEN), None)
+                if body is not None:
+                    fuzzy_target = body
+                    hit = self._locate_text(body)
+                    if hit.count:
+                        hit.tolerant = True
+                        hit.sentence_end_required = True
+                        return hit
+        return self._locate_fuzzy(fuzzy_target)
+
+    def _locate_text(self, anchor: str) -> _AnchorHit:
+        window = self.window
+        starts = _find_all_overlapping(window, anchor)
+        if starts:
+            return _AnchorHit(count=len(starts), end=starts[0] + len(anchor))
+        # normalize_source_text 非长度保持，后续各层的跨度一律取归一后的锚长
+        normalized = normalize_source_text(anchor)
+        folded_anchor = _fold_for_match(normalized)
+        starts = _find_all_overlapping(self.folded, folded_anchor)
+        if starts:
+            return _AnchorHit(count=len(starts), end=starts[0] + len(normalized), tolerant=True)
+        trimmed = _edge_trimmed(folded_anchor)
+        if trimmed is not None:
+            # 结束点越过源文紧随正文、且属于被剥尾部字符集的收尾标点与引号，吸收「补了源文没有的
+            # 收尾引号」与「引号与句号顺序颠倒」两类回显
+            _, core, tail = trimmed
+            starts = _find_all_overlapping(self.folded, core)
+            if starts:
+                end = starts[0] + len(core)
+                tail_chars = set(tail) - {" "}
+                while end < len(window) and self.folded[end] in tail_chars:
+                    if window[end] in _STRAIGHT_QUOTES and end + 1 < len(window) and window[end + 1].isalnum():
+                        break
+                    end += 1
+                return _AnchorHit(count=len(starts), end=end, tolerant=True)
+        anchor_skeleton, _ = _skeleton(normalized)
+        if len(anchor_skeleton) >= _MIN_SKELETON_LEN:
+            skeleton, origin = self.skeleton
+            starts = _find_all_overlapping(skeleton, anchor_skeleton)
+            if starts:
+                end = origin[starts[0] + len(anchor_skeleton) - 1] + 1
+                while end < len(window) and window[end] in _SENTENCE_TERMINATORS:
+                    end += 1
+                end = _absorb_closing_marks(window, end)
+                return _AnchorHit(count=len(starts), end=end, tolerant=True)
+        return _AnchorHit()
+
+    def _locate_fuzzy(self, anchor: str) -> _AnchorHit:
+        """按句子对齐近似匹配整条锚：对比原文以每个句末收尾的同数（及多一）句，结束点即该句末。
+
+        整条锚优先；整条锚落空时，末句单独近似命中且锚首各句没有在末句之后强命中（顺序不矛盾）才接受末句，
+        覆盖模型把原文中不相邻的两句拼进同一条锚的回显；锚首强命中在末句之后时拒绝，避免末句误配到更早的段落。
+        """
+        pieces = _sentence_pieces(anchor)
+        anchor_skeleton = _skeleton(anchor)[0]
+        if not pieces or len(anchor_skeleton) < _FUZZY_MIN_LEN:
+            return _AnchorHit()
+        scored = self._fuzzy_scores(anchor_skeleton, len(pieces), mid_sentence=not _ends_at_sentence_close(anchor))
+        best, best_end, best_start = scored[0] if scored else (0.0, 0, 0)
+        if best >= _FUZZY_ACCEPT:
+            # 只有与最佳候选不重叠的原文区段才算另一处出现；重叠的是同一处的不同对齐方式
+            rivals = [
+                end
+                for score, end, start in scored[1:]
+                if score > best - _FUZZY_MARGIN and (end <= best_start or start >= best_end)
+            ]
+            return _AnchorHit(count=1 + len(rivals), end=best_end, tolerant=True)
+        tail_skeleton = _skeleton(pieces[-1])[0]
+        if len(pieces) > 1 and len(tail_skeleton) >= _FUZZY_MIN_LEN:
+            tail_scored = self._fuzzy_scores(tail_skeleton, 1, mid_sentence=False)
+            if tail_scored:
+                tail_best, tail_end, tail_start = tail_scored[0]
+                if tail_best >= _FUZZY_ACCEPT and not self._head_contradicts(pieces[:-1], tail_start):
+                    rivals = [
+                        end
+                        for score, end, start in tail_scored[1:]
+                        if score > tail_best - _FUZZY_MARGIN and (end <= tail_start or start >= tail_end)
+                    ]
+                    return _AnchorHit(count=1 + len(rivals), end=tail_end, tolerant=True)
+                if tail_best > best:
+                    best, best_end = tail_best, tail_end
+        if best >= _FUZZY_HINT:
+            return _AnchorHit(hint=self._sentence_ending_at(best_end))
+        return _AnchorHit()
+
+    def _head_contradicts(self, head_pieces: list[str], tail_start: int) -> bool:
+        """锚首各句在原文中强命中（≥ _FUZZY_ACCEPT）且位置在末句命中区段起点之后。"""
+        head_skeleton = _skeleton("".join(head_pieces))[0]
+        if len(head_skeleton) < _FUZZY_MIN_LEN:
+            return False
+        head_scored = self._fuzzy_scores(head_skeleton, len(head_pieces), mid_sentence=False)
+        return bool(head_scored) and head_scored[0][0] >= _FUZZY_ACCEPT and head_scored[0][1] > tail_start
+
+    def _fuzzy_scores(
+        self, anchor_skeleton: str, sentence_count: int, *, mid_sentence: bool
+    ) -> list[tuple[float, int, int]]:
+        """各候选句末的（最高相似度, 句末偏移, 取得该相似度的区段起点），按相似度降序。
+
+        同一段骨架（句末之间只隔标点 / 空白）只计一个候选、取最靠前的句末；锚停在句中时同句数候选另取
+        「段首等长前缀相似度」，覆盖锚停在句中、又改了字的回显。
+        """
+        skeleton, origin = self.skeleton
+        ends = self.sentence_ends
+        matcher = SequenceMatcher(None, autojunk=False)
+        matcher.set_seq2(anchor_skeleton)
+        best_by_span: dict[int, tuple[float, int, int]] = {}
+        for i, end in enumerate(ends):
+            k1 = bisect_left(origin, end)
+            if k1 in best_by_span:
+                continue
+            score = 0.0
+            best_start = end
+            for count in (sentence_count, sentence_count + 1):
+                start = ends[i - count] if i - count >= 0 else 0
+                candidate = skeleton[bisect_left(origin, start) : k1]
+                if not candidate:
+                    continue
+                texts = [candidate]
+                if mid_sentence and count == sentence_count:
+                    texts.append(candidate[: len(anchor_skeleton)])
+                for text in texts:
+                    matcher.set_seq1(text)
+                    if matcher.real_quick_ratio() >= _FUZZY_HINT and matcher.quick_ratio() >= _FUZZY_HINT:
+                        ratio = matcher.ratio()
+                        if ratio > score:
+                            score, best_start = ratio, start
+            best_by_span[k1] = (score, end, best_start)
+        return sorted((pair for pair in best_by_span.values() if pair[0] > 0), key=lambda pair: (-pair[0], pair[1]))
+
+    def _sentence_ending_at(self, end: int) -> str:
+        ends = self.sentence_ends
+        idx = bisect_left(ends, end)
+        start = ends[idx - 1] if idx > 0 else 0
+        sentence = self.window[start:end].strip()
+        return sentence if len(sentence) <= _HINT_MAX_CHARS else "…" + sentence[-_HINT_MAX_CHARS:]
+
+
 def _resolve_boundaries(
     window: str,
     drafts: list[NarrationEpisodeDraft],
@@ -259,90 +596,61 @@ def _resolve_boundaries(
 ) -> list[int]:
     """把每集 end_anchor 解析为窗口内相对结束偏移，校验存在/唯一/连续。
 
-    范围由锚点构造性保证连续不重叠：第 i 集 = [第 i-1 集末尾, 第 i 集锚点末尾)。
-    末尾只剩空白时（``snap_whitespace_tail=True``，即 plan 命中全文结尾窗口）把
-    最后一集贴齐到窗口末尾，贴齐后每个字符都归属某一集。
+    范围由锚点构造性保证连续不重叠：第 i 集 = [第 i-1 集末尾, 第 i 集锚点末尾)。锚点定位分层见
+    :class:`_AnchorLocator`；任一层命中多处都按「无法唯一定位」拒绝，不静默挑第一处。
 
-    锚点定位分级：先精确 ``find``（命中即与逐字节匹配完全一致，Tier1 不做任何归一）；
-    精确落空时退化到容错——先对锚副本施加与 window 相同的 ``normalize_source_text`` 归一
-    （NFC + 换行统一），把「window 已归一、anchor 未归一」整类失配一次性闭合，再按折叠
-    全/半角标点 + 折叠空白宽度的等价口径在折叠副本上扫描。折叠对 window 为 1:1 等长映射，
-    故命中起点即归一坐标系下的精确起点；跨度取归一后的锚长（``normalize_source_text`` 非
-    长度保持，end 必须用归一锚长而非原 anchor 长，否则 \\r 或组合字符撑长会让偏移漂移）。
-    切片仍取归一后的原文、不改写源文标点。折叠后仍多处命中时维持「无法唯一定位」拒绝。
-
-    折叠仍落空时，剥掉锚首部的引号与尾部的引号 / 句末标点再定位正文（锚以省略号缩写时不剥、
-    直接以专门原因拒绝）；唯一命中后结束点越过源文紧随正文、且属于被剥尾部字符集的收尾标点与引号。
-    拒绝时附带首个失败条目之前的有效结束偏移，供重试耗尽后提交最长有效前缀。
+    校验通过后每集结束点向后贴齐到句末（含收尾引号 / 括号）或段落换行；相邻两条锚落在同一句内时拒绝后一条。
+    末尾只剩空白时（``snap_whitespace_tail=True``，即 plan 命中全文结尾窗口）把最后一集贴齐到窗口末尾，
+    贴齐后每个字符都归属某一集。拒绝时附带首个失败条目之前的有效结束偏移（同样贴齐句末），
+    供重试耗尽后提交最长有效前缀。
     """
+    locator = _AnchorLocator(window)
     reasons: list[str] = []
     ends: list[int] = []
     prefix_len = 0  # 首个失败条目之前的有效集数
     pos = 0
     ordering_valid = True
-    folded_window: str | None = None  # 懒构造：仅在精确匹配落空时折叠一次
     for idx, ep in enumerate(drafts, start=1):
         if ordering_valid:
             prefix_len = len(ends)
         anchor = ep.end_anchor
-        match_len = len(anchor)  # 精确命中：跨度即原 anchor 长度（与 window 逐字节一致）
-        starts = _find_all_overlapping(window, anchor)
-        matched_by_fold = False
-        if not starts:
-            # 精确落空：退化到容错匹配。对「匹配用的锚副本」施加与 window 完全相同的归一
-            # （normalize_source_text：NFC + 换行统一，window 本就经它产出），再折叠标点全/半角
-            # 与空白宽度，在对 window 等长的折叠副本上定位精确偏移；Tier1 字节级行为与源文坐标
-            # 不变。normalize_source_text 非长度保持，故 end 跨度取归一后锚长 match_len（不是原
-            # anchor 长），与归一坐标系对齐，避免 \r / 组合字符撑长导致偏移漂移、损坏切片坐标。
-            if folded_window is None:
-                folded_window = _fold_for_match(window)
-            normalized_anchor = normalize_source_text(anchor)
-            folded_anchor = _fold_for_match(normalized_anchor)
-            starts = _find_all_overlapping(folded_window, folded_anchor)
-            if starts:
-                matched_by_fold = True
-                match_len = len(normalized_anchor)
-            elif normalized_anchor.rstrip().endswith(_ELLIPSIS_TAILS):
-                reasons.append(
-                    f"第 {idx} 条的 end_anchor 以省略号缩写，原文窗口中不存在：请逐字摘抄完整片段，"
-                    f"不要用省略号（... 或 …）代替原文: {anchor!r}"
-                )
-                ordering_valid = False
-                continue
-            elif (trimmed := _edge_trimmed(folded_anchor)) is not None:
-                # 剥掉锚两端模型补加的引号 / 句末标点后再定位正文；结束点越过源文紧随正文、且属于被剥
-                # 尾部字符集的收尾标点与引号，从而吸收「补了源文没有的收尾引号」与「引号与句号顺序颠倒」
-                _, core, tail = trimmed
-                starts = _find_all_overlapping(folded_window, core)
-                if starts:
-                    matched_by_fold = True
-                    match_len = len(core)
-                    if len(starts) == 1:
-                        tail_chars = set(tail) - {" "}
-                        while (
-                            starts[0] + match_len < len(window) and folded_window[starts[0] + match_len] in tail_chars
-                        ):
-                            match_len += 1
-        if not starts:
-            reasons.append(f"第 {idx} 条的 end_anchor 在原文窗口中不存在（必须逐字摘抄，含标点）: {anchor!r}")
+        hit = locator.locate(anchor)
+        if hit.count == 0:
+            reason = f"第 {idx} 条的 end_anchor 在原文窗口中不存在（必须逐字摘抄，含标点）: {anchor!r}"
+            if _ELLIPSIS_RE.search(anchor):
+                reason += "；不要用省略号（... 或 …）缩写原文"
+            if hit.hint:
+                reason += f"；原文中最接近的片段是 {hit.hint!r}，请从原文逐字摘抄"
+            reasons.append(reason)
             ordering_valid = False
             continue
-        if len(starts) > 1:
-            if matched_by_fold:
-                # 折叠路径的「出现 N 次」是标点 / 空白折叠对齐后的计数；模型按字面 anchor 逐字数
-                # 往往是 0 次，必须点明计数口径，否则模型对不上、可能反复重交同一 anchor 耗尽重试
+        if hit.count > 1:
+            if hit.tolerant:
+                # 容错层的「出现 N 次」是对齐后的计数；模型按字面 anchor 逐字数往往是 0 次，必须点明
+                # 计数口径，否则模型对不上、可能反复重交同一 anchor 耗尽重试
                 reasons.append(
-                    f"第 {idx} 条的 end_anchor 在原文窗口中按归一（NFC 与换行统一）及标点全/半角、引号种类、空白折叠对齐（并剥去两端补加的引号）后出现 {len(starts)} 次"
-                    f"（逐字精确匹配可能为 0 次），无法唯一定位，请改用更长或更独特、与原文逐字一致的片段: {anchor!r}"
+                    f"第 {idx} 条的 end_anchor 在原文窗口中按容错对齐（归一、标点 / 引号 / 空白折叠、去两端引号、"
+                    f"只比对字母数字或近似句子）后出现 {hit.count} 次（逐字精确匹配可能为 0 次），无法唯一定位，"
+                    f"请改用更长或更独特、与原文逐字一致的片段: {anchor!r}"
                 )
             else:
                 reasons.append(
-                    f"第 {idx} 条的 end_anchor 在原文窗口中出现 {len(starts)} 次，无法唯一定位，"
+                    f"第 {idx} 条的 end_anchor 在原文窗口中出现 {hit.count} 次，无法唯一定位，"
                     f"请改用更长或更独特的片段: {anchor!r}"
                 )
             ordering_valid = False
             continue
-        end = starts[0] + match_len
+        end = hit.end
+        if hit.sentence_end_required:
+            snapped = _snap_to_sentence_end(window, end)
+            if snapped is None:
+                reasons.append(
+                    f"第 {idx} 条的 end_anchor 以省略号缩写，找不到它所在句子的句末：请逐字摘抄完整片段，"
+                    f"不要用省略号（... 或 …）代替原文: {anchor!r}"
+                )
+                ordering_valid = False
+                continue
+            end = snapped
         if ordering_valid and end <= pos:
             reasons.append(
                 f"第 {idx} 条的 end_anchor 位置不在上一集结尾之后（各集范围必须连续推进、不重叠）: {anchor!r}"
@@ -352,10 +660,37 @@ def _resolve_boundaries(
         ends.append(end)
         pos = end
     if reasons:
-        raise _DraftRejected(reasons, valid_prefix_ends=ends[:prefix_len])
-    if snap_whitespace_tail and ends[-1] < len(window) and not window[ends[-1] :].strip():
-        ends[-1] = len(window)
-    return ends
+        prefix, _ = _finalize_ends(window, ends[:prefix_len], snap_whitespace_tail=snap_whitespace_tail)
+        raise _DraftRejected(reasons, valid_prefix_ends=prefix)
+    final, conflict = _finalize_ends(window, ends, snap_whitespace_tail=snap_whitespace_tail)
+    if conflict is not None:
+        raise _DraftRejected(
+            [
+                f"第 {conflict + 2} 条的 end_anchor 与第 {conflict + 1} 条落在原文同一句内（各集须止于不同的句末，"
+                f"不能把一句话切成两集）: {drafts[conflict + 1].end_anchor!r}"
+            ],
+            valid_prefix_ends=final,
+        )
+    return final
+
+
+def _finalize_ends(window: str, ends: list[int], *, snap_whitespace_tail: bool) -> tuple[list[int], int | None]:
+    """把每集结束点向后贴齐到句末，返回（贴齐后的结束点, 冲突集下标）。
+
+    第 i 集贴齐后会追上第 i+1 集的结束点，说明两条锚落在同一句内：返回第 i 集之前已贴齐的结束点与 i。
+    无冲突且命中全文结尾窗口、最后一集之后只剩空白时，把最后一集贴齐到窗口末尾。
+    """
+    snapped: list[int] = []
+    for i, end in enumerate(ends):
+        target = _snap_to_sentence_end(window, end)
+        if target is None:
+            target = end
+        if i + 1 < len(ends) and target >= ends[i + 1]:
+            return snapped, i
+        snapped.append(target)
+    if snap_whitespace_tail and snapped and snapped[-1] < len(window) and not window[snapped[-1] :].strip():
+        snapped[-1] = len(window)
+    return snapped, None
 
 
 def _ledger_entry_from_draft(
@@ -1196,6 +1531,7 @@ def _build_planning_prompt(
         "- 每一集给出 title（吸引人的短标题）、hook（集尾钩子说明：这一刀为什么切在这、给观众留了什么悬念）、",
         "  end_anchor（本集结尾处的原文片段，10~30 个字符，必须从下方原文中逐字摘抄、含标点，且在整段原文中唯一出现；",
         "  本集内容 = 上一集结尾之后到该片段末尾为止的全部原文）。",
+        "  片段须止于句末标点或段落结尾，不要在片段外另加引号，不要用省略号缩写。",
     ]
     if is_screenplay:
         lines.append(_PLAN_RULE_SCREENPLAY)
