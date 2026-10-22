@@ -129,7 +129,7 @@
   "export_bytes_match_manifest_digest": true,
   "every_attempt_has_outcome": true,
   "no_head_from_truncated_or_over_context_call": true,
-  "no_head_from_truncated_or_over_context_call_detail": "22 node heads; each head revision's attempt checked: none FAILED or carrying a failure code. failure_codes_seen on attempts: OUTPUT_TRUNCATED once (chapter_plan[1]@r0.0.1#2, FAILED; #3 completed and later attempts produced the head).",
+  "no_head_from_truncated_or_over_context_call_detail": "By construction, not by revision linkage: revision records carry attempt_id null (driver._promote), so heads cannot be traced to attempts. The gateway returns text only after _judge accepts the response (server/story_authoring/generation.py _accept_generation/_judge); done_reason 'length' fails the attempt OUTPUT_TRUNCATED and raises before any content reaches the driver (tests/unit/server/story_authoring/test_generation.py parametrized failure table). In this run OUTPUT_TRUNCATED occurred once (chapter_plan[1]@r0.0.1#2, FAILED); the next attempt completed.",
   "failure_codes_seen_on_attempts": [
    "OUTPUT_TRUNCATED"
   ]
@@ -155,11 +155,18 @@
     "source/giong-ca-nui.txt",
     0
    ]
+  },
+  "episode_planner_model_run": {
+   "date": "2026-10-22",
+   "setup": "accept-clean project.json default_text_backend set to custom-1/qwen3.5-vimax:9b for this check only, then restored",
+   "result": "EpisodePlanningError after 3/3 attempts: the model's end_anchor quotes were not verbatim (wrapped in quotes, paraphrased or merged sentences)",
+   "reading": "The source was admitted and read; the failure is the V1 planner's verbatim-anchor validation against this 9B local model, independent of the stored file name. V1 episode planning with a local 9B model is not qualified."
   }
  },
  "recorded_deviations": [
-  "The plan names the hand-off file source/<slug>.md. The hand-off uploads giong-ca-nui.md through the existing source upload, which stores sources as .txt (handoff.SOURCE_SUFFIX); the stored bytes equal the export digest.",
-  "Episode-planning acceptance is shown by the planner's read-only intake (source admitted, planning starts at the handed-off file). The planner's model call was not run in this environment."
+  "Hand-off file format (decided 2026-10-22 after review of project decisions and donors): the manuscript export stays Markdown (.md), matching Novel Studio (book.md, text/markdown) and Shenbi (chapter-N.md). The video source stays the normalized UTF-8 .txt that SourceLoader produces for every upload format (upstream #350, 13a3bb6a; ADR 0031 fingerprints the normalized text). The hand-off uploads <slug>.md through that loader, so source/<slug>.txt is the project-wide contract; storing .md would fork it. The criterion 'creates source/<slug>.md' reads as 'creates the normalized source of <slug>.md'.",
+  "Episode-planning acceptance: the planner admits the source and starts at it; its model call with qwen3.5-vimax:9b failed verbatim-anchor validation (see video_handoff.episode_planner_model_run).",
+  "Post-review repair e60d49a9 (commit-abort receipt, hand-off upload claim, grant-before-load, model-time ceiling at >=) changed code after T. Human decision 2026-10-22: keep this run on e40f2c0c and record the deviation instead of rerunning; e60d49a9 is covered by 681 related tests on PostgreSQL and the static gates, not by a live run. The changes do not touch the writing path, prompts or schemas."
  ],
  "prior_attempts_on_earlier_T": [
   {
@@ -179,5 +186,6 @@
   "donor_parity": "R2_STORY_DONOR_PARITY.json unchanged: no prompt or schema text changed since the v3 differential"
  },
  "collector": "~/arcreel-v2-story-accept/collect.py accept-clean (raw output evidence/accept-clean.json)",
- "collected_at": "2026-10-22T01:24:15.889264+00:00"
+ "collected_at": "2026-10-22T01:24:15.889264+00:00",
+ "post_review_code_head": "e60d49a9"
 }
