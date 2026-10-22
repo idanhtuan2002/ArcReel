@@ -37,7 +37,7 @@ from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
 from server.story_authoring.commit import ManuscriptCommitter, load_offered_manifest
 from server.story_authoring.contracts import OLLAMA_CHAT_ENDPOINT, StoryLimits, StoryModelSelection
 from server.story_authoring.driver import CHAPTERS, StoryBrief, run_call_bound, story_bible_input
-from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video
+from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_video, upload_in_flight
 from server.story_authoring.narrative import StoryIdentity
 from server.story_authoring.pipeline import intent_targets, node_kind
 from server.story_authoring.prompts.schemas import StorySeed, StyleBibleOut
@@ -350,8 +350,15 @@ class StoryAuthoringService:
         return await self._terminal(user_id, project_name, run_id, principal, DISCARDABLE_PHASES, RunPhase.DISCARDED)
 
     async def withdraw(self, *, user_id: str, project_name: str, run_id: str, principal: str) -> RunState:
+        """Withdraw a committed run; refused while a hand-off upload is running."""
         return await self._terminal(
-            user_id, project_name, run_id, principal, frozenset({RunPhase.COMMITTED}), RunPhase.WITHDRAWN
+            user_id,
+            project_name,
+            run_id,
+            principal,
+            frozenset({RunPhase.COMMITTED}),
+            RunPhase.WITHDRAWN,
+            unless=lambda state: upload_in_flight(state, now=self._clock()),
         )
 
     async def _terminal(
@@ -362,12 +369,14 @@ class StoryAuthoringService:
         principal: str,
         allowed: frozenset[RunPhase],
         phase: RunPhase,
+        *,
+        unless: Callable[[RunState], bool] = lambda _: False,
     ) -> RunState:
         await self._require_grant(principal, user_id=user_id, project_name=project_name)
         ref, _ = await self.get(user_id=user_id, project_name=project_name, run_id=run_id)
 
         def change(current: RunState) -> tuple[RunState, bool]:
-            if current.phase not in allowed:
+            if current.phase not in allowed or unless(current):
                 return current, False
             return set_phase(current, phase, reason=f"{phase.value.lower()} by {principal}"), True
 
@@ -397,20 +406,22 @@ class StoryAuthoringService:
         run_id: str,
         principal: str,
         command_id: str,
-        project: dict[str, object],
+        load_project: Callable[[], dict[str, object]],
         upload: SourceUpload,
         on_conflict: OnConflict = "fail",
     ) -> HandoffRecord:
+        """Hand the committed manuscript to video; the project is loaded only after the grant and run checks."""
         await self._require_grant(principal, user_id=user_id, project_name=project_name)
         ref = await self._require(user_id, project_name, run_id)
         return await send_to_video(
             store=RunStateStore(self._factory, task_id=ref.task_id),
             blobs=self._blobs(project_name),
-            project=project,
+            project=load_project(),
             source_dir=self._project_dir_for(project_name) / "source",
             command_id=command_id,
             upload=upload,
             on_conflict=on_conflict,
+            clock=self._clock,
         )
 
     # --- helpers -----------------------------------------------------------------------------------

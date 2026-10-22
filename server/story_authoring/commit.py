@@ -432,11 +432,16 @@ class ManuscriptCommitter:
         )
 
     async def _complete(self, step: str) -> RunState:
+        """Record the receipt of a step that reached its owner; an abort that landed meanwhile keeps its phase."""
+
         def change(state: RunState) -> tuple[RunState, None]:
-            if state.phase not in EXECUTING_PHASES or state.commit is None:
+            if state.commit is None or state.phase not in (*EXECUTING_PHASES, RunPhase.ABORTED_PARTIAL):
                 return state, None
             progress = state.commit.model_copy(update={"completed_steps": (*state.commit.completed_steps, step)})
-            return set_phase(state, RunPhase.PARTIALLY_COMMITTED).model_copy(update={"commit": progress}), None
+            state = state.model_copy(update={"commit": progress})
+            if state.phase is RunPhase.ABORTED_PARTIAL:
+                return state, None
+            return set_phase(state, RunPhase.PARTIALLY_COMMITTED), None
 
         state, _ = await self._store.apply(change)
         return state

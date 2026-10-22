@@ -8,13 +8,19 @@ The hand-off is recorded ``PENDING`` with its file name before the upload and ``
 with the same command id returns the recorded result; a resumed ``PENDING`` hand-off whose file already holds
 exactly the exported text is completed without a second upload, so a crash between the upload and the record
 never writes a second source.
+
+Before uploading, a request claims the pending hand-off in the run state. While another request holds a claim
+younger than ``UPLOAD_CLAIM_TTL`` the call is refused ``IN_PROGRESS`` and withdrawal is refused, so one hand-off
+writes at most one source. A failed upload releases its claim; a claim left by a killed process expires.
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
+import uuid
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal
@@ -30,6 +36,7 @@ type SourceUpload = Callable[[str, str, OnConflict], Awaitable[dict[str, object]
 
 SLUG_MAX = 80
 SOURCE_SUFFIX = ".txt"
+UPLOAD_CLAIM_TTL = timedelta(seconds=120)
 
 
 class HandoffRefusal(StrEnum):
@@ -39,6 +46,7 @@ class HandoffRefusal(StrEnum):
     CJK_IN_EXPORT = "CJK_IN_EXPORT"
     NOT_A_NOVEL_PROJECT = "NOT_A_NOVEL_PROJECT"
     UPLOAD_FAILED = "UPLOAD_FAILED"
+    IN_PROGRESS = "IN_PROGRESS"
 
 
 class HandoffRefused(Exception):
@@ -78,6 +86,7 @@ async def send_to_video(
     command_id: str,
     upload: SourceUpload,
     on_conflict: OnConflict = "fail",
+    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> HandoffRecord:
     state = await store.load()
     if state.handoff is not None and state.handoff.done:
@@ -106,17 +115,79 @@ async def send_to_video(
         pending = await _record_pending(store, pending)
 
     target = source_dir / (Path(pending.filename).stem + SOURCE_SUFFIX)
+    claim: str | None = None
     if _source_text(target) == text:
         result_path = f"source/{target.name}"
     else:
+        claim = await _claim_upload(store, command_id, now=clock())
         try:
             result = await upload(pending.filename, text, on_conflict)
         except Exception as error:
+            await _release_upload(store, claim)
             raise HandoffRefused(HandoffRefusal.UPLOAD_FAILED, str(error)) from error
         result_path = str(result["path"])
-    done = pending.model_copy(update={"done": True, "path": result_path})
-    await store.apply(lambda s: (s.model_copy(update={"handoff": done}), None))
-    return done
+    return await _record_done(store, command_id, claim, result_path)
+
+
+def upload_in_flight(state: RunState, *, now: datetime) -> bool:
+    """Whether a request holds a live claim to upload this run's pending hand-off."""
+    record = state.handoff
+    return (
+        record is not None
+        and not record.done
+        and record.upload_claim is not None
+        and record.upload_claimed_at is not None
+        and now - record.upload_claimed_at < UPLOAD_CLAIM_TTL
+    )
+
+
+async def _claim_upload(store: RunStateStore, command_id: str, *, now: datetime) -> str:
+    token = uuid.uuid4().hex
+
+    def change(state: RunState) -> tuple[RunState, HandoffRefused | None]:
+        record = state.handoff
+        if state.phase is not RunPhase.COMMITTED:
+            return state, HandoffRefused(HandoffRefusal.NOT_COMMITTED, f"run is {state.phase.value}")
+        if record is None or record.command_id != command_id or record.done:
+            return state, HandoffRefused(HandoffRefusal.ALREADY_HANDED_OFF, "the hand-off changed")
+        if upload_in_flight(state, now=now):
+            return state, HandoffRefused(HandoffRefusal.IN_PROGRESS, f"the upload of {record.filename} is running")
+        claimed = record.model_copy(update={"upload_claim": token, "upload_claimed_at": now})
+        return state.model_copy(update={"handoff": claimed}), None
+
+    _, refused = await store.apply(change)
+    if refused is not None:
+        raise refused
+    return token
+
+
+async def _release_upload(store: RunStateStore, claim: str) -> None:
+    def change(state: RunState) -> tuple[RunState, None]:
+        record = state.handoff
+        if record is None or record.upload_claim != claim:
+            return state, None
+        released = record.model_copy(update={"upload_claim": None, "upload_claimed_at": None})
+        return state.model_copy(update={"handoff": released}), None
+
+    await store.apply(change)
+
+
+async def _record_done(store: RunStateStore, command_id: str, claim: str | None, path: str) -> HandoffRecord:
+    def change(state: RunState) -> tuple[RunState, HandoffRecord | HandoffRefused]:
+        record = state.handoff
+        if record is None or record.command_id != command_id:
+            return state, HandoffRefused(HandoffRefusal.ALREADY_HANDED_OFF, "the hand-off changed")
+        if record.done:
+            return state, record
+        if claim is not None and record.upload_claim != claim:
+            return state, HandoffRefused(HandoffRefusal.IN_PROGRESS, "another request took over the upload")
+        done = record.model_copy(update={"done": True, "path": path, "upload_claim": None, "upload_claimed_at": None})
+        return state.model_copy(update={"handoff": done}), done
+
+    _, outcome = await store.apply(change)
+    if isinstance(outcome, HandoffRefused):
+        raise outcome
+    return outcome
 
 
 async def _record_pending(store: RunStateStore, pending: HandoffRecord) -> HandoffRecord:

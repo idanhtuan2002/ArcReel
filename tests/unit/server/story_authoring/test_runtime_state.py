@@ -92,6 +92,14 @@ def test_the_wall_clock_ceiling_is_model_time():
         _reserve(state, "a2")
 
 
+def test_model_time_that_reached_the_ceiling_refuses_the_next_call():
+    state = _reserve(_state(wall_clock_max_seconds=1), "a1")
+    state = mark_dispatched(state, attempt_id="a1", ledger_call_id=None)
+    state = complete(state, attempt_id="a1", input_tokens=1, output_tokens=1, done_reason="stop", duration_ms=1000)
+    with pytest.raises(BudgetExhausted, match="wall_clock"):
+        _reserve(state, "a2")
+
+
 def test_a_never_dispatched_failure_releases_everything():
     state = fail(_reserve(_state(), "a1"), attempt_id="a1", code=StoryFailureCode.NOT_DISPATCHED)
     assert state.usage.model_dump() == {

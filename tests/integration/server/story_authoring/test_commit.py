@@ -395,6 +395,38 @@ async def test_a_successor_that_changes_a_committed_scene_is_refused_and_the_run
     assert again.value.code is CommitRefusal.NOT_ABORTABLE
 
 
+class _AbortDuring(ManuscriptCommitter):
+    """The Human aborts while a step is reaching its owner."""
+
+    def __init__(self, *args, abort_during: str, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._abort_during = abort_during
+
+    async def _run_step(self, step, manifest, approval, digest) -> None:
+        await super()._run_step(step, manifest, approval, digest)
+        if step == self._abort_during:
+            await self.abort(principal=SPONSOR)
+
+
+async def test_a_step_that_reached_its_owner_while_the_run_was_aborted_keeps_its_receipt(
+    concurrent_session_factory: Factory, tmp_path: Path, grants: CurrentShowrunnerGrantReader
+):
+    factory = concurrent_session_factory
+    store = await _store(factory)
+    committer = _committer(factory, store, tmp_path, grants, cls=_AbortDuring, abort_during=STEP_PLAN)
+    manifest = await _manifest()
+
+    state = await committer.approve(
+        principal=SPONSOR, manifest_digest_seen=await committer.offer(manifest), accepted_exceptions=()
+    )
+
+    assert state.phase is RunPhase.ABORTED_PARTIAL
+    assert state.commit is not None
+    assert state.commit.completed_steps == (STEP_CANON, STEP_PLAN)
+    assert await _count(factory, NarrativePlanVersionModel) == 1
+    assert await _count(factory, RevisionAcceptanceDecisionModel) == 0
+
+
 def test_the_manifest_digest_covers_its_payload_only():
     manifest = asyncio.run(_manifest())
     assert manifest.digest() == manifest.model_copy().digest()

@@ -234,7 +234,7 @@ async def send_run_to_video(
             run_id=run_id,
             principal=user.sub,
             command_id=req.command_id,
-            project=projects.load_project(project_name),
+            load_project=lambda: projects.load_project(project_name),
             upload=upload,
             on_conflict=req.on_conflict,
         )

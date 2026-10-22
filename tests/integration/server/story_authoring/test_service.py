@@ -4,6 +4,7 @@ touchpoint 2, commit, export, hand-off to a real project source, and the lifecyc
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 
@@ -159,16 +160,16 @@ async def test_a_greenlit_brief_runs_to_an_approved_manuscript_handed_to_video(
 
     upload, calls = _upload(projects)
     send = {"user_id": USER, "project_name": PROJECT, "run_id": ref.run_id, "principal": SPONSOR, "upload": upload}
-    project = projects.load_project(PROJECT)
-    record = await service.send_to_video(command_id="cmd-00000001", project=project, **send)
-    again = await service.send_to_video(command_id="cmd-00000001", project=project, **send)
+    project = lambda: projects.load_project(PROJECT)  # noqa: E731
+    record = await service.send_to_video(command_id="cmd-00000001", load_project=project, **send)
+    again = await service.send_to_video(command_id="cmd-00000001", load_project=project, **send)
 
     assert record == again
     assert (record.done, record.path, calls) == (True, "source/can-nha-cu.txt", ["can-nha-cu.md"])
     source = projects.get_project_path(PROJECT) / "source" / "can-nha-cu.txt"
     assert source.read_text(encoding="utf-8") == export.decode("utf-8")
     with pytest.raises(HandoffRefused) as other:
-        await service.send_to_video(command_id="cmd-00000002", project=project, **send)
+        await service.send_to_video(command_id="cmd-00000002", load_project=project, **send)
     assert other.value.code is HandoffRefusal.ALREADY_HANDED_OFF
 
     withdrawn = await service.withdraw(user_id=USER, project_name=PROJECT, run_id=ref.run_id, principal=SPONSOR)
@@ -207,15 +208,96 @@ async def test_a_pending_hand_off_whose_source_was_written_completes_without_a_s
         "principal": SPONSOR,
         "command_id": "cmd-00000001",
     }
-    project = projects.load_project(PROJECT)
+    project = lambda: projects.load_project(PROJECT)  # noqa: E731
     with pytest.raises(HandoffRefused):
-        await service.send_to_video(project=project, upload=crash_after_writing, **send)
+        await service.send_to_video(load_project=project, upload=crash_after_writing, **send)
 
     retry_upload, calls = _upload(projects)
-    record = await service.send_to_video(project=project, upload=retry_upload, **send)
+    record = await service.send_to_video(load_project=project, upload=retry_upload, **send)
 
     assert (record.done, record.path, calls) == (True, "source/can-nha-cu.txt", [])
     assert sorted(p.name for p in (projects.get_project_path(PROJECT) / "source").iterdir()) == ["can-nha-cu.txt"]
+
+
+async def _committed(service: StoryAuthoringService, factory: Factory, projects: ProjectManager) -> StoryRunRef:
+    ref = await _started(service, factory)
+    await _execute(factory, ref, projects, ScriptedModel())
+    _, state = await service.get(user_id=USER, project_name=PROJECT, run_id=ref.run_id)
+    offered = service.offered(PROJECT, state)
+    assert offered is not None
+    await service.approve(
+        user_id=USER,
+        project_name=PROJECT,
+        run_id=ref.run_id,
+        principal=SPONSOR,
+        manifest_digest_seen=offered["manifest_digest"],
+        accepted_exceptions=offered["exceptions_offered"],
+    )
+    return ref
+
+
+async def test_a_hand_off_in_flight_is_the_only_upload_and_holds_off_withdrawal(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    service = _service(concurrent_session_factory, grants, projects)
+    ref = await _committed(service, concurrent_session_factory, projects)
+    real_upload, calls = _upload(projects)
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def slow_upload(filename: str, content: str, on_conflict: OnConflict) -> dict[str, object]:
+        entered.set()
+        await release.wait()
+        return await real_upload(filename, content, on_conflict)
+
+    send = {
+        "user_id": USER,
+        "project_name": PROJECT,
+        "run_id": ref.run_id,
+        "principal": SPONSOR,
+        "command_id": "cmd-00000001",
+        "load_project": lambda: projects.load_project(PROJECT),
+        "on_conflict": "rename",
+    }
+    first = asyncio.create_task(service.send_to_video(upload=slow_upload, **send))
+    await entered.wait()
+
+    with pytest.raises(HandoffRefused) as concurrent:
+        await service.send_to_video(upload=real_upload, **send)
+    with pytest.raises(StoryActionRefused, match="ACTION_NOT_ALLOWED"):
+        await service.withdraw(user_id=USER, project_name=PROJECT, run_id=ref.run_id, principal=SPONSOR)
+    release.set()
+    record = await first
+
+    assert concurrent.value.code is HandoffRefusal.IN_PROGRESS
+    assert (record.done, record.path, calls) == (True, "source/can-nha-cu.txt", ["can-nha-cu.md"])
+    assert sorted(p.name for p in (projects.get_project_path(PROJECT) / "source").iterdir()) == ["can-nha-cu.txt"]
+    assert await service.send_to_video(upload=real_upload, **send) == record
+
+
+async def test_a_principal_without_a_grant_is_refused_before_the_project_is_loaded(
+    concurrent_session_factory: Factory, grants, projects: ProjectManager
+):
+    service = _service(concurrent_session_factory, grants, projects)
+    ref = await _committed(service, concurrent_session_factory, projects)
+    loaded: list[str] = []
+    upload, calls = _upload(projects)
+
+    def load_project() -> dict[str, object]:
+        loaded.append(PROJECT)
+        return projects.load_project(PROJECT)
+
+    with pytest.raises(StoryActionRefused, match="NOT_AUTHORIZED"):
+        await service.send_to_video(
+            user_id=USER,
+            project_name=PROJECT,
+            run_id=ref.run_id,
+            principal="intruder",
+            command_id="cmd-00000001",
+            load_project=load_project,
+            upload=upload,
+        )
+
+    assert (loaded, calls) == ([], [])
 
 
 async def test_start_requires_a_current_greenlight_of_this_exact_brief(

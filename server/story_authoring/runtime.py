@@ -151,13 +151,18 @@ class CommitProgress(_Frozen):
 
 
 class HandoffRecord(_Frozen):
-    """The run's one hand-off to video: written ``PENDING`` before the source upload, ``DONE`` after it."""
+    """The run's one hand-off to video: written ``PENDING`` before the source upload, ``DONE`` after it.
+
+    ``upload_claim`` names the one request allowed to upload while the hand-off is pending.
+    """
 
     command_id: str
     filename: str
     export_digest: str
     done: bool = False
     path: str | None = None
+    upload_claim: str | None = None
+    upload_claimed_at: datetime | None = None
 
 
 class RunState(_Frozen):
@@ -243,7 +248,7 @@ def reserve(
             f"output_tokens {limits.output_tokens_max}",
         ),
         (
-            usage.model_milliseconds > limits.wall_clock_max_seconds * 1000,
+            usage.model_milliseconds >= limits.wall_clock_max_seconds * 1000,
             f"wall_clock {limits.wall_clock_max_seconds}s",
         ),
     )
