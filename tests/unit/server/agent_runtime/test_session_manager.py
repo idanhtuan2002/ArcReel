@@ -340,6 +340,14 @@ class TestSessionManager:
         raw = SimpleNamespace(session_id="sdk-1")
         assert session_manager._extract_sdk_session_id(raw, msg) == "sdk-1"
         assert session_manager._extract_sdk_session_id(raw, {"sessionId": "sdk-2"}) == "sdk-2"
+        init = SimpleNamespace(subtype="init", data={"session_id": "sdk-3"})
+        assert (
+            session_manager._extract_sdk_session_id(
+                init, {"type": "system", "subtype": "init", "data": {"session_id": "sdk-3"}}
+            )
+            == "sdk-3"
+        )
+        assert session_manager._extract_sdk_session_id(SimpleNamespace(), {"type": "system", "data": {}}) is None
 
         assert session_manager._resolve_result_status({"subtype": "error_timeout"}) == "error"
         assert (

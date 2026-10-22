@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 #: sweep's cutoff never includes a hold of any session manager in this process.
 HOST_PROCESS_STARTED_AT = datetime.now(UTC)
 
-from claude_agent_sdk import ClaudeSDKClient, tag_session
+from claude_agent_sdk import ClaudeSDKClient
 from claude_agent_sdk.types import (
     PermissionResultAllow,
     PermissionResultDeny,
@@ -1739,21 +1739,8 @@ class SessionManager:
 
         # Only create DB record for new sessions (no existing meta)
         if not managed.sdk_id_event.is_set():
-            # Run DB create and SDK tag in parallel (tag is independent file I/O)
-            tag_coro = None
-            if tag_session is not None:
-
-                async def _tag() -> None:
-                    try:
-                        await asyncio.to_thread(tag_session, sdk_id, f"project:{managed.project_name}")
-                    except Exception:
-                        logger.warning("tag_session failed for %s", sdk_id, exc_info=True)
-
-                tag_coro = _tag()
-            await asyncio.gather(
-                self.meta_store.create(managed.project_name, sdk_id),
-                *([] if tag_coro is None else [tag_coro]),
-            )
+            # 会话归属只记在 meta_store；id 在 init 时刻即解析，此时 CLI 尚未落盘 transcript
+            await self.meta_store.create(managed.project_name, sdk_id)
             await self.meta_store.update_status(sdk_id, "running")
             # 新会话首条用户消息先写日志分配身份（seq 0）：本方法在 inbox 任务
             # 内串行执行于任何 assistant 条目定型之前，保证时间线顺序；写入
@@ -1787,10 +1774,19 @@ class SessionManager:
 
     @staticmethod
     def _extract_sdk_session_id(message: Any, msg_dict: dict[str, Any]) -> str | None:
-        """Extract SDK session id from either serialized payload or raw object."""
+        """Extract SDK session id from either serialized payload or raw object.
+
+        CLI 的 system 消息（init 等）把 ``session_id`` 放在 ``data`` 里而非顶层；init 在首个模型
+        请求之前到达，从它解析出 id 才不必等模型开始输出（本地模型首轮预填充可长达数分钟）。
+        """
         sdk_id = msg_dict.get("session_id") or msg_dict.get("sessionId")
         if sdk_id:
             return str(sdk_id)
+        data = msg_dict.get("data")
+        if isinstance(data, dict):
+            nested = data.get("session_id") or data.get("sessionId")
+            if nested:
+                return str(nested)
         raw_sdk_id = getattr(message, "session_id", None) or getattr(message, "sessionId", None)
         if raw_sdk_id:
             return str(raw_sdk_id)
