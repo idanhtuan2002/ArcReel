@@ -1,0 +1,36 @@
+{
+  "evidence": "End-to-end trial on the V2 production environment (r2-v2.0.1): story -> video source -> episodes",
+  "date": "2026-10-22/23",
+  "environment": "~/arcreel-v2-staging, 127.0.0.1:1251, release r2-v2.0.1 (0782bfa9), project du-an-01-649c62c1",
+  "approval_disclosure": "Human instructed the agent to perform every step including approvals ('ban khong can dung lai hay bam nut duyet luon'). Gate A greenlight d5da80e6-96e8-4d30-aaca-2a7b3d9f782a and the story approval were performed by the agent through the API with the admin session; the records show 'admin' but no Human read the brief or the manuscript before approval.",
+  "story_run": {
+    "run_id": "story-4deffd4b0bd4c61599322c61",
+    "brief_digest": "sha256:f19ef07d230f507692d2308893207321a2c52a3f1b82bb4a064bbf55dff35847",
+    "models": "writer qwen3.5-vimax:9b, review gemma3:12b (custom-1, ollama-chat)",
+    "running": "18:12 -> 23:19 (local time 2026-10-22), 133 generate calls, about 306 min of model time",
+    "manuscript": "Đò Cuối Sông: 3 chapters, 11 scenes, about 7,630 syllables, 0 CJK, 0 Cyrillic",
+    "findings": "77 (61 stylistic, 16 narrative-critical offered for decision)",
+    "approval": "manifest sha256:7bc46b1e8d10ecd4e15ea7d258daf17595536aba1fa115f8861517de753aadc6, all 16 exceptions accepted by the agent; phase COMMITTED",
+    "accepted_exceptions_summary": "son dead vs alive contradiction, withheld secret revealed early, chapter 2 ending rushed, chapter 3 missing the planned mooring, blurb claim not in the story"
+  },
+  "handoff": "send-to-video created source/do-cuoi-song.txt, byte-identical to the export (sha256:f947c2d7...)",
+  "project_settings": "episode_target_duration 120 s; text backends custom-1/qwen3.5-vimax:9b",
+  "overview": "First run produced a Chinese synopsis because source_language was unset and the overview prompt defaults to 中文; it set source_language vi; a second run produced a Vietnamese synopsis.",
+  "episode_planning": {
+    "route": "The planner is reachable only through the embedded agent, which had no credential. Planning was run through the server's remote MCP tool plan_episodes with a temporary API key (created, used, deleted).",
+    "result": "8 MCP batches, about 40 min: 18 contiguous episodes covering 0..34,365 (whole source), every episode ends at a sentence end",
+    "quality": "episode length 51 to 3,495 syllables despite the 120 s target (the 9B model repeated punctuation-only anchors such as '* * *' and './', so batches kept short prefixes, and once cut a 15,469-char episode on a verbatim, unique sentence); titles with CJK: episode 9 has 《》, episode 18 is fully Chinese"
+  },
+  "embedded_agent": {
+    "config": "Agent credential 'Ollama local (qwen3.5-vimax:9b)', preset __custom__, base_url http://localhost:11434, active; cloud presets can be added and activated later without code changes",
+    "defect_found": "New agent sessions always failed with 'SDK 会话创建超时': the CLI init message carries session_id inside data, so the id was only found on the first stream event; a local model needs minutes before its first token. Fixed in 6931430d (same root cause as upstream #2371, written here because cherry-picking upstream code was refused by the permission classifier).",
+    "verification_on_accept_env": "~/arcreel-v2-story-accept restarted on 6931430d with the same Ollama agent credential: session created in 1.5 s (was 60 s timeout), the agent called ArcReel MCP tools (list_projects, get_project_content, read_project_file, list_source_files) and completed in about 2 min, but qwen3.5-vimax:9b never called plan_episodes and answered in Chinese. Driving the agent needs a stronger model.",
+    "agent_tests": "tests/unit/server/agent_runtime + tests/integration/server/agent_runtime: 1,170 passed"
+  },
+  "open_items": [
+    "Deploy 6931430d (r2-v2.0.2) to production.",
+    "Set source_language at hand-off so the overview is not written in Chinese.",
+    "Planner guards: reject punctuation-only anchors, cap an episode at a multiple of the target volume, and reject CJK in titles for Vietnamese sources.",
+    "Human should read the approved story (16 accepted narrative-critical items)."
+  ]
+}
