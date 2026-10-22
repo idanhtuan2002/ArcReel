@@ -34,6 +34,17 @@ try:
                     raise AssertionError('spent cleanup opened content')
         import os
         sys.addaudithook(audit)
+    if body.get('deny_spend_content_read'):
+        import os,hashlib
+        header_suffix='.'+hashlib.sha256(b'header').hexdigest()+'.json'
+        def audit_spend(event,args):
+            if event=='open':
+                path,mode,flags=args
+                if isinstance(path,str) and not flags & (os.O_WRONLY|os.O_RDWR):
+                    name=os.path.basename(path)
+                    if name=='original.json' or name.startswith('material-') or (name.startswith('seal-') and not name.endswith(header_suffix)) or (name.startswith('.rollback.') and name.endswith('.tmp')):
+                        raise AssertionError('private spend opened content or material seal')
+        sys.addaudithook(audit_spend)
     if body['operation']=='public':
         result={'public_key':issuer.public_key.hex()}
     elif body['operation']=='claim':
@@ -45,6 +56,12 @@ try:
                 __import__('os')._exit(73)
         issuer=FixtureManualUploadCustodian(Path(sys.argv[1]),publication_root=Path(body['publication_root']),boundary=boundary)
         result={'publication':asyncio.run(issuer.admit(AdmissionRequest.model_validate(body['request']))).model_dump(mode='json')}
+    elif body['operation']=='close':
+        def boundary(name):
+            if body.get('crash_at')==name:
+                __import__('os')._exit(73)
+        issuer=FixtureManualUploadCustodian(Path(sys.argv[1]),boundary=boundary)
+        result={'receipt':issuer.close_original(AdmissionRequest.model_validate(body['request']),claim_ref=body['claim_ref'],closure_id=body['closure_id']).model_dump(mode='json')}
     else:
         issuer.mark_spent(AdmissionRequest.model_validate(body['request']),claim_ref=body['claim_ref'])
         result={'spent':True}
@@ -348,3 +365,393 @@ async def test_mutated_index_cannot_become_original_authority_for_new_command(tm
     code, result = await issuer_process(root, "claim", request=replay)
     assert code == 2
     assert result == {"error": "M9_RAW_DIGEST_MISMATCH"}
+
+
+async def private_spend_subject(tmp_path: Path, *, expired=False):
+    from importlib import import_module
+
+    from tests.integration.server.services.test_m9_manual_publication import prepare_publication
+
+    assert hasattr(import_module(ISSUER).FixtureManualUploadCustodian, "close_original"), (
+        "T7 private spending receipt missing"
+    )
+    root, request, instance = await prepare_publication(tmp_path)
+    if expired:
+        now = datetime.now(UTC)
+        for clock in request["original_clocks"]:
+            clock.update(
+                captured_at=now.isoformat(),
+                refresh_due_at=(now + timedelta(seconds=6)).isoformat(),
+                retention_due_at=(now + timedelta(seconds=6)).isoformat(),
+            )
+        (root / "authority.json").write_text(
+            json.dumps({"request": request, "declared_origin": "synthetic-fixture", "uploader_id": "fixture-human"})
+        )
+    code, result = await issuer_process(root, "admit", request=request, publication_root=str(instance.root))
+    assert code == 0, result
+    if expired:
+        deadline = datetime.fromisoformat(request["original_clocks"][0]["retention_due_at"])
+        await asyncio.sleep(max(0, (deadline - datetime.now(UTC)).total_seconds()) + 0.01)
+    return root, request, result["publication"], instance
+
+
+@pytest.mark.parametrize("expired", [False, True])
+async def test_private_spend_receipt_is_original_metadata_only_and_replays_across_processes(tmp_path: Path, expired):
+    from importlib import import_module
+
+    from r2.advanced_creative.digests import canonical_json_bytes
+    from r2.opportunity.manual_admission import AdmissionRequest
+
+    root, request, publication, instance = await private_spend_subject(tmp_path, expired=expired)
+    code, first = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=publication["claim_ref"],
+        closure_id="fixture-logical-closure",
+        deny_spend_content_read=True,
+    )
+    assert code == 0, first
+    verify = import_module("server.services.m9_manual_publication").verify_custodian_spent
+    receipt = verify(
+        canonical_json_bytes(first["receipt"]),
+        public_key=instance.verifier.public_key,
+        expected_request=AdmissionRequest.model_validate(request),
+        closure_id="fixture-logical-closure",
+    )
+    assert receipt.metadata.root_request == AdmissionRequest.model_validate(request)
+    assert receipt.metadata.claim_ref == publication["claim_ref"]
+    assert receipt.metadata.deleted_at >= receipt.metadata.spent_at
+    assert len(receipt.metadata.publications) == 1
+    original = receipt.metadata.publications[0]
+    assert original.state == "ORIGINAL_HEADER"
+    assert original.header.metadata.publication_key == request["publication_key"]
+    assert "material_digest" not in receipt.model_dump_json()
+    assert "Entirely synthetic fixture text." not in receipt.model_dump_json()
+    assert not (root / "original.json").exists()
+    assert not list(root.glob("material-*.json"))
+    assert not list(root.glob("seal-*.json"))
+    assert await instance.lookup_receipt(request["publication_key"]) == original.header
+    code, replay = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=publication["claim_ref"],
+        closure_id="fixture-logical-closure",
+        deny_spend_content_read=True,
+    )
+    assert code == 0
+    assert replay["receipt"] == first["receipt"]
+    assert replay["pid"] != first["pid"]
+    code, refused = await issuer_process(root, "admit", request=request, publication_root=str(instance.root))
+    assert code == 2
+    assert refused == {"error": "M9_EVIDENCE_RETENTION_EXPIRED"}
+
+
+@pytest.mark.parametrize("fault", ["closure", "signature", "key", "noncanonical", "duplicate"])
+async def test_store_owner_cannot_forge_private_spending_receipt(tmp_path: Path, fault):
+    from importlib import import_module
+
+    from r2.advanced_creative.digests import canonical_json_bytes
+    from r2.opportunity.errors import OpportunityError
+    from r2.opportunity.manual_admission import AdmissionRequest
+
+    root, request, publication, instance = await private_spend_subject(tmp_path)
+    code, result = await issuer_process(
+        root, "close", request=request, claim_ref=publication["claim_ref"], closure_id="fixture-logical-closure"
+    )
+    assert code == 0
+    body = result["receipt"]
+    key = instance.verifier.public_key
+    if fault == "closure":
+        body["metadata"]["closure_id"] = "different-closure"
+        metadata = import_module("r2.opportunity.acquisition_v2").CustodianSpendMetadata.model_validate(
+            body["metadata"]
+        )
+        body["metadata_digest"] = import_module("r2.opportunity.acquisition_v2").custodian_spend_metadata_digest(
+            metadata
+        )
+    elif fault == "signature":
+        body["signature"] = "A" * 86
+    elif fault == "key":
+        key = b"0" * 32
+    raw = canonical_json_bytes(body)
+    if fault == "noncanonical":
+        raw = json.dumps(body, indent=2).encode()
+    elif fault == "duplicate":
+        raw = raw[:-1] + b',"signature":' + json.dumps(body["signature"]).encode() + b"}"
+    verify = import_module("server.services.m9_manual_publication").verify_custodian_spent
+    with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH"):
+        verify(
+            raw,
+            public_key=key,
+            expected_request=AdmissionRequest.model_validate(request),
+            closure_id="fixture-logical-closure",
+        )
+
+
+@pytest.mark.parametrize("fault", ["header", "upload", "unissued"])
+async def test_invalid_private_closure_inventory_refuses_before_original_erasure(tmp_path: Path, fault):
+    from r2.advanced_creative.digests import canonical_json_bytes
+    from r2.opportunity.manual_admission import PublicationReceiptMetadata, publication_metadata_digest
+
+    root, request, publication, _ = await private_spend_subject(tmp_path)
+    code, crashed = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=publication["claim_ref"],
+        closure_id="fixture-logical-closure",
+        crash_at="custodian-spend-plan-durable",
+    )
+    assert code == 73
+    assert crashed["crashed"]
+    paths = list(root.glob("closure-*.json"))
+    assert len(paths) == 1
+    body = json.loads(paths[0].read_bytes())
+    if fault == "header":
+        header = body["publications"][0]["header"]
+        header["metadata"]["objects"][0]["payload_ref"] = "m9-manual-payload:" + "f" * 32
+        header["metadata_digest"] = publication_metadata_digest(
+            PublicationReceiptMetadata.model_validate(header["metadata"])
+        )
+    elif fault == "upload":
+        body["publications"][0]["request"]["opaque_upload_id"] = "different-original-upload"
+    else:
+        body["publications"][0].update(state="NEVER_ISSUED", header=None)
+    paths[0].write_bytes(canonical_json_bytes(body))
+    code, refused = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=publication["claim_ref"],
+        closure_id="fixture-logical-closure",
+        deny_spend_content_read=True,
+    )
+    assert code == 2
+    assert refused == {"error": "M9_RAW_DIGEST_MISMATCH"}
+    assert (root / "original.json").exists()
+    assert list(root.glob("material-*.json"))
+    indexes = list(root.glob("upload-*.json"))
+    assert len(indexes) == 1
+    assert json.loads(indexes[0].read_bytes())["phase"] == "ACTIVE"
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    [
+        "custodian-spend-plan-durable",
+        "custodian-spent-fence-durable",
+        "custodian-original-unlinked",
+        "custodian-comparison-unlinked",
+        "custodian-header-unlinked",
+        "custodian-material-seal-unlinked",
+        "custodian-spend-receipt-durable",
+    ],
+)
+async def test_private_spending_restart_keeps_original_inventory_and_stable_tombstone(tmp_path: Path, boundary):
+    from importlib import import_module
+
+    from r2.advanced_creative.digests import canonical_json_bytes
+    from r2.opportunity.manual_admission import AdmissionRequest
+
+    root, request, publication, instance = await private_spend_subject(tmp_path)
+    header = await instance.lookup_receipt(request["publication_key"])
+    code, crashed = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=publication["claim_ref"],
+        closure_id="fixture-logical-closure",
+        crash_at=boundary,
+        deny_spend_content_read=True,
+    )
+    assert code == 73
+    assert crashed["crashed"]
+    code, recovered = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=publication["claim_ref"],
+        closure_id="fixture-logical-closure",
+        deny_spend_content_read=True,
+    )
+    assert code == 0, recovered
+    assert recovered["pid"] != crashed["pid"]
+    receipt = import_module("server.services.m9_manual_publication").verify_custodian_spent(
+        canonical_json_bytes(recovered["receipt"]),
+        public_key=instance.verifier.public_key,
+        expected_request=AdmissionRequest.model_validate(request),
+        closure_id="fixture-logical-closure",
+    )
+    assert receipt.metadata.publications[0].header == header
+    assert not (root / "original.json").exists()
+    assert not list(root.glob("material-*.json"))
+    assert not list(root.glob("seal-*.json"))
+    code, replay = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=publication["claim_ref"],
+        closure_id="fixture-logical-closure",
+        deny_spend_content_read=True,
+    )
+    assert code == 0
+    assert replay["receipt"] == recovered["receipt"]
+    if boundary == "custodian-spend-receipt-durable":
+        paths = list(root.glob("closure-*.json"))
+        assert len(paths) == 1
+        assert json.loads(paths[0].read_bytes())["receipt"] == recovered["receipt"]
+
+
+@pytest.mark.parametrize("new_command", [False, True])
+async def test_combined_original_ledger_loss_never_reissues_under_another_command(tmp_path: Path, new_command):
+    root, request = await setup_custodian(tmp_path)
+    code, original = await issuer_process(root, "claim", request=request)
+    assert code == 0
+    assert original["claim_ref"].startswith("m9-upload-claim:")
+    for path in (*root.glob("upload-*.json"), *root.glob("material-*.json")):
+        path.unlink()
+    retry = json.loads(json.dumps(request))
+    if new_command:
+        retry["context"]["command_id"] = "019a0000-0000-7000-8000-000000000099"
+        retry["attempt_id"] = retry["context"]["command_id"]
+        retry["publication_key"] = "other-original-publication"
+    code, result = await issuer_process(root, "claim", request=retry)
+    assert code == 2
+    assert result["error"] in ("M9_RAW_DIGEST_MISMATCH", "M9_COMMAND_REPLAY_CONFLICT")
+    assert not list(root.glob("upload-*.json"))
+    assert not list(root.glob("material-*.json"))
+
+
+@pytest.mark.parametrize("retain_custody", [False, True])
+async def test_total_original_ledger_loss_never_becomes_a_fresh_upload(tmp_path: Path, retain_custody):
+    root, request = await setup_custodian(tmp_path)
+    assert (await issuer_process(root, "claim", request=request))[0] == 0
+    for pattern in ("upload-*.json", "material-*.json", "command-*.json", "seal-*.json", "closure-*.json"):
+        for path in root.glob(pattern):
+            path.unlink()
+    if not retain_custody:
+        (root / "custody.json").unlink(missing_ok=True)
+    retry = json.loads(json.dumps(request))
+    retry["context"]["command_id"] = "019a0000-0000-7000-8000-000000000098"
+    retry["attempt_id"] = retry["context"]["command_id"]
+    retry["publication_key"] = "other-original-after-loss"
+    code, result = await issuer_process(root, "claim", request=retry)
+    assert code == 2
+    assert result["error"] in ("M9_RAW_DIGEST_MISMATCH", "M9_COMMAND_REPLAY_CONFLICT")
+    assert not list(root.glob("upload-*.json"))
+
+
+async def test_never_claimed_original_can_be_spent_without_content_or_a_fabricated_claim(tmp_path: Path):
+    from importlib import import_module
+
+    from r2.advanced_creative.digests import canonical_json_bytes
+    from r2.opportunity.manual_admission import AdmissionRequest
+    from tests.integration.server.services.test_m9_manual_publication import prepare_publication
+
+    root, request, instance = await prepare_publication(tmp_path)
+    assert not list(root.glob("upload-*.json"))
+    assert await instance.lookup_receipt(request["publication_key"]) is None
+    code, result = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=None,
+        closure_id="unpublished-logical-closure",
+        deny_spend_content_read=True,
+    )
+    assert code == 0, result
+    receipt = import_module("server.services.m9_manual_publication").verify_custodian_spent(
+        canonical_json_bytes(result["receipt"]),
+        public_key=instance.verifier.public_key,
+        expected_request=AdmissionRequest.model_validate(request),
+        closure_id="unpublished-logical-closure",
+    )
+    assert receipt.metadata.claim_ref is None
+    assert receipt.metadata.inventory_complete
+    assert receipt.metadata.publications[0].state == "NEVER_ISSUED"
+    assert receipt.metadata.publications[0].header is None
+    assert not (root / "original.json").exists()
+    assert not list(root.glob("upload-*.json"))
+    code, refused = await issuer_process(root, "claim", request=request)
+    assert code == 2
+    assert refused == {"error": "M9_EVIDENCE_RETENTION_EXPIRED"}
+
+
+@pytest.mark.parametrize("lost", ["plan", "plan-key", "plan-index"])
+async def test_completed_private_receipt_survives_lost_plan_without_renewal(tmp_path: Path, lost):
+    root, request, publication, _ = await private_spend_subject(tmp_path)
+    options = {
+        "request": request,
+        "claim_ref": publication["claim_ref"],
+        "closure_id": "fixture-logical-closure",
+        "deny_spend_content_read": True,
+    }
+    code, original = await issuer_process(root, "close", **options)
+    assert code == 0
+    for path in root.glob("closure-*.json"):
+        path.unlink()
+    if lost == "plan-key":
+        (root / "issuer.key").unlink()
+    elif lost == "plan-index":
+        for path in root.glob("upload-*.json"):
+            path.unlink()
+    code, recovered = await issuer_process(root, "close", **options)
+    assert code == 0, recovered
+    assert original["pid"] != recovered["pid"]
+    assert recovered["receipt"] == original["receipt"]
+
+
+@pytest.mark.parametrize("retained", ["custody", "none"])
+async def test_private_spending_after_original_metadata_loss_requires_positive_history(tmp_path: Path, retained):
+    root, request, publication, _ = await private_spend_subject(tmp_path)
+    for pattern in ("upload-*.json", "command-*.json", "seal-*.json"):
+        for path in root.glob(pattern):
+            path.unlink()
+    if retained == "none":
+        (root / "custody.json").unlink()
+    code, result = await issuer_process(
+        root,
+        "close",
+        request=request,
+        claim_ref=publication["claim_ref"],
+        closure_id="fixture-logical-closure",
+        deny_spend_content_read=True,
+    )
+    if retained == "none":
+        assert code == 2
+        assert result == {"error": "M9_RAW_DIGEST_MISMATCH"}
+        assert (root / "original.json").exists()
+        assert list(root.glob("material-*.json"))
+        assert not list(root.glob("upload-*.json"))
+    else:
+        assert code == 0, result
+        assert result["receipt"]["metadata"]["claim_ref"] == publication["claim_ref"]
+        assert result["receipt"]["metadata"]["inventory_complete"]
+        assert result["receipt"]["metadata"]["publications"][0]["state"] == "ORIGINAL_HEADER"
+        assert not (root / "original.json").exists()
+        assert not list(root.glob("material-*.json"))
+        index = json.loads(next(root.glob("upload-*.json")).read_bytes())
+        assert index["phase"] == "SPENT"
+        assert index["claim_ref"] == publication["claim_ref"]
+
+
+async def test_cached_private_receipt_refuses_reappeared_material_without_reading_it(tmp_path: Path):
+    root, request, publication, _ = await private_spend_subject(tmp_path)
+    options = {
+        "request": request,
+        "claim_ref": publication["claim_ref"],
+        "closure_id": "fixture-logical-closure",
+        "deny_spend_content_read": True,
+    }
+    code, first = await issuer_process(root, "close", **options)
+    assert code == 0
+    original = root / "original.json"
+    original.write_bytes(b"REAPPEARED_PRIVATE_CANARY")
+    original.chmod(0o600)
+    code, refused = await issuer_process(root, "close", **options)
+    assert code == 2
+    assert refused == {"error": "M9_RAW_DIGEST_MISMATCH"}
+    assert original.read_bytes() == b"REAPPEARED_PRIVATE_CANARY"
+    assert json.loads((root / "custody.json").read_bytes())["receipt"] == first["receipt"]

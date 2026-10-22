@@ -20,12 +20,14 @@ from pathlib import Path
 from types import CodeType
 from uuid import uuid4
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import TypeAdapter
 
 from lib.json_io import atomic_write_bytes
 from r2.advanced_creative.digests import canonical_json_bytes
 from r2.contracts.opportunity import M9ContractModel, Slug
 from r2.opportunity.acquisition import NativeFieldMaterial
+from r2.opportunity.acquisition_v2 import CustodianSpendReceipt, custodian_spend_preimage
 from r2.opportunity.errors import OpportunityError, StopCode
 from r2.opportunity.manual_admission import (
     AdmissionClosureIntent,
@@ -48,6 +50,46 @@ from server.services.m9_manual_authenticity import verify_manual_seal, verify_pu
 
 _KEY_ID = TypeAdapter(Slug)
 _OPEN_DIRECTORY = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+def verify_custodian_spent(
+    raw: bytes, *, public_key: bytes, expected_request: AdmissionRequest, closure_id: str
+) -> CustodianSpendReceipt:
+    """Authenticate private erasure and original header metadata without content reads."""
+    try:
+        if type(raw) is not bytes or len(raw) > 16_777_216:
+            raise ValueError("private spending receipt exceeds bound")
+        receipt = CustodianSpendReceipt.model_validate_json(raw)
+        metadata = receipt.metadata
+        expected_request = AdmissionRequest.model_validate(expected_request.model_dump())
+        if (
+            canonical_json_bytes(receipt) != raw
+            or metadata.root_request != expected_request
+            or metadata.closure_id != closure_id
+            or metadata.deleted_at > datetime.now(UTC)
+            or type(public_key) is not bytes
+            or len(public_key) != 32
+            or _sha(public_key) != expected_request.descriptor.verification_key_digest
+        ):
+            raise ValueError("private spending scope differs")
+        signature = base64.urlsafe_b64decode(receipt.signature + "==")
+        if len(signature) != 64 or _signature(signature) != receipt.signature:
+            raise ValueError("private spending signature encoding differs")
+        Ed25519PublicKey.from_public_bytes(public_key).verify(signature, custodian_spend_preimage(metadata))
+        verifier = ManualSealVerifier(
+            public_key=public_key, verification_key_id=expected_request.descriptor.verification_key_id
+        )
+        for publication in metadata.publications:
+            if publication.header is not None:
+                if metadata.claim_ref is None:
+                    raise ValueError("private spending original claim missing")
+                expected = manual_publication_metadata(
+                    publication.request, metadata.claim_ref, publication.header.metadata.objects
+                )
+                verifier.verify_receipt(canonical_json_bytes(publication.header), expected=expected)
+        return receipt
+    except Exception:
+        raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH) from None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

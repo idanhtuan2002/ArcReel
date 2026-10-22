@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
-from typing import Protocol
+from typing import Literal, Protocol, Self
 
-from pydantic import Field, model_validator
+from pydantic import AwareDatetime, Field, model_validator
 
-from r2.advanced_creative.digests import canonical_json_bytes
+from r2.advanced_creative.digests import canonical_json_bytes, digest_canonical
+from r2.contracts.advanced_creative import Sha256Digest
 from r2.contracts.opportunity import (
     AttemptOutcomeReason,
     CapabilityEvaluationRequest,
@@ -52,6 +53,7 @@ from r2.opportunity.manual_admission import (
     FrozenManualBinding,
     ManualBindingDescriptor,
     ManualBindingRegistry,
+    PublicationHeader,
     PublishedAdmission,
 )
 from r2.opportunity.normalization import decode_manual_payload, normalize_manual_page
@@ -74,6 +76,101 @@ class ManualUploadMetadata(M9ContractModel):
         clocks = {c.data_class for c in self.original_clocks}
         if rules != clocks or len(rules) != len(self.data_rules) or len(clocks) != len(self.original_clocks):
             raise ValueError("original upload metadata requires exact class coverage")
+        return self
+
+
+class CustodianPublicationDisposition(M9ContractModel):
+    request: AdmissionRequest
+    state: Literal["ORIGINAL_HEADER", "NEVER_ISSUED", "UNRESOLVED"]
+    header: PublicationHeader | None
+
+    @model_validator(mode="after")
+    def exact_header(self) -> Self:
+        if (self.state == "ORIGINAL_HEADER") != (self.header is not None):
+            raise ValueError("publication disposition must carry its original header")
+        return self
+
+
+class CustodianSpendSubject(M9ContractModel):
+    """One original private upload and its complete declared publication inventory."""
+
+    root_request: AdmissionRequest
+    claim_ref: str | None = Field(min_length=1)
+    publications: tuple[CustodianPublicationDisposition, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def original_upload(self) -> Self:
+        root = self.root_request
+        keys = [p.request.publication_key for p in self.publications]
+        if len(keys) != len(set(keys)) or root not in tuple(p.request for p in self.publications):
+            raise ValueError("private closure must retain its unique original publication inventory")
+        for publication in self.publications:
+            request = publication.request
+            if (
+                request.context.user_id,
+                request.context.project_name,
+                request.context.actor_id,
+                request.descriptor,
+                request.opaque_upload_id,
+                request.upload_version,
+                request.data_rules,
+                request.original_clocks,
+            ) != (
+                root.context.user_id,
+                root.context.project_name,
+                root.context.actor_id,
+                root.descriptor,
+                root.opaque_upload_id,
+                root.upload_version,
+                root.data_rules,
+                root.original_clocks,
+            ):
+                raise ValueError("private closure publication belongs to another original upload")
+            if publication.header is not None and (
+                self.claim_ref is None or publication.header.metadata.claim_ref != self.claim_ref
+            ):
+                raise ValueError("private closure header has a different original claim")
+        return self
+
+
+class CustodianSpendMetadata(CustodianSpendSubject):
+    """Private ingest/comparison erasure with original content-free publication inventory."""
+
+    schema_version: Literal["m9.manual-custodian-spent.v2"]
+    operation: Literal["spend-original-upload"]
+    closure_id: str = Field(min_length=1)
+    spent_at: AwareDatetime
+    deleted_at: AwareDatetime
+    inventory_complete: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def erasure_time(self) -> Self:
+        if self.deleted_at < self.spent_at:
+            raise ValueError("private erasure cannot precede its durable spent fence")
+        if self.inventory_complete and any(p.state == "UNRESOLVED" for p in self.publications):
+            raise ValueError("complete private inventory cannot contain an unresolved publication")
+        return self
+
+
+def custodian_spend_metadata_digest(metadata: CustodianSpendMetadata) -> str:
+    return digest_canonical({"domain": "m9.manual-custodian-spent-metadata.v2", "metadata": metadata})
+
+
+def custodian_spend_preimage(metadata: CustodianSpendMetadata) -> bytes:
+    return b"m9.manual-custodian-spent.v2\x00" + canonical_json_bytes(
+        {"metadata": metadata, "metadata_digest": custodian_spend_metadata_digest(metadata)}
+    )
+
+
+class CustodianSpendReceipt(M9ContractModel):
+    metadata: CustodianSpendMetadata
+    metadata_digest: Sha256Digest
+    signature: str = Field(pattern=r"^[A-Za-z0-9_-]{86}$")
+
+    @model_validator(mode="after")
+    def exact_metadata(self) -> Self:
+        if self.metadata_digest != custodian_spend_metadata_digest(self.metadata):
+            raise ValueError("private spending receipt metadata differs")
         return self
 
 
