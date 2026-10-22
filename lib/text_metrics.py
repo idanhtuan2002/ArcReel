@@ -33,6 +33,11 @@ def _pattern_for(language: str | None) -> re.Pattern[str]:
     return _ZH_UNIT_PATTERN
 
 
+def contains_cjk(text: str) -> bool:
+    """文本是否含汉字、CJK 标点或全角符号（与 zh 阅读单位同一字符集）。"""
+    return _ZH_UNIT_PATTERN.search(text) is not None
+
+
 def count_reading_units(text: str, language: str | None) -> int:
     """按源文语言数『阅读单位』。
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lib.text_metrics import count_reading_units, find_reading_unit_offset, reading_unit_noun
+from lib.text_metrics import contains_cjk, count_reading_units, find_reading_unit_offset, reading_unit_noun
 
 
 class TestZh:
@@ -162,3 +162,13 @@ class TestReadingUnitNoun:
         assert reading_unit_noun(None) == "字"
         assert reading_unit_noun("") == "字"
         assert reading_unit_noun("ja") == "字"
+
+
+class TestContainsCjk:
+    def test_detects_han_cjk_punctuation_and_fullwidth_forms(self):
+        assert contains_cjk("拥抱真实，重获新生")
+        assert contains_cjk("《Sóng Đen Ấy Gào Thét》")
+        assert contains_cjk("Ánh nhìn洗 trôi")
+
+    def test_vietnamese_with_curly_quotes_and_dashes_is_not_cjk(self):
+        assert not contains_cjk("Đò Cuối Sông: Chương 3 – “Hội Tập” …")

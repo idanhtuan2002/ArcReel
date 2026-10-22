@@ -33,6 +33,8 @@ from server.story_authoring.script_guard import has_cjk
 
 type OnConflict = Literal["fail", "replace", "rename"]
 type SourceUpload = Callable[[str, str, OnConflict], Awaitable[dict[str, object]]]
+# 故事以越南语写成；交接时项目源文语言按此登记
+STORY_SOURCE_LANGUAGE = "vi"
 
 SLUG_MAX = 80
 SOURCE_SUFFIX = ".txt"

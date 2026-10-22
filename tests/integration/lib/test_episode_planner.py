@@ -337,6 +337,12 @@ class TestResolveBoundariesTolerance:
             _ends("First sentence.   ", "First sentence.", "missing anchor", final=True)
         assert exc_info.value.valid_prefix_ends == [18]
 
+    def test_punctuation_only_anchor_is_rejected(self):
+        window = "Một đêm mưa.\n\n* * *\n\nHai người lên đò. Hết chuyện."
+        with pytest.raises(_DraftRejected) as exc_info:
+            _ends(window, "* * *")
+        assert "正文" in exc_info.value.reasons[0]
+
     def test_exact_anchor_at_sentence_end_is_unchanged(self):
         window = "第一章 山村少年。李恒在山村长大。第二章 下山。"
         assert _ends(window, "李恒在山村长大。") == [_end_after(window, "李恒在山村长大。")]
@@ -1064,6 +1070,68 @@ class TestPlan:
         end = SOURCE.index(ANCHOR_EP2) + len(ANCHOR_EP2)
         assert result.cursor == {"source_file": "source/novel.txt", "offset": end}
         assert result.source_exhausted is False
+
+    async def test_plan_rejects_cjk_titles_for_a_vietnamese_source(self, tmp_path: Path):
+        source = "Ông Tư chèo đò qua sông. Cô Lan ngồi im lặng. Trời sáng dần trên bến."
+        project_dir = _write_project(tmp_path, source_text=source, extra={"source_language": "vi"})
+        fake = _FakeTextGenerator(
+            [
+                _plan_response([{"title": "拥抱真实", "hook": "h", "end_anchor": "Cô Lan ngồi im lặng."}]),
+                _plan_response([{"title": "Bến sông", "hook": "h", "end_anchor": "Cô Lan ngồi im lặng."}]),
+            ]
+        )
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 2
+        assert "汉字" in fake.requests[1].prompt
+        assert [s.title for s in result.episodes] == ["Bến sông"]
+
+    async def test_plan_allows_cjk_titles_for_a_chinese_source(self, tmp_path: Path):
+        project_dir = _write_project(tmp_path)
+        fake = _FakeTextGenerator([_plan_response([{"title": "古玉藏诀", "hook": "悬念", "end_anchor": ANCHOR_EP1}])])
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 1
+        assert [s.title for s in result.episodes] == ["古玉藏诀"]
+
+    async def test_plan_rejects_an_episode_far_over_the_target_volume(self, tmp_path: Path):
+        sentences = [f"Câu số {i} kể chuyện bến sông." for i in range(1, 41)]
+        source = " ".join(sentences)
+        project_dir = _write_project(
+            tmp_path, source_text=source, extra={"source_language": "vi", "episode_target_units": 20}
+        )
+        fake = _FakeTextGenerator(
+            [
+                _plan_response([{"title": "Dài", "hook": "h", "end_anchor": "Câu số 30 kể chuyện bến sông."}]),
+                _plan_response([{"title": "Vừa", "hook": "h", "end_anchor": "Câu số 5 kể chuyện bến sông."}]),
+            ]
+        )
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 2
+        assert "目标体量" in fake.requests[1].prompt
+        assert [s.title for s in result.episodes] == ["Vừa"]
+
+    async def test_plan_keeps_the_prefix_before_an_oversized_episode(self, tmp_path: Path):
+        sentences = [f"Câu số {i} kể chuyện bến sông." for i in range(1, 41)]
+        source = " ".join(sentences)
+        project_dir = _write_project(
+            tmp_path, source_text=source, extra={"source_language": "vi", "episode_target_units": 20}
+        )
+        oversized = _plan_response(
+            [
+                {"title": "Một", "hook": "h", "end_anchor": "Câu số 3 kể chuyện bến sông."},
+                {"title": "Dài", "hook": "h", "end_anchor": "Câu số 35 kể chuyện bến sông."},
+            ]
+        )
+        fake = _FakeTextGenerator([oversized, oversized, oversized])
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert [s.title for s in result.episodes] == ["Một"]
 
     async def test_plan_converts_structured_output_exhausted_to_planning_error(self, tmp_path: Path):
         """后端结构化输出降级链耗尽：转为 EpisodePlanningError，话术指向供应商能力不足，且不在本层重试。"""

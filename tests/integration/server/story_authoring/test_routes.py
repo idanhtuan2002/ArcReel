@@ -140,6 +140,7 @@ async def test_a_run_started_over_http_is_approved_exported_and_handed_off(
     assert export.headers["content-type"].startswith("text/markdown")
     assert export.text.startswith("# Căn nhà cũ\n")
     assert (sent.status_code, sent.json()["path"]) == (200, "source/can-nha-cu.txt"), sent.text
+    assert projects.load_project(PROJECT)["source_language"] == "vi"
     assert repeated.json() == sent.json()
     assert (withdrawn.status_code, withdrawn.json()["phase"]) == (200, "WITHDRAWN")
     assert (refused.status_code, refused.json()["detail"]["code"]) == (409, "ALREADY_HANDED_OFF")
