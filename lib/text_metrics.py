@@ -16,10 +16,14 @@
 
 from __future__ import annotations
 
+import bisect
 import re
+
+from lib.cjk_ranges import CJK_RANGES
 
 # zh: CJK Unified Ideographs(基本区 + 扩展 A) + CJK 兼容汉字 + CJK 符号与标点 +
 # 全角符号区 + SIP 平面 CJK Ext B-H(罕用 / 古籍 / 人名地名生僻字,U+20000-U+323AF)
+_CJK_STARTS = tuple(start for start, _ in CJK_RANGES)
 _ZH_UNIT_PATTERN = re.compile("[㐀-鿿豈-﫿　-〿＀-￯𠀀-𲎯]")
 
 # en / vi 等基于拉丁字母的语种走 unicode word-boundary
@@ -34,8 +38,13 @@ def _pattern_for(language: str | None) -> re.Pattern[str]:
 
 
 def contains_cjk(text: str) -> bool:
-    """文本是否含汉字、CJK 标点或全角符号（与 zh 阅读单位同一字符集）。"""
-    return _ZH_UNIT_PATTERN.search(text) is not None
+    """文本是否含 CJK 字符：汉字、假名、谚文、注音及 CJK 标点 / 全角符号（与故事创作的 CJK 检测同一张区间表）。"""
+    for char in text:
+        code = ord(char)
+        position = bisect.bisect_right(_CJK_STARTS, code) - 1
+        if position >= 0 and code <= CJK_RANGES[position][1]:
+            return True
+    return False
 
 
 def count_reading_units(text: str, language: str | None) -> int:

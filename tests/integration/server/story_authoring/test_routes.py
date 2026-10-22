@@ -124,7 +124,10 @@ async def test_a_run_started_over_http_is_approved_exported_and_handed_off(
         export = await client.get(f"/api/v1/projects/{PROJECT}/story-runs/{run_id}/export")
         handoff = f"/api/v1/projects/{PROJECT}/story-runs/{run_id}/send-to-video"
         sent = await client.post(handoff, json={"command_id": "cmd-00000001"})
+        language_after_send = projects.load_project(PROJECT).get("source_language")
+        projects.update_project(PROJECT, lambda project: project.pop("source_language", None))
         repeated = await client.post(handoff, json={"command_id": "cmd-00000001"})
+        language_after_replay = projects.load_project(PROJECT).get("source_language")
         withdrawn = await client.post(f"/api/v1/projects/{PROJECT}/story-runs/{run_id}/withdraw")
         refused = await client.post(handoff, json={"command_id": "cmd-00000002"})
 
@@ -140,7 +143,7 @@ async def test_a_run_started_over_http_is_approved_exported_and_handed_off(
     assert export.headers["content-type"].startswith("text/markdown")
     assert export.text.startswith("# Căn nhà cũ\n")
     assert (sent.status_code, sent.json()["path"]) == (200, "source/can-nha-cu.txt"), sent.text
-    assert projects.load_project(PROJECT)["source_language"] == "vi"
+    assert (language_after_send, language_after_replay) == ("vi", "vi")
     assert repeated.json() == sent.json()
     assert (withdrawn.status_code, withdrawn.json()["phase"]) == (200, "WITHDRAWN")
     assert (refused.status_code, refused.json()["detail"]["code"]) == (409, "ALREADY_HANDED_OFF")

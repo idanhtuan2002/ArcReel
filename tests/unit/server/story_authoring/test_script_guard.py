@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from server.story_authoring import _cjk_ranges
+from lib import cjk_ranges as _cjk_ranges
 from server.story_authoring.script_guard import build_cjk_ranges, find_cjk, has_cjk, is_cjk, no_cjk_pattern
 
 DATA = Path(__file__).resolve().parents[4] / "server" / "story_authoring" / "data" / "unicode" / "16.0.0"

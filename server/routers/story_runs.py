@@ -225,13 +225,6 @@ async def send_run_to_video(
         if outcome.problem is not None or outcome.value is None:
             problem = outcome.problem
             raise RuntimeError(f"{problem.code}: {problem.detail}" if problem is not None else "upload_source failed")
-
-        # 故事固定以越南语写成；项目尚未登记源文语言时一并登记，概述与分集按越南语处理
-        def _record_language(project: dict) -> None:
-            if not isinstance(project.get("source_language"), str) or not project["source_language"].strip():
-                project["source_language"] = STORY_SOURCE_LANGUAGE
-
-        projects.update_project(project_name, _record_language)
         return outcome.value
 
     try:
@@ -247,6 +240,14 @@ async def send_run_to_video(
         )
     except REFUSALS as error:
         raise _refusal(error) from error
+
+    # 故事固定以越南语写成：交接完成（含同文件恢复与已完成命令的重放）后，项目尚未登记源文语言时登记之，
+    # 概述与分集按越南语处理
+    def _record_language(project: dict) -> None:
+        if not isinstance(project.get("source_language"), str) or not project["source_language"].strip():
+            project["source_language"] = STORY_SOURCE_LANGUAGE
+
+    projects.update_project(project_name, _record_language)
     return record.model_dump()
 
 

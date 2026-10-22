@@ -1115,6 +1115,19 @@ class TestPlan:
         assert "目标体量" in fake.requests[1].prompt
         assert [s.title for s in result.episodes] == ["Vừa"]
 
+    async def test_plan_accepts_a_single_sentence_longer_than_the_volume_cap(self, tmp_path: Path):
+        long_sentence = "Ông Tư " + " ".join(f"chèo{i}" for i in range(1, 60)) + " mãi."
+        source = long_sentence + " Hết."
+        project_dir = _write_project(
+            tmp_path, source_text=source, extra={"source_language": "vi", "episode_target_units": 20}
+        )
+        fake = _FakeTextGenerator([_plan_response([{"title": "Dài", "hook": "h", "end_anchor": "chèo59 mãi."}])])
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 1
+        assert [s.title for s in result.episodes] == ["Dài"]
+
     async def test_plan_keeps_the_prefix_before_an_oversized_episode(self, tmp_path: Path):
         sentences = [f"Câu số {i} kể chuyện bến sông." for i in range(1, 41)]
         source = " ".join(sentences)

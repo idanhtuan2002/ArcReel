@@ -170,5 +170,9 @@ class TestContainsCjk:
         assert contains_cjk("《Sóng Đen Ấy Gào Thét》")
         assert contains_cjk("Ánh nhìn洗 trôi")
 
+    def test_detects_kana_hangul_bopomofo_radicals_and_compatibility_forms(self):
+        for text in ("こんにちは", "カタカナ", "안녕하세요", "ㄅㄆㄇㄈ", "⺀", "︰"):
+            assert contains_cjk(text), text
+
     def test_vietnamese_with_curly_quotes_and_dashes_is_not_cjk(self):
         assert not contains_cjk("Đò Cuối Sông: Chương 3 – “Hội Tập” …")

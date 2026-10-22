@@ -21,7 +21,7 @@ import json
 import logging
 import re
 import statistics
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -714,12 +714,13 @@ def _screen_episodes(
     """逐集复核草稿文本与体量，返回（首个不合格集的下标，原因）；全部合格时下标为集数、原因为空。
 
     按词计的源文语言（越南语、英语）下标题、钩子与大纲文本不得含汉字或 CJK 标点；给出体量上限时
-    单集阅读单位不得超过上限。
+    单集阅读单位不得超过上限——仅当集内还有更早的句末可切时才拒绝，单句即超限的集按不可再分接受。
     """
     latin = reading_unit_noun(language) == "词"
     unit_noun = reading_unit_noun(language)
     reasons: list[str] = []
     first_bad = len(ends)
+    sentence_ends = _AnchorLocator(window).sentence_ends if max_units is not None else []
     start = 0
     for idx, (draft, end) in enumerate(zip(drafts, ends, strict=True)):
         problems: list[str] = []
@@ -733,7 +734,8 @@ def _screen_episodes(
                 )
         if max_units is not None:
             units = count_reading_units(window[start:end], language)
-            if units > max_units:
+            inner = bisect_left(sentence_ends, end) - bisect_right(sentence_ends, start)
+            if units > max_units and inner > 0:
                 problems.append(
                     f"第 {idx + 1} 集约 {units} {unit_noun}，超过每集目标体量的 {_MAX_TARGET_MULTIPLE} 倍"
                     f"（上限 {max_units} {unit_noun}），请在这一段中间增加切分点: {draft.end_anchor!r}"

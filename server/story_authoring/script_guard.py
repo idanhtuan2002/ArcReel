@@ -1,7 +1,7 @@
 """The one CJK detector shared by runtime validation, export and acceptance.
 
 The range table is generated from the Unicode data files vendored under ``data/unicode/<version>/`` and
-committed in ``_cjk_ranges.py``; it never depends on the interpreter's ``unicodedata`` version. A code point
+committed in ``lib/cjk_ranges.py`` (shared with ``lib.text_metrics.contains_cjk``); it never depends on the interpreter's ``unicodedata`` version. A code point
 is CJK when its script is one of :data:`CJK_SCRIPTS`, or when it lies in one of :data:`CJK_BLOCKS` (CJK
 punctuation, fullwidth forms, radicals and other Common-script characters of CJK typography).
 """
@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from server.story_authoring._cjk_ranges import CJK_RANGES
+from lib.cjk_ranges import CJK_RANGES
 
 CJK_SCRIPTS = frozenset({"Han", "Hiragana", "Katakana", "Hangul", "Bopomofo"})
 CJK_BLOCKS = frozenset(
