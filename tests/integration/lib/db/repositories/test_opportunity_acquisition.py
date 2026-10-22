@@ -894,7 +894,15 @@ async def test_attempt_command_preflight_returns_retained_state_before_any_new_q
 
 
 async def peer_publication(
-    factory, envelope, *, shared="payload", attach=True, same_clocks=False, metadata=False, reverse_ids=False
+    factory,
+    envelope,
+    *,
+    shared="payload",
+    attach=True,
+    same_clocks=False,
+    metadata=False,
+    reverse_ids=False,
+    reserve=True,
 ):
     from tests.integration.lib.db.repositories.test_opportunity_manual_admission import manual_repo, publication_for
 
@@ -923,12 +931,12 @@ async def peer_publication(
         )
         running = await repo.start(attempt.attempt_id, expected_attempt_version=1)
     publication = publication_for(command, original.descriptor, running, suffix="peer")
-    if shared == "claim" or same_clocks:
+    if shared in ("claim", "upload") or same_clocks:
         clocks = envelope.request.original_clocks
         request = publication.request.model_copy(
             update={
                 "opaque_upload_id": envelope.request.opaque_upload_id
-                if shared == "claim"
+                if shared in ("claim", "upload")
                 else publication.request.opaque_upload_id,
                 "original_clocks": clocks,
             }
@@ -968,6 +976,8 @@ async def peer_publication(
         publication = type(publication).model_validate(
             {**publication.model_dump(), "request": request, "objects": objects}
         )
+    if not reserve:
+        return publication, running
     async with factory() as session, session.begin():
         repo = manual_repo(session)
         reserved = await repo.reserve(publication.request, expected_attempt_version=2)
@@ -1031,9 +1041,8 @@ async def test_v2_closure_refuses_newly_attached_dependency_instead_of_adding_la
         assert (await manual_repo(session).get_envelope(envelope.request.attempt_id)).phase == "READY"
 
 
-@pytest.mark.parametrize("shared", ["claim", "payload"])
 @pytest.mark.parametrize("erased", [False, True])
-async def test_v2_closure_prevents_late_attachment_to_fenced_or_spent_objects(session_factory, shared, erased):
+async def test_v2_closure_prevents_late_attachment_to_fenced_or_spent_objects(session_factory, erased):
     from r2.opportunity.manual_admission import AdmissionDeletionReceipt
     from tests.integration.lib.db.repositories.test_opportunity_manual_admission import (
         closure_plan,
@@ -1042,7 +1051,7 @@ async def test_v2_closure_prevents_late_attachment_to_fenced_or_spent_objects(se
     )
 
     _, _, envelope = await ready_manual(session_factory)
-    publication, _ = await peer_publication(session_factory, envelope, shared=shared, attach=False)
+    publication, _ = await peer_publication(session_factory, envelope, shared="payload", attach=False)
     plan = await closure_plan(session_factory, envelope.request.attempt_id)
     async with session_factory() as session, session.begin():
         repo = manual_repo(session)
@@ -1373,3 +1382,123 @@ async def test_v2_closure_private_dependency_order_is_independent_of_admission_t
         assert (
             await manual_repo(session).authorize_deletion(pending.closure_id, expected_closure_version=1)
         ).version == 2
+
+
+async def test_v2_closure_discovers_unclaimed_reserved_peer_by_original_upload_identity(session_factory):
+    from lib.db.models.opportunity_manual_admission import M9ManualClosureIntentModel
+    from tests.integration.lib.db.repositories.test_opportunity_manual_admission import (
+        closure_plan,
+        manual_repo,
+        ready_manual,
+    )
+
+    _, _, envelope = await ready_manual(session_factory)
+    _, peer = await peer_publication(session_factory, envelope, shared="upload", attach=False)
+    assert peer.claim_ref is None
+    plan = await closure_plan(session_factory, envelope.request.attempt_id)
+    assert {m.record.attempt.attempt_id for m in plan.members} == {
+        envelope.request.attempt_id,
+        peer.request.attempt_id,
+    }
+    with pytest.raises(OpportunityError):
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).begin_closure(
+                envelope.request.attempt_id,
+                expected_envelope_version=2,
+                dependency_plan=plan,
+            )
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(M9ManualClosureIntentModel)) == 0
+        assert (await manual_repo(session).get_envelope(envelope.request.attempt_id)).phase == "READY"
+        assert (await manual_repo(session).get_envelope(peer.request.attempt_id)).phase == "RESERVED"
+
+
+@pytest.mark.parametrize("erased", [False, True])
+async def test_v2_upload_closure_blocks_a_prepared_peer_before_original_reservation(session_factory, erased):
+    from lib.db.models.opportunity_manual_admission import M9ManualPublicationIntentModel
+    from r2.opportunity.manual_admission import AdmissionDeletionReceipt
+    from tests.integration.lib.db.repositories.test_opportunity_manual_admission import (
+        closure_plan,
+        manual_repo,
+        ready_manual,
+    )
+
+    _, _, envelope = await ready_manual(session_factory)
+    publication, peer = await peer_publication(session_factory, envelope, shared="upload", reserve=False)
+    plan = await closure_plan(session_factory, envelope.request.attempt_id)
+    async with session_factory() as session, session.begin():
+        repo = manual_repo(session)
+        pending = await repo.begin_closure(
+            envelope.request.attempt_id,
+            expected_envelope_version=2,
+            dependency_plan=plan,
+        )
+        if erased:
+            authorized = await repo.authorize_deletion(pending.closure_id, expected_closure_version=1)
+            receipt = AdmissionDeletionReceipt(
+                closure=authorized,
+                absent_refs=authorized.object_refs,
+                retained_proofs=(),
+                deleted_at=await repo.profiles.database_time(),
+            )
+            await repo.finish_closure(receipt, expected_closure_version=2)
+    with pytest.raises(OpportunityError, match="M9_INVALIDATION_INCOMPLETE"):
+        async with session_factory() as session, session.begin():
+            await manual_repo(session).reserve(publication.request, expected_attempt_version=2)
+    async with session_factory() as session:
+        assert await manual_repo(session).get_envelope(peer.attempt_id) is None
+        assert await session.scalar(select(func.count()).select_from(M9ManualPublicationIntentModel)) == 1
+
+
+@pytest.mark.parametrize("commit_fence", [False, True])
+async def test_v2_native_reserved_peer_waits_for_upload_closure_commit_or_rollback(session_factory, commit_fence):
+    import asyncio
+
+    from sqlalchemy import text
+
+    from tests.integration.lib.db.repositories.test_opportunity_manual_admission import (
+        blocked_by_owner,
+        closure_plan,
+        manual_repo,
+        ready_manual,
+    )
+
+    _, _, envelope = await ready_manual(session_factory)
+    publication, peer = await peer_publication(session_factory, envelope, shared="upload", reserve=False)
+    plan = await closure_plan(session_factory, envelope.request.attempt_id)
+    holder, contender = session_factory(), session_factory()
+    task = None
+    try:
+        await holder.begin()
+        holder_pid = await holder.scalar(text("SELECT pg_backend_pid()"))
+        await manual_repo(holder).begin_closure(
+            envelope.request.attempt_id,
+            expected_envelope_version=2,
+            dependency_plan=plan,
+        )
+        await contender.begin()
+        contender_pid = await contender.scalar(text("SELECT pg_backend_pid()"))
+        task = asyncio.create_task(manual_repo(contender).reserve(publication.request, expected_attempt_version=2))
+        await blocked_by_owner(session_factory, contender_pid, holder_pid, task)
+        if commit_fence:
+            await holder.commit()
+            with pytest.raises(OpportunityError, match="M9_INVALIDATION_INCOMPLETE"):
+                await task
+            await contender.rollback()
+        else:
+            await holder.rollback()
+            reserved = await task
+            assert reserved.request == publication.request
+            assert reserved.phase == "RESERVED"
+            await contender.commit()
+        async with session_factory() as session:
+            original = await manual_repo(session).get_envelope(envelope.request.attempt_id)
+            assert original.phase == ("CLEANUP_PENDING" if commit_fence else "READY")
+            recovered = await manual_repo(session).get_envelope(peer.attempt_id)
+            assert (recovered is None) == commit_fence
+    finally:
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        await contender.close()
+        await holder.close()

@@ -567,6 +567,42 @@ class ManualAdmissionRepository:
             text("SELECT pg_advisory_xact_lock(:first,:second)"), {"first": first, "second": second}
         )
 
+    @staticmethod
+    def _original_upload_identity(request: AdmissionRequest) -> tuple[str, str, str, str, str, int]:
+        return (
+            request.context.user_id,
+            request.context.project_name,
+            request.descriptor.source_kind,
+            request.descriptor.source_contract_version,
+            request.opaque_upload_id,
+            request.upload_version,
+        )
+
+    async def _original_upload_guards(self, requests: Sequence[AdmissionRequest]) -> None:
+        for identity in sorted({self._original_upload_identity(request) for request in requests}):
+            digest = digest_canonical({"domain": "m9.manual-original-upload-lock.v1", "identity": identity})
+            first, second = struct.unpack(">ii", bytes.fromhex(digest.removeprefix("sha256:"))[:8])
+            await self.session.execute(
+                text("SELECT pg_advisory_xact_lock(:first,:second)"), {"first": first, "second": second}
+            )
+
+    async def _reject_closed_original_upload(self, request: AdmissionRequest) -> None:
+        rows = (
+            await self.session.scalars(
+                select(M9ManualClosureIntentModel)
+                .where(
+                    M9ManualClosureIntentModel.user_id == self.user_id,
+                    M9ManualClosureIntentModel.project_name == self.project_name,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        identity = self._original_upload_identity(request)
+        for row in rows:
+            stored = await self._closure_value(row)
+            if any(self._original_upload_identity(member.admission.request) == identity for member in stored.members):
+                raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
+
     async def _guard(
         self,
         attempt_id: str,
@@ -574,6 +610,7 @@ class ManualAdmissionRepository:
         operational: bool,
         claim: tuple[str, int] | None = None,
         object_refs: Sequence[str] = (),
+        reservation: AdmissionRequest | None = None,
     ) -> tuple[M9AcquisitionAttemptModel, _AttemptRecord]:
         row = await self._row(attempt_id)
         if row is None:
@@ -585,6 +622,9 @@ class ManualAdmissionRepository:
             raise OpportunityError(_MISSING)
         record = await self._record(row)
         await self._subject(record, operational=operational)
+        await self._original_upload_guards(
+            tuple(request for request in (record.request, reservation) if request is not None)
+        )
         hint = await self._envelope(record)
         claims = set(() if claim is None else (claim,))
         if hint is not None and hint.claim_ref is not None:
@@ -885,7 +925,8 @@ class ManualAdmissionRepository:
             if existing.request != request:
                 raise OpportunityError(_CONFLICT)
             return existing
-        row, record = await self._guard(request.attempt_id, operational=True)
+        row, record = await self._guard(request.attempt_id, operational=True, reservation=request)
+        await self._reject_closed_original_upload(request)
         attempt = record.attempt
         if attempt.attempt_version != expected_attempt_version or attempt.state != AttemptStateV2.RUNNING:
             raise OpportunityError(_STALE)
@@ -1588,6 +1629,7 @@ class ManualAdmissionRepository:
             await self.queries.get_head(query_id)
         for attempt_id, record in sorted(records.items()):
             await self._subject(record, operational=attempt_id == operational_attempt_id)
+        await self._original_upload_guards(tuple(r.request for r in records.values() if r.request is not None))
         claims = set()
         object_refs = set()
         for record in records.values():
@@ -2033,6 +2075,7 @@ class ManualAdmissionRepository:
         selected = {attempt_id}
         while True:
             refs = {r for key in selected for r in self._admission_refs(envelopes[key])}
+            uploads = {self._original_upload_identity(envelopes[key].request) for key in selected}
             claims = {
                 (envelopes[key].claim_ref, envelopes[key].request.upload_version)
                 for key in selected
@@ -2044,6 +2087,7 @@ class ManualAdmissionRepository:
                 if (
                     refs.intersection(self._admission_refs(value))
                     or (value.claim_ref is not None and (value.claim_ref, value.request.upload_version) in claims)
+                    or self._original_upload_identity(value.request) in uploads
                 )
             }
             if expanded == selected:
