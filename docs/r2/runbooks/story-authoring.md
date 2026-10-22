@@ -65,8 +65,12 @@ Known limits of local 9B models (evidence, runs 1–11): coherent prose, but kin
 lack dialogue, some do-not items slip through review, and blurbs can invent facts (flagged for your decision).
 Names outside the story bible (real places, holidays) are recorded as style findings and not repaired.
 
-Video episode planning after the hand-off is not qualified on `qwen3.5-vimax:9b`: on the acceptance story its
-end anchors were not verbatim and planning failed 3/3 attempts. Use a qualified text model for episode planning.
+Video episode planning after the hand-off works on `qwen3.5-vimax:9b` from r2-v2.0.1: the planner locates
+non-verbatim end anchors (quote, punctuation, ellipsis and near-match tolerance, each still unique), cuts only at
+sentence ends, and keeps the longest valid prefix when a batch fails three times; on the acceptance story it
+planned the whole source in 3 batches (evidence `docs/r2/evidence/R2_V2_PLANNER_LOCAL_9B.json`). Set the
+project's target episode duration first: without it the model's episode lengths vary widely. Run planning again
+until the source is exhausted; a batch that hit invented or out-of-order anchors commits fewer episodes.
 
 ## 5. Limits and cost
 
