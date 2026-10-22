@@ -1,0 +1,24 @@
+{
+  "evidence": "R2 V2 production designation",
+  "date": "2026-10-22",
+  "decision": "Human chose option (b): the running V2 staging deployment is designated as production. No separate production host exists on this machine.",
+  "decided_by": "Human (sponsor), in session, 2026-10-22",
+  "release_tag": "r2-v2.0.0",
+  "release_commit": "34d06475",
+  "deploy_record": "docs/r2/evidence/R2_V2_STAGING_SMOKE.json (verdict PASS)",
+  "environment": {
+    "data_root": "~/arcreel-v2-staging",
+    "code": ".worktrees/r2-v2-release-staging (detached at r2-v2.0.0)",
+    "listen": "127.0.0.1:1251",
+    "start": "sudo bash ~/arcreel-v2-staging/v2-release-start.sh",
+    "stop": "sudo bash ~/arcreel-v2-staging/m8e-review-stop.sh",
+    "pre_release_backup": "~/arcreel-v2-staging/backups/bs-20261022T022831Z (COMPLETE)"
+  },
+  "health_at_designation": "GET /health 200 status=ok; uvicorn pid 2640674 running",
+  "no_additional_deploy": "No new deploy, migration or data change was made for the designation.",
+  "open_items": [
+    "Restore/verify/attest of the pre-release backup was not exercised.",
+    "No story run has been executed on this environment; the first run requires Human Gate A approval.",
+    "V1 episode planner with local qwen3.5-vimax:9b fails end_anchor verbatim check (known limitation recorded in the tag)."
+  ]
+}
