@@ -164,13 +164,15 @@ class DramaPlanDraft(BaseModel):
 class _DraftRejected(Exception):
     """单轮 LLM 输出被 schema / 机械校验拒绝；reasons 注入下一轮重试 prompt。"""
 
-    def __init__(self, reasons: list[str]):
+    def __init__(self, reasons: list[str], *, valid_prefix_ends: list[int] | None = None):
         super().__init__("; ".join(reasons))
         self.reasons = reasons
+        # 首个失败条目之前、已通过存在/唯一/递增校验的各集结束偏移；schema 层拒绝时为空
+        self.valid_prefix_ends = valid_prefix_ends or []
 
 
-# 全/半角标点折叠表：把同一标点的全角 / 表意形态映射到半角规范形，仅供匹配时构造
-# 折叠副本用，绝不落库。逐字符 1:1 映射（长度不变），折叠坐标即 NFC 精确坐标。
+# 全/半角标点折叠表：把同一标点的全角 / 表意形态映射到半角规范形，引号不分单双一律折成半角
+# 双引号，仅供匹配时构造折叠副本用，绝不落库。逐字符 1:1 映射（长度不变），折叠坐标即 NFC 精确坐标。
 _PUNCT_FOLD: dict[str, str] = {
     "。": ".",  # U+3002 表意句号
     "．": ".",  # U+FF0E 全角句点
@@ -185,11 +187,16 @@ _PUNCT_FOLD: dict[str, str] = {
     "〜": "~",  # U+301C CJK 波浪号（与 U+FF5E 同族，一并折向半角 ~）
     "“": '"',  # U+201C 左弯双引号
     "”": '"',  # U+201D 右弯双引号
-    "‘": "'",  # U+2018 左弯单引号
-    "’": "'",  # U+2019 右弯单引号
+    "‘": '"',  # U+2018 左弯单引号
+    "’": '"',  # U+2019 右弯单引号
     "＂": '"',  # U+FF02 全角直双引号
-    "＇": "'",  # U+FF07 全角直单引号
+    "＇": '"',  # U+FF07 全角直单引号
+    "'": '"',  # 半角直单引号
 }
+# 锚两端可剥离的字符：模型回显时常在片段外补引号、颠倒收尾引号与句末标点（折叠后的形态）
+_EDGE_QUOTES = '"'
+_EDGE_TAIL = '"' + ".,!?;:"
+_ELLIPSIS_TAILS = ("...", "…")
 # 折叠值必须是单字符：_fold_for_match 的逐字符 1:1 等长依赖于此。一旦某条映射折成多字符，
 # 折叠串偏移就相对 NFC 原文漂移，end = start + len(anchor) 会算出错误切点。导入期即拦截违例。
 assert all(len(dst) == 1 for dst in _PUNCT_FOLD.values()), "折叠表的值必须是单字符以保证等长映射"
@@ -231,6 +238,19 @@ def _find_all_overlapping(haystack: str, needle: str) -> list[int]:
     return starts
 
 
+def _edge_trimmed(folded_anchor: str) -> tuple[int, str, str] | None:
+    """剥掉折叠锚首部的引号与尾部的引号 / 句末标点，返回（首部剥离长度, 正文, 尾部剥离串）。
+
+    正文不足 2 个字符或两端无可剥离字符时返回 None。
+    """
+    body = folded_anchor.lstrip(_EDGE_QUOTES + " ")
+    lead = len(folded_anchor) - len(body)
+    core = body.rstrip(_EDGE_TAIL + " ")
+    if len(core) < 2 or len(core) == len(folded_anchor):
+        return None
+    return lead, core, body[len(core) :]
+
+
 def _resolve_boundaries(
     window: str,
     drafts: list[NarrationEpisodeDraft],
@@ -250,13 +270,20 @@ def _resolve_boundaries(
     故命中起点即归一坐标系下的精确起点；跨度取归一后的锚长（``normalize_source_text`` 非
     长度保持，end 必须用归一锚长而非原 anchor 长，否则 \\r 或组合字符撑长会让偏移漂移）。
     切片仍取归一后的原文、不改写源文标点。折叠后仍多处命中时维持「无法唯一定位」拒绝。
+
+    折叠仍落空时，剥掉锚首部的引号与尾部的引号 / 句末标点再定位正文（锚以省略号缩写时不剥、
+    直接以专门原因拒绝）；唯一命中后结束点越过源文紧随正文、且属于被剥尾部字符集的收尾标点与引号。
+    拒绝时附带首个失败条目之前的有效结束偏移，供重试耗尽后提交最长有效前缀。
     """
     reasons: list[str] = []
     ends: list[int] = []
+    prefix_len = 0  # 首个失败条目之前的有效集数
     pos = 0
     ordering_valid = True
     folded_window: str | None = None  # 懒构造：仅在精确匹配落空时折叠一次
     for idx, ep in enumerate(drafts, start=1):
+        if ordering_valid:
+            prefix_len = len(ends)
         anchor = ep.end_anchor
         match_len = len(anchor)  # 精确命中：跨度即原 anchor 长度（与 window 逐字节一致）
         starts = _find_all_overlapping(window, anchor)
@@ -270,10 +297,32 @@ def _resolve_boundaries(
             if folded_window is None:
                 folded_window = _fold_for_match(window)
             normalized_anchor = normalize_source_text(anchor)
-            starts = _find_all_overlapping(folded_window, _fold_for_match(normalized_anchor))
+            folded_anchor = _fold_for_match(normalized_anchor)
+            starts = _find_all_overlapping(folded_window, folded_anchor)
             if starts:
                 matched_by_fold = True
                 match_len = len(normalized_anchor)
+            elif normalized_anchor.rstrip().endswith(_ELLIPSIS_TAILS):
+                reasons.append(
+                    f"第 {idx} 条的 end_anchor 以省略号缩写，原文窗口中不存在：请逐字摘抄完整片段，"
+                    f"不要用省略号（... 或 …）代替原文: {anchor!r}"
+                )
+                ordering_valid = False
+                continue
+            elif (trimmed := _edge_trimmed(folded_anchor)) is not None:
+                # 剥掉锚两端模型补加的引号 / 句末标点后再定位正文；结束点越过源文紧随正文、且属于被剥
+                # 尾部字符集的收尾标点与引号，从而吸收「补了源文没有的收尾引号」与「引号与句号顺序颠倒」
+                _, core, tail = trimmed
+                starts = _find_all_overlapping(folded_window, core)
+                if starts:
+                    matched_by_fold = True
+                    match_len = len(core)
+                    if len(starts) == 1:
+                        tail_chars = set(tail) - {" "}
+                        while (
+                            starts[0] + match_len < len(window) and folded_window[starts[0] + match_len] in tail_chars
+                        ):
+                            match_len += 1
         if not starts:
             reasons.append(f"第 {idx} 条的 end_anchor 在原文窗口中不存在（必须逐字摘抄，含标点）: {anchor!r}")
             ordering_valid = False
@@ -283,7 +332,7 @@ def _resolve_boundaries(
                 # 折叠路径的「出现 N 次」是标点 / 空白折叠对齐后的计数；模型按字面 anchor 逐字数
                 # 往往是 0 次，必须点明计数口径，否则模型对不上、可能反复重交同一 anchor 耗尽重试
                 reasons.append(
-                    f"第 {idx} 条的 end_anchor 在原文窗口中按归一（NFC 与换行统一）及标点全/半角、空白折叠对齐后出现 {len(starts)} 次"
+                    f"第 {idx} 条的 end_anchor 在原文窗口中按归一（NFC 与换行统一）及标点全/半角、引号种类、空白折叠对齐（并剥去两端补加的引号）后出现 {len(starts)} 次"
                     f"（逐字精确匹配可能为 0 次），无法唯一定位，请改用更长或更独特、与原文逐字一致的片段: {anchor!r}"
                 )
             else:
@@ -303,7 +352,7 @@ def _resolve_boundaries(
         ends.append(end)
         pos = end
     if reasons:
-        raise _DraftRejected(reasons)
+        raise _DraftRejected(reasons, valid_prefix_ends=ends[:prefix_len])
     if snap_whitespace_tail and ends[-1] < len(window) and not window[ends[-1] :].strip():
         ends[-1] = len(window)
     return ends
@@ -656,7 +705,9 @@ class EpisodePlanner:
         if self.generator is None:
             raise RuntimeError("TextGenerator 未初始化，请使用 EpisodePlanner.create() 工厂方法")
         failure: list[str] | None = None
+        best_prefix: tuple[list[NarrationEpisodeDraft], list[int]] | None = None
         for attempt in range(1, self.max_attempts + 1):
+            drafts: list[NarrationEpisodeDraft] = []
             try:
                 result = await self.generator.generate(
                     TextGenerationRequest(
@@ -676,7 +727,7 @@ class EpisodePlanner:
                 raise EpisodePlanningError(str(exc)) from exc
             try:
                 draft = self._parse_draft(result.text, draft_model)
-                drafts: list[NarrationEpisodeDraft] = list(draft.episodes)
+                drafts = list(draft.episodes)
                 if max_episodes is not None and len(drafts) > max_episodes:
                     logger.warning(
                         "规划输出 %d 集超过每批上限 %d，截断保留前 %d 集（其余留给下一批）",
@@ -689,7 +740,19 @@ class EpisodePlanner:
                 return drafts, ends
             except _DraftRejected as exc:
                 failure = exc.reasons
+                if exc.valid_prefix_ends and (best_prefix is None or len(exc.valid_prefix_ends) > len(best_prefix[1])):
+                    best_prefix = (drafts[: len(exc.valid_prefix_ends)], exc.valid_prefix_ends)
                 logger.warning("分集规划第 %d/%d 次尝试未通过校验：%s", attempt, self.max_attempts, exc)
+        if best_prefix is not None:
+            # 重试耗尽：提交各轮中最长的有效前缀集，失败条目及其后的原文留给下一批规划，
+            # 与超出每批上限时截断保留前 N 集同一口径
+            logger.warning(
+                "分集规划连续 %d 次未全部通过校验，提交最长有效前缀 %d 集（其余留给下一批）；最后一轮原因：%s",
+                self.max_attempts,
+                len(best_prefix[1]),
+                "; ".join(failure or []),
+            )
+            return best_prefix
         raise EpisodePlanningError(
             f"分集规划连续 {self.max_attempts} 次未通过校验，最后一轮原因：{'; '.join(failure or [])}"
         )

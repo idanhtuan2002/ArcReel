@@ -721,6 +721,83 @@ class TestPlan:
         assert ep1.endswith("＂")  # 源文标点未被改写（仍是全角直引号）
         assert [s.title for s in result.episodes] == ["城门呼喊"]
 
+    async def test_plan_resolves_anchor_with_quote_kind_mismatch(self, tmp_path: Path):
+        """源文用双引号，模型回显成单引号：引号种类折叠后对齐，切片保留源文双引号。"""
+        source = '"Hạnh ơi, thầy về rồi," Thầy Tuấn nói. Cả lớp im lặng.'
+        anchor = "'Hạnh ơi, thầy về rồi,' Thầy Tuấn nói."
+        project_dir = _write_project(tmp_path, source_text=source)
+        fake = _FakeTextGenerator([_plan_response([{"title": "Tin dữ", "hook": "hook", "end_anchor": anchor}])])
+
+        await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 1
+        end = source.index("nói.") + len("nói.")
+        ep1 = (project_dir / "source" / "episode_1.txt").read_text(encoding="utf-8")
+        assert ep1 == source[:end]
+        assert ep1.startswith('"')
+
+    async def test_plan_resolves_anchor_with_added_closing_quote(self, tmp_path: Path):
+        """模型给片段补了源文没有的收尾引号：去掉锚两端引号后唯一命中，结束于片段正文末尾。"""
+        source = "Bà nói: 'Con đừng bỏ lũ trẻ này, chúng sẽ đói.' Tiếng khóc vang lên."
+        anchor = "'Con đừng bỏ lũ trẻ này'"
+        project_dir = _write_project(tmp_path, source_text=source)
+        fake = _FakeTextGenerator([_plan_response([{"title": "Lời xin", "hook": "hook", "end_anchor": anchor}])])
+
+        await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 1
+        end = source.index("lũ trẻ này") + len("lũ trẻ này")
+        eps = _load_project(project_dir)["episodes"]
+        assert eps[0]["source_range"] == {"source_file": "source/novel.txt", "start": 0, "end": end}
+
+    async def test_plan_resolves_anchor_with_swapped_closing_quote_and_period(self, tmp_path: Path):
+        """锚尾引号与句号顺序颠倒（ạ". ↔ ạ."）：结束点越过源文紧随其后的收尾标点与引号。"""
+        source = 'Bé gọi: "Em sẽ học thật giỏi ạ." Lời nói ngây ngô.'
+        anchor = '"Em sẽ học thật giỏi ạ".'
+        project_dir = _write_project(tmp_path, source_text=source)
+        fake = _FakeTextGenerator([_plan_response([{"title": "Lời hứa", "hook": "hook", "end_anchor": anchor}])])
+
+        await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 1
+        end = source.index('ạ."') + len('ạ."')
+        ep1 = (project_dir / "source" / "episode_1.txt").read_text(encoding="utf-8")
+        assert ep1 == source[:end]
+
+    async def test_plan_rejects_ellipsis_shortened_anchor_with_specific_reason(self, tmp_path: Path):
+        """锚以省略号缩写：不按前缀截断定位，拒绝并在重试 prompt 里点明不得用省略号缩写。"""
+        source = '"Con đừng bỏ mẹ," bà thì thầm, giọng vỡ vụn. Hạnh lặng im.'
+        project_dir = _write_project(tmp_path, source_text=source)
+        fake = _FakeTextGenerator(
+            [
+                _plan_response([{"title": "A", "hook": "A", "end_anchor": '"Con đừng bỏ mẹ," bà thì thầm...'}]),
+                _plan_response([{"title": "B", "hook": "B", "end_anchor": "Hạnh lặng im."}]),
+            ]
+        )
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 2
+        assert "省略号" in fake.requests[1].prompt
+        assert [s.title for s in result.episodes] == ["B"]
+
+    async def test_plan_rejects_anchor_ambiguous_after_edge_quote_trim(self, tmp_path: Path):
+        """去掉锚两端引号后的正文命中多处：维持「无法唯一定位」拒绝，不静默挑第一处。"""
+        source = "Cô nói: thầy ơi, ở lại. Bà nói: thầy ơi, ở lại. Hết."
+        project_dir = _write_project(tmp_path, source_text=source)
+        fake = _FakeTextGenerator(
+            [
+                _plan_response([{"title": "A", "hook": "A", "end_anchor": "'thầy ơi, ở lại'"}]),
+                _plan_response([{"title": "B", "hook": "B", "end_anchor": "Hết."}]),
+            ]
+        )
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 2
+        assert "无法唯一定位" in fake.requests[1].prompt
+        assert [s.title for s in result.episodes] == ["B"]
+
     async def test_plan_rejects_anchor_ambiguous_after_punctuation_folding(self, tmp_path: Path):
         """折叠后仍命中多处：维持「无法唯一定位」拒绝并重试，不静默挑第一处。"""
         source = "他说好的。她说好的。后来他离开了。"  # 两处「说好的。」全角句号
@@ -781,6 +858,28 @@ class TestPlan:
 
         assert (project_dir / "project.json").read_text(encoding="utf-8") == before
         assert not list((project_dir / "source").glob("episode_*.txt"))
+
+    async def test_plan_keeps_longest_valid_prefix_after_retry_exhaustion(self, tmp_path: Path):
+        """重试耗尽但某轮开头若干集有效：提交各轮中最长的有效前缀集，其余原文留给下一批。"""
+        project_dir = _write_project(tmp_path)
+        ep1 = {"title": "甲", "hook": "甲", "end_anchor": ANCHOR_EP1}
+        ep2 = {"title": "乙", "hook": "乙", "end_anchor": ANCHOR_EP2}
+        bad = {"title": "坏", "hook": "坏", "end_anchor": "不在原文里"}
+        fake = _FakeTextGenerator(
+            [
+                _plan_response([ep1, bad]),
+                _plan_response([ep1, ep2, bad]),
+                _plan_response([bad, ep2]),
+            ]
+        )
+
+        result = await EpisodePlanner(project_dir, generator=fake).plan()
+
+        assert len(fake.requests) == 3
+        assert [s.title for s in result.episodes] == ["甲", "乙"]
+        end = SOURCE.index(ANCHOR_EP2) + len(ANCHOR_EP2)
+        assert result.cursor == {"source_file": "source/novel.txt", "offset": end}
+        assert result.source_exhausted is False
 
     async def test_plan_converts_structured_output_exhausted_to_planning_error(self, tmp_path: Path):
         """后端结构化输出降级链耗尽：转为 EpisodePlanningError，话术指向供应商能力不足，且不在本层重试。"""

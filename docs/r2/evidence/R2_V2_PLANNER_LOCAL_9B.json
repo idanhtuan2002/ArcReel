@@ -1,0 +1,31 @@
+{
+  "evidence": "V1 episode planner with local qwen3.5-vimax:9b after anchor-tolerance fix",
+  "date": "2026-10-22",
+  "base": "r2-v2/main 909e3f79",
+  "problem": "EpisodePlanner failed 3/3 attempts on the accept-clean source (Vietnamese, 36,774 chars): end_anchor quotes were not verbatim.",
+  "diagnosis_run": {
+    "setup": "copy of accept-clean (project planner-diag in ~/arcreel-v2-story-accept/data), default_text_backend custom-1/qwen3.5-vimax:9b, _resolve_boundaries instrumented to record anchors and reasons; accept-clean itself untouched",
+    "attempt_1": "8/11 anchors matched; misses: extra closing quote not in source (x2), closing quote and period swapped (x1)",
+    "attempt_2": "7/12 matched; misses: quote kind swapped ' vs \" (x3, two also with an added closing quote), ellipsis-shortened (x1), changed word Co->Con (x1)",
+    "attempt_3": "0/4: every anchor shortened with '...' after the retry prompt"
+  },
+  "fix": [
+    "Fold tier treats all quote kinds as one (' \" curly fullwidth -> \"); 1:1 length mapping unchanged.",
+    "New edge-trim tier after fold: strip leading quotes and trailing quotes/sentence punctuation from the anchor, locate the core uniquely, then extend the end over the source's closing punctuation/quotes that belong to the stripped tail. Uniqueness and ordering rules unchanged.",
+    "Anchors ending in '...' or '…' that do not exist are rejected with a specific reason instead of being truncated to a prefix.",
+    "After retry exhaustion, the longest valid prefix (anchors before the first failure, across attempts) is committed and the rest is left for the next batch, the same rule as the per-batch episode cap. With no valid prefix the planner still raises and leaves the project untouched."
+  ],
+  "offline_replay_of_diagnosis_anchors": "attempt 1: all 11 anchors located; rejected only for a real ordering error at #11. attempt 2: 2 rejections left (changed word; ellipsis).",
+  "live_runs_on_fixed_code": [
+    {"batch": 1, "seconds": 665, "outcome": "3 attempts rejected (hallucinated sentence at #2; later attempts degenerated into one repeated invented anchor); longest valid prefix committed: episode 1, [0, 7044), ends at a closing quote + paragraph break"},
+    {"batch": 2, "seconds": 311, "outcome": "attempt 1 rejected (ordering, invented sentence); attempt 2 passed: episodes 2-6, cursor 33,993 / 36,774"}
+  ],
+  "tests": "tests/integration/lib/test_episode_planner.py, test_episode_reset.py, server/agent_runtime/sdk_tools/test_episode_planning.py, server/test_text_task_queue.py, unit/lib/project_migrations/test_project_migration_v2_v3.py: 198 passed (6 new tests, each seen failing first). ruff check/format, basedpyright 0/0/0 on changed files, lint-imports 23 kept, audit_tests 0 violations.",
+  "remaining_quality_limits": [
+    "The 9B model often picks anchors that end mid-sentence (at a comma or before the speech tag), so episodes 2, 3 and 4 end mid-sentence. This is allowed by the existing planner rules for every model.",
+    "Episode lengths are uneven (622 to 13,988 chars).",
+    "About 1 in 3 attempts includes an invented sentence; batches can commit fewer episodes than planned and need more plan calls.",
+    "The diagnosis skipped the overview step, so source_language was unset and reading_units reported 0; the normal V1 flow sets it at overview."
+  ],
+  "not_deployed": "The fix is not in tag r2-v2.0.0 and is not deployed to the production (staging) environment."
+}
