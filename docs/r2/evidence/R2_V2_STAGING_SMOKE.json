@@ -1,0 +1,67 @@
+{
+ "evidence": "R2_V2_STAGING_SMOKE",
+ "date": "2026-10-22",
+ "release_tag": "r2-v2.0.0",
+ "release_commit": "34d064750281aba37bde2c967e5eac21cb0818ba",
+ "tested_code_head": "e40f2c0c (acceptance run); post-review repair e60d49a9 included in the release",
+ "environment": {
+  "staging_root": "~/arcreel-v2-staging",
+  "worktree": ".worktrees/r2-v2-release-staging (detached at r2-v2.0.0)",
+  "app": "uvicorn server.app:app on 127.0.0.1:1251, activated mode (ARCREEL_GOVERNANCE_READ_DIR=/srv/arcreel-governance/read, attestor /run/arcreel-attestor active), release mode DEV",
+  "database": "arcreel on arcreel-v2-staging-pg 127.0.0.1:55470",
+  "start_script": "~/arcreel-v2-staging/v2-release-start.sh (run by the Human with sudo)"
+ },
+ "backup_before_deploy": {
+  "procedure": "docs/r2/runbooks/m7-backup-restore.md section 1 (offline: app stopped, no tasks)",
+  "backup_set": "~/arcreel-v2-staging/backups/bs-20261022T022831Z",
+  "state": "COMPLETE",
+  "recovery_point": "2026-10-22T02:28:32.745297Z",
+  "alembic_head": "918c4a0e0001",
+  "files": 55,
+  "release_git_sha": "34d064750281aba37bde2c967e5eac21cb0818ba",
+  "release_image_digest": "sha256:4c59456d9e38491d4ad8e628e6e02ba3233226f0e71c64bece555de09958b036 (sha256 of git archive r2-v2.0.0; no container image in this deployment)",
+  "not_done": "restore/verify/attest drill not run for this set"
+ },
+ "migration": {
+  "before": "918c4a0e0001",
+  "after": "918c4a0e0001 (head)",
+  "new_revisions": 0
+ },
+ "provider_registration": {
+  "via": "POST /api/v1/custom-providers (as the Settings page does)",
+  "provider": "Ollama local, base_url http://localhost:11434, no API key, id custom-1",
+  "models": [
+   [
+    "qwen3.5-vimax:9b",
+    "ollama-chat",
+    true
+   ],
+   [
+    "gemma3:12b",
+    "ollama-chat",
+    true
+   ]
+  ],
+  "model_blobs": {
+   "qwen3.5-vimax:9b": "079e71a587e3dd0c00fb189521886d4b4513531ff0bf4b92708b1c21854bbca2",
+   "gemma3:12b": "b92b218582c521ba287f38f1d6057dcd3c6cbff036f13cac97b5d861f5e58ec3"
+  }
+ },
+ "checks": {
+  "health": "200 ok",
+  "spa": "GET / and /app/projects 200",
+  "login": "POST /api/v1/auth/token admin -> token",
+  "unauthenticated_story_runs": "401",
+  "project_du-an-01-649c62c1": "200",
+  "story_runs_list": "200, 0 runs",
+  "draft_brief": "200, brief_digest sha256:356a0cd6b006be825c2e1692f72a223a2c23590c3028007a234c657f829fa3d8 (writer qwen3.5-vimax:9b, review gemma3:12b)",
+  "unconfigured_model_refused": "422 ROUTE_NOT_FOUND custom-1/no-such-model is not configured",
+  "side_effects": "tasks 0; gate_greenlight_decisions unchanged (1 row from 2026-09-28); no Gate A given",
+  "app_log": "startup complete, no errors"
+ },
+ "not_covered": [
+  "No story run was started on staging: Gate A is a Human action and was not given.",
+  "Story generation itself is covered by R2_STORY_ACCEPTANCE_RUN.json on the acceptance environment."
+ ],
+ "verdict": "PASS"
+}
