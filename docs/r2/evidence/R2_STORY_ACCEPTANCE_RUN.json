@@ -1,0 +1,183 @@
+{
+ "evidence": "R2_STORY_ACCEPTANCE_RUN",
+ "task": "Task6 clean acceptance run (reduced Task6: accept-clean on the final T, Human decision 2026-10-21)",
+ "tested_code_head": "e40f2c0c",
+ "environment": {
+  "root": "~/arcreel-v2-story-accept",
+  "server": "unmodified server started from T via launch_accept.py, port 1261",
+  "database": "arcreel_story_accept on disposable container arcreel-story-test-pg (127.0.0.1:55480)",
+  "writer_model": "qwen3.5-vimax:9b (Ollama local, proxy 11500->11434)",
+  "review_model": "gemma3:12b (Ollama local)",
+  "authority": "production GrantNarrativeShowrunnerAuthority; one signed HUMAN_SHOWRUNNER grant for sponsor"
+ },
+ "project": "accept-clean",
+ "idea": "Hạnh, cô giáo cắm bản ở Hà Giang, được xét chuyển về xuôi đúng lúc điểm trường sắp bị sáp nhập; cô phải chọn giữa suất chuyển và lời hứa với lũ trẻ. (tâm lý – đời thường)",
+ "run_id": "story-9d9a48629ff6596050f14e42",
+ "task_id": "52d40e4539be4fc49d1cf4920f6aa296",
+ "phase": "COMMITTED",
+ "block_reason": null,
+ "timeline_local_utc7": {
+  "gate_a": "2026-10-22 00:14:12",
+  "first_call": "2026-10-22 00:14:12",
+  "touchpoint_2_ready": "2026-10-22 04:21 (last call 04:19:36)",
+  "approve": "2026-10-22 08:18:38",
+  "export_download": "2026-10-22 08:19:01",
+  "send_to_video": "2026-10-22 08:24:03"
+ },
+ "human_actions": {
+  "required": [
+   "Gate A (brief + POST gates/greenlight + start, one confirmation)",
+   "Approve at touchpoint 2"
+  ],
+  "post_commit": [
+   "Export .md download",
+   "Gửi sang video"
+  ],
+  "optional_actions": [],
+  "revisions_requested": 0,
+  "retries": 0,
+  "source": "server.log: every mutating request on accept-clean listed in mutating_requests",
+  "mutating_requests": [
+   "00:14:00 POST story-runs/brief",
+   "00:14:12 POST gates/greenlight",
+   "00:14:12 POST story-runs",
+   "08:18:38 POST story-runs/{run}/approve",
+   "08:24:03 POST story-runs/{run}/send-to-video"
+  ]
+ },
+ "usage": {
+  "count_calls": 138,
+  "generate_calls": 138,
+  "input_tokens": 1056034,
+  "output_tokens": 108834,
+  "model_milliseconds": 14753250
+ },
+ "budget": {
+  "generate_calls_cap": 292,
+  "generate_calls_used": 138
+ },
+ "per_stage": {
+  "seed": {
+   "calls": 1,
+   "model_seconds": 312.262
+  },
+  "story_bible": {
+   "calls": 1,
+   "model_seconds": 283.53499999999997
+  },
+  "style_bible": {
+   "calls": 1,
+   "model_seconds": 68.09299999999999
+  },
+  "outline": {
+   "calls": 2,
+   "model_seconds": 180.129
+  },
+  "chapter_plan": {
+   "calls": 17,
+   "model_seconds": 4177.008999999999
+  },
+  "scene_draft": {
+   "calls": 42,
+   "model_seconds": 3854.3520000000017
+  },
+  "chapter_review": {
+   "calls": 69,
+   "model_seconds": 5506.705999999999
+  },
+  "manuscript_review": {
+   "calls": 1,
+   "model_seconds": 102.75800000000001
+  },
+  "packaging": {
+   "calls": 4,
+   "model_seconds": 268.406
+  }
+ },
+ "attempts": 276,
+ "export": {
+  "export_digest": "sha256:c5376c3464d0972667b150437ef28e45412c69fdea2db1cdefc5c57659c1d9b3",
+  "sha256": "sha256:c5376c3464d0972667b150437ef28e45412c69fdea2db1cdefc5c57659c1d9b3",
+  "cjk": false,
+  "syllables": 8263,
+  "chapters": 3,
+  "manifest_digest": "sha256:6657e9e321b099fd89ccfb7a564990372943016a372a024f8862a46758caf25c",
+  "completed_steps": [
+   "canon",
+   "plan",
+   "scene_draft[1,1]",
+   "scene_draft[1,2]",
+   "scene_draft[1,3]",
+   "scene_draft[1,4]",
+   "scene_draft[2,1]",
+   "scene_draft[2,2]",
+   "scene_draft[2,3]",
+   "scene_draft[3,1]",
+   "scene_draft[3,2]",
+   "scene_draft[3,3]"
+  ]
+ },
+ "human_verdict": {
+  "decision": "APPROVE",
+  "bound_manifest_digest": "sha256:6657e9e321b099fd89ccfb7a564990372943016a372a024f8862a46758caf25c",
+  "blocked_findings_at_approve": []
+ },
+ "invariants": {
+  "committed": true,
+  "three_chapters": true,
+  "zero_cjk_in_export": true,
+  "export_bytes_match_manifest_digest": true,
+  "every_attempt_has_outcome": true,
+  "no_head_from_truncated_or_over_context_call": true,
+  "no_head_from_truncated_or_over_context_call_detail": "22 node heads; each head revision's attempt checked: none FAILED or carrying a failure code. failure_codes_seen on attempts: OUTPUT_TRUNCATED once (chapter_plan[1]@r0.0.1#2, FAILED; #3 completed and later attempts produced the head).",
+  "failure_codes_seen_on_attempts": [
+   "OUTPUT_TRUNCATED"
+  ]
+ },
+ "video_handoff": {
+  "record": {
+   "command_id": "b244a5da-10fc-4cf4-84e8-37309c859890",
+   "filename": "giong-ca-nui.md",
+   "export_digest": "sha256:c5376c3464d0972667b150437ef28e45412c69fdea2db1cdefc5c57659c1d9b3",
+   "done": true,
+   "path": "source/giong-ca-nui.txt"
+  },
+  "source_file": "data/accept-clean/source/giong-ca-nui.txt",
+  "source_file_sha256": "sha256:c5376c3464d0972667b150437ef28e45412c69fdea2db1cdefc5c57659c1d9b3",
+  "matches_export_digest": true,
+  "episode_planner_intake": {
+   "check": "EpisodePlanner(project).pm.load_project + discover_sources + _effective_start, read-only",
+   "source_kind": "novel",
+   "discovered_sources": [
+    "source/giong-ca-nui.txt (36,774 chars, normalized text sha256 = export digest)"
+   ],
+   "planning_start": [
+    "source/giong-ca-nui.txt",
+    0
+   ]
+  }
+ },
+ "recorded_deviations": [
+  "The plan names the hand-off file source/<slug>.md. The hand-off uploads giong-ca-nui.md through the existing source upload, which stores sources as .txt (handoff.SOURCE_SUFFIX); the stored bytes equal the export digest.",
+  "Episode-planning acceptance is shown by the planner's read-only intake (source admitted, planning starts at the handed-off file). The planner's model call was not run in this environment."
+ ],
+ "prior_attempts_on_earlier_T": [
+  {
+   "tested_code_head": "81e165fd",
+   "outcome": "BLOCKED_BUDGET cap count_calls 132; fixed in 21780e87",
+   "kept_at": "~/arcreel-v2-story-accept/prior-T-81e165fd/"
+  },
+  {
+   "tested_code_head": "21780e87",
+   "outcome": "BLOCKED_QUALITY scene_draft[1,3] call cap 6; fixed in e40f2c0c",
+   "kept_at": "~/arcreel-v2-story-accept/prior-T-21780e87/"
+  }
+ ],
+ "gates_on_T": {
+  "pytest": "story_authoring unit+integration 330 passed (PostgreSQL); consumers donor_parity + generation_tasks_dispatch 208 passed",
+  "static": "ruff check, ruff format --check (1,966 files), basedpyright --warnings 0/0/0, lint-imports 23 kept, audit_tests --check 0 violations",
+  "donor_parity": "R2_STORY_DONOR_PARITY.json unchanged: no prompt or schema text changed since the v3 differential"
+ },
+ "collector": "~/arcreel-v2-story-accept/collect.py accept-clean (raw output evidence/accept-clean.json)",
+ "collected_at": "2026-10-22T01:24:15.889264+00:00"
+}
