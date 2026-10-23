@@ -1576,7 +1576,7 @@ class ConfigResolver:
             # provider 行、不构造 SDK client，故逐视频单元解析无 DB/网络/client 构造副作用
             # （也不因 api_key 缺失而抛）。
             try:
-                from lib.custom_provider.endpoint_resolution import resolve_endpoint_spec
+                from lib.custom_provider.endpoint_resolution import resolve_endpoint_durations, resolve_endpoint_spec
                 from lib.db.repositories.custom_endpoint_repo import CustomEndpointRepository
 
                 endpoint_spec = await resolve_endpoint_spec(model.endpoint, CustomEndpointRepository(session).get)
@@ -1624,11 +1624,8 @@ class ConfigResolver:
                     ) from exc
                 if isinstance(parsed, list):
                     supported_durations = [int(d) for d in parsed]
-            if not supported_durations and endpoint_spec.endpoint_durations:
-                # 同一条规则的另一侧：行上是空集而端点给得出档位时，按端点的来。空集只在端点也
-                # 驱动不了这一维时才成立——留着它，时长控件会禁着、剧本规划会借固定篇幅，而请求
-                # 构造已经在往图里写帧数。
-                supported_durations = list(endpoint_spec.endpoint_durations)
+            # 行上的空集由端点原生档位补齐；端点驱动不了时长时，旧行上的档位不生效。
+            supported_durations = list(resolve_endpoint_durations(endpoint_spec, supported_durations))
         else:
             source = "registry"
             durations_optional = False

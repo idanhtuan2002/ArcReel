@@ -2,17 +2,20 @@
 
 from copy import deepcopy
 from dataclasses import fields
+from typing import cast
 
 import pytest
 from sqlalchemy import event
 
 from lib.catalog import custom_models
+from lib.config.resolver import ConfigResolver
 from lib.custom_provider import make_endpoint_key
 from lib.custom_provider.endpoint_resolution import derive_mirror_columns
 from lib.custom_provider.endpoints import ENDPOINT_REGISTRY
 from lib.db.models.custom_provider import CustomProvider
 from lib.db.repositories.custom_endpoint_repo import CustomEndpointRepository
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
+from tests.factories import comfyui_endpoint_definition
 
 
 async def seed(factory):
@@ -130,7 +133,9 @@ async def test_projection_never_autoflushes_pending_work_or_reads_provider_crede
 
 
 async def test_custom_endpoint_is_read_without_exporting_its_definition(concurrent_session_factory):
-    definition = deepcopy(dict(ENDPOINT_REGISTRY["minimax-hailuo-v1"].definition))
+    source_definition = ENDPOINT_REGISTRY["minimax-hailuo-v1"].definition
+    assert source_definition is not None
+    definition = deepcopy(dict(source_definition))
     definition["meta"]["description"] = "CANARY_ENDPOINT_PRIVATE_METADATA"
     columns = derive_mirror_columns(definition)
     async with concurrent_session_factory() as session:
@@ -187,9 +192,9 @@ async def test_custom_snapshot_survives_source_edit_and_requery(concurrent_sessi
         one = (await custom_models(session, provider_id=first))[1]
         assert one.pricing is not None
         with pytest.raises(TypeError):
-            one.pricing.details["price_input"] = 99
+            cast(dict[str, object], one.pricing.details)["price_input"] = 99
         with pytest.raises(TypeError):
-            one.capability_overrides["max_reference_images"] = 9
+            cast(dict[str, object], one.capability_overrides)["max_reference_images"] = 9
         row = await CustomProviderRepository(session).get_model_by_ids(
             int(first.removeprefix("custom-")), "publisher/same"
         )
@@ -244,3 +249,42 @@ async def test_partial_price_does_not_acquire_a_zero_input_rate(concurrent_sessi
         assert view.pricing is not None
         assert view.pricing.details["price_input"] is None
         assert view.pricing.details["price_output"] == 2.5
+
+
+@pytest.mark.parametrize(("fixed", "stored", "expected"), [(True, "[8]", ()), (False, None, (5,))])
+async def test_comfyui_durations_match_the_existing_resolver(concurrent_session_factory, fixed, stored, expected):
+    definition = comfyui_endpoint_definition()
+    definition["workflow"]["5"]["inputs"]["length"] = 121
+    definition["workflow"]["9"]["inputs"]["fps"] = 24
+    if not fixed:
+        definition["bindings"]["frames"] = [{"node": "5", "input": "length", "class_type": "EmptyLatentImage"}]
+    columns = derive_mirror_columns(definition)
+    async with concurrent_session_factory() as session:
+        endpoint = await CustomEndpointRepository(session).create(
+            definition=definition,
+            kind=columns.kind,
+            schema_version=columns.schema_version,
+            media_type=columns.media_type,
+            display_name=columns.display_name,
+        )
+        provider = await CustomProviderRepository(session).create_provider(
+            "Workflow",
+            "comfyui",
+            "http://fixture.invalid",
+            "",
+            models=[
+                {
+                    "model_id": "workflow",
+                    "display_name": "Workflow",
+                    "endpoint": make_endpoint_key(endpoint.id),
+                    "supported_durations": stored,
+                }
+            ],
+        )
+        provider_id = provider.provider_id
+        await session.commit()
+    authority = await ConfigResolver(concurrent_session_factory).video_capabilities_for_model(provider_id, "workflow")
+    assert tuple(authority["supported_durations"]) == expected
+    async with concurrent_session_factory() as session:
+        (view,) = await custom_models(session, provider_id=provider_id)
+        assert view.supported_durations == expected

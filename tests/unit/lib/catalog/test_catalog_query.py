@@ -1,6 +1,7 @@
 """Model facts preserve identity and declarations without constructing providers."""
 
 from dataclasses import FrozenInstanceError
+from typing import cast
 
 import pytest
 
@@ -99,8 +100,9 @@ def test_hidden_model_and_nested_prices_are_immutable_snapshots(monkeypatch):
     with pytest.raises(TypeError):
         view.pricing.details["rates"]["publisher/name"]["input"] = 9
     with pytest.raises(TypeError):
-        view.duration_resolution_constraints["1K"] = (20,)
+        cast(dict[str, tuple[int, ...]], view.duration_resolution_constraints)["1K"] = (20,)
     info.capabilities.append("vision")
+    assert isinstance(info.pricing, PerToken)
     info.pricing.rates["publisher/name"]["input"] = 5
     info.duration_resolution_constraints["1K"].append(12)
     assert view.capabilities == ("text_generation",)

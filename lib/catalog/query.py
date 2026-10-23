@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.config.registry import model_info_for
 from lib.custom_provider import is_custom_provider, make_provider_id, parse_provider_id
-from lib.custom_provider.endpoint_resolution import resolve_endpoint_spec
+from lib.custom_provider.endpoint_resolution import resolve_endpoint_durations, resolve_endpoint_spec
 from lib.db.models.custom_provider import CustomProviderModel
 from lib.db.repositories.custom_endpoint_repo import CustomEndpointRepository
 
@@ -142,6 +142,12 @@ async def custom_models(session: AsyncSession, *, provider_id: str | None = None
         endpoints = CustomEndpointRepository(session)
         for row in rows:
             spec = await resolve_endpoint_spec(row["endpoint"], endpoints.get)
+            stored_durations = None if spec.duration_tier_empty else _durations(row["supported_durations"])
+            supported_durations = (
+                resolve_endpoint_durations(spec, stored_durations)
+                if stored_durations is not None or spec.endpoint_durations is not None
+                else None
+            )
             price = None
             if any(row[key] is not None for key in ("price_unit", "price_input", "price_output", "currency")):
                 price = PriceFacts(
@@ -161,7 +167,7 @@ async def custom_models(session: AsyncSession, *, provider_id: str | None = None
                     default=row["is_default"],
                     endpoint=row["endpoint"],
                     capabilities=None,
-                    supported_durations=_durations(row["supported_durations"]),
+                    supported_durations=supported_durations,
                     duration_resolution_constraints=MappingProxyType({}),
                     reference_image_durations=(),
                     resolutions=(),
