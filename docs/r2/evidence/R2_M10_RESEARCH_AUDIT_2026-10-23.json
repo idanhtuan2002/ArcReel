@@ -1,0 +1,368 @@
+{
+  "schema_version": "1",
+  "status": "AUDIT_RECORDED_WITH_DESIGN_GAPS",
+  "created_at": "2026-10-23T13:26:09.124335+00:00",
+  "head": "28b93411dc908a4616093ee4b8c9276cfeb75e19",
+  "release_tag": "r2-v2.0.5",
+  "release_commit": "4bd70525dc2a4e5a0e05c57381a90a35301ec169",
+  "original_m10_corpus": [
+    {
+      "path": "docs/research/2026-09-16-r2-m10-quality-evidence-packaging.md",
+      "commit": "50f1e9b41b570ae08a4c242fc8905e8eaeb1fbb6",
+      "sha256": "72290ad419f592f22d72b81ff12802c602c1bbce7d7ea03c0ead0962ca3064b5",
+      "bytes": 36959,
+      "lines": 704,
+      "source_matches_worktree": true,
+      "status": "PROPOSED_OR_RESEARCH_NOT_ACCEPTED"
+    },
+    {
+      "path": "docs/adr/0082-m10-quality-evidence-and-export-packaging.md",
+      "commit": "50f1e9b41b570ae08a4c242fc8905e8eaeb1fbb6",
+      "sha256": "05bbaeef1a8e9b3acc7c324e903c662f9b672f21537a2df32542aeb4437dcaa8",
+      "bytes": 4816,
+      "lines": 79,
+      "source_matches_worktree": true,
+      "status": "PROPOSED_OR_RESEARCH_NOT_ACCEPTED"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-09-16-r2-m10-quality-packaging-design.md",
+      "commit": "50f1e9b41b570ae08a4c242fc8905e8eaeb1fbb6",
+      "sha256": "ee35e4fa9f58d8598a379d0436573d58bf83f78041b958fc81cdf71036241649",
+      "bytes": 35784,
+      "lines": 799,
+      "source_matches_worktree": true,
+      "status": "PROPOSED_OR_RESEARCH_NOT_ACCEPTED"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-16-r2-m10-quality-packaging.md",
+      "commit": "50f1e9b41b570ae08a4c242fc8905e8eaeb1fbb6",
+      "sha256": "d0b9794e8f320c81f74df309fce7ec8b3eaeb8f1aafc1132ef0cf4a1b43f7379",
+      "bytes": 10645,
+      "lines": 142,
+      "source_matches_worktree": true,
+      "status": "PROPOSED_OR_RESEARCH_NOT_ACCEPTED"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-16-r2-m10a-quality-evidence-foundation.md",
+      "commit": "50f1e9b41b570ae08a4c242fc8905e8eaeb1fbb6",
+      "sha256": "38ab21192c7837d41b1ebca319ffcc3313948182cf81863d51d0498e77d57043",
+      "bytes": 13733,
+      "lines": 235,
+      "source_matches_worktree": true,
+      "status": "PROPOSED_OR_RESEARCH_NOT_ACCEPTED"
+    }
+  ],
+  "historical_architecture_research": {
+    "commit": "016e094689b5e59666ee879c33bdc194caa415a0",
+    "path": "docs/research/2026-09-14-r2-north-star-completion-research.md",
+    "sha256": "b32246a69e50d1ec79562d77b97e8b162b9885b0e94a6bc286da517078cd8912",
+    "matches_architecture_acceptance_binding": true
+  },
+  "inventory": {
+    "path": ".superpowers/sdd/2026-10-23-r2-m10-v2/audit-corpus.json",
+    "sha256": "e182ec2798713879c00d4550b1157a55dda1858688273320141a72d093e854e4",
+    "path_occurrences": 1373,
+    "distinct_contents": 482,
+    "roots": [
+      {
+        "path": "/home/anhtuan/content-production-os/.worktrees/r2-m10-v2",
+        "head": "28b93411dc908a4616093ee4b8c9276cfeb75e19"
+      },
+      {
+        "path": "/home/anhtuan/content-production-os",
+        "head": "dbaf93a625bd9e5499f1e50a6838355ff8c0c9e5"
+      },
+      {
+        "path": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main",
+        "head": "39b9c5dab5d0fd56cf52bf65e95355437cb1023b"
+      },
+      {
+        "path": "/home/anhtuan/content-production-os/.worktrees/r2-m9b",
+        "head": "b0de59b2293a706d495ed33f01a4095772b0b1ae"
+      }
+    ],
+    "meaning": "Full-text screening inventory; only substantively reviewed sources support audit conclusions"
+  },
+  "probes": {
+    "donor-probe.json": {
+      "pin": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "source_sha256": {
+        "tools/base_tool.py": "eb7e1041c2924aa21c42117ac3ca9f702208e95fc7f12616e93ff0115d1aa88e",
+        "tools/publishers/export_bundle.py": "ae473a27086ad8207b849f0fba857ba6c038152e20418118931ea23ccf09c653",
+        "schemas/artifacts/__init__.py": "b298af5bb8b73ceeb193220b3b722bfea842a7bf4cfbbf6fcbbdee9532595599",
+        "schemas/artifacts/publish_log.schema.json": "bab332eefac416b8b572d7fcc4eaaa2bb71dd12f27c62042f139aa38d6bb6282"
+      },
+      "first_success": true,
+      "fixed_input_member_bytes_repeat": true,
+      "invalid_media_accepted": true,
+      "unapproved_replacement_accepted": true,
+      "explicit_missing_optional_rejected": true,
+      "authority_provided": false,
+      "production_or_provider_calls": false
+    },
+    "kalinga-pure-probe.json": {
+      "pin": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+      "source_sha256": "3efc1b24cbd5f479959041ad5597f6f2a2c65ea03536b27782869d561807dfcd",
+      "execution": "Only exact AST FunctionDef nodes _words and _validate; no module-level imports/providers",
+      "cases": [
+        {
+          "case": "valid_no_visual",
+          "problems": [],
+          "raised": false
+        },
+        {
+          "case": "duplicate",
+          "raised": true,
+          "error": "must include every required label exactly once, in any order \u2014 required=['HOOK', 'BODY']; got=['HOOK', 'HOOK']; missing=['BODY']; duplicated=['HOOK']"
+        },
+        {
+          "case": "missing",
+          "raised": true,
+          "error": "must include every required label exactly once, in any order \u2014 required=['HOOK', 'BODY']; got=['HOOK']; missing=['BODY']"
+        },
+        {
+          "case": "over_cap",
+          "problems": [
+            "HOOK 5 words, max 3"
+          ],
+          "raised": false
+        }
+      ],
+      "meaning": "Donor-only behavior characterization, not M10 implementation parity",
+      "provider_calls": false
+    },
+    "kalinga-extended-probe.json": {
+      "pin": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+      "source_sha256": {
+        "pipeline/src/validate.py": "a34d680faee8d0452a22d3d20794c38f73a9679a2ca19e8ddd0b5daf82bd2b10",
+        "pipeline/src/make_video.py": "617dc1f64ae22c215ea3f1e974f33563a4d741f0f5855e16a9e1e94b4a91b56a",
+        "pipeline/src/seo.py": "fe6f583827213b2a5fe511df30c1e45272b3f7c3a8053a0af29ced9f67cf1c48"
+      },
+      "missing_virality": {
+        "status": "unknown",
+        "scores": {},
+        "why": "virality.md missing or unparseable \u2014 gate skipped"
+      },
+      "weak_virality": {
+        "status": "weak",
+        "scores": {
+          "overall": 20,
+          "hook": 40
+        },
+        "why": "overall 20 < 70; hook 40 < 70"
+      },
+      "passing_virality": {
+        "status": "pass",
+        "scores": {
+          "overall": 90,
+          "hook": 90
+        },
+        "why": "above template thresholds"
+      },
+      "erroring_validation_treated_as_pass": true,
+      "seo_context_from_exact_script": {
+        "topic": "fixture topic",
+        "video_hook": "actual hook",
+        "on_screen_headline": "actual headline"
+      },
+      "scope": "pinned donor leaf characterization; no M10 parity or gate authority",
+      "provider_calls": false
+    },
+    "openmontage-qa-probe.json": {
+      "pin": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+      "source_sha256": {
+        "tools/base_tool.py": "eb7e1041c2924aa21c42117ac3ca9f702208e95fc7f12616e93ff0115d1aa88e",
+        "tools/analysis/audio_probe.py": "75ed7da29dc035182c0c4f97458a7ecdc98d6c1e6748e8f7aca6eb6356805fcb",
+        "tools/analysis/composition_validator.py": "ce597d6ee336fab8f817e33d3509020b7de965c697949432ac9a683c8cff6a34",
+        "tools/analysis/visual_qa.py": "be5df568c8f810ea3d8b48cf3373a43f0598a92030a4c1414fd5a79fbc37c7dc"
+      },
+      "overlap_accepted": {
+        "success": true,
+        "data": {
+          "valid": true,
+          "errors": [],
+          "warnings": [
+            "No audio configured (no narration or music)"
+          ],
+          "info": [
+            "Video duration: 3s (2 cuts)",
+            "Render runtime: ffmpeg; assets root: <scratch>/assets"
+          ],
+          "error_count": 0,
+          "warning_count": 1
+        },
+        "error": null
+      },
+      "outside_asset_accepted": {
+        "success": true,
+        "data": {
+          "valid": true,
+          "errors": [],
+          "warnings": [
+            "No audio configured (no narration or music)"
+          ],
+          "info": [
+            "Video duration: 1s (1 cuts)",
+            "Render runtime: ffmpeg; assets root: <scratch>/assets"
+          ],
+          "error_count": 0,
+          "warning_count": 1
+        },
+        "error": null
+      },
+      "invalid_interval_refused": {
+        "success": false,
+        "data": {
+          "valid": false,
+          "errors": [
+            "Cut 'a': out_seconds (1) <= in_seconds (2)"
+          ],
+          "warnings": [
+            "No audio configured (no narration or music)"
+          ],
+          "info": [
+            "Video duration: 1s (1 cuts)",
+            "Render runtime: ffmpeg; assets root: <scratch>/assets"
+          ],
+          "error_count": 1,
+          "warning_count": 1
+        },
+        "error": "Composition has 1 error(s): Cut 'a': out_seconds (1) <= in_seconds (2)"
+      },
+      "visual_probe_success_with_failed_validation": {
+        "success": true,
+        "validation_passed": false,
+        "issues": [
+          "Width: expected 999, got 160"
+        ]
+      },
+      "scope": "donor behavior; not M10 parity or authority",
+      "provider_calls": false,
+      "credential_files_loaded": false
+    },
+    "kalinga-media-probe.json": {
+      "pin": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+      "member": "channels/history-shorts/output/2026-07-17_the-eruption-that-buried-pompeii/short.mp4",
+      "sha256": "34504025cc26351c286a2ddfa520e80e2c4aa037c356f73002944b34e416dfc5",
+      "bytes": 19822632,
+      "duration": 58.443991,
+      "video_codec": "h264",
+      "width": 1080,
+      "height": 1920,
+      "audio_streams": 1,
+      "full_decode_exit": 0,
+      "full_decode_diagnostic_bytes": 0,
+      "sampled_pixels": [
+        {
+          "at_seconds": 0.5,
+          "grayscale_stddev": 59.66479817207028
+        },
+        {
+          "at_seconds": 29.2219955,
+          "grayscale_stddev": 56.23949282999771
+        },
+        {
+          "at_seconds": 57.943991,
+          "grayscale_stddev": 71.62769574527259
+        }
+      ],
+      "pcm_first3seconds_samples": 48000,
+      "pcm_rms": 0.10233349279957711,
+      "scope": "decoded media evidence only; not semantic/caption/independent quality or M10 acceptance"
+    },
+    "media-reuse-probe.json": {
+      "scope": "existing V2 helpers on synthetic media; not M10 quality authority",
+      "ffmpeg": "ffmpeg version 8.0.1-3ubuntu2+esm5 Copyright (c) 2000-2025 the FFmpeg developers",
+      "argv": [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=blue:s=160x90:r=24",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc=r=48000:cl=mono",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:sample_rate=48000",
+        "-t",
+        "1",
+        "-map",
+        "0:v",
+        "-map",
+        "1:a",
+        "-map",
+        "2:a",
+        "-c:v",
+        "libx264",
+        "-threads",
+        "1",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "<scratch>/two-audio.mp4"
+      ],
+      "media_sha256": "4ff2f28f5db2fedc7272523510ea5fb3aaae1fc8f303b6fed00c56b0cf80c30d",
+      "width": 160,
+      "height": 90,
+      "fps": "24",
+      "audio_streams": 2,
+      "peak_db": -16.1,
+      "full_decode_error_count": 0,
+      "invalid_media_refused": true
+    },
+    "zip-determinism-probe.json": {
+      "scope": "synthetic ZIP_STORED writer experiment; not M10 exporter acceptance",
+      "python": "3.13.14",
+      "three_fresh_process_root_mtime_variants_equal": true,
+      "archive_sha256": "118ca1551504b3c0af802b7db2c4cabc7d2b1b0ed6d78ae8224be6d683cc5461",
+      "changed_member_changes_archive": true,
+      "members": [
+        "metadata/metadata.json",
+        "video/output.mp4"
+      ]
+    }
+  },
+  "archive": {
+    "path": ".superpowers/checkpoints/2026-10-23-m10-research-audit/m10-research-audit.tar.gz",
+    "sha256": "8dbd8eea04699382e7effd20b4f94f61dad1f68b60d9755279ee497147df9638",
+    "bytes": 153158,
+    "original_corpus_roundtrip_verified": true
+  },
+  "fresh_unit_seam_run": {
+    "passed": 65,
+    "warnings": 1,
+    "seconds": 1.73,
+    "failures": 0,
+    "skipped": 0,
+    "junit_sha256": "4150b465219c258adbebf286302fc176fe43f9bcbf340902713a05a06048a279"
+  },
+  "builder_check": {
+    "purpose": "draft builder questions, not independent normative acceptance",
+    "material_questions": 6,
+    "issues": [
+      "sequencing authority artifact",
+      "profile/package identity",
+      "run and human assessment lifecycle",
+      "sharedM8repository/receipt seam",
+      "master closure/lock composition",
+      "packaging slot key/cardinality"
+    ]
+  },
+  "design_findings": 10,
+  "original_design_status": "PROPOSED",
+  "exploratory_draft_status": "HELD_NOT_IMPLEMENTATION_BASIS",
+  "implementation_authorized_by_this_record": false,
+  "product_code_changed": false,
+  "migration_executed": false,
+  "provider_api_calls": false,
+  "production_activated": false,
+  "m9_state": "PAUSED_BY_USER_NOT_ACCEPTED",
+  "normative_acceptance_reviews": []
+}

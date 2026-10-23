@@ -1,0 +1,156 @@
+{
+  "schema_version": "1",
+  "status": "HELD_FOR_FULL_RESEARCH_AUDIT",
+  "research_head": "28b93411dc908a4616093ee4b8c9276cfeb75e19",
+  "base_release_tag": "r2-v2.0.5",
+  "base_release_commit": "4bd70525dc2a4e5a0e05c57381a90a35301ec169",
+  "source_sha256": {
+    "r2/contracts/advanced_creative.py": "064ebe4dc1dba759bc9321d2cb4a5028fb36f2f0903295a5e338bfb78d537b65",
+    "lib/db/models/advanced_creative.py": "01c69ebb2df62da10e3a714f2347d2b6a69a1bfe2d0cb1a65c7e65a193de01a1",
+    "lib/db/repositories/advanced_creative.py": "dcc3477028f60dcd73298219f68a3e071d29a8c3289d6f5f5cd8f3061de5733f",
+    "lib/db/repositories/host_hardening.py": "9e88b1bda2ab2ce926c57cfe8e1ede687db8849b4e3ee2d0e52b6e1e1f03ff72",
+    "r2/advanced_creative/exploration.py": "2a350075723bcfe5939690381dc3806450ea3d4818a0d59ce84f89a3744172cc",
+    "r2/advanced_creative/promotion.py": "285e83a528ccad86baa26fdfc640f86eba121bc74ee3c40fbcbad18a07cea4b5",
+    "r2/advanced_creative/digests.py": "f9e4357a14ab0b55405c5231b84c96069ebb4b207171c91328e9aaaa71f573fa",
+    "server/services/advanced_creative.py": "ef8f93eb45196e49d8701377bb83e0c0b98770ae8e3a68e31316b7fb55ba1464",
+    "server/services/master_authority.py": "38887a4fae10b38eabfe8f5dbf6df1aaa3443e5cb449e6bf4d71983efc85a4e1",
+    "server/routers/gates.py": "4cacf78f5fd58fd72ee5ddfc270490cce65db2e4909f1cfc065ae3bc2fd4cae2",
+    "r2/contracts/gates.py": "3ff736edf731b0fece03250fe4b64e5ee8f3a19195294edc3c1254e43380b860",
+    "server/services/format_render.py": "85d908897165c0d86843383b33b6a9faf396a5c726bc63db4a43e7e6ce81f75c",
+    "server/services/format_validation.py": "dd750e46f4c9223ae75e8c16248d2e25b8eef2994db558e3c83626435fbe2af7",
+    "r2/m3/deliverables.py": "78f3ddcbe7b16ab7206cc81fd4d9481c7162cbdb5d26507f20f031654451c785",
+    "tests/unit/r2/contracts/test_advanced_creative.py": "c1520709fcde97101124dbd816fb2f434c9a724bc2c1838d8f71ecbc5b3afb1d",
+    "tests/unit/r2/advanced_creative/test_digests.py": "c8e3f82a92d07b906e64d8477c715d4b2c5c9e5bd609d2c8a5b3cf14831ad97a",
+    "tests/unit/r2/advanced_creative/test_exploration.py": "d369be23bf18a204f714946b50f65df055135a883719166199accdba080d9645",
+    "tests/unit/r2/advanced_creative/test_exploration_promotion.py": "8102692a9f1f4c238e27749682bd9fc69857359ca47e36aa80acdf64cf174bb2"
+  },
+  "m8_seam_tests": {
+    "passed": 65,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 1,
+    "seconds": 1.73,
+    "exit": 0,
+    "junit_sha256": "4150b465219c258adbebf286302fc176fe43f9bcbf340902713a05a06048a279",
+    "paths": [
+      "tests/unit/r2/contracts/test_advanced_creative.py",
+      "tests/unit/r2/advanced_creative/test_digests.py",
+      "tests/unit/r2/advanced_creative/test_exploration.py",
+      "tests/unit/r2/advanced_creative/test_exploration_promotion.py"
+    ],
+    "actual_python": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python"
+  },
+  "kalinga_pure_probe": {
+    "pin": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+    "source_sha256": "3efc1b24cbd5f479959041ad5597f6f2a2c65ea03536b27782869d561807dfcd",
+    "execution": "Only exact AST FunctionDef nodes _words and _validate; no module-level imports/providers",
+    "cases": [
+      {
+        "case": "valid_no_visual",
+        "problems": [],
+        "raised": false
+      },
+      {
+        "case": "duplicate",
+        "raised": true,
+        "error": "must include every required label exactly once, in any order \u2014 required=['HOOK', 'BODY']; got=['HOOK', 'HOOK']; missing=['BODY']; duplicated=['HOOK']"
+      },
+      {
+        "case": "missing",
+        "raised": true,
+        "error": "must include every required label exactly once, in any order \u2014 required=['HOOK', 'BODY']; got=['HOOK']; missing=['BODY']"
+      },
+      {
+        "case": "over_cap",
+        "problems": [
+          "HOOK 5 words, max 3"
+        ],
+        "raised": false
+      }
+    ],
+    "meaning": "Donor-only behavior characterization, not M10 implementation parity",
+    "provider_calls": false
+  },
+  "zip_determinism_probe": {
+    "scope": "synthetic ZIP_STORED writer experiment; not M10 exporter acceptance",
+    "python": "3.13.14",
+    "three_fresh_process_root_mtime_variants_equal": true,
+    "archive_sha256": "118ca1551504b3c0af802b7db2c4cabc7d2b1b0ed6d78ae8224be6d683cc5461",
+    "changed_member_changes_archive": true,
+    "members": [
+      "metadata/metadata.json",
+      "video/output.mp4"
+    ]
+  },
+  "media_reuse_probe": {
+    "scope": "existing V2 helpers on synthetic media; not M10 quality authority",
+    "ffmpeg": "ffmpeg version 8.0.1-3ubuntu2+esm5 Copyright (c) 2000-2025 the FFmpeg developers",
+    "argv": [
+      "ffmpeg",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=blue:s=160x90:r=24",
+      "-f",
+      "lavfi",
+      "-i",
+      "anullsrc=r=48000:cl=mono",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000",
+      "-t",
+      "1",
+      "-map",
+      "0:v",
+      "-map",
+      "1:a",
+      "-map",
+      "2:a",
+      "-c:v",
+      "libx264",
+      "-threads",
+      "1",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "<scratch>/two-audio.mp4"
+    ],
+    "media_sha256": "4ff2f28f5db2fedc7272523510ea5fb3aaae1fc8f303b6fed00c56b0cf80c30d",
+    "width": 160,
+    "height": 90,
+    "fps": "24",
+    "audio_streams": 2,
+    "peak_db": -16.1,
+    "full_decode_error_count": 0,
+    "invalid_media_refused": true
+  },
+  "research_harness_correction": "Initial media probe failed because the harness assumed decode_errors returns a tuple. Exact source returns an integer count; corrected harness passed. Failed log retained. No product code changed.",
+  "migration_heads_command": "PYTHONPATH=. <existing-python> -m alembic heads",
+  "migration_heads_output": "918c4a0e0001 (head)",
+  "migration_executed": false,
+  "product_code_changed": false,
+  "m9_paused": true,
+  "m9_accepted": false,
+  "design_accepted": false,
+  "independent_normative_reviews": [],
+  "primary_sources": [
+    {
+      "url": "https://docs.python.org/3.13/library/zipfile.html",
+      "used_for": "ZIP timestamp/compression metadata fields; exact replay proven only by local synthetic probe"
+    }
+  ],
+  "limits": [
+    "Graph indexes older other checkout; source verified directly.",
+    "65 tests are in-memory/unit, not M10 or PostgreSQL race acceptance.",
+    "ZIP/media probes use synthetic fixtures, not approved production inputs.",
+    "Kalinga partial donor cache lacks selected runtime/test blobs; no unchecked surface accepted."
+  ],
+  "user_steering": "Review all related research, decisions and donors before further work.",
+  "design_basis": "Original M10 corpus at50f1e9b41 must be reconciled; newdraft is not an implementation basis."
+}
