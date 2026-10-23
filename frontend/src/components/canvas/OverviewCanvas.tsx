@@ -1,4 +1,5 @@
 
+import { PipelineBoard } from "./pipeline/PipelineBoard";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, RefreshCw, Sparkles, Users, Landmark, Package } from "lucide-react";
@@ -324,6 +325,8 @@ export function OverviewCanvas({
             </p>
           </div>
         </header>
+
+        {!readOnly ? <PipelineBoard projectName={projectName} /> : null}
 
         {showAdInit ? (
           <AdInitCanvas projectName={projectName} onDone={refreshProject} />
