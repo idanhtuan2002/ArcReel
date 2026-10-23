@@ -493,7 +493,7 @@ export function OverviewCanvas({
                         }}
                       >
                         <span style={{ color: "var(--color-text-4)" }}>{t("genre_prefix")}</span>
-                        {overview.genre}
+                        {humanizeLabel(overview.genre)}
                       </span>
                     )}
                     {overview.theme && (
@@ -505,7 +505,9 @@ export function OverviewCanvas({
                         }}
                       >
                         <span style={{ color: "var(--color-text-4)" }}>{t("theme_prefix")}</span>
-                        <span style={{ color: "var(--color-text-2)" }}>{overview.theme}</span>
+                        <span className="break-words" style={{ color: "var(--color-text-2)" }}>
+                          {humanizeLabel(overview.theme)}
+                        </span>
                       </span>
                     )}
                   </div>
@@ -518,7 +520,7 @@ export function OverviewCanvas({
                         {t("world_setting_label")}
                       </div>
                       <p
-                        className="mt-1 text-[13px] leading-[1.7]"
+                        className="mt-1 break-words text-[13px] leading-[1.7]"
                         style={{ color: "var(--color-text-2)" }}
                       >
                         {overview.world_setting}
@@ -1001,4 +1003,9 @@ function CostInline({
       </span>
     </span>
   );
+}
+
+// 模型生成的概述有时用 snake_case 作为分类值；展示时换成空格，避免把内部写法露给用户
+function humanizeLabel(value: string): string {
+  return value.replaceAll("_", " ");
 }

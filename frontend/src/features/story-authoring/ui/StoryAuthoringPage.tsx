@@ -9,6 +9,7 @@ import "./story-authoring.css";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "wouter";
 import type { TFunction } from "i18next";
 
 import { ApiRequestError } from "@/api";
@@ -310,7 +311,7 @@ function NewStory({
     const brief = drafted.brief;
     return (
       <section aria-labelledby="sa-gate-title" className="sa-panel rounded-md border border-hairline p-4">
-        <p className="font-mono text-[10px] tracking-[0.14em] text-text-3">GATE A</p>
+        <p className="font-mono text-[10px] tracking-[0.14em] text-text-3">BRIEF</p>
         <h2 id="sa-gate-title" className="font-editorial text-base text-text">
           {t("story_gate_title")}
         </h2>
@@ -327,9 +328,6 @@ function NewStory({
           <dt>{t("story_field_target")}</dt>
           <dd>{t("story_target_value", { count: brief.story_target_syllables })}</dd>
         </dl>
-        <p className="mt-2 font-mono text-[10px] text-text-3" title={drafted.brief_digest}>
-          {drafted.brief_digest.slice(0, 19)}…
-        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" className="sa-btn sa-btn-accent" disabled={busy} onClick={() => void greenlight(drafted)}>
             {busy ? t("story_starting") : t("story_greenlight")}
@@ -339,7 +337,7 @@ function NewStory({
           </button>
         </div>
         {error ? (
-          <p role="alert" className="mt-2 text-sm text-text-2">
+          <p role="alert" className="mt-2 text-sm text-danger">
             {error}
           </p>
         ) : null}
@@ -492,6 +490,7 @@ function RunView({ projectName, runId, onChanged }: { projectName: string; runId
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const previousPhase = useRef<StoryRun["phase"] | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -500,6 +499,8 @@ function RunView({ projectName, runId, onChanged }: { projectName: string; runId
       getRun(projectName, runId, { signal: controller.signal }).then(
         (found) => {
           if (controller.signal.aborted) return;
+          notifyWhenDone(previousPhase.current, found.phase, t("story_notify_done", { idea: found.brief.idea.slice(0, 80) }));
+          previousPhase.current = found.phase;
           setRun(found);
           setLoadError(null);
           if (WORKING_PHASES.has(found.phase)) timer = window.setTimeout(load, POLL_MS);
@@ -563,12 +564,49 @@ function RunView({ projectName, runId, onChanged }: { projectName: string; runId
           })}
         </ol>
         <p className="mt-2 text-xs text-text-2" role="status">
-          {t(`story_phase_${run.phase}`)} — {t(`story_phase_hint_${run.phase}`)}
+          {run.handoff?.done ? (
+            <>
+              {t("story_stage_video")} — {t("story_phase_hint_HANDED_OFF")}
+            </>
+          ) : (
+            <>
+              {t(`story_phase_${run.phase}`)} — {t(`story_phase_hint_${run.phase}`)}
+            </>
+          )}
         </p>
+        {WORKING_PHASES.has(run.phase) ? <RunningNote /> : null}
         <UsageLine run={run} />
       </header>
       <PhasePanel projectName={projectName} run={run} onChanged={changed} />
     </article>
+  );
+}
+
+// A browser notification when a run the page watched stops working; asked for only on the user's click.
+function notifyWhenDone(previous: StoryRun["phase"] | null, next: StoryRun["phase"], body: string) {
+  if (previous === null || !WORKING_PHASES.has(previous) || WORKING_PHASES.has(next)) return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  new Notification("ArcReel", { body });
+}
+
+function RunningNote() {
+  const { t } = useTranslation("dashboard");
+  const supported = typeof Notification !== "undefined";
+  const [permission, setPermission] = useState(supported ? Notification.permission : "denied");
+  return (
+    <p className="mt-1 text-xs text-text-2">
+      {t("story_running_reassure")}
+      {supported && permission === "default" ? (
+        <button
+          type="button"
+          className="sa-link ml-2"
+          onClick={() => void Notification.requestPermission().then((answer) => setPermission(answer))}
+        >
+          {t("story_notify_enable")}
+        </button>
+      ) : null}
+      {permission === "granted" ? <span className="ml-2 text-text-3">{t("story_notify_on")}</span> : null}
+    </p>
   );
 }
 
@@ -705,7 +743,7 @@ function Lifecycle({
         </div>
       ) : null}
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-text-2">
+        <p role="alert" className="mt-2 text-sm text-danger">
           {error}
         </p>
       ) : null}
@@ -750,6 +788,26 @@ function Review({ projectName, run, onChanged }: { projectName: string; run: Sto
     return notes;
   }, [offered.findings]);
   const exceptions = offered.findings.filter((finding) => finding.id && offered.exceptions_offered.includes(finding.id));
+  const exceptionIds = new Set(exceptions.map((finding) => finding.id!));
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const toggle = (id: string, on: boolean) => {
+    const next = new Set(ticked);
+    if (on) next.add(id);
+    else next.delete(id);
+    setTicked(next);
+  };
+  const nextOpen = exceptions.find((finding) => !ticked.has(finding.id!));
+  const note = (finding: Finding, index: number) => (
+    <p key={finding.id ?? index} id={finding.id ? `sa-note-${finding.id}` : undefined} className="sa-note" data-severity={finding.severity}>
+      <FindingBody finding={finding} />
+      {finding.id && exceptionIds.has(finding.id) ? (
+        <label className="sa-note-tick">
+          <input type="checkbox" checked={ticked.has(finding.id)} onChange={(event) => toggle(finding.id!, event.target.checked)} />
+          {t("story_keep_as_is")}
+        </label>
+      ) : null}
+    </p>
+  );
   const sceneIds = new Set(offered.scenes.map((scene) => scene.node_id));
   const general = offered.findings.filter((finding) => !sceneIds.has(finding.node_id));
   const chapters = [...new Set(offered.scenes.map((scene) => scene.chapter))];
@@ -760,6 +818,16 @@ function Review({ projectName, run, onChanged }: { projectName: string; run: Sto
         <h3 id="sa-proof-title" className="sa-proof-head font-mono text-[11px] tracking-[0.14em] text-text-3">
           {t("story_proof_title")}
         </h3>
+        {exceptions.length > 0 ? (
+          <div className="sa-tickbar" role="status">
+            <span>{t("story_ticked_count", { done: ticked.size, total: exceptions.length })}</span>
+            {nextOpen ? (
+              <a className="sa-link" href={`#sa-note-${nextOpen.id}`}>
+                {t("story_next_open")}
+              </a>
+            ) : null}
+          </div>
+        ) : null}
         {offered.packaging ? <PackagingSheet packaging={offered.packaging} /> : null}
         {chapters.map((chapter) => (
           <section key={chapter} aria-label={t("story_chapter", { number: chapter })}>
@@ -779,11 +847,7 @@ function Review({ projectName, run, onChanged }: { projectName: string; run: Sto
                       ))}
                     </div>
                     <aside className="sa-margin" aria-label={t("story_notes_for", { scene: `${chapter}.${scene.scene}` })}>
-                      {notes.map((finding, index) => (
-                        <p key={finding.id ?? index} className="sa-note" data-severity={finding.severity}>
-                          <FindingBody finding={finding} />
-                        </p>
-                      ))}
+                      {notes.map(note)}
                     </aside>
                   </div>
                 );
@@ -793,15 +857,11 @@ function Review({ projectName, run, onChanged }: { projectName: string; run: Sto
         {general.length > 0 ? (
           <section className="sa-general" aria-label={t("story_general_notes")}>
             <h4 className="font-mono text-[11px] tracking-[0.14em] text-text-3">{t("story_general_notes")}</h4>
-            {general.map((finding, index) => (
-              <p key={finding.id ?? index} className="sa-note" data-severity={finding.severity}>
-                <FindingBody finding={finding} />
-              </p>
-            ))}
+            {general.map(note)}
           </section>
         ) : null}
       </section>
-      <Decision projectName={projectName} run={run} exceptions={exceptions} onChanged={onChanged} />
+      <Decision projectName={projectName} run={run} exceptions={exceptions} ticked={ticked} onToggle={toggle} onChanged={onChanged} />
     </>
   );
 }
@@ -833,17 +893,20 @@ function Decision({
   projectName,
   run,
   exceptions,
+  ticked,
+  onToggle,
   onChanged,
 }: {
   projectName: string;
   run: StoryRun;
   exceptions: Finding[];
+  ticked: Set<string>;
+  onToggle: (id: string, on: boolean) => void;
   onChanged: (run: StoryRun | null) => void;
 }) {
   const { t } = useTranslation("dashboard");
   const offered = run.offered!;
   const ids = { target: useId(), note: useId() };
-  const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [target, setTarget] = useState("chapter[1]");
   const [note, setNote] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -883,7 +946,7 @@ function Decision({
 
   return (
     <section aria-labelledby="sa-decision-title" className="sa-panel rounded-md border border-hairline p-4">
-      <p className="font-mono text-[10px] tracking-[0.14em] text-text-3">TOUCHPOINT 2</p>
+      <p className="font-mono text-[10px] tracking-[0.14em] text-text-3">REVIEW</p>
       <h3 id="sa-decision-title" className="font-editorial text-base text-text">
         {t("story_decision_title")}
       </h3>
@@ -895,15 +958,13 @@ function Decision({
               <input
                 type="checkbox"
                 checked={ticked.has(finding.id!)}
-                onChange={(event) => {
-                  const next = new Set(ticked);
-                  if (event.target.checked) next.add(finding.id!);
-                  else next.delete(finding.id!);
-                  setTicked(next);
-                }}
+                onChange={(event) => onToggle(finding.id!, event.target.checked)}
               />
               <span>
-                <FindingBody finding={finding} showWhere />
+                <FindingBody finding={finding} showWhere />{" "}
+                <a className="sa-link" href={`#sa-note-${finding.id}`}>
+                  {t("story_show_in_text")}
+                </a>
               </span>
             </label>
           ))}
@@ -921,7 +982,7 @@ function Decision({
         {!allTicked ? <span className="text-[11px] text-text-3">{t("story_approve_needs_ticks")}</span> : null}
       </div>
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-text-2">
+        <p role="alert" className="mt-2 text-sm text-danger">
           {error}
           {code === "STALE_MANIFEST" ? (
             <button type="button" className="sa-btn ml-3" onClick={() => onChanged(null)}>
@@ -1019,7 +1080,12 @@ function Approved({ projectName, run, onChanged }: { projectName: string; run: S
         {title}
       </h3>
       {handedOff ? (
-        <p className="mt-1 text-xs text-text-2">{t("story_handed_off", { path: handedOff.path })}</p>
+        <>
+          <p className="mt-1 text-xs text-text-2">{t("story_handed_off", { path: handedOff.path })}</p>
+          <Link href="/source" className="sa-btn sa-btn-accent mt-3 inline-flex">
+            {t("story_continue_to_source")}
+          </Link>
+        </>
       ) : (
         <p className="mt-1 text-xs text-text-2">{t("story_approved_hint")}</p>
       )}
@@ -1038,7 +1104,7 @@ function Approved({ projectName, run, onChanged }: { projectName: string; run: S
       </div>
       {confirmWithdraw && handedOff ? <p className="mt-2 text-[11px] text-text-3">{t("story_withdraw_video_note")}</p> : null}
       {error ? (
-        <div role="alert" className="mt-2 text-sm text-text-2">
+        <div role="alert" className="mt-2 text-sm text-danger">
           {error}
           {code === "UPLOAD_FAILED" ? (
             <span className="ml-3 inline-flex gap-2">

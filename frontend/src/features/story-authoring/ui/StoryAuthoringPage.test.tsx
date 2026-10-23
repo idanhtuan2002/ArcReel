@@ -227,9 +227,14 @@ describe("touchpoint 2", () => {
     render(<StoryAuthoringPage projectName="demo" />);
     const approve = await screen.findByRole("button", { name: "Approve story" });
     expect(approve).toBeDisabled();
-    expect(screen.getByRole("checkbox").closest("label")).toHaveTextContent("Needs your decision · scene 1.1");
+    const [inMargin, inDecision] = screen.getAllByRole("checkbox");
+    expect(inMargin.closest("label")).toHaveTextContent("Keep as is");
+    expect(inDecision.closest("label")).toHaveTextContent("Needs your decision · scene 1.1");
+    expect(screen.getByText("0 of 1 decisions reviewed")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(inMargin);
+    expect(inDecision).toBeChecked();
+    expect(screen.getByText("1 of 1 decisions reviewed")).toBeInTheDocument();
     expect(approve).toBeEnabled();
     fireEvent.click(approve);
 
@@ -240,7 +245,7 @@ describe("touchpoint 2", () => {
   it("refuses an approval of a manuscript another tab already changed and reloads the current one", async () => {
     routes["/approve"] = () => json({ detail: { code: "STALE_MANIFEST", detail: "manifest changed" } }, 409);
     render(<StoryAuthoringPage projectName="demo" />);
-    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click((await screen.findAllByRole("checkbox"))[0]);
     fireEvent.click(screen.getByRole("button", { name: "Approve story" }));
 
     expect(await screen.findByText(/The manuscript changed since you opened it/)).toBeInTheDocument();

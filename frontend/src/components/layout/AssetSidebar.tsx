@@ -95,6 +95,10 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
 
   const navItems: NavItem[] = [
     { key: "overview", path: "/", label: t("dashboard:workspace_nav_overview"), icon: LayoutDashboard },
+    // 故事是项目的可选起点（写成后作为源文送往视频流程），紧随概览排在资产入口之前；演示项目隐藏
+    ...(demoMode
+      ? []
+      : [{ key: "story", path: "/story", label: t("dashboard:workspace_nav_story"), icon: BookOpenText }]),
     // 演示项目没有可切片的源文件，且后端不存在该项目，隐藏入口而非渲染必然报错的空页
     ...(demoMode
       ? []
@@ -132,7 +136,6 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
     ...(demoMode
       ? []
       : [
-          { key: "story", path: "/story", label: t("dashboard:workspace_nav_story"), icon: BookOpenText },
           { key: "formats", path: "/formats", label: t("dashboard:workspace_nav_formats"), icon: Proportions },
           { key: "learning", path: "/learning", label: t("dashboard:workspace_nav_learning"), icon: ChartLine },
         ]),
