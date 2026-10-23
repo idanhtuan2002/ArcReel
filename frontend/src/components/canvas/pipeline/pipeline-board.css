@@ -121,3 +121,35 @@ a.pipeline-stage:focus-visible {
   font-size: 13px;
   color: var(--color-text-3);
 }
+.pipeline-gates {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+@media (max-width: 720px) {
+  .pipeline-gates {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.pipeline-gates li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-hairline);
+}
+.pipeline-gate-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.pipeline-gate-state {
+  font-size: 12px;
+  color: var(--color-text-2);
+}
+.pipeline-provider-note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--color-warn);
+}

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
+import { API, type GateDecision, type GateHistory } from "@/api";
+import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { NORTH_STAR_STAGES, type NorthStarStage } from "@/components/layout/PhaseStepper";
 import { nextStepForAction } from "@/components/workflow/problem-views";
 import { listRuns, WORKING_PHASES, type RunSummary } from "@/features/story-authoring/api/storyClient";
@@ -21,10 +23,18 @@ const STAGE_ROUTE: Partial<Record<NorthStarStage, string>> = {
 interface PipelineBoardViewProps {
   plan: WorkflowPlan | null;
   runs: RunSummary[];
+  /** 项目级 Gate A/B/D 决定历史；未取得时为 null（Gate C 按集记录，见各集页面）。 */
+  gates?: GateHistory | null;
+  /** 视频供应商是否可用；false 表示服务端拒绝解析视频能力（未配置），null 表示未知。 */
+  videoReady?: boolean | null;
+}
+
+function latest(list: GateDecision[] | undefined): GateDecision | null {
+  return list && list.length > 0 ? list.reduce((a, b) => (b.sequence > a.sequence ? b : a)) : null;
 }
 
 /** 生产环总览：各阶段状态、下一步、等待你处理的决定与进行中的长任务。纯展示，数据由容器给出。 */
-export function PipelineBoardView({ plan, runs }: PipelineBoardViewProps) {
+export function PipelineBoardView({ plan, runs, gates = null, videoReady = null }: PipelineBoardViewProps) {
   const { t } = useTranslation("dashboard");
   const { t: tWorkflow } = useTranslation("workflow");
   const states = stageStates(plan, runs);
@@ -61,6 +71,37 @@ export function PipelineBoardView({ plan, runs }: PipelineBoardViewProps) {
           );
         })}
       </ol>
+      <ul className="pipeline-gates" aria-label={t("pipeline_gates_title")}>
+        {(
+          [
+            ["A", latest(gates?.greenlight)],
+            ["B", latest(gates?.script_lock)],
+            ["C", null],
+            ["D", latest(gates?.publish_approval)],
+          ] as const
+        ).map(([gate, decision]) => (
+          <li key={gate}>
+            <span className="pipeline-gate-name">
+              {gate} · {t(`pipeline_gate_${gate}`)}
+            </span>
+            <span className="pipeline-gate-state">
+              {gate === "C"
+                ? t("pipeline_gate_per_episode")
+                : decision
+                  ? t(`pipeline_gate_action_${decision.action}`, { defaultValue: decision.action })
+                  : t("pipeline_gate_none")}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {videoReady === false ? (
+        <p className="pipeline-provider-note" role="note">
+          {t("pipeline_no_video_provider")}{" "}
+          <Link href="~/app/settings" className="pipeline-item">
+            {t("pipeline_open_providers")}
+          </Link>
+        </p>
+      ) : null}
       <div className="pipeline-lists">
         <div>
           <h3>{t("pipeline_decisions_title")}</h3>
@@ -105,6 +146,10 @@ export function PipelineBoard({ projectName }: { projectName: string }) {
   const planKey = useWorkflowStore((s) => s.planKey);
   const refreshPlan = useWorkflowStore((s) => s.refreshPlan);
   const [runs, setRuns] = useState<RunSummary[]>([]);
+  const [gates, setGates] = useState<GateHistory | null>(null);
+  // 视频能力只经 useModelCapabilities 读取：解析出视频后端即可用，加载完成仍无后端视为未配置
+  const capabilities = useModelCapabilities({ projectName });
+  const videoReady = capabilities.loading ? null : Boolean(capabilities.resolvedVideoBackend);
 
   useEffect(() => {
     void refreshPlan(projectName, null);
@@ -118,10 +163,16 @@ export function PipelineBoard({ projectName }: { projectName: string }) {
       },
       () => undefined,
     );
+    API.getGateHistory(projectName).then(
+      (found) => {
+        if (!controller.signal.aborted) setGates(found);
+      },
+      () => undefined,
+    );
     return () => controller.abort();
   }, [projectName]);
 
   // 计划属于别的目标（例如某一集）时不据此陈述状态
   const ownPlan = planKey === `${projectName}::` ? plan : null;
-  return <PipelineBoardView plan={ownPlan} runs={runs} />;
+  return <PipelineBoardView plan={ownPlan} runs={runs} gates={gates} videoReady={videoReady} />;
 }
