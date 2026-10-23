@@ -31,7 +31,7 @@ Story authoring is CREATE/CANON (step 3), not step 0 (Human correction 2026-10-2
 | PACKAGE/DISTRIBUTE | Xuất (export, Jianying draft), formats | (export) |
 | MEASURE/LEARN | Học từ dữ liệu `/learning` | none |
 Current header stepper reads only `status.phase` ∈ {preparation, script, production, completed} (frontend/src/types/project.ts PHASE_ORDER; PhaseStepper.tsx). The workflow plan carries per-step states (completed/ready/active/blocked/pending/skipped) and is the richer server truth for a North Star stepper.
-Open Human decision: how to show DISCOVER/RESEARCH, which have no surface yet.
+Human decisions 2026-10-23: DISCOVER/RESEARCH shown muted as "Sắp có" (coming soon); order = North Star stepper + pipeline control center first, then app-wide fixes.
 
 ## Log
 - 2026-10-23: r2-v2.0.3 tagged (story UI P0/P1), deploy pending Human. Phase started.
