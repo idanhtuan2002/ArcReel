@@ -602,6 +602,10 @@ export function StudioCanvasRouter() {
         />
       </Route>
 
+      {/* 分集列表就在侧栏；裸 /episodes 没有独立页面，回到总览（生产环面板）而不是渲染空白画布 */}
+      <Route path={`/${WORKSPACE_ROUTE_EPISODES}`}>
+        <Redirect to="/" replace />
+      </Route>
       <Route path={`/${WORKSPACE_ROUTE_LOREBOOK}`}>
         <Redirect to={`/${WORKSPACE_ROUTE_CHARACTERS}`} />
       </Route>
