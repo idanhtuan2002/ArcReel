@@ -808,15 +808,19 @@ def _check_gemini_vertex(config: dict[str, str], _t: Callable[..., str]) -> Conn
 
 
 def _extract_gemini_models(pager) -> list[str]:
-    """从 Gemini models.list() 结果中提取视频/图像相关模型，去除路径前缀。"""
+    """提取已注册文本模型及视频/图像模型，去除路径前缀。"""
     keywords = ("veo", "imagen", "image")
+    text_models = {
+        info.api_model_name or model_id
+        for model_id, info in PROVIDER_REGISTRY["gemini-aistudio"].models.items()
+        if info.media_type == "text"
+    }
     models: set[str] = set()
     for m in pager:
         name = m.name or ""
-        if not any(k in name.lower() for k in keywords):
-            continue
-        # 去掉 "models/" 或 "publishers/google/models/" 前缀
         short = name.rsplit("/", 1)[-1]
+        if short not in text_models and not any(k in short.lower() for k in keywords):
+            continue
         models.add(short)
     return sorted(models)
 

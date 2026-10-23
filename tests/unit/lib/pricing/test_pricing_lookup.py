@@ -193,3 +193,15 @@ class TestHiddenModelStillResolves:
         monkeypatch.setitem(meta.models, "gemini-3-flash-retired", hidden_model)
         pricing = lookup_pricing("gemini-aistudio", "gemini-3-flash-retired", "text")
         assert pricing is hidden_model.pricing
+
+
+@pytest.mark.parametrize("model", ["gemma-4-31b-it", "gemma-4-26b-a4b-it"])
+def test_free_only_gemma_models_do_not_inherit_gemini_paid_token_rates(model: str) -> None:
+    from lib.pricing.strategies import PricingParams, calculate_pricing
+
+    pricing = lookup_pricing("gemini-aistudio", model, "text")
+    amount, currency = calculate_pricing(
+        pricing, PricingParams(call_type="text", model=model, input_tokens=1000, output_tokens=1000)
+    )
+    assert amount == 0
+    assert currency == "USD"
