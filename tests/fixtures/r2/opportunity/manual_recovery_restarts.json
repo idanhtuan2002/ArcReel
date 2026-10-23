@@ -325,9 +325,9 @@
       "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
     },
     {
-      "case_id": "application-delete-recovery-publication-fence-durable",
+      "case_id": "application-cleanup-recovery-publication-fence-durable",
       "principal": "application",
-      "operation": "delete",
+      "operation": "cleanup",
       "boundary": "recovery-publication-fence-durable",
       "mandatory": true,
       "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
@@ -459,6 +459,46 @@
       "boundary": "issuer-material:manual-native-index-seal-durable",
       "mandatory": true,
       "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-custodian-claim-custody-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "custodian-claim-custody-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release custody/index boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-custodian-comparison-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "custodian-comparison-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release custody/index boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-custodian-upload-index-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "custodian-upload-index-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release custody/index boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-custodian-command-index-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "custodian-command-index-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release custody/index boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-spent-state-durable",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-spent-state-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release custody/index boundary; real parent kill and fresh interpreter required"
     }
   ],
   "selected": [
@@ -502,7 +542,7 @@
     "issuer-close-custodian-original-unlinked",
     "issuer-close-custodian-comparison-unlinked",
     "issuer-close-custodian-spend-receipt-durable",
-    "application-delete-recovery-publication-fence-durable",
+    "application-cleanup-recovery-publication-fence-durable",
     "application-delete-recovery-deletion-plan-durable",
     "application-delete-recovery-deletion-fence-durable",
     "application-delete-recovery-deletion-attestations-durable",
@@ -518,7 +558,12 @@
     "issuer-admit-issuer-material-source-identity-2-seal-durable",
     "issuer-admit-issuer-material-native-field-1-seal-durable",
     "issuer-admit-issuer-material-native-field-2-seal-durable",
-    "issuer-admit-issuer-material-manual-native-index-seal-durable"
+    "issuer-admit-issuer-material-manual-native-index-seal-durable",
+    "issuer-admit-custodian-claim-custody-durable",
+    "issuer-admit-custodian-comparison-durable",
+    "issuer-admit-custodian-upload-index-durable",
+    "issuer-admit-custodian-command-index-durable",
+    "issuer-close-custodian-spent-state-durable"
   ],
   "unselected": [],
   "deterministic_faults": [

@@ -54,6 +54,16 @@ def subject(tmp_path):
             }
             raw = json.dumps(marker, sort_keys=True).encode()
             (evidence / (case["case_id"] + ".arrival.json")).write_bytes(raw)
+            armed = json.dumps(
+                {
+                    "schema": "m9-manual-recovery-armed.v1",
+                    "case_id": case["case_id"],
+                    "arrival_sha256": hashlib.sha256(raw).hexdigest(),
+                    "pid": killed,
+                },
+                sort_keys=True,
+            ).encode()
+            (evidence / (case["case_id"] + ".armed.json")).write_bytes(armed)
             record = {
                 "case_id": case["case_id"],
                 "passed": True,
@@ -65,6 +75,7 @@ def subject(tmp_path):
                 "reaped": True,
                 "marker_fsynced": True,
                 "marker_sha256": hashlib.sha256(raw).hexdigest(),
+                "armed_sha256": hashlib.sha256(armed).hexdigest(),
             }
             (evidence / (case["case_id"] + ".json")).write_text(json.dumps(record))
         return 0
@@ -119,6 +130,8 @@ def test_gate_requires_consistent_junit_restarts_and_source_before_pass(subject)
         "unreaped",
         "wrong-uid",
         "bad-marker",
+        "missing-armed",
+        "forged-armed",
     ],
 )
 def test_gate_never_passes_incomplete_or_failed_external_evidence(subject, fault):
@@ -147,7 +160,9 @@ def test_gate_never_passes_incomplete_or_failed_external_evidence(subject, fault
             log.seek(0)
             log.truncate()
         else:
-            evidence = next(p for p in (output / "restarts").glob("*.json") if not p.name.endswith(".arrival.json"))
+            evidence = next(
+                p for p in (output / "restarts").glob("*.json") if not p.name.endswith((".arrival.json", ".armed.json"))
+            )
             if fault == "missing-restart":
                 evidence.unlink()
             else:
@@ -160,6 +175,15 @@ def test_gate_never_passes_incomplete_or_failed_external_evidence(subject, fault
                     record["worker_uid"] = 0
                 elif fault == "bad-marker":
                     record["marker_sha256"] = "0" * 64
+                elif fault == "missing-armed":
+                    evidence.with_name(evidence.stem + ".armed.json").unlink()
+                elif fault == "forged-armed":
+                    armed_path = evidence.with_name(evidence.stem + ".armed.json")
+                    armed = json.loads(armed_path.read_text())
+                    armed["arrival_sha256"] = "0" * 64
+                    armed_raw = json.dumps(armed).encode()
+                    armed_path.write_bytes(armed_raw)
+                    record["armed_sha256"] = hashlib.sha256(armed_raw).hexdigest()
                 evidence.write_text(json.dumps(record))
         return exit_code
 

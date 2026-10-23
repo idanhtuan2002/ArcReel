@@ -489,6 +489,7 @@ class OpportunityAcquisitionServiceV2:
         await self._at("publication-returned")
         async with self.store.transaction() as tx:
             envelope = await tx.manual.attach(publication, expected_envelope_version=envelope.version)
+            await self._at("ready-before-commit")
         await self._at("ready-committed")
         self._binding(envelope.request.descriptor)
         async with self.store.transaction() as tx:
@@ -500,6 +501,7 @@ class OpportunityAcquisitionServiceV2:
             attempt = await tx.manual.get_attempt(attempt.attempt_id)
             envelope = await tx.manual.get_envelope(claim.attempt_id)
             query = await tx.queries.get_exact(command.query_id, command.query_revision)
+            await self._at("claim-before-commit")
         if attempt is None or envelope is None or query is None:
             raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
         query = verified_query(query)
@@ -556,6 +558,7 @@ class OpportunityAcquisitionServiceV2:
                 await tx.manual.append_checkpoint(
                     attempt.attempt_id, checkpoint, expected_attempt_version=attempt.attempt_version
                 )
+                await self._at("checkpoint-before-commit")
             await self._at("checkpoint-committed")
             return await self._finalize(command, attempt, envelope, checkpoint, response_at)
         except Exception:
@@ -1072,5 +1075,6 @@ class OpportunityAcquisitionServiceV2:
                 receipt = await tx.manual.get_current_receipt(command)
                 if receipt is None:
                     raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+            await self._at("finalization-before-commit")
         await self._at("finalization-committed")
         return receipt

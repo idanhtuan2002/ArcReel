@@ -167,9 +167,12 @@ def _restarts(artifact_dir: Path, cases: list[dict[str, object]]) -> int:
         identity = str(case["case_id"])
         evidence = artifact_dir / "restarts" / (identity + ".json")
         marker_path = artifact_dir / "restarts" / (identity + ".arrival.json")
+        armed_path = artifact_dir / "restarts" / (identity + ".armed.json")
         record = loads_unique_json(_no_symlinks(evidence).read_bytes())
         marker_raw = _no_symlinks(marker_path).read_bytes()
         marker = loads_unique_json(marker_raw)
+        armed_raw = _no_symlinks(armed_path).read_bytes()
+        armed = loads_unique_json(armed_raw)
         uid = 31001 if case["principal"] == "issuer" else 31002
         pids = [record.get(key) for key in ("parent_pid", "killed_pid", "restarted_pid")]
         if (
@@ -179,6 +182,14 @@ def _restarts(artifact_dir: Path, cases: list[dict[str, object]]) -> int:
             or record.get("worker_uid") != uid
             or any(record.get(key) is not True for key in ("passed", "parent_killed", "reaped", "marker_fsynced"))
             or record.get("marker_sha256") != _hash(marker_raw)
+            or record.get("armed_sha256") != _hash(armed_raw)
+            or armed
+            != {
+                "schema": "m9-manual-recovery-armed.v1",
+                "case_id": identity,
+                "arrival_sha256": _hash(marker_raw),
+                "pid": record["killed_pid"],
+            }
             or marker
             != {
                 "schema": "m9-manual-recovery-arrival.v1",

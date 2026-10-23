@@ -473,6 +473,8 @@ class FixtureManualUploadCustodian:
                 }
             )
             self._write_custody(directory, custody)
+            if self._boundary is not None:
+                self._boundary("custodian-claim-custody-durable")
             index = _UploadIndex(
                 schema_version="m9.fixture-upload-ledger.v1",
                 identity=self._identity(request),
@@ -482,7 +484,11 @@ class FixtureManualUploadCustodian:
                 spent_at=None,
             )
             self._write(directory, material_name, canonical_json_bytes(comparison))
+            if self._boundary is not None:
+                self._boundary("custodian-comparison-durable")
             self._write(directory, index_name, canonical_json_bytes(index))
+            if self._boundary is not None:
+                self._boundary("custodian-upload-index-durable")
         if custody is not None:
             matches = [p for p in custody.publications if self._names(p.request)[2] == command_name]
             if matches and matches[0].request != request:
@@ -499,6 +505,8 @@ class FixtureManualUploadCustodian:
             self._write(
                 directory, command_name, canonical_json_bytes({**expected_command, "claim_ref": index.claim_ref})
             )
+            if self._boundary is not None:
+                self._boundary("custodian-command-index-durable")
         return index.claim_ref
 
     def mark_spent(self, request: AdmissionRequest, *, claim_ref: str) -> None:
@@ -564,6 +572,8 @@ class FixtureManualUploadCustodian:
                 )
             custody = _CustodyLedger.model_validate({**custody.model_dump(), **changes})
             self._write_custody(directory, custody)
+            if self._boundary is not None:
+                self._boundary("custodian-spent-state-durable")
         if claim_ref is not None:
             index = _UploadIndex(
                 schema_version="m9.fixture-upload-ledger.v1",
