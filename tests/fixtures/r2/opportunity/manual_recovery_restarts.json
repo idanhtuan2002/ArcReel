@@ -1,0 +1,539 @@
+{
+  "schema": "m9-manual-recovery-restarts.v1",
+  "seed": 20261020,
+  "base_head": "26f1f5ba76d9c768e92c7ca4161459e2e4956340",
+  "selection_policy": "All initial-release changed boundaries are mandatory. Sampling is reserved for unchanged future runs.",
+  "cases": [
+    {
+      "case_id": "application-acquire-planned-committed",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "planned-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-reserved-committed",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "reserved-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-publication-returned",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "publication-returned",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-ready-before-commit",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "ready-before-commit",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-ready-committed",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "ready-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-claim-before-commit",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "claim-before-commit",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-claim-committed",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "claim-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-before-source-dispatch",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "before-source-dispatch",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-source-response-returned",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "source-response-returned",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-checkpoint-before-commit",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "checkpoint-before-commit",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-checkpoint-committed",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "checkpoint-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-finalization-before-commit",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "finalization-before-commit",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-acquire-finalization-committed",
+      "principal": "application",
+      "operation": "acquire",
+      "boundary": "finalization-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-reconstruct-reconstruction-fenced",
+      "principal": "application",
+      "operation": "reconstruct",
+      "boundary": "reconstruction-fenced",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-reconstruct-reconstruction-checkpoint-committed",
+      "principal": "application",
+      "operation": "reconstruct",
+      "boundary": "reconstruction-checkpoint-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-expire-expiry-committed",
+      "principal": "application",
+      "operation": "expire",
+      "boundary": "expiry-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-fence-before-commit",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-fence-before-commit",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-fenced-committed",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-fenced-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-publication-fenced",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-publication-fenced",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-drain-before-commit",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-drain-before-commit",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-drained-committed",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-drained-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-private-erasure-returned",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-private-erasure-returned",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-authorization-before-commit",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-authorization-before-commit",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-authorized-committed",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-authorized-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-public-erasure-returned",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-public-erasure-returned",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-completion-before-commit",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-completion-before-commit",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-cleanup-cleanup-erased-committed",
+      "principal": "application",
+      "operation": "cleanup",
+      "boundary": "cleanup-erased-committed",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-issuer-header-seal-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "issuer-header-seal-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-custodian-original-header-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "custodian-original-header-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-publication-header-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "publication-header-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-publication-payloads-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "publication-payloads-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-publication-integrities-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "publication-integrities-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-publication-attestations-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "publication-attestations-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-publication-complete",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "publication-complete",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-spend-plan-durable",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-spend-plan-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-spent-fence-durable",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-spent-fence-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-private-object-unlinked",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-private-object-unlinked",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-original-unlinked",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-original-unlinked",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-comparison-unlinked",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-comparison-unlinked",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-spend-receipt-durable",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-spend-receipt-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-delete-recovery-publication-fence-durable",
+      "principal": "application",
+      "operation": "delete",
+      "boundary": "recovery-publication-fence-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-delete-recovery-deletion-plan-durable",
+      "principal": "application",
+      "operation": "delete",
+      "boundary": "recovery-deletion-plan-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-delete-recovery-deletion-fence-durable",
+      "principal": "application",
+      "operation": "delete",
+      "boundary": "recovery-deletion-fence-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-delete-recovery-deletion-attestations-durable",
+      "principal": "application",
+      "operation": "delete",
+      "boundary": "recovery-deletion-attestations-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-delete-recovery-deletion-headers-durable",
+      "principal": "application",
+      "operation": "delete",
+      "boundary": "recovery-deletion-headers-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-delete-recovery-deletion-integrities-durable",
+      "principal": "application",
+      "operation": "delete",
+      "boundary": "recovery-deletion-integrities-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-delete-recovery-deletion-payloads-durable",
+      "principal": "application",
+      "operation": "delete",
+      "boundary": "recovery-deletion-payloads-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "application-delete-recovery-deletion-receipt-durable",
+      "principal": "application",
+      "operation": "delete",
+      "boundary": "recovery-deletion-receipt-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-header-unlinked",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-header-unlinked",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-material-seal-unlinked",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-material-seal-unlinked",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-close-custodian-temporary-unlinked",
+      "principal": "issuer",
+      "operation": "close",
+      "boundary": "custodian-temporary-unlinked",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-issuer-material-raw-page-seal-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "issuer-material:raw-page-seal-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-issuer-material-source-identity-1-seal-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "issuer-material:source-identity-1-seal-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-issuer-material-source-identity-2-seal-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "issuer-material:source-identity-2-seal-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-issuer-material-native-field-1-seal-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "issuer-material:native-field-1-seal-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-issuer-material-native-field-2-seal-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "issuer-material:native-field-2-seal-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    },
+    {
+      "case_id": "issuer-admit-issuer-material-manual-native-index-seal-durable",
+      "principal": "issuer",
+      "operation": "admit",
+      "boundary": "issuer-material:manual-native-index-seal-durable",
+      "mandatory": true,
+      "selection_reason": "initial-release changed boundary; real parent kill and fresh interpreter required"
+    }
+  ],
+  "selected": [
+    "application-acquire-planned-committed",
+    "application-acquire-reserved-committed",
+    "application-acquire-publication-returned",
+    "application-acquire-ready-before-commit",
+    "application-acquire-ready-committed",
+    "application-acquire-claim-before-commit",
+    "application-acquire-claim-committed",
+    "application-acquire-before-source-dispatch",
+    "application-acquire-source-response-returned",
+    "application-acquire-checkpoint-before-commit",
+    "application-acquire-checkpoint-committed",
+    "application-acquire-finalization-before-commit",
+    "application-acquire-finalization-committed",
+    "application-reconstruct-reconstruction-fenced",
+    "application-reconstruct-reconstruction-checkpoint-committed",
+    "application-expire-expiry-committed",
+    "application-cleanup-cleanup-fence-before-commit",
+    "application-cleanup-cleanup-fenced-committed",
+    "application-cleanup-cleanup-publication-fenced",
+    "application-cleanup-cleanup-drain-before-commit",
+    "application-cleanup-cleanup-drained-committed",
+    "application-cleanup-cleanup-private-erasure-returned",
+    "application-cleanup-cleanup-authorization-before-commit",
+    "application-cleanup-cleanup-authorized-committed",
+    "application-cleanup-cleanup-public-erasure-returned",
+    "application-cleanup-cleanup-completion-before-commit",
+    "application-cleanup-cleanup-erased-committed",
+    "issuer-admit-issuer-header-seal-durable",
+    "issuer-admit-custodian-original-header-durable",
+    "issuer-admit-publication-header-durable",
+    "issuer-admit-publication-payloads-durable",
+    "issuer-admit-publication-integrities-durable",
+    "issuer-admit-publication-attestations-durable",
+    "issuer-admit-publication-complete",
+    "issuer-close-custodian-spend-plan-durable",
+    "issuer-close-custodian-spent-fence-durable",
+    "issuer-close-custodian-private-object-unlinked",
+    "issuer-close-custodian-original-unlinked",
+    "issuer-close-custodian-comparison-unlinked",
+    "issuer-close-custodian-spend-receipt-durable",
+    "application-delete-recovery-publication-fence-durable",
+    "application-delete-recovery-deletion-plan-durable",
+    "application-delete-recovery-deletion-fence-durable",
+    "application-delete-recovery-deletion-attestations-durable",
+    "application-delete-recovery-deletion-headers-durable",
+    "application-delete-recovery-deletion-integrities-durable",
+    "application-delete-recovery-deletion-payloads-durable",
+    "application-delete-recovery-deletion-receipt-durable",
+    "issuer-close-custodian-header-unlinked",
+    "issuer-close-custodian-material-seal-unlinked",
+    "issuer-close-custodian-temporary-unlinked",
+    "issuer-admit-issuer-material-raw-page-seal-durable",
+    "issuer-admit-issuer-material-source-identity-1-seal-durable",
+    "issuer-admit-issuer-material-source-identity-2-seal-durable",
+    "issuer-admit-issuer-material-native-field-1-seal-durable",
+    "issuer-admit-issuer-material-native-field-2-seal-durable",
+    "issuer-admit-issuer-material-manual-native-index-seal-durable"
+  ],
+  "unselected": [],
+  "deterministic_faults": [
+    "same-command receipt replay",
+    "publication attachment rollback and lost ACK",
+    "original SQL envelope loss with retained intent",
+    "both original SQL anchors lost unresolved",
+    "material loss and MATERIAL_UNAVAILABLE audit",
+    "shared upload live peer and read drain",
+    "expanded original-ref dependency rediscovery",
+    "original clock expiry and revocation during content work",
+    "private material deletion before SQL authorization rollback",
+    "public material deletion before SQL completion rollback",
+    "cached private/public deletion receipts and reappeared material",
+    "store-owner payload plus ordinary hash rewrite refused",
+    "application private-key and custody read denial"
+  ]
+}
