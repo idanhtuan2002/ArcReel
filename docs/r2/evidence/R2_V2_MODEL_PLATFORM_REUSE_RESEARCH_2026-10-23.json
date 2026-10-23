@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "status": "RESEARCH_COMPLETE_RECOMMENDATION_ONLY",
+  "created_at": "2026-10-23T16:49:58.267626+00:00",
+  "source_head": "e9da04fb73557e726ffec56b29c31580a97f5150",
+  "research_branch": "research/v2-model-platform",
+  "production_tag": "r2-v2.0.6",
+  "production_commit": "8bd86a6c3915281838df15ee16ea4a70c3e20e71",
+  "report": "docs/research/2026-10-23-v2-system-wide-model-reuse.md",
+  "report_sha256": "f808dfdadf1e8573b1d34f0a7bb4cd64f079346ff8448926723c39927246aee5",
+  "recommendation": "Extend V2 authority/seams; selectively reuse pinned ArcReel catalog/metering behind compatibility adapters; retain modality/Agent execution contracts. No wholesale upstream merge or external gateway replacement.",
+  "upstream_pin": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+  "source_manifest_sha256": "db619eeb35ac1eca7770d60230048c11ce45cece1a0762b2f0a95fd997273776",
+  "existing_v2_tests": {
+    "tests": 128,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 4,
+    "seconds": 8.49,
+    "log_sha256": "08bb6f8477f04b56e6f58f407a4c3317ac1a2ffb7c29061f1da9ae1b9e083005",
+    "junit_sha256": "5e3b8c2b458ffcdbd3af619555b5dc922edf590f4953fec7f71121abfbd92646"
+  },
+  "donor_metering_tests": {
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 0.12,
+    "pin": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+    "scope": "exact pure module+core+existing tests extracted with empty package shims; no repo-wide donor fixtures",
+    "junit_sha256": "442da7b64f2745add1fdf54601d9847f9d75d7d0f468284fb666db7919834183"
+  },
+  "same_fixture_probe": {
+    "upstream_pin": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+    "legacy_source_head": "e9da04fb73557e726ffec56b29c31580a97f5150",
+    "matches": 3,
+    "expected_policy_differences": 1,
+    "scope": "pure price arithmetic only; no catalog migration, credential, provider, transaction or budget admission parity",
+    "fixtures": [
+      {
+        "fixture": "text",
+        "legacy_amount": 0.00155,
+        "upstream_amount": 0.00155,
+        "currency": "USD",
+        "result": "MATCH"
+      },
+      {
+        "fixture": "image",
+        "legacy_amount": 0.12,
+        "upstream_amount": 0.12,
+        "currency": "USD",
+        "result": "MATCH"
+      },
+      {
+        "fixture": "video",
+        "legacy_amount": 4.0,
+        "upstream_amount": 4.0,
+        "currency": "USD",
+        "result": "MATCH"
+      },
+      {
+        "fixture": "text_missing_usage",
+        "legacy_amount": 0.0,
+        "upstream_result": "missing_rate",
+        "result": "EXPECTED_POLICY_DIFFERENCE"
+      }
+    ]
+  },
+  "archive": {
+    "path": "/home/anhtuan/.codex/worktrees/c1b3/content-production-os/.superpowers/sdd/2026-10-23-model-platform-research-evidence.tar.gz",
+    "sha256": "c2d9e5135cfb44e810ceb9a59cc5c9943ebbd0f27abff584a27023f6cdaa3641",
+    "bytes": 42157
+  },
+  "checks": {
+    "local_report_links": true,
+    "source_hashes_match_pins": true
+  },
+  "boundaries": {
+    "implementation_changed": false,
+    "db_migration_run": false,
+    "production_changed": false,
+    "paid_generation_called": false,
+    "adr_accepted": false,
+    "m9_m10_paused": true
+  },
+  "limits": [
+    "Bounded research, not exhaustive outbound-call inventory.",
+    "OpenMontage, Huohuo and DramaClaw source inspected; their tests were not rerun.",
+    "Novel Studio/Shenbi/DC-Media protocol source not freshly verified; historical pins only.",
+    "LiteLLM and AI SDK comparison uses current official docs only, no pinned-source or execution qualification.",
+    "No full-suite, live provider, end-to-end cloud story, migration or budget-concurrency acceptance."
+  ],
+  "next": "Prepare system-wide ADR delta and compatibility crosswalk; Gemini-only drafts remain paused and are not the system-wide design."
+}
