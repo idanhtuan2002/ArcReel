@@ -526,7 +526,7 @@ export function OverviewCanvas({
                         className="mt-1 break-words text-[13px] leading-[1.7]"
                         style={{ color: "var(--color-text-2)" }}
                       >
-                        {overview.world_setting}
+                        {humanizeLabel(overview.world_setting)}
                       </p>
                     </div>
                   )}

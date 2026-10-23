@@ -26,10 +26,11 @@ interface PipelineBoardViewProps {
 /** 生产环总览：各阶段状态、下一步、等待你处理的决定与进行中的长任务。纯展示，数据由容器给出。 */
 export function PipelineBoardView({ plan, runs }: PipelineBoardViewProps) {
   const { t } = useTranslation("dashboard");
+  const { t: tWorkflow } = useTranslation("workflow");
   const states = stageStates(plan, runs);
   const decisions = pendingDecisions(runs);
   const running = runs.filter((run) => WORKING_PHASES.has(run.phase));
-  const nextAction = plan && plan.next_action.type !== "none" ? nextStepForAction(t, plan.next_action.type) : null;
+  const nextAction = plan && plan.next_action.type !== "none" ? nextStepForAction(tWorkflow, plan.next_action.type) : null;
 
   return (
     <section aria-labelledby="pipeline-board-title" className="pipeline-board">

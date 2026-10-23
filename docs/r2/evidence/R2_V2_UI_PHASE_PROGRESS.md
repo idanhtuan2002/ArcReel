@@ -11,7 +11,7 @@ Story authoring is CREATE/CANON (step 3), not step 0 (Human correction 2026-10-2
 ## Steps
 - [x] 0. Stage model located (this file).
 - [x] 1. Inventory (below).
-- [ ] 2. Design (impeccable shape + /frontend-design): stepper on the North Star loop, pipeline control center on Overview, decision inbox, activity center.
+- [x] 2. Design (impeccable shape + /frontend-design): stepper on the North Star loop, pipeline control center on Overview, decision inbox, activity center.
 - [ ] 3. Implement + tests, in small committed slices.
 - [ ] 4. App-wide audit fixes (header labels, mobile overflow, /episodes empty state, 422/409, Vietnamese serif).
 - [ ] 5. Re-run critique app-wide (Chrome overlay + detector over all src) vs 22/40.
@@ -34,6 +34,7 @@ Current header stepper reads only `status.phase` ∈ {preparation, script, produ
 Human decisions 2026-10-23: DISCOVER/RESEARCH shown muted as "Sắp có" (coming soon); order = North Star stepper + pipeline control center first, then app-wide fixes.
 
 ## Log
+- Visual check done (vite dev on :5199 proxying to production, Playwright desktop+mobile). Fixed: next-step line used the dashboard namespace (raw "next_step"), world setting snake_case, script_structure→adapt, export→package. The board is correct against the real plan (server gates episode_plan behind asset_inventory). Found for step 4: on mobile the workspace shows only the agent panel and the header overlaps.
 - Slice 2 done: pipeline control center on Overview (frontend/src/components/canvas/pipeline/: pipeline-stages.ts aggregates server workflow steps + story runs per stage; PipelineBoard shows 10 stages with state, next action (nextStepForAction), "Chờ bạn quyết định" and "Đang chạy" lists). Next: one visual check (desktop+mobile), then step 4 app-wide fixes.
 - Slice 1 done: header stepper follows the North Star loop (frontend/src/components/layout/PhaseStepper.tsx; 10 stages, current pill + dots, DISCOVER/RESEARCH dashed "Sắp có"; current stage mapped from server status.phase: preparation→create, script→adapt, production→produce, completed→package). Next: slice 2 pipeline control center on Overview from the workflow plan.
 - 2026-10-23: r2-v2.0.3 tagged (story UI P0/P1), deploy pending Human. Phase started.

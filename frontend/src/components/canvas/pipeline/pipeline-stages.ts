@@ -11,11 +11,13 @@ const STEP_STAGE: Record<string, NorthStarStage> = {
   script_plan_content: "adapt",
   script_plan_review: "adapt",
   final_script: "adapt",
+  script_structure: "adapt",
   storyboard: "direct",
   asset_inventory: "prepare",
   asset_sheets: "prepare",
   narration_delivery: "produce",
   video: "produce",
+  export: "package",
 };
 
 const DECISION_PHASES = new Set<RunSummary["phase"]>(["READY_FOR_APPROVAL", "AWAITING_GATE_A"]);
@@ -49,7 +51,7 @@ export function stageStates(plan: WorkflowPlan | null, runs: RunSummary[]): Reco
   else if (pendingDecisions(runs).length > 0) result.create = "attention";
   else result.create = plan?.status.source_revision ? "done" : "ready";
   result.evaluate = result.produce === "done" ? "ready" : "todo";
-  result.package = plan?.status.state === "EXPORT_READY" ? "ready" : "todo";
+  if (plan?.status.state === "EXPORT_READY" && result.package === "todo") result.package = "ready";
   result.learn = "todo";
   return result;
 }
