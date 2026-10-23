@@ -12,8 +12,8 @@ Story authoring is CREATE/CANON (step 3), not step 0 (Human correction 2026-10-2
 - [x] 0. Stage model located (this file).
 - [x] 1. Inventory (below).
 - [x] 2. Design (impeccable shape + /frontend-design): stepper on the North Star loop, pipeline control center on Overview, decision inbox, activity center.
-- [ ] 3. Implement + tests, in small committed slices.
-- [ ] 4. App-wide audit fixes (header labels, mobile overflow, /episodes empty state, 422/409, Vietnamese serif).
+- [x] 3. Implement + tests, in small committed slices.
+- [x] 4. App-wide audit fixes (header labels, mobile overflow, /episodes empty state, 422/409, Vietnamese serif).
 - [ ] 5. Re-run critique app-wide (Chrome overlay + detector over all src) vs 22/40.
 - [ ] 6. Tag + Human deploy.
 
@@ -34,6 +34,7 @@ Current header stepper reads only `status.phase` ∈ {preparation, script, produ
 Human decisions 2026-10-23: DISCOVER/RESEARCH shown muted as "Sắp có" (coming soon); order = North Star stepper + pipeline control center first, then app-wide fixes.
 
 ## Log
+- Step 4 done: mobile projects page no longer scrolls horizontally (390px viewport measured 758 → 390); workspace on mobile 390 with the board visible. Load errors: the only failing request is GET video-capabilities 422 (no video provider configured, a valid server refusal); follow-up idea: show "no video provider" on the Produce stage. Next: step 5 critique re-run (Chrome overlay + detector over all src), then tag r2-v2.0.4.
 - Step 4b done: bare /episodes redirects to the overview; header icon buttons already carry aria-label/title (no change); <html lang> follows i18n and a Vietnamese UI uses Noto Serif (loaded) as the editorial face. Remaining step 4: 422/409 on load, mobile projects page overflow.
 - Step 4a done: below 768px the agent panel becomes a full-width overlay that starts closed (not persisted) and the sidebar collapses to icons (frontend/src/hooks/useNarrowViewport.ts, StudioLayout.tsx, AssetSidebar.tsx). Remaining step 4: /episodes empty state, header icon labels, 422/409 on load, Vietnamese serif, mobile projects page overflow.
 - Visual check done (vite dev on :5199 proxying to production, Playwright desktop+mobile). Fixed: next-step line used the dashboard namespace (raw "next_step"), world setting snake_case, script_structure→adapt, export→package. The board is correct against the real plan (server gates episode_plan behind asset_inventory). Found for step 4: on mobile the workspace shows only the agent panel and the header overlaps.

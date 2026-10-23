@@ -414,7 +414,7 @@ function TopBar({
           "inset 0 1px 0 oklch(1 0 0 / 0.05), 0 6px 24px -12px oklch(0 0 0 / 0.45)",
       }}
     >
-      <div className="mx-auto flex max-w-[1320px] items-center gap-4 px-6 py-3">
+      <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-4 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2.5">
           <img
             src="/android-chrome-192x192.png"
@@ -454,11 +454,11 @@ function TopBar({
             </kbd>
         </label>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={onAssets}
-            className="inline-flex items-center gap-1.5 rounded-[7px] border border-accent/25 bg-accent-dim px-3 py-1.5 text-[12px] text-text-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[7px] border border-accent/25 bg-accent-dim px-3 py-1.5 text-[12px] text-text-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             title={t("assets:library_title")}
           >
             <Library className="h-3.5 w-3.5" />
@@ -469,7 +469,7 @@ function TopBar({
             type="button"
             onClick={onImport}
             disabled={importing}
-            className="inline-flex items-center gap-1.5 rounded-[7px] border border-hairline bg-bg-grad-a/50 px-3 py-1.5 text-[12px] text-text-2 transition-colors hover:border-hairline-strong hover:bg-bg-grad-a focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[7px] border border-hairline bg-bg-grad-a/50 px-3 py-1.5 text-[12px] text-text-2 transition-colors hover:border-hairline-strong hover:bg-bg-grad-a focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
             {importing ? (
               <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" />
@@ -482,7 +482,7 @@ function TopBar({
             type="button"
             onClick={onCreate}
             data-onboarding={ONBOARDING_ANCHORS.lobbyCreateProject}
-            className="inline-flex items-center gap-1.5 rounded-[7px] px-3.5 py-1.5 text-[12px] font-semibold transition-transform motion-safe:hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[7px] px-3.5 py-1.5 text-[12px] font-semibold transition-transform motion-safe:hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             style={ACCENT_BUTTON_STYLE}
           >
             <Plus className="h-3.5 w-3.5" />
@@ -600,7 +600,7 @@ function HeroStrip({ totals, t }: HeroStripProps) {
   ];
 
   return (
-    <div className="mx-auto flex max-w-[1320px] items-stretch justify-between gap-6 px-6 pb-5 pt-6">
+    <div className="mx-auto flex max-w-[1320px] flex-wrap items-stretch justify-between gap-6 px-4 pb-5 pt-6 sm:px-6">
       <div className="min-w-0 flex-1">
         <h1
           className="font-editorial m-0"
@@ -629,13 +629,13 @@ function HeroStrip({ totals, t }: HeroStripProps) {
           {summaryLine}
         </p>
       </div>
-      <div className="flex flex-col items-end justify-between gap-2.5">
+      <div className="flex max-w-full flex-col items-start justify-between gap-2.5 sm:items-end">
         <div className="mt-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent-2">
           {t("dashboard:lobby_hero_eyebrow")} — {dateLine}
         </div>
         <div
           data-testid="lobby-hero-stats"
-          className="flex items-stretch overflow-hidden rounded-[10px] border border-hairline-soft"
+          className="flex max-w-full items-stretch overflow-x-auto rounded-[10px] border border-hairline-soft"
           style={{ background: "oklch(0.16 0.010 265 / 0.4)" }}
         >
           {stats.map((s, i) => (
@@ -702,7 +702,7 @@ function FilterPills({ active, onChange, counts, phaseLabels, t }: FilterPillsPr
         borderTopColor: "var(--color-hairline-soft)",
       }}
     >
-      <div className="mx-auto flex max-w-[1320px] items-center gap-1.5 px-6 py-2.5">
+      <div className="mx-auto flex max-w-[1320px] items-center gap-1.5 overflow-x-auto px-4 py-2.5 sm:px-6">
         {pills.map((c) => {
           const isActive = active === c.key;
           return (
@@ -712,7 +712,7 @@ function FilterPills({ active, onChange, counts, phaseLabels, t }: FilterPillsPr
               onClick={() => onChange(c.key)}
               aria-pressed={isActive}
               className={
-                "inline-flex items-center rounded-full px-3 py-1 text-[11.5px] font-medium backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
+                "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-3 py-1 text-[11.5px] font-medium backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
                 (isActive
                   ? "border border-accent/40 bg-accent/45 text-text"
                   : "border border-hairline-soft bg-[oklch(0.22_0.012_265_/_0.7)] text-text-3 hover:border-hairline hover:bg-[oklch(0.24_0.012_265_/_0.78)] hover:text-text-2")
