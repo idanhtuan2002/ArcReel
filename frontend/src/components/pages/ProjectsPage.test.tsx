@@ -168,10 +168,13 @@ describe("ProjectsPage", () => {
     const scriptPill = await screen.findByRole("button", { name: /脚本/ });
     fireEvent.click(scriptPill);
 
+    // 运营总览列出全部项目、不受筛选影响；筛选只作用于项目列表
+    const operations = screen.getByRole("region", { name: "运营" });
+    const outsideOperations = (text: string) => screen.queryAllByText(text).filter((el) => !operations.contains(el));
     await waitFor(() => {
-      expect(screen.queryByText("Shooting Project")).not.toBeInTheDocument();
+      expect(outsideOperations("Shooting Project")).toHaveLength(0);
     });
-    expect(screen.getAllByText("Writing Project").length).toBeGreaterThan(0);
+    expect(outsideOperations("Writing Project").length).toBeGreaterThan(0);
   });
 
   it("tells the reader how many sheets are older than the current content", async () => {

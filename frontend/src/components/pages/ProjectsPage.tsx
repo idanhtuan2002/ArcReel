@@ -1,3 +1,4 @@
+import { OperationsOverview } from "./operations/OperationsOverview";
 import {
   useCallback,
   useEffect,
@@ -1013,6 +1014,7 @@ export function ProjectsPage() {
       />
 
       <HeroStrip totals={totals} t={t} />
+      <OperationsOverview projects={projects} />
 
       {projects.length > 0 ? (
         <FilterPills
