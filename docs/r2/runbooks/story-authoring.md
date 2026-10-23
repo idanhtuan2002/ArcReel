@@ -87,6 +87,16 @@ and a qualification run proves them. Credentials go only into Settings › Provi
 machine only when a Human configures a cloud route and approves a brief that names it. Readiness research and cost
 estimates: `docs/research/2026-10-19-r2-v2-story-cloud-model-readiness.md`.
 
+### Embedded agent (Settings › Agent)
+
+The embedded creative agent uses its own credential, separate from the story models. Production is set up with
+a custom entry **Ollama local (qwen3.5-vimax:9b)** (`http://localhost:11434`, active). From r2-v2.0.2 a local
+endpoint creates sessions at once, but a 9B model cannot drive the agent's tools (it did not call
+`plan_episodes` and answered in Chinese), and its first turn needs minutes of prompt prefill. To switch to a cloud
+model: **Settings › Agent › Add**, pick a preset (Anthropic, DeepSeek, Kimi, GLM, MiniMax, …), enter its API key,
+**Test**, then **Activate**. The Ollama entry stays and can be re-activated. Story authoring and episode planning
+keep using the text models set per project.
+
 ## 7. Backup coverage
 
 Run state lives in the `tasks` table (PostgreSQL) and run artifacts under the project's `story_authoring/` folder;
