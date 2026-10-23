@@ -1,0 +1,81 @@
+{
+  "schema_version": "1",
+  "status": "M10_V2_RESEARCH_STARTED",
+  "base_tag": "r2-v2.0.5",
+  "base_commit": "4bd70525dc2a4e5a0e05c57381a90a35301ec169",
+  "branch": "design/r2-m10-v2-quality-packaging",
+  "user_instruction": "2026-10-23: save M9 work and proceed with M10 based on released V2",
+  "m9_state": "PAUSED_BY_USER_NOT_ACCEPTED",
+  "m9_head": "b0de59b2293a706d495ed33f01a4095772b0b1ae",
+  "m9_checkpoint": "/home/anhtuan/content-production-os/.worktrees/r2-m9b/.superpowers/checkpoints/2026-10-23-m9-paused-for-m10/MANIFEST.json",
+  "m9_archive_sha256": "45cb2e8f3049b6a2d04ef32b8ccc8a67e8349074e71b83c85b41cc3cf503af9b",
+  "source_sha256": {
+    "r2/contracts/results.py": "5c83a5569f496f7d7bd4c945c3fdfa0b271eafd987bf0484d0208016170221ae",
+    "r2/contracts/advanced_creative.py": "064ebe4dc1dba759bc9321d2cb4a5028fb36f2f0903295a5e338bfb78d537b65",
+    "r2/m3/deliverables.py": "78f3ddcbe7b16ab7206cc81fd4d9481c7162cbdb5d26507f20f031654451c785",
+    "r2/production/artifact_metadata.py": "7fc0433af059ffe0024d3673d367ee8e7e5b6bfb201c7f740b121207fde711b2",
+    "lib/candidate_store.py": "24427217c79d72c140ecd6d836914f4c55be5dd042f116069e496dbb6975d9f0",
+    "server/services/format_render.py": "85d908897165c0d86843383b33b6a9faf396a5c726bc63db4a43e7e6ce81f75c",
+    "server/services/format_validation.py": "dd750e46f4c9223ae75e8c16248d2e25b8eef2994db558e3c83626435fbe2af7",
+    "server/services/format_evidence.py": "1a623fe146b8f0aae855920a1d0a5e660bbcdb383b23dfa65e1c9a4fb05a007f",
+    "server/services/format_candidate.py": "38639f5f4a010fa37493785c5c93b74d56debabfe7c07e241aa35029de93d148",
+    "r2/advanced_creative/exploration.py": "2a350075723bcfe5939690381dc3806450ea3d4818a0d59ce84f89a3744172cc",
+    "docs/adr/0080-post-m8-north-star-closed-loop.md": "53f9d9986723df587cf52fd5b34b78c0d440809d6ba057df1625d179de070aa8",
+    "docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE_CONTRACT_2026-09-14.json": "047551f6a198bb1a310292aec389d0c3828d997e220effcf7ac2c1c2f6369ea4",
+    "tests/unit/r2/m3/test_deliverables.py": "05ce979274787987d75865e6f22d149e1ce44b563b48b8e28179a0def6d7eea2",
+    "tests/unit/lib/test_candidate_store.py": "b62eee0af8cfcd52bbd7cf7ee748d06ba175dee4e0b2cfe8fa058da585d58769"
+  },
+  "baseline_checks": [
+    {
+      "test_path": "tests/unit/r2/m3/test_deliverables.py",
+      "command": "PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/r2/m3/test_deliverables.py -q -n 0 --junitxml=/tmp/m10-v2-baseline-deliverables.xml",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_sha256": "2e2f6919dee0db5820e86f3c8de2d9d04c64a2721e86a5a5124aca6655646429",
+      "junit_local": ".superpowers/sdd/2026-10-23-r2-m10-v2/m10-v2-baseline-deliverables.xml",
+      "exit": 0
+    },
+    {
+      "test_path": "tests/unit/lib/test_candidate_store.py",
+      "command": "PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/lib/test_candidate_store.py -q -n 0 --junitxml=/tmp/m10-v2-baseline-candidate-store.xml",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit_sha256": "68a051f8bc6ff6ab240f3bbca4d9b7c89f3199d282a8242b9fa1b7b18941d9db",
+      "junit_local": ".superpowers/sdd/2026-10-23-r2-m10-v2/m10-v2-baseline-candidate-store.xml",
+      "exit": 0
+    }
+  ],
+  "baseline_warnings": "Each run emitted one SQLAlchemy warning about reflection of expression-based index idx_tasks_dedupe_active. No M10 product behavior tested.",
+  "donor_probe": {
+    "pin": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+    "source_sha256": {
+      "tools/base_tool.py": "eb7e1041c2924aa21c42117ac3ca9f702208e95fc7f12616e93ff0115d1aa88e",
+      "tools/publishers/export_bundle.py": "ae473a27086ad8207b849f0fba857ba6c038152e20418118931ea23ccf09c653",
+      "schemas/artifacts/__init__.py": "b298af5bb8b73ceeb193220b3b722bfea842a7bf4cfbbf6fcbbdee9532595599",
+      "schemas/artifacts/publish_log.schema.json": "bab332eefac416b8b572d7fcc4eaaa2bb71dd12f27c62042f139aa38d6bb6282"
+    },
+    "first_success": true,
+    "fixed_input_member_bytes_repeat": true,
+    "invalid_media_accepted": true,
+    "unapproved_replacement_accepted": true,
+    "explicit_missing_optional_rejected": true,
+    "authority_provided": false,
+    "production_or_provider_calls": false
+  },
+  "implementation_started": false,
+  "migration_executed": false,
+  "provider_api_calls": false,
+  "production_activated": false,
+  "accepted": false,
+  "limits": [
+    "Graph index is older r2-v2-main, not this release checkout; direct release-source verification used.",
+    "Initial sandbox test runner was interrupted with exit130 after stream descriptor errors; only the two escalated completed runs count.",
+    "Official FFmpeg web pages timed out; no web-derived API claim accepted.",
+    "Research and initial design only; M9 predecessor acceptance and M10 design freeze are not established."
+  ],
+  "next_task": "Complete fixed-commit donor/fixture screening and M8 schema/transaction seam research, then complete the M10 design and its explicit predecessor-order treatment before production code."
+}
