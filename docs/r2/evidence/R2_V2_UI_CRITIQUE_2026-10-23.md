@@ -38,3 +38,16 @@ The manuscript proof with severity-coloured margin notes (editorial metaphor); h
 
 ## Next (awaiting Human choice of scope)
 Recommended order: P0 flow (step 0 + handoff CTA + /episodes empty state) → P0 run progress and mobile → P1 checklist → P1 copy → P2 type/a11y → polish. Re-run the critique after the fixes, with a full detector pass over `src/features` and a Chrome overlay.
+
+## Done in r2-v2.0.3 (a3aa1144, tagged; deploy pending Human)
+P0/P1 on the story page plus the sidebar order and the overview labels. See the tag message for the full list and the deferred items.
+
+## Next phase: whole-app optimisation (proposed 2026-10-23, start next week)
+The Human pointed out that the story page is only one part of the product. The UI must use V2 fully, following the design priority "fully automatic, with Human monitoring and intervention at any important decision" (memory: autonomy-with-oversight-design).
+1. Pipeline control center: the Overview becomes a live dashboard of stages (Story → Source → Episodes → Assets → Storyboard → Video → Export), each with server status, running jobs, pending decisions and an auto/manual toggle.
+2. Decision inbox: every pending Human decision (Gate A, story approval, Gates B–D, batch-video admission) in one place, with notifications.
+3. Activity center for long jobs (story, planning, generation), usable on mobile.
+4. Unified stepper with story as step 0, driven by server state.
+5. App-wide audit: icon-only header buttons, mobile overflow, empty states (/episodes), 422/409 on load, a serif with Vietnamese coverage, a11y.
+6. Re-run the critique app-wide: Chrome overlay plus a detector pass over all of `frontend/src` (including features); compare against 22/40.
+Workflow: impeccable `shape` for 1–3 (new surfaces; run /frontend-design first per repo rule), then `audit`/`adapt`/`typeset` for 5, `critique` for 6.
