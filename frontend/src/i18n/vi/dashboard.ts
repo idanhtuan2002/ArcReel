@@ -1681,6 +1681,7 @@ export default {
   'pipeline_gate_none': 'Chưa có',
   'pipeline_gate_action_GREENLIGHT': 'Đã duyệt',
   'pipeline_gate_action_LOCK': 'Đã khóa',
+  'pipeline_gate_action_APPROVE_PUBLISH': 'Đã duyệt phát hành',
   'pipeline_gate_action_APPROVE': 'Đã duyệt',
   'pipeline_gate_action_REVOKE': 'Đã thu hồi',
   'pipeline_no_video_provider': 'Chưa cấu hình nhà cung cấp video nên chưa sản xuất video được.',

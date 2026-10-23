@@ -430,6 +430,7 @@ export default {
   'pipeline_gate_none': 'None yet',
   'pipeline_gate_action_GREENLIGHT': 'Approved',
   'pipeline_gate_action_LOCK': 'Locked',
+  'pipeline_gate_action_APPROVE_PUBLISH': 'Approved to publish',
   'pipeline_gate_action_APPROVE': 'Approved',
   'pipeline_gate_action_REVOKE': 'Revoked',
   'pipeline_no_video_provider': 'No video provider is configured, so video cannot be produced yet.',

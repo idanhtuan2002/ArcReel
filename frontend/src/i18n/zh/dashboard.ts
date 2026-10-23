@@ -430,6 +430,7 @@ export default {
   'pipeline_gate_none': '尚无',
   'pipeline_gate_action_GREENLIGHT': '已批准',
   'pipeline_gate_action_LOCK': '已锁定',
+  'pipeline_gate_action_APPROVE_PUBLISH': '已批准发布',
   'pipeline_gate_action_APPROVE': '已批准',
   'pipeline_gate_action_REVOKE': '已撤销',
   'pipeline_no_video_provider': '尚未配置视频供应商，暂时无法制作视频。',
