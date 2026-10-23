@@ -1,3 +1,4 @@
+import { useNarrowViewport } from "@/hooks/useNarrowViewport";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -49,7 +50,10 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
   const { currentProjectName, currentProjectData } = useProjectsStore();
   const debouncedFetchCost = useCostStore((s) => s.debouncedFetch);
   const [location, setLocation] = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedByUser, setCollapsed] = useState(false);
+  // 窄屏下侧栏固定收成图标栏，给画布留出宽度
+  const narrow = useNarrowViewport();
+  const collapsed = collapsedByUser || narrow;
   const [search, setSearch] = useState("");
 
   const characterCount = Object.keys(currentProjectData?.characters ?? {}).length;

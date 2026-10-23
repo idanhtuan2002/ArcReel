@@ -1,3 +1,4 @@
+import { useNarrowViewport } from "@/hooks/useNarrowViewport";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Bot } from "lucide-react";
@@ -37,6 +38,12 @@ export function StudioLayout({ children }: StudioLayoutProps) {
   // 演示项目在后端不存在：任务 / 项目事件流和 Agent 都是真实写路径，演示态下整条都不接
   const demoMode = useDemoWorkbench();
   const assistantPanelOpen = useAppStore((s) => s.assistantPanelOpen);
+  const setAssistantPanelOpen = useAppStore((s) => s.setAssistantPanelOpen);
+  const narrow = useNarrowViewport();
+  // 窄屏下 Agent 面板改为覆盖层，进入窄屏时先收起，避免一打开工作区就只剩聊天面板（不写入持久偏好）
+  useEffect(() => {
+    if (narrow) setAssistantPanelOpen(false);
+  }, [narrow, setAssistantPanelOpen]);
   const toggleAssistantPanel = useAppStore((s) => s.toggleAssistantPanel);
   const assistantPanelWidth = useAppStore((s) => s.assistantPanelWidth);
   const setAssistantPanelWidth = useAppStore((s) => s.setAssistantPanelWidth);
@@ -165,7 +172,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
       <GlobalHeader onNavigateBack={() => setLocation("~/app/projects")} />
       {demoMode ? <DemoReadOnlyBanner /> : null}
       <MigrationRepairBanner />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden">
         <AssetSidebar />
         <main className="flex-1 overflow-hidden">
           {children}
@@ -188,13 +195,13 @@ export function StudioLayout({ children }: StudioLayoutProps) {
           </div>
         ) : (
         <div
-          className={`relative shrink-0 overflow-hidden ${
+          className={`${narrow ? `absolute inset-y-0 right-0 ${UI_LAYERS.workspaceFloating}` : "relative"} shrink-0 overflow-hidden ${
             isResizing
               ? "transition-[min-width,border-color]"
               : "transition-[width,min-width,border-color] duration-300 ease-in-out"
           }`}
           style={{
-            width: assistantPanelOpen ? displayedPanelWidth : 0,
+            width: assistantPanelOpen ? (narrow ? "100%" : displayedPanelWidth) : 0,
             background: "oklch(0.19 0.011 250 / 0.5)",
             borderLeft: assistantPanelOpen
               ? "1px solid var(--color-hairline)"
