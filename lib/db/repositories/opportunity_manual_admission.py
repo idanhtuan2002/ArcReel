@@ -32,7 +32,7 @@ from lib.db.models.opportunity_manual_admission import (
 )
 from lib.db.repositories.opportunity import OpportunityProfileRepository
 from lib.db.repositories.opportunity_acquisition import CapabilityEvidenceRepository, SourceQueryRepository
-from r2.advanced_creative.digests import digest_canonical
+from r2.advanced_creative.digests import canonical_json_bytes, digest_canonical
 from r2.advanced_creative.exploration import uuid7
 from r2.contracts.opportunity import (
     AttemptOutcomeReason,
@@ -57,6 +57,14 @@ from r2.contracts.opportunity_acquisition_v2 import (
     SnapshotProvenanceV2,
 )
 from r2.opportunity.acquisition import PageCheckpoint
+from r2.opportunity.acquisition_v2 import (
+    CustodianPublicationDisposition,
+    CustodianSpendReceipt,
+    CustodianSpendSubject,
+    ManualCleanupState,
+    manual_publication_metadata_for_request,
+    verify_custodian_spent,
+)
 from r2.opportunity.acquisition_v2_digests import (
     digest_acquisition_request_v2,
     digest_acquisition_result_v2,
@@ -74,6 +82,7 @@ from r2.opportunity.manual_admission import (
     AdmissionRequest,
     DispatchClaim,
     ManualBindingDescriptor,
+    PublicationObjectRef,
     PublishedAdmission,
     admission_metadata_digest,
     effective_admission_deadlines,
@@ -230,6 +239,240 @@ class _ClosureRecord(M9ContractModel):
         return self
 
 
+class _RecoveryClosureMember(M9ContractModel):
+    record: _AttemptRecord
+    admission: AdmissionEnvelope | None
+    admission_present: bool = Field(strict=True)
+    intent_present: bool = Field(strict=True)
+    leases: tuple[_UploadLeaseRecord, ...]
+
+    @model_validator(mode="after")
+    def original_metadata(self) -> Self:
+        request = self.record.request
+        if request is None or (self.admission is None) != (not self.admission_present and not self.intent_present):
+            raise ValueError("recovery member must preserve its original metadata presence")
+        if self.admission is not None and (
+            self.admission.request != request
+            or self.admission.phase not in (AdmissionPhase.RESERVED, AdmissionPhase.READY)
+        ):
+            raise ValueError("recovery member is not its original reservation or admission")
+        if len(self.leases) > 1 or any(
+            lease.request != request or (lease.state, lease.version, lease.closure_id) != ("ACTIVE", 1, None)
+            for lease in self.leases
+        ):
+            raise ValueError("recovery member original upload lease differs")
+        if self.admission is not None:
+            claim = self.admission.claim_ref
+            if (claim is None and self.leases) or (
+                claim is not None and (len(self.leases) != 1 or self.leases[0].claim_ref != claim)
+            ):
+                raise ValueError("recovery member claim and original lease differ")
+        return self
+
+
+def _recovery_request(member: _RecoveryClosureMember) -> AdmissionRequest:
+    if member.record.request is None:
+        raise OpportunityError(_MISSING)
+    return member.record.request
+
+
+def _recovery_envelope(member: _RecoveryClosureMember, *, erased: bool) -> AdmissionEnvelope:
+    original = member.admission
+    body = (
+        original.model_dump(exclude={"metadata_digest"})
+        if original is not None
+        else {
+            "schema_version": "m9.manual-admission.v1",
+            "request": _recovery_request(member),
+            "claim_ref": None,
+            "objects": (),
+            "admitted_at": None,
+            "deadlines": None,
+            "dispatch_claim": None,
+        }
+    )
+    body.update(
+        phase=AdmissionPhase.ERASED if erased else AdmissionPhase.CLEANUP_PENDING,
+        version=(0 if original is None else original.version) + (2 if erased else 1),
+    )
+    return AdmissionEnvelope.model_validate({**body, "metadata_digest": admission_metadata_digest(body)})
+
+
+def _recovery_refs(members: tuple[_RecoveryClosureMember, ...], proof: CustodianSpendReceipt | None) -> tuple[str, ...]:
+    refs = {_recovery_request(member).publication_key for member in members}
+    for member in members:
+        if member.admission is not None:
+            refs.update(
+                ref
+                for obj in member.admission.objects
+                for ref in (obj.payload_ref, obj.integrity_ref, obj.attestation_ref)
+            )
+    if proof is not None:
+        publications = {publication.request.publication_key: publication for publication in proof.metadata.publications}
+        for member in members:
+            request = _recovery_request(member)
+            original = publications.get(request.publication_key)
+            if original is not None and original.request != request:
+                raise ValueError("recovery proof request differs from fenced original")
+            if original is None:
+                publications[request.publication_key] = CustodianPublicationDisposition(
+                    request=request,
+                    state="NEVER_ISSUED",
+                    header=None,
+                )
+            if member.admission is not None and member.admission.phase == AdmissionPhase.READY:
+                if original is None or original.header is None or member.admission.claim_ref is None:
+                    raise ValueError("ready recovery member lacks its original signed header")
+                expected = manual_publication_metadata_for_request(
+                    request,
+                    member.admission.claim_ref,
+                    tuple(PublicationObjectRef.from_descriptor(obj) for obj in member.admission.objects),
+                )
+                if original.header.metadata != expected:
+                    raise ValueError("recovery proof original refs differ from admitted refs")
+            if member.leases and member.leases[0].claim_ref != proof.metadata.claim_ref:
+                raise ValueError("recovery proof differs from the original SQL upload claim")
+        CustodianSpendSubject(
+            root_request=proof.metadata.root_request,
+            claim_ref=proof.metadata.claim_ref,
+            publications=tuple(publications.values()),
+        )
+        for publication in publications.values():
+            refs.add(publication.request.publication_key)
+            if publication.header is not None:
+                refs.update(
+                    ref
+                    for obj in publication.header.metadata.objects
+                    for ref in (obj.payload_ref, obj.integrity_ref, obj.attestation_ref)
+                )
+    return tuple(sorted(refs))
+
+
+@dataclass(frozen=True)
+class ManualRecoveryClosurePlan:
+    attempt_id: str
+    members: tuple[_RecoveryClosureMember, ...]
+    planning_transaction: object
+
+
+class _RecoveryClosureRecord(M9ContractModel):
+    schema_version: Literal["m9.manual-recovery-closure.v1"] = "m9.manual-recovery-closure.v1"
+    fence: AdmissionClosureIntent
+    intent: AdmissionClosureIntent
+    members: tuple[_RecoveryClosureMember, ...] = Field(min_length=1)
+    reads: tuple[_ReadLeaseRecord, ...]
+    reads_drained_at: AwareDatetime | None = None
+    public_key: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    proof: CustodianSpendReceipt | None = None
+    authorized_at: AwareDatetime | None = None
+    receipt: AdmissionDeletionReceipt | None = None
+    finished_at: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def recovery_stages(self) -> Self:
+        object.__setattr__(
+            self, "members", tuple(sorted(self.members, key=lambda member: member.record.attempt.attempt_id))
+        )
+        object.__setattr__(self, "reads", tuple(sorted(self.reads, key=lambda read: read.permit.lease_id)))
+        ids = [member.record.attempt.attempt_id for member in self.members]
+        keys = [_recovery_request(member).publication_key for member in self.members]
+        root = next(
+            (member for member in self.members if member.record.attempt.attempt_id == self.fence.attempt_id), None
+        )
+        if root is None or len(ids) != len(set(ids)) or len(keys) != len(set(keys)):
+            raise ValueError("recovery closure must freeze unique original members")
+        request = _recovery_request(root)
+        if (
+            (self.fence.user_id, self.fence.project_name) != (request.context.user_id, request.context.project_name)
+            or self.fence.phase != "CLEANUP_PENDING"
+            or self.fence.version != 1
+            or self.fence.attempt_version != root.record.attempt.attempt_version
+            or self.fence.envelope_version != _recovery_envelope(root, erased=False).version
+            or self.fence.object_refs != _recovery_refs(self.members, None)
+            or self.intent.model_dump(exclude={"phase", "version", "object_refs"})
+            != self.fence.model_dump(exclude={"phase", "version", "object_refs"})
+        ):
+            raise ValueError("recovery closure changed its original SQL fence")
+        for member in self.members:
+            original = _recovery_request(member)
+            if (original.context.user_id, original.context.project_name) != (
+                request.context.user_id,
+                request.context.project_name,
+            ):
+                raise ValueError("recovery closure contains another scope")
+        if len({read.permit.lease_id for read in self.reads}) != len(self.reads) or any(
+            read.permit.attempt_id not in ids
+            or (read.permit.user_id, read.permit.project_name)
+            != (request.context.user_id, request.context.project_name)
+            or read.permit.issued_at > self.fence.fenced_at
+            for read in self.reads
+        ):
+            raise ValueError("recovery closure read inventory differs")
+        version = self.intent.version
+        if version not in (1, 2, 3, 4) or self.intent.phase != ("ERASED" if version == 4 else "CLEANUP_PENDING"):
+            raise ValueError("unknown recovery closure stage")
+        if (version >= 2) != (self.reads_drained_at is not None) or (
+            self.reads_drained_at is not None and self.reads_drained_at < self.fence.fenced_at
+        ):
+            raise ValueError("recovery erasure requires durable read drainage")
+        if version < 3:
+            if (
+                any(
+                    value is not None
+                    for value in (self.public_key, self.proof, self.authorized_at, self.receipt, self.finished_at)
+                )
+                or self.intent.object_refs != self.fence.object_refs
+            ):
+                raise ValueError("recovery proof cannot precede read drainage")
+        else:
+            if (
+                self.proof is None
+                or self.public_key is None
+                or self.authorized_at is None
+                or self.reads_drained_at is None
+            ):
+                raise ValueError("recovery public deletion requires original private proof")
+            verify_custodian_spent(
+                canonical_json_bytes(self.proof),
+                public_key=bytes.fromhex(self.public_key),
+                expected_request=request,
+                closure_id=self.fence.closure_id,
+            )
+            if (
+                not self.proof.metadata.inventory_complete
+                or not self.reads_drained_at <= self.proof.metadata.deleted_at <= self.authorized_at
+            ):
+                raise ValueError("recovery proof must follow drainage and precede public authorization")
+            if self.intent.object_refs != _recovery_refs(self.members, self.proof):
+                raise ValueError("recovery deletion refs differ from authenticated original inventory")
+            if version == 3 and (self.receipt is not None or self.finished_at is not None):
+                raise ValueError("recovery public deletion is still pending")
+            if version == 4 and (
+                self.receipt is None
+                or self.finished_at is None
+                or self.receipt.closure != self.intent.model_copy(update={"phase": "CLEANUP_PENDING", "version": 3})
+                or self.receipt.retained_proofs
+                or not self.authorized_at <= self.receipt.deleted_at <= self.finished_at
+            ):
+                raise ValueError("recovery completion requires both physical receipts")
+        return self
+
+    def state(self) -> ManualCleanupState:
+        root = next(member for member in self.members if member.record.attempt.attempt_id == self.fence.attempt_id)
+        claim = (
+            root.admission.claim_ref
+            if root.admission is not None
+            else (root.leases[0].claim_ref if root.leases else None)
+        )
+        return ManualCleanupState(
+            intent=self.intent,
+            root_request=_recovery_request(root),
+            requests=tuple(_recovery_request(member) for member in self.members),
+            claim_ref=claim,
+            proof=self.proof,
+        )
+
+
 def _record_digest(record: M9ContractModel) -> str:
     record = type(record).model_validate(record.model_dump())
     return digest_canonical({"domain": "m9.manual-sql-record.v1", "body": record})
@@ -361,7 +604,7 @@ class ManualAdmissionRepository:
             statement = statement.with_for_update()
         return (await self.session.execute(statement)).scalar_one_or_none()
 
-    async def _record(self, row: M9AcquisitionAttemptModel) -> _AttemptRecord:
+    async def _record(self, row: M9AcquisitionAttemptModel, *, cleanup_only: bool = False) -> _AttemptRecord:
         if row.protocol_version != "m9.acquisition.v2":
             raise OpportunityError(_MISSING)
         record = _unpack(_AttemptRecord, row.body_json)
@@ -451,12 +694,14 @@ class ManualAdmissionRepository:
             raise OpportunityError(_MISSING)
         await self._verify_history(record)
         if attempt.state in (AttemptStateV2.EXPIRED_UNRECOVERABLE, AttemptStateV2.SUCCEEDED, AttemptStateV2.FAILED):
-            await self._verify_terminal_receipt(record)
+            await self._verify_terminal_receipt(record, cleanup_only=cleanup_only)
         elif record.receipt is not None or attempt.state in (AttemptStateV2.SUCCEEDED, AttemptStateV2.FAILED):
             raise OpportunityError(_MISSING)
         return record
 
     async def _subject(self, record: _AttemptRecord, *, operational: bool) -> SourceQuery:
+        if operational and await self._material_unavailable(record):
+            raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
         state = self.session.info["m9_manual_command_plan"]
         state["lower"] = True
         await self.session.execute(text("LOCK TABLE adaptation_heads IN SHARE MODE"))
@@ -599,8 +844,20 @@ class ManualAdmissionRepository:
         ).all()
         identity = self._original_upload_identity(request)
         for row in rows:
-            stored = await self._closure_value(row)
-            if any(self._original_upload_identity(member.admission.request) == identity for member in stored.members):
+            stored = (
+                await self._recovery_closure_value(row)
+                if self._is_recovery_closure(row)
+                else await self._closure_value(row)
+            )
+            if any(
+                self._original_upload_identity(
+                    _recovery_request(member)
+                    if isinstance(member, _RecoveryClosureMember)
+                    else member.admission.request
+                )
+                == identity
+                for member in stored.members
+            ):
                 raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
 
     async def _guard(
@@ -664,6 +921,16 @@ class ManualAdmissionRepository:
         await _flush(self.session)
 
     async def get_for_command(self, command: AcquireSourceQueryV2) -> AcquisitionAttemptV2 | None:
+        record = await self._command_record(command, cleanup_only=False)
+        return None if record is None else record.attempt
+
+    async def get_cleanup_subject(
+        self, command: AcquireSourceQueryV2
+    ) -> tuple[AcquisitionAttemptV2, ManualBindingDescriptor] | None:
+        record = await self._command_record(command, cleanup_only=True)
+        return None if record is None else (record.attempt, record.descriptor)
+
+    async def _command_record(self, command: AcquireSourceQueryV2, *, cleanup_only: bool) -> _AttemptRecord | None:
         command = AcquireSourceQueryV2.model_validate(command.model_dump())
         self._scope(command.context)
         await self.lock_commands((command.context,))
@@ -683,10 +950,10 @@ class ManualAdmissionRepository:
             return None
         if row.project_name != self.project_name or row.request_digest != digest_acquisition_request_v2(command):
             raise OpportunityError(_CONFLICT)
-        record = await self._record(row)
+        record = await self._record(row, cleanup_only=cleanup_only)
         if record.command != command:
             raise OpportunityError(_CONFLICT)
-        return record.attempt
+        return record
 
     async def get_attempt(self, attempt_id: str) -> AcquisitionAttemptV2 | None:
         row = await self._row(attempt_id)
@@ -851,7 +1118,9 @@ class ManualAdmissionRepository:
                 raise ValueError("original request differs from the frozen attempt")
             if row.erasure_fenced_at is not None and envelope.phase == AdmissionPhase.READY:
                 raise ValueError("ready admission cannot ignore a SQL erasure fence")
-            witness = await self._closure_witness(envelope, row)
+            witness = await self._recovery_witness(envelope, row)
+            if witness is None:
+                witness = await self._closure_witness(envelope, row)
             if envelope.claim_ref is not None:
                 lease_row = await self.session.get(
                     M9ManualUploadLeaseModel,
@@ -880,6 +1149,73 @@ class ManualAdmissionRepository:
         except (ValueError, TypeError):
             raise OpportunityError(_MISSING) from None
 
+    async def _cleanup_envelope(self, record: _AttemptRecord) -> AdmissionEnvelope | None:
+        """Read one retained original SQL anchor solely for erasure validation."""
+        identity = (self.user_id, self.project_name, record.attempt.attempt_id)
+        admission = await self.session.get(M9ManualAdmissionModel, identity, populate_existing=True)
+        intent = await self.session.scalar(
+            select(M9ManualPublicationIntentModel)
+            .where(
+                M9ManualPublicationIntentModel.user_id == self.user_id,
+                M9ManualPublicationIntentModel.project_name == self.project_name,
+                M9ManualPublicationIntentModel.attempt_id == record.attempt.attempt_id,
+            )
+            .execution_options(populate_existing=True)
+        )
+        if admission is not None and intent is not None:
+            return await self._envelope(record)
+        retained = admission if admission is not None else intent
+        if retained is None:
+            raise OpportunityError(_MISSING)
+        try:
+            envelope = AdmissionEnvelope.model_validate(retained.body_json)
+            if (
+                envelope.request != record.request
+                or envelope.phase not in (AdmissionPhase.RESERVED, AdmissionPhase.READY)
+                or (
+                    retained.user_id,
+                    retained.project_name,
+                    retained.attempt_id,
+                    retained.phase,
+                    retained.version,
+                    retained.metadata_digest,
+                )
+                != (*identity, envelope.phase, envelope.version, envelope.metadata_digest)
+                or (intent is not None and intent.publication_key != envelope.request.publication_key)
+                or (
+                    admission is not None
+                    and (
+                        admission.admitted_at != envelope.admitted_at
+                        or admission.erasure_fenced_at is not None
+                        or admission.erasure_version is not None
+                    )
+                )
+            ):
+                raise ValueError("retained cleanup anchor differs from its original columns")
+            markers = await self.session.scalar(
+                select(M9EventModel.event_id)
+                .where(
+                    M9EventModel.user_id == self.user_id,
+                    M9EventModel.project_name == self.project_name,
+                    M9EventModel.aggregate_id == record.attempt.attempt_id,
+                    M9EventModel.event_kind.in_(("MANUAL_ADMISSION_FENCED", "MANUAL_RECOVERY_ADMISSION_FENCED")),
+                )
+                .limit(1)
+            )
+            if markers is not None or record.attempt.attempt_id in await self._verified_recovery_fences():
+                raise ValueError("lost cleanup anchor cannot reset an existing fence")
+            leases = await self._recovery_lease_rows(record.attempt.attempt_id)
+            _RecoveryClosureMember(
+                record=record,
+                admission=envelope,
+                admission_present=admission is not None,
+                intent_present=intent is not None,
+                leases=tuple(lease for _, lease in leases),
+            )
+            return envelope
+        except (ValueError, TypeError):
+            raise OpportunityError(_MISSING) from None
+
     async def get_envelope(self, attempt_id: str) -> AdmissionEnvelope | None:
         row = await self._row(attempt_id)
         if row is None:
@@ -891,7 +1227,15 @@ class ManualAdmissionRepository:
             raise OpportunityError(_MISSING)
         return await self._envelope(await self._record(row))
 
-    async def _save_envelope(self, envelope: AdmissionEnvelope, *, expected_version: int) -> None:
+    async def _save_envelope(
+        self,
+        envelope: AdmissionEnvelope,
+        *,
+        expected_version: int,
+        missing_admission: bool = False,
+        missing_intent: bool = False,
+        fenced_at: datetime | None = None,
+    ) -> None:
         body = envelope.model_dump(mode="json")
         for kind in (M9ManualAdmissionModel, M9ManualPublicationIntentModel):
             values = {
@@ -902,6 +1246,20 @@ class ManualAdmissionRepository:
             }
             if kind is M9ManualAdmissionModel:
                 values["admitted_at"] = envelope.admitted_at
+            if (kind is M9ManualAdmissionModel and missing_admission) or (
+                kind is M9ManualPublicationIntentModel and missing_intent
+            ):
+                if envelope.phase != AdmissionPhase.CLEANUP_PENDING or fenced_at is None:
+                    raise OpportunityError(_MISSING)
+                values.update(
+                    user_id=self.user_id, project_name=self.project_name, attempt_id=envelope.request.attempt_id
+                )
+                if kind is M9ManualAdmissionModel:
+                    values.update(erasure_fenced_at=fenced_at, erasure_version=1)
+                else:
+                    values["publication_key"] = envelope.request.publication_key
+                self.session.add(kind(**values))
+                continue
             result = await self.session.execute(
                 update(kind)
                 .where(
@@ -1217,10 +1575,10 @@ class ManualAdmissionRepository:
         record = await self._record(row)
         return await self._checkpoints(record)
 
-    async def _checkpoints(self, record: _AttemptRecord) -> tuple[PageCheckpoint, ...]:
+    async def _checkpoints(self, record: _AttemptRecord, *, cleanup_only: bool = False) -> tuple[PageCheckpoint, ...]:
         attempt = record.attempt
         attempt_id = attempt.attempt_id
-        envelope = await self._envelope(record)
+        envelope = await self._cleanup_envelope(record) if cleanup_only else await self._envelope(record)
         rows = (
             await self.session.scalars(
                 select(M9SnapshotPageModel)
@@ -1315,7 +1673,12 @@ class ManualAdmissionRepository:
         return checkpoint
 
     async def _validate_snapshot_binding(
-        self, stored: _SnapshotRecord, record: _AttemptRecord, envelope: AdmissionEnvelope
+        self,
+        stored: _SnapshotRecord,
+        record: _AttemptRecord,
+        envelope: AdmissionEnvelope,
+        *,
+        cleanup_only: bool = False,
     ) -> None:
         snapshot, provenance, original = stored.snapshot, stored.provenance, stored.admission
         attempt = record.attempt
@@ -1399,7 +1762,7 @@ class ManualAdmissionRepository:
             )
         ):
             raise OpportunityError(_MISSING)
-        checkpoints = await self._checkpoints(record)
+        checkpoints = await self._checkpoints(record, cleanup_only=cleanup_only)
         identities = tuple(sorted({ref for c in checkpoints for ref in c.source_identity_refs}))
         if snapshot.pages != tuple(c.page for c in checkpoints) or snapshot.source_identity_refs != identities:
             raise OpportunityError(_MISSING)
@@ -1424,7 +1787,7 @@ class ManualAdmissionRepository:
             raise OpportunityError(_MISSING)
 
     async def _snapshot_record(
-        self, row: M9SourceSnapshotModel, *, record: _AttemptRecord | None = None
+        self, row: M9SourceSnapshotModel, *, record: _AttemptRecord | None = None, cleanup_only: bool = False
     ) -> _SnapshotRecord:
         if record is None:
             attempt = await self.get_attempt(row.attempt_id)
@@ -1451,10 +1814,10 @@ class ManualAdmissionRepository:
             )
         ):
             raise OpportunityError(_MISSING)
-        envelope = await self._envelope(record)
+        envelope = await self._cleanup_envelope(record) if cleanup_only else await self._envelope(record)
         if envelope is None:
             raise OpportunityError(_MISSING)
-        await self._validate_snapshot_binding(stored, record, envelope)
+        await self._validate_snapshot_binding(stored, record, envelope, cleanup_only=cleanup_only)
         events = (
             await self.session.scalars(
                 select(M9EventModel).where(
@@ -1592,7 +1955,12 @@ class ManualAdmissionRepository:
         await _flush(self.session)
 
     async def _guard_dependencies(
-        self, records: dict[str, _AttemptRecord], *, operational_attempt_id: str | None
+        self,
+        records: dict[str, _AttemptRecord],
+        *,
+        operational_attempt_id: str | None,
+        cleanup_only: bool = False,
+        additional_object_refs: Sequence[str] = (),
     ) -> None:
         """Prelock every rank across the dependency set before validating subjects."""
         await self.lock_commands(tuple(record.command.context for record in records.values()))
@@ -1631,9 +1999,9 @@ class ManualAdmissionRepository:
             await self._subject(record, operational=attempt_id == operational_attempt_id)
         await self._original_upload_guards(tuple(r.request for r in records.values() if r.request is not None))
         claims = set()
-        object_refs = set()
+        object_refs = set(additional_object_refs)
         for record in records.values():
-            envelope = await self._envelope(record)
+            envelope = await self._cleanup_envelope(record) if cleanup_only else await self._envelope(record)
             if envelope is not None and envelope.claim_ref is not None:
                 claims.add((envelope.claim_ref, envelope.request.upload_version))
             if envelope is not None:
@@ -1643,10 +2011,13 @@ class ManualAdmissionRepository:
         await self._object_guards(tuple(object_refs))
         for attempt_id, expected in sorted(records.items()):
             row = await self._row(attempt_id, lock=True)
-            if row is None or await self._record(row) != expected:
+            if row is None or await self._record(row, cleanup_only=cleanup_only) != expected:
                 raise OpportunityError(_STALE)
         for record in records.values():
-            await self._envelope(record, lock=True)
+            if cleanup_only:
+                await self._cleanup_envelope(record)
+            else:
+                await self._envelope(record, lock=True)
 
     async def _observation_rows(self, observation_id: str) -> tuple[M9SourceObservationModel, ...]:
         return tuple(
@@ -1994,6 +2365,7 @@ class ManualAdmissionRepository:
             )
 
     async def _reject_fenced_refs(self, refs: set[str]) -> None:
+        await self._reject_recovery_fenced_refs(refs)
         rows = (
             await self.session.scalars(
                 select(M9ManualClosureIntentModel)
@@ -2016,6 +2388,9 @@ class ManualAdmissionRepository:
         expected = {}
         blocked = False
         for row in rows:
+            if self._is_recovery_closure(row):
+                await self._recovery_closure_value(row)
+                continue
             stored = await self._closure_value(row)
             blocked |= bool(refs.intersection(stored.intent.object_refs))
             for member in stored.members:
@@ -2041,7 +2416,459 @@ class ManualAdmissionRepository:
         if blocked:
             raise OpportunityError(_CONFLICT)
 
-    async def _closure_members(self, attempt_id: str) -> tuple[_ClosureMember, ...]:
+    @staticmethod
+    def _is_recovery_closure(row: M9ManualClosureIntentModel) -> bool:
+        try:
+            schema = row.body_json["metadata"]["schema_version"]
+        except (TypeError, KeyError):
+            raise OpportunityError(_MISSING) from None
+        if schema not in ("m9.manual-closure.v1", "m9.manual-recovery-closure.v1"):
+            raise OpportunityError(_MISSING)
+        return schema == "m9.manual-recovery-closure.v1"
+
+    async def _recovery_closure_value(self, row: M9ManualClosureIntentModel) -> _RecoveryClosureRecord:
+        stored = _unpack(_RecoveryClosureRecord, row.body_json, digest=row.metadata_digest)
+        intent = stored.intent
+        if (intent.user_id, intent.project_name) != (self.user_id, self.project_name) or any(
+            getattr(row, key) != getattr(intent, key)
+            for key in (
+                "user_id",
+                "project_name",
+                "closure_id",
+                "attempt_id",
+                "attempt_version",
+                "envelope_version",
+                "phase",
+                "version",
+                "fenced_at",
+            )
+        ):
+            raise OpportunityError(_MISSING)
+        await self._require_event(
+            aggregate_id=intent.closure_id,
+            version=intent.version,
+            kind="MANUAL_RECOVERY_CLOSURE_STATE",
+            digest=_record_digest(stored),
+            at=stored.finished_at or stored.authorized_at or stored.reads_drained_at or intent.fenced_at,
+        )
+        return stored
+
+    async def _store_recovery_closure(
+        self, stored: _RecoveryClosureRecord, row: M9ManualClosureIntentModel | None = None
+    ) -> None:
+        values = {
+            key: getattr(stored.intent, key)
+            for key in (
+                "user_id",
+                "project_name",
+                "closure_id",
+                "attempt_id",
+                "attempt_version",
+                "envelope_version",
+                "phase",
+                "version",
+                "fenced_at",
+            )
+        }
+        values.update(body_json=_pack(stored), metadata_digest=_record_digest(stored))
+        if row is None:
+            self.session.add(M9ManualClosureIntentModel(**values))
+        else:
+            for key, value in values.items():
+                setattr(row, key, value)
+        self._add_event(
+            aggregate_id=stored.intent.closure_id,
+            version=stored.intent.version,
+            kind="MANUAL_RECOVERY_CLOSURE_STATE",
+            digest=_record_digest(stored),
+            at=stored.finished_at or stored.authorized_at or stored.reads_drained_at or stored.fence.fenced_at,
+        )
+        await _flush(self.session)
+
+    @staticmethod
+    def _recovery_fence_digest(stored: _RecoveryClosureRecord, member: _RecoveryClosureMember) -> str:
+        return digest_canonical({"domain": "m9.manual-recovery-fence.v1", "fence": stored.fence, "member": member})
+
+    async def _verified_recovery_fences(self) -> dict[str, tuple[_RecoveryClosureRecord, _RecoveryClosureMember]]:
+        rows = (
+            await self.session.scalars(
+                select(M9ManualClosureIntentModel)
+                .where(
+                    M9ManualClosureIntentModel.user_id == self.user_id,
+                    M9ManualClosureIntentModel.project_name == self.project_name,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        expected = {}
+        for row in rows:
+            if not self._is_recovery_closure(row):
+                await self._closure_value(row)
+                continue
+            stored = await self._recovery_closure_value(row)
+            for member in stored.members:
+                attempt_id = member.record.attempt.attempt_id
+                if attempt_id in expected:
+                    raise OpportunityError(_MISSING)
+                expected[attempt_id] = (stored, member)
+        markers = (
+            await self.session.scalars(
+                select(M9EventModel).where(
+                    M9EventModel.user_id == self.user_id,
+                    M9EventModel.project_name == self.project_name,
+                    M9EventModel.event_kind == "MANUAL_RECOVERY_ADMISSION_FENCED",
+                )
+            )
+        ).all()
+        seen = set()
+        for marker in markers:
+            value = expected.get(marker.aggregate_id)
+            if value is None or marker.aggregate_id in seen:
+                raise OpportunityError(_MISSING)
+            stored, member = value
+            if (marker.aggregate_revision, marker.payload_digest, marker.committed_at) != (
+                _recovery_envelope(member, erased=False).version,
+                self._recovery_fence_digest(stored, member),
+                stored.fence.fenced_at,
+            ):
+                raise OpportunityError(_MISSING)
+            seen.add(marker.aggregate_id)
+        if seen != set(expected):
+            raise OpportunityError(_MISSING)
+        return expected
+
+    async def _recovery_lease_rows(
+        self, attempt_id: str
+    ) -> tuple[tuple[M9ManualUploadLeaseModel, _UploadLeaseRecord], ...]:
+        rows = (
+            await self.session.scalars(
+                select(M9ManualUploadLeaseModel)
+                .where(
+                    M9ManualUploadLeaseModel.user_id == self.user_id,
+                    M9ManualUploadLeaseModel.project_name == self.project_name,
+                    M9ManualUploadLeaseModel.attempt_id == attempt_id,
+                )
+                .order_by(M9ManualUploadLeaseModel.claim_ref)
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        return tuple((row, _upload_lease(row)) for row in rows)
+
+    async def _recovery_witness(
+        self, envelope: AdmissionEnvelope, row: M9ManualAdmissionModel
+    ) -> _RecoveryClosureRecord | None:
+        value = (await self._verified_recovery_fences()).get(row.attempt_id)
+        if value is None:
+            return None
+        stored, member = value
+        old_marker = await self.session.scalar(
+            select(M9EventModel.event_id)
+            .where(
+                M9EventModel.user_id == self.user_id,
+                M9EventModel.project_name == self.project_name,
+                M9EventModel.aggregate_id == row.attempt_id,
+                M9EventModel.event_kind == "MANUAL_ADMISSION_FENCED",
+            )
+            .limit(1)
+        )
+        erased = stored.intent.phase == "ERASED"
+        if (
+            old_marker is not None
+            or envelope != _recovery_envelope(member, erased=erased)
+            or (row.erasure_fenced_at, row.erasure_version) != (stored.fence.fenced_at, 1)
+        ):
+            raise OpportunityError(_MISSING)
+        leases = await self._recovery_lease_rows(row.attempt_id)
+        expected = tuple(
+            lease.model_copy(
+                update={
+                    "state": "SPENT" if erased else "CLOSING",
+                    "version": 3 if erased else 2,
+                    "closure_id": stored.fence.closure_id,
+                }
+            )
+            for lease in member.leases
+        )
+        if tuple(lease for _, lease in leases) != expected:
+            raise OpportunityError(_MISSING)
+        return stored
+
+    async def _reject_recovery_fenced_refs(self, refs: set[str]) -> None:
+        for stored, _ in (await self._verified_recovery_fences()).values():
+            if refs.intersection(stored.intent.object_refs):
+                raise OpportunityError(_CONFLICT)
+
+    async def get_cleanup_state(self, attempt_id: str) -> ManualCleanupState | None:
+        rows = (
+            await self.session.scalars(
+                select(M9ManualClosureIntentModel)
+                .where(
+                    M9ManualClosureIntentModel.user_id == self.user_id,
+                    M9ManualClosureIntentModel.project_name == self.project_name,
+                )
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        found = None
+        for row in rows:
+            if self._is_recovery_closure(row):
+                stored = await self._recovery_closure_value(row)
+                if any(member.record.attempt.attempt_id == attempt_id for member in stored.members):
+                    if found is not None:
+                        raise OpportunityError(_MISSING)
+                    found = row.closure_id
+            else:
+                old = await self._closure_value(row)
+                if any(member.record.attempt.attempt_id == attempt_id for member in old.members):
+                    raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
+        await self._verified_recovery_fences()
+        if found is None:
+            return None
+        _, current = await self._locked_recovery_closure(found, mutation=False)
+        return current.state()
+
+    async def plan_recovery_closure(self, attempt_id: str) -> ManualRecoveryClosurePlan:
+        current = await self._closure_members(attempt_id, cleanup_only=True)
+        members = []
+        for member in current:
+            leases = await self._recovery_lease_rows(member.record.attempt.attempt_id)
+            members.append(
+                _RecoveryClosureMember(
+                    record=member.record,
+                    admission=member.admission,
+                    admission_present=await self.session.get(
+                        M9ManualAdmissionModel,
+                        (self.user_id, self.project_name, member.record.attempt.attempt_id),
+                        populate_existing=True,
+                    )
+                    is not None,
+                    intent_present=await self.session.get(
+                        M9ManualPublicationIntentModel,
+                        (self.user_id, self.project_name, member.admission.request.publication_key),
+                        populate_existing=True,
+                    )
+                    is not None,
+                    leases=tuple(lease for _, lease in leases),
+                )
+            )
+        transaction = self.session.sync_session.get_transaction()
+        if transaction is None:
+            raise OpportunityError(_MISSING)
+        return ManualRecoveryClosurePlan(attempt_id, tuple(members), transaction)
+
+    async def begin_recovery_closure(self, attempt_id: str, *, dependency_plan: object) -> ManualCleanupState:
+        existing = await self.get_cleanup_state(attempt_id)
+        if existing is not None:
+            return existing
+        if not isinstance(dependency_plan, ManualRecoveryClosurePlan) or dependency_plan.attempt_id != attempt_id:
+            raise OpportunityError(_MISSING)
+        planning = dependency_plan.planning_transaction
+        if (
+            not isinstance(planning, SessionTransaction)
+            or planning.is_active
+            or planning is self.session.sync_session.get_transaction()
+        ):
+            raise OpportunityError(_STALE)
+        records = {member.record.attempt.attempt_id: member.record for member in dependency_plan.members}
+        await self._guard_dependencies(records, operational_attempt_id=None, cleanup_only=True)
+        existing = await self.get_cleanup_state(attempt_id)
+        if existing is not None:
+            return existing
+        current_plan = await self.plan_recovery_closure(attempt_id)
+        if current_plan.members != dependency_plan.members:
+            raise OpportunityError(_STALE)
+        members = current_plan.members
+        root = next(member for member in members if member.record.attempt.attempt_id == attempt_id)
+        now = await self.profiles.database_time()
+        for member in members:
+            if member is root:
+                continue
+            deadline = (
+                member.admission.deadlines.retention_due_at
+                if member.admission is not None and member.admission.deadlines is not None
+                else None
+            )
+            if deadline is None:
+                clocks = _recovery_request(member).original_clocks
+                bounds = [clock.retention_due_at for clock in clocks if clock.retention_due_at is not None]
+                deadline = min(bounds) if bounds else None
+            if deadline is None or now < deadline:
+                raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
+        reads = await self._closure_reads(members, lock=True)
+        intent = AdmissionClosureIntent(
+            closure_id=uuid7(),
+            user_id=self.user_id,
+            project_name=self.project_name,
+            attempt_id=attempt_id,
+            attempt_version=root.record.attempt.attempt_version,
+            envelope_version=_recovery_envelope(root, erased=False).version,
+            phase="CLEANUP_PENDING",
+            version=1,
+            object_refs=_recovery_refs(members, None),
+            fenced_at=now,
+        )
+        stored = _RecoveryClosureRecord(fence=intent, intent=intent, members=members, reads=reads)
+        for member in members:
+            if member.admission is None:
+                raise OpportunityError(_MISSING)
+            await self._phase_member(
+                _ClosureMember(record=member.record, admission=member.admission),
+                phase=AdmissionPhase.CLEANUP_PENDING,
+                closure_id=intent.closure_id,
+                now=now,
+                missing_admission=not member.admission_present,
+                missing_intent=not member.intent_present,
+            )
+            self._add_event(
+                aggregate_id=member.record.attempt.attempt_id,
+                version=_recovery_envelope(member, erased=False).version,
+                kind="MANUAL_RECOVERY_ADMISSION_FENCED",
+                digest=self._recovery_fence_digest(stored, member),
+                at=now,
+            )
+        await self._store_recovery_closure(stored)
+        return stored.state()
+
+    async def _locked_recovery_closure(
+        self, closure_id: str, *, mutation: bool, additional_refs: Sequence[str] = ()
+    ) -> tuple[M9ManualClosureIntentModel, _RecoveryClosureRecord]:
+        row = await self._closure_row(closure_id)
+        if row is None or not self._is_recovery_closure(row):
+            raise OpportunityError(_MISSING)
+        initial = await self._recovery_closure_value(row)
+        refs = tuple(sorted(set(initial.intent.object_refs).union(additional_refs)))
+        records = await self._closure_records_after_fence(initial.members, initial.fence.fenced_at)
+        await self.lock_commands(tuple(record.command.context for record in records.values()))
+        if mutation:
+            await self._guard_dependencies(records, operational_attempt_id=None, additional_object_refs=refs)
+        row = await self._closure_row(closure_id, lock=mutation)
+        if row is None:
+            raise OpportunityError(_MISSING)
+        stored = await self._recovery_closure_value(row)
+        if (
+            stored.fence != initial.fence
+            or stored.members != initial.members
+            or stored.reads != initial.reads
+            or stored.intent.version < initial.intent.version
+        ):
+            raise OpportunityError(_STALE)
+        current = await self._closure_members(stored.fence.attempt_id, additional_refs=refs)
+        if tuple(member.record.attempt.attempt_id for member in current) != tuple(records):
+            raise OpportunityError(_STALE)
+        return row, stored
+
+    async def _recovery_drained_reads(self, stored: _RecoveryClosureRecord, *, now: datetime) -> None:
+        reads = await self._closure_reads(stored.members, lock=True)
+        if len(reads) != len(stored.reads) or any(
+            (current.permit, current.attempt_version) != (original.permit, original.attempt_version)
+            for current, original in zip(reads, stored.reads, strict=True)
+        ):
+            raise OpportunityError(_MISSING)
+        if any(read.released_at is None and now < read.permit.expires_at for read in reads):
+            raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
+
+    async def drain_recovery_closure(self, closure_id: str, *, expected_closure_version: int) -> ManualCleanupState:
+        row, stored = await self._locked_recovery_closure(closure_id, mutation=True)
+        if stored.intent.version >= 2:
+            return stored.state()
+        if stored.intent.version != expected_closure_version:
+            raise OpportunityError(_STALE)
+        now = await self.profiles.database_time()
+        await self._recovery_drained_reads(stored, now=now)
+        updated = _RecoveryClosureRecord.model_validate(
+            {**stored.model_dump(), "intent": stored.intent.model_copy(update={"version": 2}), "reads_drained_at": now}
+        )
+        await self._store_recovery_closure(updated, row)
+        return updated.state()
+
+    async def authorize_recovery_deletion(
+        self, closure_id: str, *, proof: CustodianSpendReceipt, public_key: bytes, expected_closure_version: int
+    ) -> ManualCleanupState:
+        proof = CustodianSpendReceipt.model_validate(proof.model_dump())
+        discovered = {
+            ref
+            for publication in proof.metadata.publications
+            if publication.header is not None
+            for obj in publication.header.metadata.objects
+            for ref in (obj.payload_ref, obj.integrity_ref, obj.attestation_ref)
+        } | {publication.request.publication_key for publication in proof.metadata.publications}
+        row, stored = await self._locked_recovery_closure(
+            closure_id, mutation=True, additional_refs=tuple(sorted(discovered))
+        )
+        root = next(member for member in stored.members if member.record.attempt.attempt_id == stored.fence.attempt_id)
+        verify_custodian_spent(
+            canonical_json_bytes(proof),
+            public_key=public_key,
+            expected_request=_recovery_request(root),
+            closure_id=closure_id,
+        )
+        if stored.proof is not None:
+            if stored.proof != proof or stored.public_key != public_key.hex():
+                raise OpportunityError(_CONFLICT)
+            return stored.state()
+        now = await self.profiles.database_time()
+        if (
+            stored.intent.version != expected_closure_version
+            or stored.intent.version != 2
+            or proof.metadata.deleted_at > now
+        ):
+            raise OpportunityError(_STALE)
+        await self._recovery_drained_reads(stored, now=now)
+        updated = _RecoveryClosureRecord.model_validate(
+            {
+                **stored.model_dump(),
+                "proof": proof,
+                "public_key": public_key.hex(),
+                "authorized_at": now,
+                "intent": stored.intent.model_copy(
+                    update={"version": 3, "object_refs": _recovery_refs(stored.members, proof)}
+                ),
+            }
+        )
+        await self._store_recovery_closure(updated, row)
+        return updated.state()
+
+    async def finish_recovery_closure(
+        self, receipt: AdmissionDeletionReceipt, *, expected_closure_version: int
+    ) -> ManualCleanupState:
+        row, stored = await self._locked_recovery_closure(receipt.closure.closure_id, mutation=True)
+        receipt = AdmissionDeletionReceipt.model_validate(receipt.model_dump())
+        if stored.receipt is not None:
+            if stored.receipt != receipt:
+                raise OpportunityError(_CONFLICT)
+            return stored.state()
+        now = await self.profiles.database_time()
+        if (
+            stored.intent.version != expected_closure_version
+            or stored.intent.version != 3
+            or receipt.closure != stored.intent
+            or receipt.deleted_at > now
+        ):
+            raise OpportunityError(_STALE)
+        await self._recovery_drained_reads(stored, now=now)
+        for member in stored.members:
+            if member.admission is None:
+                raise OpportunityError(_MISSING)
+            await self._phase_member(
+                _ClosureMember(record=member.record, admission=member.admission),
+                phase=AdmissionPhase.ERASED,
+                closure_id=stored.fence.closure_id,
+                now=now,
+            )
+        updated = _RecoveryClosureRecord.model_validate(
+            {
+                **stored.model_dump(),
+                "receipt": receipt,
+                "finished_at": now,
+                "intent": stored.intent.model_copy(update={"version": 4, "phase": "ERASED"}),
+            }
+        )
+        await self._store_recovery_closure(updated, row)
+        return updated.state()
+
+    async def _closure_members(
+        self, attempt_id: str, *, cleanup_only: bool = False, additional_refs: Sequence[str] = ()
+    ) -> tuple[_ClosureMember, ...]:
         rows = (
             await self.session.scalars(
                 select(M9ManualPublicationIntentModel)
@@ -2070,11 +2897,30 @@ class ManualAdmissionRepository:
             ):
                 raise OpportunityError(_MISSING)
             envelopes[row.attempt_id] = envelope
+        if cleanup_only:
+            attempts = (
+                await self.session.scalars(
+                    select(M9AcquisitionAttemptModel)
+                    .where(
+                        M9AcquisitionAttemptModel.user_id == self.user_id,
+                        M9AcquisitionAttemptModel.project_name == self.project_name,
+                        M9AcquisitionAttemptModel.protocol_version == "m9.acquisition.v2",
+                    )
+                    .execution_options(populate_existing=True)
+                )
+            ).all()
+            for attempt_row in attempts:
+                record = await self._record(attempt_row, cleanup_only=True)
+                if record.request is not None:
+                    envelope = await self._cleanup_envelope(record)
+                    if envelope is None:
+                        raise OpportunityError(_MISSING)
+                    envelopes[attempt_row.attempt_id] = envelope
         if attempt_id not in envelopes:
             raise OpportunityError(_MISSING)
         selected = {attempt_id}
         while True:
-            refs = {r for key in selected for r in self._admission_refs(envelopes[key])}
+            refs = set(additional_refs) | {r for key in selected for r in self._admission_refs(envelopes[key])}
             uploads = {self._original_upload_identity(envelopes[key].request) for key in selected}
             claims = {
                 (envelopes[key].claim_ref, envelopes[key].request.upload_version)
@@ -2098,8 +2944,8 @@ class ManualAdmissionRepository:
             row = await self._row(key)
             if row is None:
                 raise OpportunityError(_MISSING)
-            record = await self._record(row)
-            envelope = await self._envelope(record)
+            record = await self._record(row, cleanup_only=cleanup_only)
+            envelope = await self._cleanup_envelope(record) if cleanup_only else await self._envelope(record)
             if envelope is None or envelope != envelopes[key]:
                 raise OpportunityError(_STALE)
             members.append(_ClosureMember(record=record, admission=envelope))
@@ -2230,6 +3076,9 @@ class ManualAdmissionRepository:
         ).all()
         matches = []
         for closure_row in closures:
+            if self._is_recovery_closure(closure_row):
+                await self._recovery_closure_value(closure_row)
+                continue
             stored = await self._closure_value(closure_row)
             for member in stored.members:
                 if member.record.attempt.attempt_id != row.attempt_id:
@@ -2304,7 +3153,9 @@ class ManualAdmissionRepository:
             )
         return lease
 
-    async def _closure_reads(self, members: tuple[_ClosureMember, ...], *, lock: bool) -> tuple[_ReadLeaseRecord, ...]:
+    async def _closure_reads(
+        self, members: Sequence[_ClosureMember | _RecoveryClosureMember], *, lock: bool
+    ) -> tuple[_ReadLeaseRecord, ...]:
         orphan = await self.session.scalar(
             select(M9EventModel.event_id)
             .outerjoin(
@@ -2354,6 +3205,11 @@ class ManualAdmissionRepository:
             )
         ).all()
         for row in existing:
+            if self._is_recovery_closure(row):
+                recovery = await self._recovery_closure_value(row)
+                if any(member.record.attempt.attempt_id == attempt_id for member in recovery.members):
+                    raise OpportunityError(StopCode.M9_INVALIDATION_INCOMPLETE)
+                continue
             stored = await self._closure_value(row)
             if any(m.record.attempt.attempt_id == attempt_id for m in stored.members):
                 return await self.get_closure(stored.intent.closure_id)
@@ -2412,7 +3268,14 @@ class ManualAdmissionRepository:
         return intent
 
     async def _phase_member(
-        self, member: _ClosureMember, *, phase: AdmissionPhase, closure_id: str, now: datetime
+        self,
+        member: _ClosureMember,
+        *,
+        phase: AdmissionPhase,
+        closure_id: str,
+        now: datetime,
+        missing_admission: bool = False,
+        missing_intent: bool = False,
     ) -> None:
         original = member.admission
         pending = phase == AdmissionPhase.CLEANUP_PENDING
@@ -2457,17 +3320,19 @@ class ManualAdmissionRepository:
                 )
                 .values(erasure_fenced_at=now, erasure_version=1)
             )
-        await self._save_envelope(envelope, expected_version=original.version if pending else original.version + 1)
+        await self._save_envelope(
+            envelope,
+            expected_version=original.version if pending else original.version + 1,
+            missing_admission=missing_admission,
+            missing_intent=missing_intent,
+            fenced_at=now if pending else None,
+        )
 
-    async def _locked_closure(
-        self, closure_id: str, *, mutation: bool
-    ) -> tuple[M9ManualClosureIntentModel, _ClosureRecord]:
-        row = await self._closure_row(closure_id)
-        if row is None:
-            raise OpportunityError(_MISSING)
-        initial = await self._closure_value(row)
+    async def _closure_records_after_fence(
+        self, members: Sequence[_ClosureMember | _RecoveryClosureMember], fenced_at: datetime
+    ) -> dict[str, _AttemptRecord]:
         records = {}
-        for member in initial.members:
+        for member in members:
             attempt_row = await self._row(member.record.attempt.attempt_id)
             if attempt_row is None:
                 raise OpportunityError(_MISSING)
@@ -2511,12 +3376,22 @@ class ManualAdmissionRepository:
                         not added
                         or (added[0].from_version, added[0].from_state)
                         != (original.attempt.attempt_version, original.attempt.state)
-                        or added[0].at < initial.fence.fenced_at
+                        or added[0].at < fenced_at
                     )
                 )
             ):
                 raise OpportunityError(_MISSING)
             records[current.attempt.attempt_id] = current
+        return records
+
+    async def _locked_closure(
+        self, closure_id: str, *, mutation: bool
+    ) -> tuple[M9ManualClosureIntentModel, _ClosureRecord]:
+        row = await self._closure_row(closure_id)
+        if row is None or self._is_recovery_closure(row):
+            raise OpportunityError(_MISSING)
+        initial = await self._closure_value(row)
+        records = await self._closure_records_after_fence(initial.members, initial.fence.fenced_at)
         await self.lock_commands(tuple(r.command.context for r in records.values()))
         if mutation:
             await self._guard_dependencies(records, operational_attempt_id=None)
@@ -2539,6 +3414,10 @@ class ManualAdmissionRepository:
         return row, stored
 
     async def get_closure(self, closure_id: str) -> AdmissionClosureIntent:
+        row = await self._closure_row(closure_id)
+        if row is not None and self._is_recovery_closure(row):
+            _, recovery = await self._locked_recovery_closure(closure_id, mutation=False)
+            return recovery.intent
         _, stored = await self._locked_closure(closure_id, mutation=False)
         return stored.intent
 
@@ -2658,6 +3537,58 @@ class ManualAdmissionRepository:
         await self._save_envelope(updated, expected_version=envelope.version)
         return claim
 
+    @staticmethod
+    def _material_loss_digest(envelope: AdmissionEnvelope, version: int) -> str:
+        return digest_canonical(
+            {
+                "domain": "m9.manual-material-unavailable.v1",
+                "envelope_version": version,
+                "original": envelope.model_dump(exclude={"phase", "version", "metadata_digest"}),
+            }
+        )
+
+    async def _material_unavailable(self, record: _AttemptRecord) -> bool:
+        markers = (
+            await self.session.scalars(
+                select(M9EventModel).where(
+                    M9EventModel.user_id == self.user_id,
+                    M9EventModel.project_name == self.project_name,
+                    M9EventModel.aggregate_id == record.attempt.attempt_id,
+                    M9EventModel.event_kind == "MANUAL_MATERIAL_UNAVAILABLE",
+                )
+            )
+        ).all()
+        if not markers:
+            return False
+        envelope = await self._envelope(record)
+        now = await self.profiles.database_time()
+        if envelope is None or envelope.admitted_at is None or len(markers) != 1:
+            raise OpportunityError(_MISSING)
+        marker = markers[0]
+        if (
+            not 1 <= marker.aggregate_revision <= envelope.version
+            or marker.payload_digest != self._material_loss_digest(envelope, marker.aggregate_revision)
+            or not envelope.admitted_at <= marker.committed_at <= now
+        ):
+            raise OpportunityError(_MISSING)
+        return True
+
+    async def mark_material_unavailable(self, attempt_id: str, *, expected_envelope_version: int) -> None:
+        _, record = await self._guard(attempt_id, operational=False)
+        envelope = await self._envelope(record, lock=True)
+        if envelope is None or envelope.phase != AdmissionPhase.READY or envelope.version != expected_envelope_version:
+            raise OpportunityError(_STALE)
+        if await self._material_unavailable(record):
+            return
+        self._add_event(
+            aggregate_id=attempt_id,
+            version=envelope.version,
+            kind="MANUAL_MATERIAL_UNAVAILABLE",
+            digest=self._material_loss_digest(envelope, envelope.version),
+            at=await self.profiles.database_time(),
+        )
+        await _flush(self.session)
+
     async def begin_read(
         self, attempt_id: str, *, expected_envelope_version: int, operational: bool
     ) -> AdmissionReadPermit:
@@ -2667,6 +3598,8 @@ class ManualAdmissionRepository:
             raise OpportunityError(_STALE)
         now = await self.profiles.database_time()
         require_admission_access(envelope, now=now, operational=operational)
+        if await self._material_unavailable(record):
+            raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
         limits = [envelope.deadlines.retention_due_at]
         if operational:
             limits.append(envelope.deadlines.refresh_due_at)
@@ -2811,24 +3744,24 @@ class ManualAdmissionRepository:
                 raise OpportunityError(_MISSING)
 
     async def _receipt_snapshots(
-        self, record: _AttemptRecord
+        self, record: _AttemptRecord, *, cleanup_only: bool = False
     ) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
-        await self._checkpoints(record)
+        await self._checkpoints(record, cleanup_only=cleanup_only)
         row = await self._snapshot_row_for_attempt(record.attempt.attempt_id)
         if row is None:
             return (), (), ()
-        stored = await self._snapshot_record(row, record=record)
+        stored = await self._snapshot_record(row, record=record, cleanup_only=cleanup_only)
         return (
             (stored.snapshot.snapshot_id,),
             (stored.snapshot.snapshot_digest,),
             (stored.provenance_digest,),
         )
 
-    async def _verify_terminal_receipt(self, record: _AttemptRecord) -> None:
+    async def _verify_terminal_receipt(self, record: _AttemptRecord, *, cleanup_only: bool = False) -> None:
         receipt, attempt = record.receipt, record.attempt
-        snapshots = await self._receipt_snapshots(record)
+        snapshots = await self._receipt_snapshots(record, cleanup_only=cleanup_only)
         if attempt.state in (AttemptStateV2.SUCCEEDED, AttemptStateV2.FAILED):
-            await self._known_response_snapshot(record, state=attempt.state)
+            await self._known_response_snapshot(record, state=attempt.state, cleanup_only=cleanup_only)
         if (
             receipt is None
             or (receipt.snapshot_ids, receipt.snapshot_digests, receipt.snapshot_provenance_digests) != snapshots
@@ -2998,11 +3931,13 @@ class ManualAdmissionRepository:
         )
         return receipt.model_copy(update={"result_digest": digest_acquisition_result_v2(receipt)})
 
-    async def _known_response_snapshot(self, record: _AttemptRecord, *, state: AttemptStateV2) -> _SnapshotRecord:
+    async def _known_response_snapshot(
+        self, record: _AttemptRecord, *, state: AttemptStateV2, cleanup_only: bool = False
+    ) -> _SnapshotRecord:
         row = await self._snapshot_row_for_attempt(record.attempt.attempt_id)
         if row is None:
             raise OpportunityError(_MISSING)
-        stored = await self._snapshot_record(row, record=record)
+        stored = await self._snapshot_record(row, record=record, cleanup_only=cleanup_only)
         complete = stored.snapshot.coverage_state == CoverageState.COMPLETE_WITHIN_DECLARED_BOUNDS
         if stored.provenance.origin != SnapshotOriginV2.SOURCE_RESPONSE_VERIFIED or complete != (
             state == AttemptStateV2.SUCCEEDED

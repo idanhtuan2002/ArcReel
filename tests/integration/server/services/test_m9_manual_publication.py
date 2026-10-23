@@ -498,7 +498,15 @@ sys.addaudithook(audit)
 store=FileManualPublicationStore(Path(body['root']),user_id='u1',project_name='show-a',boundary=boundary,
     verifier=ManualSealVerifier(public_key=bytes.fromhex(body['public_key']),verification_key_id=body['key_id']))
 try:
-    receipt=asyncio.run(store.delete_exact(AdmissionClosureIntent.model_validate(body['closure'])))
+    closure=AdmissionClosureIntent.model_validate(body['closure'])
+    if body.get('custody_proof') is not None:
+        from r2.opportunity.acquisition_v2 import CustodianSpendReceipt
+        from r2.opportunity.manual_admission import AdmissionRequest
+        receipt=asyncio.run(store.delete_recovery_exact(closure,
+            proof=CustodianSpendReceipt.model_validate(body['custody_proof']),
+            requests=tuple(AdmissionRequest.model_validate(r) for r in body['requests'])))
+    else:
+        receipt=asyncio.run(store.delete_exact(closure))
     print(json.dumps({'pid':os.getpid(),'receipt':receipt.model_dump(mode='json')}))
 except OpportunityError as exc:
     print(json.dumps({'error':str(exc)}))
@@ -507,7 +515,13 @@ except OpportunityError as exc:
 
 
 async def deletion_process(
-    instance: Any, publication: Any, closure: Any, crash_at: str | None = None
+    instance: Any,
+    publication: Any,
+    closure: Any,
+    crash_at: str | None = None,
+    *,
+    proof: Any = None,
+    requests: tuple[Any, ...] = (),
 ) -> tuple[int, dict[str, Any]]:
     body = {
         "root": str(instance.root),
@@ -515,9 +529,11 @@ async def deletion_process(
         "key_id": instance.verifier.verification_key_id,
         "closure": closure.model_dump(mode="json"),
         "crash_at": crash_at,
+        "custody_proof": None if proof is None else proof.model_dump(mode="json"),
+        "requests": [request.model_dump(mode="json") for request in requests],
         "forbidden_reads": [
             ref.rsplit(":", 1)[1] + suffix
-            for obj in publication.objects
+            for obj in (() if publication is None else publication.objects)
             for ref, suffix in ((obj.payload_ref, ".bin"), (obj.integrity_ref, ".json"), (obj.attestation_ref, ".json"))
         ],
     }
@@ -653,3 +669,119 @@ async def test_original_issuer_header_recovery_never_allocates_successor_refs(tm
     assert code == 0
     assert result["publication"] == publication.model_dump(mode="json")
     assert await instance.lookup_receipt(publication.publication_key) == original
+
+
+@pytest.mark.parametrize(
+    ("shape", "boundary"),
+    [("published", None), ("header-lost", None), ("never-issued", None)]
+    + [
+        ("published", "recovery-deletion-" + name + "-durable")
+        for name in ("plan", "fence", "attestations", "headers", "integrities", "payloads", "receipt")
+    ],
+)
+async def test_recovery_deletion_uses_original_private_inventory_without_content_reads(tmp_path: Path, shape, boundary):
+    from datetime import UTC, datetime
+
+    from r2.advanced_creative.digests import canonical_json_bytes
+    from r2.opportunity.manual_admission import AdmissionClosureIntent, AdmissionDeletionReceipt, AdmissionRequest
+    from tests.integration.server.services.test_m9_manual_custody_isolation import issuer_process
+
+    publication = None
+    if shape == "never-issued":
+        root, data, instance = await prepare_publication(tmp_path)
+        request = AdmissionRequest.model_validate(data)
+        claim_ref = None
+        refs = (request.publication_key,)
+    else:
+        root, _, publication, instance = await publication_subject(tmp_path)
+        request = publication.request
+        claim_ref = publication.claim_ref
+        refs = publication_closure(publication).object_refs
+        if shape == "header-lost":
+            headers = list(instance.root.rglob("headers/*.json"))
+            assert len(headers) == 1
+            headers[0].unlink()
+    closure = AdmissionClosureIntent(
+        closure_id="fixture-recovery-closure",
+        user_id="u1",
+        project_name="show-a",
+        attempt_id=request.attempt_id,
+        attempt_version=request.attempt_version,
+        envelope_version=2,
+        phase="CLEANUP_PENDING",
+        version=3,
+        object_refs=refs,
+        fenced_at=datetime.now(UTC),
+    )
+
+    class Custodian:
+        async def close_original(self, original, *, claim_ref, closure_id):
+            code, result = await issuer_process(
+                root,
+                "close",
+                request=original.model_dump(mode="json"),
+                claim_ref=claim_ref,
+                closure_id=closure_id,
+                deny_spend_content_read=True,
+            )
+            assert code == 0, result
+            return canonical_json_bytes(result["receipt"])
+
+    cleanup = publication_module().VerifiedManualCleanup(
+        descriptor=request.descriptor,
+        publication=instance,
+        custodian=Custodian(),
+        declared_origin="synthetic-fixture",
+        uploader_id="fixture-human",
+    )
+    discovered = await cleanup.fence_publications((request,), closure_id=closure.closure_id)
+    assert bool(discovered) == (shape == "published")
+    proof = await cleanup.spend_original(request, claim_ref=claim_ref, closure_id=closure.closure_id)
+    assert proof.metadata.inventory_complete
+    assert proof.metadata.publications[0].state == ("NEVER_ISSUED" if shape == "never-issued" else "ORIGINAL_HEADER")
+    interrupted = None
+    if boundary is not None:
+        code, interrupted = await deletion_process(
+            instance, publication, closure, boundary, proof=proof, requests=(request,)
+        )
+        assert code == 74
+    code, first = await deletion_process(instance, publication, closure, proof=proof, requests=(request,))
+    assert code == 0, first
+    if boundary is not None:
+        assert interrupted is not None
+        assert first["pid"] != interrupted["pid"]
+    receipt = AdmissionDeletionReceipt.model_validate(first["receipt"])
+    assert receipt.closure == closure
+    assert receipt.absent_refs == closure.object_refs
+    assert not receipt.retained_proofs
+    code, replay = await deletion_process(instance, publication, closure, proof=proof, requests=(request,))
+    assert code == 0, replay
+    assert first["pid"] != replay["pid"]
+    assert first["receipt"] == replay["receipt"]
+    for category in ("payloads", "integrities", "attestations", "headers"):
+        assert not list(instance.root.rglob(category + "/*"))
+    assert not (root / "original.json").exists()
+    assert not list(root.glob("seal-*.json"))
+
+
+async def test_cleanup_cannot_prove_absence_in_an_empty_successor_publication_root(tmp_path: Path):
+    from dataclasses import replace
+
+    root, data, instance = await prepare_publication(tmp_path)
+    from r2.opportunity.manual_admission import AdmissionRequest
+
+    request = AdmissionRequest.model_validate(data)
+
+    class UnavailableCustodian:
+        async def close_original(self, request, *, claim_ref, closure_id):
+            pytest.fail("wrong-root cleanup contacted original custodian")
+
+    with pytest.raises(OpportunityError, match="M9_SOURCE_POLICY_FORBIDDEN"):
+        publication_module().VerifiedManualCleanup(
+            descriptor=request.descriptor,
+            publication=replace(instance, root=tmp_path / "empty-successor"),
+            custodian=UnavailableCustodian(),
+            declared_origin="synthetic-fixture",
+            uploader_id="fixture-human",
+        )
+    assert (root / "original.json").exists()

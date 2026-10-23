@@ -18,16 +18,25 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from types import CodeType
+from typing import Literal
 from uuid import uuid4
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from pydantic import TypeAdapter
+from pydantic import Field, TypeAdapter
 
 from lib.json_io import atomic_write_bytes
 from r2.advanced_creative.digests import canonical_json_bytes
 from r2.contracts.opportunity import M9ContractModel, Slug
 from r2.opportunity.acquisition import NativeFieldMaterial
-from r2.opportunity.acquisition_v2 import CustodianSpendReceipt, custodian_spend_preimage
+from r2.opportunity.acquisition_v2 import (
+    CustodianPublicationDisposition,
+    CustodianSpendReceipt,
+    CustodianSpendSubject,
+    ManualCustodianClosurePort,
+    manual_publication_metadata_for_request,
+)
+from r2.opportunity.acquisition_v2 import (
+    verify_custodian_spent as verify_private_custody_spend,
+)
 from r2.opportunity.errors import OpportunityError, StopCode
 from r2.opportunity.manual_admission import (
     AdmissionClosureIntent,
@@ -35,13 +44,13 @@ from r2.opportunity.manual_admission import (
     AdmissionEnvelope,
     AdmissionReadPermit,
     AdmissionRequest,
+    ManualBindingDescriptor,
     PublicationHeader,
     PublicationObjectRef,
     PublicationReceiptMetadata,
     PublishedAdmission,
     SealedObjectDescriptor,
     SealExpectation,
-    manual_binding_digest,
     publication_metadata_digest,
     require_admission_access,
 )
@@ -56,40 +65,9 @@ def verify_custodian_spent(
     raw: bytes, *, public_key: bytes, expected_request: AdmissionRequest, closure_id: str
 ) -> CustodianSpendReceipt:
     """Authenticate private erasure and original header metadata without content reads."""
-    try:
-        if type(raw) is not bytes or len(raw) > 16_777_216:
-            raise ValueError("private spending receipt exceeds bound")
-        receipt = CustodianSpendReceipt.model_validate_json(raw)
-        metadata = receipt.metadata
-        expected_request = AdmissionRequest.model_validate(expected_request.model_dump())
-        if (
-            canonical_json_bytes(receipt) != raw
-            or metadata.root_request != expected_request
-            or metadata.closure_id != closure_id
-            or metadata.deleted_at > datetime.now(UTC)
-            or type(public_key) is not bytes
-            or len(public_key) != 32
-            or _sha(public_key) != expected_request.descriptor.verification_key_digest
-        ):
-            raise ValueError("private spending scope differs")
-        signature = base64.urlsafe_b64decode(receipt.signature + "==")
-        if len(signature) != 64 or _signature(signature) != receipt.signature:
-            raise ValueError("private spending signature encoding differs")
-        Ed25519PublicKey.from_public_bytes(public_key).verify(signature, custodian_spend_preimage(metadata))
-        verifier = ManualSealVerifier(
-            public_key=public_key, verification_key_id=expected_request.descriptor.verification_key_id
-        )
-        for publication in metadata.publications:
-            if publication.header is not None:
-                if metadata.claim_ref is None:
-                    raise ValueError("private spending original claim missing")
-                expected = manual_publication_metadata(
-                    publication.request, metadata.claim_ref, publication.header.metadata.objects
-                )
-                verifier.verify_receipt(canonical_json_bytes(publication.header), expected=expected)
-        return receipt
-    except Exception:
-        raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH) from None
+    return verify_private_custody_spend(
+        raw, public_key=public_key, expected_request=expected_request, closure_id=closure_id
+    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -430,6 +408,110 @@ class FileManualPublicationStore:
             self._arrive("deletion-receipt-durable")
             return receipt
 
+    async def fence_recovery_publications(
+        self, requests: tuple[AdmissionRequest, ...], *, closure_id: str
+    ) -> tuple[PublicationHeader, ...]:
+        try:
+            return await asyncio.to_thread(self._fence_recovery_publications, requests, closure_id)
+        except OpportunityError:
+            raise
+        except Exception:
+            raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH) from None
+
+    def _fence_recovery_publications(
+        self, requests: tuple[AdmissionRequest, ...], closure_id: str
+    ) -> tuple[PublicationHeader, ...]:
+        requests = tuple(AdmissionRequest.model_validate(request.model_dump()) for request in requests)
+        if not requests or not closure_id or len({r.publication_key for r in requests}) != len(requests):
+            raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+        for request in requests:
+            _recovery_request_scope(self, request)
+        with self._locked(create=True) as directories:
+            for request in requests:
+                _write_once(
+                    directories["blocked"],
+                    _key_name(request.publication_key),
+                    canonical_json_bytes({"closure_id": closure_id}),
+                )
+            self._arrive("recovery-publication-fence-durable")
+            return tuple(
+                header for request in requests if (header := self._lookup_receipt(request.publication_key)) is not None
+            )
+
+    async def delete_recovery_exact(
+        self, closure: AdmissionClosureIntent, *, proof: CustodianSpendReceipt, requests: tuple[AdmissionRequest, ...]
+    ) -> AdmissionDeletionReceipt:
+        try:
+            return await asyncio.to_thread(self._delete_recovery_exact, closure, proof, requests)
+        except OpportunityError:
+            raise
+        except Exception:
+            raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH) from None
+
+    def _delete_recovery_exact(
+        self, closure: AdmissionClosureIntent, proof: CustodianSpendReceipt, requests: tuple[AdmissionRequest, ...]
+    ) -> AdmissionDeletionReceipt:
+        expected = _RecoveryDeletionJob(
+            schema_version="m9.manual-recovery-deletion.v1",
+            closure=closure,
+            proof=proof,
+            requests=requests,
+            receipt=None,
+        )
+        _verify_recovery_job(self, expected)
+        if len(canonical_json_bytes(expected)) * 2 + 8192 > 33_554_432:
+            raise OpportunityError(StopCode.M9_OPERATIONAL_ENVELOPE_EXCEEDED)
+        with self._locked(create=True) as directories:
+            name = _key_name(closure.closure_id)
+            try:
+                raw = _read_file(directories["closures"], name, limit=33_554_432)
+                job = _RecoveryDeletionJob.model_validate_json(raw)
+                if canonical_json_bytes(job) != raw:
+                    raise ValueError("recovery deletion job is not canonical")
+            except FileNotFoundError:
+                job = expected
+                _write_once(directories["closures"], name, canonical_json_bytes(job))
+                self._arrive("recovery-deletion-plan-durable")
+            if job.model_dump(exclude={"receipt"}) != expected.model_dump(exclude={"receipt"}):
+                raise OpportunityError(StopCode.M9_COMMAND_REPLAY_CONFLICT)
+            headers, keys = _verify_recovery_job(self, job)
+            targets = _deletion_targets(headers) | {("headers", _key_name(key)) for key in keys}
+            if job.receipt is not None:
+                if any(_exists(directories[directory], target) for directory, target in targets):
+                    raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+                return job.receipt
+            originals = {header.metadata.publication_key: header for header in headers}
+            for key in keys:
+                present = self._lookup_receipt(key)
+                if present is not None and present != originals.get(key):
+                    raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+            for ref in closure.object_refs:
+                _write_once(
+                    directories["blocked"], _key_name(ref), canonical_json_bytes({"closure_id": closure.closure_id})
+                )
+            self._arrive("recovery-deletion-fence-durable")
+            for directory, target in sorted(targets):
+                try:
+                    info = os.stat(target, dir_fd=directories[directory], follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+                os.unlink(target, dir_fd=directories[directory])
+                os.fsync(directories[directory])
+                self._arrive("recovery-deletion-" + directory + "-durable")
+            if any(_exists(directories[directory], target) for directory, target in targets):
+                raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+            receipt = AdmissionDeletionReceipt(
+                closure=closure, absent_refs=closure.object_refs, retained_proofs=(), deleted_at=datetime.now(UTC)
+            )
+            job = job.model_copy(update={"receipt": receipt})
+            _verify_recovery_job(self, job)
+            atomic_write_bytes(Path(f"/proc/self/fd/{directories['closures']}") / name, canonical_json_bytes(job))
+            os.fsync(directories["closures"])
+            self._arrive("recovery-deletion-receipt-durable")
+            return receipt
+
 
 _MATERIAL_DOMAIN = b"m9.manual-material-seal.v1\x00"
 _HEADER_DOMAIN = b"m9.manual-publication-receipt.v1\x00"
@@ -450,6 +532,146 @@ class _DeletionJob(M9ContractModel):
     closure: AdmissionClosureIntent
     headers: tuple[PublicationHeader, ...]
     receipt: AdmissionDeletionReceipt | None
+
+
+class _RecoveryDeletionJob(M9ContractModel):
+    schema_version: Literal["m9.manual-recovery-deletion.v1"]
+    closure: AdmissionClosureIntent
+    proof: CustodianSpendReceipt
+    requests: tuple[AdmissionRequest, ...] = Field(min_length=1)
+    receipt: AdmissionDeletionReceipt | None
+
+
+def _recovery_request_scope(store: FileManualPublicationStore, request: AdmissionRequest) -> None:
+    if (
+        (request.context.user_id, request.context.project_name) != (store.user_id, store.project_name)
+        or request.descriptor.verification_key_id != store.verifier.verification_key_id
+        or request.descriptor.verification_key_digest != _sha(store.verifier.public_key)
+        or not request.publication_key
+        or len(request.publication_key) > 4096
+    ):
+        raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+
+
+def _verify_recovery_job(
+    store: FileManualPublicationStore, job: _RecoveryDeletionJob
+) -> tuple[tuple[PublicationHeader, ...], tuple[str, ...]]:
+    closure, proof = job.closure, job.proof
+    root = next((r for r in job.requests if r.attempt_id == closure.attempt_id), None)
+    if (
+        root is None
+        or root != proof.metadata.root_request
+        or (closure.user_id, closure.project_name) != (store.user_id, store.project_name)
+        or closure.phase != "CLEANUP_PENDING"
+        or closure.version != 3
+        or closure.attempt_version < root.attempt_version
+        or proof.metadata.deleted_at < closure.fenced_at
+        or not proof.metadata.inventory_complete
+        or len({r.publication_key for r in job.requests}) != len(job.requests)
+    ):
+        raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+    verify_custodian_spent(
+        canonical_json_bytes(proof),
+        public_key=store.verifier.public_key,
+        expected_request=root,
+        closure_id=closure.closure_id,
+    )
+    publications = {p.request.publication_key: p for p in proof.metadata.publications}
+    for request in job.requests:
+        _recovery_request_scope(store, request)
+        original = publications.get(request.publication_key)
+        if original is not None and original.request != request:
+            raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+        if original is None:
+            publications[request.publication_key] = CustodianPublicationDisposition(
+                request=request, state="NEVER_ISSUED", header=None
+            )
+    subject = CustodianSpendSubject(
+        root_request=root, claim_ref=proof.metadata.claim_ref, publications=tuple(publications.values())
+    )
+    headers = tuple(p.header for p in subject.publications if p.header is not None)
+    keys = tuple(sorted(publications))
+    refs = {
+        ref
+        for header in headers
+        for obj in header.metadata.objects
+        for ref in (obj.payload_ref, obj.integrity_ref, obj.attestation_ref)
+    }
+    if set(keys).intersection(refs) or set(closure.object_refs) != set(keys) | refs:
+        raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+    if job.receipt is not None and (
+        job.receipt.closure != closure
+        or job.receipt.retained_proofs
+        or job.receipt.deleted_at < proof.metadata.deleted_at
+        or job.receipt.deleted_at > datetime.now(UTC)
+    ):
+        raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH)
+    return headers, keys
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class VerifiedManualCleanup:
+    """Original storage/config binding and public verification, without a signing key."""
+
+    descriptor: ManualBindingDescriptor
+    publication: FileManualPublicationStore
+    custodian: ManualCustodianClosurePort = field(repr=False)
+    declared_origin: str
+    uploader_id: str
+
+    def __post_init__(self) -> None:
+        descriptor = ManualBindingDescriptor.model_validate(self.descriptor.model_dump())
+        store = self.publication
+        if (
+            (descriptor.user_id, descriptor.project_name) != (store.user_id, store.project_name)
+            or descriptor.verification_key_id != store.verifier.verification_key_id
+            or descriptor.verification_key_digest != _sha(self.public_key)
+            or descriptor.config_digest
+            != manual_publication_config_digest(
+                store.root,
+                declared_origin=self.declared_origin,
+                uploader_id=self.uploader_id,
+                store_namespace=descriptor.store_namespace,
+                resolver_namespace=descriptor.resolver_namespace,
+            )
+        ):
+            raise OpportunityError(StopCode.M9_SOURCE_POLICY_FORBIDDEN)
+
+    @property
+    def public_key(self) -> bytes:
+        return self.publication.verifier.public_key
+
+    def _request(self, request: AdmissionRequest) -> None:
+        if request.descriptor != self.descriptor:
+            raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)
+
+    async def fence_publications(
+        self, requests: tuple[AdmissionRequest, ...], *, closure_id: str
+    ) -> tuple[PublicationHeader, ...]:
+        for request in requests:
+            self._request(request)
+        return await self.publication.fence_recovery_publications(requests, closure_id=closure_id)
+
+    async def spend_original(
+        self, request: AdmissionRequest, *, claim_ref: str | None, closure_id: str
+    ) -> CustodianSpendReceipt:
+        self._request(request)
+        raw = await self.custodian.close_original(request, claim_ref=claim_ref, closure_id=closure_id)
+        receipt = verify_custodian_spent(
+            raw, public_key=self.public_key, expected_request=request, closure_id=closure_id
+        )
+        if not receipt.metadata.inventory_complete or (
+            claim_ref is not None and receipt.metadata.claim_ref != claim_ref
+        ):
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        return receipt
+
+    async def delete_exact(
+        self, closure: AdmissionClosureIntent, *, proof: CustodianSpendReceipt, requests: tuple[AdmissionRequest, ...]
+    ) -> AdmissionDeletionReceipt:
+        for request in requests:
+            self._request(request)
+        return await self.publication.delete_recovery_exact(closure, proof=proof, requests=requests)
 
 
 def _sha(raw: bytes) -> str:
@@ -634,24 +856,7 @@ def _require_read(envelope: AdmissionEnvelope, permit: AdmissionReadPermit) -> N
 def manual_publication_metadata(
     request: AdmissionRequest, claim: str, objects: tuple[PublicationObjectRef, ...]
 ) -> PublicationReceiptMetadata:
-    return PublicationReceiptMetadata(
-        schema_version="m9.manual-publication-receipt.v1",
-        context=request.context,
-        source_kind=request.descriptor.source_kind,
-        source_contract_version=request.descriptor.source_contract_version,
-        verification_key_id=request.descriptor.verification_key_id,
-        request_digest=request.request_digest,
-        query_id=request.query_id,
-        query_revision=request.query_revision,
-        query_digest=request.query_digest,
-        attempt_id=request.attempt_id,
-        attempt_version=request.attempt_version,
-        publication_key=request.publication_key,
-        claim_ref=claim,
-        upload_version=request.upload_version,
-        descriptor_digest=manual_binding_digest(request.descriptor),
-        objects=objects,
-    )
+    return manual_publication_metadata_for_request(request, claim, objects)
 
 
 def manual_material_expectation(metadata: PublicationReceiptMetadata, obj: PublicationObjectRef) -> SealExpectation:

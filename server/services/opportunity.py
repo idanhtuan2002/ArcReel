@@ -24,7 +24,7 @@ from server.services.governance_grants import CurrentShowrunnerGrantReader
 from server.services.m9_custodian import M9ProfileCustodian
 
 if TYPE_CHECKING:
-    from r2.opportunity.acquisition_v2 import ManualUploadMetadata, OpportunityAcquisitionServiceV2
+    from r2.opportunity.acquisition_v2 import ManualCleanupPort, ManualUploadMetadata, OpportunityAcquisitionServiceV2
     from r2.opportunity.manual_admission import ManualBindingDescriptor, ManualBindingRegistry
 
 
@@ -117,9 +117,10 @@ def build_acquisition_service_for_protocol(
     registry: ManualBindingRegistry | None = None,
     descriptor: ManualBindingDescriptor | None = None,
     upload: ManualUploadMetadata | None = None,
+    cleanup: ManualCleanupPort | None = None,
 ) -> OpportunityAcquisitionService | OpportunityAcquisitionServiceV2:
     if protocol_version == "m9.acquisition.v1":
-        if registry is not None or descriptor is not None or upload is not None:
+        if registry is not None or descriptor is not None or upload is not None or cleanup is not None:
             raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)
         return build_acquisition_service(
             sessions,
@@ -142,5 +143,6 @@ def build_acquisition_service_for_protocol(
             registry=registry,
             descriptor=descriptor,
             upload=upload,
+            cleanup=cleanup,
         )
     raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)

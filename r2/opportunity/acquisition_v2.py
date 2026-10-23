@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal, Protocol, Self
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import AwareDatetime, Field, model_validator
 
 from r2.advanced_creative.digests import canonical_json_bytes, digest_canonical
@@ -46,6 +49,8 @@ from r2.opportunity.capabilities import validate_capability
 from r2.opportunity.digests import digest_source_observation, digest_source_snapshot
 from r2.opportunity.errors import OpportunityError, StopCode
 from r2.opportunity.manual_admission import (
+    AdmissionClosureIntent,
+    AdmissionDeletionReceipt,
     AdmissionEnvelope,
     AdmissionReadPermit,
     AdmissionRequest,
@@ -54,7 +59,11 @@ from r2.opportunity.manual_admission import (
     ManualBindingDescriptor,
     ManualBindingRegistry,
     PublicationHeader,
+    PublicationObjectRef,
+    PublicationReceiptMetadata,
     PublishedAdmission,
+    SealedObjectDescriptor,
+    manual_binding_digest,
 )
 from r2.opportunity.normalization import decode_manual_payload, normalize_manual_page
 from r2.opportunity.ports import SourceCapabilityPort
@@ -174,7 +183,118 @@ class CustodianSpendReceipt(M9ContractModel):
         return self
 
 
+def manual_publication_metadata_for_request(
+    request: AdmissionRequest, claim: str, objects: tuple[PublicationObjectRef, ...]
+) -> PublicationReceiptMetadata:
+    return PublicationReceiptMetadata(
+        schema_version="m9.manual-publication-receipt.v1",
+        context=request.context,
+        source_kind=request.descriptor.source_kind,
+        source_contract_version=request.descriptor.source_contract_version,
+        verification_key_id=request.descriptor.verification_key_id,
+        request_digest=request.request_digest,
+        query_id=request.query_id,
+        query_revision=request.query_revision,
+        query_digest=request.query_digest,
+        attempt_id=request.attempt_id,
+        attempt_version=request.attempt_version,
+        publication_key=request.publication_key,
+        claim_ref=claim,
+        upload_version=request.upload_version,
+        descriptor_digest=manual_binding_digest(request.descriptor),
+        objects=objects,
+    )
+
+
+def _custody_signature(encoded: str) -> bytes:
+    signature = base64.urlsafe_b64decode(encoded + "==")
+    if len(signature) != 64 or base64.urlsafe_b64encode(signature).decode().rstrip("=") != encoded:
+        raise ValueError("private custody signature encoding differs")
+    return signature
+
+
+def verify_custodian_spent(
+    raw: bytes, *, public_key: bytes, expected_request: AdmissionRequest, closure_id: str
+) -> CustodianSpendReceipt:
+    """Verify original private erasure and header bindings without external I/O."""
+    try:
+        if type(raw) is not bytes or not 0 < len(raw) <= 16_777_216:
+            raise ValueError("private spending receipt exceeds bound")
+        receipt = CustodianSpendReceipt.model_validate_json(raw)
+        metadata = receipt.metadata
+        expected_request = AdmissionRequest.model_validate(expected_request.model_dump())
+        if (
+            canonical_json_bytes(receipt) != raw
+            or metadata.root_request != expected_request
+            or metadata.closure_id != closure_id
+            or metadata.deleted_at > datetime.now(UTC)
+            or type(public_key) is not bytes
+            or len(public_key) != 32
+            or "sha256:" + hashlib.sha256(public_key).hexdigest() != expected_request.descriptor.verification_key_digest
+        ):
+            raise ValueError("private spending scope differs")
+        key = Ed25519PublicKey.from_public_bytes(public_key)
+        key.verify(_custody_signature(receipt.signature), custodian_spend_preimage(metadata))
+        for publication in metadata.publications:
+            header = publication.header
+            if header is None:
+                continue
+            if metadata.claim_ref is None:
+                raise ValueError("private spending original claim missing")
+            PublishedAdmission(
+                request=publication.request,
+                publication_key=publication.request.publication_key,
+                claim_ref=metadata.claim_ref,
+                upload_version=publication.request.upload_version,
+                objects=tuple(SealedObjectDescriptor(**obj.model_dump()) for obj in header.metadata.objects),
+            )
+            expected = manual_publication_metadata_for_request(
+                publication.request, metadata.claim_ref, header.metadata.objects
+            )
+            if header.metadata != expected or len(canonical_json_bytes(header)) > 65_536:
+                raise ValueError("private spending original header binding differs")
+            key.verify(
+                _custody_signature(header.signature),
+                b"m9.manual-publication-receipt.v1\x00"
+                + canonical_json_bytes(header.model_dump(exclude={"signature"})),
+            )
+        return receipt
+    except Exception:
+        raise OpportunityError(StopCode.M9_RAW_DIGEST_MISMATCH) from None
+
+
+class ManualCustodianClosurePort(Protocol):
+    async def close_original(self, request: AdmissionRequest, *, claim_ref: str | None, closure_id: str) -> bytes: ...
+
+
+class ManualCleanupPort(Protocol):
+    @property
+    def descriptor(self) -> ManualBindingDescriptor: ...
+    @property
+    def public_key(self) -> bytes: ...
+    async def fence_publications(
+        self, requests: tuple[AdmissionRequest, ...], *, closure_id: str
+    ) -> tuple[PublicationHeader, ...]: ...
+    async def spend_original(
+        self, request: AdmissionRequest, *, claim_ref: str | None, closure_id: str
+    ) -> CustodianSpendReceipt: ...
+    async def delete_exact(
+        self, closure: AdmissionClosureIntent, *, proof: CustodianSpendReceipt, requests: tuple[AdmissionRequest, ...]
+    ) -> AdmissionDeletionReceipt: ...
+
+
+class ManualCleanupState(M9ContractModel):
+    intent: AdmissionClosureIntent
+    root_request: AdmissionRequest
+    requests: tuple[AdmissionRequest, ...] = Field(min_length=1)
+    claim_ref: str | None
+    proof: CustodianSpendReceipt | None
+
+
 class ManualAcquisitionRepositoryPort(Protocol):
+    async def get_cleanup_subject(
+        self, command: AcquireSourceQueryV2
+    ) -> tuple[AcquisitionAttemptV2, ManualBindingDescriptor] | None: ...
     async def get_for_command(self, command: AcquireSourceQueryV2) -> AcquisitionAttemptV2 | None: ...
     async def get_attempt(self, attempt_id: str) -> AcquisitionAttemptV2 | None: ...
     async def get_descriptor(self, attempt_id: str) -> ManualBindingDescriptor | None: ...
@@ -193,6 +313,7 @@ class ManualAcquisitionRepositoryPort(Protocol):
         self, attempt_id: str, *, expected_envelope_version: int, operational: bool
     ) -> AdmissionReadPermit: ...
     async def release_read(self, lease_id: str) -> None: ...
+    async def mark_material_unavailable(self, attempt_id: str, *, expected_envelope_version: int) -> None: ...
     async def append_checkpoint(
         self, attempt_id: str, checkpoint: PageCheckpoint, *, expected_attempt_version: int
     ) -> PageCheckpoint: ...
@@ -217,6 +338,16 @@ class ManualAcquisitionRepositoryPort(Protocol):
     async def close_expired(
         self, attempt_id: str, *, expected_attempt_version: int, resolver_id: str
     ) -> AcquisitionReceiptV2: ...
+    async def get_cleanup_state(self, attempt_id: str) -> ManualCleanupState | None: ...
+    async def plan_recovery_closure(self, attempt_id: str) -> object: ...
+    async def begin_recovery_closure(self, attempt_id: str, *, dependency_plan: object) -> ManualCleanupState: ...
+    async def drain_recovery_closure(self, closure_id: str, *, expected_closure_version: int) -> ManualCleanupState: ...
+    async def authorize_recovery_deletion(
+        self, closure_id: str, *, proof: CustodianSpendReceipt, public_key: bytes, expected_closure_version: int
+    ) -> ManualCleanupState: ...
+    async def finish_recovery_closure(
+        self, receipt: AdmissionDeletionReceipt, *, expected_closure_version: int
+    ) -> ManualCleanupState: ...
 
 
 class ManualAcquisitionTransactionPort(Protocol):
@@ -246,7 +377,9 @@ class OpportunityAcquisitionServiceV2:
         project_name: str,
         actor_id: str,
         boundary: Callable[[str], Awaitable[None]] | None = None,
+        cleanup: ManualCleanupPort | None = None,
     ) -> None:
+        self.cleanup = cleanup
         self.store, self.registry, self.descriptor, self.upload = store, registry, descriptor, upload
         self.capabilities, self._new_id, self._boundary = capabilities, new_id, boundary
         self.user_id, self.project_name, self.actor_id = user_id, project_name, actor_id
@@ -484,6 +617,89 @@ class OpportunityAcquisitionServiceV2:
             now = await tx.profiles.database_time()
         validate_capability(grant, evaluation, request, now=now)
         return grant, evaluation
+
+    async def reconcile_cleanup(self, command: AcquireSourceQueryV2) -> AdmissionClosureIntent:
+        command = self._command(command)
+        async with self.store.transaction() as tx:
+            subject = await tx.manual.get_cleanup_subject(command)
+        if subject is None:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        attempt, descriptor = subject
+        try:
+            return await self._reconcile_cleanup(attempt.attempt_id, descriptor)
+        except OpportunityError:
+            async with self.store.transaction() as tx:
+                retained = await tx.manual.get_cleanup_state(attempt.attempt_id)
+            if retained is not None and retained.intent.phase == "ERASED":
+                return retained.intent
+            raise
+        except Exception:
+            try:
+                async with self.store.transaction() as tx:
+                    retained = await tx.manual.get_cleanup_state(attempt.attempt_id)
+                if retained is not None:
+                    return retained.intent
+            except Exception:
+                pass
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING) from None
+
+    async def _reconcile_cleanup(self, attempt_id: str, descriptor: ManualBindingDescriptor) -> AdmissionClosureIntent:
+        async with self.store.transaction() as tx:
+            state = await tx.manual.get_cleanup_state(attempt_id)
+        if state is not None and state.intent.phase == "ERASED":
+            return state.intent
+        cleanup = self.cleanup
+        if cleanup is None:
+            raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)
+        if cleanup.descriptor != descriptor:
+            raise OpportunityError(StopCode.M9_SOURCE_CAPABILITY_UNAVAILABLE)
+        if state is None:
+            async with self.store.transaction() as tx:
+                plan = await tx.manual.plan_recovery_closure(attempt_id)
+            async with self.store.transaction() as tx:
+                state = await tx.manual.begin_recovery_closure(attempt_id, dependency_plan=plan)
+                await self._at("cleanup-fence-before-commit")
+            await self._at("cleanup-fenced-committed")
+        if state.intent.phase == "ERASED":
+            return state.intent
+        await cleanup.fence_publications(state.requests, closure_id=state.intent.closure_id)
+        await self._at("cleanup-publication-fenced")
+        if state.intent.version == 1:
+            async with self.store.transaction() as tx:
+                state = await tx.manual.drain_recovery_closure(state.intent.closure_id, expected_closure_version=1)
+                await self._at("cleanup-drain-before-commit")
+            await self._at("cleanup-drained-committed")
+        if state.intent.phase == "ERASED":
+            return state.intent
+        if state.intent.version == 2:
+            public_key = cleanup.public_key
+            proof = await cleanup.spend_original(
+                state.root_request, claim_ref=state.claim_ref, closure_id=state.intent.closure_id
+            )
+            proof = verify_custodian_spent(
+                canonical_json_bytes(proof),
+                public_key=public_key,
+                expected_request=state.root_request,
+                closure_id=state.intent.closure_id,
+            )
+            await self._at("cleanup-private-erasure-returned")
+            async with self.store.transaction() as tx:
+                state = await tx.manual.authorize_recovery_deletion(
+                    state.intent.closure_id, proof=proof, public_key=public_key, expected_closure_version=2
+                )
+                await self._at("cleanup-authorization-before-commit")
+            await self._at("cleanup-authorized-committed")
+        if state.intent.phase == "ERASED":
+            return state.intent
+        if state.intent.version != 3 or state.proof is None:
+            raise OpportunityError(StopCode.M9_REQUIRED_EVIDENCE_MISSING)
+        receipt = await cleanup.delete_exact(state.intent, proof=state.proof, requests=state.requests)
+        await self._at("cleanup-public-erasure-returned")
+        async with self.store.transaction() as tx:
+            state = await tx.manual.finish_recovery_closure(receipt, expected_closure_version=3)
+            await self._at("cleanup-completion-before-commit")
+        await self._at("cleanup-erased-committed")
+        return state.intent
 
     async def reconcile_publication(self, command: AcquireSourceQueryV2) -> AcquisitionReceiptV2:
         command = self._command(command)
@@ -748,6 +964,13 @@ class OpportunityAcquisitionServiceV2:
                 provider_observed_at=response.provider_observed_at,
                 native_fields=tuple(expected_fields),
             )
+        except OpportunityError as error:
+            if error.code == StopCode.M9_RAW_DIGEST_MISMATCH:
+                async with self.store.transaction() as tx:
+                    await tx.manual.mark_material_unavailable(
+                        envelope.request.attempt_id, expected_envelope_version=envelope.version
+                    )
+            raise
         finally:
             async with self.store.transaction() as tx:
                 await tx.manual.release_read(permit.lease_id)

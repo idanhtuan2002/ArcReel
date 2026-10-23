@@ -27,7 +27,9 @@ from tests.integration.server.services.test_m9_manual_custody_isolation import i
 from tests.integration.server.services.test_m9_manual_publication import prepare_publication
 
 
-async def service_subject(factory, tmp_path, *, boundary=None, refresh_seconds=60, retention_seconds=120):
+async def service_subject(
+    factory, tmp_path, *, boundary=None, refresh_seconds=60, retention_seconds=120, cleanup=False
+):
     module = importlib.import_module("r2.opportunity.acquisition_v2")
     host = importlib.import_module("server.services.opportunity_acquisition_v2")
     old, declaration, capabilities = await acquisition_service_fixture(factory, tmp_path)
@@ -123,6 +125,41 @@ async def service_subject(factory, tmp_path, *, boundary=None, refresh_seconds=6
             assert active.get() == 0
             return await publication.delete_exact(closure)
 
+    class CustodianClosure:
+        async def close_original(self, request, *, claim_ref, closure_id):
+            from r2.advanced_creative.digests import canonical_json_bytes
+
+            assert active.get() == 0
+            calls.append("spend")
+            async with factory() as session, session.begin():
+                envelope = await host.HostManualAdmissionTransaction(
+                    session, user_id="u1", project_name="show-a"
+                ).manual.get_envelope(request.attempt_id)
+                assert envelope.phase == "CLEANUP_PENDING"
+            code, result = await issuer_process(
+                root,
+                "close",
+                request=request.model_dump(mode="json"),
+                claim_ref=claim_ref,
+                closure_id=closure_id,
+                deny_spend_content_read=True,
+            )
+            if code != 0:
+                raise OpportunityError(result["error"])
+            return canonical_json_bytes(result["receipt"])
+
+    cleanup_ports = {}
+    if cleanup:
+        cleanup_ports["cleanup"] = importlib.import_module(
+            "server.services.m9_manual_publication"
+        ).VerifiedManualCleanup(
+            descriptor=descriptor,
+            publication=publication,
+            custodian=CustodianClosure(),
+            declared_origin="synthetic-fixture",
+            uploader_id="fixture-human",
+        )
+
     registry = ManualBindingRegistry(
         (
             FrozenManualBinding(
@@ -151,6 +188,7 @@ async def service_subject(factory, tmp_path, *, boundary=None, refresh_seconds=6
         project_name="show-a",
         actor_id="human-a",
         boundary=boundary,
+        **cleanup_ports,
     )
     return service, command, calls, publication
 
@@ -647,6 +685,7 @@ async def test_v2_reconstruction_uses_original_refs_after_ingest_path_replacemen
     receipt = await service.reconcile_manual_admission(command)
     assert receipt.attempt_id == initial.attempt_id
     assert calls.count("admit") == 1
+
     assert "fetch" not in calls
     async with service.store.transaction() as tx:
         envelope = await tx.manual.get_envelope(receipt.attempt_id)
@@ -866,3 +905,471 @@ async def test_v2_missing_original_deadlines_are_custody_failure_even_after_expi
         row = (await session.scalars(select(M9AcquisitionAttemptModel))).one()
         assert row.state == initial.state == "RUNNING"
         assert row.attempt_version == initial.attempt_version
+
+
+@pytest.mark.parametrize("shape", ["ready", "published-unattached", "never-published"])
+async def test_v2_cleanup_commits_only_after_real_private_and_public_erasure(session_factory, tmp_path, shape):
+    target = {"published-unattached": "publication-returned", "never-published": "reserved-committed"}.get(shape)
+
+    async def boundary(name):
+        if name == target:
+            raise RuntimeError("leave original recovery boundary")
+
+    service, command, calls, publication = await service_subject(
+        session_factory,
+        tmp_path,
+        boundary=boundary,
+        cleanup=True,
+    )
+    receipt = await service.acquire(command)
+    assert receipt.state == ("SUCCEEDED" if shape == "ready" else "RUNNING")
+    async with service.store.transaction() as tx:
+        original = await tx.manual.get_envelope(receipt.attempt_id)
+    assert original.phase == ("READY" if shape == "ready" else "RESERVED")
+    if shape != "ready":
+        assert original.admitted_at is None
+        assert original.claim_ref is None
+        assert not original.objects
+    before = list(calls)
+    service.registry = None
+    service.descriptor = None
+    service.upload = None
+    service.capabilities = None
+    erased = await service.reconcile_cleanup(command)
+    assert erased.phase == "ERASED"
+    assert erased.attempt_id == receipt.attempt_id
+    assert erased.closure_id
+    assert calls.count("fetch") == before.count("fetch")
+    assert calls.count("read") == before.count("read")
+    assert calls.count("admit") == before.count("admit")
+    assert calls.count("spend") == 1
+    issuer_root = tmp_path / "issuer"
+    assert not (issuer_root / "original.json").exists()
+    assert not list(issuer_root.glob("material-*.json"))
+    assert not list(issuer_root.glob("seal-*.json"))
+    assert await publication.lookup_receipt(original.request.publication_key) is None
+    data_directories = {"payloads", "integrities", "attestations", "headers"}
+    assert not [p for p in publication.root.rglob("*") if p.is_file() and p.parent.name in data_directories]
+    async with service.store.transaction() as tx:
+        retained = await tx.manual.get_envelope(receipt.attempt_id)
+        assert retained.phase == "ERASED"
+        assert retained.admitted_at == original.admitted_at
+        assert retained.deadlines == original.deadlines
+        assert await tx.manual.get_current_receipt(command) == receipt
+        with pytest.raises(
+            OpportunityError,
+            match="M9_INVALIDATION_INCOMPLETE" if original.deadlines is not None else "M9_STALE_HEAD",
+        ):
+            await tx.manual.begin_read(
+                receipt.attempt_id, expected_envelope_version=retained.version, operational=False
+            )
+    after = list(calls)
+    assert await service.reconcile_cleanup(command) == erased
+    assert calls == after
+    code, refused = await issuer_process(issuer_root, "claim", request=original.request.model_dump(mode="json"))
+    assert code == 2
+    assert refused == {"error": "M9_EVIDENCE_RETENTION_EXPIRED"}
+
+
+async def test_v2_cleanup_drains_admitted_reads_before_any_private_erasure(session_factory, tmp_path):
+    service, command, calls, publication = await service_subject(session_factory, tmp_path, cleanup=True)
+    receipt = await service.acquire(command)
+    async with service.store.transaction() as tx:
+        original = await tx.manual.get_envelope(receipt.attempt_id)
+        permit = await tx.manual.begin_read(
+            receipt.attempt_id,
+            expected_envelope_version=original.version,
+            operational=False,
+        )
+    with pytest.raises(OpportunityError, match="M9_INVALIDATION_INCOMPLETE"):
+        await service.reconcile_cleanup(command)
+    assert "spend" not in calls
+    assert (tmp_path / "issuer" / "original.json").exists()
+    assert list(publication.root.rglob("payloads/*"))
+    async with service.store.transaction() as tx:
+        pending = await tx.manual.get_cleanup_state(receipt.attempt_id)
+        assert pending.intent.phase == "CLEANUP_PENDING"
+        assert pending.intent.version == 1
+        assert pending.proof is None
+        assert (await tx.manual.get_envelope(receipt.attempt_id)).admitted_at == original.admitted_at
+        await tx.manual.release_read(permit.lease_id)
+    erased = await service.reconcile_cleanup(command)
+    assert (erased.phase, erased.version) == ("ERASED", 4)
+    assert erased.closure_id == pending.intent.closure_id
+    assert calls.count("spend") == 1
+    assert calls.count("fetch") == 1
+    assert not (tmp_path / "issuer" / "original.json").exists()
+    assert not list(publication.root.rglob("payloads/*"))
+
+
+@pytest.mark.parametrize("directory", ["payloads", "attestations"])
+async def test_v2_material_loss_is_audited_and_blocks_reuse_after_files_reappear(session_factory, tmp_path, directory):
+    from lib.db.models.opportunity import M9EventModel
+
+    async def stop_ready(name):
+        if name == "ready-committed":
+            raise RuntimeError("leave original ready admission")
+
+    service, command, calls, publication = await service_subject(
+        session_factory, tmp_path, boundary=stop_ready, cleanup=True
+    )
+    acquired = await service.acquire(command)
+    assert acquired.state == "RUNNING"
+    target = next(publication.root.rglob(directory + "/*"))
+    original = target.read_bytes()
+    target.unlink()
+    with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH"):
+        await service.reconcile_manual_admission(command)
+    async with session_factory() as session:
+        events = (
+            await session.scalars(select(M9EventModel).where(M9EventModel.event_kind == "MANUAL_MATERIAL_UNAVAILABLE"))
+        ).all()
+        assert len(events) == 1
+        marker = events[0]
+        assert marker.aggregate_id == acquired.attempt_id
+    target.write_bytes(original)
+    before = list(calls)
+    with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH"):
+        await service.reconcile_manual_admission(command)
+    assert calls == before
+    async with service.store.transaction() as tx:
+        envelope = await tx.manual.get_envelope(acquired.attempt_id)
+        assert envelope.phase == "READY"
+        assert await tx.manual.get_snapshot_for_attempt(acquired.attempt_id) is None
+        assert await tx.manual.list_checkpoints(acquired.attempt_id) == ()
+        for operational in (False, True):
+            with pytest.raises(OpportunityError, match="M9_RAW_DIGEST_MISMATCH"):
+                await tx.manual.begin_read(
+                    acquired.attempt_id, expected_envelope_version=envelope.version, operational=operational
+                )
+    erased = await service.reconcile_cleanup(command)
+    assert erased.phase == "ERASED"
+    assert "fetch" not in calls
+    assert calls.count("admit") == 1
+
+
+@pytest.mark.parametrize(
+    ("stop", "version", "private_erased", "public_erased"),
+    [
+        ("cleanup-fence-before-commit", None, False, False),
+        ("cleanup-fenced-committed", 1, False, False),
+        ("cleanup-publication-fenced", 1, False, False),
+        ("cleanup-drain-before-commit", 1, False, False),
+        ("cleanup-drained-committed", 2, False, False),
+        ("cleanup-private-erasure-returned", 2, True, False),
+        ("cleanup-authorization-before-commit", 2, True, False),
+        ("cleanup-authorized-committed", 3, True, False),
+        ("cleanup-public-erasure-returned", 3, True, True),
+        ("cleanup-completion-before-commit", 3, True, True),
+        ("cleanup-erased-committed", 4, True, True),
+    ],
+)
+async def test_v2_cleanup_retry_reconciles_physical_erasure_with_sql_rollback(
+    session_factory, tmp_path, stop, version, private_erased, public_erased
+):
+    from lib.db.models.opportunity_manual_admission import M9ManualClosureIntentModel
+
+    reached = []
+
+    async def interrupt(name):
+        if name == stop and not reached:
+            reached.append(name)
+            raise RuntimeError("CLEANUP_ACK_CANARY")
+
+    service, command, calls, publication = await service_subject(
+        session_factory, tmp_path, boundary=interrupt, cleanup=True
+    )
+    acquired = await service.acquire(command)
+    assert acquired.state == "SUCCEEDED"
+    interrupted = None
+    if version is None:
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await service.reconcile_cleanup(command)
+    else:
+        interrupted = await service.reconcile_cleanup(command)
+        assert interrupted.version == version
+        assert interrupted.phase == ("ERASED" if version == 4 else "CLEANUP_PENDING")
+    assert reached == [stop]
+    assert (not (tmp_path / "issuer" / "original.json").exists()) == private_erased
+    assert (not list(publication.root.rglob("payloads/*"))) == public_erased
+    async with service.store.transaction() as tx:
+        pending = await tx.manual.get_cleanup_state(acquired.attempt_id)
+        envelope = await tx.manual.get_envelope(acquired.attempt_id)
+        assert envelope.phase == ("READY" if version is None else "ERASED" if version == 4 else "CLEANUP_PENDING")
+        assert (pending is None) == (version is None)
+        if pending is not None:
+            assert interrupted is not None
+            assert pending.intent == interrupted
+    async with session_factory() as session:
+        row = await session.scalar(select(M9ManualClosureIntentModel))
+        retained = row.body_json["metadata"] if row is not None else None
+    erased = await service.reconcile_cleanup(command)
+    assert (erased.phase, erased.version) == ("ERASED", 4)
+    if pending is not None:
+        assert erased.closure_id == pending.intent.closure_id
+        assert erased.fenced_at == pending.intent.fenced_at
+    async with session_factory() as session:
+        row = (await session.scalars(select(M9ManualClosureIntentModel))).one()
+        completed = row.body_json["metadata"]
+    if retained is not None:
+        for field in ("proof", "public_key", "reads_drained_at", "authorized_at", "receipt", "finished_at"):
+            if retained.get(field) is not None:
+                assert completed[field] == retained[field]
+    assert completed["proof"]["metadata"]["closure_id"] == erased.closure_id
+    assert completed["receipt"]["closure"]["closure_id"] == erased.closure_id
+    assert not (tmp_path / "issuer" / "original.json").exists()
+    assert not list(publication.root.rglob("payloads/*"))
+    assert calls.count("fetch") == calls.count("admit") == 1
+    before = list(calls)
+    service.cleanup = None
+    assert await service.reconcile_cleanup(command) == erased
+    assert calls == before
+
+
+@pytest.mark.parametrize("terminal", [False, True])
+@pytest.mark.parametrize("lost", ["admission", "intent", "both"])
+async def test_v2_cleanup_uses_retained_sql_anchor_without_recreating_ready(session_factory, tmp_path, terminal, lost):
+    from sqlalchemy import delete
+
+    from lib.db.models.opportunity_manual_admission import (
+        M9ManualAdmissionModel,
+        M9ManualPublicationIntentModel,
+    )
+
+    async def stop_ready(name):
+        if not terminal and name == "ready-committed":
+            raise RuntimeError("original READY retained before dispatch")
+
+    service, command, calls, publication = await service_subject(
+        session_factory, tmp_path, boundary=stop_ready, cleanup=True
+    )
+    acquired = await service.acquire(command)
+    assert acquired.state == ("SUCCEEDED" if terminal else "RUNNING")
+    async with service.store.transaction() as tx:
+        original = await tx.manual.get_envelope(acquired.attempt_id)
+    async with session_factory() as session, session.begin():
+        if lost in ("admission", "both"):
+            await session.execute(delete(M9ManualAdmissionModel))
+        if lost in ("intent", "both"):
+            await session.execute(delete(M9ManualPublicationIntentModel))
+    async with service.store.transaction() as tx:
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await tx.manual.get_envelope(acquired.attempt_id)
+    before = list(calls)
+    if lost == "both":
+        with pytest.raises(OpportunityError, match="M9_REQUIRED_EVIDENCE_MISSING"):
+            await service.reconcile_cleanup(command)
+        assert calls == before
+        assert (tmp_path / "issuer" / "original.json").exists()
+        assert list(publication.root.rglob("payloads/*"))
+        return
+    erased = await service.reconcile_cleanup(command)
+    assert (erased.phase, erased.version) == ("ERASED", 4)
+    async with service.store.transaction() as tx:
+        retained = await tx.manual.get_envelope(acquired.attempt_id)
+        assert retained.phase == "ERASED"
+        assert retained.admitted_at == original.admitted_at
+        assert retained.deadlines == original.deadlines
+        assert retained.objects == original.objects
+        assert retained.version == original.version + 2
+    assert calls.count("admit") == before.count("admit")
+    assert calls.count("fetch") == before.count("fetch")
+    assert calls.count("read") == before.count("read")
+    assert calls.count("spend") == 1
+    assert not (tmp_path / "issuer" / "original.json").exists()
+    assert not list(publication.root.rglob("payloads/*"))
+
+
+@pytest.mark.parametrize("peer_shape", ["reserved", "ready-with-read"])
+async def test_v2_cleanup_preserves_live_shared_upload_then_erases_expired_dependency_group(
+    session_factory, tmp_path, peer_shape
+):
+    from r2.advanced_creative.exploration import uuid7
+    from r2.opportunity.manual_admission import AdmissionRequest
+
+    async def stop_ready(name):
+        if name == "ready-committed":
+            raise RuntimeError("keep original admission before dispatch")
+
+    service, command, calls, publication = await service_subject(
+        session_factory, tmp_path, boundary=stop_ready, cleanup=True, refresh_seconds=60, retention_seconds=30
+    )
+    original_receipt = await service.acquire(command)
+    async with service.store.transaction() as tx:
+        original = await tx.manual.get_envelope(original_receipt.attempt_id)
+    peer = command.model_copy(update={"context": command.context.model_copy(update={"command_id": uuid7()})})
+    assert service.descriptor is not None
+    async with service.store.transaction() as tx:
+        prepared, created = await tx.manual.prepare(peer, attempt_id=uuid7(), descriptor=service.descriptor)
+        assert created
+        running = await tx.manual.start(prepared.attempt_id, expected_attempt_version=prepared.attempt_version)
+        request = AdmissionRequest.model_validate(
+            {
+                **original.request.model_dump(),
+                "context": peer.context,
+                "request_digest": running.request_digest,
+                "attempt_id": running.attempt_id,
+                "attempt_version": running.attempt_version,
+                "publication_key": "original-peer-publication",
+            }
+        )
+        reserved = await tx.manual.reserve(request, expected_attempt_version=running.attempt_version)
+    peer_original = reserved
+    if peer_shape == "ready-with-read":
+        code, result = await issuer_process(
+            tmp_path / "issuer",
+            "admit",
+            request=request.model_dump(mode="json"),
+            publication_root=str(publication.root),
+        )
+        assert code == 0, result
+        async with service.store.transaction() as tx:
+            peer_original = await tx.manual.attach(
+                PublishedAdmission.model_validate(result["publication"]), expected_envelope_version=reserved.version
+            )
+            await tx.manual.begin_read(
+                running.attempt_id, expected_envelope_version=peer_original.version, operational=False
+            )
+    with pytest.raises(OpportunityError, match="M9_INVALIDATION_INCOMPLETE"):
+        await service.reconcile_cleanup(command)
+    assert "spend" not in calls
+    assert (tmp_path / "issuer" / "original.json").exists()
+    assert list(publication.root.rglob("payloads/*"))
+    async with service.store.transaction() as tx:
+        assert await tx.manual.get_cleanup_state(original_receipt.attempt_id) is None
+        assert await tx.manual.get_envelope(running.attempt_id) == peer_original
+        now = await tx.profiles.database_time()
+    deadline = min(c.retention_due_at for c in request.original_clocks if c.retention_due_at is not None)
+    await asyncio.sleep(max(0, (deadline - now).total_seconds()) + 0.05)
+    erased = await service.reconcile_cleanup(command)
+    assert erased.phase == "ERASED"
+    async with service.store.transaction() as tx:
+        for attempt_id, prior in ((original_receipt.attempt_id, original), (running.attempt_id, peer_original)):
+            current = await tx.manual.get_envelope(attempt_id)
+            assert current.phase == "ERASED"
+            assert current.admitted_at == prior.admitted_at
+            assert current.objects == prior.objects
+            state = await tx.manual.get_cleanup_state(attempt_id)
+            assert state.intent == erased
+    assert calls.count("spend") == 1
+    assert "fetch" not in calls
+    assert not (tmp_path / "issuer" / "original.json").exists()
+    assert not list(publication.root.rglob("payloads/*"))
+
+
+@pytest.mark.parametrize("hold_object_guard", [False, True])
+async def test_v2_cleanup_rechecks_newly_discovered_public_refs_before_deleting_a_shared_object(
+    session_factory, tmp_path, hold_object_guard
+):
+    import struct
+
+    from sqlalchemy import text
+
+    from lib.db.models.opportunity_manual_admission import M9ManualClosureIntentModel
+    from r2.advanced_creative.digests import digest_canonical
+    from r2.advanced_creative.exploration import uuid7
+    from r2.opportunity.manual_admission import AdmissionRequest
+
+    async def stop_publication(name):
+        if name == "publication-returned":
+            raise RuntimeError("original publication not attached")
+
+    service, command, calls, publication = await service_subject(
+        session_factory, tmp_path, boundary=stop_publication, cleanup=True
+    )
+    acquired = await service.acquire(command)
+    async with service.store.transaction() as tx:
+        original = await tx.manual.get_envelope(acquired.attempt_id)
+    assert original.phase == "RESERVED"
+    code, result = await issuer_process(
+        tmp_path / "issuer",
+        "admit",
+        request=original.request.model_dump(mode="json"),
+        publication_root=str(publication.root),
+    )
+    assert code == 0, result
+    published = PublishedAdmission.model_validate(result["publication"])
+    peer = command.model_copy(update={"context": command.context.model_copy(update={"command_id": uuid7()})})
+    assert service.descriptor is not None
+    async with service.store.transaction() as tx:
+        prepared, _ = await tx.manual.prepare(peer, attempt_id=uuid7(), descriptor=service.descriptor)
+        running = await tx.manual.start(prepared.attempt_id, expected_attempt_version=prepared.attempt_version)
+        request = AdmissionRequest.model_validate(
+            {
+                **original.request.model_dump(),
+                "context": peer.context,
+                "request_digest": running.request_digest,
+                "attempt_id": running.attempt_id,
+                "attempt_version": running.attempt_version,
+                "publication_key": uuid7(),
+                "opaque_upload_id": "independent-sql-upload",
+            }
+        )
+        reserved = await tx.manual.reserve(request, expected_attempt_version=running.attempt_version)
+        shared = PublishedAdmission.model_validate(
+            {
+                **published.model_dump(),
+                "request": request,
+                "publication_key": request.publication_key,
+            }
+        )
+        peer_ready = await tx.manual.attach(shared, expected_envelope_version=reserved.version)
+    if hold_object_guard:
+        holder = session_factory()
+        cleanup_task = None
+        try:
+            await holder.begin()
+            holder_pid = await holder.scalar(text("SELECT pg_backend_pid()"))
+            digest = digest_canonical(
+                {
+                    "domain": "m9.manual-object-lock.v1",
+                    "user_id": "u1",
+                    "project_name": "show-a",
+                    "ref": published.objects[0].payload_ref,
+                }
+            )
+            first, second = struct.unpack(">ii", bytes.fromhex(digest.removeprefix("sha256:"))[:8])
+            await holder.execute(
+                text("SELECT pg_advisory_xact_lock(:first,:second)"), {"first": first, "second": second}
+            )
+            cleanup_task = asyncio.create_task(service.reconcile_cleanup(command))
+            async with asyncio.timeout(20):
+                while True:
+                    async with session_factory() as observer:
+                        waiting = await observer.scalar(
+                            text(
+                                "SELECT EXISTS(SELECT 1 FROM pg_stat_activity "
+                                "WHERE :holder = ANY(pg_blocking_pids(pid)))"
+                            ),
+                            {"holder": holder_pid},
+                        )
+                    if waiting:
+                        break
+                    if cleanup_task.done():
+                        pytest.fail("expanded custody refs did not wait for their native object guard")
+                    await asyncio.sleep(0.01)
+            assert not cleanup_task.done()
+            assert calls.count("spend") == 1
+            assert list(publication.root.rglob("payloads/*"))
+            async with session_factory() as observer:
+                assert await observer.scalar(select(M9ManualClosureIntentModel.version)) == 2
+            await holder.commit()
+            with pytest.raises(OpportunityError, match="M9_STALE_HEAD"):
+                await cleanup_task
+        finally:
+            await holder.rollback()
+            await holder.close()
+            if cleanup_task is not None and not cleanup_task.done():
+                cleanup_task.cancel()
+                await asyncio.gather(cleanup_task, return_exceptions=True)
+    else:
+        with pytest.raises(OpportunityError, match="M9_STALE_HEAD"):
+            await service.reconcile_cleanup(command)
+    assert calls.count("spend") == 1
+    assert list(publication.root.rglob("payloads/*"))
+    async with service.store.transaction() as tx:
+        assert await tx.manual.get_envelope(running.attempt_id) == peer_ready
+    async with service.store.transaction() as tx:
+        state = await tx.manual.get_cleanup_state(acquired.attempt_id)
+        assert (state.intent.phase, state.intent.version) == ("CLEANUP_PENDING", 2)
+        assert state.proof is None
