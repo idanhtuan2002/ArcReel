@@ -89,11 +89,13 @@ def test_hidden_model_and_nested_prices_are_immutable_snapshots(monkeypatch):
         ProviderMeta(display_name="Fixture", description="", required_keys=[], models={"alias/with/slash": info}),
     )
     view = builtin_model("catalog-fixture", "alias/with/slash")
-    assert view is not None and view.pricing is not None
-    assert view.hidden and view.enabled
+    assert view is not None
+    assert view.pricing is not None
+    assert view.hidden
+    assert view.enabled
     assert view.model_id == "alias/with/slash"
     with pytest.raises(FrozenInstanceError):
-        setattr(view, "display_name", "changed")
+        view.display_name = "changed"
     with pytest.raises(TypeError):
         view.pricing.details["rates"]["publisher/name"]["input"] = 9
     with pytest.raises(TypeError):
@@ -105,16 +107,19 @@ def test_hidden_model_and_nested_prices_are_immutable_snapshots(monkeypatch):
     assert view.pricing.details["rates"]["publisher/name"]["input"] == 0.45
     assert view.duration_resolution_constraints["1K"] == (5, 8)
     fresh = builtin_model("catalog-fixture", "alias/with/slash")
-    assert fresh is not None and fresh.pricing is not None
+    assert fresh is not None
+    assert fresh.pricing is not None
     assert fresh.pricing.details["rates"]["publisher/name"]["input"] == 5
 
 
 def test_video_price_tuple_keys_and_zero_rates_survive_projection():
     view = builtin_model("gemini-aistudio", "veo-3.1-lite-generate-preview")
-    assert view is not None and view.pricing is not None
+    assert view is not None
+    assert view.pricing is not None
     original = PROVIDER_REGISTRY["gemini-aistudio"].models[view.model_id].pricing
     assert original is not None
     assert view.pricing.details["rates"][view.model_id] == original.rates[view.model_id]
     free = builtin_model("gemini-aistudio", "gemma-4-31b-it")
-    assert free is not None and free.pricing is not None
+    assert free is not None
+    assert free.pricing is not None
     assert free.pricing.details["rates"][free.model_id] == {"input": 0.0, "output": 0.0}

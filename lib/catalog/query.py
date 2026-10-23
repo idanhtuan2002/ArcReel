@@ -6,12 +6,20 @@ Prices are declarations in their original units, not estimates or admission deci
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from types import MappingProxyType
 from typing import Any, Literal
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from lib.config.registry import model_info_for
+from lib.custom_provider import is_custom_provider, make_provider_id, parse_provider_id
+from lib.custom_provider.endpoint_resolution import resolve_endpoint_spec
+from lib.db.models.custom_provider import CustomProviderModel
+from lib.db.repositories.custom_endpoint_repo import CustomEndpointRepository
 
 PROJECTION_VERSION = "v2-model-facts-v1"
 
@@ -54,6 +62,8 @@ class CatalogModel:
     pricing: PriceFacts | None
     source: Literal["builtin_registry", "custom_model"]
     source_version: str = PROJECTION_VERSION
+    resolution: str | None = None
+    capability_overrides: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}))
 
 
 def builtin_model(provider_id: str, model_id: str) -> CatalogModel | None:
@@ -84,3 +94,81 @@ def builtin_model(provider_id: str, model_id: str) -> CatalogModel | None:
         pricing=price,
         source="builtin_registry",
     )
+
+
+def _durations(raw: str | None) -> tuple[int, ...] | None:
+    if raw is None:
+        return None
+    parsed = json.loads(raw)
+    if not isinstance(parsed, list) or any(type(item) is not int for item in parsed):
+        raise ValueError("custom supported_durations must be an integer list")
+    return tuple(parsed)
+
+
+async def custom_models(session: AsyncSession, *, provider_id: str | None = None) -> tuple[CatalogModel, ...]:
+    """Read model columns only, retaining disabled rows and propagating invalid endpoints.
+
+    The optional provider filter is a canonical ``custom-<positive id>`` identity. No filter
+    reads all custom models. A caller's pending work is never autoflushed by this query.
+    Protocol-derived capabilities are not model-level evidence and remain unknown here;
+    the stored overrides are exposed separately without interpreting them as permission.
+    """
+    model = CustomProviderModel
+    statement = select(
+        model.provider_id,
+        model.model_id,
+        model.display_name,
+        model.endpoint,
+        model.is_enabled,
+        model.is_default,
+        model.price_unit,
+        model.price_input,
+        model.price_output,
+        model.currency,
+        model.supported_durations,
+        model.resolution,
+        model.capability_overrides,
+    ).order_by(model.provider_id, model.model_id)
+    if provider_id is not None:
+        if not is_custom_provider(provider_id):
+            raise ValueError("expected a canonical custom provider identity")
+        db_id = parse_provider_id(provider_id)
+        if db_id <= 0 or make_provider_id(db_id) != provider_id:
+            raise ValueError("expected a canonical custom provider identity")
+        statement = statement.where(model.provider_id == db_id)
+    views = []
+    with session.no_autoflush:
+        rows = (await session.execute(statement)).mappings()
+        endpoints = CustomEndpointRepository(session)
+        for row in rows:
+            spec = await resolve_endpoint_spec(row["endpoint"], endpoints.get)
+            price = None
+            if any(row[key] is not None for key in ("price_unit", "price_input", "price_output", "currency")):
+                price = PriceFacts(
+                    kind="custom",
+                    currency=row["currency"],
+                    details=_freeze({key: row[key] for key in ("price_unit", "price_input", "price_output")}),
+                )
+            views.append(
+                CatalogModel(
+                    provider_id=make_provider_id(row["provider_id"]),
+                    model_id=row["model_id"],
+                    api_model_name=None,
+                    media_type=spec.media_type,
+                    display_name=row["display_name"],
+                    enabled=row["is_enabled"],
+                    hidden=False,
+                    default=row["is_default"],
+                    endpoint=row["endpoint"],
+                    capabilities=None,
+                    supported_durations=_durations(row["supported_durations"]),
+                    duration_resolution_constraints=MappingProxyType({}),
+                    reference_image_durations=(),
+                    resolutions=(),
+                    pricing=price,
+                    source="custom_model",
+                    resolution=row["resolution"],
+                    capability_overrides=_freeze(row["capability_overrides"] or {}),
+                )
+            )
+    return tuple(views)
