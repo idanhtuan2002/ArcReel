@@ -41,7 +41,7 @@ interface GlobalHeaderProps {
 /**
  * 工作台顶栏（48px，玻璃面板）。三段式 grid：
  * - 左：返回按钮 + ProjectMenu（项目切换菜单）
- * - 中：PhaseStepper（5 阶段胶囊）
+ * - 中：PhaseStepper（北极星生产环十阶段点阵，当前阶段展开）
  * - 右：通知 / 费用 / 任务雷达 / 导出 / 资产库 / 设置
  */
 export function GlobalHeader({ onNavigateBack }: GlobalHeaderProps) {

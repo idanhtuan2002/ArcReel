@@ -34,4 +34,5 @@ Current header stepper reads only `status.phase` ∈ {preparation, script, produ
 Human decisions 2026-10-23: DISCOVER/RESEARCH shown muted as "Sắp có" (coming soon); order = North Star stepper + pipeline control center first, then app-wide fixes.
 
 ## Log
+- Slice 1 done: header stepper follows the North Star loop (frontend/src/components/layout/PhaseStepper.tsx; 10 stages, current pill + dots, DISCOVER/RESEARCH dashed "Sắp có"; current stage mapped from server status.phase: preparation→create, script→adapt, production→produce, completed→package). Next: slice 2 pipeline control center on Overview from the workflow plan.
 - 2026-10-23: r2-v2.0.3 tagged (story UI P0/P1), deploy pending Human. Phase started.
