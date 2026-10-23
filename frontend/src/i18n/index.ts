@@ -89,4 +89,11 @@ export const i18nReady = i18n
     react: { useSuspense: false },
   });
 
+// 页面语言跟随界面语言：浏览器据此选字形，样式据 :lang() 为越南语换用带越南语字符集的衬线体
+function syncDocumentLanguage(lng: string | undefined) {
+  if (typeof document !== 'undefined' && lng) document.documentElement.lang = lng;
+}
+i18n.on('languageChanged', syncDocumentLanguage);
+syncDocumentLanguage(i18n.language);
+
 export default i18n;

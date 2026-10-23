@@ -294,3 +294,9 @@ body {
   white-space: nowrap;
   color: var(--color-text);
 }
+
+/* Instrument Serif has no Vietnamese glyphs; a Vietnamese interface uses a serif that covers them whole,
+   instead of mixing faces letter by letter. */
+:root:lang(vi) {
+  --font-editorial: "Noto Serif", Georgia, serif;
+}
