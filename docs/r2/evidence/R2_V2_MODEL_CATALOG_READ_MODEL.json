@@ -1,0 +1,139 @@
+{
+  "status": "FULL_REGRESSION_PENDING_NOT_ACCEPTED",
+  "recorded_at_utc": "2026-10-23T19:11:04.591991+00:00",
+  "implementation_base": "49cb7956065474a64018745629bdeb475b35422a",
+  "source_head": "a56f07a9471c0916c768c120eaaacf95598c8e6e",
+  "documentation_head": "f39494c2b96a254e75198a56e39db525023bad80",
+  "branch": "feat/v2-model-catalog-read-model",
+  "source_sha256": {
+    "lib/catalog/__init__.py": "ff952334ec7e3f30f51126bbb0ca113881fafe7c7480a03811ec4826c73774ff",
+    "lib/catalog/query.py": "31952a3dabb8a024fdddf8e6fd49a08c4266fc787c6ecf58ae968bd12255473b",
+    "lib/custom_provider/endpoint_resolution.py": "f5cc30191a2260d44944f48ee2b25e9caaf712f60df5b4b2c2728357d4e16036",
+    "lib/config/resolver.py": "ff4df1aea46913a1a249f2317b62a6ef0c56dc5602a5175d95e655d1f8e516d4",
+    "tests/unit/lib/catalog/test_catalog_query.py": "c81ee359e22292e3b293e7b168fed95832ad6ad5d6362bcba08c23f004ded51c",
+    "tests/integration/lib/catalog/test_custom_model_query.py": "f47c657344065a39cd9c1bd2b07aab57c215c06d5d8cc1d0309077eadaecf0fb"
+  },
+  "affected_regression": {
+    "passed": 1806,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 4,
+    "seconds": 26.38,
+    "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/regression-final.log",
+    "junit": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/regression-final.xml"
+  },
+  "statics": [
+    {
+      "check": "ruff",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "check",
+        "."
+      ],
+      "exit": 0,
+      "seconds": 0.02,
+      "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/static-ruff.log"
+    },
+    {
+      "check": "format",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "exit": 0,
+      "seconds": 0.01,
+      "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/static-format.log"
+    },
+    {
+      "check": "types",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright",
+        "--warnings",
+        "--venvpath",
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main"
+      ],
+      "exit": 0,
+      "seconds": 67.5,
+      "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/static-types.log"
+    },
+    {
+      "check": "imports",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports"
+      ],
+      "exit": 0,
+      "seconds": 0.18,
+      "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/static-imports.log"
+    },
+    {
+      "check": "deptry",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry",
+        "lib",
+        "server",
+        "alembic",
+        "scripts",
+        "tests",
+        "r2"
+      ],
+      "exit": 0,
+      "seconds": 0.72,
+      "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/static-deptry.log"
+    },
+    {
+      "check": "audit",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+        "scripts/audit_tests.py",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 18.87,
+      "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/static-audit.log"
+    },
+    {
+      "check": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.01,
+      "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/static-diff.log"
+    }
+  ],
+  "full_backend": {
+    "status": "RUNNING",
+    "session": 24596,
+    "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/full-regression.log",
+    "junit_expected": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/full-regression.xml",
+    "failure_markers_observed": 3,
+    "final_counts": null,
+    "failure_classification": "UNKNOWN_PENDING_TRACE"
+  },
+  "review": {
+    "candidate": "f50986975b0485c1b8ede44ef13d4e27fa149008",
+    "verdict": "REQUEST_CHANGES",
+    "confirmed_finding": "P2 ComfyUI endpoint durations diverged from ConfigResolver authority",
+    "repair_commit": "a56f07a9471c0916c768c120eaaacf95598c8e6e",
+    "main_verification": "2 differential regressions RED to GREEN; 290 related and 1806 affected passed",
+    "independent_re_review": false,
+    "deferred_minor": "Custom duration_resolution_constraints, reference_image_durations and resolutions do not distinguish unknown from empty; resolve before consumer wiring"
+  },
+  "rulings": [
+    "Preserve original ten price declaration kinds and independent custom rates; descriptive PriceFacts is not an executable price estimate.",
+    "source_version denotes the projection schema, not freshness, qualification or admission.",
+    "Extend scope by one pure endpoint-duration authority helper shared with ConfigResolver; preserve legacy resolver semantics.",
+    "Cloud execution, metering/admission, UI/API and migrations remain outside this slice; test typing corrections verified by main."
+  ],
+  "limits": [
+    "No read-model acceptance until the remaining gate is resolved.",
+    "No new model selector, cloud generation, live qualification, DB migration, push, merge or production activation.",
+    "Production r2-v2.0.6 unchanged; M9/M10 remain paused."
+  ],
+  "next_research": "docs/research/2026-10-24-model-metering-readiness.md"
+}
