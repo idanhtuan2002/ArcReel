@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "status": "DESIGN_PACKET_COMPLETE_IMPLEMENTATION_NOT_STARTED",
+  "created_at": "2026-10-23T18:05:46.672168+00:00",
+  "source_head": "b019d87d64d8fe145a3dd1d932ae16861aa2006c",
+  "branch": "research/v2-model-platform",
+  "production_tag": "r2-v2.0.6",
+  "production_head": "8bd86a6c3915281838df15ee16ea4a70c3e20e71",
+  "donor_pin": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+  "documents_sha256": {
+    "docs/adr/0110-shared-model-catalog-keeps-v2-execution-authority.md": "c45a86526a97a09275f50fd6e6fae045fc349cab560b8e3567261944e8701d3a",
+    "docs/superpowers/specs/2026-10-24-v2-model-platform-compatibility.md": "f8f965b9c1bd8fb0c37aa8e966f101662e3b7bf5433060e2098ed493b97b6e01",
+    "docs/superpowers/plans/2026-10-24-v2-model-catalog-read-model.md": "74b857d9e7a1baf64927f050a01eed333a7eecbfec61e4bf79f52b9246fc1a5f"
+  },
+  "adr_status": "proposed",
+  "baseline_source_files_unchanged": 35,
+  "compatibility_probe": {
+    "source_head": "b019d87d64d8fe145a3dd1d932ae16861aa2006c",
+    "upstream_pin": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+    "case_count": 22,
+    "arithmetic_matches": 12,
+    "pricing_shapes_with_matching_examples": 9,
+    "gaps": 3,
+    "cases": [
+      {
+        "case": "per_token_USD",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 0.00155,
+        "donor_amount": 0.00155,
+        "currency": "USD"
+      },
+      {
+        "case": "per_token_CNY",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 0.00155,
+        "donor_amount": 0.00155,
+        "currency": "CNY"
+      },
+      {
+        "case": "per_image_flat",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 0.12,
+        "donor_amount": 0.12,
+        "currency": "USD"
+      },
+      {
+        "case": "per_image_by_resolution",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 0.16,
+        "donor_amount": 0.16,
+        "currency": "USD"
+      },
+      {
+        "case": "per_image_openai_token",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 0.0037,
+        "donor_amount": 0.0037,
+        "currency": "USD"
+      },
+      {
+        "case": "per_second_matrix",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 4.0,
+        "donor_amount": 4.0,
+        "currency": "USD"
+      },
+      {
+        "case": "per_second_tiered",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 10,
+        "donor_amount": 10.0,
+        "currency": "CNY"
+      },
+      {
+        "case": "per_video_bucket",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 2.1,
+        "donor_amount": 2.1,
+        "currency": "CNY"
+      },
+      {
+        "case": "per_token_video",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 1.6,
+        "donor_amount": 1.6,
+        "currency": "CNY"
+      },
+      {
+        "case": "per_character",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 0.008,
+        "donor_amount": 0.008,
+        "currency": "CNY"
+      },
+      {
+        "case": "custom_independent_rates_USD",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 0.001075,
+        "donor_amount": 0.001075,
+        "currency": "USD",
+        "single_channel_multiplier_can_preserve_both_rates": false
+      },
+      {
+        "case": "custom_independent_rates_CNY",
+        "status": "ARITHMETIC_MATCH",
+        "legacy_amount": 0.001075,
+        "donor_amount": 0.001075,
+        "currency": "CNY",
+        "single_channel_multiplier_can_preserve_both_rates": false
+      },
+      {
+        "case": "explicit_free",
+        "status": "OBSERVED",
+        "amount": 0,
+        "currency": "USD"
+      },
+      {
+        "case": "missing_usage",
+        "status": "OBSERVED_UNPRICED",
+        "reason": "missing_rate"
+      },
+      {
+        "case": "unknown_entry",
+        "status": "OBSERVED_UNPRICED",
+        "reason": "no_entry"
+      },
+      {
+        "case": "missing_estimate",
+        "status": "OBSERVED_UNPRICED",
+        "reason": "no_usage_estimate"
+      },
+      {
+        "case": "cache_disjoint_units",
+        "status": "OBSERVED",
+        "quantities": {
+          "cache_read_tokens": 200,
+          "cache_write_5m_tokens": 100,
+          "cache_write_1h_tokens": 50,
+          "uncached_input_tokens": 650,
+          "output_tokens": 150
+        }
+      },
+      {
+        "case": "two_explicit_requests",
+        "status": "OBSERVED",
+        "amount": 0.0031
+      },
+      {
+        "case": "local_currency_not_catalog_money",
+        "status": "CONFIRMED_COMPATIBILITY_GAP",
+        "action": "retain LOCAL in run authority; do not rewrite as paid USD"
+      },
+      {
+        "case": "vidu_credits_unit",
+        "status": "CONFIRMED_COMPATIBILITY_GAP",
+        "action": "retain ViduDelegate; no credits-to-token relabeling"
+      },
+      {
+        "case": "legacy_brief_current_roundtrip",
+        "status": "BASELINE_ONLY",
+        "digest": "sha256:bcd8571c90f3c6816322c3bce8c5cc3980a5c4ab161609683ed2ebc992dc388d",
+        "note": "does not prove a future schema migration compatible"
+      },
+      {
+        "case": "legacy_wrapper_zero_duration",
+        "status": "CONFIRMED_COMPATIBILITY_GAP",
+        "pure_strategy_amount": 0.0,
+        "legacy_wrapper_amount": 0.4,
+        "currency": "USD",
+        "action": "preserve wrapper semantics on legacy routes; new strict execution validates actual request duration before pricing"
+      }
+    ],
+    "limits": [
+      "Synthetic offline fixtures; no new production interface or migration.",
+      "PerVideoBucket and tier cases test only chosen exact buckets, not all fallback dimensions.",
+      "No DB concurrency, live provider, alias migration, catalogue snapshot composition or literary acceptance."
+    ]
+  },
+  "existing_tests": {
+    "tests": 111,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 4,
+    "seconds": 7.45,
+    "command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 <existing-venv>/bin/python -m pytest tests/unit/lib/pricing tests/unit/lib/backend_assembly/test_backend_assembly_loader.py tests/integration/lib/backend_assembly/test_release_gate_binding.py -q -n 4 --dist loadfile --junitxml=<packet>/compatibility-tests.xml",
+    "exit_code": 0,
+    "junit_sha256": "7e1db3d62264f4e1d643c01115fb22a0c79d8c88bc41592e800137d09ab9c3eb",
+    "log_sha256": "b4c7b7ab3a2f8de5bd8c27a5df0be364382c2b9882bf9b45a39052f2474c8178"
+  },
+  "probe_script_sha256": "0ac7326a64272293ff20f1877ddfa5c023c676fbff0968ea0840829077eabb80",
+  "probe_result_sha256": "57f7ec8134c1d6d9fb3886bccd891ca46a0701dd9d820ad3acd333b3717e2126",
+  "legacy_brief_fixture_sha256": "4738f827e8c0fb7498f3c943ad7477de699a7a7fdf88131073a1116978a2af60",
+  "archive": {
+    "path": "/home/anhtuan/.codex/worktrees/c1b3/content-production-os/.superpowers/sdd/2026-10-24-model-platform-design-evidence.tar.gz",
+    "sha256": "a605b0e5506292ad9825a9abd12567fb166ee7b4e6bb287c51507eeb19f0c75c",
+    "bytes": 42657
+  },
+  "verification": {
+    "document_relative_links": "PASS",
+    "diff_whitespace": "PASS",
+    "donor_metering_matches_pinned_source": true,
+    "source_35_file_seal_unchanged": true
+  },
+  "preserved_untracked_paths": [
+    "docs/superpowers/plans/2026-10-23-story-gemini.md",
+    "docs/superpowers/specs/2026-10-23-story-gemini.md"
+  ],
+  "scope": {
+    "runtime_source_modified": false,
+    "new_production_dependency": false,
+    "migration_run": false,
+    "provider_generation_called": false,
+    "production_changed": false,
+    "m9_m10_paused": true
+  },
+  "limits": [
+    "Design and executable spike, not implemented compatibility bridge.",
+    "Nine pricing shapes have selected exact examples, not exhaustive dimension/fallback parity.",
+    "Old-brief roundtrip is baseline golden only; no future schema migration verified.",
+    "SQLite disposable fixture release-binding tests do not prove PostgreSQL budget concurrency.",
+    "Catalog alias/snapshot/migration and new UI behavior are pending future gates.",
+    "Prior research128+9 results were not rerun and are not included in the111 current tests."
+  ],
+  "next": "Review ADR0110/spec and execute only read-model plan Task0; preserve production. Later metering, budgets, cloud story, Agent and UI require their specified gates."
+}
