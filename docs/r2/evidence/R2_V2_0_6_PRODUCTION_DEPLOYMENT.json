@@ -1,0 +1,64 @@
+{
+  "schema_version": "1",
+  "status": "DEPLOYED_POST_SMOKE_VERIFIED",
+  "verified_at": "2026-10-23T15:12:15.234231+00:00",
+  "release_tag": "r2-v2.0.6",
+  "release_commit": "8bd86a6c3915281838df15ee16ea4a70c3e20e71",
+  "tag_object": "be347b1410433639c9faff17e30cc7df965b0d54",
+  "tested_code_head": "95e12819ba4595c9acde430ceb1630d3ace88fc9",
+  "deployment_checkout": "/home/anhtuan/content-production-os/.worktrees/r2-v2-release-staging",
+  "deployment_checkout_clean": true,
+  "post_deploy_smoke": {
+    "mode": "post",
+    "active_task_count": 0,
+    "schema_head": "918c4a0e0001",
+    "health_status": 200,
+    "anonymous_providers_status": 401,
+    "authenticated_providers_status": 200,
+    "gemini_requested_models": [
+      "gemini-3.8-flash",
+      "gemini-3.6-flash",
+      "gemini-2.5-flash",
+      "gemini-3.5-flash-lite",
+      "gemma-4-31b-it",
+      "gemma-4-26b-a4b-it"
+    ],
+    "gemini_models_list_ok": true,
+    "head": "8bd86a6c3915281838df15ee16ea4a70c3e20e71"
+  },
+  "verification_command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=<deployment-checkout> <existing-venv>/bin/python <prepared-deploy-directory>/check_deployment.py post",
+  "verification_exit_code": 0,
+  "backup": {
+    "path": "/home/anhtuan/arcreel-v2-staging/backups/bs-20261023T151016Z",
+    "state": {
+      "backup_set_id": "bs-20261023T151016Z",
+      "manifest_digest": "sha256:69908018748ed9003145dffff546a0f00608932e994b79cdc7e623ba43940821",
+      "state": "COMPLETE",
+      "updated_at": "2026-10-23T15:10:17.924532+00:00"
+    },
+    "files": {
+      "database.dump": {
+        "sha256": "77affe12f850c842a135834017368fc1357eb776f6f982754e2c6c453a30556a",
+        "bytes": 588915
+      },
+      "manifest.json": {
+        "sha256": "73594ad7a2ed5f39a45e752b5686f3a5fad6b37cd4f8da23e064f323f42e98fa",
+        "bytes": 42080
+      },
+      "state.json": {
+        "sha256": "0e8cb0b8b110beeb34b3460fb68d7d8f747b7cfb24cd531cecdee30a9d6311d6",
+        "bytes": 215
+      }
+    },
+    "restore_test_performed": false
+  },
+  "preserved_incoming_registry_sha256": "7e315e71b719fa7534ce5bae2ee14c13ccec4efc3c5dafdcc7c40085c7d2e568",
+  "limits": [
+    "Post-deploy verification checks health, authentication, exact clean source, schema, active tasks and metadata-only Gemini models.list.",
+    "No paid generation or new content-generation acceptance performed.",
+    "Story cloud authoring remains unqualified; this release changes the provider catalog only.",
+    "Automatic rollback path and backup restore were not exercised.",
+    "Earlier 554-test and static verification belongs to tested_code_head; no new suite run in this evidence-only step."
+  ],
+  "m9_m10_remain_paused": true
+}
