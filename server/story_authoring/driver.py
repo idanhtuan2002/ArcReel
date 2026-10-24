@@ -52,6 +52,7 @@ from server.story_authoring.checks import (
 from server.story_authoring.commit import ManuscriptCommitManifest, SceneEntry, load_offered_manifest, offer_manifest
 from server.story_authoring.contracts import (
     AttemptKind,
+    CloudRouteProfile,
     OutputMode,
     StoryDecoding,
     StoryFailureCode,
@@ -166,6 +167,7 @@ class StoryBrief(BaseModel):
     selection: StoryModelSelection
     judge_selection: StoryModelSelection | None = None
     limits: StoryLimits
+    cloud_profiles: tuple[CloudRouteProfile, ...] = Field(default=(), exclude_if=lambda value: not value)
 
     @property
     def judge(self) -> StoryModelSelection:

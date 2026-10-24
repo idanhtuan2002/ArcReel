@@ -33,6 +33,7 @@ from lib.db.repositories.usage_repo import SettlementInput, UsageRepository
 from server.story_authoring.contracts import (
     LOCAL_CURRENCY,
     AttemptKind,
+    CloudPriceBounds,
     StoryFailureCode,
     StoryLimits,
     StoryScope,
@@ -252,6 +253,12 @@ def reserve(
             f"wall_clock {limits.wall_clock_max_seconds}s",
         ),
     )
+    if limits.cloud_prices is not None:
+        projected = limits.cloud_prices.minor_units(
+            usage.input_tokens + reserved_input_tokens, usage.output_tokens + reserved_output_tokens
+        )
+        if projected > limits.max_cost_minor_units:
+            raise BudgetExhausted(f"USD cap {limits.max_cost_minor_units} cents reached")
     for exceeded, cap in checks:
         if exceeded:
             raise BudgetExhausted(f"cap {cap} reached")
@@ -329,7 +336,7 @@ def complete(
     record = state.attempt(attempt_id)
     if record.state is not AttemptState.DISPATCHED:
         raise ValueError(f"attempt {attempt_id} is {record.state.value}, not DISPATCHED")
-    return _settle(
+    settled = _settle(
         state,
         record,
         new_state=AttemptState.COMPLETED,
@@ -338,6 +345,16 @@ def complete(
         duration_ms=duration_ms,
         done_reason=done_reason,
     )
+
+    if state.limits.cloud_prices is not None:
+        exceeds_tokens = input_tokens > record.reserved_input_tokens or output_tokens > record.reserved_output_tokens
+        exceeds_money = (
+            state.limits.cloud_prices.minor_units(settled.usage.input_tokens, settled.usage.output_tokens)
+            > state.limits.max_cost_minor_units
+        )
+        if exceeds_tokens or exceeds_money:
+            return set_phase(settled, RunPhase.BLOCKED_BUDGET, reason="cloud usage exceeded the approved reservation")
+    return settled
 
 
 def fail(
@@ -595,6 +612,7 @@ class StoryAttemptSink:
         model_id: str,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         attempt_ids: Callable[[], str] = lambda: uuid.uuid4().hex,
+        price_bounds: CloudPriceBounds | None = None,
     ) -> None:
         self._store = store
         self._session_factory = session_factory
@@ -602,6 +620,8 @@ class StoryAttemptSink:
         self._model_id = model_id
         self._clock = clock
         self._attempt_ids = attempt_ids
+        self._price_bounds = price_bounds
+        self._currency = "USD" if price_bounds is not None else LOCAL_CURRENCY
         self._scopes: dict[str, StoryScope] = {}
         self._dispatched_at: dict[str, datetime] = {}
 
@@ -681,6 +701,8 @@ class StoryAttemptSink:
         await self._close_usage_row(
             state.attempt(attempt_id).ledger_call_id,
             status="success",
+            cost_amount=self._cost(state, attempt_id),
+            currency=self._currency,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
         )
@@ -698,6 +720,8 @@ class StoryAttemptSink:
             state.attempt(attempt_id).ledger_call_id,
             status="failed",
             error=f"{code.value}: {detail}",
+            cost_amount=self._cost(state, attempt_id),
+            currency=self._currency,
             input_tokens=input_tokens,
         )
 
@@ -707,7 +731,15 @@ class StoryAttemptSink:
             state.attempt(attempt_id).ledger_call_id,
             status="failed",
             error=f"{StoryFailureCode.OUTCOME_UNKNOWN.value}: {detail}",
+            cost_amount=self._cost(state, attempt_id),
+            currency=self._currency,
         )
+
+    def _cost(self, state: RunState, attempt_id: str) -> float:
+        record = state.attempt(attempt_id)
+        if self._price_bounds is None or record.kind is AttemptKind.COUNT:
+            return 0.0
+        return float(self._price_bounds.usd(record.charged_input_tokens, record.charged_output_tokens))
 
     def _elapsed_ms(self, attempt_id: str) -> int:
         started = self._dispatched_at.get(attempt_id)
@@ -739,6 +771,8 @@ class StoryAttemptSink:
         error: str | None = None,
         input_tokens: int | None = None,
         output_tokens: int | None = None,
+        cost_amount: float = 0.0,
+        currency: str = LOCAL_CURRENCY,
     ) -> None:
         if call_id is None:
             return
@@ -748,8 +782,8 @@ class StoryAttemptSink:
                     call_id,
                     status=status,
                     settlement=SettlementInput(
-                        cost_amount=0.0,
-                        currency=LOCAL_CURRENCY,
+                        cost_amount=cost_amount,
+                        currency=currency,
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                     ),
@@ -780,10 +814,17 @@ async def recover_run(
             if call_id is None:
                 continue
             code = record.failure_code.value if record.failure_code else "RECOVERED"
+            call = await session.get(ApiCall, call_id)
+            prices = state.limits.cloud_prices if call is not None and call.provider == "gemini-aistudio" else None
+            cost = (
+                float(prices.usd(record.charged_input_tokens, record.charged_output_tokens))
+                if prices is not None and record.kind is AttemptKind.GENERATE
+                else 0.0
+            )
             await UsageRepository(session).finish_call(
                 call_id,
                 status="failed",
-                settlement=SettlementInput(cost_amount=0.0, currency=LOCAL_CURRENCY),
+                settlement=SettlementInput(cost_amount=cost, currency="USD" if prices is not None else LOCAL_CURRENCY),
                 error_message=f"{code}: settled by restart recovery",
             )
     return state, problems

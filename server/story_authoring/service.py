@@ -31,6 +31,7 @@ from lib.db.models.task import Task
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.db.repositories.gates import GreenlightRepository
 from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
+from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from r2.narrative_lifecycle.errors import NarrativeDecisionAuthorizationError
 from server.story_authoring.artifacts import StoryBlobStore
 from server.story_authoring.authority import GrantNarrativeShowrunnerAuthority
@@ -41,6 +42,7 @@ from server.story_authoring.handoff import OnConflict, SourceUpload, send_to_vid
 from server.story_authoring.narrative import StoryIdentity
 from server.story_authoring.pipeline import intent_targets, node_kind
 from server.story_authoring.prompts.schemas import StorySeed, StyleBibleOut
+from server.story_authoring.routes import max_prices, resolve_cloud_route, story_routes, validate_cloud_brief
 from server.story_authoring.runtime import (
     HandoffRecord,
     RunPhase,
@@ -127,6 +129,7 @@ class StoryAuthoringService:
         story_target_syllables: int = 9000,
         judge_provider_id: str | None = None,
         judge_model_id: str | None = None,
+        max_cost_minor_units: int = 500,
     ) -> StoryBrief:
         """The brief with its frozen routes; its digest is what the Human greenlights at Gate A. A judge route is
         optional; without one the writer's route also reviews."""
@@ -136,18 +139,49 @@ class StoryAuthoringService:
         judge = (
             await self._selection(judge_provider_id, judge_model_id) if judge_provider_id and judge_model_id else None
         )
+        profiles = []
+        for route in (selection, judge):
+            if route is not None and route.endpoint != OLLAMA_CHAT_ENDPOINT:
+                resolved = await resolve_cloud_route(self._factory, route.provider_id, route.model_id)
+                if resolved.selection != route:
+                    raise StoryActionRefused("ROUTE_CHANGED", "cloud route changed while preparing the brief")
+                if resolved.profile not in profiles:
+                    profiles.append(resolved.profile)
+        limits = DEFAULT_LIMITS
+        if profiles:
+            if type(max_cost_minor_units) is not int or not 1 <= max_cost_minor_units <= 10_000:
+                raise StoryActionRefused(
+                    "CLOUD_BUDGET_INVALID", "cloud USD cap must be between 1 and 10000 cents", status=422
+                )
+            limits = StoryLimits.model_validate(
+                {
+                    **DEFAULT_LIMITS.model_dump(),
+                    "currency": "USD",
+                    "max_cost_minor_units": max_cost_minor_units,
+                    "cloud_prices": max_prices(tuple(profiles)),
+                }
+            )
         return StoryBrief(
             idea=idea,
             genre=genre,
             story_target_syllables=story_target_syllables,
             selection=selection,
             judge_selection=judge if judge != selection else None,
-            limits=DEFAULT_LIMITS,
+            limits=limits,
+            cloud_profiles=tuple(profiles),
         )
+
+    async def list_routes(self) -> list[dict[str, Any]]:
+        return await story_routes(self._factory)
 
     async def _selection(self, provider_id: str, model_id: str) -> StoryModelSelection:
         if not is_custom_provider(provider_id):
-            raise StoryActionRefused("ROUTE_NOT_QUALIFIED", f"{provider_id} is not a custom provider", status=422)
+            try:
+                return (await resolve_cloud_route(self._factory, provider_id, model_id)).selection
+            except (ValueError, PaidRouteUnqualifiedError):
+                raise StoryActionRefused(
+                    "ROUTE_NOT_QUALIFIED", "cloud story route is unavailable or unqualified", status=422
+                ) from None
         async with self._factory() as session:
             repo = CustomProviderRepository(session)
             provider = await repo.get_provider(parse_provider_id(provider_id))
@@ -172,6 +206,10 @@ class StoryAuthoringService:
         await self._require_grant(principal, user_id=user_id, project_name=project_name)
         draft = brief.model_copy(update={"gate_a_decision_id": None})
         await self._require_greenlight(user_id, project_name, draft.digest(), gate_a_decision_id)
+        try:
+            await validate_cloud_brief(self._factory, draft)
+        except (ValueError, PaidRouteUnqualifiedError):
+            raise StoryActionRefused("ROUTE_CHANGED", "story route or approved cloud profile changed") from None
         run_id = run_id_for(gate_a_decision_id)
         existing = await self._find(user_id, project_name, run_id)
         if existing is not None:

@@ -8,8 +8,9 @@ positive finite integer; money ceilings are in the configured currency's minor u
 from __future__ import annotations
 
 import hashlib
+from decimal import ROUND_CEILING, Decimal
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -69,6 +70,19 @@ class StoryScope(_Frozen):
     actor_id: str = Field(min_length=1)
 
 
+class CloudPriceBounds(_Frozen):
+    """Frozen USD bounds per million tokens; cache savings are not assumed."""
+
+    input_per_million: Decimal = Field(ge=0, allow_inf_nan=False)
+    output_per_million: Decimal = Field(ge=0, allow_inf_nan=False)
+
+    def usd(self, input_tokens: int, output_tokens: int) -> Decimal:
+        return (self.input_per_million * input_tokens + self.output_per_million * output_tokens) / 1_000_000
+
+    def minor_units(self, input_tokens: int, output_tokens: int) -> int:
+        return int((self.usd(input_tokens, output_tokens) * 100).to_integral_value(rounding=ROUND_CEILING))
+
+
 class StoryLimits(_Frozen):
     chapters: int = Field(default=3, ge=1)
     max_input_tokens: int = Field(default=24576, gt=0)
@@ -83,6 +97,7 @@ class StoryLimits(_Frozen):
     max_scene_attempts: int = Field(default=6, gt=0)
     max_cost_minor_units: int = Field(default=0, ge=0)
     currency: str = Field(default=LOCAL_CURRENCY, min_length=1)
+    cloud_prices: CloudPriceBounds | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def _consistent(self) -> StoryLimits:
@@ -92,11 +107,21 @@ class StoryLimits(_Frozen):
             raise ValueError("a priced currency needs a positive max_cost_minor_units")
         if self.currency == LOCAL_CURRENCY and self.max_cost_minor_units != 0:
             raise ValueError("currency LOCAL carries no money ceiling")
+        if self.cloud_prices is not None and self.currency != "USD":
+            raise ValueError("cloud prices require USD limits")
         return self
 
     @property
     def total_http_calls_max(self) -> int:
         return self.count_calls_max + self.generate_calls_max
+
+
+class CloudRouteProfile(_Frozen):
+    version: Literal[2] = 2
+    selection_digest: str
+    binding: str
+    adapter_version: Literal["gemini-story-v1"] = "gemini-story-v1"
+    prices: CloudPriceBounds
 
 
 class StoryModelSelection(_Frozen):

@@ -4,7 +4,6 @@
  */
 
 import { API } from "@/api";
-import type { CustomProviderInfo } from "@/types";
 
 interface CallOptions {
   signal?: AbortSignal;
@@ -64,6 +63,7 @@ export interface StoryBrief {
   selection: ModelSelection;
   judge_selection: ModelSelection | null;
   story_target_syllables: number;
+  limits?: { currency: string; max_cost_minor_units: number };
   [key: string]: unknown;
 }
 
@@ -139,6 +139,7 @@ export interface DraftBriefRequest {
   story_target_syllables: number;
   judge_provider_id: string | null;
   judge_model_id: string | null;
+  max_cost_minor_units?: number;
 }
 
 export interface DraftedBrief {
@@ -149,25 +150,14 @@ export interface DraftedBrief {
 export type LifecycleAction = "resume" | "abort" | "retry" | "discard" | "withdraw";
 export type OnConflict = "fail" | "replace" | "rename";
 
-/** A model the story run can use: an enabled model on the native Ollama chat endpoint of a custom provider. */
+/** Backend-owned story choices; display metadata does not authorize dispatch. */
 export interface StoryRoute {
   provider_id: string;
   model_id: string;
   label: string;
-}
-
-const STORY_ENDPOINT = "ollama-chat";
-
-export function storyRoutes(providers: CustomProviderInfo[]): StoryRoute[] {
-  return providers.flatMap((provider) =>
-    provider.models
-      .filter((model) => model.is_enabled && model.endpoint === STORY_ENDPOINT)
-      .map((model) => ({
-        provider_id: `custom-${provider.id}`,
-        model_id: model.model_id,
-        label: `${provider.display_name} · ${model.display_name || model.model_id}`,
-      })),
-  );
+  enabled: boolean;
+  reason: "MISSING_CREDENTIAL" | "NOT_QUALIFIED" | "UNAVAILABLE" | null;
+  cloud: boolean;
 }
 
 function base(projectName: string): string {
@@ -179,8 +169,10 @@ function post<T>(endpoint: string, body: unknown, options: CallOptions = {}): Pr
 }
 
 export async function listRoutes(options: CallOptions = {}): Promise<StoryRoute[]> {
-  const { providers } = await API.listCustomProviders({ signal: options.signal });
-  return storyRoutes(providers);
+  const { routes } = await API.request<{ routes: StoryRoute[] }>("/system/config/story-routes", {
+    signal: options.signal,
+  });
+  return routes;
 }
 
 export async function listRuns(projectName: string, options: CallOptions = {}): Promise<RunSummary[]> {
@@ -192,7 +184,11 @@ export function getRun(projectName: string, runId: string, options: CallOptions 
   return API.request(`${base(projectName)}/${encodeURIComponent(runId)}`, { signal: options.signal });
 }
 
-export function draftBrief(projectName: string, request: DraftBriefRequest, options: CallOptions = {}): Promise<DraftedBrief> {
+export function draftBrief(
+  projectName: string,
+  request: DraftBriefRequest,
+  options: CallOptions = {},
+): Promise<DraftedBrief> {
   return post(`${base(projectName)}/brief`, request, options);
 }
 
@@ -202,7 +198,10 @@ export async function greenlightAndStart(
   drafted: DraftedBrief,
   options: CallOptions = {},
 ): Promise<string> {
-  const decision = await API.greenlightProject(projectName, { source_digest: drafted.brief_digest, action: "GREENLIGHT" });
+  const decision = await API.greenlightProject(projectName, {
+    source_digest: drafted.brief_digest,
+    action: "GREENLIGHT",
+  });
   const started = await post<{ run_id: string }>(
     base(projectName),
     { brief: drafted.brief, gate_a_decision_id: decision.decision_id },

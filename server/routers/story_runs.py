@@ -60,6 +60,7 @@ class DraftBriefRequest(_Request):
     story_target_syllables: int = Field(default=9000, ge=7000, le=11000)
     judge_provider_id: str | None = Field(default=None, min_length=1)
     judge_model_id: str | None = Field(default=None, min_length=1)
+    max_cost_minor_units: int = Field(default=500, ge=1, le=10_000)
 
 
 class StartRunRequest(_Request):
@@ -109,6 +110,11 @@ def _view(run_id: str, brief: StoryBrief, state: RunState, offered: dict[str, An
     }
 
 
+@router.get("/system/config/story-routes")
+async def available_story_routes(_user: CurrentUser, service: Service) -> dict:
+    return {"routes": await service.list_routes()}
+
+
 @router.post("/projects/{project_name}/story-runs/brief")
 async def draft_brief(project_name: str, req: DraftBriefRequest, _user: CurrentUser, service: Service) -> dict:
     """The brief and the digest the Human greenlights through ``POST /gates/greenlight``."""
@@ -121,6 +127,7 @@ async def draft_brief(project_name: str, req: DraftBriefRequest, _user: CurrentU
             story_target_syllables=req.story_target_syllables,
             judge_provider_id=req.judge_provider_id,
             judge_model_id=req.judge_model_id,
+            max_cost_minor_units=req.max_cost_minor_units,
         )
     except REFUSALS as error:
         raise _refusal(error) from error
