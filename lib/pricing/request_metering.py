@@ -26,6 +26,7 @@ __all__ = [
     "Usage",
     "price_requests",
     "token_usage",
+    "validate_price_table",
 ]
 
 
@@ -141,6 +142,12 @@ def _table(value: object) -> tuple[PriceTable, bool]:
             )
         )
     return PriceTable(currency=currency, meters=tuple(meters)), known
+
+
+def validate_price_table(table: PriceTable) -> PriceTable | Unpriced:
+    """Snapshot recognized price facts without evaluating usage or permission."""
+    copied, known = _table(table)
+    return copied if known else Unpriced(UnpricedReason.UNRECOGNIZED_TERMS)
 
 
 def price_requests(
