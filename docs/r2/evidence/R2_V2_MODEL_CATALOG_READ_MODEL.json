@@ -1,6 +1,6 @@
 {
-  "status": "FULL_REGRESSION_PENDING_NOT_ACCEPTED",
-  "recorded_at_utc": "2026-10-23T19:11:04.591991+00:00",
+  "status": "VERIFICATION_COMPLETE_FULL_BACKEND_NOT_GREEN",
+  "recorded_at_utc": "2026-10-24T01:07:00.107526+00:00",
   "implementation_base": "49cb7956065474a64018745629bdeb475b35422a",
   "source_head": "a56f07a9471c0916c768c120eaaacf95598c8e6e",
   "documentation_head": "f39494c2b96a254e75198a56e39db525023bad80",
@@ -107,13 +107,131 @@
     }
   ],
   "full_backend": {
-    "status": "RUNNING",
-    "session": 24596,
+    "status": "ALL_COLLECTED_NODEIDS_RECONCILED_WITH_BASELINE_FAILURES",
+    "first_exit": 2,
+    "passed": 17407,
+    "failed": 3,
+    "skipped": 187,
+    "warnings": 159,
+    "seconds": 2614.53,
     "log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/full-regression.log",
-    "junit_expected": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/full-regression.xml",
-    "failure_markers_observed": 3,
-    "final_counts": null,
-    "failure_classification": "UNKNOWN_PENDING_TRACE"
+    "junit": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/full-regression.xml",
+    "collected": 17604,
+    "completed_nodeids": 17597,
+    "remaining_tests": 0,
+    "remaining_log": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/remaining-regression.log",
+    "nodeid_reconciliation": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/collection-reconciliation.json",
+    "failure_disposition": {
+      "proof": [
+        {
+          "label": "baseline",
+          "failed": [
+            "tests.unit.r2.narrative.test_canon_architecture_boundaries::test_authority_write_symbols_stay_out_of_downstream_layers",
+            "tests.unit.r2.test_master_authority_boundaries::test_the_manifest_master_is_approved_only_by_the_projection_step_and_the_offline_runner"
+          ],
+          "passed": [
+            "tests.integration.scripts.r2.test_verify_m7_scope_git::test_verify_m7_scope_passes_against_the_real_baseline_and_repo"
+          ]
+        },
+        {
+          "label": "candidate",
+          "failed": [
+            "tests.unit.r2.narrative.test_canon_architecture_boundaries::test_authority_write_symbols_stay_out_of_downstream_layers",
+            "tests.unit.r2.test_master_authority_boundaries::test_the_manifest_master_is_approved_only_by_the_projection_step_and_the_offline_runner"
+          ],
+          "passed": [
+            "tests.integration.scripts.r2.test_verify_m7_scope_git::test_verify_m7_scope_passes_against_the_real_baseline_and_repo"
+          ]
+        }
+      ],
+      "unchanged_baseline_failures": 2,
+      "dirty_checkout_failure_passes_in_clean_clones": true,
+      "full_gate": "NOT_GREEN",
+      "remaining_tests": 7,
+      "remaining_session": 79442
+    },
+    "resumed_run": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "warnings": 4,
+      "seconds": 1378.06,
+      "junit": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model/remaining-regression.xml"
+    },
+    "verification_summary": {
+      "status": "COVERAGE_RECONCILED_WITH_UNCHANGED_BASELINE_FAILURES",
+      "source_seal_matches": true,
+      "collected_test_nodeids": 17604,
+      "first_run": {
+        "passed": 17407,
+        "failed": 3,
+        "skipped": 187,
+        "error": 0
+      },
+      "resumed_run": {
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "error": 0
+      },
+      "unexecuted_nodeids": [],
+      "new_catalog_tests_passed": 25,
+      "static_checks_passed": 7,
+      "unchanged_baseline_failures": [
+        "tests/unit/r2/narrative/test_canon_architecture_boundaries.py::test_authority_write_symbols_stay_out_of_downstream_layers",
+        "tests/unit/r2/test_master_authority_boundaries.py::test_the_manifest_master_is_approved_only_by_the_projection_step_and_the_offline_runner"
+      ],
+      "dirty_checkout_failure_passed_in_clean_baseline_and_candidate": [
+        "tests/integration/scripts/r2/test_verify_m7_scope_git.py::test_verify_m7_scope_passes_against_the_real_baseline_and_repo"
+      ],
+      "full_backend_gate_passed": false,
+      "production_activation": false
+    },
+    "skip_reasons": {
+      "drama \u7684\u811a\u672c\u89c4\u5212\u6ca1\u6709\u8349\u7a3f\u6a21\u578b\uff0c\u4e24\u4fa7\u6d88\u8d39\u7684\u90fd\u662f\u78c1\u76d8\u539f\u6587": 1,
+      "candidate publisher requires PostgreSQL": 31,
+      "concurrency races need real row-level locking (PostgreSQL only)": 15,
+      "row-lock interleaving requires PostgreSQL": 4,
+      "attestor requires PostgreSQL": 3,
+      "requires DATABASE_URL pointing at a disposable PostgreSQL server": 23,
+      "this race needs two real connections and row-level locking (PostgreSQL only)": 2,
+      "full recovery scan requires PostgreSQL": 15,
+      "the SQLite test engine runs with foreign keys disabled": 3,
+      "row locks between sessions need PostgreSQL": 2,
+      "requires PostgreSQL transaction advisory locks": 7,
+      "concurrent attempt admission requires PostgreSQL": 1,
+      "cross-parent unique-key races require PostgreSQL": 1,
+      "concurrent appends need PostgreSQL row locks": 3,
+      "SQLite test databases do not enforce foreign keys": 1,
+      "concurrent admission needs PostgreSQL row locks": 3,
+      "row-level write locks between sessions need PostgreSQL": 1,
+      "requires PostgreSQL foreign keys": 1,
+      "requires PostgreSQL session timezone": 1,
+      "requires PostgreSQL row locks": 3,
+      "operator preflight requires PostgreSQL": 4,
+      "public startup requires PostgreSQL": 3,
+      "activated startup requires PostgreSQL": 5,
+      "concurrent decisions need PostgreSQL locks": 1,
+      "operator reconciliation requires PostgreSQL schema preflight": 8,
+      "requires PostgreSQL row-lock blocker evidence": 2,
+      "forced hint/lock interleaving requires PostgreSQL": 2,
+      "FOR UPDATE order is PostgreSQL-specific": 1,
+      "requires PostgreSQL row and advisory locks": 1,
+      "frontend/dist is missing; run (cd frontend && pnpm build)": 9,
+      "concurrent read-committed claims need PostgreSQL": 1,
+      "the operator ceremony requires PostgreSQL": 6,
+      "requires PostgreSQL read-only transaction": 4,
+      "candidate preflight requires PostgreSQL": 5,
+      "activated lifespan requires PostgreSQL": 1,
+      "forced row-lock interleavings require PostgreSQL": 4,
+      "deferred coupling triggers are PostgreSQL-only": 1,
+      "requires PostgreSQL row-lock observation": 3,
+      "requires PostgreSQL transaction-clock behavior": 1,
+      "_scproxy \u53ea\u5728 macOS \u5b58\u5728": 1,
+      "forced Gate C writer-first schedule requires PostgreSQL row locks": 1,
+      "ARCREEL_E2E_DATA_DIR is not set; point it at a restore-derived target": 1,
+      "isolation level is a PostgreSQL-only precondition (spec \u00a77.2)": 1
+    }
   },
   "review": {
     "candidate": "f50986975b0485c1b8ede44ef13d4e27fa149008",
@@ -131,9 +249,19 @@
     "Cloud execution, metering/admission, UI/API and migrations remain outside this slice; test typing corrections verified by main."
   ],
   "limits": [
-    "No read-model acceptance until the remaining gate is resolved.",
+    "All 17604 collected node IDs are accounted for, including 187 explicit skips. Full backend remains NOT_GREEN: two authority assertions fail identically on clean baseline and candidate. This evidence does not grant release or production acceptance.",
     "No new model selector, cloud generation, live qualification, DB migration, push, merge or production activation.",
     "Production r2-v2.0.6 unchanged; M9/M10 remain paused."
   ],
-  "next_research": "docs/research/2026-10-24-model-metering-readiness.md"
+  "next_research": "docs/research/2026-10-24-model-metering-readiness.md",
+  "next_prerequisites": [
+    "Resolve or explicitly adjudicate the two existing Story Authoring authority-test failures before claiming a green whole-backend release gate.",
+    "Resolve the deferred custom constraint unknown/empty semantics before any selector consumes those fields.",
+    "Prepare a separate pinned metering bridge plan from the compatibility specification and readiness research; no runtime ledger/admission changes in a pure arithmetic slice."
+  ],
+  "archive": {
+    "path": ".superpowers/sdd/2026-10-24-v2-model-catalog-read-model-evidence.tar.gz",
+    "sha256": "1955c614cee4dfe18955939096abf829961699cc8f43ca69aeaeffeb4e78e941",
+    "contents": "catalog verification workspace and metering readiness probe artifacts; final evidence JSON is external to avoid a circular hash"
+  }
 }
