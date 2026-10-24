@@ -9,18 +9,18 @@
 
 ## Task 0: Baseline
 
-- [ ] Pin source/graph and current scope; source fallback for stale/missing paths. Preserve dirty drafts and record current default-resolution tests. Reuse existing fixture/fake boundaries; do not mock away the assembly or ledger under test.
+- [x] Pin source/graph and current scope; source fallback for stale/missing paths. Preserve dirty drafts and record current default-resolution tests. Reuse existing fixture/fake boundaries; do not mock away the assembly or ledger under test.
 
 ## Task 1: Explicit selection and use
 
 **Modify:** lib/config/resolver.py (shared pure vision wrapper + equivalent legacy call), lib/text_backends/factory.py, lib/text_generator.py; tests/unit/lib/text_backends/test_factory.py; tests/unit/lib/test_text_generator.py. A separate integration test file may be used for real assembly/config fixture coverage.
 
-- [ ] RED: new create_text_backend_for_model absent; native Gemini/Grok/OpenAI resolve exact current IDs through actual assembly with constructor-only fake; assert constructed kwargs/provider attribution. Existing credentials/qualification remain owned by current seams.
-- [ ] RED: unknown builtin/model, non-text model, invalid canonical custom ID, partial/empty pair, unknown task, unsupported vision fail without generation; custom fallback returned by existing loader is rejected by actual-model comparison. Qualifier refusal propagates.
-- [ ] RED: TextGenerator.create accepts complete explicit pair and generate calls selected backend and records provider/model in disposable real Ledger. Omitting pair still calls existing task factory. No config persistence or default modification.
-- [ ] Implement specified three modules, retaining default behavior and using existing policy predicate. No provider calls or UI/story/price work.
-- [ ] GREEN: run factory/generator tests then full text-backends/config/backend-assembly domains and release-binding integration tests. Run Ruff/format/basedpyright/imports/deptry/test-audit and committed-range diff-check. No unrelated media suite absent a CONTRIBUTING trigger.
-- [ ] Commit owned paths before task-done; record exact source range and actual outputs.
+- [x] RED: new create_text_backend_for_model absent; native Gemini/Grok/OpenAI resolve exact current IDs through actual assembly with constructor-only fake; assert constructed kwargs/provider attribution. Existing credentials/qualification remain owned by current seams.
+- [x] Regression coverage: unknown builtin/model, non-text model, invalid canonical custom ID, partial/empty pair, unknown task, unsupported vision fail without generation; custom fallback returned by existing loader is rejected by actual-model comparison. Qualifier refusal propagates.
+- [x] Integration coverage: TextGenerator.create accepts complete explicit pair and generate calls selected backend and records provider/model in disposable real Ledger. Omitting pair still calls existing task factory. No config persistence or default modification.
+- [x] Implement specified three modules, retaining default behavior and using existing policy predicate. No provider calls or UI/story/price work.
+- [x] GREEN: run factory/generator tests then full text-backends/config/backend-assembly domains and release-binding integration tests. Run Ruff/format/basedpyright/imports/deptry/test-audit and committed-range diff-check. No unrelated media suite absent a CONTRIBUTING trigger.
+- [x] Commit owned paths before task-done; record exact source range and actual outputs.
 
 ## Additive operator entrypoint (scope clarification, 2026-10-24)
 
@@ -28,5 +28,9 @@ The sponsor asked to select/use models through the shared backend. Include `lib/
 
 ## Task 2: Review/handoff
 
-- [ ] One independent read-only review for identity substitution, capability/qualification bypass, attribution and default compatibility. Main owns decisions; one significant repair pass if necessary.
-- [ ] Evidence with exact source/test counts/limits and instructions for the backend Python interface. State native-Claude/live-provider/UI/story limitations; no production activation. Archive/checkpoint then evidence-only commit. No push/merge/deploy.
+- [x] One independent read-only review for identity substitution, capability/qualification bypass, attribution and default compatibility. Main owns decisions; one significant repair pass if necessary.
+- [x] Evidence with exact source/test counts/limits and instructions for the backend Python interface. State native-Claude/live-provider/UI/story limitations; no production activation. Archive/checkpoint then evidence-only commit. No push/merge/deploy.
+
+## Final gate
+
+Code candidate:`2ee4730354eb9985705a3f756fbede21d07c9639`.818 affected tests passed with4SQLite expression-index reflection warnings; six static tools plus committed-range diff-check passed. Independent reviewer:APPROVE, no findings. New-feature/console initial missing-symbol RED logs are archived; extra default/non-text/unknown-task regression cases were added after the initial GREEN. No claim that every later case independently went through RED. All evidence is recorded under docs/r2/evidence/R2_EXPLICIT_TEXT_BACKEND.json and the accompanying archive. Keep the branch/worktree; no merge/push/deploy or cloud generation.

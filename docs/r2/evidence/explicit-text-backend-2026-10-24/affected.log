@@ -1,0 +1,51 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  8%]
+........................................................................ [ 17%]
+........................................................................ [ 26%]
+........................................................................ [ 35%]
+........................................................................ [ 44%]
+........................................................................ [ 52%]
+........................................................................ [ 61%]
+........................................................................ [ 70%]
+........................................................................ [ 79%]
+........................................................................ [ 88%]
+........................................................................ [ 96%]
+..........................                                               [100%]
+=============================== warnings summary ===============================
+tests/unit/lib/backend_assembly/test_backend_assembly_specs.py::test_migrated_builtin_video_providers_use_shipped_definitions[minimax-MiniMax-Hailuo-2.3-minimax-hailuo-v1]
+tests/integration/lib/config/test_config_resolver.py::TestVideoGenerateAudio::test_default_is_true_when_db_empty
+tests/unit/lib/text_backends/test_base.py::TestTextCapability::test_values
+tests/unit/lib/config/test_config_resolver_resolution.py::test_returns_none_when_nothing_configured
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+1.88s setup    tests/unit/lib/config/test_config_resolver_resolution.py::test_returns_none_when_nothing_configured
+1.42s setup    tests/unit/lib/text_backends/test_base.py::TestTextCapability::test_values
+1.42s setup    tests/integration/lib/config/test_config_resolver.py::TestVideoGenerateAudio::test_default_is_true_when_db_empty
+1.39s setup    tests/unit/lib/backend_assembly/test_backend_assembly_specs.py::test_migrated_builtin_video_providers_use_shipped_definitions[minimax-MiniMax-Hailuo-2.3-minimax-hailuo-v1]
+0.45s setup    tests/integration/lib/config/test_config_resolver.py::TestDefaultBackends::test_video_backend_auto_resolve
+0.43s call     tests/unit/lib/text_backends/test_instructor_support.py::TestInstructorExceptionShape::test_api_call_failure_arrives_wrapped
+0.41s setup    tests/unit/lib/config/test_config_service.py::test_get_all_providers_status_empty
+0.27s call     tests/unit/lib/text_backends/test_instructor_support.py::TestGenerateStructuredViaInstructorAsync::test_explicit_token_param_max_completion_tokens
+0.26s setup    tests/unit/lib/config/test_config_resolver_resolution.py::test_legacy_only
+0.17s setup    tests/unit/lib/config/test_config_resolver_resolution.py::test_model_settings_overrides_legacy
+0.17s setup    tests/unit/lib/test_text_generator.py::test_generate_calls_the_backend_without_ambient_baggage
+0.17s setup    tests/unit/lib/backend_assembly/test_backend_assembly_loader.py::TestLoadBuiltinConfig::test_rate_limiter_carried_into_envelope
+0.17s setup    tests/unit/lib/config/test_config_migration.py::test_tier_migration_simple_combinations[-gemini-aistudio/b-gemini-aistudio/b]
+0.17s setup    tests/unit/lib/config/test_config_service.py::test_provider_status_models_isolated_from_registry
+0.16s setup    tests/integration/lib/config/test_config_resolver.py::TestVoiceConsistency::test_missing_binding_defaults_to_prompt_and_downgrades
+0.16s setup    tests/unit/lib/config/test_config_repository.py::test_setting_set_and_get
+0.16s setup    tests/unit/lib/config/test_config_service.py::test_set_max_workers_accepts_positive_integers[5]
+0.16s setup    tests/unit/lib/backend_assembly/test_backend_assembly_loader.py::TestAssembleBuiltinEndToEnd::test_kling_image_api_model_name_decoupled_end_to_end
+0.16s setup    tests/unit/lib/config/test_config_service.py::test_provider_becomes_ready
+0.16s setup    tests/integration/lib/config/test_config_resolver.py::TestVoiceConsistency::test_prompt_binding_downgrades_native_to_soft
+0.16s setup    tests/unit/lib/config/test_config_repository.py::test_get_configured_keys
+0.16s setup    tests/integration/lib/config/test_config_resolver.py::TestDefaultBackends::test_image_backend_auto_resolve
+0.16s setup    tests/unit/lib/config/test_config_resolver_resolution.py::test_tolerates_top_level_field_as_string
+0.16s setup    tests/unit/lib/config/test_config_service.py::test_set_max_workers_rejects_invalid_values[-image_max_workers]
+0.16s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_explicit_selection_does_not_bypass_release_qualification
+818 passed, 4 warnings in 18.45s

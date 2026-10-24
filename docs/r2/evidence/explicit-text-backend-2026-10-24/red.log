@@ -1,0 +1,16 @@
+
+==================================== ERRORS ====================================
+_ ERROR collecting tests/integration/lib/text_backends/test_explicit_selection.py _
+ImportError while importing test module '/home/anhtuan/.codex/worktrees/c1b3/content-production-os/tests/integration/lib/text_backends/test_explicit_selection.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/integration/lib/text_backends/test_explicit_selection.py:16: in <module>
+    from lib.text_backends.factory import create_text_backend_for_model
+E   ImportError: cannot import name 'create_text_backend_for_model' from 'lib.text_backends.factory' (/home/anhtuan/.codex/worktrees/c1b3/content-production-os/lib/text_backends/factory.py)
+=========================== short test summary info ============================
+ERROR tests/integration/lib/text_backends/test_explicit_selection.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.22s

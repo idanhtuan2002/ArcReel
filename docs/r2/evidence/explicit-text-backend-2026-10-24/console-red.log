@@ -1,0 +1,16 @@
+
+==================================== ERRORS ====================================
+________ ERROR collecting tests/unit/lib/text_backends/test_console.py _________
+ImportError while importing test module '/home/anhtuan/.codex/worktrees/c1b3/content-production-os/tests/unit/lib/text_backends/test_console.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/unit/lib/text_backends/test_console.py:9: in <module>
+    from lib.text_backends.console import main
+E   ModuleNotFoundError: No module named 'lib.text_backends.console'
+=========================== short test summary info ============================
+ERROR tests/unit/lib/text_backends/test_console.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.22s
