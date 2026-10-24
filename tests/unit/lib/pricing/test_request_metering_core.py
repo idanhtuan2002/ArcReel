@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from lib.pricing._metering_core.metering import Priced, Unpriced, UnpricedReason, Usage, price_requests, price_usage
 from lib.pricing._metering_core.model import Meter, PriceRow, PriceTable
 from lib.pricing._metering_core.vocabulary import METERS
-from lib.pricing._metering_core.metering import Priced, Unpriced, UnpricedReason, Usage, price_requests, price_usage
 
 
 def _table(*meters: Meter) -> PriceTable:
