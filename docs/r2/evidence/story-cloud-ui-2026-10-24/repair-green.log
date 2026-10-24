@@ -1,0 +1,25 @@
+..............                                                           [100%]
+=============================== warnings summary ===============================
+tests/unit/server/story_authoring/test_cloud.py::test_sdk_count_and_generate_are_single_calls_and_thoughts_are_charged
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+2.34s setup    tests/unit/server/story_authoring/test_cloud.py::test_sdk_count_and_generate_are_single_calls_and_thoughts_are_charged
+0.41s call     tests/integration/scripts/r2/test_story_cloud_qualification.py::test_story_canary_opens_only_the_exact_story_model_and_configuration
+0.25s setup    tests/integration/scripts/r2/test_story_cloud_qualification.py::test_story_canary_opens_only_the_exact_story_model_and_configuration
+0.08s call     tests/unit/server/story_authoring/test_cloud.py::test_sdk_count_and_generate_are_single_calls_and_thoughts_are_charged
+0.04s call     tests/unit/server/story_authoring/test_cloud.py::test_sdk_uses_the_google_canonical_base_url[https://proxy.example/v1alpha/-https://proxy.example/]
+0.02s call     tests/unit/server/story_authoring/test_cloud.py::test_invalid_output_is_never_accepted[STOP-False-None]
+0.02s call     tests/unit/server/story_authoring/test_cloud.py::test_sdk_uses_the_google_canonical_base_url[https://proxy.example/gemini-https://proxy.example/gemini/]
+0.02s call     tests/unit/server/story_authoring/test_cloud.py::test_sdk_uses_the_google_canonical_base_url[https://proxy.example/v1beta-https://proxy.example/]
+0.02s call     tests/unit/server/story_authoring/test_cloud.py::test_invalid_output_is_never_accepted[MAX_TOKENS-True-None]
+0.02s call     tests/unit/server/story_authoring/test_cloud.py::test_invalid_output_is_never_accepted[STOP-True-{"paragraphs":["\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587\u4e2d\u6587"]}]
+0.02s call     tests/unit/server/story_authoring/test_cloud.py::test_sdk_uses_the_google_canonical_base_url[https://proxy.example/v1-https://proxy.example/]
+0.02s call     tests/unit/server/story_authoring/test_cloud.py::test_sdk_never_retries_an_ambiguous_failure_or_prints_provider_secret
+0.01s setup    tests/unit/server/story_authoring/test_cloud.py::test_sdk_uses_the_google_canonical_base_url[https://proxy.example/v1alpha/-https://proxy.example/]
+0.01s teardown tests/unit/server/story_authoring/test_cloud.py::test_sdk_uses_the_google_canonical_base_url[https://proxy.example/v1beta-https://proxy.example/]
+
+(11 durations < 0.005s hidden.  Use -vv to show these durations.)
+14 passed, 1 warning in 3.60s

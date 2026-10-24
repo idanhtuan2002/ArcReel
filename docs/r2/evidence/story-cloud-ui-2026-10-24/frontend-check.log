@@ -1,0 +1,62 @@
+
+> arcreel-frontend@0.29.0 check /home/anhtuan/.codex/worktrees/c1b3/content-production-os/frontend
+> pnpm typecheck && pnpm lint && pnpm knip && vitest run
+
+
+> arcreel-frontend@0.29.0 typecheck /home/anhtuan/.codex/worktrees/c1b3/content-production-os/frontend
+> tsc --noEmit
+
+
+> arcreel-frontend@0.29.0 lint /home/anhtuan/.codex/worktrees/c1b3/content-production-os/frontend
+> eslint .
+
+
+> arcreel-frontend@0.29.0 knip /home/anhtuan/.codex/worktrees/c1b3/content-production-os/frontend
+> knip
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:5:36). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /home/anhtuan/.codex/worktrees/c1b3/content-production-os/frontend
+
+Not implemented: navigation to another Document
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: HTMLMediaElement's pause() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+
+ Test Files  233 passed (233)
+      Tests  2625 passed | 4 skipped (2629)
+   Start at  15:46:23
+   Duration  79.16s (transform 13.74s, setup 67.04s, import 38.20s, tests 155.95s, environment 216.85s)
+

@@ -1,0 +1,11 @@
+# V2 cloud story UI handoff
+
+Code head:677f2d97d1208a527b39df09ca72449c48e94b29. Branch:feat/v2-story-cloud-ui. Worktree:/home/anhtuan/.codex/worktrees/c1b3/content-production-os.
+
+User priority is actual cloud choice/use in V2; CLI-only completion was rejected. Product:Gemini Flash writer/judge choices, backend-owned route list, frozen USD cap/profile, durable request custody; local brief golden retained. Three Important independent review findings repaired in one pass, RED→GREEN:failed output actual usage; workload canary/inventory; Google URL normalization.322repaired-domain tests,12legacy/new canary tests,2625frontend tests+4skips,6statics passed. A real Gemini2.5Flash synthetic call passed under USD0.10/one generation,26input51outputSTOP; no full paid story was started.
+
+Fullbackend is NOT_GREEN; interrupted21min run had17694passes/178skips/3failures (two prior authority assertions and dirtytreeM7). Broad gate not fully reconciled. Main scoped acceptance does not claim a full-suite pass. One deferred Minor:recovered mixed-route cost may be estimated at the higher frozen route price; budget cap remains conservative.
+
+Production remains0.6 until user runs sudo command. Prepared exact cutover/checker/wizard under .superpowers/sdd/2026-10-24-story-cloud-ui/deploy; /tmp/arcreel-v2.0.7-cutover.sh is entrypoint. It checks idle tasks and clean pinned checkout, archives old frontend, reuses existing complete backup/deploy helpers, checks authenticated new routes, and rolls back only if no new story data/active jobs. No schema/dependency changes. sudo -n unavailable:OS terminal authentication is the only manual step. No userpassword inchat.
+
+After user returns setup/deploy complete:read live deployment GitHEAD/tag, deploy/post-result.json and backupid; authenticate using existing stored password without printing; browser sessionname in /tmp/r2-story-cloud-probe/browser-session. Use agent-browser via npx with its own session and /usr/bin/google-chrome. Current browser is at1251login. Verifyactual cloud dropdown and USD brief onV2, do not auto-greenlight a full user manuscript. Updateproductionevidence only after livechecks. Preserve two unrelated untracked2026-10-23Gemini drafts. M9/M10 remainpaused.

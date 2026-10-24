@@ -1,0 +1,44 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 22%]
+........................................................................ [ 44%]
+........................................................................ [ 67%]
+........................................................................ [ 89%]
+..................................                                       [100%]
+=============================== warnings summary ===============================
+tests/unit/server/story_authoring/test_checks.py::test_vietnamese_syllables_are_recognized[nghi\xeang]
+tests/unit/server/story_authoring/test_runtime_state.py::test_a_reservation_charges_its_maximum_until_settled
+tests/unit/server/story_authoring/test_script_guard.py::test_the_vendored_unicode_files_are_unmodified
+tests/unit/server/story_authoring/test_generation.py::test_prose_is_counted_then_generated_and_joined_into_paragraphs
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+6.03s call     tests/integration/server/story_authoring/test_cloud_routes.py::test_real_story_executor_uses_cloud_gateway_and_records_usd_usage
+2.03s setup    tests/unit/server/story_authoring/test_generation.py::test_prose_is_counted_then_generated_and_joined_into_paragraphs
+1.91s setup    tests/unit/server/story_authoring/test_script_guard.py::test_the_vendored_unicode_files_are_unmodified
+1.81s setup    tests/unit/server/story_authoring/test_runtime_state.py::test_a_reservation_charges_its_maximum_until_settled
+1.78s setup    tests/unit/server/story_authoring/test_checks.py::test_vietnamese_syllables_are_recognized[nghi\xeang]
+0.58s call     tests/integration/scripts/r2/test_story_cloud_qualification.py::test_story_canary_opens_only_the_exact_story_model_and_configuration
+0.40s setup    tests/integration/server/story_authoring/test_runtime.py::test_an_attempt_is_recorded_in_the_run_and_as_a_local_usage_row
+0.40s setup    tests/integration/server/story_authoring/test_cloud_routes.py::test_generic_text_qualification_never_opens_story_route
+0.27s setup    tests/integration/server/story_authoring/test_runtime.py::test_concurrent_reservations_never_exceed_the_call_ceiling
+0.26s call     tests/integration/scripts/r2/test_story_cloud_qualification.py::test_rejected_canary_keeps_failed_attempt_and_actual_billed_usage
+0.25s setup    tests/integration/server/story_authoring/test_cloud_routes.py::test_cloud_brief_freezes_cap_profile_and_detects_key_rotation
+0.24s call     tests/integration/server/story_authoring/test_runtime.py::test_concurrent_reservations_never_exceed_the_call_ceiling
+0.21s setup    tests/integration/scripts/r2/test_story_cloud_qualification.py::test_story_canary_opens_only_the_exact_story_model_and_configuration
+0.20s setup    tests/integration/server/story_authoring/test_cloud_routes.py::test_cloud_route_never_freezes_credentials_from_a_base_url[https://provider.invalid?key=secret]
+0.20s setup    tests/integration/server/story_authoring/test_cloud_routes.py::test_real_story_executor_uses_cloud_gateway_and_records_usd_usage
+0.20s setup    tests/integration/server/story_authoring/test_cloud_routes.py::test_cloud_route_never_freezes_credentials_from_a_base_url[https://user:secret@provider.invalid]
+0.19s setup    tests/integration/server/story_authoring/test_cloud_routes.py::test_choices_report_missing_credentials_then_enable_exact_configured_route
+0.19s setup    tests/integration/server/story_authoring/test_runtime.py::test_a_local_usage_row_never_enters_money_totals
+0.19s setup    tests/integration/server/story_authoring/test_runtime.py::test_restart_recovery_settles_interrupted_attempts_and_their_usage_rows
+0.18s setup    tests/integration/server/story_authoring/test_runtime.py::test_a_finished_generation_keeps_its_run_state_writable
+0.18s setup    tests/integration/scripts/r2/test_story_cloud_qualification.py::test_rejected_canary_keeps_failed_attempt_and_actual_billed_usage
+0.17s setup    tests/integration/server/story_authoring/test_runtime.py::test_a_cancelled_run_task_refuses_every_state_change
+0.16s setup    tests/integration/server/story_authoring/test_runtime.py::test_two_results_with_the_same_expectations_promote_exactly_once
+0.16s setup    tests/integration/server/story_authoring/test_runtime.py::test_a_run_stopped_before_dispatch_sends_nothing
+0.15s setup    tests/integration/server/story_authoring/test_cloud_routes.py::test_cloud_route_never_freezes_credentials_from_a_base_url[http://provider.invalid]
+322 passed, 4 warnings in 17.25s
