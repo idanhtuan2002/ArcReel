@@ -1,6 +1,6 @@
 # V2 local-price compilation, stage 2B
 
-Status: scoped implementation specification. Baseline `ee00e0a9302d17e61754e6f13219c07a4bee051a`; uses the verified [stage2A kernel](2026-10-24-v2-request-metering-kernel.md), [49-case crosswalk](../../research/2026-10-24-model-metering-crosswalk.md) and parent [compatibility specification](2026-10-24-v2-model-platform-compatibility.md). No runtime activation.
+Status: implemented and independently reviewed at b11709defb532de038d810715c424f7f9423f2ae;182new/374affected tests and7statics pass. Not wired to runtime. Baseline `ee00e0a9302d17e61754e6f13219c07a4bee051a`; uses the verified [stage2A kernel](2026-10-24-v2-request-metering-kernel.md), [49-case crosswalk](../../research/2026-10-24-model-metering-crosswalk.md) and parent [compatibility specification](2026-10-24-v2-model-platform-compatibility.md). No runtime activation.
 
 ## Decision and reuse evidence
 
