@@ -11,7 +11,16 @@ from server.story_authoring.cloud import CloudStoryGateway, GeminiStoryClient
 from server.story_authoring.contracts import AttemptKind, CloudPriceBounds, StoryLimits, StoryModelSelection
 from server.story_authoring.generation import StoryStepError
 from server.story_authoring.runtime import BudgetExhausted, new_run_state, reserve
-from tests.unit.server.story_authoring.test_generation import LIMITS, SCOPE, _Sink, _step
+from tests.unit.server.story_authoring.test_generation import LIMITS, SCOPE, _step
+from tests.unit.server.story_authoring.test_generation import _Sink as _LocalSink
+
+
+class _Sink(_LocalSink):
+    async def failed(
+        self, attempt_id, *, code, detail, input_tokens=None, output_tokens=None, done_reason=None, duration_ms=None
+    ):
+        self.events.append(("failed", attempt_id, code, input_tokens, output_tokens, done_reason))
+
 
 MODEL = "gemini-2.5-flash"
 SELECTION = StoryModelSelection.create(
@@ -108,8 +117,14 @@ async def test_invalid_output_is_never_accepted(respx_mock, finish, usage, conte
     respx_mock.post(f"{SELECTION.base_url}/v1beta/models/{MODEL}:generateContent").mock(
         return_value=_reply(finish=finish, usage=usage, content=content)
     )
+    sink = _Sink()
     with pytest.raises(StoryStepError):
-        await _gateway(_Sink()).generate(scope=SCOPE, request=_step().model_copy(update={"selection": SELECTION}))
+        await _gateway(sink).generate(scope=SCOPE, request=_step().model_copy(update={"selection": SELECTION}))
+    if usage:
+        assert sink.events[-1][0] == "failed"
+        assert sink.events[-1][3:5] == (102, 25)
+    else:
+        assert sink.events[-1][0] == "unknown"
 
 
 async def test_sdk_never_retries_an_ambiguous_failure_or_prints_provider_secret(respx_mock):
@@ -165,3 +180,25 @@ def test_usage_over_the_cloud_reservation_is_recorded_without_clamping_and_stops
     assert state.phase is RunPhase.BLOCKED_BUDGET
     assert state.usage.input_tokens == 11
     assert state.usage.output_tokens == 12
+
+
+@pytest.mark.parametrize(
+    ("configured", "canonical"),
+    [
+        ("https://proxy.example/v1", "https://proxy.example/"),
+        ("https://proxy.example/v1beta", "https://proxy.example/"),
+        ("https://proxy.example/v1alpha/", "https://proxy.example/"),
+        ("https://proxy.example/gemini", "https://proxy.example/gemini/"),
+    ],
+)
+async def test_sdk_uses_the_google_canonical_base_url(configured, canonical, respx_mock):
+    from lib.config.url_utils import ensure_google_base_url
+
+    client = GeminiStoryClient(api_key="fixture-key", base_url=configured)
+    response = respx_mock.post(canonical + f"v1beta/models/{MODEL}:countTokens").mock(
+        return_value=httpx.Response(200, json={"totalTokens": 100})
+    )
+    assert await client.count(_step(selection=SELECTION)) == 100
+    assert response.call_count == 1
+    assert ensure_google_base_url(configured) == canonical
+    await client.close()

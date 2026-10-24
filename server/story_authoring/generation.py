@@ -77,7 +77,15 @@ class AttemptSink(Protocol):
     ) -> None: ...
 
     async def failed(
-        self, attempt_id: str, *, code: StoryFailureCode, detail: str, input_tokens: int | None = None
+        self,
+        attempt_id: str,
+        *,
+        code: StoryFailureCode,
+        detail: str,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        done_reason: str | None = None,
+        duration_ms: int | None = None,
     ) -> None: ...
 
     async def unknown(self, attempt_id: str, *, detail: str) -> None: ...

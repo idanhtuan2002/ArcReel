@@ -346,15 +346,23 @@ def complete(
         done_reason=done_reason,
     )
 
+    return _block_cloud_overage(settled, record)
+
+
+def _block_cloud_overage(state: RunState, record: AttemptRecord) -> RunState:
     if state.limits.cloud_prices is not None:
-        exceeds_tokens = input_tokens > record.reserved_input_tokens or output_tokens > record.reserved_output_tokens
+        settled = state.attempt(record.attempt_id)
+        exceeds_tokens = (
+            settled.charged_input_tokens > record.reserved_input_tokens
+            or settled.charged_output_tokens > record.reserved_output_tokens
+        )
         exceeds_money = (
-            state.limits.cloud_prices.minor_units(settled.usage.input_tokens, settled.usage.output_tokens)
+            state.limits.cloud_prices.minor_units(state.usage.input_tokens, state.usage.output_tokens)
             > state.limits.max_cost_minor_units
         )
         if exceeds_tokens or exceeds_money:
-            return set_phase(settled, RunPhase.BLOCKED_BUDGET, reason="cloud usage exceeded the approved reservation")
-    return settled
+            return set_phase(state, RunPhase.BLOCKED_BUDGET, reason="cloud usage exceeded the approved reservation")
+    return state
 
 
 def fail(
@@ -364,6 +372,8 @@ def fail(
     code: StoryFailureCode,
     input_tokens: int | None = None,
     duration_ms: int = 0,
+    output_tokens: int | None = None,
+    done_reason: str | None = None,
 ) -> RunState:
     """Settle a failed attempt. A never-dispatched attempt releases its whole reservation and its call."""
     record = state.attempt(attempt_id)
@@ -380,15 +390,20 @@ def fail(
         )
     if record.state is not AttemptState.DISPATCHED:
         raise ValueError(f"attempt {attempt_id} is {record.state.value}")
-    return _settle(
+    settled = _settle(
         state,
         record,
         new_state=AttemptState.FAILED,
         input_tokens=record.reserved_input_tokens if input_tokens is None else input_tokens,
-        output_tokens=0 if code in NO_GENERATION_CODES else record.reserved_output_tokens,
+        output_tokens=output_tokens
+        if output_tokens is not None
+        else (0 if code in NO_GENERATION_CODES else record.reserved_output_tokens),
         duration_ms=duration_ms,
         failure_code=code,
+        done_reason=done_reason,
     )
+
+    return _block_cloud_overage(settled, record)
 
 
 def mark_unknown(state: RunState, *, attempt_id: str) -> RunState:
@@ -708,18 +723,35 @@ class StoryAttemptSink:
         )
 
     async def failed(
-        self, attempt_id: str, *, code: StoryFailureCode, detail: str, input_tokens: int | None = None
+        self,
+        attempt_id: str,
+        *,
+        code: StoryFailureCode,
+        detail: str,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        done_reason: str | None = None,
+        duration_ms: int | None = None,
     ) -> None:
-        duration_ms = self._elapsed_ms(attempt_id)
+        duration_ms = self._elapsed_ms(attempt_id) if duration_ms is None else duration_ms
         state, _ = await self._store.apply(
             _only(
-                lambda s: fail(s, attempt_id=attempt_id, code=code, input_tokens=input_tokens, duration_ms=duration_ms)
+                lambda s: fail(
+                    s,
+                    attempt_id=attempt_id,
+                    code=code,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    done_reason=done_reason,
+                    duration_ms=duration_ms,
+                )
             )
         )
         await self._close_usage_row(
             state.attempt(attempt_id).ledger_call_id,
             status="failed",
             error=f"{code.value}: {detail}",
+            output_tokens=output_tokens,
             cost_amount=self._cost(state, attempt_id),
             currency=self._currency,
             input_tokens=input_tokens,

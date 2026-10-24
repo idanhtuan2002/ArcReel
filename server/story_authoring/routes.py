@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 from lib.backend_assembly.assembler import _TUNING_KEY_RE
 from lib.config.registry import PROVIDER_REGISTRY, model_info_for
 from lib.config.resolver import ConfigResolver
-from lib.config.url_utils import normalize_base_url
+from lib.config.url_utils import ensure_google_base_url
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.pricing.price_compiler import compile_pricing
 from lib.pricing.request_metering import PriceTable
@@ -59,7 +59,7 @@ async def resolve_cloud_route(factory: Factory, provider_id: str, model_id: str)
         credential = config.get("api_key") or ""
         if not credential:
             raise ValueError("MISSING_CREDENTIAL")
-        base_url = normalize_base_url(config.get("base_url")) or "https://generativelanguage.googleapis.com"
+        base_url = ensure_google_base_url(config.get("base_url")) or "https://generativelanguage.googleapis.com"
         parsed = urlsplit(base_url)
         if (
             parsed.scheme != "https"

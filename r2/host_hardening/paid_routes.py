@@ -155,7 +155,7 @@ def paid_route_inventory() -> frozenset[PaidRoute]:
 
     routes = {PaidRoute("media", provider_id=p, media_type=m) for p, m in PROVIDER_SPEC_REGISTRY}
     routes |= {PaidRoute("custom_media", media_type=m) for m in CUSTOM_MEDIA_TYPES}
-    routes |= {PaidRoute("agent"), PaidRoute("trial_run")}
+    routes |= {PaidRoute("agent"), PaidRoute("trial_run"), PaidRoute("story", provider_id="gemini-aistudio")}
     return frozenset(routes)
 
 

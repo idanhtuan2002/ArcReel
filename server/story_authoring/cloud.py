@@ -13,6 +13,7 @@ import httpx
 from google import genai
 from google.genai import types
 
+from lib.config.url_utils import ensure_google_base_url
 from lib.text_backends.base import resolve_schema
 from lib.text_backends.gemini import _to_response_schema
 from server.story_authoring.contracts import (
@@ -80,7 +81,7 @@ class GeminiStoryClient:
         self._client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(
-                base_url=base_url,
+                base_url=ensure_google_base_url(base_url),
                 httpx_async_client=httpx.AsyncClient(timeout=180, follow_redirects=False),
                 timeout=180_000,
                 retry_options=types.HttpRetryOptions(attempts=1),
@@ -243,13 +244,6 @@ class CloudStoryGateway(AuthoringTextGateway):
             reserved_output_tokens=request.max_output_tokens,
         )
         response, duration = await self._send_cloud(attempt, request, count=False)
-        await self._sink.completed(
-            attempt,
-            input_tokens=response.input_tokens,
-            output_tokens=response.output_tokens,
-            done_reason=response.finish_reason,
-            duration_ms=duration,
-        )
         code = None
         detail = ""
         text = ""
@@ -262,7 +256,23 @@ class CloudStoryGateway(AuthoringTextGateway):
         else:
             code, detail, text = validate_story_content(request, response.content)
         if code is not None:
+            await self._sink.failed(
+                attempt,
+                code=code,
+                detail=detail,
+                input_tokens=response.input_tokens,
+                output_tokens=response.output_tokens,
+                done_reason=response.finish_reason,
+                duration_ms=duration,
+            )
             raise StoryStepError(code, detail, step_id=step)
+        await self._sink.completed(
+            attempt,
+            input_tokens=response.input_tokens,
+            output_tokens=response.output_tokens,
+            done_reason=response.finish_reason,
+            duration_ms=duration,
+        )
         return StoryStepOutput(
             step_id=step,
             text=text,
