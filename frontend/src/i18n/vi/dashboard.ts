@@ -2719,4 +2719,17 @@ export default {
   "story_route_not_qualified": "chưa được xác nhận cho viết truyện",
   "story_route_unavailable": "chưa khả dụng",
   "story_choose_model": "Chọn model khả dụng",
+  "model_defaults_title": "Model mặc định",
+  "model_scope_system": "Đây là mặc định của hệ thống. Dự án có thể dùng cấu hình riêng; mỗi lần viết truyện có thể đổi model riêng. Model viết ưu tiên cấu hình văn bản phức tạp nếu đã thiết lập.",
+  "model_scope_project": "Kế thừa mặc định hệ thống khi dự án không cần model riêng. Cấu hình dự án được ưu tiên; thay đổi trong Truyện mới chỉ áp dụng cho lần viết đó.",
+  "model_source_project": "Theo cấu hình dự án",
+  "model_source_system": "Theo mặc định hệ thống",
+  "model_source_automatic": "Tự động",
+  "model_source_run": "Riêng lần viết này",
+  "model_change_this_run": "Thay đổi cho lần này",
+  "model_use_inherited": "Dùng lại model kế thừa",
+  "model_inherited_unavailable": "Model kế thừa chưa dùng được cho viết truyện. Chọn model cho lần này hoặc chỉnh mặc định của dự án.",
+  "model_customize_project": "Tùy chỉnh model cho dự án",
+  "model_project_overrides": "Lựa chọn model riêng: {{count}}",
+
 } satisfies Record<keyof typeof enDashboard, string>;

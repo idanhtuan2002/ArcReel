@@ -12,7 +12,8 @@ import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import type { TFunction } from "i18next";
 
-import { ApiRequestError } from "@/api";
+import { API, ApiRequestError } from "@/api";
+import { resolveStoryDefaults, type StoryDefaults } from "../api/modelDefaults";
 
 import {
   BLOCKED_PHASES,
@@ -210,6 +211,7 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
             <main className="min-w-0">
               {showForm ? (
                 <NewStory
+                  key={projectName}
                   projectName={projectName}
                   onCancel={runs.length > 0 ? () => setCreating(false) : null}
                   onStarted={(runId) => {
@@ -247,8 +249,12 @@ function NewStory({
   const [genre, setGenre] = useState(() => readDraft(draftKey).genre);
   const [routes, setRoutes] = useState<StoryRoute[] | null>(null);
   const [routesError, setRoutesError] = useState<string | null>(null);
-  const [writer, setWriter] = useState("");
-  const [judge, setJudge] = useState("");
+  const [writerOverride, setWriter] = useState("");
+  const [judgeOverride, setJudge] = useState("");
+  const [customizeModels, setCustomizeModels] = useState(false);
+  const [inheritedModels, setInheritedModels] = useState<StoryDefaults | null>(null);
+  const writer = customizeModels ? writerOverride || inheritedModels?.writer || "" : inheritedModels?.writer || "";
+  const judge = customizeModels ? judgeOverride : "";
   const [target, setTarget] = useState(TARGET_DEFAULT);
   const [cloudBudget, setCloudBudget] = useState("5.00");
   const [drafted, setDrafted] = useState<DraftedBrief | null>(null);
@@ -259,21 +265,22 @@ function NewStory({
 
   useEffect(() => {
     const controller = new AbortController();
-    listRoutes({ signal: controller.signal }).then(
-      (found) => {
+    Promise.all([
+      listRoutes({ signal: controller.signal }),
+      API.getProject(projectName, { signal: controller.signal }),
+      API.getSystemConfig(),
+    ]).then(
+      ([found, project, system]) => {
         if (controller.signal.aborted) return;
         setRoutes(found);
-        setWriter(
-          (current) =>
-            current || (found.find((route) => route.enabled) ? routeKey(found.find((route) => route.enabled)!) : ""),
-        );
+        setInheritedModels(resolveStoryDefaults(found, project.project ?? {}, system.settings ?? {}));
       },
       (failure: unknown) => {
         if (!controller.signal.aborted) setRoutesError(failureText(t, failure, t("story_routes_failed")));
       },
     );
     return () => controller.abort();
-  }, [t]);
+  }, [projectName, t]);
 
   const writerRoute = routes?.find((route) => routeKey(route) === writer) ?? null;
   const judgeRoute = routes?.find((route) => routeKey(route) === judge) ?? null;
@@ -435,49 +442,90 @@ function NewStory({
               {t("story_routes_empty")}
             </p>
           ) : (
-            <div className="sa-grid">
-              <div>
-                <label htmlFor={ids.writer} className="block text-[11px] text-text-3">
-                  {t("story_field_writer")}
-                </label>
-                <select
-                  id={ids.writer}
-                  value={writer}
-                  onChange={(event) => setWriter(event.target.value)}
-                  className="sa-input"
+            <div className="space-y-3">
+              <div className="rounded-md border border-hairline p-3 text-sm">
+                <p className="text-[11px] text-text-3">
+                  {customizeModels
+                    ? t("model_source_run")
+                    : t(`model_source_${inheritedModels?.source ?? "automatic"}`)}
+                </p>
+                <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+                  <dt className="text-text-3">{t("story_field_writer")}</dt>
+                  <dd className="min-w-0 break-words">{writerRoute?.label || writer || t("story_choose_model")}</dd>
+                  <dt className="text-text-3">{t("story_field_judge")}</dt>
+                  <dd className="min-w-0 break-words">{judgeRoute?.label || t("story_judge_same")}</dd>
+                </dl>
+                {!customizeModels && inheritedModels && !inheritedModels.available ? (
+                  <p role="alert" className="mt-2 text-xs text-warm">
+                    {t("model_inherited_unavailable")}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className="sa-btn mt-3"
+                  onClick={() => {
+                    if (customizeModels) {
+                      setWriter("");
+                      setJudge("");
+                    }
+                    setCustomizeModels(!customizeModels);
+                  }}
                 >
-                  {!writer ? (
-                    <option value="" disabled>
-                      {t("story_choose_model")}
-                    </option>
-                  ) : null}
-                  {routes.map((route) => (
-                    <option key={routeKey(route)} value={routeKey(route)} disabled={!route.enabled}>
-                      {routeLabel(route)}
-                    </option>
-                  ))}
-                </select>
+                  {customizeModels ? t("model_use_inherited") : t("model_change_this_run")}
+                </button>
               </div>
-              <div>
-                <label htmlFor={ids.judge} className="block text-[11px] text-text-3">
-                  {t("story_field_judge")}
-                </label>
-                <select
-                  id={ids.judge}
-                  value={judge}
-                  onChange={(event) => setJudge(event.target.value)}
-                  className="sa-input"
-                >
-                  <option value="">{t("story_judge_same")}</option>
-                  {routes
-                    .filter((route) => routeKey(route) !== writer)
-                    .map((route) => (
-                      <option key={routeKey(route)} value={routeKey(route)} disabled={!route.enabled}>
-                        {routeLabel(route)}
-                      </option>
-                    ))}
-                </select>
-              </div>
+              {customizeModels || (inheritedModels && !inheritedModels.available) ? (
+                <div className="sa-grid">
+                  <div>
+                    <label htmlFor={ids.writer} className="block text-[11px] text-text-3">
+                      {t("story_field_writer")}
+                    </label>
+                    <select
+                      id={ids.writer}
+                      value={writer}
+                      onChange={(event) => {
+                        setCustomizeModels(true);
+                        setWriter(event.target.value);
+                      }}
+                      className="sa-input"
+                    >
+                      {!writerRoute ? (
+                        <option value={writer} disabled>
+                          {writer ? `${writer} · ${t("story_route_unavailable")}` : t("story_choose_model")}
+                        </option>
+                      ) : null}
+                      {routes.map((route) => (
+                        <option key={routeKey(route)} value={routeKey(route)} disabled={!route.enabled}>
+                          {routeLabel(route)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={ids.judge} className="block text-[11px] text-text-3">
+                      {t("story_field_judge")}
+                    </label>
+                    <select
+                      id={ids.judge}
+                      value={judge}
+                      onChange={(event) => {
+                        setCustomizeModels(true);
+                        setJudge(event.target.value);
+                      }}
+                      className="sa-input"
+                    >
+                      <option value="">{t("story_judge_same")}</option>
+                      {routes
+                        .filter((route) => routeKey(route) !== writer)
+                        .map((route) => (
+                          <option key={routeKey(route)} value={routeKey(route)} disabled={!route.enabled}>
+                            {routeLabel(route)}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
           {usesCloud ? (

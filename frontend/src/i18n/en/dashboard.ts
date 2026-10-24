@@ -2721,4 +2721,17 @@ export default {
   "story_route_not_qualified": "not qualified for stories",
   "story_route_unavailable": "unavailable",
   "story_choose_model": "Choose an available model",
+  "model_defaults_title": "Default models",
+  "model_scope_system": "These are system defaults. Projects can override them, and a story can use different models for one run. Writing uses the complex-text task model when configured.",
+  "model_scope_project": "Inherit system defaults unless this project needs different models. Project choices take priority; story overrides affect one run.",
+  "model_source_project": "From project settings",
+  "model_source_system": "From system defaults",
+  "model_source_automatic": "Automatic",
+  "model_source_run": "This story only",
+  "model_change_this_run": "Change for this run",
+  "model_use_inherited": "Use inherited models",
+  "model_inherited_unavailable": "The inherited model is unavailable for stories. Choose a model for this run or update project defaults.",
+  "model_customize_project": "Customize project models",
+  "model_project_overrides": "Explicit model choices: {{count}}",
+
 };

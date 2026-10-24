@@ -113,6 +113,8 @@ let runs: RunSummary[] = [];
 let current: StoryRun = run();
 let routes: Record<string, () => Response> = {};
 let providers: () => Response = () => json(PROVIDERS);
+let projectDefaults: Record<string, string> = {};
+let systemDefaults: Record<string, string> = {};
 const requests: { url: string; method: string; body: Record<string, unknown> | null }[] = [];
 
 function posted(suffix: string): Record<string, unknown>[] {
@@ -137,6 +139,8 @@ beforeEach(() => {
   current = run();
   routes = {};
   providers = () => json(PROVIDERS);
+  projectDefaults = {};
+  systemDefaults = {};
   requests.length = 0;
   sessionStorage.clear();
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
@@ -149,6 +153,8 @@ beforeEach(() => {
     });
     const route = method === "POST" ? Object.keys(routes).find((suffix) => url.endsWith(suffix)) : undefined;
     if (route) return Promise.resolve(routes[route]());
+    if (url.endsWith("/projects/demo") && method === "GET") return Promise.resolve(json({ project: projectDefaults }));
+    if (url.endsWith("/system/config") && method === "GET") return Promise.resolve(json({ settings: systemDefaults }));
     if (url.endsWith("/story-routes")) return Promise.resolve(providers());
     if (url.endsWith("/story-runs") && method === "GET") return Promise.resolve(json({ runs }));
     if (url.endsWith("/story-runs/story-1") && method === "GET") return Promise.resolve(json(current));
@@ -167,6 +173,7 @@ describe("a new story", () => {
 
   it("offers only models on the story endpoint and keeps typed text across a reload until the run starts", async () => {
     const first = render(<StoryAuthoringPage projectName="demo" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change for this run" }));
     const writer = await screen.findByLabelText("Writing model");
     expect(
       within(writer)
@@ -215,6 +222,7 @@ describe("a new story", () => {
         brief_digest: "sha256:cloud",
       });
     render(<StoryAuthoringPage projectName="demo" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change for this run" }));
     const writer = await screen.findByLabelText("Writing model");
     expect(within(writer).getByRole("option", { name: /Gemini 3.8 Flash/ })).toBeDisabled();
     fireEvent.change(writer, { target: { value: "gemini-aistudio/gemini-2.5-flash" } });
@@ -228,6 +236,35 @@ describe("a new story", () => {
       model_id: "gemini-2.5-flash",
       max_cost_minor_units: 250,
     });
+  });
+
+  it("shows inherited project models and restores them after a per-run override", async () => {
+    projectDefaults = { text_backend_complex: "custom-7/gemma3:12b" };
+    systemDefaults = { default_text_backend: "custom-7/qwen3.5-vimax:9b" };
+    render(<StoryAuthoringPage projectName="demo" />);
+    expect(await screen.findByText("From project settings")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Writing model" })).not.toBeInTheDocument();
+    expect(screen.getByText("Ollama local · gemma3:12b")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Change for this run" }));
+    fireEvent.change(screen.getByLabelText("Writing model"), { target: { value: "custom-7/qwen3.5-vimax:9b" } });
+    expect(screen.getByText("This story only")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Use inherited models" }));
+    expect(screen.getByText("From project settings")).toBeInTheDocument();
+    expect(screen.getByText("Ollama local · gemma3:12b")).toBeInTheDocument();
+    expect(requests.filter((request) => request.method === "PATCH")).toHaveLength(0);
+  });
+
+  it("requires an explicit choice when the inherited model is unsupported", async () => {
+    projectDefaults = { default_text_backend: "missing/model" };
+    render(<StoryAuthoringPage projectName="demo" />);
+    const writer = await screen.findByLabelText("Writing model");
+    expect(writer).toHaveValue("missing/model");
+    expect(screen.getByRole("alert")).toHaveTextContent("The inherited model is unavailable");
+    fireEvent.change(screen.getByLabelText("Idea"), { target: { value: "A village story" } });
+    fireEvent.change(screen.getByLabelText("Genre"), { target: { value: "drama" } });
+    expect(screen.getByRole("button", { name: "Prepare brief" })).toBeDisabled();
+    fireEvent.change(writer, { target: { value: "custom-7/qwen3.5-vimax:9b" } });
+    expect(screen.getByRole("button", { name: "Prepare brief" })).toBeEnabled();
   });
 
   it("asks for a story model when none is configured", async () => {
@@ -266,6 +303,7 @@ describe("a new story", () => {
     render(<StoryAuthoringPage projectName="demo" />);
     fireEvent.change(await screen.findByLabelText("Idea"), { target: { value: "Minh về làng bán nhà." } });
     fireEvent.change(screen.getByLabelText("Genre"), { target: { value: "đời thường" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Change for this run" }));
     fireEvent.change(screen.getByLabelText("Review model"), { target: { value: "custom-7/gemma3:12b" } });
     fireEvent.click(screen.getByRole("button", { name: "Prepare brief" }));
 

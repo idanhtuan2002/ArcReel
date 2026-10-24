@@ -2720,4 +2720,17 @@ export default {
   "story_route_not_qualified": "尚未通过故事任务验证",
   "story_route_unavailable": "不可用",
   "story_choose_model": "选择可用模型",
+  "model_defaults_title": "默认模型",
+  "model_scope_system": "这是系统默认配置。项目可单独覆盖，每次故事创作也可临时更换模型。写作优先使用已配置的复杂文本任务模型。",
+  "model_scope_project": "项目无需独立模型时继承系统默认值。项目配置优先；新故事中的更改仅影响本次创作。",
+  "model_source_project": "来自项目配置",
+  "model_source_system": "来自系统默认值",
+  "model_source_automatic": "自动选择",
+  "model_source_run": "仅本次故事",
+  "model_change_this_run": "更改本次模型",
+  "model_use_inherited": "恢复继承模型",
+  "model_inherited_unavailable": "继承的模型暂不可用于故事创作。请为本次选择模型或修改项目默认值。",
+  "model_customize_project": "自定义项目模型",
+  "model_project_overrides": "独立模型选择：{{count}}",
+
 } satisfies Record<keyof typeof enDashboard, string>;

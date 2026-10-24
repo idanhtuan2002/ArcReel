@@ -125,7 +125,7 @@ describe("SystemConfigPage", () => {
     renderPage();
     expect(screen.getByRole("button", { name: /Agent/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /供应商/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /模型选择/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /默认模型/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /用量统计/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /API 令牌/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /关于/ })).toBeInTheDocument();
@@ -147,9 +147,9 @@ describe("SystemConfigPage", () => {
     });
   });
 
-  it("clicking 模型选择 makes it the active section", async () => {
+  it("clicking 默认模型 makes it the active section", async () => {
     renderPage();
-    const mediaButton = screen.getByRole("button", { name: /模型选择/ });
+    const mediaButton = screen.getByRole("button", { name: /默认模型/ });
     fireEvent.click(mediaButton);
     await waitFor(() => {
       expect(mediaButton).toHaveAttribute("aria-current", "page");

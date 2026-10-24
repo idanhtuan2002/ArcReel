@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, type CSSProperties } from "react";
+import { useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { InlineWarning } from "@/components/ui/InlineWarning";
 import {
@@ -73,6 +73,7 @@ export interface ModelConfigSectionProps {
    * 后者拉取失败时文本档位不受影响。
    */
   showSubFields?: boolean;
+  collapsible?: boolean;
   /**
    * 媒体细分项的候选（docs/adr/0054）。缺席（拉取失败）时细分区降级：只保留已配置的细分项、
    * 候选只列其当前值，未配置项不渲染；全部未配置即整块折叠区不渲染。
@@ -149,6 +150,7 @@ export function ModelConfigSection({
   projectName,
   options,
   showSubFields = true,
+  collapsible = false,
   candidates,
   candidatesError,
   providers,
@@ -161,6 +163,10 @@ export function ModelConfigSection({
   enable,
 }: ModelConfigSectionProps) {
   const { t } = useTranslation(["templates", "dashboard"]);
+  const [customizationOpen, setCustomizationOpen] = useState<boolean | undefined>();
+  const configuredModels = [value.videoBackend, value.videoProviderI2V, value.videoProviderR2V,
+    value.imageBackendDefault, value.imageBackendT2I, value.imageBackendI2I,
+    value.textBackendDefault, value.textBackendSimple, value.textBackendComplex].filter(Boolean);
   // 派生唯一 radio name，避免同页多个 ModelConfigSection 实例的音频开关被浏览器并入同一互斥组
   const generateAudioName = useId();
 
@@ -380,7 +386,7 @@ export function ModelConfigSection({
     );
   };
 
-  return (
+  const content = (
     <div className="space-y-4">
       <p className="text-[12.5px] leading-[1.55] text-text-3">{t("default_hint")}</p>
 
@@ -581,6 +587,29 @@ export function ModelConfigSection({
         </ChannelCard>
       )}
     </div>
+  );
+
+  if (!collapsible) return content;
+  const textModel = effectiveModel(value.textBackendDefault, globalDefaults.textDefault);
+  const name = (model: string | undefined) => model ? options.modelNames?.[model] || model : t("dashboard:model_source_automatic");
+  return (
+    <section className="space-y-3">
+      <div className="rounded-md border border-hairline-soft p-3 text-xs text-text-3">
+        <p>{t("dashboard:model_scope_project")}</p>
+        <dl className="mt-2 grid gap-1 sm:grid-cols-3">
+          <div><dt>{t("dashboard:text_models")}</dt><dd className="mt-1 break-words text-text">{name(textModel)}</dd></div>
+          <div><dt>{t("dashboard:image_models")}</dt><dd className="mt-1 break-words text-text">{name(executingImage)}</dd></div>
+          <div><dt>{t("dashboard:video_models")}</dt><dd className="mt-1 break-words text-text">{name(executingVideo)}</dd></div>
+        </dl>
+      </div>
+      <details open={customizationOpen ?? configuredModels.length > 0} onToggle={(event) => setCustomizationOpen(event.currentTarget.open)}>
+        <summary className="cursor-pointer rounded-md py-2 text-sm font-medium text-text">
+          {t("dashboard:model_customize_project")}
+          <span className="ml-2 text-xs font-normal text-text-3">{configuredModels.length ? t("dashboard:model_project_overrides", {count: configuredModels.length}) : t("dashboard:model_source_system")}</span>
+        </summary>
+        <div className="mt-3">{content}</div>
+      </details>
+    </section>
   );
 }
 
