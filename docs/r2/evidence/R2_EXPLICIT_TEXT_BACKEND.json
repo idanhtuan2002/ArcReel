@@ -139,7 +139,7 @@
     "docs/r2/evidence/explicit-text-backend-2026-10-24/console-red.log": "c3854d01aa59234decbb79eb0476713518bf73073fe65c45b7335489c3e79ce9",
     "docs/r2/evidence/explicit-text-backend-2026-10-24/deptry-check.log": "85b9468c4ad48fa245b3354e160cacd530e3a64f5f4a270e1f23a375e6031bfb",
     "docs/r2/evidence/explicit-text-backend-2026-10-24/green.log": "47c320ffa12ddf16070272df9473b7f2afb7fd394c3187bbc3ae4e01c2f04186",
-    "docs/r2/evidence/explicit-text-backend-2026-10-24/lint-imports-check.log": "9cb77ca6150f6612ecab1989a03c5e47062f3d6d6fbdca1a786680c3fe71bb7e",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/lint-imports-check.log": "475615c9e9ee22b448b9eff7ca13519faa8c7042704aac6f35dc23cb486c2395",
     "docs/r2/evidence/explicit-text-backend-2026-10-24/progress.md": "036eb16e12c371852f643b3f946f019059efe1e2c19cf79a52f9196ad54dc862",
     "docs/r2/evidence/explicit-text-backend-2026-10-24/python-check.log": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55",
     "docs/r2/evidence/explicit-text-backend-2026-10-24/red.log": "461686254cba5fab9b0057b0a520e2fba0ccf6702b6df76e1f22494939a37b4d",
@@ -149,5 +149,6 @@
     "docs/r2/evidence/explicit-text-backend-2026-10-24/static-results.json": "192ff42ed52e0af0918aa1d006cd2136aa29b526deb08a93d26c0da197666be3",
     "docs/r2/evidence/explicit-text-backend-2026-10-24/task-1-tests.log": "bc3f1f5f90c7f951cb365e302f4e6741061dd7c230e6c2dd33eba4e463ceac39",
     "docs/r2/evidence/explicit-text-backend-2026-10-24/task-2-tests.log": "bfe00ae4e3b541f6eaede18b705f2200fe89c3a5ce3c4e7191e56b953efa8c5a"
-  }
+  },
+  "log_normalization": "Trailing whitespace from import-linter console formatting was removed in the archived log; command result and text content preserved."
 }

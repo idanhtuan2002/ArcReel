@@ -5,7 +5,7 @@
  ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
 ╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
 ╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
-  └──▶║║                    ▲ 
+  └──▶║║                    ▲
       ╚╝────────────────────┘
 
 
@@ -34,11 +34,11 @@ M5B narrative context is read-only and persistence-neutral KEPT
 R2 narrative lifecycle pure ports are authority- and persistence-free KEPT
 M5C narrative evidence service holds no head-mutation capability KEPT
 M5C-2 sole head writer: only acceptance.py may append decisions or mutate heads KEPT
-M5C-3 compiler purity: no authority write port, repository, UoW, or Canon 
+M5C-3 compiler purity: no authority write port, repository, UoW, or Canon
 service KEPT
 M5C repositories cannot import or write M5A Canon ORM models KEPT
 M6 adaptation evidence service holds no head-mutation capability KEPT
-M6 adaptation authority service carries no persistence, Canon, or provider 
+M6 adaptation authority service carries no persistence, Canon, or provider
 import KEPT
 M6 adaptation authority kernel carries no persistence, Canon, or provider importKEPT
 
