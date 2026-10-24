@@ -1,6 +1,6 @@
 # Pinned metering donor: bridge prerequisites
 
-Status: preparatory source research, not a bridge implementation or acceptance. Host source `a56f07a9471c0916c768c120eaaacf95598c8e6e`; the read-model full regression is still running. M9/M10 and deployed V2 are unchanged.
+Status: preparatory source research, not a bridge implementation or acceptance. Host source `a56f07a9471c0916c768c120eaaacf95598c8e6e`; read-model verification is complete with two unchanged whole-backend baseline failures, recorded in commit `78c05c918`. M9/M10 and deployed V2 are unchanged.
 
 The existing [compatibility specification](../superpowers/specs/2026-10-24-v2-model-platform-compatibility.md#4-price-and-usage-semantics) remains the authority. This note narrows packaging and validation gaps before its second slice; it does not replace the prior reuse review or select a package-install strategy.
 
@@ -33,3 +33,16 @@ These observations do not establish a donor defect: the module documents disjoin
 Before implementation: choose a reproducibly pinned import/package surface and check its dependency/import contracts; run the same fixtures across all ten legacy price shapes and legacy fallback behavior; retain explicit LOCAL/Vidu delegates; validate finite nonnegative usage/rates, missing versus zero, cache overlap and thought/output accounting; preserve independent custom rates/currencies and historical settled costs. Request identity must come from existing execution attempts, and money writes remain in the current ledger/reservation authority. A new pure arithmetic helper must not imply safe pre-submit bounds or open a cloud route.
 
 The current probe covers no packaging build/install, money precision, concurrent reservations, provider response parsing, full fallback matrix, retry recovery or live qualification. The earlier 22-case compatibility evidence remains historical; it was not rerun or enlarged by these nine cases. No later implementation plan or runtime activation is approved merely by this note.
+
+## Dimension crosswalk still needed
+
+Further pinned-source inspection found a second boundary to settle before writing the production bridge plan. This is not an accepted mapping:
+
+- Local `lib/pricing/types.py:PerSecondTiered` and `lib/pricing/strategies.py:_per_second_tiered` use quality/mode tiers `std`, `pro` and `4k`. The donor vocabulary calls `service_tier` the separate closed set `standard`, `flex`, `fast`. Equal field names do not establish equal meanings. Do not translate local `pro` into donor `fast`.
+- The donor vocabulary has no `size` dimension. Existing `PerImageOpenAIToken` reference fallback uses `(quality, size)`. Converting size to another dimension needs an explicit, fixture-tested mapping; the prior exact-rate arithmetic examples did not prove this matrix.
+- Direct construction of donor `PriceTable` with a `service_tier=std/pro/4k/default` row reports `is_priceable=True`: that property checks recognized currency/meter/dimension keys, not all row values. The donor reader separately flags invalid dimension values (`reading.py:check_dimension_values`, via `is_valid_dimension_value`). Therefore a bridge that constructs types directly must preserve validation rather than treat `is_priceable` as complete validation. A table using a `size` dimension reports `is_priceable=False` with `unrecognized_keys=(size,)`. These six additional direct-construction observations were run offline; they are separate from the nine numeric/mutation probes above.
+- The actual pinned `lib/catalog/snapshot/catalog.json` video entry `kuaishou/kling-v3` declares rates by resolution/audio, and `kling-v3-omni` additionally includes input_video. This does not make that snapshot a replacement for local tiered declarations. Use the donor algorithm/schema selectively and preserve local price ownership.
+
+Primary sources: [donor vocabulary](https://github.com/ArcReel/ArcReel/blob/258c7ff1ca1f103117cb4f757f7f09fd46cb8647/packages/arcreel-catalog-core/src/arcreel_catalog_core/vocabulary.py), [price model/property](https://github.com/ArcReel/ArcReel/blob/258c7ff1ca1f103117cb4f757f7f09fd46cb8647/packages/arcreel-catalog-core/src/arcreel_catalog_core/model.py), [reader validation](https://github.com/ArcReel/ArcReel/blob/258c7ff1ca1f103117cb4f757f7f09fd46cb8647/packages/arcreel-catalog-core/src/arcreel_catalog_core/reading.py), and [pinned snapshot](https://github.com/ArcReel/ArcReel/blob/258c7ff1ca1f103117cb4f757f7f09fd46cb8647/lib/catalog/snapshot/catalog.json). Read from local Git objects/extracted bytes; no live provider or price synchronization occurred.
+
+Next concrete research gate: a lossless unit/dimension crosswalk and paired fixtures for local tier derivation, OpenAI size fallback, nearest video buckets and missing usage. Then select the smallest pinned import/package surface and write the bounded bridge plan. No production bridge interface has been declared ready by this note.
