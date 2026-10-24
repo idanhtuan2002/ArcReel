@@ -212,3 +212,34 @@ def _compile(pricing: object, model_id: str, mode: str) -> PriceTable | Unpriced
             )
         ],
     )
+
+
+def _custom_unit(value: object) -> str | Unpriced:
+    if value is None:
+        return Unpriced(UnpricedReason.UNRECOGNIZED_TERMS)
+    if not isinstance(value, str):
+        raise ValueError("custom price unit must be a string")
+    return value if value in {"token", "image", "second", "character"} else Unpriced(UnpricedReason.UNRECOGNIZED_TERMS)
+
+
+def compile_custom_pricing(
+    *,
+    price_unit: str | None,
+    price_input: float | None,
+    price_output: float | None,
+    currency: str | None,
+) -> PriceTable | Unpriced:
+    """Compile active custom rates without defaults, lookup or persistence."""
+    if currency is None:
+        return Unpriced(UnpricedReason.NO_PRICE_TABLE)
+    unit = _custom_unit(price_unit)
+    if isinstance(unit, Unpriced):
+        return unit
+    if price_input is None or (unit == "token" and price_output is None):
+        return Unpriced(UnpricedReason.MISSING_RATE)
+    if unit == "token":
+        meters = [_flat("uncached_input_tokens", price_input), _flat("output_tokens", price_output)]
+    else:
+        name = {"image": "output_images", "second": "output_seconds", "character": "characters"}[unit]
+        meters = [_flat(name, price_input)]
+    return _finish(currency, meters)
