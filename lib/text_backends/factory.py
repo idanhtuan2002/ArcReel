@@ -8,7 +8,7 @@ assemble_backend（media_type=text）：内置文本 provider 全部经 Provider
 from __future__ import annotations
 
 from lib.backend_assembly import assemble_backend
-from lib.config.resolver import ConfigResolver
+from lib.config.resolver import ConfigResolver, validate_explicit_text_selection
 from lib.db import async_session_factory
 from lib.text_backends.base import TextBackend, TextTaskType
 
@@ -32,4 +32,17 @@ async def create_text_backend_for_task(
             model_id=model_id,
             resolver=r,
         )
+    return backend, provider_id
+
+
+async def create_text_backend_for_model(
+    task_type: TextTaskType, *, provider_id: str, model_id: str
+) -> tuple[TextBackend, str]:
+    """Build the exact selected model through existing assembly and qualification."""
+    validate_explicit_text_selection(task_type, provider_id, model_id)
+    resolver = ConfigResolver(async_session_factory)
+    async with resolver.session() as r:
+        backend = await assemble_backend(provider_id=provider_id, media_type="text", model_id=model_id, resolver=r)
+    if backend.model != model_id:
+        raise ValueError("selected text model unavailable; refusing default fallback")
     return backend, provider_id

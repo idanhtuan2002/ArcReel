@@ -22,6 +22,10 @@
 - [ ] GREEN: run factory/generator tests then full text-backends/config/backend-assembly domains and release-binding integration tests. Run Ruff/format/basedpyright/imports/deptry/test-audit and committed-range diff-check. No unrelated media suite absent a CONTRIBUTING trigger.
 - [ ] Commit owned paths before task-done; record exact source range and actual outputs.
 
+## Additive operator entrypoint (scope clarification, 2026-10-24)
+
+The sponsor asked to select/use models through the shared backend. Include `lib/text_backends/console.py` and `tests/unit/lib/text_backends/test_console.py`: list registered builtin text IDs without SDK construction; check a selected configured route without generation; generate via the same explicit TextGenerator/Ledger path. Reuse the application's runtime qualification installer. No HTTP/auth boundary, persistent settings, SDK, database migration or story behavior change. Listing does not claim configured/qualified/live availability; construction does not verify provider access. Existing backend environment/database/master-key context is required. Errors must not print raw credential-bearing exceptions.
+
 ## Task 2: Review/handoff
 
 - [ ] One independent read-only review for identity substitution, capability/qualification bypass, attribution and default compatibility. Main owns decisions; one significant repair pass if necessary.

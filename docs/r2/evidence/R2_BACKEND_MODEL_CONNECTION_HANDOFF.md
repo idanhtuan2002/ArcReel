@@ -1,39 +1,34 @@
-# Backend model connection — NOT IMPLEMENTED / NOT DEPLOYED
+# Shared backend model selection
 
-Checkpoint UTC: 2026-10-24T02:27:35.407947+00:00
-Exact starting HEAD: `b2d65f757da4ff874bb42d1f81064ded52d66fbe`. Branch `feat/v2-explicit-text-backend`.
-Managed worktree: `/home/anhtuan/.codex/worktrees/c1b3/content-production-os`.
+Branch: `feat/v2-explicit-text-backend`.
+Worktree: `/home/anhtuan/.codex/worktrees/c1b3/content-production-os`.
+Plan baseline: `b2d65f757da4ff874bb42d1f81064ded52d66fbe`.
 
-## Sponsor's latest priority
+## Implemented interface
 
-Make models selectable and usable first through the common backend. Defer further billing/profile refinement and advanced UI. Quota5h near exhaustion. Do not spend the next session on more metering research or report backend connection complete from compiler/kernel tests. A Python constructor alone is not proof that the user can select and use the model through an application entrypoint.
+`TextGenerator.create(task_type, project_name=None, *, provider_id=None, model_id=None)` accepts an exact provider/model pair. Omitting both preserves existing task/project resolution. Partial pairs, unknown or non-text builtins, noncanonical custom IDs and unsupported known vision routes fail before assembly. An unknown task fails. Existing assembly owns credentials and release qualification; existing Ledger owns generation accounting/admission. A custom loader's default fallback is rejected if its actual model differs from the explicit selection. No provider SDK, database schema, billing policy or persistent default is added.
 
-## Actual status
+The operator entrypoint is `python -m lib.text_backends.console` in this checkout and the backend's configured environment. It uses the application's runtime qualification installer. It does not initialize/migrate a database or create qualification records.
 
-- Backend connection is NOT implemented or deployed. Only its scope/spec/plan and new branch exist; no backend product file or backend test was changed/run in this step.
-- Earlier independent pure work is committed: catalog, kernel and price compiler. Latest compiler source `b11709defb532de038d810715c424f7f9423f2ae`, evidence commit `9a6571aa3961ebc5661efb3c8c488b8050727821`. Its374tests/7statics/review do NOT prove backend connection or live provider usability.
-- Native Gemini/Grok/OpenAI and other text adapters already exist in `lib/text_backends`, registered through `lib/backend_assembly/specs.py`. Do not build them again.
-- `TextGenerator.create(task_type, project_name)` currently resolves project/task/global settings, calls factory/assembler, and uses the existing Ledger wrapper when generating. It has no explicit per-call provider/model arguments yet.
-- Native Anthropic Messages text adapter is absent from current registry/specs. The Anthropic constant/Agent configuration does not supply a native text backend. Existing OpenAI-compatible custom gateways may serve such model IDs only when actually configured; do not claim native Claude support.
-- Story Authoring remains deliberately custom Ollama-only: `_selection` in `server/story_authoring/service.py` rejects builtin/cloud routes. Do not remove this restriction alone: old brief digests, token counting, retries and budget/qualification semantics would be bypassed.
-- One read-only GET of local1251model-candidates returned401. No credentials/config values were inspected, no provider generation call was made, no live cloud selection was verified.
+```bash
+# Run from the feature checkout, using its project dependencies.
+uv run python -m lib.text_backends.console --list
 
-## Concrete resume path
+# Choose an exact ID from the list; construction only, no generation request.
+uv run python -m lib.text_backends.console --provider gemini-aistudio --model gemini-2.5-flash --check
 
-1. Read live Git status and this handoff first. Preserve the two untracked old Gemini drafts.
-2. Check which existing user-facing/API selection path and masked provider configuration can already be reused; the live API needs authentication. A configuration/credential gap must not be misdiagnosed as a missing adapter. Do not print credentials or bypass authentication.
-3. Scope packet: `docs/superpowers/specs/2026-10-24-explicit-text-backend.md` and matching plan. Proposed backend seam: exact create_text_backend_for_model plus explicit optional pair in TextGenerator.create, preserving default path, task vision policy, actual-model/fallback rejection, provider attribution, and existing release qualification. This packet is not implemented.
-4. Ensure the chosen application/API entrypoint can actually select/use the route; deliver and test that entrypoint before claiming user usability. Shared-backend-first does not mean silently enabling cloud StoryBrief or creating an unguarded paid endpoint.
-5. Reuse real assembler/config/ledger with constructor/SDK boundary fakes. Existing captured_backend_construction returns object() without `.model`, so it cannot alone test strict actual-model comparison; use a local model-bearing constructor fake or suitable SDK fixture, not a shared-fixture rewrite that forces unrelated full media tests.
-6. Native/gateway routes require current configured credentials and existing qualifications. Retain these gates; don't route Claude text through Agent credentials. No migration, new financial framework, provider/model default rewrite or broad new research.
-7. Run required affected checks, perform one final independent review and record code/runtime/deployment/live-provider statuses separately. Do not claim the user can use the feature until the actual entrypoint has been exercised and release activation handled explicitly.
-
-## Preservation and verification limits
-
-No push/merge/deploy occurred. Two earlier whole-backend Story Authoring authority assertions remain baseline failures; not fixed or rerun here. Earlier pure-module test counts are not fresh backend tests. Do not start speculative work at this quota boundary.
-
-Initial visible status before this handoff:
+# This sends a generation request and can incur provider charges.
+uv run python -m lib.text_backends.console --provider gemini-aistudio --model gemini-2.5-flash --prompt 'Write one short greeting in Vietnamese.' --max-output-tokens 64
 ```
-?? docs/superpowers/plans/2026-10-23-story-gemini.md
-?? docs/superpowers/specs/2026-10-23-story-gemini.md
-```
+
+For another provider, use its exact `provider_id` and `model_id`. Custom routes accept the existing `custom-N` identity and enabled model ID from backend configuration; `--list` lists registered builtins only. Output is JSON. Provider failures return a sanitized `MODEL_CALL_FAILED` with exit code 1, without printing raw credential-bearing exceptions. Troubleshoot through existing protected backend diagnostics.
+
+The command needs the existing backend database and credential/master-key context (`DATABASE_URL` or `ARCREEL_DATA_DIR`, plus the deployment's existing encryption configuration). Do not point it at an empty checkout database or copy keys into prompts/CLI flags. Use the same release mode and governance context as the backend; never downgrade release mode to bypass qualification. Listing indicates registered metadata only. `--check` indicates successful construction, not working credentials, quota or remote availability. The default output limit is 256 tokens; explicit positive limits are supported. Existing adapter retries and ledger pricing behavior remain in effect.
+
+## Verification and limits
+
+Automated tests use disposable config/ledger databases and replace SDK construction or generation boundaries. They exercise exact native Gemini/Grok/OpenAI attribution, real assembly/ledger, fallback rejection, capability/qualification refusal, legacy resolution and console parsing/error sanitization. Actual CLI listing has been exercised: 42 registered text models across 9 provider IDs. Final exact code SHA, command outputs and review verdict are recorded in `R2_EXPLICIT_TEXT_BACKEND.json` after the verification gate.
+
+No cloud generation has been performed against real credentials. No production activation, push or merge has occurred. The V2 web UI and Story Authoring selection remain unchanged; Story Authoring remains Ollama-only. Native Anthropic Messages is not registered; compatible custom gateways are not native Claude support. Earlier pure catalog/metering/compiler tests are not evidence for this connection. Historical whole-backend Story Authoring baseline failures are outside this affected-domain run and are not claimed fixed.
+
+Preserve the two unrelated old Gemini draft files. M9/M10 remain paused. Further UI/story/cloud acceptance and production release are separate work.
