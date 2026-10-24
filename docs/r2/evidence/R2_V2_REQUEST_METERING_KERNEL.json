@@ -1,0 +1,198 @@
+{
+  "status": "STAGE_2A_VERIFIED_NOT_WIRED",
+  "recorded_at_utc": "2026-10-24T01:43:13.725440+00:00",
+  "source_head": "169490a211a76b58425a91e711a5f392d66f3448",
+  "base": "c3b7ed2fd63acafab694e7d7b7527220dcd7cbbe",
+  "branch": "feat/v2-request-metering-kernel",
+  "plan": "docs/superpowers/plans/2026-10-24-v2-request-metering-kernel.md",
+  "spec": "docs/superpowers/specs/2026-10-24-v2-request-metering-kernel.md",
+  "donor_commit": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+  "source_seal": {
+    "source_head": "169490a211a76b58425a91e711a5f392d66f3448",
+    "base": "c3b7ed2fd63acafab694e7d7b7527220dcd7cbbe",
+    "sha256": {
+      "lib/pricing/_metering_core/SOURCE.json": "e730282d60e3a4ea1e0d680651b177d62ea79fc7e7dbcc59b443b526db280d20",
+      "lib/pricing/_metering_core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "lib/pricing/_metering_core/metering.py": "a1194ce17ac72a499d4e087768e89ca9954952479096261ac6a58d962e38717f",
+      "lib/pricing/_metering_core/model.py": "056df93f13c6ed15627bea5929a800925cacb5f4b71dc5a740e7f81e3b985659",
+      "lib/pricing/_metering_core/vocabulary.py": "bfd55fed4adc51375661c3de0791adc25b179d6e772a6dd94111969572aa2a12",
+      "lib/pricing/request_metering.py": "1f809aa764fe47379d0522f473f43b6a4927ad45439adff2a53a9d10886008ee",
+      "tests/unit/lib/pricing/test_request_metering.py": "fbe192f90d25c072baccf6ddd239f540abf87984bb7964b6ea0a4dcef1149b16",
+      "tests/unit/lib/pricing/test_request_metering_core.py": "c4b38dec5f9882713d42f4d454abd41295dcfd0eebe39d7d69476e43033d8b12"
+    },
+    "affected_passed": 192,
+    "legacy_source_sha256_unchanged": true,
+    "port_byte_verification": true,
+    "static_production_imports_of_public_module": [],
+    "import_scan_scope": "tracked Python under lib/server/r2/scripts; static imports, not arbitrary dynamic import execution"
+  },
+  "new_kernel_cases_passed": 63,
+  "affected_tests": {
+    "passed": 192,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 1,
+    "warning_scope": "existing SQLite expression-index reflection",
+    "junit": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/affected.xml",
+    "log": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/affected.log",
+    "baseline_passed": 129
+  },
+  "statics": [
+    {
+      "check": "ruff",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "check",
+        "."
+      ],
+      "exit": 0,
+      "seconds": 0.01,
+      "log": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/static-ruff.log"
+    },
+    {
+      "check": "format",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "exit": 0,
+      "seconds": 0.01,
+      "log": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/static-format.log"
+    },
+    {
+      "check": "types",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright",
+        "--warnings",
+        "--venvpath",
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main"
+      ],
+      "exit": 0,
+      "seconds": 59.3,
+      "log": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/static-types.log"
+    },
+    {
+      "check": "imports",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports"
+      ],
+      "exit": 0,
+      "seconds": 0.15,
+      "log": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/static-imports.log"
+    },
+    {
+      "check": "deptry",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry",
+        "lib",
+        "server",
+        "alembic",
+        "scripts",
+        "tests",
+        "r2"
+      ],
+      "exit": 0,
+      "seconds": 0.54,
+      "log": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/static-deptry.log"
+    },
+    {
+      "check": "audit",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+        "scripts/audit_tests.py",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 17.12,
+      "log": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/static-audit.log"
+    },
+    {
+      "check": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "c3b7ed2fd63acafab694e7d7b7527220dcd7cbbe",
+        "169490a211a76b58425a91e711a5f392d66f3448"
+      ],
+      "exit": 0,
+      "seconds": 0.0,
+      "log": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/static-diff.log"
+    }
+  ],
+  "core_test_provenance": {
+    "donor_test_sha256": "82459a1f5c983ff9b57cc377526136c4d83cf4891e89869cfab199fba93c7801",
+    "host_test_sha256": "c4b38dec5f9882713d42f4d454abd41295dcfd0eebe39d7d69476e43033d8b12",
+    "non_import_ast_equal": true,
+    "scope": "AST equality excluding module imports only; test assertions/fixtures/parameterization unchanged"
+  },
+  "review": {
+    "reviewer": "/root/request_metering_review",
+    "candidate": "169490a211a76b58425a91e711a5f392d66f3448",
+    "base": "c3b7ed2fd63acafab694e7d7b7527220dcd7cbbe",
+    "verdict": "READY_FOR_PRODUCT_MERGE_AFTER_EVIDENCE_ONLY_CORRECTIONS",
+    "critical_or_important_product_findings": 0,
+    "significant_product_fix_pass": false,
+    "minor_evidence_notes": [
+      {
+        "finding": "plain diff check omitted committed range",
+        "disposition": "Main and reviewer ran explicit base..candidate diff-check; exit0, command recorded in statics.json."
+      },
+      {
+        "finding": "historical task-done ranges preceded commits",
+        "disposition": "Actual Task1 c3b7ed2f..48e2b4bc and Task2 48e2b4bc..169490a2 appended to ledger, preserving original execution lines."
+      }
+    ],
+    "deferred_product_minors": [],
+    "verified_sound": [
+      "Exact donor provenance and unchanged test assertion/fixture AST.",
+      "All supplied numeric facts validated before free/unknown returns; copied mappings/sequences.",
+      "Missing axes distinct from explicit zero; cache partition derived only from complete facts.",
+      "Equal physical requests remain distinct.",
+      "No static production consumer import; seven legacy source hashes unchanged."
+    ],
+    "declined_to_judge": [
+      "Stage2B local/custom price compilation.",
+      "Provider response semantics and documented zero cache facts.",
+      "Persisted attempt/retry/deduplication/idempotency.",
+      "Decimal conservative bounds, reservations, money writes and admission.",
+      "Production/release activation and historical authority failures.",
+      "Sponsor-excluded license matters."
+    ],
+    "main_disposition": "All declined runtime/conversion/authority behaviors remain outside this unwired pure kernel; unchanged owners retain their present behavior. No new guarantees or activation are claimed. Later profiles must prove those requirements. Sponsor exclusion remains effective."
+  },
+  "review_packet_sha256": "361e93dd7caac7aabed67cea07b5f2e7673fc30ba55cb013c4aaa5e7717a6c7f",
+  "legacy_source_sha256": {
+    "lib/pricing/types.py": "8912cf168a438d28539b0d6f55d8dc6b4ecb9caec79c30019a4c3504e8d04ecf",
+    "lib/pricing/strategies.py": "7f384586fc48b0a26b832c9ba9483d7f8face8874bfc38db7ab5d68a591a1e1f",
+    "lib/cost_calculator.py": "bfd2baaf1f0b79886bc796eb210ce5308673bb18cd985872289084082837f18b",
+    "lib/video_backends/kling.py": "1e256e1f8888e81f2135cbfa1912c8f22b81cb43305f19071063868eb37072f5",
+    "lib/video_backends/ark.py": "358aeaad25407597c9e09b05a32e8280b4f5fe78a51eedd7414d6d82901e6f85",
+    "lib/vidu_shared.py": "da6d898f68ee4abfc56891b5275303e917e8f8cedaa6a77b870dca384f36fc40",
+    "lib/db/models/custom_provider.py": "e2de2befe6926e3d6fd8af8562c784be4c1d1c9fc7e8e58647699a02b7bf6b0d"
+  },
+  "limits": [
+    "Pure normalized-request reference arithmetic only; no local/custom-price compiler yet.",
+    "No production consumer wiring, provider parsing, SDK construction or generation call.",
+    "Float cost is not a conservative hard-budget bound or admission token.",
+    "No new attempt identity store, DB/schema, ledger, historical-price edit, UI/API or deployment.",
+    "Full backend not rerun: previously proven two unchanged Story Authoring authority assertions remain failed evidence.",
+    "Old catalog constraint unknown/empty minor remains a prerequisite before selector consumption."
+  ],
+  "next_step": "Stage2B: compile existing exact local/custom price facts into normalized tables using the49-case crosswalk; retain legacy fallback behind its existing interface and Vidu/LOCAL owners.",
+  "archive": {
+    "path": ".superpowers/sdd/2026-10-24-v2-request-metering-kernel-evidence.tar.gz",
+    "sha256": "172c5156035d42c9a441d7c2fde595e2fbc74954dca2b141385b54b7ff15f2b8"
+  },
+  "completion_gate": {
+    "command": [
+      "python3",
+      ".superpowers/sdd/2026-10-24-v2-request-metering-kernel/verify_final.py"
+    ],
+    "exit": 0,
+    "scope": "source/test/static/review/archive evidence validation; not full backend or production acceptance"
+  }
+}

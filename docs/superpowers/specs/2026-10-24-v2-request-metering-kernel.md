@@ -1,6 +1,6 @@
 # V2 guarded request-metering kernel, stage 2A
 
-Status: implementation specification prepared from the sponsor's reuse-first continuation; product code not implemented. Parent: [model-platform compatibility](2026-10-24-v2-model-platform-compatibility.md), [ADR0110 proposed](../../adr/0110-shared-model-catalog-keeps-v2-execution-authority.md). [Crosswalk](../../research/2026-10-24-model-metering-crosswalk.md) and its 49 cases/three-file experiment supply the source evidence.
+Status: bounded kernel implemented and independently reviewed at `169490a211a76b58425a91e711a5f392d66f3448`;63new cases/192affected tests and7static gates pass. No runtime wiring, paid-route or production acceptance. Parent: [model-platform compatibility](2026-10-24-v2-model-platform-compatibility.md), [ADR0110 proposed](../../adr/0110-shared-model-catalog-keeps-v2-execution-authority.md). [Crosswalk](../../research/2026-10-24-model-metering-crosswalk.md) and its 49 cases/three-file experiment supply the source evidence.
 
 ## Purpose and choices
 
