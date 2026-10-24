@@ -12,4 +12,6 @@ Task 1: complete (commits b2d65f7..2ee4730, tests: env -u DATABASE_URL PYTHONDON
 
 Final review:independent reviewer APPROVE candidate2ee4730354eb9985705a3f756fbede21d07c9639; no concrete defects, no deferred minors, no fix pass required.
 Final: Ruling: Live-provider, web/story activation and production qualification success are not part of this backend-only acceptance; preserve those as unverified, do not mark production usable. Cost if wrong: real deployment credentials/qualification/provider behavior may still prevent use; no production usability claim is made.
-Task 2: complete (commits 2ee4730..2ee4730, tests: python3 /tmp/verify-r2-explicit-backend-evidence.py → Evidence/source hashes, 818-test output, seven static gates and review status verified.)
+Task 2: complete (commits 2ee4730..2395818, tests: python3 /tmp/verify-r2-explicit-backend-evidence.py → Evidence/source hashes, 818-test output, seven static gates and review status verified.)
+
+Task2 evidence commit239581880d2fc69825b8746071689f7fd11536c7 is documentation-only; the initial task-done ran before that commit existed. Range corrected to include the actual evidence commit. Product source remains2ee4730354eb9985705a3f756fbede21d07c9639. The final seal commit changes only this bookkeeping and its digest.
