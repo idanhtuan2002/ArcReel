@@ -51,6 +51,17 @@ _CONTRACT_SOURCES = {
     "immutable_json": "r2/contracts/advanced_creative.py",
     "master_snapshot": "r2/contracts/host_hardening.py",
     "metadata_validation": "r2/production/artifact_metadata.py",
+    "artifact_identity": "lib/artifact_manifest.py",
+    "master_ref_validation": "r2/m3/host_integration.py",
+    "contract_common": "r2/contracts/common.py",
+    "contract_content_basis": "r2/contracts/content_basis.py",
+    "contract_enums": "r2/contracts/enums.py",
+    "r2_package_init": "r2/__init__.py",
+    "contracts_package_init": "r2/contracts/__init__.py",
+    "production_package_init": "r2/production/__init__.py",
+    "m3_package_init": "r2/m3/__init__.py",
+    "creative_package_init": "r2/advanced_creative/__init__.py",
+    "lib_package_init": "lib/__init__.py",
 }
 
 TEST_PATHS = (
@@ -433,6 +444,8 @@ def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any], pac
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         if packet == "contracts":
             _check_contract_packet(repo, envelope)
+            protected.update(_CONTRACT_SOURCES.values())
+            protected.add("docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE_CONTRACT_2026-09-14.json")
             if any(
                 not row["blind_review_artifact"]["path"].startswith("docs/r2/evidence/m10-contract-reviews/")
                 for row in envelope["reviewers"]
@@ -559,7 +572,9 @@ class GitRepository:
             + self._git("ls-files", "--others", "--exclude-standard", "-z")
             + self._git("ls-files", "--others", "-z", "--", *sorted(protected))
         )
-        return tuple(p for p in data.decode().split("\0") if p)
+        hidden = self._git("ls-files", "-v", "-z", "--", *sorted(protected)).decode().split("\0")
+        marked = tuple(row[2:] for row in hidden if row and (row[0] == "S" or row[0].islower()))
+        return tuple(p for p in data.decode().split("\0") if p) + marked
 
     def paths(self, ref: str, prefix: str) -> tuple[str, ...]:
         return tuple(

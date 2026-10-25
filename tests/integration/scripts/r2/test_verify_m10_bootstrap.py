@@ -160,6 +160,8 @@ def test_exact_source_extracted_from_git_is_read_only_and_does_not_import_migrat
         "dirty_owned",
         "dirty_bound",
         "staged_bound",
+        "skip_worktree",
+        "assume_unchanged",
         "dirty_migration",
         "ignored_owned",
         "two_heads",
@@ -191,6 +193,10 @@ def test_refusals_never_write_repository_files(accepted_repo, case: str) -> None
         write(repo, VERIFIER_PATH, b"staged tamper")
         git(repo, "add", VERIFIER_PATH)
         (repo / VERIFIER_PATH).write_bytes(original)
+    elif case in {"skip_worktree", "assume_unchanged"}:
+        flag = "--skip-worktree" if case == "skip_worktree" else "--assume-unchanged"
+        git(repo, "update-index", flag, VERIFIER_PATH)
+        write(repo, VERIFIER_PATH, b"hidden uncommitted bytes")
     elif case == "dirty_migration":
         write(repo, "alembic/versions/new.py", b'revision="new"\ndown_revision="first"\n')
     elif case == "ignored_owned":
@@ -200,7 +206,15 @@ def test_refusals_never_write_repository_files(accepted_repo, case: str) -> None
         write(repo, "alembic/versions/second.py", b'revision="second"\ndown_revision=None\n')
     if case in {"wrong_parent", "same_reviewer", "wrong_hash", "naive_time", "unaccepted_m9"}:
         write(repo, ACCEPTANCE_PATH, envelope)
-    if case not in {"dirty_owned", "dirty_bound", "staged_bound", "dirty_migration", "ignored_owned"}:
+    if case not in {
+        "dirty_owned",
+        "dirty_bound",
+        "staged_bound",
+        "skip_worktree",
+        "assume_unchanged",
+        "dirty_migration",
+        "ignored_owned",
+    }:
         git(repo, "reset", "--soft", candidate)
         commit(repo)
     before = snapshot(repo)

@@ -224,6 +224,7 @@ DispositionSubject
   user_id, project_name, actor_id: ExactIdentity
   subject_digest: Sha256Digest
   quality_run_id: M10Uuid7; quality_run_digest: Sha256Digest
+  profile_id: M10Uuid7; profile_revision: int>=1
   profile_digest: Sha256Digest; decision: DispositionDecision
   waiver_bindings: tuple[WaiverBinding, ...]
   reason: nonempty string; requested_expires_at: AwareDatetime
@@ -242,3 +243,160 @@ publication_request_digest, with the explicit field names in this paragraph.
 The finalized disposition retains its exact run/subject/profile, authority and
 expiry fields from the original spec. Cross-record validity is verified before
 future writes, not asserted by these data constructors.
+
+
+## Review repair: complete command surface and artifact identity
+
+### Run completion request
+
+The original port's undeclared CompleteRunCommand is concretized as follows.
+These are data constructors, not a collecting-run repository or sealing service.
+
+```text
+ObservationBinding
+  observation_id: M10Uuid7; observation_type: ObservationType
+  observation_digest: Sha256Digest
+  requirement_id, slot_id: ExactIdentity
+RunCompletionSubject
+  user_id, project_name, actor_id: ExactIdentity
+  run_id: M10Uuid7
+  subject: AssessedSubject; subject_digest: Sha256Digest
+  profile_id: M10Uuid7; profile_revision: int>=1; profile_digest: Sha256Digest
+  observations: tuple[ObservationBinding, ...]
+  observation_closure_digest: Sha256Digest
+  requirements_digest: Sha256Digest
+  execution_refs: tuple[ExactIdentity, ...]
+CompleteRunCommand
+  command: CommandEnvelope
+  subject: RunCompletionSubject
+```
+
+Require COMPLETE_RUN; command scope/actor equals completion subject scope/actor,
+and embedded master-binding scope agrees. run_id identifies the already allocated
+run being completed, so it is semantic input and must be hashed. The sealed
+QualityRun must retain this run_id and exact subject/profile/requirements/
+observation/execution bindings. Constructor checks do not prove allocation or
+ownership in a real repository; A5 must do so.
+
+Observations are nonempty, unique by observation_id and ordered by
+(requirement_id, slot_id, observation_id); reject contradictory duplicate IDs.
+Execution refs are unique and sorted. Closure verification recomputes the exact
+normalized ObservationBinding tuple and checks its declared digest. At A5,
+each binding must match the full fetched immutable observation's variant,
+identity, requirement/slot and recomputed digest. A binding is not proof that the
+observation/evidence exists. Do not substitute a slot count or untagged digest
+list for this closure.
+
+The final QualityDisposition also gains profile_id/profile_revision explicitly.
+They must agree with DispositionSubject and the resolved QualityRun at A6; a
+digest alone is not the identity selector. All added identity/revision fields
+participate in request/subject/final-result digests and mutation/roundtrip tests.
+
+QualityRun's local ref invariants: run observation IDs are nonempty/unique,
+slot-result (requirement_id,slot_id) pairs are unique, per-row observation refs
+and digests are parallel/nonempty, and no primary observation is counted in two
+slots. Their union equals the run's observation refs. Escalation refs name bound
+observations in that same union; actual escalation policy, qualification,
+independence and whether SATISFIED is justified are evaluated at A5 against the
+resolved profile, not trusted from a constructor or caller status.
+
+### Closed hash-body projection table
+
+This table resolves cache/exclusion ambiguity; it supplements original §5.1.
+All digests use the previously defined domain/version/body envelope. Own-cache
+exclusion is top-level only; referenced-body digests are never stripped.
+
+| Domain/body kind | Exact normative body | Own cache excluded |
+| --- | --- | --- |
+| m10.quality-policy.v1 | Full QualityPolicyV1 including added rule_ids | None |
+| m10.quality-profile-draft.v1 | Full QualityProfileDraft, including full policy and policy_digest | None |
+| m10.quality-profile.v1 | Full finalized QualityProfileRevision, including draft subject/request and publication/admission fields | profile_digest only |
+| m10.artifact-metadata.v1 | Full ArtifactMetadataSnapshot, including artifact_key and normalized immutable host metadata body | metadata_digest only |
+| m10.master-binding.v1 | Full MasterBindingV1 with normalized heads/snapshots/edges and referenced metadata digests | None |
+| m10.content-basis.v1 | Complete normalized content_basis object from root metadata | None |
+| m10.assessed-subject.v1 | Full AssessedSubject, including master binding/full referenced digests | None |
+| Original seven variant-specific observation domains | Entire matching closed-union observation body, including all common bindings and variant fields | None |
+| m10.observation-closure.v1 | Normalized tuple of full ObservationBinding bodies | None |
+| m10.assessment-requirements.v1 | Ordered AssessmentRequirement tuple, including full ordered slots and escalation fields | None |
+| m10.quality-run.v1 | Full final QualityRun with all identity/subject/profile/closure/slot/execution/completion fields | None |
+| m10.waiver-binding.v1 | Full WaiverBinding | None |
+| m10.quality-disposition.v1 | Full QualityDisposition including explicit profile identity/revision and issuer/lease/admission/expiry | None |
+| m10.profile-publication-subject.v1 | Full ProfilePublicationSubject, including full draft and its digest | None |
+| m10.disposition-subject.v1 | Full DispositionSubject including explicit profile identity/revision | None |
+| Three original *-request.v1 domains | Object with command scope/actor/operation plus full corresponding publication/completion/disposition subject | command_id and request_digest; future result receipt/commit fields are absent, not recursively removed from referenced evidence |
+| m10.command-key-guard.v1 | Object of user_id,project_name,actor_id,operation,command_id | request_digest is absent from this projection |
+
+Add m10.observation-closure.v1 explicitly to the closed A registry, in addition
+to the four added tags above. No implicit digest field is added to a contract
+merely because a helper returns its digest. Referenced preallocated entity IDs
+and existing execution/receipt references remain semantic data; only result
+fields created by the operation itself are excluded from its preflight request.
+Requirements/slot tuple order remains policy-declared order. Only explicitly
+set-like heads/snapshots/edges, observation bindings, execution refs and waiver
+bindings normalize to the documented stable key order.
+
+### Exact master-ref mapping
+
+For each master: edge, decode parent and child artifact keys using the existing
+ArtifactKey decoder, require canonical encode/decode roundtrip, require both
+EPISODE_VIDEO and the same positive episode, then require:
+
+```text
+shot_ref = dependency_ref with exactly one leading "master:" removed
+validate_m3_target_ref(shot_ref) succeeds
+child_artifact_key == ArtifactKey.episode_video(parent.episode_number, shot_ref).encode()
+```
+
+This is the pinned GoldenAHostIntegration.artifact_key_for/ApprovedMasterResolver
+mapping, not a new wire encoder. Reject an empty/unsafe ref, alias encoding,
+other key kind, cross-episode child and master:A->child B even when candidate,
+version and content digest coincide. Unknown master-ref identity families fail
+closed pending a separately reviewed extension. Non-master dependency owners
+remain bound snapshots and are not rewritten into these edges.
+
+A1 may import only the qualified pure ArtifactKey/ArtifactKind identity surface
+and validate_m3_target_ref leaf, not instantiate GoldenAHostIntegration or a
+manifest adapter. Importing a containing host module may load existing class
+definitions; it does not authorize invoking its filesystem/authority methods.
+A0 checks exact direct imports/calls and source pins, while review/side-effect
+tests inspect the allowed transitive module initialization.
+
+Before delegated host parsing, reject whitespace/control normalization in raw
+identity fields. Existing already validated host snapshots must themselves hold
+exact identities. Do not let a permissive nested host parser silently trim a
+caller-supplied key into a different authority identity. Metadata must equal its
+complete normalized host representation before it is frozen.
+
+Required A1 additions: full request-family roundtrip/mutation coverage; same-
+content different-target, alias and cross-episode refusal fixtures; explicit
+request/result cache-cycle vectors; nested-mutation and raw-identity tests.
+These are required implementation tests, not claims of current A1 execution.
+
+Exact request body layout is
+`{command: {user_id, project_name, actor_id, operation}, subject: <full subject>}`;
+key names and nesting are fixed. Guard body is the flat five-field object
+`{user_id, project_name, actor_id, operation, command_id}`. No alternate flattening,
+renaming or generic recursive cache stripping is conforming. Use StrictInt for
+new M10 ordinal/count/version/TTL/byte-limit fields so booleans and numeric
+strings cannot impersonate integer identity or policy values. Validate raw host
+head version integers before delegated host parsing as well.
+
+For metadata normalization, compare canonical bytes of the input frozen JSON
+against canonical bytes of the temporary host model's full model_dump(mode=json)
+representation. Ordinary Python equality is insufficient because True equals1.
+Store only the canonical immutable representation, never the temporary model.
+
+The bounded bootstrap also protects its consumed host/canonical/metadata/identity
+source and namespace-initializer files as dirty dependencies, rather than calling
+them unrelated work. Owned/consumed index entries marked assume-unchanged or
+skip-worktree are refused even when Git's normal diff hides changed bytes. The
+verifier never clears those flags, rewrites the index or discards hidden work.
+
+Each master: child's metadata contract_ref.contract_type is ShotSpec, matching
+ApprovedMasterResolver's existing check. Every head content digest and dependency
+fingerprint must be valid64hex, allowing the host's existing optional sha256:
+prefix; comparison follows the pinned normalize_sha256 semantics. Preserve the
+foreign head's wire value in the binding. AssessedSubject.artifact_digest is the
+canonical prefixed digest and compares to the root through that normalization,
+not a string-format alias. Invalid opaque digest strings cannot form a valid
+internal subject merely because two strings happen to agree.

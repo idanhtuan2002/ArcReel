@@ -57,7 +57,18 @@
     "canonical": "r2/advanced_creative/digests.py",
     "immutable_json": "r2/contracts/advanced_creative.py",
     "master_snapshot": "r2/contracts/host_hardening.py",
-    "metadata_validation": "r2/production/artifact_metadata.py"
+    "metadata_validation": "r2/production/artifact_metadata.py",
+    "artifact_identity": "lib/artifact_manifest.py",
+    "master_ref_validation": "r2/m3/host_integration.py",
+    "contract_common": "r2/contracts/common.py",
+    "contract_content_basis": "r2/contracts/content_basis.py",
+    "contract_enums": "r2/contracts/enums.py",
+    "r2_package_init": "r2/__init__.py",
+    "contracts_package_init": "r2/contracts/__init__.py",
+    "production_package_init": "r2/production/__init__.py",
+    "m3_package_init": "r2/m3/__init__.py",
+    "creative_package_init": "r2/advanced_creative/__init__.py",
+    "lib_package_init": "lib/__init__.py"
   },
   "definition": "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md",
   "sequencing_basis": {
