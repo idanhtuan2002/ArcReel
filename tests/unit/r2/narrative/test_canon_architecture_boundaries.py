@@ -11,6 +11,8 @@ import json
 import tomllib
 from pathlib import Path
 
+import pytest
+
 _ROOT = Path(__file__).resolve().parents[4]
 _NARRATIVE_DIR = _ROOT / "r2" / "narrative"
 # Every authoritative Canon write-port method.
@@ -130,6 +132,52 @@ def test_repository_and_resolver_never_own_a_transaction() -> None:
         }, rel_path
 
 
+def _authority_import_violations(rel: str, tree: ast.Module) -> list[str]:
+    factory = "canon_authority_uow_factory"
+    factory_names = [n for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == factory]
+    factory_calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and n.func in factory_names]
+    owner_calls = [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == "CanonTransactionService"
+        and n.args
+        and isinstance(n.args[0], ast.Call)
+        and isinstance(n.args[0].func, ast.Name)
+        and n.args[0].func.id == factory
+    ]
+    factory_imports = [
+        (n.module, alias.asname)
+        for n in ast.walk(tree)
+        if isinstance(n, ast.ImportFrom)
+        for alias in n.names
+        if alias.name == factory
+    ]
+    owner_imports = [
+        (n.module, alias.asname)
+        for n in ast.walk(tree)
+        if isinstance(n, ast.ImportFrom)
+        for alias in n.names
+        if alias.name == "CanonTransactionService"
+    ]
+    composition = (
+        rel == "server/story_authoring/commit.py"
+        and factory_imports == [("lib.db.canon_uow", None)]
+        and owner_imports == [("r2.narrative.canon_transaction", None)]
+        and len(factory_names) == 1
+        and len(factory_calls) == 1
+        and len(owner_calls) == 1
+        and owner_calls[0].args[0] is factory_calls[0]
+    )
+    return [
+        symbol
+        for symbol in _AUTHORITY_ONLY_SYMBOLS
+        if any(name.endswith(f".{symbol}") or name == symbol for name in _imports(tree))
+        and not (composition and symbol == factory)
+    ]
+
+
 def test_authority_write_symbols_stay_out_of_downstream_layers() -> None:
     downstream = ("server", "r2/production", "r2/production_intelligence", "r2/m3")
     for root in downstream:
@@ -137,12 +185,10 @@ def test_authority_write_symbols_stay_out_of_downstream_layers() -> None:
         if not base.exists():
             continue
         for path in sorted(base.rglob("*.py")):
-            names = _imports(ast.parse(path.read_text(encoding="utf-8")))
-            for symbol in _AUTHORITY_ONLY_SYMBOLS:
-                assert not any(name.endswith(f".{symbol}") or name == symbol for name in names), (
-                    path.relative_to(_ROOT).as_posix(),
-                    symbol,
-                )
+            violations = _authority_import_violations(
+                path.relative_to(_ROOT).as_posix(), ast.parse(path.read_text(encoding="utf-8"))
+            )
+            assert not violations, (path.relative_to(_ROOT).as_posix(), violations)
 
 
 def test_authority_uow_factory_is_referenced_only_where_expected() -> None:
@@ -228,3 +274,31 @@ def test_frozen_contract_registry_still_names_the_transaction_service() -> None:
     assert canon_contracts, "no CANON-family contracts in the frozen registry"
     for item in canon_contracts:
         assert item["commit_authority"] == "CanonTransactionService", item["name"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from lib.db.canon_uow import canon_authority_uow_factory\nleak = canon_authority_uow_factory",
+        "from lib.db.canon_uow import canon_authority_uow_factory\nuow = canon_authority_uow_factory(session)",
+        "from lib.db.canon_uow import canon_authority_uow_factory as factory\nuow = factory(session)",
+        "from lib.db.canon_uow import CanonRepository",
+        "from lib.db.canon_uow import canon_authority_uow_factory\n"
+        "from r2.narrative.canon_transaction import CanonTransactionService\n"
+        "owner = CanonTransactionService(canon_authority_uow_factory(session))\n"
+        "leak = canon_authority_uow_factory",
+        "from lib.db.canon_uow import canon_authority_uow_factory, CanonRepository\n"
+        "from r2.narrative.canon_transaction import CanonTransactionService\n"
+        "owner = CanonTransactionService(canon_authority_uow_factory(session))",
+        "from lib.db.canon_uow import canon_authority_uow_factory\n"
+        "from other import CanonTransactionService\n"
+        "owner = CanonTransactionService(canon_authority_uow_factory(session))",
+    ],
+)
+def test_story_composition_exception_refuses_authority_escape(source: str) -> None:
+    assert _authority_import_violations("server/story_authoring/commit.py", ast.parse(source))
+
+
+def test_story_composition_exception_is_not_available_to_other_downstream_files() -> None:
+    tree = ast.parse("from lib.db.canon_uow import canon_authority_uow_factory")
+    assert _authority_import_violations("server/other.py", tree) == ["canon_authority_uow_factory"]

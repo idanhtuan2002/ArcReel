@@ -64,31 +64,40 @@ def _attempt(execution_id: str, task_id: str) -> PlannedExecutionAttempt:
     )
 
 
-async def test_scan_once_recovers_a_dead_submitting_attempt(session_factory: Factory) -> None:
-    now = datetime.now(UTC)
-    async with session_factory() as session:
+async def _seed_expired_attempt(factory: Factory, execution_id: str, task_id: str) -> None:
+    async with factory() as session:
         repo = _repo(session)
-        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt("exec-1", "task-1"))
+        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt(execution_id, task_id))
         leased = await repo.acquire_lease(
             user_id=USER,
             project_name=PROJECT,
-            execution_id=planned.execution_id,
+            execution_id=execution_id,
             expected_version=planned.state_version,
             owner="dead-worker",
-            expires_at=now + timedelta(milliseconds=50),
+            expires_at=datetime.now(UTC) + timedelta(days=1),
         )
-        await repo.transition_worker(
+        submitting = await repo.transition_worker(
             user_id=USER,
             project_name=PROJECT,
-            execution_id=planned.execution_id,
+            execution_id=execution_id,
             expected_version=leased.state_version,
             expected_states=frozenset({ExecutionAttemptState.PLANNED}),
             new_state=ExecutionAttemptState.SUBMITTING,
             fence=AttemptLeaseFence(owner="dead-worker", token=leased.lease_token or 0),
         )
+        await repo.acquire_lease(
+            user_id=USER,
+            project_name=PROJECT,
+            execution_id=execution_id,
+            expected_version=submitting.state_version,
+            owner="dead-worker",
+            expires_at=datetime.now(UTC) - timedelta(seconds=1),
+        )
         await session.commit()
 
-    await asyncio.sleep(0.2)
+
+async def test_scan_once_recovers_a_dead_submitting_attempt(session_factory: Factory) -> None:
+    await _seed_expired_attempt(session_factory, "exec-1", "task-1")
 
     scheduler = ExecutionRecoveryScheduler(session_factory=session_factory)
     await scheduler.scan_once()
@@ -161,43 +170,24 @@ async def test_scan_once_leaves_an_unsupported_cancel_request_pending(session_fa
 
 
 async def test_start_and_stop_run_at_least_one_scan(session_factory: Factory) -> None:
-    async with session_factory() as session:
-        repo = _repo(session)
-        planned = await repo.plan(user_id=USER, project_name=PROJECT, attempt=_attempt("exec-3", "task-3"))
-        leased = await repo.acquire_lease(
-            user_id=USER,
-            project_name=PROJECT,
-            execution_id=planned.execution_id,
-            expected_version=planned.state_version,
-            owner="dead-worker",
-            expires_at=datetime.now(UTC) + timedelta(milliseconds=50),
-        )
-        await repo.transition_worker(
-            user_id=USER,
-            project_name=PROJECT,
-            execution_id=planned.execution_id,
-            expected_version=leased.state_version,
-            expected_states=frozenset({ExecutionAttemptState.PLANNED}),
-            new_state=ExecutionAttemptState.SUBMITTING,
-            fence=AttemptLeaseFence(owner="dead-worker", token=leased.lease_token or 0),
-        )
-        await session.commit()
+    await _seed_expired_attempt(session_factory, "exec-3", "task-3")
 
-    await asyncio.sleep(0.2)
+    completed = asyncio.Event()
 
-    scheduler = ExecutionRecoveryScheduler(session_factory=session_factory, interval_seconds=0.05)
+    class ObservedScheduler(ExecutionRecoveryScheduler):
+        async def scan_once(self) -> None:
+            await super().scan_once()
+            completed.set()
+
+    scheduler = ObservedScheduler(session_factory=session_factory, interval_seconds=60)
     await scheduler.start()
     try:
-        for _ in range(50):
-            async with session_factory() as session:
-                durable = await _repo(session).get_exact(user_id=USER, project_name=PROJECT, execution_id="exec-3")
-            if durable is not None and durable.state is not ExecutionAttemptState.SUBMITTING:
-                break
-            await asyncio.sleep(0.05)
-        else:
-            raise AssertionError("scheduler did not process the dead attempt in time")
+        async with asyncio.timeout(5):
+            await completed.wait()
     finally:
         await scheduler.stop()
 
+    async with session_factory() as session:
+        durable = await _repo(session).get_exact(user_id=USER, project_name=PROJECT, execution_id="exec-3")
     assert durable is not None
     assert durable.state is ExecutionAttemptState.NEEDS_OPERATOR

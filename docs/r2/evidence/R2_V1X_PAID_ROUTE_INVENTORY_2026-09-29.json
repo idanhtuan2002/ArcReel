@@ -301,6 +301,14 @@
    "release_disposition": "DISABLED_IN_RELEASE: async video adapter profiles are UNQUALIFIED; needs OFFLINE_VERIFIED adapter evidence, then a route canary"
   },
   {
+   "route_ref": "story:gemini-aistudio",
+   "kind": "story",
+   "provider_id": "gemini-aistudio",
+   "media_type": null,
+   "adapter_version": "gemini-story-v1",
+   "release_disposition": "REFUSED_UNTIL_QUALIFIED: operator canary per exact model and configuration binding; inventory entry is not runtime qualification"
+  },
+  {
    "route_ref": "trial_run",
    "kind": "trial_run",
    "provider_id": null,
