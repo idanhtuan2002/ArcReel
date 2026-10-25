@@ -1,0 +1,66 @@
+{
+  "schema_version": "1",
+  "status": "BOUNDED_DESIGN_CANDIDATE_NOT_ACCEPTED",
+  "tested_source_head": "845a2aedb8dc425bc1a51bf50f01bff55b48a64d",
+  "packet": "M10_A_A0_A1",
+  "implementation_scope": "CONTRACTS_ONLY",
+  "full_m10_accepted": false,
+  "runtime_activation_authorized": false,
+  "product_files_created": false,
+  "source_sha256": {
+    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "62af5418a718abca82a0f034cff53dda675cc2657b9adf5966e6aeb6848a24ab",
+    "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json": "72f980aec9c79ec0ecea7462d2fd8fc8547c7a1ef87e198fecafe44fde2f5249",
+    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "04a6f2d2076b18e7b839bb674664aca2dd1432392777fc9614b07b443c1c7b48",
+    "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md": "099dfcdb63cdd14a23214d8f8e6c17f06de049ef2bb8772c610a788648f7491a",
+    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "b98f4d601cf51af5b3d75b7e514b59ff1304cda1a5d942b416fd6056b21dfd1d",
+    "scripts/r2/verify_m10_bootstrap.py": "26a1e23393c580e35cacee72303aa41fbf0126b3b218fde1623c101ab0635d17",
+    "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "5f30b02ddf463b864fc539c0f8c5cc93db6909f788ca67b25b21f1106c7e3afb",
+    "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "8797b4ea2fe429852c28fea08259afac3efdfee5c7dcb1f4970ae39d11f81e38"
+  },
+  "tests": {
+    "counts": {
+      "tests": 100,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "junit_sha256": "1afb3aa9018049ad08e39e7d257198074610c71ebaf0ff6fb07264a22141fda4",
+    "scope": "Existing M7/M8 verifier regressions, original full bootstrap and bounded-mode data/real-Git fixtures; not future A1 product contracts."
+  },
+  "checks": {
+    "ruff": "PASS",
+    "format": "PASS",
+    "types": "0errors0warnings",
+    "test_audit": "0violations",
+    "import_contracts": "23kept0broken",
+    "dependencies": "PASS"
+  },
+  "live": {
+    "results": [
+      {
+        "head": "845a2aedb8dc425bc1a51bf50f01bff55b48a64d",
+        "packet": "full",
+        "status": "REFUSED",
+        "stop_codes": [
+          "M10_DESIGN_NOT_ACCEPTED"
+        ]
+      },
+      {
+        "head": "845a2aedb8dc425bc1a51bf50f01bff55b48a64d",
+        "packet": "contracts",
+        "status": "REFUSED",
+        "stop_codes": [
+          "M10_DESIGN_NOT_ACCEPTED"
+        ]
+      }
+    ],
+    "index_and_status_unchanged": true
+  },
+  "review_status": "TWO_BLIND_REVIEWS_NOT_YET_OBTAINED",
+  "limits": [
+    "No M10 action custodian or factual runtime qualified.",
+    "No database, migration, probe, API, provider, credential or export code allowed.",
+    "Original full gate remains closed.",
+    "Synthetic review fixtures grant no real acceptance."
+  ]
+}
