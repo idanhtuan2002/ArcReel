@@ -34,11 +34,14 @@ No acceptance fabrication, M9 edits, provider calls, production mutations, migra
 
 ## Task D2: Complete concrete acceptance dependencies
 
-- [ ] Read the canonical master identity/transaction seam and freeze explicit MasterBinding fields and domain vectors; test full source closure movement and mismatched approval identity.
-- [ ] Record the narrowly scoped sequencing amendment needed for paused M9; name its reviewer/acceptance boundary without editing old accepted evidence.
-- [ ] Bind concrete profile/disposition custodian requests/leases and qualified host adapter; identify exact allowed action/scope and revocation/currentness checks.
-- [ ] Bind the durable Factual read adapter and receipt, or keep operational factual profile admission blocked. Do not rewrite its requirement as an optional slot.
-- [ ] Derive concrete migration predecessor and exact owned allowlist from accepted base. No migration runs in this packet.
+- [x] Read canonical host identity/transaction seams; propose explicit MasterBinding fields and encoding vectors in2026-10-25-r2-m10-foundation-bindings.md and R2_M10_MASTER_BINDING_VECTORS.json. Eight bound-field changes alter the digest; key order does not.
+- [ ] Normatively freeze those contracts and prove identity-mismatch refusal/full transitive currentness in A1/A5; encoding vectors alone do not establish this.
+- [x] Record scoped sequencing proposal and reviewer/acceptance boundary in the concrete bindings document; old acceptance unchanged. Original predecessor policy remains enforced until separately accepted amendment.
+- [x] Bind separate publication/disposition requests,30-second DB-time leases and current revocation checks. Existing Showrunner reader is not an M10 action adapter.
+- [ ] Qualify concrete action-specific host adapter before operational admission; no such qualification is claimed.
+- [x] Specify exact durable factual receipt/transaction requirements and keep operational factual admission blocked; no fixture substitution or optional-slot conversion.
+- [x] Bind observed predecessor918c4a0e0001 and deterministic proposed revision derivation; bootstrap forbids migration graph drift. No migration created/executed.
+- [ ] Freeze final exact production migration/registry allowlist on the accepted base before A0; original owned-path list remains the source.
 
 - [ ] Test the authority/lifecycle matrix: HISTORICAL_ONLY preserves readiness, alternative runs do not revoke Human disposition, explicit policy/evidence/disposition changes invalidate only their declared bindings. Include PostgreSQL interleavings.
 
@@ -48,10 +51,10 @@ Files: `scripts/r2/verify_m10_bootstrap.py`, mirrored unit/integration tests, ac
 
 - [x] Draft strict acceptance JSON Schema; meta-schema check passes and rejects empty/status-only records. Distinct reviewer identities, exact Git custody and prerequisites still require the executable verifier; schema validity is not acceptance.
 
-- [ ] RED: missing acceptance, changed candidate/review/test hash, duplicate JSON key, invalid timestamp, wrong acceptance parent, same-author reviewer, mismatched predecessor, dirty owned path and multiple migration heads.
-- [ ] Implement Git-object envelope reads and strict schema/identity validation. Verifier reads do not execute candidate imports. Diagnostic output is sanitized; no repository writes on failure.
-- [ ] GREEN: fixture-only accepted envelope is valid only with exact synthetic Git lineage and every dependency; a test success grants no real acceptance.
-- [ ] Integration: before/after tracked/untracked snapshots on every refusal; exact source invocation from Git object; nonzero tests, static checks and test audit.
+- [x] RED observed: module absent initially; subsequent regression cases expose ignored owned/uncommitted migration omissions, candidate-scope/stop-code omissions and schema remote resolution. Other listed refusal cases covered by focused tests.
+- [x] Implement structural Git-object envelope, artifact/parent/review/prerequisite/schema/graph checks. No candidate imports, migration execution, external schema references, diff drivers or repository writes.
+- [x] GREEN: complete synthetic closure accepted; invalid closure refused. Qualification/independence/blindness declarations still require substantive review; fixture success grants no real acceptance.
+- [x] Integration: before/after complete repository snapshots on every refusal; exact source extracted from Git object;88 affected tests pass, Ruff/type checks/import contracts/dependency check/test audit pass. See bootstrap candidate evidence for exact scope/results.
 - [ ] Bind verifier/test/schema/source hashes to one clean design candidate.
 
 ## Task D4: Normative freeze

@@ -1,0 +1,106 @@
+{
+  "status": "PROPOSED_DESIGN_ENCODING_VECTORS_ONLY",
+  "canonical_source": "r2/advanced_creative/digests.py",
+  "canonical_source_sha256": "f9e4357a14ab0b55405c5231b84c96069ebb4b207171c91328e9aaaa71f573fa",
+  "domain": "m10.master-binding.v1",
+  "body": {
+    "schema_id": "m10.master-binding.v1",
+    "user_id": "fixture-user",
+    "project_name": "fixture-project",
+    "root": {
+      "artifact_key": "fixture/root",
+      "master_version": 1,
+      "candidate_id": "fixture-candidate-root",
+      "object_ref": "fixture-object-root",
+      "content_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "approval_record": "fixture-approval-root"
+    },
+    "dependency_heads": [
+      {
+        "artifact_key": "fixture/source",
+        "master_version": 1,
+        "candidate_id": "fixture-candidate-source",
+        "object_ref": "fixture-object-source",
+        "content_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "approval_record": "fixture-approval-source"
+      }
+    ],
+    "metadata_snapshots": [
+      {
+        "artifact_key": "fixture/root",
+        "body": {
+          "fixture_only": true,
+          "content_basis": {
+            "kind": "fictional"
+          },
+          "approved_master": {
+            "candidate_id": "fixture-candidate-root",
+            "approval_record": "fixture-approval-root"
+          },
+          "direct_dependencies": []
+        },
+        "metadata_digest": "sha256:5ea12d5a3774ed46bd15e8478fc32461ac5fb517f0e96981325255c75dba62cc"
+      },
+      {
+        "artifact_key": "fixture/source",
+        "body": {
+          "fixture_only": true,
+          "content_basis": {
+            "kind": "fictional"
+          },
+          "approved_master": {
+            "candidate_id": "fixture-candidate-source",
+            "approval_record": "fixture-approval-source"
+          },
+          "direct_dependencies": []
+        },
+        "metadata_digest": "sha256:1d6a913d4105d8edac5e868d2c89a3efe52ffb471daed7e3fe436830adcd31c6"
+      }
+    ]
+  },
+  "expected_digest": "sha256:34accf8f5c403fe23733735f2a47b619e7a00e0b97dd5338b5c93dccb1a724b9",
+  "key_order_independent": true,
+  "mutations": [
+    {
+      "changed_field": "user_id",
+      "value": "other-user",
+      "expected_digest": "sha256:ee4892653b2df112046dc32f36921f175c8262eae736d210d6a11a8a3c0f4689"
+    },
+    {
+      "changed_field": "project_name",
+      "value": "other-project",
+      "expected_digest": "sha256:5ab181c2e8f552515b0d6687d8a9ba1947faa6da5e00ecbb0e4bb46e680e16ae"
+    },
+    {
+      "changed_field": "root.master_version",
+      "value": 2,
+      "expected_digest": "sha256:1e91412db94dba78582574cfe5d424698ca608a0a065358c7768cf9b1fa6e521"
+    },
+    {
+      "changed_field": "root.approval_record",
+      "value": "other-approval",
+      "expected_digest": "sha256:9cf1d8bf67322a69a9adfd059fbbca098a9c6a5315ad20e6796d05754f5d4321"
+    },
+    {
+      "changed_field": "root.content_digest",
+      "value": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "expected_digest": "sha256:eb2977953f4756dd0795ebe6dd29391f3ca47205f477d6ca92170e3e81122384"
+    },
+    {
+      "changed_field": "dependency_heads.0.master_version",
+      "value": 2,
+      "expected_digest": "sha256:7f568df7bb44f348402c4c94b1c511a62d81f0808ab9c319b783354417a81ed6"
+    },
+    {
+      "changed_field": "dependency_heads.0.approval_record",
+      "value": "other-source-approval",
+      "expected_digest": "sha256:54a0a45d913bb66bb0a225b997039123308ba6d2bd67dfd0cead1b3596cd6b82"
+    },
+    {
+      "changed_field": "metadata_snapshots.0.body.content_basis.kind",
+      "value": "factual",
+      "expected_digest": "sha256:4e9ba755b5cd46e87f62c639368a9c1b29a756b5ed1fd418085d29fd8dbfd381"
+    }
+  ],
+  "limits": "Synthetic encoding vectors only. Metadata fixtures are not production R2ArtifactMetadata instances; mismatched identity must be rejected by A1/A5 validation, not merely hashed."
+}
