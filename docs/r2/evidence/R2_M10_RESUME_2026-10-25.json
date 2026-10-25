@@ -124,5 +124,25 @@
   "provider_calls": false,
   "production_changed_by_resume": false,
   "design_accepted": false,
-  "next_gate": "Finalize original M10 design delta and design-owned bootstrap before two independent normative reviews."
+  "next_gate": "Finalize original M10 design delta and design-owned bootstrap before two independent normative reviews.",
+  "preliminary_review": {
+    "reviewed_candidate_head": "9a58b60206b6191f5deb43f844fcf0c1ec78d068",
+    "normative_acceptance": false,
+    "confirmed_defects": 2,
+    "contract_risks": 1,
+    "repair_status": "REPAIRED_IN_PROPOSED_DELTA_NOT_NORMATIVELY_REVIEWED",
+    "record_path": "docs/r2/evidence/R2_M10_RESUME_REVIEW_2026-10-25.md"
+  },
+  "proposed_acceptance_schema": {
+    "path": "docs/r2/evidence/schemas/R2_M10_DESIGN_ACCEPTANCE.schema.json",
+    "sha256": "a872969b863d4556a023cbfd8768b895a16e9404cce017e33353fa2c9f8973af",
+    "meta_schema_valid": true,
+    "empty_and_status_only_rejected": true,
+    "bootstrap_implemented": false
+  },
+  "m9_preservation_check": {
+    "source_files_match": 4,
+    "archive_matches": true,
+    "m9_modified": false
+  }
 }

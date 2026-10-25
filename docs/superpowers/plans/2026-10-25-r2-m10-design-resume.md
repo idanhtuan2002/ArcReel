@@ -30,7 +30,7 @@ No acceptance fabrication, M9 edits, provider calls, production mutations, migra
 - [x] Refresh checkpoint hashes and run six existing-seam test files;93 tests pass.
 - [x] Confirm singleton Alembic head without migration.
 - [x] Draft explicit responses to10 audit findings and six builder questions; retain unproved conditions as pending.
-- [ ] Independent gap review of this design delta; repair material findings once.
+- [x] Independent preliminary gap review at9a58b602: two confirmed defects and one applicability risk; repaired in one pass. This is not a normative PASS.
 
 ## Task D2: Complete concrete acceptance dependencies
 
@@ -40,9 +40,13 @@ No acceptance fabrication, M9 edits, provider calls, production mutations, migra
 - [ ] Bind the durable Factual read adapter and receipt, or keep operational factual profile admission blocked. Do not rewrite its requirement as an optional slot.
 - [ ] Derive concrete migration predecessor and exact owned allowlist from accepted base. No migration runs in this packet.
 
+- [ ] Test the authority/lifecycle matrix: HISTORICAL_ONLY preserves readiness, alternative runs do not revoke Human disposition, explicit policy/evidence/disposition changes invalidate only their declared bindings. Include PostgreSQL interleavings.
+
 ## Task D3: Design-owned bootstrap
 
 Files: `scripts/r2/verify_m10_bootstrap.py`, mirrored unit/integration tests, acceptance contract/schema under `docs/r2/evidence/`.
+
+- [x] Draft strict acceptance JSON Schema; meta-schema check passes and rejects empty/status-only records. Distinct reviewer identities, exact Git custody and prerequisites still require the executable verifier; schema validity is not acceptance.
 
 - [ ] RED: missing acceptance, changed candidate/review/test hash, duplicate JSON key, invalid timestamp, wrong acceptance parent, same-author reviewer, mismatched predecessor, dirty owned path and multiple migration heads.
 - [ ] Implement Git-object envelope reads and strict schema/identity validation. Verifier reads do not execute candidate imports. Diagnostic output is sanitized; no repository writes on failure.
