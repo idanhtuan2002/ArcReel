@@ -75,3 +75,9 @@ This proposed A0/A1-only ceremony requires two independent reviews and a distinc
 acceptance record; it cannot mark this full-M10 D4 complete or qualify any runtime
 adapter. The original four-owner/default bootstrap remains enforced. Do not
 implement the bounded product files before its separate envelope is accepted.
+
+## Pure-source preparation and bounded re-review
+
+The legacy-import candidate4987526405bd13cc83a950eac9db7a906276baea is withdrawn after FAIL, not accepted. Verified local maintenance base dda0f273e035615e1c10a67f8712279d23b7053c descends from released V2.0.8 and exposes the shared identity/metadata definitions without host initialization. See R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json for exact source/review/combined-test evidence and limits. It does not qualify M10 runtime or change the release.
+
+The bounded proposal now pins that separate implementation base and proof, the27 observed pure import files, project configuration/lockfile bytes and regular-file modes. Dirty imported siblings are relevant dependencies. M7/M8 proofs still bind the released ancestor; the nine-path A0/A1 scope and original full gate remain unchanged. Freeze a fresh normal single-parent candidate after affected verifier/type/audit checks and live refusals, then obtain two new blind reviews of that same candidate. Do not reuse earlier FAILs or maintenance review PASS as M10 design acceptance.

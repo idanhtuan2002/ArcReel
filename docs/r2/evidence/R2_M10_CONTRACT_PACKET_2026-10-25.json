@@ -57,18 +57,17 @@
     "canonical": "r2/advanced_creative/digests.py",
     "immutable_json": "r2/contracts/advanced_creative.py",
     "master_snapshot": "r2/contracts/host_hardening.py",
-    "metadata_validation": "r2/production/artifact_metadata.py",
-    "artifact_identity": "lib/artifact_manifest.py",
-    "master_ref_validation": "r2/m3/host_integration.py",
+    "metadata_validation": "r2/contracts/artifact_metadata.py",
+    "artifact_identity": "r2/artifact_identity.py",
+    "master_ref_validation": "r2/artifact_identity.py",
     "contract_common": "r2/contracts/common.py",
     "contract_content_basis": "r2/contracts/content_basis.py",
     "contract_enums": "r2/contracts/enums.py",
     "r2_package_init": "r2/__init__.py",
     "contracts_package_init": "r2/contracts/__init__.py",
-    "production_package_init": "r2/production/__init__.py",
-    "m3_package_init": "r2/m3/__init__.py",
     "creative_package_init": "r2/advanced_creative/__init__.py",
-    "lib_package_init": "lib/__init__.py"
+    "project_config": "pyproject.toml",
+    "dependency_lock": "uv.lock"
   },
   "definition": "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md",
   "sequencing_basis": {
@@ -78,5 +77,39 @@
     "does_not_accept_design": true,
     "does_not_waive_reviews": true
   },
-  "plan": "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md"
+  "plan": "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md",
+  "implementation_base": "dda0f273e035615e1c10a67f8712279d23b7053c",
+  "preparation_verification": {
+    "path": "docs/r2/evidence/R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json",
+    "sha256": "b53367f9fe9f02e0716365c26d3d79b992ec372e3f83375951e939aa39b80101"
+  },
+  "import_closure": [
+    "r2/__init__.py",
+    "r2/advanced_creative/__init__.py",
+    "r2/advanced_creative/digests.py",
+    "r2/artifact_identity.py",
+    "r2/contracts/__init__.py",
+    "r2/contracts/advanced_creative.py",
+    "r2/contracts/artifact_metadata.py",
+    "r2/contracts/capabilities.py",
+    "r2/contracts/common.py",
+    "r2/contracts/content_basis.py",
+    "r2/contracts/director.py",
+    "r2/contracts/enums.py",
+    "r2/contracts/execution.py",
+    "r2/contracts/factual.py",
+    "r2/contracts/fingerprints.py",
+    "r2/contracts/host_hardening.py",
+    "r2/contracts/narrative.py",
+    "r2/contracts/narrative_context.py",
+    "r2/contracts/narrative_lifecycle.py",
+    "r2/contracts/narrative_plan.py",
+    "r2/contracts/observability.py",
+    "r2/contracts/preparation.py",
+    "r2/contracts/production.py",
+    "r2/contracts/provenance.py",
+    "r2/contracts/provider_syntax.py",
+    "r2/contracts/results.py",
+    "r2/contracts/script.py"
+  ]
 }

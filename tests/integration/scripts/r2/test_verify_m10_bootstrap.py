@@ -253,9 +253,9 @@ def test_a_commit_after_repository_capture_cannot_get_stale_eligibility(accepted
 def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_path: Path) -> None:
     from scripts.r2.verify_m10_bootstrap import (
         CONTRACT_ACCEPTANCE_PATH,
+        CONTRACT_IMPLEMENTATION_BASE,
         CONTRACT_PACKET_PATH,
         CONTRACT_PLAN_PATH,
-        CONTRACT_RELEASE_BASE,
         CONTRACT_SCHEMA_PATH,
         CONTRACT_SPEC_PATH,
     )
@@ -266,7 +266,7 @@ def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_
         check=True,
         capture_output=True,
     )
-    git(repo, "checkout", "--detach", "-q", CONTRACT_RELEASE_BASE)
+    git(repo, "checkout", "--detach", "-q", CONTRACT_IMPLEMENTATION_BASE)
     git(repo, "config", "user.name", "Fixture")
     git(repo, "config", "user.email", "fixture@example.invalid")
     extras = [CONTRACT_PACKET_PATH, CONTRACT_SPEC_PATH, CONTRACT_SCHEMA_PATH, CONTRACT_PLAN_PATH]
@@ -310,7 +310,7 @@ def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_
         "status": "M10_CONTRACT_DESIGN_ACCEPTED",
         "milestone": "M10_A_A0_A1",
         "accepted_design_head": candidate,
-        "accepted_candidate_parent": CONTRACT_RELEASE_BASE,
+        "accepted_candidate_parent": CONTRACT_IMPLEMENTATION_BASE,
         "author_id": "fixture-author",
         "contract_paths_and_sha256": [
             bound(p) for p in [*REQUIRED_DESIGN_PATHS, CONTRACT_SPEC_PATH, CONTRACT_PACKET_PATH, CONTRACT_PLAN_PATH]
@@ -318,7 +318,7 @@ def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_
         "evidence_schema_paths_and_sha256": [bound(SCHEMA_PATH), bound(CONTRACT_SCHEMA_PATH)],
         "bootstrap": {"verifier": bound(VERIFIER_PATH), "tests": [bound(p) for p in TEST_PATHS]},
         "migration_boundary": {
-            "implementation_base_head": CONTRACT_RELEASE_BASE,
+            "implementation_base_head": CONTRACT_IMPLEMENTATION_BASE,
             "singleton_predecessor": "918c4a0e0001",
             "production_migration_authorized": False,
         },
@@ -346,3 +346,11 @@ def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_
     assert full.returncode == 2
     assert json.loads(full.stdout)["stop_codes"] == ["M10_DESIGN_NOT_ACCEPTED"]
     assert snapshot(repo) == before
+
+    imported = repo / "r2/contracts/factual.py"
+    imported.write_text(imported.read_text() + "\n# dirty transitive import\n")
+    dirty_before = snapshot(repo)
+    dirty = subprocess.run(arguments, capture_output=True, text=True, env=environment, timeout=30)
+    assert dirty.returncode == 2
+    assert json.loads(dirty.stdout)["stop_codes"] == ["M10_OWNED_PATH_DIRTY"]
+    assert snapshot(repo) == dirty_before

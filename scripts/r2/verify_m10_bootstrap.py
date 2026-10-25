@@ -29,6 +29,42 @@ CONTRACT_PACKET_PATH = "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json"
 CONTRACT_SPEC_PATH = "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md"
 CONTRACT_PLAN_PATH = "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md"
 CONTRACT_RELEASE_BASE = "14565f9d8a181654be272267a097ddafe2c87c79"
+CONTRACT_IMPLEMENTATION_BASE = "dda0f273e035615e1c10a67f8712279d23b7053c"
+CONTRACT_PREPARATION_ARTIFACT = {
+    "path": "docs/r2/evidence/R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json",
+    "sha256": "b53367f9fe9f02e0716365c26d3d79b992ec372e3f83375951e939aa39b80101",
+}
+_CONTRACT_IMPORTS = frozenset(
+    [
+        "r2/__init__.py",
+        "r2/advanced_creative/__init__.py",
+        "r2/advanced_creative/digests.py",
+        "r2/artifact_identity.py",
+        "r2/contracts/__init__.py",
+        "r2/contracts/advanced_creative.py",
+        "r2/contracts/artifact_metadata.py",
+        "r2/contracts/capabilities.py",
+        "r2/contracts/common.py",
+        "r2/contracts/content_basis.py",
+        "r2/contracts/director.py",
+        "r2/contracts/enums.py",
+        "r2/contracts/execution.py",
+        "r2/contracts/factual.py",
+        "r2/contracts/fingerprints.py",
+        "r2/contracts/host_hardening.py",
+        "r2/contracts/narrative.py",
+        "r2/contracts/narrative_context.py",
+        "r2/contracts/narrative_lifecycle.py",
+        "r2/contracts/narrative_plan.py",
+        "r2/contracts/observability.py",
+        "r2/contracts/preparation.py",
+        "r2/contracts/production.py",
+        "r2/contracts/provenance.py",
+        "r2/contracts/provider_syntax.py",
+        "r2/contracts/results.py",
+        "r2/contracts/script.py",
+    ]
+)
 CONTRACT_SCOPE = frozenset(
     {
         "scripts/r2/verify_m10_scope.py",
@@ -50,18 +86,17 @@ _CONTRACT_SOURCES = {
     "canonical": "r2/advanced_creative/digests.py",
     "immutable_json": "r2/contracts/advanced_creative.py",
     "master_snapshot": "r2/contracts/host_hardening.py",
-    "metadata_validation": "r2/production/artifact_metadata.py",
-    "artifact_identity": "lib/artifact_manifest.py",
-    "master_ref_validation": "r2/m3/host_integration.py",
+    "metadata_validation": "r2/contracts/artifact_metadata.py",
+    "artifact_identity": "r2/artifact_identity.py",
+    "master_ref_validation": "r2/artifact_identity.py",
     "contract_common": "r2/contracts/common.py",
     "contract_content_basis": "r2/contracts/content_basis.py",
     "contract_enums": "r2/contracts/enums.py",
     "r2_package_init": "r2/__init__.py",
     "contracts_package_init": "r2/contracts/__init__.py",
-    "production_package_init": "r2/production/__init__.py",
-    "m3_package_init": "r2/m3/__init__.py",
     "creative_package_init": "r2/advanced_creative/__init__.py",
-    "lib_package_init": "lib/__init__.py",
+    "project_config": "pyproject.toml",
+    "dependency_lock": "uv.lock",
 }
 
 TEST_PATHS = (
@@ -310,10 +345,33 @@ def _check_contract_packet(repo: Repository, envelope: dict[str, Any]) -> None:
         raise BootstrapError("M10_SCOPE_EXPANSION_REQUIRED")
     boundary = envelope["migration_boundary"]
     if (
-        boundary["implementation_base_head"] != CONTRACT_RELEASE_BASE
+        boundary["implementation_base_head"] != CONTRACT_IMPLEMENTATION_BASE
         or boundary["singleton_predecessor"] != "918c4a0e0001"
     ):
         raise BootstrapError("M10_PREREQUISITE_NOT_ACCEPTED")
+    if (
+        definition.get("implementation_base") != CONTRACT_IMPLEMENTATION_BASE
+        or definition.get("preparation_verification") != CONTRACT_PREPARATION_ARTIFACT
+        or definition.get("import_closure") != sorted(_CONTRACT_IMPORTS)
+    ):
+        raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
+    preparation_bytes = _bound(
+        repo, CONTRACT_IMPLEMENTATION_BASE, CONTRACT_PREPARATION_ARTIFACT, "M10_SCHEMA_FREEZE_FAILED"
+    )
+    preparation = load_json(preparation_bytes)
+    if (
+        preparation.get("status") != "R2_PURE_ARTIFACT_SEAMS_VERIFIED"
+        or preparation.get("scope") != "LOCAL_SOURCE_COMPATIBILITY_ONLY"
+        or preparation.get("release_ancestor") != CONTRACT_RELEASE_BASE
+        or preparation.get("runtime_activation_authorized") is not False
+        or preparation.get("m10_design_accepted") is not False
+        or repo.parents(CONTRACT_IMPLEMENTATION_BASE) != (preparation["verified_source_head"],)
+        or not repo.ancestor(CONTRACT_RELEASE_BASE, CONTRACT_IMPLEMENTATION_BASE)
+        or not repo.ancestor(CONTRACT_IMPLEMENTATION_BASE, envelope["accepted_design_head"])
+    ):
+        raise BootstrapError("M10_PREREQUISITE_NOT_ACCEPTED")
+    for path, digest in preparation["source_sha256"].items():
+        _bound(repo, CONTRACT_IMPLEMENTATION_BASE, {"path": path, "sha256": digest}, "M10_SCHEMA_FREEZE_FAILED")
     expected_rows = []
     for owner, ref in _CONTRACT_PREDECESSORS.items():
         path = f"docs/r2/evidence/R2_{owner}_IMPLEMENTATION_ACCEPTANCE.json"
@@ -336,8 +394,16 @@ def _check_contract_packet(repo: Repository, envelope: dict[str, Any]) -> None:
     for ref in (envelope["accepted_design_head"], repo.head):
         if repo.read(ref, architecture["path"]) != base_contract:
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
-        for path in _CONTRACT_SOURCES.values():
-            if repo.read(ref, path) != repo.read(CONTRACT_RELEASE_BASE, path):
+        if repo.read(ref, CONTRACT_PREPARATION_ARTIFACT["path"]) != preparation_bytes or repo.mode(
+            ref, CONTRACT_PREPARATION_ARTIFACT["path"]
+        ) != repo.mode(CONTRACT_IMPLEMENTATION_BASE, CONTRACT_PREPARATION_ARTIFACT["path"]):
+            raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
+        for path in {*_CONTRACT_SOURCES.values(), *_CONTRACT_IMPORTS}:
+            if (
+                repo.read(ref, path) != repo.read(CONTRACT_IMPLEMENTATION_BASE, path)
+                or repo.mode(CONTRACT_IMPLEMENTATION_BASE, path) not in {"100644", "100755"}
+                or repo.mode(ref, path) != repo.mode(CONTRACT_IMPLEMENTATION_BASE, path)
+            ):
                 raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
 
 
@@ -445,6 +511,8 @@ def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any], pac
         if packet == "contracts":
             _check_contract_packet(repo, envelope)
             protected.update(_CONTRACT_SOURCES.values())
+            protected.update(_CONTRACT_IMPORTS)
+            protected.add(CONTRACT_PREPARATION_ARTIFACT["path"])
             protected.add("docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE_CONTRACT_2026-09-14.json")
             if any(
                 not row["blind_review_artifact"]["path"].startswith("docs/r2/evidence/m10-contract-reviews/")

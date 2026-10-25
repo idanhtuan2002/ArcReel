@@ -338,13 +338,16 @@ bindings normalize to the documented stable key order.
 ### Exact master-ref mapping
 
 For each master: edge, decode parent and child artifact keys using the existing
-ArtifactKey decoder, require canonical encode/decode roundtrip, require both
-EPISODE_VIDEO and the same positive episode, then require:
+`r2.artifact_identity.decode_episode_video_key` helper, which requires the canonical
+`episode-video` wire kind and a positive integer episode. Require the same episode, then:
 
 ```text
+parent_episode, parent_resource = decode_episode_video_key(parent.artifact_key)
+child_episode, child_resource = decode_episode_video_key(child.artifact_key)
+parent_episode == child_episode
 shot_ref = dependency_ref with exactly one leading "master:" removed
 validate_m3_target_ref(shot_ref) succeeds
-child_artifact_key == ArtifactKey.episode_video(parent.episode_number, shot_ref).encode()
+child.artifact_key == episode_video_key(parent_episode, shot_ref)
 ```
 
 This is the pinned GoldenAHostIntegration.artifact_key_for/ApprovedMasterResolver
@@ -354,12 +357,16 @@ version and content digest coincide. Unknown master-ref identity families fail
 closed pending a separately reviewed extension. Non-master dependency owners
 remain bound snapshots and are not rewritten into these edges.
 
-A1 may import only the qualified pure ArtifactKey/ArtifactKind identity surface
-and validate_m3_target_ref leaf, not instantiate GoldenAHostIntegration or a
-manifest adapter. Importing a containing host module may load existing class
-definitions; it does not authorize invoking its filesystem/authority methods.
-A0 checks exact direct imports/calls and source pins, while review/side-effect
-tests inspect the allowed transitive module initialization.
+A1 imports identity helpers only from `r2.artifact_identity` and metadata models
+only from `r2.contracts.artifact_metadata`. It cannot import `lib.artifact_manifest`,
+`r2.m3.host_integration` or `r2.production.artifact_metadata`: their legacy package
+initialization reads environment configuration. It cannot instantiate a host or
+manifest adapter. The verified pure helpers share the existing codec/validators;
+legacy paths re-export those definitions, and metadata classes retain identity.
+A0 checks direct imports/calls and fixed source pins; cold-process tests cover
+actual transitive initialization. The observed 27-file project import closure is
+listed explicitly and dirty-protected, with project configuration and lockfile.
+No AST allowlist is a general Python sandbox.
 
 Before delegated host parsing, reject whitespace/control normalization in raw
 identity fields. Existing already validated host snapshots must themselves hold
@@ -400,3 +407,23 @@ foreign head's wire value in the binding. AssessedSubject.artifact_digest is the
 canonical prefixed digest and compares to the root through that normalization,
 not a string-format alias. Invalid opaque digest strings cannot form a valid
 internal subject merely because two strings happen to agree.
+
+## Verified maintenance base amendment
+
+The released ancestor remains `14565f9d8a181654be272267a097ddafe2c87c79` (V2.0.8).
+The derived local implementation base is `dda0f273e035615e1c10a67f8712279d23b7053c`,
+whose sole parent is verified source `a61b1a85d307d9a518bd5f09ff8ab6a92760b0a2`.
+Its exact source-compatibility evidence is pinned by path/hash in the packet.
+This local checkpoint is not another release and does not accept M10. The prior
+candidate `4987526405bd13cc83a950eac9db7a906276baea` failed the legacy import-purity
+review and is withdrawn, not retroactively accepted. The new candidate needs two
+fresh blind reviews on one exact HEAD.
+
+Bootstrap must retain the released M7/M8 and architecture evidence, prove the
+release-to-maintenance-to-design ancestry and the fixed preparation record's
+source parent, recompute its source hashes from the immutable maintenance tree,
+and pin the actual consumed pure source/configuration/import-closure bytes to
+that tree at candidate and live HEAD. The record explicitly grants no M10 or
+runtime activation. The exact nine-path implementation allowlist, migration
+singleton and original full-M10 gate are unchanged. Historical full-backend
+coverage is combined evidence with recorded skips, not a fabricated fresh suite.

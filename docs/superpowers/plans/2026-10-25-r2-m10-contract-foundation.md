@@ -58,3 +58,7 @@ Files: r2/contracts/quality.py, behavior-free r2/quality/__init__.py, r2/quality
 - [ ] Create only docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json after both tasks' tests/gates pass, with exact clean source HEAD/parent, acceptance ref, file hashes, commands/results, zero tests skipped and explicit no-runtime boundaries.
 - [ ] Run the scope guard against the committed candidate, independently review the bounded implementation and repair material findings with RED/GREEN before requesting its acceptance.
 - [ ] Do not start A2/A3, create a migration, qualify a factual/custodian adapter, mark M10-A complete or deploy from this packet. Those require the original next-packet gates or a separately reviewed amendment.
+
+## Pure dependency amendment before review
+
+Use the contract packet's fixed released ancestor and separately fixed verified local implementation base. Consume only r2/artifact_identity.py and r2/contracts/artifact_metadata.py for identity/metadata. Preserve raw codec wire bytes; safe master refs use the separate leaf validator. Bootstrap pins the exact preparation evidence, checks its source parent/hashes and the observed pure import closure, and protects all consumed source/config/lock paths against dirty/hidden changes. Re-run affected verifier tests with adversarial source/base/evidence/closure cases and both live refusal modes before freezing a new normal single-parent review candidate. No product file or acceptance is created by this amendment.

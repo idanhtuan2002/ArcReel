@@ -148,3 +148,7 @@ working-tree changes independently, including ignored owned files. Compare fresh
 HEAD with the pinned commit before and after verification; this is a point-in-time
 check, not a grant surviving subsequent source changes. Candidate changes are
 limited to the exact design-owned set, not all documents under docs/.
+
+## Bounded pure-source implementation base
+
+For the separately reviewed A0/A1 packet only, released V2.0.8 remains the release ancestor; verified local checkpoint dda0f273e035615e1c10a67f8712279d23b7053c is the derived implementation base. Import identity/target-ref leaves from r2.artifact_identity and metadata types from r2.contracts.artifact_metadata. Legacy host paths describe owner behavior only and must not be imported by pure contracts. The bounded packet's exact base/evidence/closure pins take precedence for this import boundary. Original operational predecessor, factual, custodian and full-M10 gates remain unqualified.

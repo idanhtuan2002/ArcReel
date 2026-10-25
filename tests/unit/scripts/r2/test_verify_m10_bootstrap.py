@@ -30,6 +30,7 @@ class MemoryRepository:
         self.head = ACCEPTANCE
         self.live_head = ACCEPTANCE
         self.blobs: dict[tuple[str, str], bytes] = {}
+        self.modes: dict[tuple[str, str], str] = {}
         self.parent_map = {ACCEPTANCE: (CANDIDATE,), CANDIDATE: (BASE,), BASE: (PARENT,), PARENT: ()}
         self.changed_paths: tuple[str, ...] = (ACCEPTANCE_PATH,)
         self.dirty_paths: tuple[str, ...] = ()
@@ -46,7 +47,7 @@ class MemoryRepository:
 
     def mode(self, ref: str, path: str) -> str:
         self.read(ref, path)
-        return "100644"
+        return self.modes.get((ref, path), "100644")
 
     def parents(self, ref: str) -> tuple[str, ...]:
         return self.parent_map[ref]
@@ -282,6 +283,8 @@ CONTRACT_SCHEMA = "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.sc
 CONTRACT_PACKET = "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json"
 CONTRACT_SPEC = "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md"
 RELEASE = "14565f9d8a181654be272267a097ddafe2c87c79"
+IMPLEMENTATION = "dda0f273e035615e1c10a67f8712279d23b7053c"
+PREPARATION_SOURCE = "a61b1a85d307d9a518bd5f09ff8ab6a92760b0a2"
 
 
 @pytest.fixture
@@ -290,7 +293,9 @@ def contract_fixture(fixture):
     source = Path(__file__).resolve().parents[4]
     schema = json.loads((source / CONTRACT_SCHEMA).read_text())
     definition = json.loads((source / CONTRACT_PACKET).read_text())
-    repo.parent_map[CANDIDATE] = (RELEASE,)
+    repo.parent_map[CANDIDATE] = (IMPLEMENTATION,)
+    repo.parent_map[IMPLEMENTATION] = (PREPARATION_SOURCE,)
+    repo.parent_map[PREPARATION_SOURCE] = (RELEASE,)
     repo.parent_map[RELEASE] = (BASE,)
     previous = BASE
     for row in definition["prerequisite_evidence"]:
@@ -311,8 +316,22 @@ def contract_fixture(fixture):
             row["acceptance_artifact"]["path"],
             (source / row["acceptance_artifact"]["path"]).read_bytes(),
         )
-    for path in [definition["architecture_contract"]["path"], *definition["source_reuse"].values()]:
-        for ref in [RELEASE, CANDIDATE, ACCEPTANCE]:
+    preparation_path = definition["preparation_verification"]["path"]
+    preparation = json.loads((source / preparation_path).read_text())
+    put(
+        repo,
+        RELEASE,
+        definition["architecture_contract"]["path"],
+        (source / definition["architecture_contract"]["path"]).read_bytes(),
+    )
+    for path in [
+        definition["architecture_contract"]["path"],
+        preparation_path,
+        *preparation["source_sha256"],
+        *definition["source_reuse"].values(),
+        *definition["import_closure"],
+    ]:
+        for ref in [IMPLEMENTATION, CANDIDATE, ACCEPTANCE]:
             put(repo, ref, path, (source / path).read_bytes())
     envelope.update(
         status="M10_CONTRACT_DESIGN_ACCEPTED",
@@ -321,11 +340,11 @@ def contract_fixture(fixture):
         implementation_scope="CONTRACTS_ONLY",
         full_m10_accepted=False,
         runtime_activation_authorized=False,
-        accepted_candidate_parent=RELEASE,
+        accepted_candidate_parent=IMPLEMENTATION,
         scope_allowlist=definition["scope_allowlist"],
         prerequisite_evidence=definition["prerequisite_evidence"],
     )
-    envelope["migration_boundary"].update(implementation_base_head=RELEASE, singleton_predecessor="918c4a0e0001")
+    envelope["migration_boundary"].update(implementation_base_head=IMPLEMENTATION, singleton_predecessor="918c4a0e0001")
     envelope["packet_definition"] = put(repo, CANDIDATE, CONTRACT_PACKET, (source / CONTRACT_PACKET).read_bytes())
     envelope["contract_paths_and_sha256"].append(
         put(repo, CANDIDATE, CONTRACT_SPEC, (source / CONTRACT_SPEC).read_bytes())
@@ -344,7 +363,7 @@ def contract_fixture(fixture):
             f"docs/r2/evidence/m10-contract-reviews/{row['reviewer_id']}.json",
             {k: v for k, v in row.items() if k != "blind_review_artifact"},
         )
-    for ref in [RELEASE, CANDIDATE, ACCEPTANCE]:
+    for ref in [RELEASE, IMPLEMENTATION, CANDIDATE, ACCEPTANCE]:
         repo.blobs[(ref, "alembic/versions/first.py")] = b'revision="918c4a0e0001"\ndown_revision=None\n'
     repo.changed_paths = (CONTRACT_ACCEPTANCE, *[row["blind_review_artifact"]["path"] for row in envelope["reviewers"]])
     return repo, envelope, schema
@@ -384,3 +403,49 @@ def test_contract_packet_definition_cannot_claim_runtime_authority(contract_fixt
     envelope["packet_definition"] = put(repo, CANDIDATE, CONTRACT_PACKET, definition)
     envelope["contract_paths_and_sha256"][-1] = envelope["packet_definition"]
     assert "M10_SCOPE_EXPANSION_REQUIRED" in run_contracts(contract_fixture)
+
+
+@pytest.mark.parametrize("field", ["implementation_base", "import_closure", "preparation_verification"])
+def test_contract_packet_cannot_repin_its_verified_preparation(contract_fixture, field: str) -> None:
+    repo, envelope, _ = contract_fixture
+    definition = load_json(repo.read(CANDIDATE, CONTRACT_PACKET))
+    definition[field] = [] if field == "import_closure" else "f" * 40
+    envelope["packet_definition"] = put(repo, CANDIDATE, CONTRACT_PACKET, definition)
+    envelope["contract_paths_and_sha256"][-1] = envelope["packet_definition"]
+    assert "M10_SCHEMA_FREEZE_FAILED" in run_contracts(contract_fixture)
+
+
+def test_contract_sources_cannot_change_a_transitive_pure_import(contract_fixture) -> None:
+    repo, _, _ = contract_fixture
+    put(repo, CANDIDATE, "r2/contracts/factual.py", b"changed")
+    assert "M10_SCHEMA_FREEZE_FAILED" in run_contracts(contract_fixture)
+
+
+def test_contract_preparation_cannot_lose_release_ancestry(contract_fixture) -> None:
+    repo, _, _ = contract_fixture
+    repo.parent_map[PREPARATION_SOURCE] = ()
+    assert "M10_PREREQUISITE_NOT_ACCEPTED" in run_contracts(contract_fixture)
+
+
+@pytest.mark.parametrize("path", ["r2/contracts/factual.py", "r2/artifact_identity.py", "uv.lock", "pyproject.toml"])
+def test_contract_closure_and_configuration_are_dirty_dependencies(contract_fixture, path: str) -> None:
+    contract_fixture[0].dirty_paths = (path,)
+    assert "M10_OWNED_PATH_DIRTY" in run_contracts(contract_fixture)
+
+
+def test_preparation_source_hashes_are_recomputed_from_the_base_tree(contract_fixture) -> None:
+    repo, _, _ = contract_fixture
+    put(repo, IMPLEMENTATION, "r2/artifact_identity.py", b"changed")
+    assert "M10_SCHEMA_FREEZE_FAILED" in run_contracts(contract_fixture)
+
+
+def test_preparation_evidence_cannot_change_at_the_candidate(contract_fixture) -> None:
+    repo, _, _ = contract_fixture
+    put(repo, CANDIDATE, "docs/r2/evidence/R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json", b"{}")
+    assert "M10_SCHEMA_FREEZE_FAILED" in run_contracts(contract_fixture)
+
+
+def test_contract_source_pin_includes_regular_file_mode(contract_fixture) -> None:
+    repo, _, _ = contract_fixture
+    repo.modes[(ACCEPTANCE, "r2/contracts/factual.py")] = "120000"
+    assert "M10_SCHEMA_FREEZE_FAILED" in run_contracts(contract_fixture)
