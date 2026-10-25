@@ -1,0 +1,71 @@
+{
+  "schema_version": "1",
+  "packet": "M10_A_A0_A1",
+  "status": "CONTRACT_PACKET_DEFINITION",
+  "release_base": "14565f9d8a181654be272267a097ddafe2c87c79",
+  "architecture_contract": {
+    "path": "docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE_CONTRACT_2026-09-14.json",
+    "sha256": "047551f6a198bb1a310292aec389d0c3828d997e220effcf7ac2c1c2f6369ea4"
+  },
+  "prerequisite_evidence": [
+    {
+      "owner": "M7",
+      "accepted_head": "b2816af45c9e81be76540ff03134c008ccdceafa",
+      "acceptance_artifact": {
+        "path": "docs/r2/evidence/R2_M7_IMPLEMENTATION_ACCEPTANCE.json",
+        "sha256": "4cfa038beda73708891b3f9995393bcb06a6d33152cb1b4ab61cbb0572e2345c"
+      }
+    },
+    {
+      "owner": "M8",
+      "accepted_head": "23cf146a61c3b7acfb78440d2b1498fd9d77db4b",
+      "acceptance_artifact": {
+        "path": "docs/r2/evidence/R2_M8_IMPLEMENTATION_ACCEPTANCE.json",
+        "sha256": "686f5250b13befb7ec3cbad9110407989eecd2b236a7f2030cd3a4a4ddcfcda2"
+      }
+    }
+  ],
+  "scope_allowlist": [
+    "docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json",
+    "r2/contracts/quality.py",
+    "r2/quality/__init__.py",
+    "r2/quality/digests.py",
+    "scripts/r2/verify_m10_scope.py",
+    "tests/integration/scripts/r2/test_verify_m10_scope.py",
+    "tests/unit/r2/contracts/test_quality.py",
+    "tests/unit/r2/quality/test_digests.py",
+    "tests/unit/scripts/r2/test_verify_m10_scope.py"
+  ],
+  "implementation_scope": "CONTRACTS_ONLY",
+  "full_m10_accepted": false,
+  "runtime_activation_authorized": false,
+  "m9_implementation_accepted": false,
+  "factual_runtime_qualified": false,
+  "custodian_runtime_qualified": false,
+  "migration_authorized": false,
+  "full_m10_gate_unchanged": true,
+  "deferred_to_original_packets": [
+    "A2 ports/parity",
+    "A3 persistence/profile publication",
+    "A4 probes",
+    "A5 currentness/run closure",
+    "A6 Human disposition",
+    "A7 operational parity/resources",
+    "M10-B packaging/export/pilots"
+  ],
+  "source_reuse": {
+    "canonical": "r2/advanced_creative/digests.py",
+    "immutable_json": "r2/contracts/advanced_creative.py",
+    "master_snapshot": "r2/contracts/host_hardening.py",
+    "metadata_validation": "r2/production/artifact_metadata.py"
+  },
+  "definition": "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md",
+  "sequencing_basis": {
+    "kind": "USER_PRIORITY_DIRECTIVE",
+    "instruction": "luu lai du lieu phan m9, lam m10 luon tren co so phien ban phat hanh V2",
+    "bounded_scope": "M10_A_A0_A1_ONLY",
+    "does_not_accept_design": true,
+    "does_not_waive_reviews": true
+  },
+  "plan": "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md"
+}

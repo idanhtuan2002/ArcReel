@@ -65,3 +65,13 @@ Files: `scripts/r2/verify_m10_bootstrap.py`, mirrored unit/integration tests, ac
 - [ ] Run read-only bootstrap from the committed entrypoint; only IMPLEMENTATION_ELIGIBLE releases original M10-A A0.
 
 D1 source/test refresh and D3 structural bootstrap tooling are complete as development work, not normative acceptance. D2 has concrete proposals but its contract/concurrency/qualification freeze remains incomplete; D4 remains incomplete. The next implementation task remains original A0 only after this design gate; M10-B is not released.
+
+
+## Bounded contract sequencing proposal
+
+The operational D2 prerequisites above are not constructor prerequisites. See
+2026-10-25-r2-m10-contract-foundation.md and its contract-packet spec/manifest.
+This proposed A0/A1-only ceremony requires two independent reviews and a distinct
+acceptance record; it cannot mark this full-M10 D4 complete or qualify any runtime
+adapter. The original four-owner/default bootstrap remains enforced. Do not
+implement the bounded product files before its separate envelope is accepted.

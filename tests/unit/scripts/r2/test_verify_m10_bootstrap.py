@@ -275,3 +275,112 @@ def test_head_moved_during_dirty_checks_is_refused(fixture, monkeypatch: pytest.
 
     monkeypatch.setattr(repo, "dirty", moved)
     assert "M10_SCHEMA_FREEZE_FAILED" in run(fixture)
+
+
+CONTRACT_ACCEPTANCE = "docs/r2/evidence/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.json"
+CONTRACT_SCHEMA = "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json"
+CONTRACT_PACKET = "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json"
+CONTRACT_SPEC = "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md"
+RELEASE = "14565f9d8a181654be272267a097ddafe2c87c79"
+
+
+@pytest.fixture
+def contract_fixture(fixture):
+    repo, envelope, _ = fixture
+    source = Path(__file__).resolve().parents[4]
+    schema = json.loads((source / CONTRACT_SCHEMA).read_text())
+    definition = json.loads((source / CONTRACT_PACKET).read_text())
+    repo.parent_map[CANDIDATE] = (RELEASE,)
+    repo.parent_map[RELEASE] = (BASE,)
+    previous = BASE
+    for row in definition["prerequisite_evidence"]:
+        body = json.loads((source / row["acceptance_artifact"]["path"]).read_text())
+        repo.parent_map[previous] = (row["accepted_head"],)
+        repo.parent_map[row["accepted_head"]] = (body["accepted_candidate_head"],)
+        repo.parent_map[body["accepted_candidate_head"]] = (PARENT,)
+        previous = body["accepted_candidate_head"]
+        put(
+            repo,
+            row["accepted_head"],
+            row["acceptance_artifact"]["path"],
+            (source / row["acceptance_artifact"]["path"]).read_bytes(),
+        )
+        put(
+            repo,
+            RELEASE,
+            row["acceptance_artifact"]["path"],
+            (source / row["acceptance_artifact"]["path"]).read_bytes(),
+        )
+    for path in [definition["architecture_contract"]["path"], *definition["source_reuse"].values()]:
+        for ref in [RELEASE, CANDIDATE, ACCEPTANCE]:
+            put(repo, ref, path, (source / path).read_bytes())
+    envelope.update(
+        status="M10_CONTRACT_DESIGN_ACCEPTED",
+        milestone="M10_A_A0_A1",
+        rubric_version="R2_M10_CONTRACT_REVIEW_V1",
+        implementation_scope="CONTRACTS_ONLY",
+        full_m10_accepted=False,
+        runtime_activation_authorized=False,
+        accepted_candidate_parent=RELEASE,
+        scope_allowlist=definition["scope_allowlist"],
+        prerequisite_evidence=definition["prerequisite_evidence"],
+    )
+    envelope["migration_boundary"].update(implementation_base_head=RELEASE, singleton_predecessor="918c4a0e0001")
+    envelope["packet_definition"] = put(repo, CANDIDATE, CONTRACT_PACKET, (source / CONTRACT_PACKET).read_bytes())
+    envelope["contract_paths_and_sha256"].append(
+        put(repo, CANDIDATE, CONTRACT_SPEC, (source / CONTRACT_SPEC).read_bytes())
+    )
+    plan = "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md"
+    envelope["contract_paths_and_sha256"].append(put(repo, CANDIDATE, plan, (source / plan).read_bytes()))
+    envelope["contract_paths_and_sha256"].append(envelope["packet_definition"])
+    envelope["evidence_schema_paths_and_sha256"].append(
+        put(repo, CANDIDATE, CONTRACT_SCHEMA, (source / CONTRACT_SCHEMA).read_bytes())
+    )
+    for row in envelope["reviewers"]:
+        row["rubric_version"] = "R2_M10_CONTRACT_REVIEW_V1"
+        row["blind_review_artifact"] = put(
+            repo,
+            ACCEPTANCE,
+            f"docs/r2/evidence/m10-contract-reviews/{row['reviewer_id']}.json",
+            {k: v for k, v in row.items() if k != "blind_review_artifact"},
+        )
+    for ref in [RELEASE, CANDIDATE, ACCEPTANCE]:
+        repo.blobs[(ref, "alembic/versions/first.py")] = b'revision="918c4a0e0001"\ndown_revision=None\n'
+    repo.changed_paths = (CONTRACT_ACCEPTANCE, *[row["blind_review_artifact"]["path"] for row in envelope["reviewers"]])
+    return repo, envelope, schema
+
+
+def run_contracts(fixture):
+    repo, envelope, schema = fixture
+    put(repo, ACCEPTANCE, CONTRACT_ACCEPTANCE, envelope)
+    return verify(repo, acceptance_ref=ACCEPTANCE, schema=schema, packet="contracts")
+
+
+def test_bounded_contract_packet_accepts_only_its_separate_qualified_envelope(contract_fixture) -> None:
+    assert run_contracts(contract_fixture) == ()
+
+
+def test_contract_mode_cannot_use_a_full_or_missing_acceptance_record(fixture) -> None:
+    repo, envelope, schema = fixture
+    put(repo, ACCEPTANCE, ACCEPTANCE_PATH, envelope)
+    assert verify(repo, acceptance_ref=ACCEPTANCE, schema=schema, packet="contracts") == ("M10_DESIGN_NOT_ACCEPTED",)
+
+
+def test_bounded_contract_acceptance_never_opens_full_m10(contract_fixture) -> None:
+    repo, envelope, schema = contract_fixture
+    put(repo, ACCEPTANCE, CONTRACT_ACCEPTANCE, envelope)
+    assert verify(repo, acceptance_ref=ACCEPTANCE, schema=schema) == ("M10_DESIGN_NOT_ACCEPTED",)
+
+
+def test_contract_scope_cannot_include_runtime_or_migration_files(contract_fixture) -> None:
+    contract_fixture[1]["scope_allowlist"].append("server/routers/quality.py")
+    assert "M10_SCOPE_EXPANSION_REQUIRED" in run_contracts(contract_fixture)
+
+
+def test_contract_packet_definition_cannot_claim_runtime_authority(contract_fixture) -> None:
+    repo, envelope, _ = contract_fixture
+    definition = load_json(repo.read(CANDIDATE, CONTRACT_PACKET))
+    definition["runtime_activation_authorized"] = True
+    envelope["packet_definition"] = put(repo, CANDIDATE, CONTRACT_PACKET, definition)
+    envelope["contract_paths_and_sha256"][-1] = envelope["packet_definition"]
+    assert "M10_SCOPE_EXPANSION_REQUIRED" in run_contracts(contract_fixture)

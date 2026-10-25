@@ -23,6 +23,36 @@ from jsonschema.exceptions import SchemaError
 ACCEPTANCE_PATH = "docs/r2/evidence/R2_M10_DESIGN_ACCEPTANCE.json"
 SCHEMA_PATH = "docs/r2/evidence/schemas/R2_M10_DESIGN_ACCEPTANCE.schema.json"
 VERIFIER_PATH = "scripts/r2/verify_m10_bootstrap.py"
+CONTRACT_ACCEPTANCE_PATH = "docs/r2/evidence/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.json"
+CONTRACT_SCHEMA_PATH = "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json"
+CONTRACT_PACKET_PATH = "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json"
+CONTRACT_SPEC_PATH = "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md"
+CONTRACT_PLAN_PATH = "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md"
+CONTRACT_RELEASE_BASE = "14565f9d8a181654be272267a097ddafe2c87c79"
+CONTRACT_SCOPE = frozenset(
+    {
+        "scripts/r2/verify_m10_scope.py",
+        "tests/unit/scripts/r2/test_verify_m10_scope.py",
+        "tests/integration/scripts/r2/test_verify_m10_scope.py",
+        "r2/contracts/quality.py",
+        "r2/quality/__init__.py",
+        "r2/quality/digests.py",
+        "tests/unit/r2/contracts/test_quality.py",
+        "tests/unit/r2/quality/test_digests.py",
+        "docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json",
+    }
+)
+_CONTRACT_PREDECESSORS = {
+    "M7": "b2816af45c9e81be76540ff03134c008ccdceafa",
+    "M8": "23cf146a61c3b7acfb78440d2b1498fd9d77db4b",
+}
+_CONTRACT_SOURCES = {
+    "canonical": "r2/advanced_creative/digests.py",
+    "immutable_json": "r2/contracts/advanced_creative.py",
+    "master_snapshot": "r2/contracts/host_hardening.py",
+    "metadata_validation": "r2/production/artifact_metadata.py",
+}
+
 TEST_PATHS = (
     "tests/unit/scripts/r2/test_verify_m10_bootstrap.py",
     "tests/integration/scripts/r2/test_verify_m10_bootstrap.py",
@@ -70,6 +100,14 @@ DESIGN_OWNED_PATHS = frozenset(
         "tests/unit/scripts/r2/test_verify_m10_bootstrap.py",
     )
 )
+
+DESIGN_OWNED_PATHS = DESIGN_OWNED_PATHS | {
+    "docs/r2/evidence/R2_M10_CONTRACT_DESIGN_CANDIDATE_2026-10-25.json",
+    CONTRACT_PACKET_PATH,
+    CONTRACT_SPEC_PATH,
+    CONTRACT_SCHEMA_PATH,
+    CONTRACT_PLAN_PATH,
+}
 
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _OWNERS = {"M7", "M8", "M9", "FACTUAL"}
@@ -164,7 +202,7 @@ def _bound(repo: Repository, ref: str, artifact: dict[str, Any], code: str) -> b
         raise BootstrapError(code) from exc
 
 
-def _check_artifacts(repo: Repository, envelope: dict[str, Any]) -> set[str]:
+def _check_artifacts(repo: Repository, envelope: dict[str, Any], *, packet: str = "full") -> set[str]:
     candidate = envelope["accepted_design_head"]
     bootstrap = envelope["bootstrap"]
     groups = (
@@ -180,7 +218,10 @@ def _check_artifacts(repo: Repository, envelope: dict[str, Any]) -> set[str]:
                 raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
             seen.add(artifact["path"])
             _bound(repo, candidate, artifact, "M10_SCHEMA_FREEZE_FAILED")
-    if not {*REQUIRED_DESIGN_PATHS, SCHEMA_PATH, VERIFIER_PATH, *TEST_PATHS} <= seen:
+    required = {*REQUIRED_DESIGN_PATHS, SCHEMA_PATH, VERIFIER_PATH, *TEST_PATHS}
+    if packet == "contracts":
+        required.update({CONTRACT_SCHEMA_PATH, CONTRACT_PACKET_PATH, CONTRACT_SPEC_PATH, CONTRACT_PLAN_PATH})
+    if not required <= seen:
         raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
     if bootstrap["verifier"]["path"] != VERIFIER_PATH or {r["path"] for r in bootstrap["tests"]} != set(TEST_PATHS):
         raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
@@ -209,9 +250,9 @@ def _check_reviews(repo: Repository, ref: str, envelope: dict[str, Any]) -> None
             raise BootstrapError("M10_REVIEW_INDEPENDENCE_FAILED")
 
 
-def _check_prerequisites(repo: Repository, envelope: dict[str, Any]) -> None:
+def _check_prerequisites(repo: Repository, envelope: dict[str, Any], *, owners: set[str] = _OWNERS) -> None:
     rows = envelope["prerequisite_evidence"]
-    if len(rows) != 4 or {row["owner"] for row in rows} != _OWNERS:
+    if len(rows) != len(owners) or {row["owner"] for row in rows} != owners:
         raise BootstrapError("M10_PREREQUISITE_NOT_ACCEPTED")
     base = envelope["migration_boundary"]["implementation_base_head"]
     for row in rows:
@@ -224,6 +265,69 @@ def _check_prerequisites(repo: Repository, envelope: dict[str, Any]) -> None:
         candidate = body.get("accepted_candidate_head", "")
         if not _SHA.fullmatch(candidate) or repo.parents(ref) != (candidate,):
             raise BootstrapError("M10_PREREQUISITE_NOT_ACCEPTED")
+
+
+def _check_contract_packet(repo: Repository, envelope: dict[str, Any]) -> None:
+    artifact = envelope["packet_definition"]
+    if artifact["path"] != CONTRACT_PACKET_PATH:
+        raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
+    definition = load_json(_bound(repo, envelope["accepted_design_head"], artifact, "M10_SCHEMA_FREEZE_FAILED"))
+    flags = (
+        "full_m10_accepted",
+        "runtime_activation_authorized",
+        "m9_implementation_accepted",
+        "factual_runtime_qualified",
+        "custodian_runtime_qualified",
+        "migration_authorized",
+    )
+    if (
+        definition.get("packet") != "M10_A_A0_A1"
+        or definition.get("status") != "CONTRACT_PACKET_DEFINITION"
+        or definition.get("release_base") != CONTRACT_RELEASE_BASE
+        or definition.get("implementation_scope") != "CONTRACTS_ONLY"
+        or definition.get("full_m10_gate_unchanged") is not True
+        or any(definition.get(flag) is not False for flag in flags)
+    ):
+        raise BootstrapError("M10_SCOPE_EXPANSION_REQUIRED")
+    if (
+        definition.get("scope_allowlist") != sorted(CONTRACT_SCOPE)
+        or envelope["scope_allowlist"] != sorted(CONTRACT_SCOPE)
+        or envelope.get("implementation_scope") != "CONTRACTS_ONLY"
+        or envelope.get("full_m10_accepted") is not False
+        or envelope.get("runtime_activation_authorized") is not False
+    ):
+        raise BootstrapError("M10_SCOPE_EXPANSION_REQUIRED")
+    boundary = envelope["migration_boundary"]
+    if (
+        boundary["implementation_base_head"] != CONTRACT_RELEASE_BASE
+        or boundary["singleton_predecessor"] != "918c4a0e0001"
+    ):
+        raise BootstrapError("M10_PREREQUISITE_NOT_ACCEPTED")
+    expected_rows = []
+    for owner, ref in _CONTRACT_PREDECESSORS.items():
+        path = f"docs/r2/evidence/R2_{owner}_IMPLEMENTATION_ACCEPTANCE.json"
+        data = repo.read(CONTRACT_RELEASE_BASE, path)
+        expected_rows.append(
+            {
+                "owner": owner,
+                "accepted_head": ref,
+                "acceptance_artifact": {"path": path, "sha256": hashlib.sha256(data).hexdigest()},
+            }
+        )
+    if definition.get("prerequisite_evidence") != expected_rows or envelope["prerequisite_evidence"] != expected_rows:
+        raise BootstrapError("M10_PREREQUISITE_NOT_ACCEPTED")
+    architecture = definition["architecture_contract"]
+    if architecture["path"] != "docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE_CONTRACT_2026-09-14.json":
+        raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
+    base_contract = _bound(repo, CONTRACT_RELEASE_BASE, architecture, "M10_SCHEMA_FREEZE_FAILED")
+    if definition.get("source_reuse") != _CONTRACT_SOURCES:
+        raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
+    for ref in (envelope["accepted_design_head"], repo.head):
+        if repo.read(ref, architecture["path"]) != base_contract:
+            raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
+        for path in _CONTRACT_SOURCES.values():
+            if repo.read(ref, path) != repo.read(CONTRACT_RELEASE_BASE, path):
+                raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
 
 
 def _migration_graph(repo: Repository, ref: str) -> dict[str, str | None]:
@@ -267,16 +371,20 @@ def _migration_graph(repo: Repository, ref: str) -> dict[str, str | None]:
     return graph
 
 
-def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any]) -> tuple[str, ...]:
+def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any], packet: str = "full") -> tuple[str, ...]:
     """Return sanitized refusal codes; a synthetic fixture pass is not real acceptance."""
     try:
+        if packet not in {"full", "contracts"}:
+            raise BootstrapError("M10_SCOPE_EXPANSION_REQUIRED")
+        acceptance_path = CONTRACT_ACCEPTANCE_PATH if packet == "contracts" else ACCEPTANCE_PATH
+        schema_path = CONTRACT_SCHEMA_PATH if packet == "contracts" else SCHEMA_PATH
         if repo.current_head() != repo.head:
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         try:
-            raw = repo.read(acceptance_ref, ACCEPTANCE_PATH)
+            raw = repo.read(acceptance_ref, acceptance_path)
         except BootstrapError:
             return ("M10_DESIGN_NOT_ACCEPTED",)
-        if repo.mode(acceptance_ref, ACCEPTANCE_PATH) != "100644":
+        if repo.mode(acceptance_ref, acceptance_path) != "100644":
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         envelope = load_json(raw)
         pending: list[Any] = [schema]
@@ -291,6 +399,9 @@ def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any]) -> 
         Draft202012Validator.check_schema(schema)
         if not Draft202012Validator(schema, format_checker=FormatChecker()).is_valid(envelope):
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
+        expected_status = "M10_CONTRACT_DESIGN_ACCEPTED" if packet == "contracts" else "M10_DESIGN_ACCEPTED"
+        if envelope["status"] != expected_status:
+            raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         candidate = envelope["accepted_design_head"]
         if (
             repo.parents(acceptance_ref) != (candidate,)
@@ -304,21 +415,30 @@ def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any]) -> 
         changed_candidate = set(repo.changed(envelope["migration_boundary"]["implementation_base_head"], candidate))
         if not changed_candidate <= DESIGN_OWNED_PATHS:
             raise BootstrapError("M10_SCOPE_EXPANSION_REQUIRED")
-        protected = _check_artifacts(repo, envelope)
-        if load_json(repo.read(candidate, SCHEMA_PATH)) != schema:
+        protected = _check_artifacts(repo, envelope, packet=packet)
+        if load_json(repo.read(candidate, schema_path)) != schema:
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         _check_reviews(repo, acceptance_ref, envelope)
-        allowed_acceptance = {ACCEPTANCE_PATH, ADR_PATH} | {
-            r["blind_review_artifact"]["path"] for r in envelope["reviewers"]
-        }
+        allowed_acceptance = (
+            {acceptance_path}
+            | ({ADR_PATH} if packet == "full" else set())
+            | {r["blind_review_artifact"]["path"] for r in envelope["reviewers"]}
+        )
         changed = set(repo.changed(candidate, acceptance_ref))
-        if ACCEPTANCE_PATH not in changed or not changed <= allowed_acceptance:
+        if acceptance_path not in changed or not changed <= allowed_acceptance:
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         if ADR_PATH in changed and repo.read(acceptance_ref, ADR_PATH) != repo.read(candidate, ADR_PATH).replace(
             b"status: proposed", b"status: accepted", 1
         ):
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
-        _check_prerequisites(repo, envelope)
+        if packet == "contracts":
+            _check_contract_packet(repo, envelope)
+            if any(
+                not row["blind_review_artifact"]["path"].startswith("docs/r2/evidence/m10-contract-reviews/")
+                for row in envelope["reviewers"]
+            ):
+                raise BootstrapError("M10_REVIEW_INDEPENDENCE_FAILED")
+        _check_prerequisites(repo, envelope, owners=set(_CONTRACT_PREDECESSORS) if packet == "contracts" else _OWNERS)
         expected = envelope["migration_boundary"]["singleton_predecessor"]
         base_graph = _migration_graph(repo, envelope["migration_boundary"]["implementation_base_head"])
         for ref in (candidate, acceptance_ref, repo.head):
@@ -451,22 +571,32 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--acceptance-ref")
+    parser.add_argument("--packet", choices=("full", "contracts"), default="full")
     parser.add_argument("--preflight", action="store_true", help="verify eligibility without repository writes")
     args = parser.parse_args()
     try:
         repo = GitRepository(args.repo.resolve())
         ref = args.acceptance_ref or repo.head
-        schema = load_json(repo.read(repo.head, SCHEMA_PATH))
-        problems = verify(repo, acceptance_ref=ref, schema=schema)
+        acceptance_path = CONTRACT_ACCEPTANCE_PATH if args.packet == "contracts" else ACCEPTANCE_PATH
+        schema_path = CONTRACT_SCHEMA_PATH if args.packet == "contracts" else SCHEMA_PATH
+        schema = load_json(repo.read(repo.head, schema_path))
+        problems = verify(repo, acceptance_ref=ref, schema=schema, packet=args.packet)
         if not problems:
-            envelope = load_json(repo.read(ref, ACCEPTANCE_PATH))
+            envelope = load_json(repo.read(ref, acceptance_path))
             if repo.read(envelope["accepted_design_head"], VERIFIER_PATH) != Path(__file__).read_bytes():
                 problems = ("M10_SCHEMA_FREEZE_FAILED",)
         result = {
-            "status": "REFUSED" if problems else "IMPLEMENTATION_ELIGIBLE",
+            "status": "REFUSED"
+            if problems
+            else "CONTRACT_IMPLEMENTATION_ELIGIBLE"
+            if args.packet == "contracts"
+            else "IMPLEMENTATION_ELIGIBLE",
+            "packet": args.packet,
             "head": repo.head,
             "stop_codes": list(problems),
         }
+        if not problems and args.packet == "contracts":
+            result["scope_allowlist"] = sorted(CONTRACT_SCOPE)
     except (BootstrapError, OSError) as exc:
         result = {
             "status": "REFUSED",

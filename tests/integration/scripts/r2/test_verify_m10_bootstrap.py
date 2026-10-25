@@ -234,3 +234,101 @@ def test_a_commit_after_repository_capture_cannot_get_stale_eligibility(accepted
     schema = load_json((repo / SCHEMA_PATH).read_bytes())
     assert verify(view, acceptance_ref=acceptance, schema=schema) == ("M10_SCHEMA_FREEZE_FAILED",)
     assert snapshot(repo) == before
+
+
+def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_path: Path) -> None:
+    from scripts.r2.verify_m10_bootstrap import (
+        CONTRACT_ACCEPTANCE_PATH,
+        CONTRACT_PACKET_PATH,
+        CONTRACT_PLAN_PATH,
+        CONTRACT_RELEASE_BASE,
+        CONTRACT_SCHEMA_PATH,
+        CONTRACT_SPEC_PATH,
+    )
+
+    repo = tmp_path / "contract-repo"
+    subprocess.run(
+        ["git", "clone", "--shared", "--no-checkout", "--quiet", str(SOURCE), str(repo)],
+        check=True,
+        capture_output=True,
+    )
+    git(repo, "checkout", "--detach", "-q", CONTRACT_RELEASE_BASE)
+    git(repo, "config", "user.name", "Fixture")
+    git(repo, "config", "user.email", "fixture@example.invalid")
+    extras = [CONTRACT_PACKET_PATH, CONTRACT_SPEC_PATH, CONTRACT_SCHEMA_PATH, CONTRACT_PLAN_PATH]
+    for path in [*REQUIRED_DESIGN_PATHS, SCHEMA_PATH, VERIFIER_PATH, *TEST_PATHS, *extras]:
+        write(repo, path, (SOURCE / path).read_bytes())
+    candidate = commit(repo)
+    arguments = [
+        sys.executable,
+        str(SOURCE / VERIFIER_PATH),
+        "--repo",
+        str(repo),
+        "--packet",
+        "contracts",
+        "--preflight",
+    ]
+    environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    missing = subprocess.run(arguments, capture_output=True, text=True, env=environment, timeout=30)
+    assert missing.returncode == 2
+    assert json.loads(missing.stdout)["stop_codes"] == ["M10_DESIGN_NOT_ACCEPTED"]
+    definition = json.loads((repo / CONTRACT_PACKET_PATH).read_text())
+    reviewers = []
+    for identity in ["synthetic-one", "synthetic-two"]:
+        row = {
+            "reviewer_id": identity,
+            "qualification_evidence": "synthetic fixture, no real acceptance",
+            "conflict_declaration": "NO_CONFLICT",
+            "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+            "reviewed_candidate_head": candidate,
+            "verdict": "PASS",
+            "reviewed_at": "2026-10-25T00:00:00Z",
+        }
+        reviewers.append(
+            {**row, "blind_review_artifact": write(repo, f"docs/r2/evidence/m10-contract-reviews/{identity}.json", row)}
+        )
+
+    def bound(path: str) -> dict[str, str]:
+        return {"path": path, "sha256": hashlib.sha256((repo / path).read_bytes()).hexdigest()}
+
+    envelope = {
+        "schema_version": "1",
+        "status": "M10_CONTRACT_DESIGN_ACCEPTED",
+        "milestone": "M10_A_A0_A1",
+        "accepted_design_head": candidate,
+        "accepted_candidate_parent": CONTRACT_RELEASE_BASE,
+        "author_id": "fixture-author",
+        "contract_paths_and_sha256": [
+            bound(p) for p in [*REQUIRED_DESIGN_PATHS, CONTRACT_SPEC_PATH, CONTRACT_PACKET_PATH, CONTRACT_PLAN_PATH]
+        ],
+        "evidence_schema_paths_and_sha256": [bound(SCHEMA_PATH), bound(CONTRACT_SCHEMA_PATH)],
+        "bootstrap": {"verifier": bound(VERIFIER_PATH), "tests": [bound(p) for p in TEST_PATHS]},
+        "migration_boundary": {
+            "implementation_base_head": CONTRACT_RELEASE_BASE,
+            "singleton_predecessor": "918c4a0e0001",
+            "production_migration_authorized": False,
+        },
+        "prerequisite_evidence": definition["prerequisite_evidence"],
+        "scope_allowlist": definition["scope_allowlist"],
+        "stop_codes": sorted(STOP_CODES),
+        "reviewers": reviewers,
+        "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+        "reviewed_at": "2026-10-25T01:00:00Z",
+        "required_skips": [],
+        "material_unknowns": [],
+        "packet_definition": bound(CONTRACT_PACKET_PATH),
+        "implementation_scope": "CONTRACTS_ONLY",
+        "full_m10_accepted": False,
+        "runtime_activation_authorized": False,
+    }
+    write(repo, CONTRACT_ACCEPTANCE_PATH, envelope)
+    commit(repo)
+    before = snapshot(repo)
+    result = subprocess.run(arguments, capture_output=True, text=True, env=environment, timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout)["status"] == "CONTRACT_IMPLEMENTATION_ELIGIBLE"
+    assert json.loads(result.stdout)["scope_allowlist"] == definition["scope_allowlist"]
+    full = invoke(repo, SOURCE / VERIFIER_PATH)
+    assert full.returncode == 2
+    assert json.loads(full.stdout)["stop_codes"] == ["M10_DESIGN_NOT_ACCEPTED"]
+    assert snapshot(repo) == before
