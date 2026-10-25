@@ -10,6 +10,7 @@ import argparse
 import ast
 import hashlib
 import json
+import os
 import re
 import subprocess
 from datetime import datetime, timedelta
@@ -38,6 +39,38 @@ REQUIRED_DESIGN_PATHS = (
     "docs/r2/evidence/R2_M10_MASTER_BINDING_VECTORS.json",
     "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md",
 )
+DESIGN_OWNED_PATHS = frozenset(
+    (
+        "docs/adr/0082-m10-quality-evidence-and-export-packaging.md",
+        "docs/r2/evidence/R2_M10_BOOTSTRAP_CANDIDATE_2026-10-25.json",
+        "docs/r2/evidence/R2_M10_BOOTSTRAP_REVIEW_2026-10-25.md",
+        "docs/r2/evidence/R2_M10_MASTER_BINDING_VECTORS.json",
+        "docs/r2/evidence/R2_M10_PAUSE_HANDOFF_2026-10-23.md",
+        "docs/r2/evidence/R2_M10_RESEARCH_AUDIT_2026-10-23.json",
+        "docs/r2/evidence/R2_M10_RESUME_2026-10-25.json",
+        "docs/r2/evidence/R2_M10_RESUME_REVIEW_2026-10-25.md",
+        "docs/r2/evidence/R2_M10_V2_RESEARCH_2026-10-23.json",
+        "docs/r2/evidence/R2_M10_V2_START_2026-10-23.json",
+        "docs/r2/evidence/R2_V2_0_8_PRODUCTION_DEPLOYMENT.json",
+        "docs/r2/evidence/schemas/R2_M10_DESIGN_ACCEPTANCE.schema.json",
+        "docs/research/2026-09-16-r2-m10-quality-evidence-packaging.md",
+        "docs/research/2026-10-23-r2-m10-research-decision-donor-audit.md",
+        "docs/research/2026-10-23-r2-m10-v2-quality-packaging-seams.md",
+        "docs/research/2026-10-23-r2-m10-v2-reuse-inventory.md",
+        "docs/research/2026-10-23-r2-m10-v2-start.md",
+        "docs/superpowers/plans/2026-09-16-r2-m10-quality-packaging.md",
+        "docs/superpowers/plans/2026-09-16-r2-m10a-quality-evidence-foundation.md",
+        "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md",
+        "docs/superpowers/specs/2026-09-16-r2-m10-quality-packaging-design.md",
+        "docs/superpowers/specs/2026-10-23-r2-m10-quality-packaging-design.md",
+        "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md",
+        "docs/superpowers/specs/2026-10-25-r2-m10-v2-rebase.md",
+        "scripts/r2/verify_m10_bootstrap.py",
+        "tests/integration/scripts/r2/test_verify_m10_bootstrap.py",
+        "tests/unit/scripts/r2/test_verify_m10_bootstrap.py",
+    )
+)
+
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _OWNERS = {"M7", "M8", "M9", "FACTUAL"}
 STOP_CODES = frozenset(
@@ -60,6 +93,8 @@ class BootstrapError(ValueError):
 
 class Repository(Protocol):
     head: str
+
+    def current_head(self) -> str: ...
 
     def read(self, ref: str, path: str) -> bytes: ...
     def mode(self, ref: str, path: str) -> str: ...
@@ -235,6 +270,8 @@ def _migration_graph(repo: Repository, ref: str) -> dict[str, str | None]:
 def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any]) -> tuple[str, ...]:
     """Return sanitized refusal codes; a synthetic fixture pass is not real acceptance."""
     try:
+        if repo.current_head() != repo.head:
+            raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         try:
             raw = repo.read(acceptance_ref, ACCEPTANCE_PATH)
         except BootstrapError:
@@ -264,11 +301,8 @@ def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any]) -> 
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         if not set(envelope["stop_codes"]) >= STOP_CODES:
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
-        design_paths = {VERIFIER_PATH, *TEST_PATHS}
-        if any(
-            not p.startswith("docs/") and p not in design_paths
-            for p in repo.changed(envelope["migration_boundary"]["implementation_base_head"], candidate)
-        ):
+        changed_candidate = set(repo.changed(envelope["migration_boundary"]["implementation_base_head"], candidate))
+        if not changed_candidate <= DESIGN_OWNED_PATHS:
             raise BootstrapError("M10_SCOPE_EXPANSION_REQUIRED")
         protected = _check_artifacts(repo, envelope)
         if load_json(repo.read(candidate, SCHEMA_PATH)) != schema:
@@ -301,6 +335,8 @@ def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any]) -> 
             raise BootstrapError("M10_OWNED_PATH_DIRTY")
         if not set(repo.changed(acceptance_ref, repo.head)) <= scope:
             raise BootstrapError("M10_SCOPE_EXPANSION_REQUIRED")
+        if repo.current_head() != repo.head:
+            raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
         return ()
     except BootstrapError as exc:
         return (str(exc),)
@@ -310,10 +346,23 @@ def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any]) -> 
 
 class GitRepository:
     def __init__(self, root: Path) -> None:
-        self.root = root
-        self.head = self._git("rev-parse", "--verify", "HEAD^{commit}").decode().strip()
+        self.root = root.resolve()
+        self.root = Path(self._git("rev-parse", "--show-toplevel").decode().strip())
+        self.head = self.current_head()
+
+    def current_head(self) -> str:
+        return self._git("rev-parse", "--verify", "HEAD^{commit}").decode().strip()
 
     def _git(self, *args: str) -> bytes:
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        environment.update(
+            {
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_GRAFT_FILE": os.devnull,
+                "GIT_NO_LAZY_FETCH": "1",
+            }
+        )
         try:
             return subprocess.run(
                 [
@@ -323,9 +372,16 @@ class GitRepository:
                     "--literal-pathspecs",
                     "-c",
                     "core.fsmonitor=false",
+                    "-c",
+                    "core.untrackedCache=false",
+                    "-c",
+                    "core.hooksPath=" + os.devnull,
+                    "-c",
+                    "protocol.allow=never",
                     *args,
                 ],
                 cwd=self.root,
+                env=environment,
                 capture_output=True,
                 check=True,
                 timeout=15,
@@ -368,7 +424,18 @@ class GitRepository:
 
     def dirty(self, protected: set[str]) -> tuple[str, ...]:
         data = (
-            self._git("diff", "--no-ext-diff", "--no-textconv", "--name-only", "--no-renames", "-z", "HEAD", "--")
+            self._git(
+                "diff",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--name-only",
+                "--no-renames",
+                "--cached",
+                "-z",
+                self.head,
+                "--",
+            )
+            + self._git("diff", "--no-ext-diff", "--no-textconv", "--name-only", "--no-renames", "-z", "--")
             + self._git("ls-files", "--others", "--exclude-standard", "-z")
             + self._git("ls-files", "--others", "-z", "--", *sorted(protected))
         )

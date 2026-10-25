@@ -19,6 +19,9 @@ from scripts.r2.verify_m10_bootstrap import (
     STOP_CODES,
     TEST_PATHS,
     VERIFIER_PATH,
+    GitRepository,
+    load_json,
+    verify,
 )
 
 SOURCE = Path(__file__).resolve().parents[4]
@@ -156,6 +159,7 @@ def test_exact_source_extracted_from_git_is_read_only_and_does_not_import_migrat
         "unaccepted_m9",
         "dirty_owned",
         "dirty_bound",
+        "staged_bound",
         "dirty_migration",
         "ignored_owned",
         "two_heads",
@@ -182,6 +186,11 @@ def test_refusals_never_write_repository_files(accepted_repo, case: str) -> None
         write(repo, "r2/contracts/quality.py", b"uncommitted")
     elif case == "dirty_bound":
         (repo / VERIFIER_PATH).write_text("uncommitted")
+    elif case == "staged_bound":
+        original = (repo / VERIFIER_PATH).read_bytes()
+        write(repo, VERIFIER_PATH, b"staged tamper")
+        git(repo, "add", VERIFIER_PATH)
+        (repo / VERIFIER_PATH).write_bytes(original)
     elif case == "dirty_migration":
         write(repo, "alembic/versions/new.py", b'revision="new"\ndown_revision="first"\n')
     elif case == "ignored_owned":
@@ -191,7 +200,7 @@ def test_refusals_never_write_repository_files(accepted_repo, case: str) -> None
         write(repo, "alembic/versions/second.py", b'revision="second"\ndown_revision=None\n')
     if case in {"wrong_parent", "same_reviewer", "wrong_hash", "naive_time", "unaccepted_m9"}:
         write(repo, ACCEPTANCE_PATH, envelope)
-    if case not in {"dirty_owned", "dirty_bound", "dirty_migration", "ignored_owned"}:
+    if case not in {"dirty_owned", "dirty_bound", "staged_bound", "dirty_migration", "ignored_owned"}:
         git(repo, "reset", "--soft", candidate)
         commit(repo)
     before = snapshot(repo)
@@ -199,4 +208,29 @@ def test_refusals_never_write_repository_files(accepted_repo, case: str) -> None
     assert result.returncode == 2, result.stdout + result.stderr
     assert json.loads(result.stdout)["status"] == "REFUSED"
     assert "Traceback" not in result.stderr
+    assert snapshot(repo) == before
+
+
+def test_inherited_git_environment_cannot_redirect_the_requested_repo(
+    accepted_repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _, _ = accepted_repo
+    other = tmp_path / "other"
+    other.mkdir()
+    git(other, "init", "-q")
+    git(other, "config", "user.name", "Fixture")
+    git(other, "config", "user.email", "fixture@example.invalid")
+    expected = commit(other)
+    monkeypatch.setenv("GIT_DIR", str(repo / ".git"))
+    assert GitRepository(other).head == expected
+
+
+def test_a_commit_after_repository_capture_cannot_get_stale_eligibility(accepted_repo) -> None:
+    repo, _, acceptance = accepted_repo
+    view = GitRepository(repo)
+    write(repo, "server/app.py", b"outside scope")
+    commit(repo)
+    before = snapshot(repo)
+    schema = load_json((repo / SCHEMA_PATH).read_bytes())
+    assert verify(view, acceptance_ref=acceptance, schema=schema) == ("M10_SCHEMA_FREEZE_FAILED",)
     assert snapshot(repo) == before

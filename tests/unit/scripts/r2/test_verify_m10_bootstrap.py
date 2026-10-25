@@ -28,11 +28,15 @@ BASE, CANDIDATE, ACCEPTANCE, PARENT = (c * 40 for c in "1234")
 class MemoryRepository:
     def __init__(self) -> None:
         self.head = ACCEPTANCE
+        self.live_head = ACCEPTANCE
         self.blobs: dict[tuple[str, str], bytes] = {}
         self.parent_map = {ACCEPTANCE: (CANDIDATE,), CANDIDATE: (BASE,), BASE: (PARENT,), PARENT: ()}
         self.changed_paths: tuple[str, ...] = (ACCEPTANCE_PATH,)
         self.dirty_paths: tuple[str, ...] = ()
         self.candidate_changes: tuple[str, ...] = ()
+
+    def current_head(self) -> str:
+        return self.live_head
 
     def read(self, ref: str, path: str) -> bytes:
         try:
@@ -250,3 +254,24 @@ def test_schema_cannot_load_remote_references(fixture, monkeypatch: pytest.Monke
     monkeypatch.setattr("urllib.request.urlopen", forbidden)
     fixture[2]["$ref"] = "https://fixture.invalid/schema.json"
     assert run(fixture) == ("M10_SCHEMA_FREEZE_FAILED",)
+
+
+def test_unrelated_documentation_is_outside_design_candidate_scope(fixture) -> None:
+    fixture[0].candidate_changes = ("docs/r2/evidence/UNRELATED_ACCEPTANCE.json",)
+    assert "M10_SCOPE_EXPANSION_REQUIRED" in run(fixture)
+
+
+def test_head_moved_before_verification_is_not_attested_as_the_old_head(fixture) -> None:
+    fixture[0].live_head = BASE
+    assert "M10_SCHEMA_FREEZE_FAILED" in run(fixture)
+
+
+def test_head_moved_during_dirty_checks_is_refused(fixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = fixture[0]
+
+    def moved(protected: set[str]) -> tuple[str, ...]:
+        repo.live_head = BASE
+        return ()
+
+    monkeypatch.setattr(repo, "dirty", moved)
+    assert "M10_SCHEMA_FREEZE_FAILED" in run(fixture)

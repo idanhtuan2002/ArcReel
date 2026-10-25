@@ -54,8 +54,8 @@ Files: `scripts/r2/verify_m10_bootstrap.py`, mirrored unit/integration tests, ac
 - [x] RED observed: module absent initially; subsequent regression cases expose ignored owned/uncommitted migration omissions, candidate-scope/stop-code omissions and schema remote resolution. Other listed refusal cases covered by focused tests.
 - [x] Implement structural Git-object envelope, artifact/parent/review/prerequisite/schema/graph checks. No candidate imports, migration execution, external schema references, diff drivers or repository writes.
 - [x] GREEN: complete synthetic closure accepted; invalid closure refused. Qualification/independence/blindness declarations still require substantive review; fixture success grants no real acceptance.
-- [x] Integration: before/after complete repository snapshots on every refusal; exact source extracted from Git object;88 affected tests pass, Ruff/type checks/import contracts/dependency check/test audit pass. See bootstrap candidate evidence for exact scope/results.
-- [ ] Bind verifier/test/schema/source hashes to one clean design candidate.
+- [x] Integration: before/after complete repository snapshots on every refusal; exact source extracted from Git object;94 affected tests pass, Ruff/type checks/import contracts/dependency check/test audit pass. See bootstrap candidate evidence for exact scope/results.
+- [x] Bind source/test/schema hashes in R2_M10_BOOTSTRAP_CANDIDATE_2026-10-25.json. Bounded code review found4 defects; all repaired in one RED/GREEN pass. This does not freeze/accept the design.
 
 ## Task D4: Normative freeze
 
@@ -64,4 +64,4 @@ Files: `scripts/r2/verify_m10_bootstrap.py`, mirrored unit/integration tests, ac
 - [ ] Separate custodian acceptance commit binds hashes, exact reviewed HEAD, review records, empty required skips/material unknowns and eligible prerequisite chain.
 - [ ] Run read-only bootstrap from the committed entrypoint; only IMPLEMENTATION_ELIGIBLE releases original M10-A A0.
 
-D1 source/test refresh is complete. D2-D4 are not complete. The next implementation task remains original A0 only after this design gate; M10-B is not released.
+D1 source/test refresh and D3 structural bootstrap tooling are complete as development work, not normative acceptance. D2 has concrete proposals but its contract/concurrency/qualification freeze remains incomplete; D4 remains incomplete. The next implementation task remains original A0 only after this design gate; M10-B is not released.

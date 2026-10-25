@@ -141,3 +141,10 @@ proposed domain and exact existing canonical source. They test byte sensitivity,
 not production schema validity, identity mismatch refusal or transaction safety.
 These latter proofs remain required before the corresponding A implementation
 can be accepted.
+
+Bootstrap repair constraints: Git commands ignore inherited Git-selection/config
+variables and disable graft/lazy-fetch/protocol resolution. Detect staged and
+working-tree changes independently, including ignored owned files. Compare fresh
+HEAD with the pinned commit before and after verification; this is a point-in-time
+check, not a grant surviving subsequent source changes. Candidate changes are
+limited to the exact design-owned set, not all documents under docs/.
