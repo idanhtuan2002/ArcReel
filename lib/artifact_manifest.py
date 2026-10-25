@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import binascii
 import contextlib
 import ctypes
 import ctypes.wintypes as wintypes
@@ -23,7 +21,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import NamedTuple, Protocol, Self, cast
+from typing import Protocol, Self, cast
 
 import portalocker
 
@@ -37,6 +35,16 @@ from lib.content_digest import (
     prefixed,
 )
 from lib.schema_guards import is_str
+from r2.artifact_identity import (
+    _KEY_PREFIX,
+    _episode_number,
+    _non_empty,
+    decode_artifact_key_parts,
+    encode_artifact_key_parts,
+)
+from r2.artifact_identity import (
+    ArtifactKeyParts as ArtifactKeyParts,
+)
 
 
 def _binary_open_flag() -> int:
@@ -49,7 +57,6 @@ def _binary_open_flag() -> int:
     return getattr(os, "O_BINARY", 0)
 
 
-_KEY_PREFIX = "artifact-key-v1:"
 MANIFEST_FILENAME = ".arcreel_artifacts.json"
 LOCK_FILENAME = ".artifact_manifest.lock"
 MANIFEST_SCHEMA_VERSION = 1
@@ -1625,47 +1632,6 @@ def _coerce_optional_artifact_basis_descriptor(
     return _coerce_artifact_basis_descriptor(field, value)
 
 
-def encode_artifact_key_parts(kind: str, components: Sequence[object]) -> str:
-    """Encode raw key parts into the manifest key wire form.
-
-    Shared with :meth:`ArtifactKey.encode` so exactly one encoding exists, including
-    for producers that cannot go through :class:`ArtifactKey` — a migration rewriting
-    a key whose kind this build no longer defines has no typed key to encode.
-    """
-
-    payload = json.dumps([kind, *components], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    token = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
-    return _KEY_PREFIX + token
-
-
-class ArtifactKeyParts(NamedTuple):
-    """A manifest key's raw parts, before any :class:`ArtifactKind` is required to exist."""
-
-    kind: str
-    components: tuple[object, ...]
-
-
-def decode_artifact_key_parts(value: str) -> ArtifactKeyParts | None:
-    """Decode a manifest key back into its raw kind and components.
-
-    Returns ``None`` for anything that is not this encoding.  Unlike
-    :meth:`ArtifactKey.decode` the kind is not required to still be a supported
-    :class:`ArtifactKind`, which is what lets a migration rewrite a renamed kind.
-    """
-
-    if not value.startswith(_KEY_PREFIX):
-        return None
-    token = value.removeprefix(_KEY_PREFIX)
-    try:
-        raw = base64.b64decode(token + "=" * (-len(token) % 4), altchars=b"-_", validate=True)
-        payload = json.loads(raw.decode("utf-8"))
-    except (binascii.Error, UnicodeDecodeError, ValueError, RecursionError):
-        return None
-    if not isinstance(payload, list) or not payload or not isinstance(payload[0], str):
-        return None
-    return ArtifactKeyParts(payload[0], tuple(cast(list[object], payload)[1:]))
-
-
 @dataclass(frozen=True, slots=True)
 class ArtifactKey:
     """Typed artifact identity with a canonical reversible wire representation."""
@@ -1827,18 +1793,6 @@ class ArtifactKey:
             return cls(kind, cast(tuple[str | int, ...], tuple(parts)))
         except ValueError as exc:
             raise ValueError("artifact key payload does not match its kind") from exc
-
-
-def _episode_number(value: int) -> int:
-    if type(value) is not int or value < 1:
-        raise ValueError(f"episode must be a positive integer, got {value!r}")
-    return value
-
-
-def _non_empty(field: str, value: object) -> str:
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{field} must be a non-empty string")
-    return value
 
 
 def _rendition_variant(value: object) -> str:

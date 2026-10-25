@@ -1,0 +1,129 @@
+{
+  "schema_version": "1",
+  "status": "R2_PURE_ARTIFACT_SEAMS_VERIFIED",
+  "scope": "LOCAL_SOURCE_COMPATIBILITY_ONLY",
+  "verified_source_head": "a61b1a85d307d9a518bd5f09ff8ab6a92760b0a2",
+  "extraction_source_head": "7d53046be8526bde910b4c8ca46c76e44a041197",
+  "release_ancestor": "14565f9d8a181654be272267a097ddafe2c87c79",
+  "recorded_at": "2026-10-25T15:21:36.071296+00:00",
+  "source_sha256": {
+    "r2/artifact_identity.py": "be003a037b44b1591d46dc5a54193b0e55210ee8d5aaa84aebee0c931d0a1703",
+    "r2/contracts/artifact_metadata.py": "891a348d0cbb1bbfd7b9a45ff4fb7e3ac2f073ebc4c14f2c07ff83cb57ebb783",
+    "lib/artifact_manifest.py": "3d7d4afdcf4a592151348231be3d6a52d3bf9ad3062b94694967fb64dd684d28",
+    "r2/m3/host_integration.py": "89c6b66b4a371253da306da56e86b1fd54d6807f604d5ce576959652a948bd03",
+    "r2/production/artifact_metadata.py": "d1f6669f6edf483d13ee0194f10401e29f95fb2204cec6fa582309dcd8c46103",
+    "lib/__init__.py": "58b1e0ba3f28dd34c03229fa5e36030cd73710b77df814067ae3c7d0a57133d9",
+    "lib/env_init.py": "b4b5ec318cfe1fc5752bf24c86a4d1f5c994e360009c75fae6fd0459e6b585df",
+    "pyproject.toml": "c678cd7440d9d112db29f6b5b850eaca3c339befd33bd8871bc0b3a00a6a3fba",
+    "uv.lock": "bfca48df4104bfeb2327495a7463602bb303086826dea3c94d936e71e0b0d3c5"
+  },
+  "tests": {
+    "pure_targeted": {
+      "junit_sha256": "5767e75f05cc79364ec41d027fb23f30a74ef491c5e22e37f548d6a824b1fab6",
+      "counts": {
+        "tests": 179,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0
+      },
+      "evidence_path": ".superpowers/sdd/2026-10-25-r2-pure-artifact-seams/targeted-verified.xml"
+    },
+    "repair_targeted": {
+      "junit_sha256": "9fed98acec9c0e547f3f7eb1717def5eb2ec9ea7fc789592df3af2576ff1a8ed",
+      "counts": {
+        "tests": 52,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0
+      },
+      "evidence_path": ".superpowers/sdd/2026-10-25-r2-backend-gate-repairs/review-sealed.xml"
+    },
+    "consumers": {
+      "junit_sha256": "334655e5f486bab5492bf89e773a01854e06569c5699f5fb0316cefae8397dc8",
+      "counts": {
+        "tests": 48,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0
+      },
+      "evidence_path": ".superpowers/sdd/2026-10-25-r2-backend-gate-repairs/consumers.xml"
+    },
+    "scope": {
+      "junit_sha256": "eeda8ad663b524a0647aa23fe3bece75bdb9d69bc3552f90d7c5c6ae61657ce6",
+      "counts": {
+        "tests": 1,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0
+      },
+      "evidence_path": ".superpowers/sdd/2026-10-25-r2-backend-gate-repairs/repair-clean-scope.xml"
+    },
+    "remaining_media": {
+      "junit_sha256": "5b57f0636055ed323bc32ebf5d8ef8ffdee674f6b704d115917854c6528498af",
+      "counts": {
+        "tests": 10,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0
+      },
+      "evidence_path": ".superpowers/sdd/2026-10-25-r2-backend-gate-repairs/remaining.xml"
+    }
+  },
+  "checks": {
+    "ruff": "PASS",
+    "format": "PASS",
+    "types": "0errors0warnings",
+    "test_audit": "0violations",
+    "import_contracts": "23kept0broken",
+    "dependencies": "PASS"
+  },
+  "reviews": [
+    {
+      "reviewer": "/root/pure_artifact_seams_review",
+      "candidate": "7d53046be8526bde910b4c8ca46c76e44a041197",
+      "verdict": "PASS",
+      "scope": "Mechanical source/compatibility extraction; original evidence-file collision subsequently repaired."
+    },
+    {
+      "reviewer": "/root/backend_fitness_repair_review",
+      "candidate": "e668017d51c5916bbeadbce33f7a7120c3a7cc36",
+      "verdict": "FAIL",
+      "findings": {
+        "P1": "Module-qualified Canon authority import escape.",
+        "P2": "Story approval sensor lacked exact call/scope fingerprints."
+      }
+    },
+    {
+      "reviewer": "/root/backend_fitness_repair_review",
+      "candidate": "a61b1a85d307d9a518bd5f09ff8ab6a92760b0a2",
+      "verdict": "PASS",
+      "P1": "FIXED",
+      "P2": "FIXED",
+      "new_material_findings": []
+    }
+  ],
+  "coverage": {
+    "fresh_single_head_full_backend_pass": false,
+    "original_run": {
+      "source_head": "7d53046be8526bde910b4c8ca46c76e44a041197",
+      "passed": 17721,
+      "skipped": 177,
+      "failed": 5,
+      "unfinished": 10,
+      "status": "INTERRUPTED_NOT_PASS"
+    },
+    "qualification": "Original five failures repaired or clean-rechecked with exact focused tests; exact ten unfinished nodes now pass. Runtime lib/r2/server bytes unchanged from extraction through repair. Evidence is combined execution across pinned source heads, not a new whole-backend pass. Original177skips remain outside this source-compatibility qualification.",
+    "remaining_unfinished_original_nodes": []
+  },
+  "runtime_activation_authorized": false,
+  "m10_design_accepted": false,
+  "m10_runtime_accepted": false,
+  "provider_qualified": false,
+  "production_changed": false,
+  "limits": [
+    "Static AST sensors are bounded structural checks, not a general Python sandbox.",
+    "No real provider qualification, migration, production deployment or M10 product contract was performed.",
+    "Graph generation2026-10-15 is stale/excludes relevant docs/integration paths; exact source/probes were authoritative."
+  ],
+  "next": "Use this verified local maintenance checkpoint as derived implementation base for a freshly reviewed M10 A0/A1-only design. Released ancestor remains V2.0.8; original full M10 gate remains closed."
+}
