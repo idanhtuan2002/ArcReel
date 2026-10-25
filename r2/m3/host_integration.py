@@ -17,6 +17,7 @@ from lib.artifact_manifest import (
     ProjectArtifactManifestAdapter,
 )
 from lib.version_manager import VersionManager
+from r2.artifact_identity import episode_video_key, validate_m3_target_ref
 from r2.contracts import (
     AnyShotSpec,
     CandidateSelectionStatus,
@@ -83,17 +84,6 @@ class RegisteredGoldenACandidate:
     host_version_ref: str
 
 
-def validate_m3_target_ref(target_ref: str) -> str:
-    if (
-        not target_ref
-        or target_ref in {".", ".."}
-        or any(char in target_ref for char in ("/", "\\", ":", "\x00"))
-        or any(ord(char) < 32 for char in target_ref)
-    ):
-        raise ValueError("target_ref must be one safe filename component")
-    return target_ref
-
-
 def safe_project_subdir(project_dir: Path, name: str) -> Path:
     root = Path(project_dir).resolve()
     path = Path(project_dir) / name
@@ -129,10 +119,7 @@ class GoldenAHostIntegration:
 
     def artifact_key_for(self, target_ref: str) -> str:
         validate_m3_target_ref(target_ref)
-        return ArtifactKey.episode_video(
-            self.episode,
-            target_ref,
-        ).encode()
+        return episode_video_key(self.episode, target_ref)
 
     def current_file_for(self, target_ref: str) -> Path:
         validate_m3_target_ref(target_ref)
