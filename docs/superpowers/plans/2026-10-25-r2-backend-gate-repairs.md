@@ -24,3 +24,7 @@ Candidate e668017d51c5916bbeadbce33f7a7120c3a7cc36 was independently reviewed by
 The one repair adds module/qualified-attribute authority refusals, exact async/class containing scopes, one approve occurrence, no positional/expanded/extra kwargs, and exact principal/manifest argument expressions. RED:14 failed/29 passed on the reported gaps. Final focused gate:52 passed/1warning; type0errors0warnings; test audit0violations. Final repair verification by the independent reviewer remains pending.
 
 The ten previously unfinished backend nodes completed:10 passed/2warnings in2815.65s. Prior consumer regressions:48 passed; clean M7 scope:1passed. Runtime lib/r2/server sources remain byte-identical to the pure-extraction checkpoint. This is combined coverage, not a fresh full-suite run at the repair HEAD. No further render rerun is justified without a new runtime-source change or unresolved media failure.
+
+## Final source-compatibility checkpoint
+
+The derived local source is verified in docs/r2/evidence/R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json. Both reported sensor defects are independently FIXED/PASS at a61b1a85d307d9a518bd5f09ff8ab6a92760b0a2; all10 previously unfinished media nodes passed. Focused repair52, consumer48, clean scope1 and pure179 passed. The original interrupted/failed full run remains preserved, not relabeled as PASS. Combined coverage qualifies the unchanged extraction runtime source, not all backend features or M10 runtime. No new provider or deployment is enabled.

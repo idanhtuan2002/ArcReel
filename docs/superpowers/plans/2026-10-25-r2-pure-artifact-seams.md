@@ -71,3 +71,7 @@ Full backend was interrupted after 29m48s to inspect existing failures rather th
 Three failures reproduce on a disposable archive of released V2.0.8: story Canon authority boundary, story master approval call allowlist, and missing `story:gemini-aistudio` inventory evidence. The scheduler failure passes in isolation on both release and candidate but remains unresolved under load. The M7 scope failure was caused by this session writing checkpoint docs while the cleanliness assertion ran; recheck after committing this checkpoint. Do not loosen authority tests or fabricate route qualification to get green.
 
 Resume this maintenance branch first. Do not merge it into M10 or create an M10 acceptance while its integrated gate remains unqualified. M9 remains paused; released V2 and the rejected M10 design branch remain unchanged. Preserve failed/successful logs separately. No test/render process from the interrupted suite remains active.
+
+## Final source-compatibility checkpoint
+
+The derived local source is verified in docs/r2/evidence/R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json. Both reported sensor defects are independently FIXED/PASS at a61b1a85d307d9a518bd5f09ff8ab6a92760b0a2; all10 previously unfinished media nodes passed. Focused repair52, consumer48, clean scope1 and pure179 passed. The original interrupted/failed full run remains preserved, not relabeled as PASS. Combined coverage qualifies the unchanged extraction runtime source, not all backend features or M10 runtime. No new provider or deployment is enabled.
