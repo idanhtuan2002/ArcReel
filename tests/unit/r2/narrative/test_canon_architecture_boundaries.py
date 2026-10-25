@@ -170,12 +170,25 @@ def _authority_import_violations(rel: str, tree: ast.Module) -> list[str]:
         and len(owner_calls) == 1
         and owner_calls[0].args[0] is factory_calls[0]
     )
-    return [
+    violations = [
         symbol
         for symbol in _AUTHORITY_ONLY_SYMBOLS
         if any(name.endswith(f".{symbol}") or name == symbol for name in _imports(tree))
         and not (composition and symbol == factory)
     ]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in _AUTHORITY_ONLY_SYMBOLS:
+            violations.append(node.attr)
+        if isinstance(node, ast.Import) and any(
+            alias.name == "lib.db.canon_uow" or alias.name.startswith("lib.db.canon_uow.") for alias in node.names
+        ):
+            violations.append("lib.db.canon_uow")
+        if isinstance(node, ast.ImportFrom) and (
+            (node.module == "lib.db" and any(alias.name == "canon_uow" for alias in node.names))
+            or (node.module == "lib.db.canon_uow" and any(alias.name == "*" for alias in node.names))
+        ):
+            violations.append("lib.db.canon_uow")
+    return sorted(set(violations))
 
 
 def test_authority_write_symbols_stay_out_of_downstream_layers() -> None:
@@ -302,3 +315,9 @@ def test_story_composition_exception_refuses_authority_escape(source: str) -> No
 def test_story_composition_exception_is_not_available_to_other_downstream_files() -> None:
     tree = ast.parse("from lib.db.canon_uow import canon_authority_uow_factory")
     assert _authority_import_violations("server/other.py", tree) == ["canon_authority_uow_factory"]
+
+
+@pytest.mark.parametrize("source", ["import lib.db.canon_uow as cu", "from lib.db import canon_uow"])
+@pytest.mark.parametrize("rel", ["server/other.py", "server/story_authoring/commit.py"])
+def test_downstream_module_imports_cannot_expose_the_canon_authority(rel: str, source: str) -> None:
+    assert _authority_import_violations(rel, ast.parse(source))
