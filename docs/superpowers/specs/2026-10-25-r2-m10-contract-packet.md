@@ -93,7 +93,12 @@ MasterBindingV1
 ```
 
 Reuse the host metadata type for temporary validation of a thawed copy, never
-store that mutable model inside the frozen contract. Require a complete normalized
+store that mutable model inside the frozen contract. Each ArtifactMetadataSnapshot
+must decode its own artifact_key with decode_episode_video_key and require the
+returned resource ID to equal body.contract_ref.id exactly, before joining a
+binding. For every consumed head (root and dependencies), its snapshot's
+artifact_key equals that head's artifact_key. Equal content/candidate/version/
+approval values never replace this identity equality. Require a complete normalized
 metadata body, one snapshot per consumed head and no extra/missing keys. Root
 cannot also be a dependency. Sort heads/snapshots by artifact key and edges by
 (parent, dependency_ref, child). Reject duplicate keys/edges and cycles; every
@@ -115,11 +120,27 @@ current real master or that bytes exist. A5 still resolves/revalidates all bodie
 bytes and external authority references under the canonical host row locks.
 
 QualityProfileRevision gains explicit user_id/project_name scope. The original
-QualityPolicyV1 gains a nonempty unique rule_ids catalog: probe rules and slot
-rule references must refer to it. This avoids treating technical probe-rule IDs
-as the only valid narrative/accessibility rule IDs. Requirement IDs and slot IDs
-are unique within the profile; rule IDs are separately unique. ALL requires all
-slots, N_OF_M bounds are valid, references exist and escalation is acyclic.
+QualityPolicyV1 gains a nonempty unique rule_ids catalog. Every ProbeRule.rule_id,
+FreshnessRule.rule_id, each AssessmentSlot.rule_ids entry, and each
+DispositionRule.waiverable_rule_ids entry must belong to that catalog. Technical
+probe declarations are not the catalog: logical narrative/accessibility rules
+need not have a technical probe. The same catalog ID may be referenced across
+these families and across different slots.
+
+Reject duplicate catalog IDs, duplicate ProbeRule.rule_id declarations, duplicate
+FreshnessRule (rule_id,evidence_kind) pairs, duplicate rule IDs within any one
+slot, and duplicate waiverable_rule_ids. Different evidence kinds may have
+separate freshness declarations under one rule ID; no duplicate pair may choose
+between conflicting ages/effects by last-write-wins. Policy tuples (including
+catalog/declarations and waiverable IDs) retain their declared semantic order;
+only the explicitly set-like evidence/waiver collections are normalized below.
+Requirement IDs and slot IDs remain unique within the profile. Failure codes
+in non_waiverable_failure_codes are a separate namespace, not rule catalog refs.
+These self-contained policy-reference checks run in A1. Checking a disposition's
+actual waiver bindings against the externally resolved selected policy remains
+A6 admission work; constructing standalone waiver data grants no waiver power.
+ALL requires all slots, N_OF_M bounds are valid, references exist and escalation
+is acyclic.
 INAPPLICABLE must be an explicitly allowed slot state plus a bound observation;
 missing evidence is never an applicability reason.
 
@@ -335,6 +356,20 @@ Requirements/slot tuple order remains policy-declared order. Only explicitly
 set-like heads/snapshots/edges, observation bindings, execution refs and waiver
 bindings normalize to the documented stable key order.
 
+For waiver_bindings in DispositionSubject, its authorization request and final
+QualityDisposition, reject duplicate logical keys (rule_id,finding_id,scope),
+even when justification differs. Normalize each valid tuple by lexicographically
+sorting the unsigned canonical JSON bytes of each full validated WaiverBinding
+(all four original fields: rule_id,finding_id,scope,justification), using the
+pinned canonical_json_bytes helper. finding_id=None is the explicit JSON null;
+it is never replaced with an empty string or omitted. There is no locale/case/
+Unicode normalization or Python mixed-None/string tuple comparison. Store and
+hash this normalized tuple; caller order cannot affect subject/request/final
+digests. A changed justification or other binding field remains semantic data
+and changes the binding and containing digest. Identity strings in the existing
+head/snapshot/edge/observation/execution sort keys compare lexicographically as
+UTF-8 bytes; this introduces no normalization of those foreign identities.
+
 ### Exact master-ref mapping
 
 For each master: edge, decode parent and child artifact keys using the existing
@@ -348,6 +383,8 @@ parent_episode == child_episode
 shot_ref = dependency_ref with exactly one leading "master:" removed
 validate_m3_target_ref(shot_ref) succeeds
 child.artifact_key == episode_video_key(parent_episode, shot_ref)
+parent_metadata.body.contract_ref.id == parent_resource
+child_metadata.body.contract_ref.id == child_resource == shot_ref
 ```
 
 This is the pinned GoldenAHostIntegration.artifact_key_for/ApprovedMasterResolver
@@ -427,3 +464,21 @@ that tree at candidate and live HEAD. The record explicitly grants no M10 or
 runtime activation. The exact nine-path implementation allowlist, migration
 singleton and original full-M10 gate are unchanged. Historical full-backend
 coverage is combined evidence with recorded skips, not a fabricated fresh suite.
+
+## Required A1 refusal/determinism cases after normative review
+
+- Root metadata ID swap and child metadata ID swap, retaining equal bytes,
+  candidate/version/approval and all other fields: refuse. A key/ref match cannot
+  rebind another target's normalized metadata.
+- All permutations of at least three distinct waiver bindings (including None
+  and non-None finding IDs) produce identical normalized tuples and subject,
+  request and final-disposition digests under otherwise fixed bodies. Duplicate
+  logical waiver keys, identical or with conflicting justifications, refuse.
+  Each of the four binding-field mutations changes the applicable digests.
+- Unknown catalog refs refuse independently in probe declarations, freshness
+  declarations, every slot's rule list and waiverable IDs. Test duplicates for
+  each declared collection/key. Reusing a catalog ID across families/slots and
+  across distinct freshness evidence kinds remains valid. Preserve declared
+  policy tuple order and do not treat failure codes as rule IDs.
+
+These are mandatory future A1 tests, not claims of an implemented validator.

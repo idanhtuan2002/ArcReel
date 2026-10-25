@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "status": "BOUNDED_DESIGN_CANDIDATE_NOT_ACCEPTED",
+  "status": "BOUNDED_DESIGN_REPAIR_NOT_ACCEPTED",
   "tested_source_head": "c7f4449c5bb0da2d078530aca8455568a7b3f252",
   "packet": "M10_A_A0_A1",
   "implementation_scope": "CONTRACTS_ONLY",
@@ -57,7 +57,7 @@
     ],
     "repository_status_unchanged": true
   },
-  "review_status": "FRESH_PAIR_NOT_YET_OBTAINED",
+  "review_status": "63cc4e986_FAILED_WITHDRAWN_FRESH_PAIR_REQUIRED",
   "limits": [
     "No M10 action custodian or factual runtime qualified.",
     "No database, migration, probe, API, provider, credential or export code allowed.",
@@ -79,6 +79,23 @@
       "verdict": "FAIL",
       "material_findings": 1,
       "disposition": "Withdrawn. Legacy dotenv-loading imports replaced by separately verified pure identity/metadata seams; no previous PASS reused for M10."
+    },
+    {
+      "candidate": "63cc4e9869a663ec190c3d1af23bd8ea69434a27",
+      "verdict": "FAIL",
+      "material_findings": 3,
+      "disposition": "Withdrawn. Metadata/key resource identity, waiver comparator/duplicates and full policy rule-catalog closure added before a fresh pair.",
+      "reviewer_record": {
+        "reviewer_id": "codex-m10-contract-review-a-63cc4e986-20261025T154714Z",
+        "qualification_evidence": "Independent Tier-2 structural and exact-source review covering M7/M8 acceptance ancestry, A0 bootstrap custody, A1 identity and digest closure, authorization separation, source/import boundaries, GoldenAHostIntegration artifact-key mapping and ApprovedMasterResolver behavior. Graph generation 2026-10-15T01:19:44Z was used only for historical call relationships; excluded or stale paths were verified directly. Candidate hashes and lineage were recomputed, both live modes refused with M10_DESIGN_NOT_ACCEPTED, and 104 focused verifier, pure-import, identity and metadata tests passed with zero skips.",
+        "conflict_declaration": "NO_CONFLICT",
+        "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+        "reviewed_candidate_head": "63cc4e9869a663ec190c3d1af23bd8ea69434a27",
+        "verdict": "FAIL",
+        "reviewed_at": "2026-10-25T15:47:14Z",
+        "required_skips": [],
+        "material_unknowns": []
+      }
     }
   ],
   "source_coverage": "Observed27-file pure import closure and config/lock/proof bytes/modes pinned to derived base; stale graph supplemented by exact source and cold-process probes."
