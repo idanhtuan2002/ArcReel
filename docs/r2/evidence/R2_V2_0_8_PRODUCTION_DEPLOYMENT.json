@@ -1,0 +1,15 @@
+{
+  "verified_at": "2026-10-25T02:01:19.091203+00:00",
+  "release": "r2-v2.0.8",
+  "commit": "14565f9d8a181654be272267a097ddafe2c87c79",
+  "production_checkout_clean": true,
+  "post_check": "passed",
+  "browser": {
+    "origin": "http://127.0.0.1:1251",
+    "path": "/app/settings",
+    "model_defaults_navigation_visible": true
+  },
+  "limit": "No paid generation or settings mutations performed. Existing active task left running.",
+  "status": "PRODUCTION_VERIFIED",
+  "evidence_source_sha256": "86cc6510a71e753153f7c168075e9e2a41abe6b23a55d26f15da3d2acbb2382a"
+}

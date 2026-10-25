@@ -1,3 +1,7 @@
+> Historical exploratory draft: HELD, superseded as a design candidate.
+> Use the restored 2026-09-16 design plus [the proposed V2 rebase](2026-10-25-r2-m10-v2-rebase.md).
+> This draft must not be implemented or used as acceptance authority.
+
 # M10 V2 — Quality Evidence and Product Packaging
 
 Status: **HELD — RESEARCH AUDIT REQUIRED**, not a schema freeze or implementation release.
