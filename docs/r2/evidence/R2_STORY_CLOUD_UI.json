@@ -1,0 +1,126 @@
+{
+  "status": "SCOPED_VERIFIED_AWAITING_SUDO_DEPLOYMENT",
+  "code_head": "677f2d97d1208a527b39df09ca72449c48e94b29",
+  "base": "a4b1adc84724a3aa9ee6e7bbdb97c270d6f88079",
+  "initial_review_candidate": "6be7f059bbaba70d6652ef6942898d921258c019",
+  "important_review_findings_fixed": 3,
+  "repair_domains_passed": 322,
+  "legacy_and_new_canary_tests_passed": 12,
+  "frontend_passed": 2625,
+  "frontend_skipped": 4,
+  "static_checks": [
+    {
+      "command": [
+        "ruff",
+        "check",
+        "."
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "basedpyright",
+        "--warnings",
+        "--venvpath",
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "lint-imports"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "deptry",
+        "lib",
+        "server",
+        "alembic",
+        "scripts",
+        "tests",
+        "r2"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python",
+        "scripts/audit_tests.py",
+        "--check"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "live_probe": {
+    "model_id": "gemini-2.5-flash",
+    "provider_id": "gemini-aistudio",
+    "binding": "sha256:5477336f59987110b822ae595df1d90d5350b6f15ba9a2634c853499d08152d3",
+    "cap_usd": "0.10",
+    "max_generation_requests": 1,
+    "max_output_tokens": 2048,
+    "status": "PASSED",
+    "contains_user_content": false,
+    "recorded_at": "2026-10-24T08:53:25.217114+00:00",
+    "input_tokens": 26,
+    "output_tokens": 51,
+    "finish_reason": "stop",
+    "request_digest": "sha256:4df1b24857b9c3db924e7fe07c6ac0663fe70d8ce2c7e404370b25d4bf628b73",
+    "response_digest": "sha256:1d8d23d2098c3593600af75a6f13cd9ae2bddf7eec15112f87bebde64e7e9a42",
+    "output_schema_valid": true,
+    "attempts": [
+      {
+        "kind": "COUNT",
+        "state": "COMPLETED",
+        "reserved_input_tokens": 4096,
+        "reserved_output_tokens": 0,
+        "charged_input_tokens": 25,
+        "charged_output_tokens": 0
+      },
+      {
+        "kind": "GENERATE",
+        "state": "COMPLETED",
+        "reserved_input_tokens": 415,
+        "reserved_output_tokens": 2048,
+        "charged_input_tokens": 26,
+        "charged_output_tokens": 51
+      }
+    ]
+  },
+  "production_deployed": false,
+  "full_backend_gate": "NOT_GREEN:interrupted after17694passed/178skipped/3failures; two historically reproduced authority assertions and dirty-worktree M7 check. No whole-backend-green claim.",
+  "deferred_minor": "Restart recovery uses the maximum frozen writer/judge price for uncertain cloud usage, which can overestimate a cheaper route. Conservative cap is not weakened.",
+  "deployment_command": "sudo bash /tmp/arcreel-v2.0.7-cutover.sh",
+  "ruling": "Main accepts the bounded cloud-story change on affected-domain/frontend/static evidence and repaired Important findings. Existing broad-gate failures and unfinished broad cases remain outside this acceptance; do not report a green full suite.",
+  "source_files": {
+    "frontend/src/features/story-authoring/api/storyClient.test.ts": "615459a6cde555dc551349429c49bc78a09c4fbfa221adfa25955745ee37941a",
+    "frontend/src/features/story-authoring/api/storyClient.ts": "40c9cc2b6b9589888e61e63710118097ce06f4ade015dd17b436e706f8cf55d7",
+    "frontend/src/features/story-authoring/ui/StoryAuthoringPage.test.tsx": "dc260e14158535c8bec157c7f66b44bd293242c63e1b6268ed04e20b975211d9",
+    "frontend/src/features/story-authoring/ui/StoryAuthoringPage.tsx": "becb46591f1fd469d75d8968fc1d3659a2fd78d727381e4db54d67ac84786e99",
+    "frontend/src/i18n/en/dashboard.ts": "6a189aeba43b47ea2c185d878997daf088a0c7ca6406eda951d76b0dd0eb5e95",
+    "frontend/src/i18n/vi/dashboard.ts": "37e44f01fa30d79b06b5816b9b9d396b36188af9c1ca69d9b8fd5bfa8f4c9dfb",
+    "frontend/src/i18n/zh/dashboard.ts": "23e96668bc48d54403e4f03d872dedcb94cd578933527cd4b5869f5c90b60808",
+    "r2/host_hardening/paid_routes.py": "b6c7351fe0cfe349e08baf724c2265dc7d9bddf250e2427b3d0085015f0cfa0d",
+    "r2/host_hardening/route_qualifications.py": "0e3a1d8891a526163d06a2b9e2aa50d722a9be54b08520206be86767b885482f",
+    "scripts/r2/qualify_route.py": "69ca4e5d1f40396414e63ca56935a373d72d670ef7e69697070f80d6e8eaaf23",
+    "server/routers/story_runs.py": "07523db1775c2131aa62d616bf28b1279a82586ac64cf79b2c9b31f0e29710d6",
+    "server/story_authoring/cloud.py": "2e9688170a79d88b73db732f982e1c852dcea78061a8e77ad092c8f87b91d1f6",
+    "server/story_authoring/contracts.py": "eba175cb29ca1c0da694196984a37a5146f22e28400afbde408ba0939e0a90de",
+    "server/story_authoring/driver.py": "bc3d41b81099b9a9f36076541252a4a79a334c17246e756b6b23530eb8f09d5d",
+    "server/story_authoring/executor.py": "e132c4c14ede9042a7884b7a1df253849a4a74a8c5652a7e1d32432972b65806",
+    "server/story_authoring/generation.py": "c45a97a575e97c40e420a1265538739d06e79f7134adc5b6b72b1d1bc49305c7",
+    "server/story_authoring/routes.py": "a31a034fb4fed4fc504205436c8378ed53202049cf12c49138ba61ea477f9780",
+    "server/story_authoring/runtime.py": "b1958a30eb9aab71df9389a44cbd02bbf65e239eb487307c8439ad0f53f69fc9",
+    "server/story_authoring/service.py": "23267697fc4880af940c79006c14e89328086df6b4a46979dd37b64be7feb1c1"
+  }
+}

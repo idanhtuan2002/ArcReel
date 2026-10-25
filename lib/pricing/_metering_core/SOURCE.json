@@ -1,0 +1,22 @@
+{
+  "donor_commit": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+  "scope": "private pure schema/vocabulary/arithmetic; no catalog data or runtime imports",
+  "sources": {
+    "model.py": {
+      "source_sha256": "056df93f13c6ed15627bea5929a800925cacb5f4b71dc5a740e7f81e3b985659",
+      "copied_byte_exact": true
+    },
+    "vocabulary.py": {
+      "source_sha256": "bfd55fed4adc51375661c3de0791adc25b179d6e772a6dd94111969572aa2a12",
+      "copied_byte_exact": true
+    },
+    "metering.py": {
+      "source_sha256": "a10716df6a783de359c5eb9a21de26da70a91b5b32633f96817419c9a8ea8a51",
+      "ported_sha256": "a1194ce17ac72a499d4e087768e89ca9954952479096261ac6a58d962e38717f",
+      "only_change": "replace one package import with two relative imports"
+    }
+  },
+  "test_source": "tests/unit/lib/billing/test_metering.py",
+  "test_adaptation": "imports only, to private host paths",
+  "upstream_document_references": "Docstrings/ADR references retained verbatim refer to the pinned donor repository, not local ADR numbering."
+}

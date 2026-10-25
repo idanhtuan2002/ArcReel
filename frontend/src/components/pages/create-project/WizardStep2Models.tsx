@@ -76,6 +76,7 @@ export function WizardStep2Models({
       {/* 创建向导只暴露默认层（docs/adr/0054），按用途细分留给项目设置页 */}
       {data && (
         <ModelConfigSection
+                  collapsible
           showSubFields={false}
           value={value}
           onChange={onChange}

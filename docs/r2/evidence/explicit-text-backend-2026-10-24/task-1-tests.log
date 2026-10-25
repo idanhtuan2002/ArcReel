@@ -1,0 +1,51 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  8%]
+........................................................................ [ 17%]
+........................................................................ [ 26%]
+........................................................................ [ 35%]
+........................................................................ [ 44%]
+........................................................................ [ 52%]
+........................................................................ [ 61%]
+........................................................................ [ 70%]
+........................................................................ [ 79%]
+........................................................................ [ 88%]
+........................................................................ [ 96%]
+..........................                                               [100%]
+=============================== warnings summary ===============================
+tests/unit/lib/text_backends/test_base.py::TestTextCapability::test_values
+tests/unit/lib/backend_assembly/test_backend_assembly_specs.py::test_migrated_builtin_video_providers_use_shipped_definitions[minimax-MiniMax-Hailuo-2.3-minimax-hailuo-v1]
+tests/integration/lib/config/test_config_resolver.py::TestVideoGenerateAudio::test_default_is_true_when_db_empty
+tests/unit/lib/config/test_config_resolver_resolution.py::test_returns_none_when_nothing_configured
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+1.59s setup    tests/unit/lib/config/test_config_resolver_resolution.py::test_returns_none_when_nothing_configured
+1.24s setup    tests/integration/lib/config/test_config_resolver.py::TestVideoGenerateAudio::test_default_is_true_when_db_empty
+1.23s setup    tests/unit/lib/backend_assembly/test_backend_assembly_specs.py::test_migrated_builtin_video_providers_use_shipped_definitions[minimax-MiniMax-Hailuo-2.3-minimax-hailuo-v1]
+1.23s setup    tests/unit/lib/text_backends/test_base.py::TestTextCapability::test_values
+0.36s setup    tests/integration/lib/config/test_config_resolver.py::TestDefaultBackends::test_video_backend_auto_resolve
+0.31s setup    tests/unit/lib/config/test_config_service.py::test_get_all_providers_status_empty
+0.27s call     tests/unit/lib/text_backends/test_instructor_support.py::TestInstructorExceptionShape::test_api_call_failure_arrives_wrapped
+0.22s setup    tests/unit/lib/text_backends/test_instructor_support.py::TestGenerateStructuredViaInstructorAsync::test_explicit_token_param_max_completion_tokens
+0.15s setup    tests/unit/lib/config/test_config_repository.py::test_setting_get_default
+0.14s setup    tests/unit/lib/config/test_config_resolver_resolution.py::test_legacy_wins_over_custom_default
+0.14s setup    tests/integration/lib/config/test_config_resolver.py::TestVoiceConsistency::test_prompt_binding_downgrades_native_to_soft
+0.14s setup    tests/unit/lib/config/test_tts_resolver.py::TestResolveNarrationSpeed::test_invalid_values_treated_as_unset
+0.14s setup    tests/integration/lib/config/test_config_resolver.py::TestVideoCapabilitiesBucketing::test_storyboard_project_errors_when_model_lacks_first_frame
+0.14s setup    tests/integration/lib/config/test_config_resolver.py::TestVoiceConsistency::test_missing_binding_defaults_to_prompt_and_downgrades
+0.14s setup    tests/unit/lib/config/test_tts_resolver.py::TestPublicAudioResolverApi::test_resolve_audio_backend_payload_short_circuit
+0.14s setup    tests/unit/lib/config/test_config_service.py::test_unknown_provider_raises
+0.14s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[openai-openai]
+0.13s setup    tests/integration/lib/config/test_config_resolver.py::TestVoiceConsistency::test_seedance_2_reference_video_is_native
+0.13s setup    tests/unit/lib/config/test_config_repository.py::test_setting_set_and_get
+0.13s setup    tests/unit/lib/config/test_config_repository.py::test_setting_get_all
+0.13s setup    tests/unit/lib/config/test_tts_resolver.py::TestResolveNarrationVoice::test_project_override_wins
+0.13s setup    tests/unit/lib/config/test_config_service.py::test_set_max_workers_rejects_invalid_values[3.7-image_max_workers]
+0.13s setup    tests/unit/lib/config/test_config_repository.py::test_set_and_get
+0.13s setup    tests/integration/lib/config/test_config_resolver.py::TestVoiceConsistency::test_unreadable_binding_falls_back_to_prompt
+0.13s setup    tests/unit/lib/config/test_config_resolver_resolution.py::test_legacy_only
+818 passed, 4 warnings in 16.39s

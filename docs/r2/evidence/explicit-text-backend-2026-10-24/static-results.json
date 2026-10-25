@@ -1,0 +1,54 @@
+[
+  {
+    "command": [
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+      "check",
+      "."
+    ],
+    "returncode": 0
+  },
+  {
+    "command": [
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+      "format",
+      "--check",
+      "."
+    ],
+    "returncode": 0
+  },
+  {
+    "command": [
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright",
+      "--warnings",
+      "--venvpath",
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main"
+    ],
+    "returncode": 0
+  },
+  {
+    "command": [
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports"
+    ],
+    "returncode": 0
+  },
+  {
+    "command": [
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry",
+      "lib",
+      "server",
+      "alembic",
+      "scripts",
+      "tests",
+      "r2"
+    ],
+    "returncode": 0
+  },
+  {
+    "command": [
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+      "scripts/audit_tests.py",
+      "--check"
+    ],
+    "returncode": 0
+  }
+]

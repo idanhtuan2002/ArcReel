@@ -1,0 +1,29 @@
+.....................                                                    [100%]
+=============================== warnings summary ===============================
+tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[gemini-aistudio-gemini]
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+1.62s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[gemini-aistudio-gemini]
+0.13s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_explicit_selection_does_not_bypass_release_qualification
+0.13s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[grok-grok]
+0.13s setup    tests/unit/lib/test_text_generator.py::TestTextGenerator::test_generate_records_usage_on_failure
+0.13s setup    tests/unit/lib/test_text_generator.py::test_generate_calls_the_backend_without_ambient_baggage
+0.13s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_invalid_custom_model_never_returns_the_default_fallback
+0.13s setup    tests/unit/lib/test_text_generator.py::TestTextGenerator::test_generate_without_project_name
+0.12s setup    tests/unit/lib/test_text_generator.py::TestTextGenerator::test_generate_records_usage_on_success
+0.12s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[openai-openai]
+0.06s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[gemini-aistudio-gemini]
+0.02s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[grok-grok]
+0.01s call     tests/unit/lib/test_text_generator.py::TestTextGenerator::test_generate_records_usage_on_success
+0.01s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[openai-openai]
+0.01s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_invalid_custom_model_never_returns_the_default_fallback
+0.01s call     tests/unit/lib/test_text_generator.py::TestTextGenerator::test_generate_records_usage_on_failure
+0.01s call     tests/unit/lib/test_text_generator.py::TestTextGenerator::test_generate_without_project_name
+0.01s call     tests/unit/lib/test_text_generator.py::test_generate_calls_the_backend_without_ambient_baggage
+0.01s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_explicit_selection_does_not_bypass_release_qualification
+
+(7 durations < 0.005s hidden.  Use -vv to show these durations.)
+21 passed, 1 warning in 2.99s

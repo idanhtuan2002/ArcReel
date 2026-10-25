@@ -1,0 +1,21 @@
+.......................                                                  [100%]
+=============================== warnings summary ===============================
+tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[gemini-aistudio-gemini]
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+1.54s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[gemini-aistudio-gemini]
+0.12s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[openai-openai]
+0.12s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_omitting_pair_keeps_the_existing_task_and_project_resolution
+0.11s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[grok-grok]
+0.11s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_invalid_custom_model_never_returns_the_default_fallback
+0.11s setup    tests/integration/lib/text_backends/test_explicit_selection.py::test_explicit_selection_does_not_bypass_release_qualification
+0.06s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[gemini-aistudio-gemini]
+0.01s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[grok-grok]
+0.01s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_selected_model_generates_and_records_exact_provider_model[openai-openai]
+0.01s call     tests/integration/lib/text_backends/test_explicit_selection.py::test_invalid_custom_model_never_returns_the_default_fallback
+
+(15 durations < 0.005s hidden.  Use -vv to show these durations.)
+23 passed, 1 warning in 2.39s

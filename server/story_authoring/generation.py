@@ -77,7 +77,15 @@ class AttemptSink(Protocol):
     ) -> None: ...
 
     async def failed(
-        self, attempt_id: str, *, code: StoryFailureCode, detail: str, input_tokens: int | None = None
+        self,
+        attempt_id: str,
+        *,
+        code: StoryFailureCode,
+        detail: str,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        done_reason: str | None = None,
+        duration_ms: int | None = None,
     ) -> None: ...
 
     async def unknown(self, attempt_id: str, *, detail: str) -> None: ...
@@ -321,23 +329,26 @@ class AuthoringTextGateway:
             return StoryFailureCode.OUTPUT_TRUNCATED, f"output stopped at {response.eval_count} tokens", ""
         if response.done_reason != "stop":
             return StoryFailureCode.OUTPUT_INVALID, f"done_reason {response.done_reason!r}", ""
-        hits = find_cjk(response.content)
-        if hits:
-            sample = "".join(hit.char for hit in hits[:10])
-            return StoryFailureCode.CJK_IN_OUTPUT, f"{len(hits)} CJK code points ({sample})", ""
-        try:
-            if request.output_mode is OutputMode.PROSE:
-                paragraphs = [
-                    p.strip() for p in ProseParagraphs.model_validate_json(response.content, strict=True).paragraphs
-                ]
-                if not request.min_paragraphs <= len(paragraphs) <= request.max_paragraphs:
-                    return StoryFailureCode.OUTPUT_INVALID, f"{len(paragraphs)} paragraphs", ""
-                ceiling = request.max_paragraph_chars
-                if any(len(p) < request.min_paragraph_chars or (ceiling and len(p) > ceiling) for p in paragraphs):
-                    return StoryFailureCode.OUTPUT_INVALID, "a paragraph is empty or too short", ""
-                return None, "", "\n\n".join(paragraphs)
-            assert request.response_model is not None
-            request.response_model.model_validate_json(response.content, strict=True)
-        except ValidationError as exc:
-            return StoryFailureCode.OUTPUT_INVALID, f"{exc.error_count()} schema errors", ""
-        return None, "", response.content
+        return validate_story_content(request, response.content)
+
+
+def validate_story_content(request: StoryStepRequest, content: str) -> tuple[StoryFailureCode | None, str, str]:
+    """Apply the same strict shape, prose-length and Unicode policy on every transport."""
+    hits = find_cjk(content)
+    if hits:
+        sample = "".join(hit.char for hit in hits[:10])
+        return StoryFailureCode.CJK_IN_OUTPUT, f"{len(hits)} CJK code points ({sample})", ""
+    try:
+        if request.output_mode is OutputMode.PROSE:
+            paragraphs = [p.strip() for p in ProseParagraphs.model_validate_json(content, strict=True).paragraphs]
+            if not request.min_paragraphs <= len(paragraphs) <= request.max_paragraphs:
+                return StoryFailureCode.OUTPUT_INVALID, f"{len(paragraphs)} paragraphs", ""
+            ceiling = request.max_paragraph_chars
+            if any(len(p) < request.min_paragraph_chars or (ceiling and len(p) > ceiling) for p in paragraphs):
+                return StoryFailureCode.OUTPUT_INVALID, "a paragraph is empty or too short", ""
+            return None, "", "\n\n".join(paragraphs)
+        assert request.response_model is not None
+        request.response_model.model_validate_json(content, strict=True)
+    except ValidationError as exc:
+        return StoryFailureCode.OUTPUT_INVALID, f"{exc.error_count()} schema errors", ""
+    return None, "", content

@@ -73,7 +73,7 @@ const SECTION_GROUPS: SectionGroup[] = [
       { id: "providers", labelKey: "dashboard:providers", Icon: Plug },
       { id: "agent", labelKey: "dashboard:agents", Icon: Bot },
       { id: "endpoints", labelKey: "dashboard:ce_section_title", Icon: Waypoints },
-      { id: "media", labelKey: "dashboard:models", Icon: Film },
+      { id: "media", labelKey: "dashboard:model_defaults_title", Icon: Film },
     ],
   },
   {

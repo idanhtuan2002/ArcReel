@@ -1,0 +1,35 @@
+{
+  "model_id": "gemini-2.5-flash",
+  "provider_id": "gemini-aistudio",
+  "binding": "sha256:5477336f59987110b822ae595df1d90d5350b6f15ba9a2634c853499d08152d3",
+  "cap_usd": "0.10",
+  "max_generation_requests": 1,
+  "max_output_tokens": 2048,
+  "status": "PASSED",
+  "contains_user_content": false,
+  "recorded_at": "2026-10-24T08:53:25.217114+00:00",
+  "input_tokens": 26,
+  "output_tokens": 51,
+  "finish_reason": "stop",
+  "request_digest": "sha256:4df1b24857b9c3db924e7fe07c6ac0663fe70d8ce2c7e404370b25d4bf628b73",
+  "response_digest": "sha256:1d8d23d2098c3593600af75a6f13cd9ae2bddf7eec15112f87bebde64e7e9a42",
+  "output_schema_valid": true,
+  "attempts": [
+    {
+      "kind": "COUNT",
+      "state": "COMPLETED",
+      "reserved_input_tokens": 4096,
+      "reserved_output_tokens": 0,
+      "charged_input_tokens": 25,
+      "charged_output_tokens": 0
+    },
+    {
+      "kind": "GENERATE",
+      "state": "COMPLETED",
+      "reserved_input_tokens": 415,
+      "reserved_output_tokens": 2048,
+      "charged_input_tokens": 26,
+      "charged_output_tokens": 51
+    }
+  ]
+}

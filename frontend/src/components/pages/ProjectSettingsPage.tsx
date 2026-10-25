@@ -778,6 +778,7 @@ export function ProjectSettingsPage() {
               {/* Model config (video + duration + image + text) */}
               <SectionCard kicker="Engine Routing" title={t("model_config")}>
                 <ModelConfigSection
+                  collapsible
                   projectName={projectName}
                   value={{
                     videoBackend,

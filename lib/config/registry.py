@@ -401,6 +401,42 @@ PROVIDER_REGISTRY: dict[str, ProviderMeta] = {
                 capabilities=["text_generation", "structured_output"],
                 pricing=_gemini_text_pricing("gemini-3.1-flash-lite-preview", 0.25, 1.50),
             ),
+            "gemini-3.8-flash": ModelInfo(
+                display_name="Gemini 3.8 Flash",
+                media_type="text",
+                capabilities=["text_generation", "structured_output", "vision"],
+                pricing=_gemini_text_pricing("gemini-3.8-flash", 0.75, 3.75),
+            ),
+            "gemini-3.6-flash": ModelInfo(
+                display_name="Gemini 3.6 Flash",
+                media_type="text",
+                capabilities=["text_generation", "structured_output", "vision"],
+                pricing=_gemini_text_pricing("gemini-3.6-flash", 0.75, 3.75),
+            ),
+            "gemini-2.5-flash": ModelInfo(
+                display_name="Gemini 2.5 Flash",
+                media_type="text",
+                capabilities=["text_generation", "structured_output", "vision"],
+                pricing=_gemini_text_pricing("gemini-2.5-flash", 0.30, 2.50),
+            ),
+            "gemini-3.5-flash-lite": ModelInfo(
+                display_name="Gemini 3.5 Flash Lite",
+                media_type="text",
+                capabilities=["text_generation", "structured_output", "vision"],
+                pricing=_gemini_text_pricing("gemini-3.5-flash-lite", 0.30, 2.50),
+            ),
+            "gemma-4-31b-it": ModelInfo(
+                display_name="Gemma 4 31B",
+                media_type="text",
+                capabilities=["text_generation"],
+                pricing=_gemini_text_pricing("gemma-4-31b-it", 0.00, 0.00),
+            ),
+            "gemma-4-26b-a4b-it": ModelInfo(
+                display_name="Gemma 4 26B A4B",
+                media_type="text",
+                capabilities=["text_generation"],
+                pricing=_gemini_text_pricing("gemma-4-26b-a4b-it", 0.00, 0.00),
+            ),
             # --- image ---
             "gemini-3-pro-image-preview": ModelInfo(
                 display_name="Gemini 3 Pro Image",

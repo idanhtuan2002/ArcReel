@@ -1,0 +1,522 @@
+{
+  "status": "OFFLINE_CROSSWALK_AND_IMPORT_SPIKE_COMPLETE_NOT_RUNTIME_ACCEPTANCE",
+  "recorded_at_utc": "2026-10-24T01:21:38.427858+00:00",
+  "host_head": "b646708d62b8dcbb183a65ea5341f29db99e2a14",
+  "donor_pin": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+  "crosswalk": {
+    "host_head": "b646708d62b8dcbb183a65ea5341f29db99e2a14",
+    "donor_pin": "258c7ff1ca1f103117cb4f757f7f09fd46cb8647",
+    "cases": [
+      {
+        "case": "tokens_USD",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_token",
+        "amount": 0.00155,
+        "currency": "USD",
+        "dimensions": {}
+      },
+      {
+        "case": "missing_tokens_USD",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_token",
+        "legacy_amount": 0.0,
+        "currency": "USD",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "zero_tokens_USD",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_token",
+        "amount": 0.0,
+        "currency": "USD",
+        "dimensions": {}
+      },
+      {
+        "case": "tokens_CNY",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_token",
+        "amount": 0.00155,
+        "currency": "CNY",
+        "dimensions": {}
+      },
+      {
+        "case": "missing_tokens_CNY",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_token",
+        "legacy_amount": 0.0,
+        "currency": "CNY",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "zero_tokens_CNY",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_token",
+        "amount": 0.0,
+        "currency": "CNY",
+        "dimensions": {}
+      },
+      {
+        "case": "image_count",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_image_flat",
+        "amount": 0.12,
+        "currency": "USD",
+        "dimensions": {}
+      },
+      {
+        "case": "resolution_1K",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_image_by_resolution",
+        "amount": 0.2,
+        "currency": "USD",
+        "dimensions": {
+          "resolution": "1K"
+        }
+      },
+      {
+        "case": "resolution_2k",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_image_by_resolution",
+        "amount": 0.4,
+        "currency": "USD",
+        "dimensions": {
+          "resolution": "2K"
+        }
+      },
+      {
+        "case": "resolution_4K",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_image_by_resolution",
+        "amount": 0,
+        "currency": "USD",
+        "dimensions": {
+          "resolution": "4K"
+        }
+      },
+      {
+        "case": "unknown_image_resolution",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_image_by_resolution",
+        "legacy_amount": 0.1,
+        "currency": "USD",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "missing_image_resolution",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_image_by_resolution",
+        "legacy_amount": 0.1,
+        "currency": "USD",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "image_exact_medium",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_image_openai_token",
+        "amount": 0.068,
+        "currency": "USD",
+        "dimensions": {
+          "quality": "medium",
+          "resolution": "1024x1024"
+        }
+      },
+      {
+        "case": "image_exact_high",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_image_openai_token",
+        "amount": 0.4,
+        "currency": "USD",
+        "dimensions": {
+          "quality": "high",
+          "resolution": "1536x1024"
+        }
+      },
+      {
+        "case": "image_exact_low",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_image_openai_token",
+        "amount": 0,
+        "currency": "USD",
+        "dimensions": {
+          "quality": "low",
+          "resolution": "1024x1024"
+        }
+      },
+      {
+        "case": "image_unknown_size",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_image_openai_token",
+        "legacy_amount": 0.1,
+        "currency": "USD",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "image_missing_size",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_image_openai_token",
+        "legacy_amount": 0.034,
+        "currency": "USD",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "image_unknown_quality",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_image_openai_token",
+        "legacy_amount": 0.034,
+        "currency": "USD",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "image_actual_tokens",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_image_openai_token",
+        "amount": 0.0037,
+        "currency": "USD",
+        "dimensions": {}
+      },
+      {
+        "case": "matrix_720p_True",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_matrix",
+        "amount": 4.0,
+        "currency": "USD",
+        "dimensions": {
+          "resolution": "720p",
+          "audio": true
+        }
+      },
+      {
+        "case": "matrix_720p_False",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_matrix",
+        "amount": 2.0,
+        "currency": "USD",
+        "dimensions": {
+          "resolution": "720p",
+          "audio": false
+        }
+      },
+      {
+        "case": "matrix_1080p_False",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_matrix",
+        "amount": 0,
+        "currency": "USD",
+        "dimensions": {
+          "resolution": "1080p",
+          "audio": false
+        }
+      },
+      {
+        "case": "matrix_unknown_resolution",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_second_matrix",
+        "legacy_amount": 4.0,
+        "currency": "USD",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "matrix_zero_duration",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_matrix",
+        "amount": 0.0,
+        "currency": "USD",
+        "dimensions": {
+          "resolution": "720p",
+          "audio": true
+        }
+      },
+      {
+        "case": "matrix_missing_duration",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_second_matrix",
+        "legacy_amount": 4.0,
+        "currency": "USD",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "quality_std",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_tiered",
+        "amount": 0.5,
+        "currency": "CNY",
+        "dimensions": {
+          "quality": "std",
+          "audio": false
+        }
+      },
+      {
+        "case": "quality_default",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_tiered",
+        "amount": 1.0,
+        "currency": "CNY",
+        "dimensions": {
+          "quality": "std",
+          "audio": true
+        }
+      },
+      {
+        "case": "quality_pro",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_tiered",
+        "amount": 2.0,
+        "currency": "CNY",
+        "dimensions": {
+          "quality": "pro",
+          "audio": true
+        }
+      },
+      {
+        "case": "quality_4k_override",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_tiered",
+        "amount": 4.0,
+        "currency": "CNY",
+        "dimensions": {
+          "quality": "4k",
+          "audio": false
+        }
+      },
+      {
+        "case": "quality_1080_std",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_second_tiered",
+        "amount": 0.5,
+        "currency": "CNY",
+        "dimensions": {
+          "quality": "std",
+          "audio": false
+        }
+      },
+      {
+        "case": "quality_unknown_tier",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_second_tiered",
+        "legacy_amount": 0.5,
+        "currency": "CNY",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "bucket_exact_6",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_video_bucket",
+        "amount": 2,
+        "currency": "CNY",
+        "dimensions": {
+          "resolution": "720p",
+          "duration": 6
+        }
+      },
+      {
+        "case": "bucket_exact_10",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_video_bucket",
+        "amount": 4,
+        "currency": "CNY",
+        "dimensions": {
+          "resolution": "720p",
+          "duration": 10
+        }
+      },
+      {
+        "case": "bucket_nearest_tie",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_video_bucket",
+        "legacy_amount": 2,
+        "currency": "CNY",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "bucket_cross_resolution",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_video_bucket",
+        "legacy_amount": 1,
+        "currency": "CNY",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "video_tokens_default",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_token_video",
+        "amount": 1.6,
+        "currency": "CNY",
+        "dimensions": {
+          "service_tier": "standard",
+          "audio": true
+        }
+      },
+      {
+        "case": "video_tokens_flex",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_token_video",
+        "amount": 0.8,
+        "currency": "CNY",
+        "dimensions": {
+          "service_tier": "flex",
+          "audio": false
+        }
+      },
+      {
+        "case": "video_tokens_missing_usage",
+        "status": "LEGACY_FALLBACK_VS_STRICT_UNPRICED",
+        "shape": "per_token_video",
+        "legacy_amount": 0.0,
+        "currency": "CNY",
+        "donor_reason": "missing_rate"
+      },
+      {
+        "case": "characters_raw_count",
+        "status": "EXACT_ARITHMETIC_MATCH",
+        "shape": "per_character",
+        "amount": 0.00032,
+        "currency": "CNY",
+        "dimensions": {}
+      },
+      {
+        "case": "characters_optional_cjk_double",
+        "status": "EXPLICIT_POLICY_DIFFERENCE",
+        "legacy_count": 4,
+        "donor_opt_in_count": 6
+      },
+      {
+        "case": "vidu_credit_0",
+        "status": "DELEGATE_REQUIRED",
+        "shape": "vidu_delegate",
+        "amount": 0,
+        "currency": "CNY",
+        "credits": 0
+      },
+      {
+        "case": "vidu_credit_32",
+        "status": "DELEGATE_REQUIRED",
+        "shape": "vidu_delegate",
+        "amount": 1,
+        "currency": "CNY",
+        "credits": 32
+      },
+      {
+        "case": "LOCAL_currency",
+        "status": "DELEGATE_REQUIRED",
+        "reason": "not_paid_USD_or_CNY"
+      },
+      {
+        "case": "custom_independent_rates_USD",
+        "status": "HOST_PRICE_FACTS_PRESERVED",
+        "input_rate": 0.45,
+        "output_rate": 1.25,
+        "amount": 0.001075,
+        "currency": "USD"
+      },
+      {
+        "case": "custom_independent_rates_CNY",
+        "status": "HOST_PRICE_FACTS_PRESERVED",
+        "input_rate": 0.45,
+        "output_rate": 1.25,
+        "amount": 0.001075,
+        "currency": "CNY"
+      },
+      {
+        "case": "adapter_mode_1080p_std",
+        "status": "CONFIRMED_EXECUTION_DIFFERENCE",
+        "host_mode": "std",
+        "donor_mode": "pro"
+      },
+      {
+        "case": "adapter_mode_4k_std",
+        "status": "ISOLATED_METHOD_MATCH",
+        "host_mode": "4k",
+        "donor_mode": "4k"
+      },
+      {
+        "case": "adapter_mode_720p_pro",
+        "status": "ISOLATED_METHOD_MATCH",
+        "host_mode": "pro",
+        "donor_mode": "pro"
+      },
+      {
+        "case": "adapter_mode_720p_default",
+        "status": "ISOLATED_METHOD_MATCH",
+        "host_mode": "std",
+        "donor_mode": "std"
+      }
+    ],
+    "case_count": 49,
+    "counts": {
+      "CONFIRMED_EXECUTION_DIFFERENCE": 1,
+      "DELEGATE_REQUIRED": 3,
+      "EXACT_ARITHMETIC_MATCH": 26,
+      "EXPLICIT_POLICY_DIFFERENCE": 1,
+      "HOST_PRICE_FACTS_PRESERVED": 2,
+      "ISOLATED_METHOD_MATCH": 3,
+      "LEGACY_FALLBACK_VS_STRICT_UNPRICED": 13
+    },
+    "host_source_sha256": {
+      "lib/pricing/types.py": "8912cf168a438d28539b0d6f55d8dc6b4ecb9caec79c30019a4c3504e8d04ecf",
+      "lib/pricing/strategies.py": "7f384586fc48b0a26b832c9ba9483d7f8face8874bfc38db7ab5d68a591a1e1f",
+      "lib/cost_calculator.py": "bfd2baaf1f0b79886bc796eb210ce5308673bb18cd985872289084082837f18b",
+      "lib/video_backends/kling.py": "1e256e1f8888e81f2135cbfa1912c8f22b81cb43305f19071063868eb37072f5",
+      "lib/video_backends/ark.py": "358aeaad25407597c9e09b05a32e8280b4f5fe78a51eedd7414d6d82901e6f85",
+      "lib/vidu_shared.py": "da6d898f68ee4abfc56891b5275303e917e8f8cedaa6a77b870dca384f36fc40",
+      "lib/db/models/custom_provider.py": "e2de2befe6926e3d6fd8af8562c784be4c1d1c9fc7e8e58647699a02b7bf6b0d"
+    },
+    "donor_source_sha256": {
+      "lib/billing/metering.py": "a10716df6a783de359c5eb9a21de26da70a91b5b32633f96817419c9a8ea8a51",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/__init__.py": "ea2840c1d101c558395880d00c57512c37025832457b1406f873d18e638307bb",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/__main__.py": "25856f7c9486dcb67b392cf9a92c04ce6e8005fbb0a8c72bb8f37f94be441a00",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/cli.py": "655b5bc337544b4805e7dc00dae61c48b44425c58f7054acb0f9c891f2cef3bb",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/dataset.py": "8372bb73e62de885cf0359a513d690d3a311dd83353d412630eb596b48b33a0d",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/model.py": "056df93f13c6ed15627bea5929a800925cacb5f4b71dc5a740e7f81e3b985659",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/names.py": "a7ae7eceb4714adb5026812a4f8d4b55671a099cea72bc27a121882af5e75f8c",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/reading.py": "f622f64849ab1dc40855759995499ef66f20bf0ba76fea43572b8a48b12bb9db",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/vocabulary.py": "bfd55fed4adc51375661c3de0791adc25b179d6e772a6dd94111969572aa2a12",
+      "packages/arcreel-catalog-core/src/arcreel_catalog_core/writing.py": "91835216eb225292a7f213d33e84c71385fea7becdf5da667c533e162df55d7e",
+      "tests/unit/lib/billing/test_metering.py": "82459a1f5c983ff9b57cc377526136c4d83cf4891e89869cfab199fba93c7801"
+    },
+    "pinned_donor_kling_source_sha256": "8c1d2eb525cecb7972faed6e6d1e2e8cbee8fecd6b44a1d0e0fd819d5bf5debc",
+    "network_attempts": [],
+    "limits": [
+      "Hand-constructed fixture tables, not a production converter or actual provider response parsing.",
+      "Quality/size mappings demonstrate a representation; they do not authorize execution or replace host adapters.",
+      "Kling donor method body isolated from pinned AST, not a complete donor backend test.",
+      "Zero usage differs from missing usage; existing legacy fallback is characterized, not changed.",
+      "No DB/ledger/budget write, migration, price sync, SDK construction or production activation."
+    ]
+  },
+  "isolated_port": {
+    "original_tests_passed": 9,
+    "original_test_file_byte_exact": true,
+    "dependency_install": false,
+    "source_port": {
+      "model.py": {
+        "source_sha256": "056df93f13c6ed15627bea5929a800925cacb5f4b71dc5a740e7f81e3b985659",
+        "copied_byte_exact": true
+      },
+      "vocabulary.py": {
+        "source_sha256": "bfd55fed4adc51375661c3de0791adc25b179d6e772a6dd94111969572aa2a12",
+        "copied_byte_exact": true
+      },
+      "metering.py": {
+        "source_sha256": "a10716df6a783de359c5eb9a21de26da70a91b5b32633f96817419c9a8ea8a51",
+        "ported_sha256": "a1194ce17ac72a499d4e087768e89ca9954952479096261ac6a58d962e38717f",
+        "only_change": "replace one package import with two relative imports"
+      }
+    },
+    "command": "PYTHONPATH=<isolated-port> python -m pytest -c /dev/null --rootdir=<isolated-port> --confcutdir=<isolated-port> <isolated-port>/tests/test_metering.py -q",
+    "junit": ".superpowers/sdd/2026-10-24-model-metering-crosswalk/isolated-port/port-tests.xml"
+  },
+  "graph": {
+    "project": "r2-v2-main",
+    "generation": "2026-10-15T01:19:44Z",
+    "tier": 2,
+    "limitation": "Index is another older linked worktree. Seven material host files read directly; lib/pricing source inventory confirmed. Scope coverage reports excluded bytecode cache only. Donor Git object files are not graph-indexed; exact pinned source fallback used."
+  },
+  "probe_sha256": "92355901d3191add3c9ddb3e52ace471f19fe314921fc5debac512a3aabe7a7a",
+  "archive": {
+    "path": ".superpowers/sdd/2026-10-24-model-metering-crosswalk-evidence.tar.gz",
+    "sha256": "88ef5a6f4225c0af74187f84198803374b85859a7ca8da8d35002797f947d4c3"
+  },
+  "runtime_changes": false,
+  "production_activation": false,
+  "existing_full_backend_gate": "NOT_GREEN: two unchanged Story Authoring authority assertions reproduced in clean baseline and candidate; this gate was not rerun here"
+}

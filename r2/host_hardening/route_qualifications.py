@@ -61,6 +61,7 @@ ROUTE_ADAPTER_VERSIONS: dict[str, str] = {
     "media:audio": "host-media-v1",
     "agent": "agent-sdk-v2",
     "trial_run": "declarative-trial-v1",
+    "story": "gemini-story-v1",
 }
 
 _OFFLINE_OR_BETTER = frozenset(

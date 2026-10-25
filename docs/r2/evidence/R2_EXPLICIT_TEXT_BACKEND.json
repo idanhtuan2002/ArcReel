@@ -1,0 +1,154 @@
+{
+  "schema_version": "1",
+  "status": "SOURCE_VERIFIED_NOT_DEPLOYED",
+  "recorded_at": "2026-10-24T07:23:20.352795+00:00",
+  "code_head": "2ee4730354eb9985705a3f756fbede21d07c9639",
+  "branch": "feat/v2-explicit-text-backend",
+  "plan_base": "b2d65f757da4ff874bb42d1f81064ded52d66fbe",
+  "code_sha256": {
+    "lib/config/resolver.py": "3d84eb00e86fe98baf9c3f07e3dbe13835b2eb82d65db2518e6e4b3b54881d38",
+    "lib/text_backends/factory.py": "ff4d07846da1faf91a27b7b64ee4a7f628d53141f38f111013c34989a7b9bb0b",
+    "lib/text_generator.py": "51864ed7e6491029d8ba6f4e2aba899369d845d7c5f819e9ebf84bd341365a39",
+    "lib/text_backends/console.py": "f17a9cd437fdabbd1f85d81de5de64eda6ecb83caf1f61bd5b93430d02b7d4df",
+    "tests/integration/lib/text_backends/test_explicit_selection.py": "6803dd418c1b52ce9dbbc7c3570cb3cdc35184ba28777fca7094ca60e387fa27",
+    "tests/unit/lib/text_backends/test_console.py": "d6b9f803cc464c4c6cc7ff8c91714e0c33c66094ee81d9a64a646d0e2e37febc"
+  },
+  "new_tests": 23,
+  "affected_tests": {
+    "command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/lib/text_backends tests/unit/lib/test_text_generator.py tests/unit/lib/config tests/unit/lib/backend_assembly tests/integration/lib/config tests/integration/lib/backend_assembly tests/integration/lib/text_backends tests/unit/r2/host_hardening/test_paid_routes.py tests/unit/r2/host_hardening/test_route_qualifications.py -n 4 --dist loadfile -q",
+    "passed": 818,
+    "failed": 0,
+    "warnings": 4,
+    "warning_kind": "SQLite reflection skips expression-based index idx_tasks_dedupe_active",
+    "log": "docs/r2/evidence/explicit-text-backend-2026-10-24/task-1-tests.log",
+    "exit_code": 0
+  },
+  "static_checks": [
+    {
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "check",
+        "."
+      ],
+      "returncode": 0
+    },
+    {
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "returncode": 0
+    },
+    {
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright",
+        "--warnings",
+        "--venvpath",
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main"
+      ],
+      "returncode": 0
+    },
+    {
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports"
+      ],
+      "returncode": 0
+    },
+    {
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry",
+        "lib",
+        "server",
+        "alembic",
+        "scripts",
+        "tests",
+        "r2"
+      ],
+      "returncode": 0
+    },
+    {
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+        "scripts/audit_tests.py",
+        "--check"
+      ],
+      "returncode": 0
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "b2d65f757da4ff874bb42d1f81064ded52d66fbe",
+        "2ee4730354eb9985705a3f756fbede21d07c9639"
+      ],
+      "returncode": 0
+    }
+  ],
+  "operator_smoke": {
+    "commands": [
+      "python -m lib.text_backends.console --list",
+      "python -m lib.text_backends.console --help"
+    ],
+    "exit_codes": [
+      0,
+      0
+    ],
+    "registered_text_models": 42,
+    "providers": [
+      "agnes",
+      "ark",
+      "ark-agent-plan",
+      "dashscope",
+      "gemini-aistudio",
+      "gemini-vertex",
+      "grok",
+      "minimax",
+      "openai"
+    ],
+    "constructs_sdk_during_listing": false,
+    "provider_generation_requests": 0
+  },
+  "review": {
+    "verdict": "APPROVE",
+    "critical": 0,
+    "important": 0,
+    "minor": 0,
+    "report": "docs/r2/evidence/explicit-text-backend-2026-10-24/review.md",
+    "independent_tests_rerun": false
+  },
+  "limits": [
+    "No live provider generation or actual-credential/quota/availability verification.",
+    "No successful production-mode console construction with a real qualification record was exercised.",
+    "No merge, push, deployment or UI/story activation. Story authoring remains Ollama-only.",
+    "No native Anthropic Messages adapter. Custom compatible gateways are not native Claude support.",
+    "Affected domains only; historical whole-backend baseline failures not claimed fixed or rerun.",
+    "Graph is older linked-worktree evidence; direct source fallback used for new/excluded files."
+  ],
+  "preserved_unrelated_paths": [
+    "docs/superpowers/plans/2026-10-23-story-gemini.md",
+    "docs/superpowers/specs/2026-10-23-story-gemini.md"
+  ],
+  "evidence_sha256": {
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/affected.log": "c1aceb9ccec5c98420ec2daf256752ef71a6f887fdf48d1afd92ad1a2fd61c46",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/affected.xml": "36fea9893f2dae00ac736c942ec2a077a01fcaf8a35901c16ca7c7a4cdaf4476",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/basedpyright-check.log": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/console-green.log": "b462d55763730d11a7ad04f232b99dfe1c4e33558f8db573cabf0ad42dae16f7",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/console-red.log": "c3854d01aa59234decbb79eb0476713518bf73073fe65c45b7335489c3e79ce9",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/deptry-check.log": "85b9468c4ad48fa245b3354e160cacd530e3a64f5f4a270e1f23a375e6031bfb",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/green.log": "47c320ffa12ddf16070272df9473b7f2afb7fd394c3187bbc3ae4e01c2f04186",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/lint-imports-check.log": "475615c9e9ee22b448b9eff7ca13519faa8c7042704aac6f35dc23cb486c2395",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/progress.md": "036eb16e12c371852f643b3f946f019059efe1e2c19cf79a52f9196ad54dc862",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/python-check.log": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/red.log": "461686254cba5fab9b0057b0a520e2fba0ccf6702b6df76e1f22494939a37b4d",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/review.md": "b23907e27bbab02a1a7c5d690b750e4b3e29ade9f45886f3159472f98ab3b2f2",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/ruff-check.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/ruff-format.log": "c12c86d3e0979b9f226a47e24dfab68be510a164d4ddd53ee1ed7fda4cec502f",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/static-results.json": "192ff42ed52e0af0918aa1d006cd2136aa29b526deb08a93d26c0da197666be3",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/task-1-tests.log": "bc3f1f5f90c7f951cb365e302f4e6741061dd7c230e6c2dd33eba4e463ceac39",
+    "docs/r2/evidence/explicit-text-backend-2026-10-24/task-2-tests.log": "bfe00ae4e3b541f6eaede18b705f2200fe89c3a5ce3c4e7191e56b953efa8c5a"
+  },
+  "log_normalization": "Trailing whitespace from import-linter console formatting was removed in the archived log; command result and text content preserved."
+}

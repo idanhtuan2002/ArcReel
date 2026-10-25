@@ -1,0 +1,57 @@
+{
+  "schema_version": "1",
+  "status": "APPROVED_TAG_PUSHED_OS_AUTHENTICATION_REQUIRED",
+  "approved_in_current_session": true,
+  "created_at": "2026-10-23T14:54:24.164903+00:00",
+  "release_tag": "r2-v2.0.6",
+  "tag_object": "be347b1410433639c9faff17e30cc7df965b0d54",
+  "release_commit": "8bd86a6c3915281838df15ee16ea4a70c3e20e71",
+  "tested_code_head": "95e12819ba4595c9acde430ceb1630d3ace88fc9",
+  "remote_tag_pushed": true,
+  "currently_running_tag": "r2-v2.0.5",
+  "currently_running_commit": "4bd70525dc2a4e5a0e05c57381a90a35301ec169",
+  "app_stopped": false,
+  "backup_created_by_this_attempt": false,
+  "deployment_executed": false,
+  "preflight": {
+    "mode": "pre",
+    "active_task_count": 0,
+    "schema_head": "918c4a0e0001",
+    "health_status": 200,
+    "anonymous_providers_status": 401,
+    "authenticated_providers_status": 200,
+    "head": "4bd70525dc2a4e5a0e05c57381a90a35301ec169"
+  },
+  "staging_dirty_edit_preservation": {
+    "sha256": "7e315e71b719fa7534ce5bae2ee14c13ccec4efc3c5dafdcc7c40085c7d2e568",
+    "raw_file": "/home/anhtuan/.codex/worktrees/c1b3/content-production-os/.superpowers/sdd/2026-10-23-gemini-takeover/deploy/staging-registry.py",
+    "git_patch": "/home/anhtuan/.codex/worktrees/c1b3/content-production-os/.superpowers/sdd/2026-10-23-gemini-takeover/deploy/staging.patch",
+    "working_file_changed_by_this_attempt": false
+  },
+  "manual_command": "bash /tmp/arcreel-v2.0.6-deploy.sh",
+  "manual_requirement": "sudo reports interactive authentication is required; sandbox escalation does not grant root. No password requested in chat.",
+  "prepared_scripts": {
+    "cutover.sh": "a87cd37ec5e63951d5243929ae44df5a731c37c784001bfddeeb86b03dea443e",
+    "wizard.sh": "0c066bc2ccb43451e93fa9f99b5f63fd0b850ddaccdf638bb440008a27d903ac",
+    "check_deployment.py": "79b7597cf79fdea6f35340163c18f7c2f1e3f110e2a5bfc0901e432d1e283079",
+    "preflight.json": "e624477c361e09141b768c975fcd9b0600d6b2b7d4cee33b85a97cb9e4dff726"
+  },
+  "wizard_library": "/home/anhtuan/content-production-os/.agents/skills/wizard/template.sh; library copied unchanged",
+  "verification": [
+    "bash -n cutover.sh:0",
+    "bash -n wizard:0",
+    "cutover.sh --check:0; read-only path only"
+  ],
+  "not_executed": [
+    "privileged cutover",
+    "automatic rollback",
+    "post-deploy smoke"
+  ],
+  "archive": {
+    "path": "/home/anhtuan/.codex/worktrees/c1b3/content-production-os/.superpowers/sdd/2026-10-23-v2.0.6-deployment-preparation.tar.gz",
+    "sha256": "88f476dd896a31e146d70b4151ce31296f8db4b413d48ff20479c8701f40825c",
+    "bytes": 23063
+  },
+  "next": "After human sudo authentication and execution, verify actual backup/tag/health/auth/model catalog and replace preparation status with an actual deploy record.",
+  "m9_m10_remain_paused": true
+}

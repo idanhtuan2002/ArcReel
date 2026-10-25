@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -119,3 +119,12 @@ async def resolve_endpoint_spec(
     if row is None:
         raise ValueError(f"unknown endpoint: {endpoint!r}")
     return endpoint_spec_from_row(row)
+
+
+def resolve_endpoint_durations(spec: EndpointSpec, stored: Sequence[int] | None) -> tuple[int, ...]:
+    """Apply the endpoint's duration authority to a model's stored duration declaration."""
+    if spec.duration_tier_empty:
+        return ()
+    if stored:
+        return tuple(stored)
+    return tuple(spec.endpoint_durations or ())

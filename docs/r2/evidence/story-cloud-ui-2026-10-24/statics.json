@@ -1,0 +1,54 @@
+[
+  {
+    "command": [
+      "ruff",
+      "check",
+      "."
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "ruff",
+      "format",
+      "--check",
+      "."
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "basedpyright",
+      "--warnings",
+      "--venvpath",
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "lint-imports"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "deptry",
+      "lib",
+      "server",
+      "alembic",
+      "scripts",
+      "tests",
+      "r2"
+    ],
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "python",
+      "scripts/audit_tests.py",
+      "--check"
+    ],
+    "exit_code": 0
+  }
+]

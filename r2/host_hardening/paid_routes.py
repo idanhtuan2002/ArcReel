@@ -29,7 +29,7 @@ from r2.host_hardening.provider_capabilities import ReleaseMode
 
 RELEASE_MODE_ENV = "ARCREEL_RELEASE_MODE"
 
-PaidRouteKind = Literal["media", "custom_media", "agent", "trial_run"]
+PaidRouteKind = Literal["media", "custom_media", "agent", "trial_run", "story"]
 
 #: Media types a custom provider can serve through the declarative runtime.
 CUSTOM_MEDIA_TYPES: frozenset[str] = frozenset({"image", "video", "text", "audio"})
@@ -155,7 +155,7 @@ def paid_route_inventory() -> frozenset[PaidRoute]:
 
     routes = {PaidRoute("media", provider_id=p, media_type=m) for p, m in PROVIDER_SPEC_REGISTRY}
     routes |= {PaidRoute("custom_media", media_type=m) for m in CUSTOM_MEDIA_TYPES}
-    routes |= {PaidRoute("agent"), PaidRoute("trial_run")}
+    routes |= {PaidRoute("agent"), PaidRoute("trial_run"), PaidRoute("story", provider_id="gemini-aistudio")}
     return frozenset(routes)
 
 

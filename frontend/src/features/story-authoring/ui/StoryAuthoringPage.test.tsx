@@ -7,15 +7,22 @@ import type { Finding, RunSummary, StoryRun } from "../api/storyClient";
 import StoryAuthoringPage from "./StoryAuthoringPage";
 
 const PROVIDERS = {
-  providers: [
+  routes: [
     {
-      id: 7,
-      display_name: "Ollama local",
-      models: [
-        { model_id: "qwen3.5-vimax:9b", display_name: "", endpoint: "ollama-chat", is_enabled: true },
-        { model_id: "gemma3:12b", display_name: "", endpoint: "ollama-chat", is_enabled: true },
-        { model_id: "gpt-x", display_name: "", endpoint: "openai-chat", is_enabled: true },
-      ],
+      provider_id: "custom-7",
+      model_id: "qwen3.5-vimax:9b",
+      label: "Ollama local · qwen3.5-vimax:9b",
+      enabled: true,
+      reason: null,
+      cloud: false,
+    },
+    {
+      provider_id: "custom-7",
+      model_id: "gemma3:12b",
+      label: "Ollama local · gemma3:12b",
+      enabled: true,
+      reason: null,
+      cloud: false,
     },
   ],
 };
@@ -28,7 +35,13 @@ const SELECTION = {
   has_credential: false,
   digest: "sha256:s",
 };
-const BRIEF = { idea: "Minh về làng bán nhà.", genre: "đời thường", selection: SELECTION, judge_selection: null, story_target_syllables: 9000 };
+const BRIEF = {
+  idea: "Minh về làng bán nhà.",
+  genre: "đời thường",
+  selection: SELECTION,
+  judge_selection: null,
+  story_target_syllables: 9000,
+};
 
 const EXCEPTION: Finding = {
   id: "F002",
@@ -47,7 +60,13 @@ function run(overrides: Partial<StoryRun> = {}): StoryRun {
     blocked_findings: [],
     brief: BRIEF,
     brief_digest: "sha256:brief",
-    usage: { count_calls: 10, generate_calls: 10, input_tokens: 80000, output_tokens: 9000, model_milliseconds: 600000 },
+    usage: {
+      count_calls: 10,
+      generate_calls: 10,
+      input_tokens: 80000,
+      output_tokens: 9000,
+      model_milliseconds: 600000,
+    },
     limits: { input_tokens_max: 1, output_tokens_max: 1, wall_clock_max_seconds: 1 },
     intents: {},
     offered: {
@@ -58,7 +77,14 @@ function run(overrides: Partial<StoryRun> = {}): StoryRun {
         { node_id: "scene_draft[2,1]", chapter: 2, scene: 1, text: "Lan mở cuốn sổ." },
       ],
       findings: [
-        { id: "F001", code: "NO_DIALOGUE", severity: "STYLISTIC", node_id: "scene_draft[2,1]", message: "thiếu thoại", quote: "" },
+        {
+          id: "F001",
+          code: "NO_DIALOGUE",
+          severity: "STYLISTIC",
+          node_id: "scene_draft[2,1]",
+          message: "thiếu thoại",
+          quote: "",
+        },
         EXCEPTION,
       ],
       packaging: {
@@ -87,6 +113,8 @@ let runs: RunSummary[] = [];
 let current: StoryRun = run();
 let routes: Record<string, () => Response> = {};
 let providers: () => Response = () => json(PROVIDERS);
+let projectDefaults: Record<string, string> = {};
+let systemDefaults: Record<string, string> = {};
 const requests: { url: string; method: string; body: Record<string, unknown> | null }[] = [];
 
 function posted(suffix: string): Record<string, unknown>[] {
@@ -111,15 +139,23 @@ beforeEach(() => {
   current = run();
   routes = {};
   providers = () => json(PROVIDERS);
+  projectDefaults = {};
+  systemDefaults = {};
   requests.length = 0;
   sessionStorage.clear();
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
-    requests.push({ url, method, body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null });
+    requests.push({
+      url,
+      method,
+      body: init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null,
+    });
     const route = method === "POST" ? Object.keys(routes).find((suffix) => url.endsWith(suffix)) : undefined;
     if (route) return Promise.resolve(routes[route]());
-    if (url.endsWith("/custom-providers")) return Promise.resolve(providers());
+    if (url.endsWith("/projects/demo") && method === "GET") return Promise.resolve(json({ project: projectDefaults }));
+    if (url.endsWith("/system/config") && method === "GET") return Promise.resolve(json({ settings: systemDefaults }));
+    if (url.endsWith("/story-routes")) return Promise.resolve(providers());
     if (url.endsWith("/story-runs") && method === "GET") return Promise.resolve(json({ runs }));
     if (url.endsWith("/story-runs/story-1") && method === "GET") return Promise.resolve(json(current));
     return Promise.resolve(json({}));
@@ -137,11 +173,13 @@ describe("a new story", () => {
 
   it("offers only models on the story endpoint and keeps typed text across a reload until the run starts", async () => {
     const first = render(<StoryAuthoringPage projectName="demo" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change for this run" }));
     const writer = await screen.findByLabelText("Writing model");
-    expect(within(writer).getAllByRole("option").map((option) => option.textContent)).toEqual([
-      "Ollama local · qwen3.5-vimax:9b",
-      "Ollama local · gemma3:12b",
-    ]);
+    expect(
+      within(writer)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Ollama local · qwen3.5-vimax:9b", "Ollama local · gemma3:12b"]);
     fireEvent.change(screen.getByLabelText("Idea"), { target: { value: "Minh về làng bán nhà." } });
     fireEvent.change(screen.getByLabelText("Genre"), { target: { value: "đời thường" } });
     first.unmount();
@@ -151,10 +189,88 @@ describe("a new story", () => {
     expect(screen.getByLabelText("Genre")).toHaveValue("đời thường");
   });
 
-  it("asks for a story model when none is configured", async () => {
-    providers = () => json({ providers: [] });
+  it("selects a configured cloud writer and freezes its USD cap in the approval brief", async () => {
+    providers = () =>
+      json({
+        routes: [
+          ...PROVIDERS.routes,
+          {
+            provider_id: "gemini-aistudio",
+            model_id: "gemini-2.5-flash",
+            label: "Gemini · Gemini 2.5 Flash",
+            enabled: true,
+            reason: null,
+            cloud: true,
+          },
+          {
+            provider_id: "gemini-aistudio",
+            model_id: "gemini-3.8-flash",
+            label: "Gemini · Gemini 3.8 Flash",
+            enabled: false,
+            reason: "MISSING_CREDENTIAL",
+            cloud: true,
+          },
+        ],
+      });
+    routes["/story-runs/brief"] = () =>
+      json({
+        brief: {
+          ...BRIEF,
+          selection: { ...SELECTION, provider_id: "gemini-aistudio", model_id: "gemini-2.5-flash" },
+          limits: { currency: "USD", max_cost_minor_units: 250 },
+        },
+        brief_digest: "sha256:cloud",
+      });
     render(<StoryAuthoringPage projectName="demo" />);
-    expect(await screen.findByText(/No model can write stories yet/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Change for this run" }));
+    const writer = await screen.findByLabelText("Writing model");
+    expect(within(writer).getByRole("option", { name: /Gemini 3.8 Flash/ })).toBeDisabled();
+    fireEvent.change(writer, { target: { value: "gemini-aistudio/gemini-2.5-flash" } });
+    fireEvent.change(screen.getByLabelText("Cloud budget limit (USD)"), { target: { value: "2.50" } });
+    fireEvent.change(screen.getByLabelText("Idea"), { target: { value: "A village story" } });
+    fireEvent.change(screen.getByLabelText("Genre"), { target: { value: "drama" } });
+    fireEvent.click(screen.getByRole("button", { name: "Prepare brief" }));
+    expect(await screen.findByText("$2.50")).toBeInTheDocument();
+    expect(posted("/story-runs/brief")[0]).toMatchObject({
+      provider_id: "gemini-aistudio",
+      model_id: "gemini-2.5-flash",
+      max_cost_minor_units: 250,
+    });
+  });
+
+  it("shows inherited project models and restores them after a per-run override", async () => {
+    projectDefaults = { text_backend_complex: "custom-7/gemma3:12b" };
+    systemDefaults = { default_text_backend: "custom-7/qwen3.5-vimax:9b" };
+    render(<StoryAuthoringPage projectName="demo" />);
+    expect(await screen.findByText("From project settings")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Writing model" })).not.toBeInTheDocument();
+    expect(screen.getByText("Ollama local · gemma3:12b")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Change for this run" }));
+    fireEvent.change(screen.getByLabelText("Writing model"), { target: { value: "custom-7/qwen3.5-vimax:9b" } });
+    expect(screen.getByText("This story only")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Use inherited models" }));
+    expect(screen.getByText("From project settings")).toBeInTheDocument();
+    expect(screen.getByText("Ollama local · gemma3:12b")).toBeInTheDocument();
+    expect(requests.filter((request) => request.method === "PATCH")).toHaveLength(0);
+  });
+
+  it("requires an explicit choice when the inherited model is unsupported", async () => {
+    projectDefaults = { default_text_backend: "missing/model" };
+    render(<StoryAuthoringPage projectName="demo" />);
+    const writer = await screen.findByLabelText("Writing model");
+    expect(writer).toHaveValue("missing/model");
+    expect(screen.getByRole("alert")).toHaveTextContent("The inherited model is unavailable");
+    fireEvent.change(screen.getByLabelText("Idea"), { target: { value: "A village story" } });
+    fireEvent.change(screen.getByLabelText("Genre"), { target: { value: "drama" } });
+    expect(screen.getByRole("button", { name: "Prepare brief" })).toBeDisabled();
+    fireEvent.change(writer, { target: { value: "custom-7/qwen3.5-vimax:9b" } });
+    expect(screen.getByRole("button", { name: "Prepare brief" })).toBeEnabled();
+  });
+
+  it("asks for a story model when none is configured", async () => {
+    providers = () => json({ routes: [] });
+    render(<StoryAuthoringPage projectName="demo" />);
+    expect(await screen.findByText(/No story model is available/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Prepare brief" })).toBeDisabled();
   });
 
@@ -187,6 +303,7 @@ describe("a new story", () => {
     render(<StoryAuthoringPage projectName="demo" />);
     fireEvent.change(await screen.findByLabelText("Idea"), { target: { value: "Minh về làng bán nhà." } });
     fireEvent.change(screen.getByLabelText("Genre"), { target: { value: "đời thường" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Change for this run" }));
     fireEvent.change(screen.getByLabelText("Review model"), { target: { value: "custom-7/gemma3:12b" } });
     fireEvent.click(screen.getByRole("button", { name: "Prepare brief" }));
 
@@ -251,7 +368,9 @@ describe("touchpoint 2", () => {
     expect(await screen.findByText(/The manuscript changed since you opened it/)).toBeInTheDocument();
     const loads = requests.filter((item) => item.url.endsWith("/story-runs/story-1")).length;
     fireEvent.click(screen.getByRole("button", { name: "Load the current manuscript" }));
-    await waitFor(() => expect(requests.filter((item) => item.url.endsWith("/story-runs/story-1")).length).toBe(loads + 1));
+    await waitFor(() =>
+      expect(requests.filter((item) => item.url.endsWith("/story-runs/story-1")).length).toBe(loads + 1),
+    );
   });
 
   it("sends a revision request for the chosen part with the Human's note", async () => {
@@ -296,7 +415,8 @@ describe("other phases", () => {
     };
     render(<StoryAuthoringPage projectName="demo" />);
     expect(await screen.findByText(/does not resolve the central conflict/)).toBeInTheDocument();
-    const loads = () => requests.filter((item) => item.method === "GET" && item.url.endsWith("/story-runs/story-1")).length;
+    const loads = () =>
+      requests.filter((item) => item.method === "GET" && item.url.endsWith("/story-runs/story-1")).length;
     const before = loads();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText(/The model is planning, writing and reviewing/)).toBeInTheDocument();
@@ -307,7 +427,13 @@ describe("other phases", () => {
   it("finishes a pending hand-off with its own command and offers a new name on a name clash", async () => {
     current = run({
       phase: "COMMITTED",
-      handoff: { command_id: "cmd-pending", filename: "cuon-so", export_digest: "sha256:export", done: false, path: null },
+      handoff: {
+        command_id: "cmd-pending",
+        filename: "cuon-so",
+        export_digest: "sha256:export",
+        done: false,
+        path: null,
+      },
     });
     routes["/send-to-video"] = () => json({ detail: { code: "UPLOAD_FAILED", detail: "source exists" } }, 409);
     render(<StoryAuthoringPage projectName="demo" />);
@@ -325,7 +451,13 @@ describe("other phases", () => {
   it("withdraws an approved story only on a second click and says running video jobs continue", async () => {
     current = run({
       phase: "COMMITTED",
-      handoff: { command_id: "cmd-1", filename: "cuon-so", export_digest: "sha256:export", done: true, path: "source/cuon-so.txt" },
+      handoff: {
+        command_id: "cmd-1",
+        filename: "cuon-so",
+        export_digest: "sha256:export",
+        done: true,
+        path: "source/cuon-so.txt",
+      },
     });
     render(<StoryAuthoringPage projectName="demo" />);
     expect(await screen.findByText("Sent to video as source/cuon-so.txt.")).toBeInTheDocument();

@@ -1,0 +1,45 @@
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 561 files, 2016 dependencies.
+--------------------------------------
+
+lib.config / lib.*_backends / lib.custom_provider 分层契约 KEPT
+ComfyUI 端点实现不依赖声明式运行时 KEPT
+ComfyUI 顶层实现模块不直接依赖声明式运行时 KEPT
+路线中立层不依赖参考生视频子包 KEPT
+C04 R2 预算端口不直连 Host DB 层 KEPT
+M4 稳定契约不依赖生产层 KEPT
+M4 Method Router 不回依赖下游或能力层 KEPT
+M4 CapabilityRegistry 不改写 MethodDecision（不 import method_router） KEPT
+M4 生产智能层不直连 Host DB 层 KEPT
+M4 PromptCompiler 只做翻译不做路由 KEPT
+R2 learning core does not depend on Host persistence KEPT
+R2 narrative core does not depend on Host persistence KEPT
+R2 narrative plan authority does not depend on Host persistence KEPT
+M5B NarrativePlanService cannot reach Canon authoritative writes KEPT
+M5B narrative context is read-only and persistence-neutral KEPT
+R2 narrative lifecycle pure ports are authority- and persistence-free KEPT
+M5C narrative evidence service holds no head-mutation capability KEPT
+M5C-2 sole head writer: only acceptance.py may append decisions or mutate heads KEPT
+M5C-3 compiler purity: no authority write port, repository, UoW, or Canon
+service KEPT
+M5C repositories cannot import or write M5A Canon ORM models KEPT
+M6 adaptation evidence service holds no head-mutation capability KEPT
+M6 adaptation authority service carries no persistence, Canon, or provider
+import KEPT
+M6 adaptation authority kernel carries no persistence, Canon, or provider importKEPT
+
+Contracts: 23 kept, 0 broken.

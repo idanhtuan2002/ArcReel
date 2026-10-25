@@ -32,6 +32,7 @@ import hashlib
 import json
 import sys
 import tempfile
+import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -145,6 +146,7 @@ def _finish(
     started: datetime,
     output: dict[str, Any],
     cost_record_ref: str | None,
+    root: Path | None = None,
 ) -> dict[str, Any]:
     finished = datetime.now(UTC)
     evidence = {
@@ -169,8 +171,140 @@ def _finish(
         cost_record_ref=cost_record_ref,
         recorded_by=args.recorded_by,
         now=finished,
+        root=root,
     )
     return {"qualified": record.route_ref, "model": record.model_id, "expires_at": record.expires_at}
+
+
+async def run_story_canary(
+    args: argparse.Namespace, *, session_factory=async_session_factory, root: Path | None = None
+) -> dict[str, Any]:
+    """One synthetic story generation, capped at USD0.10 and2048 output tokens.
+
+    An isolated durable attempt DB lives under the qualification evidence directory.
+    Failed and unknown attempts remain there; no worker connects to this database.
+    """
+    from pydantic import BaseModel, ConfigDict, Field
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from lib.db.base import Base
+    from lib.db.models import User
+    from lib.db.repositories.task_repo import STORY_RUN_TASK_TYPE, TaskRepository
+    from r2.host_hardening.route_qualifications import qualifications_dir
+    from server.story_authoring.cloud import CloudStoryGateway, GeminiStoryClient
+    from server.story_authoring.contracts import (
+        OutputMode,
+        StoryDecoding,
+        StoryLimits,
+        StoryScope,
+        StoryStepKind,
+        StoryStepRequest,
+    )
+    from server.story_authoring.routes import resolve_cloud_route
+    from server.story_authoring.runtime import RunStateStore, StoryAttemptSink, new_run_state
+
+    class Greeting(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        greeting: str = Field(min_length=1, max_length=200)
+
+    route = PaidRoute("story", provider_id=args.provider)
+    started = datetime.now(UTC)
+    with qualification_canary(route, args.model):
+        resolved = await resolve_cloud_route(session_factory, args.provider, args.model)
+        limits = StoryLimits(
+            max_input_tokens=2048,
+            max_output_tokens=2048,
+            server_context_tokens=4096,
+            input_tokens_max=8192,
+            output_tokens_max=2048,
+            wall_clock_max_seconds=300,
+            generate_calls_max=1,
+            count_calls_max=1,
+            currency="USD",
+            max_cost_minor_units=10,
+            cloud_prices=resolved.profile.prices,
+        )
+        probe_id = uuid.uuid4().hex
+        directory = qualifications_dir(root) / "story-probes" / probe_id
+        directory.mkdir(parents=True)
+        engine = create_async_engine(f"sqlite+aiosqlite:///{directory / 'attempts.db'}")
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        client = GeminiStoryClient(api_key=resolved.credential, base_url=resolved.selection.base_url)
+        try:
+            async with engine.begin() as connection:
+                await connection.run_sync(Base.metadata.create_all)
+            async with factory() as session:
+                session.add(User(id="default", username="story-canary"))
+                await session.commit()
+                task = await TaskRepository(session).enqueue(
+                    project_name="story-cloud-canary",
+                    task_type=STORY_RUN_TASK_TYPE,
+                    media_type="text",
+                    resource_id=probe_id,
+                    user_id="default",
+                )
+            store = RunStateStore(factory, task_id=task["task_id"])
+            await store.initialize(new_run_state(run_id=probe_id, limits=limits, now=started))
+
+            async def revalidate() -> None:
+                current = await resolve_cloud_route(session_factory, args.provider, args.model)
+                if current != resolved:
+                    raise ValueError("cloud route changed during canary")
+
+            gateway = CloudStoryGateway(
+                selection=resolved.selection,
+                limits=limits,
+                client=client,
+                sink=StoryAttemptSink(
+                    store=store,
+                    session_factory=factory,
+                    provider_id=args.provider,
+                    model_id=args.model,
+                    price_bounds=resolved.profile.prices,
+                ),
+                revalidate=revalidate,
+            )
+            result = await gateway.generate(
+                scope=StoryScope(user_id="default", project_name="story-cloud-canary", actor_id="operator"),
+                request=StoryStepRequest(
+                    step_id="synthetic-qualification",
+                    kind=StoryStepKind.SEED,
+                    context_digest="synthetic-no-user-content",
+                    selection=resolved.selection,
+                    system_prompt="Respond in Vietnamese using the supplied JSON schema.",
+                    prompt="Return a short friendly Vietnamese greeting in the greeting field. No other content.",
+                    output_mode=OutputMode.STRUCTURED,
+                    response_model=Greeting,
+                    decoding=StoryDecoding(temperature=0.2, seed=1),
+                    max_output_tokens=2048,
+                ),
+            )
+            state = await store.load()
+            if len(state.attempts) != 2 or any(attempt.state.value != "COMPLETED" for attempt in state.attempts):
+                raise CanaryFailedError("story canary did not settle exactly two requests")
+            output = {
+                "input_tokens": result.input_tokens,
+                "output_tokens": result.output_tokens,
+                "finish_reason": result.finish_reason,
+                "request_digest": result.request_digest,
+                "response_digest": result.response_digest,
+                "user_content": False,
+                "max_cost_usd": "0.10",
+                "attempt_database": f"story-probes/{probe_id}/attempts.db",
+            }
+            cost_ref = f"story-probes/{probe_id}/attempts.db#{result.generate_attempt_id}"
+        finally:
+            await client.close()
+            await engine.dispose()
+    return _finish(
+        route,
+        args,
+        binding=resolved.profile.binding,
+        started=started,
+        output=output,
+        cost_record_ref=cost_ref,
+        root=root,
+    )
 
 
 AGENT_CANARY_CAP_USD = 0.0001
@@ -272,7 +406,7 @@ async def run_agent_canary(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--provider", required=True, help="built-in provider id or custom-<id>")
-    parser.add_argument("--media", required=True, choices=("image", "video", "text", "audio", "agent"))
+    parser.add_argument("--media", required=True, choices=("image", "video", "text", "audio", "agent", "story"))
     parser.add_argument("--model", required=True, help="model id; for --media agent, '' means the CLI default")
     parser.add_argument("--duration", type=int, default=5, help="video seconds (a duration the model supports)")
     parser.add_argument("--voice", help="voice id for an audio route")
@@ -284,7 +418,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        canary = run_agent_canary if args.media == "agent" else run_media_canary
+        canary = (
+            run_story_canary
+            if args.media == "story"
+            else run_agent_canary
+            if args.media == "agent"
+            else run_media_canary
+        )
         result = asyncio.run(canary(args))
     except Exception as exc:
         print(json.dumps({"error": type(exc).__name__, "detail": str(exc)[:500]}), file=sys.stderr)

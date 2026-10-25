@@ -1,0 +1,194 @@
+{
+  "status": "STAGE_2B_VERIFIED_NOT_WIRED",
+  "recorded_at_utc": "2026-10-24T02:20:06.131307+00:00",
+  "source_head": "b11709defb532de038d810715c424f7f9423f2ae",
+  "base": "9b4e16f7943251641634a1e0780840e6fdc4df14",
+  "source_seal": {
+    "base": "9b4e16f7943251641634a1e0780840e6fdc4df14",
+    "source_head": "b11709defb532de038d810715c424f7f9423f2ae",
+    "sha256": {
+      "lib/pricing/price_compiler.py": "1298d8859120a9bc43f02ff2498d9588fb14b3fad398bc61a57a4f069ce5bd60",
+      "lib/pricing/request_metering.py": "82cebb42c785490dc1e07d4a238174cba71fc6833054d02024d6a6846566d83a",
+      "tests/unit/lib/pricing/test_custom_price_compiler.py": "f2aa4aaedd5310d48ed720496df0cebb8e1cced9e656b464c5d7bddf9b292435",
+      "tests/unit/lib/pricing/test_price_compiler.py": "1f933358dc2b9655eac6cb134a989d16de1bdb10ce1b74b824f060ebbda422bc"
+    },
+    "unchanged_legacy_owners": [
+      "lib/pricing/types.py",
+      "lib/pricing/strategies.py",
+      "lib/cost_calculator.py",
+      "lib/video_backends/kling.py",
+      "lib/video_backends/ark.py",
+      "lib/vidu_shared.py",
+      "lib/db/models/custom_provider.py",
+      "lib/pricing/lookup.py",
+      "lib/config/registry.py",
+      "lib/budget_guard.py",
+      "lib/ledger.py"
+    ],
+    "kernel_previous_ast_unchanged_except_additive_validator": true,
+    "kernel_private_sources_and_prior_tests_unchanged": true,
+    "new_compiler_cases_passed": 182,
+    "affected_passed": 374,
+    "static_production_imports_of_compiler": [],
+    "scan_scope": "tracked Python in lib/server/r2/scripts; static imports only"
+  },
+  "tests": {
+    "baseline": 192,
+    "new_compiler_cases": 182,
+    "affected_passed": 374,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 1,
+    "junit": ".superpowers/sdd/2026-10-24-v2-price-compiler/affected.xml",
+    "log": ".superpowers/sdd/2026-10-24-v2-price-compiler/affected.log"
+  },
+  "registry_inventory": {
+    "total": 108,
+    "convertible": 88,
+    "no_price": 14,
+    "vidu_delegates": 6,
+    "exact_rate_key_misses": 0
+  },
+  "statics": [
+    {
+      "check": "ruff",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "check",
+        "."
+      ],
+      "exit": 0,
+      "seconds": 0.02,
+      "log": ".superpowers/sdd/2026-10-24-v2-price-compiler/static-ruff.log"
+    },
+    {
+      "check": "format",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "exit": 0,
+      "seconds": 0.02,
+      "log": ".superpowers/sdd/2026-10-24-v2-price-compiler/static-format.log"
+    },
+    {
+      "check": "types",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright",
+        "--warnings",
+        "--venvpath",
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main"
+      ],
+      "exit": 0,
+      "seconds": 58.49,
+      "log": ".superpowers/sdd/2026-10-24-v2-price-compiler/static-types.log"
+    },
+    {
+      "check": "imports",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports"
+      ],
+      "exit": 0,
+      "seconds": 0.16,
+      "log": ".superpowers/sdd/2026-10-24-v2-price-compiler/static-imports.log"
+    },
+    {
+      "check": "deptry",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry",
+        "lib",
+        "server",
+        "alembic",
+        "scripts",
+        "tests",
+        "r2"
+      ],
+      "exit": 0,
+      "seconds": 0.52,
+      "log": ".superpowers/sdd/2026-10-24-v2-price-compiler/static-deptry.log"
+    },
+    {
+      "check": "audit",
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+        "scripts/audit_tests.py",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 17.49,
+      "log": ".superpowers/sdd/2026-10-24-v2-price-compiler/static-audit.log"
+    },
+    {
+      "check": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "9b4e16f7943251641634a1e0780840e6fdc4df14",
+        "b11709defb532de038d810715c424f7f9423f2ae"
+      ],
+      "exit": 0,
+      "seconds": 0.0,
+      "log": ".superpowers/sdd/2026-10-24-v2-price-compiler/static-diff.log"
+    }
+  ],
+  "legacy_source_sha256": {
+    "lib/pricing/types.py": "8912cf168a438d28539b0d6f55d8dc6b4ecb9caec79c30019a4c3504e8d04ecf",
+    "lib/pricing/strategies.py": "7f384586fc48b0a26b832c9ba9483d7f8face8874bfc38db7ab5d68a591a1e1f",
+    "lib/cost_calculator.py": "bfd2baaf1f0b79886bc796eb210ce5308673bb18cd985872289084082837f18b",
+    "lib/video_backends/kling.py": "1e256e1f8888e81f2135cbfa1912c8f22b81cb43305f19071063868eb37072f5",
+    "lib/video_backends/ark.py": "358aeaad25407597c9e09b05a32e8280b4f5fe78a51eedd7414d6d82901e6f85",
+    "lib/vidu_shared.py": "da6d898f68ee4abfc56891b5275303e917e8f8cedaa6a77b870dca384f36fc40",
+    "lib/db/models/custom_provider.py": "e2de2befe6926e3d6fd8af8562c784be4c1d1c9fc7e8e58647699a02b7bf6b0d",
+    "lib/pricing/lookup.py": "b275b334cdbc7628d25c19666e474dac3c9cd61bd31c559fdc80d241712dca4c",
+    "lib/config/registry.py": "5d8edb42a12c0b0d112958614298ac8ad6acbad703d4df692f4c9a2f6a03f4da",
+    "lib/budget_guard.py": "cabc6ec57ea0022f6d6f6b2483559539371249479825be3b9e4b795759536d3d",
+    "lib/ledger.py": "51a544d640660838100a251e017d2cc9db20e3315378fb3e697b97c0b74edefd"
+  },
+  "review": {
+    "candidate": "b11709defb532de038d810715c424f7f9423f2ae",
+    "reviewer": "/root/price_compiler_review",
+    "verdict": "READY_FOR_SCOPED_PRODUCT_MERGE_NOT_PRODUCTION",
+    "critical": 0,
+    "important": 0,
+    "minor": 0,
+    "deferred_product_minors": [],
+    "verified": [
+      "exact identities and no fallback",
+      "all six declared image/text token/cache axes retained",
+      "dimensioned matrices/buckets/tier aliases, collision rejection",
+      "shared immutable numeric/vocabulary validation",
+      "independent custom prices/currency and inactive non-token output semantics",
+      "four authorized paths, eleven unchanged owner hashes, no compiler consumer"
+    ],
+    "independent_checks": {
+      "pure_compiler_kernel_tests": 245,
+      "sandbox_root_autouse_DB_fixture": "initial setup unavailable in restricted sandbox; not product failures",
+      "ruff_format_and_committed_range_diff": "passed",
+      "full_374_and_full_statics": "main execution evidence; not independently rerun"
+    },
+    "declined": [
+      "provider parsing/usage facts/aliases/request normalization",
+      "DB/ledger/reservations/Decimal bounds/admission",
+      "runtime wiring/qualification/UI/API/deployment",
+      "external provider price freshness",
+      "sponsor-excluded license",
+      "two historical whole-backend authority failures"
+    ],
+    "main_ruling": "These remain outside the pure compiler. Existing owners unchanged; no new guarantees, execution permission or activation. Sponsor now prioritizes common backend model selection; defer further metering/profile expansion."
+  },
+  "limits": [
+    "No existing runtime consumer, price/default/history edits, DB/schema changes, provider calls or deployment.",
+    "Float reference math is not conservative reservation authority.",
+    "Vidu/LOCAL and old fallback remain owned by existing paths.",
+    "Two earlier baseline authority-test failures are not fixed or rerun here."
+  ],
+  "next_priority": "User-selected common backend route/model selection and use; remaining financial/profile/UI refinements deferred.",
+  "archive": {
+    "path": ".superpowers/sdd/2026-10-24-v2-price-compiler-evidence.tar.gz",
+    "sha256": "bbc73a84772a6a231eaf258e175ebfca987d733276138617efbf06ecc47d7374"
+  }
+}

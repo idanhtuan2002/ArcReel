@@ -41,7 +41,7 @@ from lib.config.service import (
     _DEFAULT_VIDEO_BACKEND,
     ConfigService,
 )
-from lib.custom_provider import is_custom_provider, parse_provider_id
+from lib.custom_provider import is_custom_provider, make_provider_id, parse_provider_id
 from lib.db.repositories.credential_repository import CredentialRepository
 from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.episode_target_duration import project_episode_target_duration
@@ -793,6 +793,35 @@ def _ensure_text_model_vision_capable(task_type: TextTaskType, provider_id: str,
     model_info = meta.models.get(model_id) if meta else None
     if model_info is not None and "vision" not in model_info.capabilities:
         raise VisionCapabilityError(task_type=task_type, provider_id=provider_id, model_id=model_id)
+
+
+def validate_text_model_for_task(task_type: TextTaskType, provider_id: str, model_id: str) -> None:
+    """Apply the shared task-level vision policy to a selected text model."""
+    if task_type in VISION_REQUIRED_TASKS:
+        _ensure_text_model_vision_capable(task_type, provider_id, model_id)
+
+
+def _selection_identity(value: object) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError("provider/model identity must be a nonempty string")
+    return value
+
+
+def validate_explicit_text_selection(task_type: TextTaskType, provider_id: str, model_id: str) -> None:
+    """Validate exact text identities and task capability without resolving defaults."""
+    provider_id = _selection_identity(provider_id)
+    model_id = _selection_identity(model_id)
+    if task_type not in TEXT_TASK_TIERS:
+        raise ValueError("unknown text task category")
+    if is_custom_provider(provider_id):
+        db_id = parse_provider_id(provider_id)
+        if db_id <= 0 or make_provider_id(db_id) != provider_id:
+            raise ValueError("custom provider identity must be canonical")
+    else:
+        info = model_info_for(provider_id, model_id)
+        if info is None or info.media_type != "text":
+            raise ValueError("selected provider/model is not a registered text model")
+    validate_text_model_for_task(task_type, provider_id, model_id)
 
 
 class ConfigResolver:
@@ -1576,7 +1605,7 @@ class ConfigResolver:
             # provider 行、不构造 SDK client，故逐视频单元解析无 DB/网络/client 构造副作用
             # （也不因 api_key 缺失而抛）。
             try:
-                from lib.custom_provider.endpoint_resolution import resolve_endpoint_spec
+                from lib.custom_provider.endpoint_resolution import resolve_endpoint_durations, resolve_endpoint_spec
                 from lib.db.repositories.custom_endpoint_repo import CustomEndpointRepository
 
                 endpoint_spec = await resolve_endpoint_spec(model.endpoint, CustomEndpointRepository(session).get)
@@ -1624,11 +1653,8 @@ class ConfigResolver:
                     ) from exc
                 if isinstance(parsed, list):
                     supported_durations = [int(d) for d in parsed]
-            if not supported_durations and endpoint_spec.endpoint_durations:
-                # 同一条规则的另一侧：行上是空集而端点给得出档位时，按端点的来。空集只在端点也
-                # 驱动不了这一维时才成立——留着它，时长控件会禁着、剧本规划会借固定篇幅，而请求
-                # 构造已经在往图里写帧数。
-                supported_durations = list(endpoint_spec.endpoint_durations)
+            # 行上的空集由端点原生档位补齐；端点驱动不了时长时，旧行上的档位不生效。
+            supported_durations = list(resolve_endpoint_durations(endpoint_spec, supported_durations))
         else:
             source = "registry"
             durations_optional = False
@@ -1828,8 +1854,7 @@ class ConfigResolver:
         project = get_project_manager().load_project(project_name) if project_name else None
         keys = _TEXT_LAYERED_KEYS[TEXT_TASK_TIERS[task_type]]
         resolved = await self._resolve_layered_backend(svc, session, project, keys)
-        if task_type in VISION_REQUIRED_TASKS:
-            _ensure_text_model_vision_capable(task_type, *resolved)
+        validate_text_model_for_task(task_type, *resolved)
         return resolved
 
     async def _auto_resolve_backend(

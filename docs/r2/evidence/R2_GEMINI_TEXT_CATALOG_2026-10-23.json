@@ -1,0 +1,177 @@
+{
+  "schema_version": "1",
+  "status": "CODE_VERIFIED_NOT_DEPLOYED",
+  "created_at": "2026-10-23T14:12:20.044237+00:00",
+  "tested_code_head": "95e12819ba4595c9acde430ceb1630d3ace88fc9",
+  "tested_code_parent": "2626fc10026e69064888832f9e68199edd631ad1",
+  "branch": "fix/v2-gemini-text-catalog",
+  "source_sha256": {
+    "lib/config/registry.py": "5d8edb42a12c0b0d112958614298ac8ad6acbad703d4df692f4c9a2f6a03f4da",
+    "server/routers/providers.py": "d59634486961a7983c5e48e1e7cb966c3f7bfe9f939bac4551f8a9df75590f6a",
+    "tests/unit/lib/pricing/test_pricing_lookup.py": "94bcc3b4c956347b7c14b1f0fcfef84b90f51ff0b3654c65bc5cf70d0314d4bd",
+    "tests/unit/server/routers/test_gemini_connection.py": "1570fb4861e2cd924a5a94e742338d2e6c51e03f0c7763aebcb186f7ecb0cc58"
+  },
+  "static_checks": [
+    {
+      "check": "ruff",
+      "argv": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "check",
+        "."
+      ],
+      "exit": 0,
+      "seconds": 0.15,
+      "log": ".superpowers/sdd/2026-10-23-gemini-takeover/static-ruff.log"
+    },
+    {
+      "check": "format",
+      "argv": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "exit": 0,
+      "seconds": 0.13,
+      "log": ".superpowers/sdd/2026-10-23-gemini-takeover/static-format.log"
+    },
+    {
+      "check": "types",
+      "argv": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/basedpyright",
+        "--warnings",
+        "--venvpath",
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main"
+      ],
+      "exit": 0,
+      "seconds": null,
+      "log": ".superpowers/sdd/2026-10-23-gemini-takeover/static-types-final.log"
+    },
+    {
+      "check": "imports",
+      "argv": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports"
+      ],
+      "exit": 0,
+      "seconds": 0.16,
+      "log": ".superpowers/sdd/2026-10-23-gemini-takeover/static-imports.log"
+    },
+    {
+      "check": "deptry",
+      "argv": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry",
+        "lib",
+        "server",
+        "alembic",
+        "scripts",
+        "tests",
+        "r2"
+      ],
+      "exit": 0,
+      "seconds": 0.52,
+      "log": ".superpowers/sdd/2026-10-23-gemini-takeover/static-deptry.log"
+    },
+    {
+      "check": "audit",
+      "argv": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+        "scripts/audit_tests.py",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 16.76,
+      "log": ".superpowers/sdd/2026-10-23-gemini-takeover/static-audit.log"
+    },
+    {
+      "check": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.0,
+      "log": ".superpowers/sdd/2026-10-23-gemini-takeover/static-diff.log"
+    }
+  ],
+  "type_summary": "0 errors, 0 warnings, 0 notes",
+  "regression": {
+    "passed": 554,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 8,
+    "pytest_seconds": 11.04,
+    "junit_sha256": "b9f960abe0a4407bb79873dc876e77fc86409635a302c91c7913f9d9dacaf01a",
+    "paths": [
+      "tests/unit/server/routers/test_gemini_connection.py",
+      "tests/unit/server/routers/test_providers_api.py",
+      "tests/unit/lib/pricing",
+      "tests/unit/lib/config",
+      "tests/unit/lib/test_cost_calculator.py",
+      "tests/unit/lib/text_backends/test_gemini.py"
+    ]
+  },
+  "red": {
+    "failed": 4,
+    "passed": 26,
+    "warnings": 1
+  },
+  "green": {
+    "passed": 30,
+    "warnings": 1
+  },
+  "live_catalog": {
+    "models_list_ok": true,
+    "catalog_count": 60,
+    "requested_models_listed": [
+      "gemini-3.8-flash",
+      "gemini-3.6-flash",
+      "gemini-2.5-flash",
+      "gemini-3.5-flash-lite",
+      "gemma-4-31b-it",
+      "gemma-4-26b-a4b-it"
+    ],
+    "source": "Observed output from sanitized read_gemini_catalog.py against actual V2 deployment database; models.list only",
+    "credential_changed": false,
+    "generation_test": {
+      "scope": "synthetic plain-text integration smoke, not story-authoring route qualification",
+      "free_only_models": true,
+      "configured_key_changed": false,
+      "results": [
+        {
+          "model": "gemma-4-31b-it",
+          "success": false,
+          "error_type": "TimeoutError",
+          "status_code": null
+        },
+        {
+          "model": "gemma-4-26b-a4b-it",
+          "success": true,
+          "reply_is_ok": true,
+          "input_tokens": 16,
+          "output_tokens": 1
+        }
+      ]
+    }
+  },
+  "incoming_registry_preserved_sha256": "7e315e71b719fa7534ce5bae2ee14c13ccec4efc3c5dafdcc7c40085c7d2e568",
+  "api_key_saved_to_evidence": false,
+  "provider_configuration_written": false,
+  "archive": {
+    "path": "/home/anhtuan/.codex/worktrees/c1b3/content-production-os/.superpowers/sdd/2026-10-23-gemini-takeover-evidence.tar.gz",
+    "sha256": "506d675f957527ddeb71fd435e845d76bdc43acc065ee607ecce4a59e4de42d0",
+    "bytes": 17019
+  },
+  "source_note": "docs/research/2026-10-23-v2-gemini-text-model-catalog.md",
+  "limits": [
+    "Gemini metadata visibility is not per-account free-tier/generation qualification.",
+    "Gemma31Bsmoke timedout; no blindretry.",
+    "No Story cloud adapter/qualification, paid Gemini generation, deployment or production activation.",
+    "Initial type CLI selector conflict did not run analysis; corrected command passed."
+  ],
+  "m9_m10_remain_paused": true,
+  "pushed": false,
+  "deployed": false,
+  "release_gate": "docs/superpowers/plans/2026-10-18-r2-v2-story-release-amendment.md:483,486"
+}

@@ -22,11 +22,14 @@ from lib.db.repositories.custom_provider_repo import CustomProviderRepository
 from lib.db.repositories.task_repo import StoryRunStateConflict
 from lib.project_manager import get_project_manager
 from lib.text_backends.ollama import OllamaChatClient
+from r2.host_hardening.paid_routes import PaidRouteUnqualifiedError
 from server.story_authoring.artifacts import StoryBlobStore
+from server.story_authoring.cloud import CloudStoryGateway, GeminiStoryClient
 from server.story_authoring.contracts import StoryModelSelection
 from server.story_authoring.driver import StoryBrief, StoryRunDriver
 from server.story_authoring.generation import AuthoringTextGateway
 from server.story_authoring.narrative import StoryIdentity
+from server.story_authoring.routes import resolve_cloud_route, validate_cloud_brief
 from server.story_authoring.runtime import (
     RunPhase,
     RunStateStore,
@@ -47,7 +50,13 @@ class RouteUnavailable(Exception):
 async def resolve_route_credential(factory: Factory, selection: StoryModelSelection) -> str | None:
     """The provider's credential, after checking that the provider still serves exactly the frozen route."""
     if not is_custom_provider(selection.provider_id):
-        raise RouteUnavailable(f"{selection.provider_id} is not a custom provider")
+        try:
+            resolved = await resolve_cloud_route(factory, selection.provider_id, selection.model_id)
+            if resolved.selection != selection:
+                raise RouteUnavailable("cloud route changed")
+            return resolved.credential
+        except (ValueError, PaidRouteUnqualifiedError):
+            raise RouteUnavailable("cloud route is unavailable or changed") from None
     provider_db_id = parse_provider_id(selection.provider_id)
     async with factory() as session:
         repo = CustomProviderRepository(session)
@@ -93,26 +102,43 @@ async def execute_story_run_task(
         return {"run_id": resource_id, "phase": state.phase.value}
     routes = [brief.selection] if brief.judge_selection is None else [brief.selection, brief.judge_selection]
     try:
+        await validate_cloud_brief(session_factory, brief)
         keys = [await resolve_route_credential(session_factory, route) for route in routes]
-    except RouteUnavailable as error:
+    except (RouteUnavailable, ValueError, PaidRouteUnqualifiedError) as error:
         reason = str(error)
         state, _ = await store.apply(lambda s: (set_phase(s, RunPhase.MODEL_UNAVAILABLE, reason=reason), None))
         return {"run_id": resource_id, "phase": state.phase.value}
-    gateways = [
-        AuthoringTextGateway(
-            selection=route,
-            limits=brief.limits,
-            client=client_for(route.base_url, key),
-            sink=StoryAttemptSink(
-                store=store,
-                session_factory=session_factory,
-                provider_id=route.provider_id,
-                model_id=route.model_id,
-                clock=clock,
-            ),
+
+    async def revalidate() -> None:
+        await validate_cloud_brief(session_factory, brief)
+
+    gateways = []
+    cloud_clients = []
+    for route, key in zip(routes, keys, strict=True):
+        profile = next(
+            (profile for profile in brief.cloud_profiles if profile.selection_digest == route.config_digest), None
         )
-        for route, key in zip(routes, keys, strict=True)
-    ]
+        sink = StoryAttemptSink(
+            store=store,
+            session_factory=session_factory,
+            provider_id=route.provider_id,
+            model_id=route.model_id,
+            clock=clock,
+            price_bounds=profile.prices if profile else None,
+        )
+        if route.endpoint == "ollama-chat":
+            gateway = AuthoringTextGateway(
+                selection=route, limits=brief.limits, client=client_for(route.base_url, key), sink=sink
+            )
+        else:
+            if not key or profile is None:
+                raise RouteUnavailable("cloud brief is missing its approved profile")
+            client = GeminiStoryClient(api_key=key, base_url=route.base_url)
+            cloud_clients.append(client)
+            gateway = CloudStoryGateway(
+                selection=route, limits=brief.limits, client=client, sink=sink, revalidate=revalidate
+            )
+        gateways.append(gateway)
     driver = StoryRunDriver(
         identity=identity,
         brief=brief,
@@ -122,5 +148,9 @@ async def execute_story_run_task(
         blobs=blobs,
         clock=clock,
     )
-    state = await driver.run()
-    return {"run_id": resource_id, "phase": state.phase.value}
+    try:
+        state = await driver.run()
+        return {"run_id": resource_id, "phase": state.phase.value}
+    finally:
+        for client in cloud_clients:
+            await client.close()

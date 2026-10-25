@@ -1,0 +1,33 @@
+............                                                             [100%]
+=============================== warnings summary ===============================
+tests/integration/scripts/r2/test_qualify_route.py::test_the_canary_is_the_one_call_an_unqualified_route_may_make
+  /home/anhtuan/.local/share/uv/python/cpython-3.13.14-linux-x86_64-gnu/lib/python3.13/contextlib.py:148: SAWarning: Skipped unsupported reflection of expression-based index idx_tasks_dedupe_active
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 25 durations =============================
+1.58s setup    tests/integration/scripts/r2/test_qualify_route.py::test_the_canary_is_the_one_call_an_unqualified_route_may_make
+0.24s call     tests/integration/scripts/r2/test_story_cloud_qualification.py::test_story_canary_opens_only_the_exact_story_model_and_configuration
+0.19s call     tests/integration/scripts/r2/test_story_cloud_qualification.py::test_rejected_canary_keeps_failed_attempt_and_actual_billed_usage
+0.13s setup    tests/integration/scripts/r2/test_qualify_route.py::test_an_agent_route_the_cli_cannot_price_is_refused_before_any_call[fields0-args0]
+0.13s setup    tests/integration/scripts/r2/test_qualify_route.py::test_the_agent_canary_fails_when_the_cli_does_not_stop_at_the_cap
+0.13s setup    tests/integration/scripts/r2/test_qualify_route.py::test_an_agent_route_the_cli_cannot_price_is_refused_before_any_call[fields1-args1]
+0.12s setup    tests/integration/scripts/r2/test_qualify_route.py::test_a_canary_without_usable_output_records_nothing
+0.12s setup    tests/integration/scripts/r2/test_story_cloud_qualification.py::test_rejected_canary_keeps_failed_attempt_and_actual_billed_usage
+0.12s setup    tests/integration/scripts/r2/test_story_cloud_qualification.py::test_story_canary_opens_only_the_exact_story_model_and_configuration
+0.12s setup    tests/integration/scripts/r2/test_qualify_route.py::test_a_canary_setup_failure_leaves_no_budget_hold
+0.12s setup    tests/integration/scripts/r2/test_qualify_route.py::test_a_new_api_key_needs_a_new_canary
+0.11s setup    tests/integration/scripts/r2/test_qualify_route.py::test_a_video_canary_is_refused_before_any_paid_call
+0.11s setup    tests/integration/scripts/r2/test_qualify_route.py::test_the_agent_canary_qualifies_a_route_whose_cap_the_cli_enforces
+0.03s call     tests/integration/scripts/r2/test_qualify_route.py::test_the_canary_is_the_one_call_an_unqualified_route_may_make
+0.03s call     tests/integration/scripts/r2/test_qualify_route.py::test_the_agent_canary_qualifies_a_route_whose_cap_the_cli_enforces
+0.03s call     tests/integration/scripts/r2/test_qualify_route.py::test_the_agent_canary_fails_when_the_cli_does_not_stop_at_the_cap
+0.02s call     tests/integration/scripts/r2/test_qualify_route.py::test_a_new_api_key_needs_a_new_canary
+0.02s call     tests/integration/scripts/r2/test_qualify_route.py::test_a_canary_without_usable_output_records_nothing
+0.01s call     tests/integration/scripts/r2/test_qualify_route.py::test_a_video_canary_is_refused_before_any_paid_call
+0.01s call     tests/integration/scripts/r2/test_qualify_route.py::test_an_agent_route_the_cli_cannot_price_is_refused_before_any_call[fields1-args1]
+0.01s call     tests/integration/scripts/r2/test_qualify_route.py::test_an_agent_route_the_cli_cannot_price_is_refused_before_any_call[fields0-args0]
+0.01s call     tests/integration/scripts/r2/test_qualify_route.py::test_a_canary_setup_failure_leaves_no_budget_hold
+
+(3 durations < 0.005s hidden.  Use -vv to show these durations.)
+12 passed, 1 warning in 4.36s

@@ -12,7 +12,8 @@ import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import type { TFunction } from "i18next";
 
-import { ApiRequestError } from "@/api";
+import { API, ApiRequestError } from "@/api";
+import { resolveStoryDefaults, type StoryDefaults } from "../api/modelDefaults";
 
 import {
   BLOCKED_PHASES,
@@ -138,7 +139,9 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
         if (controller.signal.aborted) return;
         setRuns(found);
         setLoadError(null);
-        setSelected((current) => (current && found.some((r) => r.run_id === current) ? current : (found[0]?.run_id ?? null)));
+        setSelected((current) =>
+          current && found.some((r) => r.run_id === current) ? current : (found[0]?.run_id ?? null),
+        );
       },
       (failure: unknown) => {
         if (!controller.signal.aborted) setLoadError(failureText(t, failure, t("story_load_failed")));
@@ -208,6 +211,7 @@ export default function StoryAuthoringPage({ projectName }: StoryAuthoringPagePr
             <main className="min-w-0">
               {showForm ? (
                 <NewStory
+                  key={projectName}
                   projectName={projectName}
                   onCancel={runs.length > 0 ? () => setCreating(false) : null}
                   onStarted={(runId) => {
@@ -240,14 +244,19 @@ function NewStory({
 }) {
   const { t } = useTranslation("dashboard");
   const draftKey = `story-draft:${projectName}`;
-  const ids = { idea: useId(), genre: useId(), writer: useId(), judge: useId(), target: useId() };
+  const ids = { idea: useId(), genre: useId(), writer: useId(), judge: useId(), target: useId(), cloudBudget: useId() };
   const [idea, setIdea] = useState(() => readDraft(draftKey).idea);
   const [genre, setGenre] = useState(() => readDraft(draftKey).genre);
   const [routes, setRoutes] = useState<StoryRoute[] | null>(null);
   const [routesError, setRoutesError] = useState<string | null>(null);
-  const [writer, setWriter] = useState("");
-  const [judge, setJudge] = useState("");
+  const [writerOverride, setWriter] = useState("");
+  const [judgeOverride, setJudge] = useState("");
+  const [customizeModels, setCustomizeModels] = useState(false);
+  const [inheritedModels, setInheritedModels] = useState<StoryDefaults | null>(null);
+  const writer = customizeModels ? writerOverride || inheritedModels?.writer || "" : inheritedModels?.writer || "";
+  const judge = customizeModels ? judgeOverride : "";
   const [target, setTarget] = useState(TARGET_DEFAULT);
+  const [cloudBudget, setCloudBudget] = useState("5.00");
   const [drafted, setDrafted] = useState<DraftedBrief | null>(null);
   const { busy, error, run } = useStep();
 
@@ -256,23 +265,48 @@ function NewStory({
 
   useEffect(() => {
     const controller = new AbortController();
-    listRoutes({ signal: controller.signal }).then(
-      (found) => {
+    Promise.all([
+      listRoutes({ signal: controller.signal }),
+      API.getProject(projectName, { signal: controller.signal }),
+      API.getSystemConfig(),
+    ]).then(
+      ([found, project, system]) => {
         if (controller.signal.aborted) return;
         setRoutes(found);
-        setWriter((current) => current || (found[0] ? routeKey(found[0]) : ""));
+        setInheritedModels(resolveStoryDefaults(found, project.project ?? {}, system.settings ?? {}));
       },
       (failure: unknown) => {
         if (!controller.signal.aborted) setRoutesError(failureText(t, failure, t("story_routes_failed")));
       },
     );
     return () => controller.abort();
-  }, [t]);
+  }, [projectName, t]);
 
   const writerRoute = routes?.find((route) => routeKey(route) === writer) ?? null;
   const judgeRoute = routes?.find((route) => routeKey(route) === judge) ?? null;
   const targetValid = Number.isInteger(target) && target >= TARGET_MIN && target <= TARGET_MAX;
-  const ready = Boolean(idea.trim() && genre.trim() && writerRoute && targetValid);
+  const usesCloud = Boolean(writerRoute?.cloud || judgeRoute?.cloud);
+  const cloudCents = Math.round(Number(cloudBudget) * 100);
+  const budgetValid = !usesCloud || (/^\d+(\.\d{1,2})?$/.test(cloudBudget) && cloudCents >= 1 && cloudCents <= 10000);
+  const ready = Boolean(
+    idea.trim() &&
+    genre.trim() &&
+    writerRoute?.enabled &&
+    (!judge || judgeRoute?.enabled) &&
+    targetValid &&
+    budgetValid,
+  );
+  const routeLabel = (route: StoryRoute) => {
+    const reason =
+      route.reason === "MISSING_CREDENTIAL"
+        ? t("story_route_missing_key")
+        : route.reason === "NOT_QUALIFIED"
+          ? t("story_route_not_qualified")
+          : route.reason
+            ? t("story_route_unavailable")
+            : "";
+    return reason ? `${route.label} — ${reason}` : route.label;
+  };
 
   async function prepare(event: FormEvent) {
     event.preventDefault();
@@ -286,6 +320,7 @@ function NewStory({
             genre: genre.trim(),
             provider_id: writerRoute.provider_id,
             model_id: writerRoute.model_id,
+            ...(usesCloud ? { max_cost_minor_units: cloudCents } : {}),
             story_target_syllables: target,
             judge_provider_id: judgeRoute?.provider_id ?? null,
             judge_model_id: judgeRoute?.model_id ?? null,
@@ -325,11 +360,22 @@ function NewStory({
           <dd>{brief.selection.model_id}</dd>
           <dt>{t("story_field_judge")}</dt>
           <dd>{brief.judge_selection ? brief.judge_selection.model_id : t("story_judge_same")}</dd>
+          {brief.limits?.currency === "USD" ? (
+            <>
+              <dt>{t("story_cloud_budget")}</dt>
+              <dd>${(brief.limits.max_cost_minor_units / 100).toFixed(2)}</dd>
+            </>
+          ) : null}
           <dt>{t("story_field_target")}</dt>
           <dd>{t("story_target_value", { count: brief.story_target_syllables })}</dd>
         </dl>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="sa-btn sa-btn-accent" disabled={busy} onClick={() => void greenlight(drafted)}>
+          <button
+            type="button"
+            className="sa-btn sa-btn-accent"
+            disabled={busy}
+            onClick={() => void greenlight(drafted)}
+          >
             {busy ? t("story_starting") : t("story_greenlight")}
           </button>
           <button type="button" className="sa-btn" disabled={busy} onClick={() => setDrafted(null)}>
@@ -396,36 +442,110 @@ function NewStory({
               {t("story_routes_empty")}
             </p>
           ) : (
-            <div className="sa-grid">
-              <div>
-                <label htmlFor={ids.writer} className="block text-[11px] text-text-3">
-                  {t("story_field_writer")}
-                </label>
-                <select id={ids.writer} value={writer} onChange={(event) => setWriter(event.target.value)} className="sa-input">
-                  {routes.map((route) => (
-                    <option key={routeKey(route)} value={routeKey(route)}>
-                      {route.label}
-                    </option>
-                  ))}
-                </select>
+            <div className="space-y-3">
+              <div className="rounded-md border border-hairline p-3 text-sm">
+                <p className="text-[11px] text-text-3">
+                  {customizeModels
+                    ? t("model_source_run")
+                    : t(`model_source_${inheritedModels?.source ?? "automatic"}`)}
+                </p>
+                <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+                  <dt className="text-text-3">{t("story_field_writer")}</dt>
+                  <dd className="min-w-0 break-words">{writerRoute?.label || writer || t("story_choose_model")}</dd>
+                  <dt className="text-text-3">{t("story_field_judge")}</dt>
+                  <dd className="min-w-0 break-words">{judgeRoute?.label || t("story_judge_same")}</dd>
+                </dl>
+                {!customizeModels && inheritedModels && !inheritedModels.available ? (
+                  <p role="alert" className="mt-2 text-xs text-warm">
+                    {t("model_inherited_unavailable")}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className="sa-btn mt-3"
+                  onClick={() => {
+                    if (customizeModels) {
+                      setWriter("");
+                      setJudge("");
+                    }
+                    setCustomizeModels(!customizeModels);
+                  }}
+                >
+                  {customizeModels ? t("model_use_inherited") : t("model_change_this_run")}
+                </button>
               </div>
-              <div>
-                <label htmlFor={ids.judge} className="block text-[11px] text-text-3">
-                  {t("story_field_judge")}
-                </label>
-                <select id={ids.judge} value={judge} onChange={(event) => setJudge(event.target.value)} className="sa-input">
-                  <option value="">{t("story_judge_same")}</option>
-                  {routes
-                    .filter((route) => routeKey(route) !== writer)
-                    .map((route) => (
-                      <option key={routeKey(route)} value={routeKey(route)}>
-                        {route.label}
-                      </option>
-                    ))}
-                </select>
-              </div>
+              {customizeModels || (inheritedModels && !inheritedModels.available) ? (
+                <div className="sa-grid">
+                  <div>
+                    <label htmlFor={ids.writer} className="block text-[11px] text-text-3">
+                      {t("story_field_writer")}
+                    </label>
+                    <select
+                      id={ids.writer}
+                      value={writer}
+                      onChange={(event) => {
+                        setCustomizeModels(true);
+                        setWriter(event.target.value);
+                      }}
+                      className="sa-input"
+                    >
+                      {!writerRoute ? (
+                        <option value={writer} disabled>
+                          {writer ? `${writer} · ${t("story_route_unavailable")}` : t("story_choose_model")}
+                        </option>
+                      ) : null}
+                      {routes.map((route) => (
+                        <option key={routeKey(route)} value={routeKey(route)} disabled={!route.enabled}>
+                          {routeLabel(route)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={ids.judge} className="block text-[11px] text-text-3">
+                      {t("story_field_judge")}
+                    </label>
+                    <select
+                      id={ids.judge}
+                      value={judge}
+                      onChange={(event) => {
+                        setCustomizeModels(true);
+                        setJudge(event.target.value);
+                      }}
+                      className="sa-input"
+                    >
+                      <option value="">{t("story_judge_same")}</option>
+                      {routes
+                        .filter((route) => routeKey(route) !== writer)
+                        .map((route) => (
+                          <option key={routeKey(route)} value={routeKey(route)} disabled={!route.enabled}>
+                            {routeLabel(route)}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
+          {usesCloud ? (
+            <div>
+              <label htmlFor={ids.cloudBudget} className="block text-[11px] text-text-3">
+                {t("story_cloud_budget")}
+              </label>
+              <input
+                id={ids.cloudBudget}
+                type="number"
+                min="0.01"
+                max="100"
+                step="0.01"
+                value={cloudBudget}
+                onChange={(event) => setCloudBudget(event.target.value)}
+                className="sa-input mt-1"
+              />
+              <p className="mt-1 text-xs text-text-3">{t("story_cloud_hint")}</p>
+            </div>
+          ) : null}
           <div>
             <label htmlFor={ids.target} className="block text-[11px] text-text-3">
               {t("story_field_target")}
@@ -478,7 +598,12 @@ type Stage = (typeof STAGES)[number];
 function stageOf(run: StoryRun): Stage {
   if (run.handoff?.done) return "video";
   if (run.phase === "COMMITTED" || run.phase === "WITHDRAWN") return "approved";
-  if (run.phase === "READY_FOR_APPROVAL" || run.phase === "APPROVING" || run.phase === "PARTIALLY_COMMITTED" || run.phase === "COMMIT_BLOCKED")
+  if (
+    run.phase === "READY_FOR_APPROVAL" ||
+    run.phase === "APPROVING" ||
+    run.phase === "PARTIALLY_COMMITTED" ||
+    run.phase === "COMMIT_BLOCKED"
+  )
     return "review";
   if (run.phase === "AWAITING_GATE_A") return "brief";
   return "writing";
@@ -499,7 +624,11 @@ function RunView({ projectName, runId, onChanged }: { projectName: string; runId
       getRun(projectName, runId, { signal: controller.signal }).then(
         (found) => {
           if (controller.signal.aborted) return;
-          notifyWhenDone(previousPhase.current, found.phase, t("story_notify_done", { idea: found.brief.idea.slice(0, 80) }));
+          notifyWhenDone(
+            previousPhase.current,
+            found.phase,
+            t("story_notify_done", { idea: found.brief.idea.slice(0, 80) }),
+          );
           previousPhase.current = found.phase;
           setRun(found);
           setLoadError(null);
@@ -625,7 +754,15 @@ function UsageLine({ run }: { run: StoryRun }) {
   );
 }
 
-function PhasePanel({ projectName, run, onChanged }: { projectName: string; run: StoryRun; onChanged: (run: StoryRun | null) => void }) {
+function PhasePanel({
+  projectName,
+  run,
+  onChanged,
+}: {
+  projectName: string;
+  run: StoryRun;
+  onChanged: (run: StoryRun | null) => void;
+}) {
   const phase: RunPhase = run.phase;
   if (phase === "READY_FOR_APPROVAL" && run.offered) {
     return <Review projectName={projectName} run={run} onChanged={onChanged} />;
@@ -719,7 +856,10 @@ function Lifecycle({
       return;
     }
     setConfirming(null);
-    const next = await step((signal) => runAction(projectName, run.run_id, action, { signal }), t("story_action_failed"));
+    const next = await step(
+      (signal) => runAction(projectName, run.run_id, action, { signal }),
+      t("story_action_failed"),
+    );
     if (next) onChanged(next);
   }
 
@@ -775,7 +915,15 @@ function FindingBody({ finding, showWhere = false }: { finding: Finding; showWhe
 }
 
 /** Touchpoint 2: the manuscript as a proof with notes beside each scene, the packaging, and the decision. */
-function Review({ projectName, run, onChanged }: { projectName: string; run: StoryRun; onChanged: (run: StoryRun | null) => void }) {
+function Review({
+  projectName,
+  run,
+  onChanged,
+}: {
+  projectName: string;
+  run: StoryRun;
+  onChanged: (run: StoryRun | null) => void;
+}) {
   const { t } = useTranslation("dashboard");
   const offered = run.offered!;
   const byScene = useMemo(() => {
@@ -787,7 +935,9 @@ function Review({ projectName, run, onChanged }: { projectName: string; run: Sto
     }
     return notes;
   }, [offered.findings]);
-  const exceptions = offered.findings.filter((finding) => finding.id && offered.exceptions_offered.includes(finding.id));
+  const exceptions = offered.findings.filter(
+    (finding) => finding.id && offered.exceptions_offered.includes(finding.id),
+  );
   const exceptionIds = new Set(exceptions.map((finding) => finding.id!));
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const toggle = (id: string, on: boolean) => {
@@ -798,11 +948,20 @@ function Review({ projectName, run, onChanged }: { projectName: string; run: Sto
   };
   const nextOpen = exceptions.find((finding) => !ticked.has(finding.id!));
   const note = (finding: Finding, index: number) => (
-    <p key={finding.id ?? index} id={finding.id ? `sa-note-${finding.id}` : undefined} className="sa-note" data-severity={finding.severity}>
+    <p
+      key={finding.id ?? index}
+      id={finding.id ? `sa-note-${finding.id}` : undefined}
+      className="sa-note"
+      data-severity={finding.severity}
+    >
       <FindingBody finding={finding} />
       {finding.id && exceptionIds.has(finding.id) ? (
         <label className="sa-note-tick">
-          <input type="checkbox" checked={ticked.has(finding.id)} onChange={(event) => toggle(finding.id!, event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={ticked.has(finding.id)}
+            onChange={(event) => toggle(finding.id!, event.target.checked)}
+          />
           {t("story_keep_as_is")}
         </label>
       ) : null}
@@ -846,7 +1005,10 @@ function Review({ projectName, run, onChanged }: { projectName: string; run: Sto
                         <p key={index}>{paragraph}</p>
                       ))}
                     </div>
-                    <aside className="sa-margin" aria-label={t("story_notes_for", { scene: `${chapter}.${scene.scene}` })}>
+                    <aside
+                      className="sa-margin"
+                      aria-label={t("story_notes_for", { scene: `${chapter}.${scene.scene}` })}
+                    >
                       {notes.map(note)}
                     </aside>
                   </div>
@@ -861,7 +1023,14 @@ function Review({ projectName, run, onChanged }: { projectName: string; run: Sto
           </section>
         ) : null}
       </section>
-      <Decision projectName={projectName} run={run} exceptions={exceptions} ticked={ticked} onToggle={toggle} onChanged={onChanged} />
+      <Decision
+        projectName={projectName}
+        run={run}
+        exceptions={exceptions}
+        ticked={ticked}
+        onToggle={toggle}
+        onChanged={onChanged}
+      />
     </>
   );
 }
@@ -872,7 +1041,11 @@ function PackagingSheet({ packaging }: { packaging: Packaging }) {
     <section className="sa-packaging" aria-label={t("story_packaging")}>
       <p className="sa-title font-editorial text-text">{packaging.titles[0]?.title}</p>
       <p className="mt-1 text-xs text-text-3">
-        {t("story_other_titles")}: {packaging.titles.slice(1).map((title) => title.title).join(" · ")}
+        {t("story_other_titles")}:{" "}
+        {packaging.titles
+          .slice(1)
+          .map((title) => title.title)
+          .join(" · ")}
       </p>
       {packaging.blurbs.map((blurb, index) => (
         <blockquote key={index} className="sa-blurb">
@@ -928,7 +1101,10 @@ function Decision({
   async function revise(event: FormEvent) {
     event.preventDefault();
     if (!note.trim() || busy) return;
-    const next = await step((signal) => reviseRun(projectName, run.run_id, target, note.trim(), { signal }), t("story_revise_failed"));
+    const next = await step(
+      (signal) => reviseRun(projectName, run.run_id, target, note.trim(), { signal }),
+      t("story_revise_failed"),
+    );
     if (next) {
       setNote("");
       onChanged(next);
@@ -940,7 +1116,10 @@ function Decision({
       setConfirmDiscard(true);
       return;
     }
-    const next = await step((signal) => runAction(projectName, run.run_id, "discard", { signal }), t("story_action_failed"));
+    const next = await step(
+      (signal) => runAction(projectName, run.run_id, "discard", { signal }),
+      t("story_action_failed"),
+    );
     if (next) onChanged(next);
   }
 
@@ -973,7 +1152,12 @@ function Decision({
         <p className="mt-2 text-xs text-text-2">{t("story_no_exceptions")}</p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" className="sa-btn sa-btn-accent" disabled={busy || !allTicked} onClick={() => void approve()}>
+        <button
+          type="button"
+          className="sa-btn sa-btn-accent"
+          disabled={busy || !allTicked}
+          onClick={() => void approve()}
+        >
           {t("story_approve")}
         </button>
         <button type="button" className="sa-btn" disabled={busy} onClick={() => void discard()}>
@@ -1000,7 +1184,12 @@ function Decision({
             <label htmlFor={ids.target} className="block text-[11px] text-text-3">
               {t("story_revise_target")}
             </label>
-            <select id={ids.target} value={target} onChange={(event) => setTarget(event.target.value)} className="sa-input">
+            <select
+              id={ids.target}
+              value={target}
+              onChange={(event) => setTarget(event.target.value)}
+              className="sa-input"
+            >
               {chapters.map((chapter) => (
                 <option key={chapter} value={`chapter[${chapter}]`}>
                   {t("story_chapter", { number: chapter })}
@@ -1039,7 +1228,15 @@ function Decision({
 
 // --- after approval ----------------------------------------------------------------------------------
 
-function Approved({ projectName, run, onChanged }: { projectName: string; run: StoryRun; onChanged: (run: StoryRun | null) => void }) {
+function Approved({
+  projectName,
+  run,
+  onChanged,
+}: {
+  projectName: string;
+  run: StoryRun;
+  onChanged: (run: StoryRun | null) => void;
+}) {
   const { t } = useTranslation("dashboard");
   const { busy, error, code, run: step } = useStep();
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
@@ -1060,7 +1257,10 @@ function Approved({ projectName, run, onChanged }: { projectName: string; run: S
   async function handOff(onConflict: OnConflict) {
     // The server binds a hand-off to its first command; a pending one is finished with the same command.
     const commandId = run.handoff?.command_id ?? crypto.randomUUID();
-    const sent = await step((signal) => sendToVideo(projectName, run.run_id, commandId, onConflict, { signal }), t("story_handoff_failed"));
+    const sent = await step(
+      (signal) => sendToVideo(projectName, run.run_id, commandId, onConflict, { signal }),
+      t("story_handoff_failed"),
+    );
     onChanged(null);
     return sent;
   }
@@ -1070,7 +1270,10 @@ function Approved({ projectName, run, onChanged }: { projectName: string; run: S
       setConfirmWithdraw(true);
       return;
     }
-    const next = await step((signal) => runAction(projectName, run.run_id, "withdraw", { signal }), t("story_action_failed"));
+    const next = await step(
+      (signal) => runAction(projectName, run.run_id, "withdraw", { signal }),
+      t("story_action_failed"),
+    );
     if (next) onChanged(next);
   }
 
@@ -1102,7 +1305,9 @@ function Approved({ projectName, run, onChanged }: { projectName: string; run: S
           {confirmWithdraw ? t("story_confirm_withdraw") : t("story_action_withdraw")}
         </button>
       </div>
-      {confirmWithdraw && handedOff ? <p className="mt-2 text-[11px] text-text-3">{t("story_withdraw_video_note")}</p> : null}
+      {confirmWithdraw && handedOff ? (
+        <p className="mt-2 text-[11px] text-text-3">{t("story_withdraw_video_note")}</p>
+      ) : null}
       {error ? (
         <div role="alert" className="mt-2 text-sm text-danger">
           {error}

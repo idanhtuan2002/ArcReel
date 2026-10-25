@@ -280,6 +280,7 @@ export function MediaModelSection() {
 
   return (
     <div className="space-y-7">
+      <p className="rounded-md border border-hairline-soft p-3 text-xs leading-relaxed text-text-3">{t("model_scope_system")}</p>
       {/* Heading */}
       <div>
         <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent-2">

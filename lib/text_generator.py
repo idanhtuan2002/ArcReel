@@ -18,7 +18,7 @@ from lib.text_backends.base import (
     TextGenerationResult,
     TextTaskType,
 )
-from lib.text_backends.factory import create_text_backend_for_task
+from lib.text_backends.factory import create_text_backend_for_model, create_text_backend_for_task
 
 if TYPE_CHECKING:
     from lib.text_backends.base import TextBackend
@@ -45,10 +45,21 @@ class TextGenerator:
         cls,
         task_type: TextTaskType,
         project_name: str | None = None,
+        *,
+        provider_id: str | None = None,
+        model_id: str | None = None,
     ) -> TextGenerator:
         """工厂方法：根据任务类型创建对应的 backend + ledger。"""
-        backend, provider_id = await create_text_backend_for_task(task_type, project_name)
-        return cls(backend, Ledger(), provider_id)
+        if (provider_id is None) != (model_id is None):
+            raise ValueError("provider_id and model_id must be supplied together")
+        if provider_id is None:
+            backend, resolved_provider = await create_text_backend_for_task(task_type, project_name)
+        else:
+            assert model_id is not None
+            backend, resolved_provider = await create_text_backend_for_model(
+                task_type, provider_id=provider_id, model_id=model_id
+            )
+        return cls(backend, Ledger(), resolved_provider)
 
     @clears_baggage_at_provider_boundary
     async def generate(
