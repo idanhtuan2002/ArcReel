@@ -1,31 +1,32 @@
 {
   "schema_version": "1",
   "status": "BOUNDED_DESIGN_CANDIDATE_NOT_ACCEPTED",
-  "tested_source_head": "3b6b28c90844781f79eb97965be1b1bbc5022c42",
+  "tested_source_head": "c7f4449c5bb0da2d078530aca8455568a7b3f252",
   "packet": "M10_A_A0_A1",
   "implementation_scope": "CONTRACTS_ONLY",
   "full_m10_accepted": false,
   "runtime_activation_authorized": false,
   "product_files_created": false,
   "source_sha256": {
-    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "e5587df5c7705c1d738fd2ecc5a6aab1f27d935de53d5c03ebbf87fc6870fcb6",
+    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "fc0913308cef0cfdb7d82eacd358ff23c6a8d3e139e48b9594ce7a9e9d5e7107",
     "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json": "72f980aec9c79ec0ecea7462d2fd8fc8547c7a1ef87e198fecafe44fde2f5249",
-    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "b3e1a905d8af8398bb3ec25c0c8ceac89f3d949f66090d5080a5865c96a75b58",
-    "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md": "099dfcdb63cdd14a23214d8f8e6c17f06de049ef2bb8772c610a788648f7491a",
-    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "45de53b7ef69d534ca90a48f630727af1632ee59128a9a97ee2091e2ba258118",
-    "scripts/r2/verify_m10_bootstrap.py": "107238f7d44bf3233f532de77ebf56fd10eacec12e4f9ef15dd560f50eca2395",
-    "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "fe56ea34550fd4afe9d6e4a62dc70f35a46d24ae8987217d36338260ecd0ca0d",
-    "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "8797b4ea2fe429852c28fea08259afac3efdfee5c7dcb1f4970ae39d11f81e38"
+    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "5e60cddb016ccb026bd9b857830f9cb863663a5374764ffd44135eef63b7e21b",
+    "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md": "1631f622143135038507f4977a6bd81bae181ba9ab22a3f02f6c540e49ab2ba9",
+    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "b0e66864bf4b7ac6db4ebd21164067b62a75c6408c5fd1252406d7c68bf13820",
+    "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md": "7a13bfbb11a1f8163c538b338aa77974570aec4b29daa68208bcfb8220daf51d",
+    "scripts/r2/verify_m10_bootstrap.py": "7940c2ae34e89faea9a8f2e5d4c3661866fe5e75b69679d19610c04a1bc3574f",
+    "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "2c5d1cf88d0af3afe1f69c5a94d93d8efe18e496e4b5a43248e0ae5e0cd3cae3",
+    "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "c4405a230870ac03851afc46106a90f1180f5945a42e452a45aa424b2e48de68"
   },
   "tests": {
     "counts": {
-      "tests": 102,
+      "tests": 119,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
-    "junit_sha256": "118c445a3b6f027ec4af73ae90f23c4b8267c5d7f615fcfa08b194622ab18e5c",
-    "scope": "Existing M7/M8 verifier regressions, original full bootstrap and bounded-mode data/real-Git fixtures; not future A1 product contracts."
+    "junit_sha256": "691d170db3b074487b5a42af147d5ffa731ac667a34716b5af1bf58d923afdfb",
+    "scope": "Bounded/full M10 verifier, M7/M8 scope verifier regressions and cold pure imports. Synthetic eligibility fixtures are not real acceptance or A1 product tests."
   },
   "checks": {
     "ruff": "PASS",
@@ -38,7 +39,7 @@
   "live": {
     "results": [
       {
-        "head": "3b6b28c90844781f79eb97965be1b1bbc5022c42",
+        "head": "c7f4449c5bb0da2d078530aca8455568a7b3f252",
         "packet": "full",
         "status": "REFUSED",
         "stop_codes": [
@@ -46,7 +47,7 @@
         ]
       },
       {
-        "head": "3b6b28c90844781f79eb97965be1b1bbc5022c42",
+        "head": "c7f4449c5bb0da2d078530aca8455568a7b3f252",
         "packet": "contracts",
         "status": "REFUSED",
         "stop_codes": [
@@ -63,10 +64,22 @@
     "Original full gate remains closed.",
     "Synthetic review fixtures grant no real acceptance."
   ],
-  "previous_attempt": {
-    "candidate": "532d4d4642f03122dd49513c362d2f2849d5bfff",
-    "verdict": "FAIL",
-    "material_findings": 2,
-    "disposition": "Withdrawn; request surface/profile selectors and exact master identity mapping corrected before fresh pair of reviews."
-  }
+  "implementation_base": "dda0f273e035615e1c10a67f8712279d23b7053c",
+  "release_base": "14565f9d8a181654be272267a097ddafe2c87c79",
+  "preparation_verification": "docs/r2/evidence/R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json",
+  "previous_attempts": [
+    {
+      "candidate": "532d4d4642f03122dd49513c362d2f2849d5bfff",
+      "verdict": "FAIL",
+      "material_findings": 2,
+      "disposition": "Withdrawn; request surface/profile selectors and exact master identity mapping corrected before fresh pair of reviews."
+    },
+    {
+      "candidate": "4987526405bd13cc83a950eac9db7a906276baea",
+      "verdict": "FAIL",
+      "material_findings": 1,
+      "disposition": "Withdrawn. Legacy dotenv-loading imports replaced by separately verified pure identity/metadata seams; no previous PASS reused for M10."
+    }
+  ],
+  "source_coverage": "Observed27-file pure import closure and config/lock/proof bytes/modes pinned to derived base; stale graph supplemented by exact source and cold-process probes."
 }
