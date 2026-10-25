@@ -1,0 +1,71 @@
+{
+  "schema_version": "1",
+  "status": "BOOTSTRAP_REPAIRED_VERIFIED_NOT_DESIGN_ACCEPTED",
+  "candidate_head": "7a8da7ecea014a703a0e712255d7c1c79971af02",
+  "candidate_parent": "5652fec045c3ea689fa28503c9d4d57d87273158",
+  "release_base": "14565f9d8a181654be272267a097ddafe2c87c79",
+  "source_sha256": {
+    "docs/r2/evidence/R2_M10_BOOTSTRAP_REVIEW_2026-10-25.md": "af7b4e99e82591a825eb9820e6e7631ea1c1a3c8ddf2b9c26f191e3a76a07d73",
+    "docs/r2/evidence/R2_M10_MASTER_BINDING_VECTORS.json": "e7926d3706d058d370cf2b6018396e826a7319c34ba4a39b1a0103ccbce560b4",
+    "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md": "bb8462fbd4337ada2d5b4a767736145cafc55bede0c848de91c7fbf422460d65",
+    "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md": "47bfa9b16367c7a32d44f1dedabf9316addaeb05ab4e566466e62b4a35bb0a74",
+    "scripts/r2/verify_m10_bootstrap.py": "de15251023552c30aeeecc8e9591358ee3de4fd24438467cd1a94ac6d6116567",
+    "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "cd693cb6aba0f3d36038675ab14799ac0c4a4d783f10a200db6996d7c3dec795",
+    "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "2643f7392d6c48a54990d0cdd0304c9c56a2d07f5b53feca26252e77ae42e475"
+  },
+  "tests": {
+    "command": "pytest tests/unit/scripts/r2/test_verify_m7_scope.py tests/unit/scripts/r2/test_verify_m8_scope.py tests/unit/scripts/r2/test_verify_m10_bootstrap.py tests/integration/scripts/r2/test_verify_m10_bootstrap.py -q -n 0",
+    "counts": {
+      "tests": 94,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "junit_sha256": "4545d57e2ab9a215cc74a5926b8a8c5bbe3d81e0e3ca0c18b5211e621acf1b50",
+    "limits": "Synthetic Git custody and existing verifier regressions; no PostgreSQL race proof or product M10 tests."
+  },
+  "checks": {
+    "ruff": "PASS",
+    "format": "PASS",
+    "basedpyright": "0errors0warnings; existing missing local venv informational message",
+    "import_contracts": "23kept0broken",
+    "dependency_audit": "PASS",
+    "test_audit": "0violations",
+    "git_diff_check": "PASS"
+  },
+  "real_preflight": {
+    "head": "7a8da7ecea014a703a0e712255d7c1c79971af02",
+    "status": "REFUSED",
+    "stop_codes": [
+      "M10_DESIGN_NOT_ACCEPTED"
+    ],
+    "exit_code": 2,
+    "source": "exact_git_object",
+    "repository_status_unchanged": true,
+    "index_bytes_unchanged": true
+  },
+  "design_accepted": false,
+  "product_implementation_started": false,
+  "m9_modified": false,
+  "production_modified": false,
+  "qualification_limits": [
+    "Substantive reviewer qualification/conflict/blindness requires normative review; structural checks cannot establish it.",
+    "Action-specific M10 custodian adapter and durable factual authority remain unqualified.",
+    "M9 prerequisite or separately accepted sequencing amendment remains required.",
+    "MasterBinding vectors prove encoding sensitivity, not contract admission or concurrency."
+  ],
+  "created_at": "2026-10-25T02:36:37.691317+00:00",
+  "code_review": {
+    "reviewed_candidate_head": "5652fec045c3ea689fa28503c9d4d57d87273158",
+    "verdict": "CHANGES_REQUIRED",
+    "confirmed_findings": 4,
+    "repair": "ONE_COMBINED_RED_GREEN_PASS",
+    "parent_repair_verification": "PASS",
+    "second_independent_review": false,
+    "normative_design_acceptance": false,
+    "record_path": "docs/r2/evidence/R2_M10_BOOTSTRAP_REVIEW_2026-10-25.md"
+  },
+  "schema_sha256": "a872969b863d4556a023cbfd8768b895a16e9404cce017e33353fa2c9f8973af",
+  "m9_preserved_source_count": 4,
+  "production_source_head": "14565f9d8a181654be272267a097ddafe2c87c79"
+}
