@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from scripts.r2.verify_m10_a2_scope import source_problems
@@ -58,3 +60,9 @@ class Reader(Protocol):
 def test_a2_unknown_path_and_malformed_source_refuse() -> None:
     assert source_problems("r2/quality/runs.py", b"") == ("POST_M8_BASE_SEAM_CHANGED",)
     assert source_problems("r2/quality/parity.py", b"not valid :") == ("POST_M8_BASE_SEAM_CHANGED",)
+
+
+@pytest.mark.parametrize("path", ["r2/quality/errors.py", "r2/quality/ports.py", "r2/quality/parity.py"])
+def test_actual_a2_sources_fit_the_static_pure_boundary(path: str) -> None:
+    root = Path(__file__).resolve().parents[4]
+    assert source_problems(path, (root / path).read_bytes()) == ()

@@ -158,3 +158,70 @@ def test_a2_sanitizes_inherited_git_redirects(a2_repo, tmp_path: Path) -> None:
     result = invoke(repo, runner, ref, GIT_DIR=str(unrelated / ".git"), GIT_WORK_TREE=str(unrelated))
     assert result.returncode == 0, result.stdout + result.stderr
     assert json.loads(result.stdout)["status"] == "M10_A2_SCOPE_OK"
+
+
+def test_a2_imports_do_not_open_runtime_authority_or_side_effects() -> None:
+    code = r"""
+import builtins, os, sys
+sys.path.insert(0, sys.argv[1])
+import r2.contracts.quality
+import r2.quality.digests
+import r2.advanced_creative.parity
+targets = ('r2.quality.errors', 'r2.quality.ports', 'r2.quality.parity')
+assert not any(name in sys.modules for name in targets)
+old_import = builtins.__import__
+def guarded_import(name, *args, **kwargs):
+    if name.startswith(('lib.db', 'server', 'r2.production', 'r2.host_hardening')):
+        raise AssertionError('runtime import forbidden')
+    return old_import(name, *args, **kwargs)
+builtins.__import__ = guarded_import
+def audit(event, args):
+    if event in ('socket.connect', 'socket.bind', 'subprocess.Popen', 'os.system',
+                 'sqlite3.connect', 'os.putenv', 'os.remove', 'os.rename', 'os.mkdir'):
+        raise AssertionError('side effect forbidden')
+    if event == 'open':
+        flags = args[2]
+        if isinstance(flags, int) and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND):
+            raise AssertionError('file write forbidden')
+sys.addaudithook(audit)
+import r2.quality.errors
+import r2.quality.ports
+import r2.quality.parity
+assert all(name in sys.modules for name in targets)
+assert not any(name.startswith(('lib.db', 'server', 'r2.production')) for name in sys.modules)
+print('M10_A2_IMPORT_PURE')
+"""
+    result = subprocess.run(
+        [sys.executable, "-I", "-B", "-c", code, str(SOURCE)], check=False, capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == "M10_A2_IMPORT_PURE"
+
+
+def test_missing_accepted_objects_refuse_without_writing(a2_repo, tmp_path: Path) -> None:
+    _, runner, ref = a2_repo
+    repo = tmp_path / "empty-history"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    git(repo, "config", "user.name", "Fixture")
+    git(repo, "config", "user.email", "fixture@example.invalid")
+    (repo / GUARD).parent.mkdir(parents=True)
+    (repo / GUARD).write_bytes(runner.read_bytes())
+    commit(repo)
+    before = snapshot(repo)
+    result = invoke(repo, runner, ref)
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["stop_codes"] == ["M10_PREREQUISITE_NOT_ACCEPTED"]
+    assert snapshot(repo) == before
+
+
+def test_detached_unaccepted_lineage_cannot_reuse_accepted_objects(a2_repo) -> None:
+    repo, runner, ref = a2_repo
+    git(repo, "checkout", "--detach", "-q", "5eda15b8931cc6537c784970672094373230e6f5")
+    (repo / GUARD).write_bytes(runner.read_bytes())
+    commit(repo)
+    before = snapshot(repo)
+    result = invoke(repo, runner, ref)
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["stop_codes"] == ["M10_DESIGN_NOT_ACCEPTED"]
+    assert snapshot(repo) == before
