@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "status": "SOURCE_REPAIRED_PENDING_INDEPENDENT_REVERIFICATION",
+  "status": "M10_A2_SOURCE_REVIEWED",
   "packet": "M10_A2_PURE_FOUNDATION",
   "acceptance_ref": "f3d9cf97877e60a21818bb74d184c7c81867ff4c",
   "acceptance_sha256": "8a51f562280d21bbf4284e94783b454eed159b67a87db900fa23f147e3ed2136",
@@ -45,7 +45,8 @@
     "154 A2 tests after cache refusal repair",
     "full backend types and static checks",
     "actual clean source HEAD scope guard",
-    "whole-packet implementation review performed; one P1 repaired via two RED-to-GREEN regressions;156 A2 tests passed"
+    "whole-packet implementation review performed; one P1 repaired via two RED-to-GREEN regressions;156 A2 tests passed",
+    "independent bounded repair re-verification PASS at79a20db5; P1FIXED; no newP1/P2"
   ],
   "checks": {
     "ruff": "All checks passed!",
@@ -114,9 +115,27 @@
     "status": "M10_A2_SCOPE_OK",
     "stop_codes": []
   },
-  "implementation_review": null,
+  "implementation_review": {
+    "reviewer_id": "codex-m10-a2-implementation-reverification-20261026T183942Z",
+    "qualification_evidence": "Bounded independent read-only re-verification of the sole confirmed P1 repair from c1906c3e8e4a59c6096c5f0a36733e72f638c16b to exact clean 79a20db5a2b8083187629bf115e131a7cbffe8e8. Verified the delta is exactly r2/quality/errors.py, tests/unit/r2/quality/test_quality_errors.py and R2_M10_A2_CANDIDATE.json; every outward inverse lookup now uses an identity-only scan and never hashes or compares the input exception class. Fresh hostile raising-metaclass probe passed across foreign payload plus local M10 constructor/code/str/repr/payload, and the focused error suite passed 31 tests outside the sandbox after the sandbox database setup timed out before test execution. Verified recorded RED 2 failures, GREEN 156 passed/0 skipped/1 existing SQLite warning, repaired source/test and XML/log hashes, full types 0/0 and audit 0 hashes, exact immutable copy/hash of the complete c190 evidence and FAIL review, distinct historical 647/154 execution identities, and live M10_A2_SCOPE_OK at 79a20. Stale graph generation had no repaired-path records and docs are excluded; exact source controlled.",
+    "conflict_declaration": "NO_CONFLICT",
+    "rubric_version": "R2_M10_A2_IMPLEMENTATION_REVIEW_V1",
+    "candidate_head": "79a20db5a2b8083187629bf115e131a7cbffe8e8",
+    "verdict": "PASS",
+    "P1_findings": [],
+    "P2_findings": [],
+    "repair_verification": [
+      {
+        "finding": "P1 exact-class error identity bypass",
+        "status": "FIXED",
+        "evidence": "r2/quality/errors.py:10-14 performs only `error_type is registered`; lines21,25,28,31,174 route constructor/code/str/repr/payload through it. tests/unit/r2/quality/test_quality_errors.py:85-110 covers aliasing and raising hostile metaclasses for both foreign and local M10 exceptions. Fresh direct probe and 31-test focused suite passed."
+      }
+    ],
+    "reviewed_at": "2026-10-26T18:39:42Z",
+    "required_skips": [],
+    "material_unknowns": []
+  },
   "remaining_gates": [
-    "bounded independent re-verification of confirmed P1 repair and evidence provenance",
     "A3 separately qualified persistence/Human publication packet",
     "A4 probe execution and M7 custody",
     "A5 qualified Factual currentness and run closure",
@@ -302,11 +321,31 @@
       "reviewed_at": "2026-10-26T18:32:41Z",
       "required_skips": [],
       "material_unknowns": []
+    },
+    {
+      "reviewer_id": "codex-m10-a2-implementation-reverification-20261026T183942Z",
+      "qualification_evidence": "Bounded independent read-only re-verification of the sole confirmed P1 repair from c1906c3e8e4a59c6096c5f0a36733e72f638c16b to exact clean 79a20db5a2b8083187629bf115e131a7cbffe8e8. Verified the delta is exactly r2/quality/errors.py, tests/unit/r2/quality/test_quality_errors.py and R2_M10_A2_CANDIDATE.json; every outward inverse lookup now uses an identity-only scan and never hashes or compares the input exception class. Fresh hostile raising-metaclass probe passed across foreign payload plus local M10 constructor/code/str/repr/payload, and the focused error suite passed 31 tests outside the sandbox after the sandbox database setup timed out before test execution. Verified recorded RED 2 failures, GREEN 156 passed/0 skipped/1 existing SQLite warning, repaired source/test and XML/log hashes, full types 0/0 and audit 0 hashes, exact immutable copy/hash of the complete c190 evidence and FAIL review, distinct historical 647/154 execution identities, and live M10_A2_SCOPE_OK at 79a20. Stale graph generation had no repaired-path records and docs are excluded; exact source controlled.",
+      "conflict_declaration": "NO_CONFLICT",
+      "rubric_version": "R2_M10_A2_IMPLEMENTATION_REVIEW_V1",
+      "candidate_head": "79a20db5a2b8083187629bf115e131a7cbffe8e8",
+      "verdict": "PASS",
+      "P1_findings": [],
+      "P2_findings": [],
+      "repair_verification": [
+        {
+          "finding": "P1 exact-class error identity bypass",
+          "status": "FIXED",
+          "evidence": "r2/quality/errors.py:10-14 performs only `error_type is registered`; lines21,25,28,31,174 route constructor/code/str/repr/payload through it. tests/unit/r2/quality/test_quality_errors.py:85-110 covers aliasing and raising hostile metaclasses for both foreign and local M10 exceptions. Fresh direct probe and 31-test focused suite passed."
+        }
+      ],
+      "reviewed_at": "2026-10-26T18:39:42Z",
+      "required_skips": [],
+      "material_unknowns": []
     }
   ],
   "repair_pass": {
     "finding": "P1 exact-class error identity bypass",
-    "status": "FIXED_PENDING_INDEPENDENT_REVERIFICATION",
+    "status": "FIXED",
     "source_head": "c056c1df6ccceb3598e359dfb005f79598428eee",
     "source_paths": [
       "r2/quality/errors.py",
@@ -335,5 +374,6 @@
     "audit_tests": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python scripts/audit_tests.py --check",
     "lint_imports": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/lint-imports",
     "deptry": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/deptry lib server alembic scripts tests r2"
-  }
+  },
+  "source_review_scope": "A2 pure errors, frozen port data/Protocols, request-result binding, reused parity and read-only scope custody only. Full M10 and runtime authority remain unaccepted."
 }
