@@ -1,0 +1,167 @@
+{
+  "schema_version": "1",
+  "status": "M10_CONTRACT_DESIGN_ACCEPTED",
+  "milestone": "M10_A_A0_A1",
+  "accepted_design_head": "97e03c2ccee778e2797940f245fca9900fbf7a8e",
+  "accepted_candidate_parent": "2eec9e7fec7ae9266e7020f1a36ae94166427135",
+  "author_id": "codex-m10-contract-author-20261025",
+  "contract_paths_and_sha256": [
+    {
+      "path": "docs/adr/0082-m10-quality-evidence-and-export-packaging.md",
+      "sha256": "05bbaeef1a8e9b3acc7c324e903c662f9b672f21537a2df32542aeb4437dcaa8"
+    },
+    {
+      "path": "docs/research/2026-09-16-r2-m10-quality-evidence-packaging.md",
+      "sha256": "72290ad419f592f22d72b81ff12802c602c1bbce7d7ea03c0ead0962ca3064b5"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-09-16-r2-m10-quality-packaging-design.md",
+      "sha256": "ee35e4fa9f58d8598a379d0436573d58bf83f78041b958fc81cdf71036241649"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-16-r2-m10-quality-packaging.md",
+      "sha256": "d0b9794e8f320c81f74df309fce7ec8b3eaeb8f1aafc1132ef0cf4a1b43f7379"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-16-r2-m10a-quality-evidence-foundation.md",
+      "sha256": "38ab21192c7837d41b1ebca319ffcc3313948182cf81863d51d0498e77d57043"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-25-r2-m10-v2-rebase.md",
+      "sha256": "876450241fe175e050b599d10f958c06a7e3446c84a4a54c04086f38daa83128"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md",
+      "sha256": "9d11a47b04b00b5661866a643a5b412d0640dd3082fe7ceeb3abd19dec01dfac"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M10_MASTER_BINDING_VECTORS.json",
+      "sha256": "e7926d3706d058d370cf2b6018396e826a7319c34ba4a39b1a0103ccbce560b4"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md",
+      "sha256": "1631f622143135038507f4977a6bd81bae181ba9ab22a3f02f6c540e49ab2ba9"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md",
+      "sha256": "9cf56774e3886ad13b9018a4cbc754b4dff63758c1746f35fbacc76a4c4cd067"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json",
+      "sha256": "b3c78d725ad0a4842ba463d341de88cdd71d9f5f9bbbd82f2a196a8ca728c81f"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md",
+      "sha256": "dc5e2b54ddbb8edbb4dd6a1dafe327cffce0e5e8194614b96f7b9889c7304406"
+    }
+  ],
+  "evidence_schema_paths_and_sha256": [
+    {
+      "path": "docs/r2/evidence/schemas/R2_M10_DESIGN_ACCEPTANCE.schema.json",
+      "sha256": "a872969b863d4556a023cbfd8768b895a16e9404cce017e33353fa2c9f8973af"
+    },
+    {
+      "path": "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json",
+      "sha256": "72f980aec9c79ec0ecea7462d2fd8fc8547c7a1ef87e198fecafe44fde2f5249"
+    }
+  ],
+  "bootstrap": {
+    "verifier": {
+      "path": "scripts/r2/verify_m10_bootstrap.py",
+      "sha256": "b861916b2b0388f49af1df0576acd6aff7aa8447f6abe5490d4cd565055d5163"
+    },
+    "tests": [
+      {
+        "path": "tests/unit/scripts/r2/test_verify_m10_bootstrap.py",
+        "sha256": "fe4d14ff74ce90ba9f45e349e08d7712834466709f8b08ebfddca34b46feab20"
+      },
+      {
+        "path": "tests/integration/scripts/r2/test_verify_m10_bootstrap.py",
+        "sha256": "6c56d88c624f8f4791593a792be0a7f48d7ac2c84cb5e5e22b57c30929cdc53e"
+      }
+    ]
+  },
+  "migration_boundary": {
+    "implementation_base_head": "dda0f273e035615e1c10a67f8712279d23b7053c",
+    "singleton_predecessor": "918c4a0e0001",
+    "production_migration_authorized": false
+  },
+  "prerequisite_evidence": [
+    {
+      "owner": "M7",
+      "accepted_head": "b2816af45c9e81be76540ff03134c008ccdceafa",
+      "acceptance_artifact": {
+        "path": "docs/r2/evidence/R2_M7_IMPLEMENTATION_ACCEPTANCE.json",
+        "sha256": "4cfa038beda73708891b3f9995393bcb06a6d33152cb1b4ab61cbb0572e2345c"
+      }
+    },
+    {
+      "owner": "M8",
+      "accepted_head": "23cf146a61c3b7acfb78440d2b1498fd9d77db4b",
+      "acceptance_artifact": {
+        "path": "docs/r2/evidence/R2_M8_IMPLEMENTATION_ACCEPTANCE.json",
+        "sha256": "686f5250b13befb7ec3cbad9110407989eecd2b236a7f2030cd3a4a4ddcfcda2"
+      }
+    }
+  ],
+  "scope_allowlist": [
+    "docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json",
+    "r2/contracts/quality.py",
+    "r2/quality/__init__.py",
+    "r2/quality/digests.py",
+    "scripts/r2/verify_m10_scope.py",
+    "tests/integration/scripts/r2/test_verify_m10_scope.py",
+    "tests/unit/r2/contracts/test_quality.py",
+    "tests/unit/r2/quality/test_quality_digests.py",
+    "tests/unit/scripts/r2/test_verify_m10_scope.py"
+  ],
+  "stop_codes": [
+    "M10_DESIGN_NOT_ACCEPTED",
+    "M10_MIGRATION_BOUNDARY_INVALID",
+    "M10_OWNED_PATH_DIRTY",
+    "M10_PREREQUISITE_NOT_ACCEPTED",
+    "M10_REQUIRED_EVIDENCE_MISSING",
+    "M10_REVIEW_INDEPENDENCE_FAILED",
+    "M10_SCHEMA_FREEZE_FAILED",
+    "M10_SCOPE_EXPANSION_REQUIRED"
+  ],
+  "reviewers": [
+    {
+      "reviewer_id": "codex-m10-contract-path-review-a-97e03c2cc-20261026T091713Z",
+      "qualification_evidence": "Fresh independent read-only review of the minimal M10 A0/A1 test-namespace amendment at 97e03c2ccee778e2797940f245fca9900fbf7a8e, reusing the prior qualified normative review only for unchanged bytes. Verified that the only functional change replaces tests/unit/r2/quality/test_digests.py with tests/unit/r2/quality/test_quality_digests.py consistently across the nine-path manifest, bootstrap scope constant and implementation plan; the packet explicitly preserves all normative contract, digest, authority, source/import/characterization, release/base and deferral constraints. Confirmed the collision mechanism against the unchanged default pytest configuration and un-packaged test directories, global uniqueness of the new basename, absence of both old/new A1 product paths and acceptance, separation from the immutable prior acceptance branch, matching resealed source hashes, clean exact HEAD, and fresh full/contracts REFUSED/M10_DESIGN_NOT_ACCEPTED behavior.",
+      "conflict_declaration": "NO_CONFLICT",
+      "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+      "reviewed_candidate_head": "97e03c2ccee778e2797940f245fca9900fbf7a8e",
+      "verdict": "PASS",
+      "reviewed_at": "2026-10-26T09:17:13Z",
+      "blind_review_artifact": {
+        "path": "docs/r2/evidence/m10-contract-reviews/a-97e03c2cc.json",
+        "sha256": "faad14383eff9b3230123dd6bce61eeb3215a98632517bc4b6d32a5b1f6f086d"
+      }
+    },
+    {
+      "reviewer_id": "codex-m10-test-path-amendment-review-b-97e03c2cc-20261026T092020Z",
+      "qualification_evidence": "Fresh independent read-only Tier-2 review of sealed candidate 97e03c2ccee778e2797940f245fca9900fbf7a8e, reusing my unchanged normative verification from 72958426b42629bdc506a2e252427840c53a1651 and directly verifying the five-file test-path-only delta, default pytest namespace mechanism, exact nine-path custody agreement, sealed hashes, Git ancestry, absence of product/acceptance/WIP files, and both live refusal modes.",
+      "conflict_declaration": "NO_CONFLICT",
+      "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+      "reviewed_candidate_head": "97e03c2ccee778e2797940f245fca9900fbf7a8e",
+      "verdict": "PASS",
+      "reviewed_at": "2026-10-26T09:20:20Z",
+      "blind_review_artifact": {
+        "path": "docs/r2/evidence/m10-contract-reviews/b-97e03c2cc.json",
+        "sha256": "522cd25bf0f754c913d79c9e296edc5bba8e1f3720ac25ecc7bdc49e4bfb29dd"
+      }
+    }
+  ],
+  "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+  "reviewed_at": "2026-10-26T09:24:19.085763+00:00",
+  "required_skips": [],
+  "material_unknowns": [],
+  "packet_definition": {
+    "path": "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json",
+    "sha256": "b3c78d725ad0a4842ba463d341de88cdd71d9f5f9bbbd82f2a196a8ca728c81f"
+  },
+  "implementation_scope": "CONTRACTS_ONLY",
+  "full_m10_accepted": false,
+  "runtime_activation_authorized": false
+}
