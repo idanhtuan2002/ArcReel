@@ -1,32 +1,32 @@
 {
   "schema_version": "1",
-  "status": "BOUNDED_DESIGN_REPAIR_NOT_ACCEPTED",
-  "tested_source_head": "1d880cb0dbda2d253cd3a6e86f260b949710842f",
+  "status": "BOUNDED_DESIGN_CANDIDATE_NOT_ACCEPTED",
+  "tested_source_head": "93dfd94dc325597675d72b069804509ee8cc29db",
   "packet": "M10_A_A0_A1",
   "implementation_scope": "CONTRACTS_ONLY",
   "full_m10_accepted": false,
   "runtime_activation_authorized": false,
   "product_files_created": false,
   "source_sha256": {
-    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "fc0913308cef0cfdb7d82eacd358ff23c6a8d3e139e48b9594ce7a9e9d5e7107",
+    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "9db5ad20c8a317c6764a89bc4249346554f6fcc30af667336db9e658715c7602",
     "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json": "72f980aec9c79ec0ecea7462d2fd8fc8547c7a1ef87e198fecafe44fde2f5249",
-    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "c325ac0b2a89e5d722efe475fdd422fc7ded52f4c14e1042485409f503ab6d3e",
+    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "b2b0cf9601196fcdbdacbabb4bc46f9810f218f39927e6715d388c70818a696d",
     "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md": "1631f622143135038507f4977a6bd81bae181ba9ab22a3f02f6c540e49ab2ba9",
-    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "5b735b93fc81b4495a49c27afde142a4d5db8cfe24bba81b7baee106eadedf7e",
+    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "26c7fe21ae35a9c77e9d8577cacf1c1f7d9a3c7356abc5b1d5e2415ca87fb3c6",
     "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md": "7b8125a8fa78c1822075ffda4a2e4586e721b8b560e5124f7756e78f6cbae6be",
-    "scripts/r2/verify_m10_bootstrap.py": "7940c2ae34e89faea9a8f2e5d4c3661866fe5e75b69679d19610c04a1bc3574f",
-    "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "2c5d1cf88d0af3afe1f69c5a94d93d8efe18e496e4b5a43248e0ae5e0cd3cae3",
-    "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "c4405a230870ac03851afc46106a90f1180f5945a42e452a45aa424b2e48de68"
+    "scripts/r2/verify_m10_bootstrap.py": "d3985698ce74d2834a835e6ff72a7a8b1ea5866e2f08a5e91b4bf878f410e985",
+    "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "f65282ec9ba559bb5b8e680a351067f9844e65e800589b234af6ea8d23bdc5d8",
+    "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "8043efb2fa7deb3cf4095dcb751add4c60cda950ce5a7072631ad31ddc87213a"
   },
   "tests": {
     "counts": {
-      "tests": 119,
+      "tests": 132,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
-    "junit_sha256": "4d47307a18c7bcec961d48a4f7403470df9f55a858441fe531dd82ad9076adc5",
-    "scope": "Bounded/full M10 verifier, M7/M8 scope verifier regressions and cold pure imports. Synthetic eligibility fixtures are not real acceptance or A1 product tests."
+    "junit_sha256": "b43aeee2c90ae5a965bf6c509a3074b18e0d1770fbdad1b1ecd8b7e89493929c",
+    "scope": "Full/bounded M10 bootstrap, M7/M8 verifier, cold-import and exact characterized-source dirty/hash/mode regressions. No A1 validator implementation is claimed."
   },
   "checks": {
     "ruff": "PASS",
@@ -39,7 +39,7 @@
   "live": {
     "results": [
       {
-        "head": "1d880cb0dbda2d253cd3a6e86f260b949710842f",
+        "head": "93dfd94dc325597675d72b069804509ee8cc29db",
         "packet": "full",
         "status": "REFUSED",
         "stop_codes": [
@@ -47,7 +47,7 @@
         ]
       },
       {
-        "head": "1d880cb0dbda2d253cd3a6e86f260b949710842f",
+        "head": "93dfd94dc325597675d72b069804509ee8cc29db",
         "packet": "contracts",
         "status": "REFUSED",
         "stop_codes": [
@@ -57,7 +57,7 @@
     ],
     "repository_status_unchanged": true
   },
-  "review_status": "be304aa58_FAILED_WITHDRAWN_FRESH_REVIEWS_REQUIRED",
+  "review_status": "FRESH_REVIEWS_NOT_YET_OBTAINED",
   "limits": [
     "No M10 action custodian or factual runtime qualified.",
     "No database, migration, probe, API, provider, credential or export code allowed.",
@@ -117,19 +117,14 @@
   ],
   "source_coverage": "Observed27-file pure import closure and config/lock/proof bytes/modes pinned to derived base; stale graph supplemented by exact source and cold-process probes.",
   "normative_repair": {
-    "withdrawn_candidate": "63cc4e9869a663ec190c3d1af23bd8ea69434a27",
+    "withdrawn_candidate": "be304aa58a106d547ec6167dfe3afebec3c09f53",
     "proposed_closures": [
-      "Every metadata snapshot ID equals decoded artifact resource and corresponding head; master child also equals shot_ref.",
-      "Waivers sort by full canonical bytes, explicit null, duplicate(rule_id,finding_id,scope) refusal.",
-      "Catalog refs cover probe/freshness/slot/waiverable IDs with explicit per-collection uniqueness and policy ordering."
+      "A1 validates known final/lease time pairs and aware absolute request expiry; A6 validates remaining lifetime against fresh locked DB time and stamps final issue/admission/expiry.",
+      "All eight characterized host/namespace sources, including deliverables, have exact base hashes/modes and dirty protection; they remain forbidden imports in A1.",
+      "Every root/dependency resource passes safe-target validation before metadata identity equality."
     ],
     "a1_validation_implemented": false,
-    "python_source_unchanged_from": "c7f4449c5bb0da2d078530aca8455568a7b3f252",
-    "comparator_probe": {
-      "status": "DESIGN_COMPARATOR_CHARACTERIZATION_ONLY",
-      "permutations": 6,
-      "distinct_normalized_byte_sequences": 1,
-      "sha256": "c54547d28095adf355326613e5666fb22ae60aa1dbe9a6b66882669057be1b00"
-    }
+    "python_source_unchanged_from": "93dfd94dc325597675d72b069804509ee8cc29db",
+    "characterized_source_count": 8
   }
 }
