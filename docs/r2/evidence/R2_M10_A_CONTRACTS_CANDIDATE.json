@@ -169,25 +169,25 @@
       "tests": {
         "affected": {
           "counts": {
-            "tests": 476,
+            "tests": 455,
             "failures": 0,
             "errors": 0,
             "skipped": 0
           },
-          "junit_sha256": "5901282a3a78a819219ef7756d9ddad8eb2a2bc15d10c826696e1bfc927e6828"
+          "junit_sha256": "9e2bcc1f2014e513cb09e1e8e2f87263d5ad7a7906d2cf5cd6ee46850734c9e5"
         },
         "repeat": {
           "counts": {
-            "tests": 208,
+            "tests": 187,
             "failures": 0,
             "errors": 0,
             "skipped": 0
           },
-          "junit_sha256": "92f840ae37d0b9f4de64d2e6282138b6427e5609954c8a12e432cf61439f301f"
+          "junit_sha256": "91952066efc8a7d3019ab489fca439e8e0995d50161fec8caaa2859a86235de7"
         },
         "affected_command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/scripts/r2/test_verify_m10_scope.py tests/integration/scripts/r2/test_verify_m10_scope.py tests/unit/scripts/r2/test_verify_m10_bootstrap.py tests/integration/scripts/r2/test_verify_m10_bootstrap.py tests/unit/scripts/r2/test_verify_m7_scope.py tests/unit/scripts/r2/test_verify_m8_scope.py tests/integration/r2/test_pure_artifact_imports.py tests/unit/r2/contracts/test_quality.py tests/unit/r2/quality/test_quality_digests.py tests/unit/r2/advanced_creative/test_digests.py tests/unit/r2/contracts/test_advanced_creative.py tests/unit/r2/contracts/test_host_hardening.py tests/unit/r2/contracts/test_pure_artifact_metadata.py tests/unit/r2/contracts/test_content_basis.py tests/unit/r2/test_artifact_identity.py -q -n 2 --dist loadfile",
-        "affected_execution_head": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
-        "execution_identity": "Affected gate ran on2e2665e92 plus exact4 repaired source/test files, now committed unchanged at source_head; repeat ran at exact source_head. The8 SHA256 values bind all tested bytes.",
+        "affected_execution_head": "cf18b9f6156ed9e6337c40708e217a73271027fa",
+        "execution_identity": "Affected gate executed on acceptance HEAD plus exact8source files now committed unchanged at source_head. Repeat ran at8ec57b535 plus identical5 A1 files. SHA256 above binds the tested bytes; no test source changed after the runs.",
         "repeat_command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/r2/contracts/test_quality.py tests/unit/r2/quality/test_quality_digests.py -q",
         "warnings": "2 SQLite expression-index reflection warnings in affected gate;1 in repeated A1 gate; no skipped tests."
       },
@@ -226,5 +226,20 @@
       "tests/unit/r2/quality/test_quality_digests.py"
     ],
     "contract_fields_and_digest_domains_unchanged": true
+  },
+  "evidence_provenance_repair": {
+    "immutable_historical_candidate": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
+    "historical_source_head": "fc1770e7e9aaede6cc4b7d1f2567d51caf489516",
+    "historical_tests_restored_exactly_from_git": true,
+    "historical_counts": [
+      455,
+      187
+    ],
+    "current_counts": [
+      476,
+      208
+    ],
+    "product_source_unchanged_from": "40e174a3989ee7a79446e265dadfda622ca5a7fa",
+    "reason": "Evidence builder reused a mutable tests dictionary; historical block is now an independent deep copy of the immutable Git record."
   }
 }
