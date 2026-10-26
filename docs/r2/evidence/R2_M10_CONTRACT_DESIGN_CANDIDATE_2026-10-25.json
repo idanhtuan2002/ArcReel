@@ -1,32 +1,34 @@
 {
   "schema_version": "1",
   "status": "BOUNDED_DESIGN_CANDIDATE_NOT_ACCEPTED",
-  "tested_source_head": "93dfd94dc325597675d72b069804509ee8cc29db",
+  "tested_source_head": "d22120b58dd5e380edc582bb16dd5f7133cb7346",
   "packet": "M10_A_A0_A1",
   "implementation_scope": "CONTRACTS_ONLY",
   "full_m10_accepted": false,
   "runtime_activation_authorized": false,
   "product_files_created": false,
   "source_sha256": {
-    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "9db5ad20c8a317c6764a89bc4249346554f6fcc30af667336db9e658715c7602",
+    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "b8e023f7aea2f18c61e781dc41decf7550fe08afa86a0d65c6ff8d84648bcf0e",
     "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json": "72f980aec9c79ec0ecea7462d2fd8fc8547c7a1ef87e198fecafe44fde2f5249",
-    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "b2b0cf9601196fcdbdacbabb4bc46f9810f218f39927e6715d388c70818a696d",
+    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "d449937a2f8e9ecb1ae1479a928f23262b5f42024d118165f83a7795f4ba5c76",
     "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md": "1631f622143135038507f4977a6bd81bae181ba9ab22a3f02f6c540e49ab2ba9",
-    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "26c7fe21ae35a9c77e9d8577cacf1c1f7d9a3c7356abc5b1d5e2415ca87fb3c6",
-    "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md": "7b8125a8fa78c1822075ffda4a2e4586e721b8b560e5124f7756e78f6cbae6be",
-    "scripts/r2/verify_m10_bootstrap.py": "d3985698ce74d2834a835e6ff72a7a8b1ea5866e2f08a5e91b4bf878f410e985",
-    "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "f65282ec9ba559bb5b8e680a351067f9844e65e800589b234af6ea8d23bdc5d8",
-    "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "8043efb2fa7deb3cf4095dcb751add4c60cda950ce5a7072631ad31ddc87213a"
+    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "17cf302f88e7b4af08fd8fe17069c2028afe3ac1d422ae433bd0f9f002f2c7b8",
+    "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md": "9d11a47b04b00b5661866a643a5b412d0640dd3082fe7ceeb3abd19dec01dfac",
+    "scripts/r2/verify_m10_bootstrap.py": "22ba0dfdbf1cd4f4b2deff6a30b73553b60d59dc33ca8be40f09db8d5620ca31",
+    "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "6c56d88c624f8f4791593a792be0a7f48d7ac2c84cb5e5e22b57c30929cdc53e",
+    "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "fe4d14ff74ce90ba9f45e349e08d7712834466709f8b08ebfddca34b46feab20"
   },
   "tests": {
     "counts": {
-      "tests": 132,
+      "tests": 149,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
-    "junit_sha256": "b43aeee2c90ae5a965bf6c509a3074b18e0d1770fbdad1b1ecd8b7e89493929c",
-    "scope": "Full/bounded M10 bootstrap, M7/M8 verifier, cold-import and exact characterized-source dirty/hash/mode regressions. No A1 validator implementation is claimed."
+    "junit_sha256": "7feda737fb1e1ab118d4b083e763886b6e7bc70b61265f1d0d346f275bf8c37d",
+    "scope": "Affected full/bounded M10 bootstrap and real Git policy tests, M7/M8 gates, pure imports and existing scoped/legacy candidate projection tests. No A1 implementation or runtime concurrency proof.",
+    "command": "pytest tests/unit/scripts/r2/test_verify_m10_bootstrap.py tests/integration/scripts/r2/test_verify_m10_bootstrap.py tests/unit/scripts/r2/test_verify_m7_scope.py tests/unit/scripts/r2/test_verify_m8_scope.py tests/integration/r2/test_pure_artifact_imports.py tests/unit/r2/host_hardening/test_master_authority.py -q -n 2 --dist loadfile",
+    "execution_identity": "Executed on14076 plus the exact seven repaired source files committed unchanged at tested_source_head; hashes above bind the tested bytes."
   },
   "checks": {
     "ruff": "PASS",
@@ -39,7 +41,7 @@
   "live": {
     "results": [
       {
-        "head": "93dfd94dc325597675d72b069804509ee8cc29db",
+        "head": "d22120b58dd5e380edc582bb16dd5f7133cb7346",
         "packet": "full",
         "status": "REFUSED",
         "stop_codes": [
@@ -47,7 +49,7 @@
         ]
       },
       {
-        "head": "93dfd94dc325597675d72b069804509ee8cc29db",
+        "head": "d22120b58dd5e380edc582bb16dd5f7133cb7346",
         "packet": "contracts",
         "status": "REFUSED",
         "stop_codes": [
@@ -113,18 +115,62 @@
         "required_skips": [],
         "material_unknowns": []
       }
+    },
+    {
+      "candidate": "14076bb2ad69c7f0dd3c1bcef6cc0ed242ee7d09",
+      "verdict": "FAIL",
+      "material_findings": 2,
+      "disposition": "Withdrawn. Separate host generation and statefully projected M7 candidate namespaces; defer mapping proof to A5. Explicit predecessor-to-release ancestry required. Two fresh reviews needed.",
+      "reviewer_record": {
+        "reviewer_id": "codex-m10-contract-review-b-14076bb2a-20261026T023740Z",
+        "qualification_evidence": "Independent blind Tier-2 normative review of sealed candidate 14076bb2, including exact-source M7/M8 lineage, bootstrap custody, host candidate-identity projection, A0/A1 scope, type/digest/master-edge/waiver/catalog closure, immutability, TTL and authorization separation. Stale or excluded graph paths were verified directly; characterized hashes/modes and live refusal modes were recomputed.",
+        "conflict_declaration": "NO_CONFLICT",
+        "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+        "reviewed_candidate_head": "14076bb2ad69c7f0dd3c1bcef6cc0ed242ee7d09",
+        "verdict": "FAIL",
+        "reviewed_at": "2026-10-26T02:37:40Z",
+        "required_skips": [],
+        "material_unknowns": []
+      },
+      "other_reviewer_record": {
+        "reviewer_id": "codex-m10-contract-review-a-14076bb2a-20261026T022723Z",
+        "qualification_evidence": "Fresh independent Tier-2 graph and exact-source normative review covering the complete bounded A0/A1 packet, M7/M8 and release lineage, sequencing authority, acceptance custody, immutable contract and digest closure, authorization and TTL separation, exact host identity mapping, characterized-source byte/mode/dirty protection, scope exclusion and live refusal behavior. Graph exclusions and stale paths were verified directly; all prior be304 findings were independently re-evaluated against current bytes.",
+        "conflict_declaration": "NO_CONFLICT",
+        "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+        "reviewed_candidate_head": "14076bb2ad69c7f0dd3c1bcef6cc0ed242ee7d09",
+        "verdict": "PASS",
+        "reviewed_at": "2026-10-26T02:27:23Z",
+        "required_skips": [],
+        "material_unknowns": []
+      },
+      "findings": [
+        {
+          "severity": "HIGH",
+          "finding": "Raw generation ID versus state-dependent M7 candidate-object ID equality is invalid.",
+          "sources": [
+            "r2/host_hardening/master_authority.py",
+            "r2/host_hardening/promotion.py",
+            "r2/production/approval_service.py",
+            "docs/adr/0106-m7-candidate-ids-are-scoped-to-user-and-project.md"
+          ]
+        },
+        {
+          "severity": "MEDIUM",
+          "finding": "Missing explicit predecessor-to-release ancestry; negative merge-DAG was wrongly eligible, now refused."
+        }
+      ]
     }
   ],
   "source_coverage": "Observed27-file pure import closure and config/lock/proof bytes/modes pinned to derived base; stale graph supplemented by exact source and cold-process probes.",
   "normative_repair": {
-    "withdrawn_candidate": "be304aa58a106d547ec6167dfe3afebec3c09f53",
+    "withdrawn_candidate": "14076bb2ad69c7f0dd3c1bcef6cc0ed242ee7d09",
     "proposed_closures": [
-      "A1 validates known final/lease time pairs and aware absolute request expiry; A6 validates remaining lifetime against fresh locked DB time and stamps final issue/admission/expiry.",
-      "All eight characterized host/namespace sources, including deliverables, have exact base hashes/modes and dirty protection; they remain forbidden imports in A1.",
-      "Every root/dependency resource passes safe-target validation before metadata identity equality."
+      "A1 binds both candidate namespaces without stateful projection claims; A5 uses real scoped/legacy resolver, stored candidates and qualified registration/master consistency.",
+      "Thirteen exact characterized source/ADR hashes/modes pinned and dirty protected; no new allowed imports.",
+      "Fixed predecessor-to-fixed-release ancestry enforced; RED1fail68deselected then GREEN2pass90deselected plus final149pass."
     ],
     "a1_validation_implemented": false,
-    "python_source_unchanged_from": "93dfd94dc325597675d72b069804509ee8cc29db",
-    "characterized_source_count": 8
+    "python_source_unchanged_from": "d22120b58dd5e380edc582bb16dd5f7133cb7346",
+    "characterized_source_count": 13
   }
 }
