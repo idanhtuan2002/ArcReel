@@ -80,3 +80,31 @@ def test_forged_codes_unknown_subclasses_and_raw_errors_cannot_masquerade() -> N
     direct = errors.M10Error("CANARY_SECRET")
     assert direct.args == (FALLBACK,)
     assert str(direct) == FALLBACK
+
+
+@pytest.mark.parametrize("hostile_kind", ["alias", "raise"])
+def test_error_identity_never_executes_metaclass_hash_or_equality(hostile_kind: str) -> None:
+    class HostileMeta(type):
+        def __hash__(cls) -> int:
+            if hostile_kind == "raise":
+                raise AssertionError("untrusted metaclass hash executed")
+            return hash(errors.ProbeFailedError)
+
+        def __eq__(cls, other: object) -> bool:
+            if hostile_kind == "raise":
+                raise AssertionError("untrusted metaclass equality executed")
+            return other is errors.ProbeFailedError
+
+    class ForeignError(Exception, metaclass=HostileMeta):
+        pass
+
+    class LocalError(errors.M10Error, metaclass=HostileMeta):
+        pass
+
+    assert errors.error_payload(ForeignError("CANARY_SECRET")) == {"code": FALLBACK, "message": FALLBACK}
+    exc = LocalError("CANARY_SECRET")
+    assert exc.args == (FALLBACK,)
+    assert exc.code == FALLBACK
+    assert str(exc) == FALLBACK
+    assert repr(exc) == f"M10Error({FALLBACK!r})"
+    assert errors.error_payload(exc) == {"code": FALLBACK, "message": FALLBACK}

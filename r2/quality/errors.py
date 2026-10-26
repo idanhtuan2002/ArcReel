@@ -7,21 +7,28 @@ from types import MappingProxyType
 _FALLBACK = "M10_REQUIRED_EVIDENCE_MISSING"
 
 
+def _registered_code(error_type: type[BaseException]) -> str:
+    for registered, code in ERROR_CODES.items():
+        if error_type is registered:
+            return code
+    return _FALLBACK
+
+
 class M10Error(Exception):
     """Only exact registered classes identify outward failures."""
 
     def __init__(self, *details: object, **context: object) -> None:
-        Exception.__init__(self, ERROR_CODES.get(type(self), _FALLBACK))
+        Exception.__init__(self, _registered_code(type(self)))
 
     @property
     def code(self) -> str:
-        return ERROR_CODES.get(type(self), _FALLBACK)
+        return _registered_code(type(self))
 
     def __str__(self) -> str:
-        return ERROR_CODES.get(type(self), _FALLBACK)
+        return _registered_code(type(self))
 
     def __repr__(self) -> str:
-        return f"M10Error({ERROR_CODES.get(type(self), _FALLBACK)!r})"
+        return f"M10Error({_registered_code(type(self))!r})"
 
 
 class DesignNotAcceptedError(M10Error):
@@ -164,5 +171,5 @@ def error_for_code(code: object) -> M10Error:
 
 def error_payload(exc: BaseException) -> dict[str, str]:
     """Never inspect an arbitrary exception's code, details, cause or traceback."""
-    code = ERROR_CODES.get(type(exc), _FALLBACK)
+    code = _registered_code(type(exc))
     return {"code": code, "message": code}
