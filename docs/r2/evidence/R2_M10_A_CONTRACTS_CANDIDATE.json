@@ -4,16 +4,16 @@
   "packet": "M10_A_A0_A1",
   "acceptance_ref": "cf18b9f6156ed9e6337c40708e217a73271027fa",
   "accepted_design_head": "97e03c2ccee778e2797940f245fca9900fbf7a8e",
-  "source_head": "fc1770e7e9aaede6cc4b7d1f2567d51caf489516",
-  "source_parent": "8ec57b535800547a87964f30210f4a622709c49e",
+  "source_head": "40e174a3989ee7a79446e265dadfda622ca5a7fa",
+  "source_parent": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
   "source_sha256": {
-    "r2/contracts/quality.py": "9733e2582ab855bb9ce707aa21a0c7607e48a6b0c76be9527b16b5ae248ef8fa",
+    "r2/contracts/quality.py": "b8e5398d000f31d25196d5533a00ce5bb3740bfc13a7d0aab72ce869901f1384",
     "r2/quality/__init__.py": "983a07c910996a8ecb7ff05e19d28c54bf5be102c1d79207c11e8faf0d2dcd6b",
-    "r2/quality/digests.py": "bad5491acdc2a180446ebbd16aa3b0442d0b9440bc0eeb526d676c6ddee24ce0",
+    "r2/quality/digests.py": "323e748d18ad719cff57d285ebfc21e4f633086150495368337843d9751ee6e7",
     "scripts/r2/verify_m10_scope.py": "9c3574c687095370896e3c61dfba2d8c520731f71aa2d97e97b9a4bcacb5fa24",
     "tests/integration/scripts/r2/test_verify_m10_scope.py": "3c1aea46a4f75a06290abf65d9456939dbe438abe3e6b76928cb10ff047f91a5",
-    "tests/unit/r2/contracts/test_quality.py": "b90ed59d73b0ce90a6086218d53afeec7fa0665e79560cc01c4e38dd7cbf67d7",
-    "tests/unit/r2/quality/test_quality_digests.py": "3be1d6b757fb096bc3424b40721ccbe236482fefc8c31adf672210b36e707d1b",
+    "tests/unit/r2/contracts/test_quality.py": "7090f75f2ea5f1896c54b545f9ae85e1b0485547509d9294f3d9e2eaa0cfb173",
+    "tests/unit/r2/quality/test_quality_digests.py": "72abd5ff6d6ed1caf8b9f94fdbe41cac6e26eb522e10d66542580834fec364e2",
     "tests/unit/scripts/r2/test_verify_m10_scope.py": "41ee31812e2efc2b87a3200eaf11ba2861e5f7c598aa31b29d47787cef6be9c2"
   },
   "scope_allowlist": [
@@ -36,25 +36,25 @@
   "tests": {
     "affected": {
       "counts": {
-        "tests": 455,
+        "tests": 476,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
-      "junit_sha256": "9e2bcc1f2014e513cb09e1e8e2f87263d5ad7a7906d2cf5cd6ee46850734c9e5"
+      "junit_sha256": "5901282a3a78a819219ef7756d9ddad8eb2a2bc15d10c826696e1bfc927e6828"
     },
     "repeat": {
       "counts": {
-        "tests": 187,
+        "tests": 208,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
-      "junit_sha256": "91952066efc8a7d3019ab489fca439e8e0995d50161fec8caaa2859a86235de7"
+      "junit_sha256": "92f840ae37d0b9f4de64d2e6282138b6427e5609954c8a12e432cf61439f301f"
     },
     "affected_command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/scripts/r2/test_verify_m10_scope.py tests/integration/scripts/r2/test_verify_m10_scope.py tests/unit/scripts/r2/test_verify_m10_bootstrap.py tests/integration/scripts/r2/test_verify_m10_bootstrap.py tests/unit/scripts/r2/test_verify_m7_scope.py tests/unit/scripts/r2/test_verify_m8_scope.py tests/integration/r2/test_pure_artifact_imports.py tests/unit/r2/contracts/test_quality.py tests/unit/r2/quality/test_quality_digests.py tests/unit/r2/advanced_creative/test_digests.py tests/unit/r2/contracts/test_advanced_creative.py tests/unit/r2/contracts/test_host_hardening.py tests/unit/r2/contracts/test_pure_artifact_metadata.py tests/unit/r2/contracts/test_content_basis.py tests/unit/r2/test_artifact_identity.py -q -n 2 --dist loadfile",
-    "affected_execution_head": "cf18b9f6156ed9e6337c40708e217a73271027fa",
-    "execution_identity": "Affected gate executed on acceptance HEAD plus exact8source files now committed unchanged at source_head. Repeat ran at8ec57b535 plus identical5 A1 files. SHA256 above binds the tested bytes; no test source changed after the runs.",
+    "affected_execution_head": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
+    "execution_identity": "Affected gate ran on2e2665e92 plus exact4 repaired source/test files, now committed unchanged at source_head; repeat ran at exact source_head. The8 SHA256 values bind all tested bytes.",
     "repeat_command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/r2/contracts/test_quality.py tests/unit/r2/quality/test_quality_digests.py -q",
     "warnings": "2 SQLite expression-index reflection warnings in affected gate;1 in repeated A1 gate; no skipped tests."
   },
@@ -97,7 +97,8 @@
       "m10.technical-observation.v1": "sha256:04e027b5a292075d84d24feee92c79d5d3fc3a6f4f0abf56146ff5810bf8521e",
       "m10.waiver-binding.v1": "sha256:0414f6408b6572610465a35568c14f2230a38d009ed1bc601125fefd7277a9ec"
     },
-    "limits": "Encoding vectors use deterministic shape-valid fixture data; cached foreign assertions are not runtime authority. Separate cache-verifier tests recompute embedded caches."
+    "limits": "Encoding vectors use deterministic shape-valid fixture data; cached foreign assertions are not runtime authority. Separate cache-verifier tests recompute embedded caches.",
+    "valid_vectors_unchanged_after_repair": true
   },
   "field_audit": {
     "model_count": 37,
@@ -107,7 +108,7 @@
   "live": [
     {
       "acceptance_ref": "cf18b9f6156ed9e6337c40708e217a73271027fa",
-      "head": "fc1770e7e9aaede6cc4b7d1f2567d51caf489516",
+      "head": "40e174a3989ee7a79446e265dadfda622ca5a7fa",
       "scope_allowlist": [
         "docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json",
         "r2/contracts/quality.py",
@@ -123,7 +124,7 @@
       "stop_codes": []
     },
     {
-      "head": "fc1770e7e9aaede6cc4b7d1f2567d51caf489516",
+      "head": "40e174a3989ee7a79446e265dadfda622ca5a7fa",
       "packet": "full",
       "status": "REFUSED",
       "stop_codes": [
@@ -132,7 +133,8 @@
     }
   ],
   "independent_implementation_review": {
-    "status": "PENDING",
+    "status": "REPAIR_REVERIFICATION_PENDING",
+    "failed_candidate_head": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
     "no_pass_inferred": true
   },
   "remaining_gates": [
@@ -149,5 +151,80 @@
     "Local source/contract/digest scope only; no database migration, API, UI, provider, probe or packaging/export implementation.",
     "No broad17k backend/media suite rerun; actual affected gates listed above.",
     "No checksum, type constructor or scope success grants Human disposition or currentness."
-  ]
+  ],
+  "previous_implementation_candidates": [
+    {
+      "candidate_head": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
+      "source_head": "fc1770e7e9aaede6cc4b7d1f2567d51caf489516",
+      "source_sha256": {
+        "r2/contracts/quality.py": "9733e2582ab855bb9ce707aa21a0c7607e48a6b0c76be9527b16b5ae248ef8fa",
+        "r2/quality/__init__.py": "983a07c910996a8ecb7ff05e19d28c54bf5be102c1d79207c11e8faf0d2dcd6b",
+        "r2/quality/digests.py": "bad5491acdc2a180446ebbd16aa3b0442d0b9440bc0eeb526d676c6ddee24ce0",
+        "scripts/r2/verify_m10_scope.py": "9c3574c687095370896e3c61dfba2d8c520731f71aa2d97e97b9a4bcacb5fa24",
+        "tests/integration/scripts/r2/test_verify_m10_scope.py": "3c1aea46a4f75a06290abf65d9456939dbe438abe3e6b76928cb10ff047f91a5",
+        "tests/unit/r2/contracts/test_quality.py": "b90ed59d73b0ce90a6086218d53afeec7fa0665e79560cc01c4e38dd7cbf67d7",
+        "tests/unit/r2/quality/test_quality_digests.py": "3be1d6b757fb096bc3424b40721ccbe236482fefc8c31adf672210b36e707d1b",
+        "tests/unit/scripts/r2/test_verify_m10_scope.py": "41ee31812e2efc2b87a3200eaf11ba2861e5f7c598aa31b29d47787cef6be9c2"
+      },
+      "tests": {
+        "affected": {
+          "counts": {
+            "tests": 476,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "junit_sha256": "5901282a3a78a819219ef7756d9ddad8eb2a2bc15d10c826696e1bfc927e6828"
+        },
+        "repeat": {
+          "counts": {
+            "tests": 208,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "junit_sha256": "92f840ae37d0b9f4de64d2e6282138b6427e5609954c8a12e432cf61439f301f"
+        },
+        "affected_command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/scripts/r2/test_verify_m10_scope.py tests/integration/scripts/r2/test_verify_m10_scope.py tests/unit/scripts/r2/test_verify_m10_bootstrap.py tests/integration/scripts/r2/test_verify_m10_bootstrap.py tests/unit/scripts/r2/test_verify_m7_scope.py tests/unit/scripts/r2/test_verify_m8_scope.py tests/integration/r2/test_pure_artifact_imports.py tests/unit/r2/contracts/test_quality.py tests/unit/r2/quality/test_quality_digests.py tests/unit/r2/advanced_creative/test_digests.py tests/unit/r2/contracts/test_advanced_creative.py tests/unit/r2/contracts/test_host_hardening.py tests/unit/r2/contracts/test_pure_artifact_metadata.py tests/unit/r2/contracts/test_content_basis.py tests/unit/r2/test_artifact_identity.py -q -n 2 --dist loadfile",
+        "affected_execution_head": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
+        "execution_identity": "Affected gate ran on2e2665e92 plus exact4 repaired source/test files, now committed unchanged at source_head; repeat ran at exact source_head. The8 SHA256 values bind all tested bytes.",
+        "repeat_command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/r2/contracts/test_quality.py tests/unit/r2/quality/test_quality_digests.py -q",
+        "warnings": "2 SQLite expression-index reflection warnings in affected gate;1 in repeated A1 gate; no skipped tests."
+      },
+      "independent_review": {
+        "reviewer_id": "codex-m10-a0a1-implementation-review-2e2665e92-20261026T094408Z",
+        "qualification_evidence": "Independent sealed-HEAD, read-only Tier-2 review of the accepted A0/A1 packet, exact nine-path diff, product source, tests, digest projections, scope guard/bootstrap, source hashes, and dependency seams. The graph generation was stale and excluded/missed new paths, so every material conclusion was verified directly against the sealed checkout.",
+        "conflict_declaration": "NO_CONFLICT",
+        "candidate_head": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
+        "verdict": "FAIL",
+        "reviewed_at": "2026-10-26T09:44:08Z",
+        "required_skips": [],
+        "material_unknowns": [],
+        "findings": [
+          {
+            "severity": "P2",
+            "id": "UNORDERED_TUPLE_INPUT",
+            "scenario": "Pydantic accepts set/frozenset for semantic tuples and parallel observation refs/digests, yielding hash-seed-dependent digests and arbitrary pairings.",
+            "repair": "Require explicit list/tuple input before coercion; retain only documented normalizers; fresh-process regression."
+          }
+        ],
+        "limits": "Reviewer pytest stalled and was interrupted; no fresh reviewer test pass claimed. Parent455/187 hash-bound tests are historical candidate evidence."
+      }
+    }
+  ],
+  "repair_pass": {
+    "number": 1,
+    "independent_review_finding": "P2_UNORDERED_TUPLE_INPUT",
+    "main_confirmed_adjacent_gap": "Metadata selected_candidate_id/host_version_ref/selected_by accepted interior controls; encoded DEL/C1 resource identity also needed the existing exact check.",
+    "red": "21failed187deselected before repair",
+    "green": "208passed1warning0skips",
+    "behavior": "Require list/tuple before any M10 tuple coercion and both tuple digest entrypoints; preserve documented normalizers. Apply existing exact-identity checks to every string value in the normalized closed host metadata body.",
+    "source_paths": [
+      "r2/contracts/quality.py",
+      "r2/quality/digests.py",
+      "tests/unit/r2/contracts/test_quality.py",
+      "tests/unit/r2/quality/test_quality_digests.py"
+    ],
+    "contract_fields_and_digest_domains_unchanged": true
+  }
 }
