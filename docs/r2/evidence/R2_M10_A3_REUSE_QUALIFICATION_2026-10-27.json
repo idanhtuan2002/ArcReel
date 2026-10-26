@@ -1,0 +1,72 @@
+{
+  "schema_version": "1",
+  "status": "PARTIAL_A3_REUSE_QUALIFICATION_ONLY",
+  "source_head": "c82638504931541cc7796088381760c7bb4664bb",
+  "a2_completed_head": "fc2f6812bef8a4044cd3018af857cbd24482970e",
+  "source_sha256": {
+    "lib/db/repositories/advanced_creative.py": "dcc3477028f60dcd73298219f68a3e071d29a8c3289d6f5f5cd8f3061de5733f",
+    "server/services/governance_grants.py": "18f9376f33dafbbc84ac49486476685cd8f1b74bb042f8b28c9f7df9aec36746",
+    "server/services/format_review.py": "681835b5acc812a9ceab6262a5ad03b1c24db9d84ead675b2bd152eb6205e1b6",
+    "r2/contracts/quality.py": "b8e5398d000f31d25196d5533a00ce5bb3740bfc13a7d0aab72ce869901f1384",
+    "r2/quality/digests.py": "323e748d18ad719cff57d285ebfc21e4f633086150495368337843d9751ee6e7",
+    "tests/conftest.py": "d5bc270aae45f026b281bc7e6312950908df3bf88f6c34f91244a918cdc7f8d1",
+    "tests/integration/lib/db/repositories/test_advanced_creative.py": "b4537756d3a8b68c1a80d074c83ee5007012ab7693c8fe59257d2fba7c04c026",
+    "tests/integration/r2/governance/test_checkpointed_grant_reader.py": "ccd77c72830a00bbd9ec2a8621d92bcb15c706b962750dc98ac50034c4e9f268",
+    "tests/integration/r2/governance/test_grant_import_fence.py": "c5b21ed01ce11c477f27598a0d6067078320132e3d19705bafd55c1acb6e2593",
+    "tests/integration/r2/governance/test_grant_importer.py": "4dfabcb8e3050ec1c475fec90f4a1ce14871e550e60e0646815c55d20b2a96d5",
+    "tests/integration/r2/governance/test_grant_recovery_snapshot.py": "084791dfba057a25b72c4a4d7bb8d80e93e7ac8ff2d79d4f6f4d94874f33fea2",
+    "uv.lock": "bfca48df4104bfeb2327495a7463602bb303086826dea3c94d936e71e0b0d3c5",
+    "deploy/production/docker-compose.yml": "49d26388e0db6e3fed2aa7597ad244f067f21c9dc19b368ca79b1712314ee7c2"
+  },
+  "tested_candidates": [
+    "M8 ExplorationRepository append/replay/CAS mechanics",
+    "CheckpointedShowrunnerGrantReader signed-head/currentness mechanics"
+  ],
+  "tests": {
+    "counts": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "command": "DATABASE_URL=<owned private localhost target> PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest -q tests/integration/lib/db/repositories/test_advanced_creative.py tests/integration/r2/governance/test_checkpointed_grant_reader.py --junitxml=.superpowers/sdd/2026-10-27-r2-m10-a3/reuse-postgres.xml",
+    "junit_sha256": "8a99b5bcf16ec633dadc229977a8260e1991835d39751ae3e08ef7a54b1ab205",
+    "log_sha256": "d3306c9e3a690214486c346fb8ca013f860f583b70fb7b2ca0ec600400a8fc55",
+    "warnings": 0
+  },
+  "postgres": {
+    "server_version": "18.6",
+    "image_id": "sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873",
+    "host": "127.0.0.1",
+    "host_port": 32769,
+    "database": "r2_m10_a3_test",
+    "container_label": "codex.task=r2-m10-a3-reuse-qualification",
+    "public_tables_after": 0,
+    "test_schemas_after": 0,
+    "cleanup": "owned container and anonymous volume removed; private credential file/directory removed",
+    "scope": "new disposable database; existing services untouched"
+  },
+  "interpretation": [
+    "Fresh existing fixture execution at pinned V2 source qualifies only the cited M8/grant mechanics in their existing contracts.",
+    "Repository concurrent genesis/head fixtures passed; checkpointed reader/importer cases include explicit PostgreSQL blocking observations.",
+    "No M10 profile schema, publication lease composition, receipt/outbox writer or cross-writer lock order has been implemented or proved.",
+    "Per-test schemas came from existing Base.metadata.create_all fixture; no Alembic migration or production operation ran."
+  ],
+  "not_executed": [
+    "M8 format-review media fixtures",
+    "M10 profile publication implementation or migration",
+    "Human policy/lease issuance or admission",
+    "provider operations or production/staging deployment"
+  ],
+  "remaining_qualification": [
+    "M10-owned profile/revision/head/receipt/outbox schema and reversible migration scope",
+    "exact Human publication issuer/policy/receipt/checkpoint binding and final DB-time admission",
+    "M10 lock order, advisory hash-collision behavior and controlled PostgreSQL interleavings",
+    "transactional recovery/outbox lifecycle and profile supersession consumers"
+  ],
+  "a3_design_accepted": false,
+  "a3_runtime_accepted": false,
+  "full_m10_accepted": false,
+  "m9_modified": false,
+  "production_modified": false
+}
