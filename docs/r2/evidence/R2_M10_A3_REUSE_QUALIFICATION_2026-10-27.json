@@ -16,7 +16,26 @@
     "tests/integration/r2/governance/test_grant_importer.py": "4dfabcb8e3050ec1c475fec90f4a1ce14871e550e60e0646815c55d20b2a96d5",
     "tests/integration/r2/governance/test_grant_recovery_snapshot.py": "084791dfba057a25b72c4a4d7bb8d80e93e7ac8ff2d79d4f6f4d94874f33fea2",
     "uv.lock": "bfca48df4104bfeb2327495a7463602bb303086826dea3c94d936e71e0b0d3c5",
-    "deploy/production/docker-compose.yml": "49d26388e0db6e3fed2aa7597ad244f067f21c9dc19b368ca79b1712314ee7c2"
+    "deploy/production/docker-compose.yml": "49d26388e0db6e3fed2aa7597ad244f067f21c9dc19b368ca79b1712314ee7c2",
+    "server/auth.py": "178beaed657bab2e4465a21ad9f7e42dd8416a7217d33d4cd86851fa6019f085",
+    "tests/unit/server/test_interactive_auth.py": "57b76bea8743016a743b3a65a0a1348b61f6462ef69ac36d7ea7d370c5063154",
+    "r2/adaptation/session_authority.py": "deaa7433f5fca56528e2c7f21a5fe8d2730b82e7644fb07210761849000f493b",
+    "server/services/governance_startup.py": "e1cae3c8489b4f1dd539e0253fa1d99fde3478ab84b3310552f0f86c836d585d",
+    "server/services/governance_schema_preflight.py": "d1ab2a404269f07ef2e29c54168a187d9822dc0e3f4fbc9dc79dfd7e2af071fb",
+    "server/services/governance_attestation.py": "129c9c821c346d801a4c6898d2b5dc200be902da6ceb34a4aeab294739c3ddeb",
+    "server/services/governance_checkpoint_file.py": "606ba15a44b136ddb06cf38af220bf1a3d3892661c605782ae48ca19d8d64b57",
+    "server/services/governance_grant_fence.py": "c39c9d08e891295cc1741b2b68b4d11fbb6f7045fecc6bdb32f1adbdf5f7174d",
+    "r2/governance/public_custody_snapshot.py": "d746eab4fa3218b961b71bf00539e06d3d52986f8a7b0aee27c5cd31a46a568b",
+    "r2/governance/checkpoint_signature.py": "5d9b68213779c9320b72364a70c9cf914342fcc6a9593c904bc4d9c452d2aab2",
+    "r2/governance/operator_archive_reader.py": "a0d281af02b2330b141e4e9710563a3ba47090209028712b1b4babd7ec657be4",
+    "r2/governance/grant_signature.py": "1b6941d1bfbc09906f0ce60e20b5021dbf818364dadd6cb962ae0f52103e9f39",
+    "r2/governance/grant_transition.py": "f688443798140fe9486f96f0c91d3c713389a72e17d0d63dda388cbecb3c8b62",
+    "r2/contracts/showrunner_grant.py": "17ac789e4b11f05c8458395e901f45a613c7f1261dab16cb9b6830f5c0d6e230",
+    "r2/contracts/grant_checkpoint.py": "2a0c7215181d70858360e3b8b539fa75189cd3c0ab3ceac3bb5d7d20156057a6",
+    "tests/integration/r2/governance/test_activated_governance_startup.py": "53c54476a9bbaa2443470c560f448612487598aa2bff72fb3fe3e5d92344301d",
+    "tests/integration/r2/governance/test_operator_archive_reconcile.py": "38c8dd8bf587fa1437f13f7c704efadede74b77e3c9c279e611b8be67f98f866",
+    "tests/integration/r2/governance/test_governance_schema_preflight.py": "2d42f3a696dd282634ec432afd18c071d1871eb7913a21bede45b0e1d48e7e7f",
+    "tests/unit/r2/governance/test_operator_archive_reader.py": "6c25afd1cd66300b9792866e8129c17e109b647b98a9db0ac4393be0905d532b"
   },
   "tested_candidates": [
     "M8 ExplorationRepository append/replay/CAS mechanics",
@@ -68,5 +87,40 @@
   "a3_runtime_accepted": false,
   "full_m10_accepted": false,
   "m9_modified": false,
-  "production_modified": false
+  "production_modified": false,
+  "interactive_auth_qualification": {
+    "source_head": "dca138da92ca7bb3e8b6adbb44cacdfce84f0f84",
+    "counts": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "warnings": 1,
+    "command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest -q tests/unit/server/test_interactive_auth.py --junitxml=.superpowers/sdd/2026-10-27-r2-m10-a3/interactive-auth.xml",
+    "junit_sha256": "1d1e25e757cd8e962ac2cf021e2c05fbcad15e0525567c5b90a4f211bab24cfa",
+    "log_sha256": "e7f05a9cb44eeb7b68ea0687c64e4cb816b2b8e5fd20b91556ac7c5f0bbef613",
+    "scope": "existing interactive JWT authentication; no M10 action issuer yet"
+  },
+  "activated_governance_qualification": {
+    "source_head": "dca138da92ca7bb3e8b6adbb44cacdfce84f0f84",
+    "counts": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "deselected": 1,
+    "warnings": 0,
+    "command": "DATABASE_URL=<owned private localhost target> PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest -q tests/integration/r2/governance/test_activated_governance_startup.py -k requires_independent_current_archive --junitxml=.superpowers/sdd/2026-10-27-r2-m10-a3/activation-postgres.xml",
+    "junit_sha256": "e60136d132b405b375748beaa01fc1f0d965107c1bf0454faa1f7234ee6f1f98",
+    "log_sha256": "a19c5347f23a7dd3a910b0d47f0aec038d4a53799b7d453b153e79fa0faf0509",
+    "postgres_server_version": "18.6",
+    "image_id": "sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873",
+    "cleanup": "owned container/anonymous volume/private credentials removed",
+    "public_tables_after": 0,
+    "test_schemas_after": 0,
+    "scope": "existing real activated-startup verifier/independent archive cases only; metadata/version-table fixture, not migration execution or full lifespan activation",
+    "earlier_attempt": "temporary Unix-socket init server shutdown; no tests ran; owned resources cleaned; final TCP readiness retry passed"
+  }
 }
