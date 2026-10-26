@@ -438,5 +438,23 @@
     "A6 Human disposition",
     "A7 runtime/resource parity",
     "M10-B packaging/export"
+  ],
+  "previous_design_reviews": [
+    {
+      "reviewer_id": "codex-m10-a2-design-review-a-1e933d5b3-20261026T164848Z",
+      "qualification_evidence": "Fresh independent Tier-2 graph-assisted and exact-source review of the complete bounded M10 A2 pure-foundation design at 1e933d5b350c7e67490a9f876e4a44e6de93efab. Evaluated the original A2 plan and M10 sections 6 and 9, all four new design artifacts, inherited A0/A1 contracts and scope custody, actual M8 parity/error/Protocol/factual seams. Recomputed all 79 baseline SHA/mode pins at baseline/current, verified lineage, exact 4-design/10-future-product scope, no A2 product/acceptance, unchanged old guard refusal, clean exact HEAD. Graph gen 2026-10-15 stale/other-worktree and excluded docs/scripts/new quality types; exact current-source fallback used.",
+      "conflict_declaration": "NO_CONFLICT",
+      "rubric_version": "R2_M10_A2_DESIGN_REVIEW_V1",
+      "reviewed_candidate_head": "1e933d5b350c7e67490a9f876e4a44e6de93efab",
+      "verdict": "FAIL",
+      "reviewed_at": "2026-10-26T16:48:48Z",
+      "required_skips": [],
+      "material_unknowns": [],
+      "findings": [
+        "HIGH: ProbeRequest lacked requirement/slot selectors for its slot-bound TechnicalObservation result.",
+        "HIGH: raw Factual reader returned slot-bound observation without assessment context."
+      ],
+      "repair": "Explicit probe selectors/membership/result binding; raw slot-free factual projection plus request/result matching. No product code yet."
+    }
   ]
 }

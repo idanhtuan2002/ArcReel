@@ -36,7 +36,7 @@
 
 - [ ] RED tests in three unique test_quality_* files for the spec's errors, descriptors, interface surface, cold imports and parity differential matrix.
 - [ ] Implement exactly r2/quality/errors.py, ports.py, parity.py. Reuse A1 model/scalars and M8 fold/report; no mutable Factual body or new domain/command/schema.
-- [ ] Verify all typed Protocol signatures and source-only async stubs, scope/rule coherence, unknown-error canaries and every parity dimension, including the actual empty-HEAD gap.
+- [ ] Verify all typed Protocol signatures and source-only async stubs, scope/rule/requirement/slot coherence, request-result binding helpers, two slots sharing a rule, slot-free factual projections, unknown-error canaries and every parity dimension, including the actual empty-HEAD gap.
 - [ ] Run affected A2/A1/M8 tests, Ruff/format, full types, audit, import contracts and dependency gate. Commit only these six paths.
 
 ## Evidence and review
