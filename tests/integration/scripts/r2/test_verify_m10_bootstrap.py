@@ -19,8 +19,10 @@ from scripts.r2.verify_m10_bootstrap import (
     STOP_CODES,
     TEST_PATHS,
     VERIFIER_PATH,
+    BootstrapError,
     GitRepository,
     load_json,
+    require_release_ancestry,
     verify,
 )
 
@@ -131,6 +133,30 @@ def invoke(repo: Path, runner: Path) -> subprocess.CompletedProcess[str]:
         text=True,
         timeout=30,
     )
+
+
+def test_release_ancestry_rejects_a_predecessor_only_merged_after_release(tmp_path: Path) -> None:
+    repo = tmp_path / "release-lineage"
+    repo.mkdir()
+    git(repo, "init", "-q")
+    git(repo, "config", "user.name", "Fixture")
+    git(repo, "config", "user.email", "fixture@example.invalid")
+    common = commit(repo)
+    write(repo, "release.txt", b"released")
+    release = commit(repo)
+    git(repo, "checkout", "--detach", common)
+    write(repo, "accepted.txt", b"accepted on a side branch")
+    accepted = commit(repo)
+    git(repo, "-c", "core.hooksPath=/dev/null", "merge", "--no-ff", "-qm", "implementation merge", release)
+    implementation = git(repo, "rev-parse", "HEAD")
+    repository = GitRepository(repo)
+    assert repository.ancestor(release, implementation)
+    assert repository.ancestor(accepted, implementation)
+    assert not repository.ancestor(accepted, release)
+    before = snapshot(repo)
+    with pytest.raises(BootstrapError, match="M10_PREREQUISITE_NOT_ACCEPTED"):
+        require_release_ancestry(repository, release_base=release, accepted_heads=(accepted,))
+    assert snapshot(repo) == before
 
 
 def test_exact_source_extracted_from_git_is_read_only_and_does_not_import_migrations(
@@ -251,7 +277,15 @@ def test_a_commit_after_repository_capture_cannot_get_stale_eligibility(accepted
 
 
 @pytest.mark.parametrize(
-    "dirty_path", ["r2/contracts/factual.py", "r2/m3/host_integration.py", "r2/m3/deliverables.py", "lib/env_init.py"]
+    "dirty_path",
+    [
+        "r2/contracts/factual.py",
+        "r2/m3/host_integration.py",
+        "r2/m3/deliverables.py",
+        "lib/env_init.py",
+        "r2/host_hardening/master_authority.py",
+        "docs/adr/0106-m7-candidate-ids-are-scoped-to-user-and-project.md",
+    ],
 )
 def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_path: Path, dirty_path: str) -> None:
     from scripts.r2.verify_m10_bootstrap import (

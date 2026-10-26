@@ -152,6 +152,31 @@
       "path": "r2/production/artifact_metadata.py",
       "sha256": "d1f6669f6edf483d13ee0194f10401e29f95fb2204cec6fa582309dcd8c46103",
       "mode": "100644"
+    },
+    {
+      "path": "r2/host_hardening/master_authority.py",
+      "sha256": "ca2bf5668743c0d336e6c1db71cc5e9ea071c8d79d7b640b31193b343f74952b",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/host_hardening/promotion.py",
+      "sha256": "14381eb7751270f380af5b5e15766fe9bf84e8f390de3ab05efa7e7508d16e10",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/host_hardening/master_resolver.py",
+      "sha256": "6de1b6eb534da038a94503134afd5dd50568edbdfd589c73f0b67903890c802f",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/production/approval_service.py",
+      "sha256": "d16442ddef3c094b172d743e60fc79d65bcb5aaae817e1296b354519e012d393",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/adr/0106-m7-candidate-ids-are-scoped-to-user-and-project.md",
+      "sha256": "9c5a7467df8bc7cbb8631726a19d5da48c777c90022a26cb50f6eedbd4383001",
+      "mode": "100644"
     }
   ]
 }

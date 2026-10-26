@@ -53,12 +53,16 @@ class MemoryRepository:
         return self.parent_map[ref]
 
     def ancestor(self, older: str, newer: str) -> bool:
-        while newer != older:
-            parents = self.parent_map.get(newer, ())
-            if not parents:
-                return False
-            newer = parents[0]
-        return True
+        pending = [newer]
+        seen: set[str] = set()
+        while pending:
+            current = pending.pop()
+            if current == older:
+                return True
+            if current not in seen:
+                seen.add(current)
+                pending.extend(self.parent_map.get(current, ()))
+        return False
 
     def changed(self, older: str, newer: str) -> tuple[str, ...]:
         if newer == CANDIDATE:
@@ -428,6 +432,18 @@ def test_contract_preparation_cannot_lose_release_ancestry(contract_fixture) -> 
     assert "M10_PREREQUISITE_NOT_ACCEPTED" in run_contracts(contract_fixture)
 
 
+def test_contract_predecessors_merged_after_release_are_not_release_prerequisites(contract_fixture) -> None:
+    repo, envelope, _ = contract_fixture
+    repo.parent_map[RELEASE] = (PARENT,)
+    repo.parent_map[PREPARATION_SOURCE] = (RELEASE, BASE)
+    for row in envelope["prerequisite_evidence"]:
+        accepted = row["accepted_head"]
+        assert repo.ancestor(accepted, IMPLEMENTATION)
+        assert not repo.ancestor(accepted, RELEASE)
+    assert repo.ancestor(RELEASE, IMPLEMENTATION)
+    assert "M10_PREREQUISITE_NOT_ACCEPTED" in run_contracts(contract_fixture)
+
+
 @pytest.mark.parametrize("path", ["r2/contracts/factual.py", "r2/artifact_identity.py", "uv.lock", "pyproject.toml"])
 def test_contract_closure_and_configuration_are_dirty_dependencies(contract_fixture, path: str) -> None:
     contract_fixture[0].dirty_paths = (path,)
@@ -463,6 +479,11 @@ def test_contract_source_pin_includes_regular_file_mode(contract_fixture) -> Non
         "r2/m3/deliverables.py",
         "r2/production/__init__.py",
         "r2/production/artifact_metadata.py",
+        "r2/host_hardening/master_authority.py",
+        "r2/host_hardening/promotion.py",
+        "r2/host_hardening/master_resolver.py",
+        "r2/production/approval_service.py",
+        "docs/adr/0106-m7-candidate-ids-are-scoped-to-user-and-project.md",
     ],
 )
 def test_characterized_host_sources_are_pinned_and_dirty_protected(contract_fixture, path: str) -> None:
@@ -472,9 +493,9 @@ def test_characterized_host_sources_are_pinned_and_dirty_protected(contract_fixt
 
 
 @pytest.mark.parametrize("change", ["bytes", "mode"])
-def test_characterized_resolver_cannot_drift_at_live_head(contract_fixture, change: str) -> None:
+@pytest.mark.parametrize("path", ["r2/m3/deliverables.py", "r2/host_hardening/master_authority.py"])
+def test_characterized_resolver_cannot_drift_at_live_head(contract_fixture, change: str, path: str) -> None:
     repo, _, _ = contract_fixture
-    path = "r2/m3/deliverables.py"
     if change == "bytes":
         put(repo, ACCEPTANCE, path, b"changed")
     else:

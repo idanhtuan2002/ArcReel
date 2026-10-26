@@ -108,11 +108,39 @@ cannot also be a dependency. Sort heads/snapshots by artifact key and edges by
 dependency head must be reachable from root. Each metadata `master:` dependency
 must have exactly one edge and each edge must name such a dependency. Its
 fingerprint equals the child's content digest (host prefix normalization only);
-its version is the existing resolver representation candidate_id@host_version_ref
-from the child's approved metadata. Never derive host_version_ref from the DB
-master_version. Each head's selected candidate and approval reference agree with
-its metadata; malformed/unapproved/mismatched bodies are rejected. Non-master
+its version is the existing ApprovedMasterResolver representation
+selected_candidate_id@host_version_ref from the child's approved metadata: the
+candidate component is the raw host generation ID, not the M7 candidate ID.
+Never derive host_version_ref from the DB master_version. Each head's approval_record
+equals its metadata approved_master.approval_record exactly; malformed/unapproved
+bodies and those directly comparable mismatches are rejected. Non-master
 snapshot references remain bound metadata, not new M10 authority heads.
+
+Candidate identities occupy two distinct namespaces. Metadata
+approved_master.selected_candidate_id is the raw generation ID (for example
+CAND-SH01-V1); MasterHeadSnapshot.candidate_id is the M7 candidate-object ID.
+They must not be compared for string equality. A1 retains and digest-binds both
+as exact foreign identities, but cannot establish their state-dependent mapping.
+Do not add a caller-selected legacy/scoped branch, duplicate a hash algorithm,
+derive an M7 ID in pure validation or import host/database code into A1.
+The accepted ADR-0106 and pinned master_authority.py define the actual resolver:
+resolve_m7_candidate_id uses an existing legacy candidate only in its own
+user/project scope, otherwise uses the scoped ID. A5 must reuse that resolver
+with a real transaction-bound scoped candidate lookup (or a qualified
+FileMasterProjection/DatabaseMasterResolver composition), and require the result
+to equal the current head.candidate_id exactly. A computed ID alone is not proof
+of a stored candidate: resolve and verify the scoped candidate object, artifact
+key, object reference and actual content digest. Missing projection/metadata or
+candidate objects, unknown mappings and mismatches refuse; the optional legacy
+projection's permissive missing behavior is insufficient for M10 admission.
+
+Other values also retain their owner namespaces. master_version is the M7 DB
+CAS ordinal; metadata contract_ref.version is the source-contract revision;
+approved_master.host_version_ref is an opaque host version locator. None is an
+alias of another. Metadata content_fingerprint binds artifact input/basis and
+is distinct from the media-byte head.content_digest and master-dependency
+fingerprint. metadata_digest hashes the complete canonical metadata snapshot.
+Bind all these fields without inventing equality across their namespaces.
 
 AssessedSubject replaces its ambiguous approved_master_id display field with
 master_binding and master_binding_digest. artifact_ref equals root.object_ref;
@@ -120,7 +148,13 @@ artifact_digest equals root.content_digest; content_basis_digest binds the full
 root metadata content basis; existing caption/audio digests remain optional and
 bound. Pure validation establishes internal coherence, not that this is the
 current real master or that bytes exist. A5 still resolves/revalidates all bodies,
-bytes and external authority references under the canonical host row locks.
+bytes and external authority references under qualified authoritative locks and
+fences. At assessment, completion and admission/currentness boundaries it must
+revalidate the state-dependent candidate mapping with the authoritative scoped
+store. Prove stable lookup across competing candidate registration (including
+legacy-row materialization) and master changes using real transaction
+interleavings; refuse if that consistency cannot be qualified. Existing source
+characterization is not a concurrency proof or permission to invent a lock.
 
 QualityProfileRevision gains explicit user_id/project_name scope. The original
 QualityPolicyV1 gains a nonempty unique rule_ids catalog. Every ProbeRule.rule_id,
@@ -511,8 +545,10 @@ These are mandatory future A1 tests, not claims of an implemented validator.
 
 ## Characterization custody and temporal test split
 
-The packet separately lists eight characterized host/namespace files with exact
-base SHA256 and Git modes, including ApprovedMasterResolver in deliverables.py.
+The packet separately lists thirteen characterized host/namespace/decision files
+with exact base SHA256 and Git modes, including ApprovedMasterResolver in
+deliverables.py, the M7 projection/promotion/lookup owners, host approval writer
+and ADR-0106. These are source characterizations, not qualified runtime adapters.
 Bootstrap recomputes their hashes/modes at the verified base, reviewed candidate
 and live HEAD and refuses any dirty/hidden-index change. This characterizes the
 host identity/mapping contract without permitting A1 to import or execute those
@@ -535,3 +571,11 @@ resources and unsafe dependency resources (dot segments, separators, colon and
 control characters) even when wire encoding, metadata ID, bytes and approvals
 otherwise match. The generic host codec's broader nonempty resource behavior
 remains unchanged; this bounded characterized family is deliberately narrower.
+
+A1 must roundtrip distinct raw-generation and M7 candidate IDs and show that
+mutating either changes the binding digest, without claiming stateful mapping
+refusal. Mandatory A5 fixtures cover same-scope legacy reuse, new scoped IDs,
+another project's legacy row, wrong generation/artifact/user/project mapping,
+missing candidate objects, and concurrent legacy registration/master changes.
+Use the actual pinned resolver/store call surface, never caller-supplied mapping
+claims. These are future runtime qualification gates, not A0/A1 completion claims.

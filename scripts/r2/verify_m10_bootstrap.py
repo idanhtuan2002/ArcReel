@@ -75,7 +75,33 @@ _CONTRACT_CHARACTERIZATION = (
         "sha256": "d1f6669f6edf483d13ee0194f10401e29f95fb2204cec6fa582309dcd8c46103",
         "mode": "100644",
     },
+    {
+        "path": "r2/host_hardening/master_authority.py",
+        "sha256": "ca2bf5668743c0d336e6c1db71cc5e9ea071c8d79d7b640b31193b343f74952b",
+        "mode": "100644",
+    },
+    {
+        "path": "r2/host_hardening/promotion.py",
+        "sha256": "14381eb7751270f380af5b5e15766fe9bf84e8f390de3ab05efa7e7508d16e10",
+        "mode": "100644",
+    },
+    {
+        "path": "r2/host_hardening/master_resolver.py",
+        "sha256": "6de1b6eb534da038a94503134afd5dd50568edbdfd589c73f0b67903890c802f",
+        "mode": "100644",
+    },
+    {
+        "path": "r2/production/approval_service.py",
+        "sha256": "d16442ddef3c094b172d743e60fc79d65bcb5aaae817e1296b354519e012d393",
+        "mode": "100644",
+    },
+    {
+        "path": "docs/adr/0106-m7-candidate-ids-are-scoped-to-user-and-project.md",
+        "sha256": "9c5a7467df8bc7cbb8631726a19d5da48c777c90022a26cb50f6eedbd4383001",
+        "mode": "100644",
+    },
 )
+
 _CONTRACT_IMPORTS = frozenset(
     [
         "r2/__init__.py",
@@ -338,6 +364,12 @@ def _check_reviews(repo: Repository, ref: str, envelope: dict[str, Any]) -> None
             raise BootstrapError("M10_REVIEW_INDEPENDENCE_FAILED")
 
 
+def require_release_ancestry(repo: Repository, *, release_base: str, accepted_heads: tuple[str, ...]) -> None:
+    """Require each accepted predecessor in the released history, including merge parents."""
+    if any(not repo.ancestor(ref, release_base) for ref in accepted_heads):
+        raise BootstrapError("M10_PREREQUISITE_NOT_ACCEPTED")
+
+
 def _check_prerequisites(repo: Repository, envelope: dict[str, Any], *, owners: set[str] = _OWNERS) -> None:
     rows = envelope["prerequisite_evidence"]
     if len(rows) != len(owners) or {row["owner"] for row in rows} != owners:
@@ -416,6 +448,9 @@ def _check_contract_packet(repo: Repository, envelope: dict[str, Any]) -> None:
     for path, digest in preparation["source_sha256"].items():
         _bound(repo, CONTRACT_IMPLEMENTATION_BASE, {"path": path, "sha256": digest}, "M10_SCHEMA_FREEZE_FAILED")
     expected_rows = []
+    require_release_ancestry(
+        repo, release_base=CONTRACT_RELEASE_BASE, accepted_heads=tuple(_CONTRACT_PREDECESSORS.values())
+    )
     for owner, ref in _CONTRACT_PREDECESSORS.items():
         path = f"docs/r2/evidence/R2_{owner}_IMPLEMENTATION_ACCEPTANCE.json"
         data = repo.read(CONTRACT_RELEASE_BASE, path)

@@ -26,8 +26,15 @@ No caller-supplied digest is authoritative. Resolve root and every consumed
 source head from the scoped host repository. Require one metadata snapshot per
 root/dependency key; no duplicate heads, duplicate metadata keys, unconsumed
 extra keys or root in dependency_heads. Sort both tuples by exact artifact key.
-Validate approval_record and selected candidate against the database head and
-candidate object; host_version_ref is host-owned and must be resolved by the
+Validate approval_record by exact equality. Metadata selected_candidate_id is
+the raw host generation ID; head.candidate_id is the M7 candidate-object ID.
+A1 retains/digest-binds both and cannot validate their stateful mapping. A5
+reuses resolve_m7_candidate_id with the authoritative scoped candidate store
+(or qualified FileMasterProjection/DatabaseMasterResolver composition),
+requiring the projected ID to match the head and verifying the candidate
+object/artifact/bytes. Missing objects or projection refuse. Pin ADR-0106 and
+its real owner sources; no resolver algorithm or host import enters A1. Prove
+lookup consistency under registration/master races before runtime admission; host_version_ref is host-owned and must be resolved by the
 host mapping, never inferred from an integer display version. Verify actual
 private bytes against content_digest before assessment. Recompute every body
 and exact transitive currentness closure under the caller transaction guard.

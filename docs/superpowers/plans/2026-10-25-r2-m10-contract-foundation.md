@@ -25,7 +25,7 @@
 
 - Shallow frozen models must not retain mutable metadata/body aliases.
 - Future authorization receipt/admission fields must not create a profile/request digest cycle.
-- Source-head/approval/edge mismatch must fail structural validation; an internally coherent subject must still not be called the current real master.
+- Directly comparable source-head/approval/edge mismatch must fail structural validation; host-generation to M7 candidate mapping is stateful A5 qualification, not A1 equality; an internally coherent subject must still not be called the current real master.
 - B digest tags and operations cannot pass through an A prefix/default fallback.
 - A scoped acceptance cannot open full-M10 code or runtime paths.
 
@@ -45,12 +45,12 @@ Files: scripts/r2/verify_m10_scope.py and mirrored unit/integration tests.
 Files: r2/contracts/quality.py, behavior-free r2/quality/__init__.py, r2/quality/digests.py, tests/unit/r2/contracts/test_quality.py, tests/unit/r2/quality/test_digests.py.
 
 - [ ] RED field/roundtrip tests for every original A contract plus the explicitly patched draft/request/master/metadata/edge types. No B contract/type/operation may be exported.
-- [ ] RED for mutable input aliases, extra fields, nonfinite values, naive time, wrong new-entity UUIDv7, normalized foreign identity, duplicate/unknown rule/requirement/slot IDs, invalid N_OF_M, missing/cyclic escalation and source edges, wrong metadata/head approval/candidate/version/fingerprint, master:A-to-childB aliasing even with equal bytes/version, noncanonical key encoding and cross-episode edges.
+- [ ] RED for mutable input aliases, extra fields, nonfinite values, naive time, wrong new-entity UUIDv7, normalized foreign identity, duplicate/unknown rule/requirement/slot IDs, invalid N_OF_M, missing/cyclic escalation and source edges, wrong metadata/head approval, wrong dependency raw-generation/host-version/media-fingerprint, master:A-to-childB aliasing even with equal bytes/version, noncanonical key encoding and cross-episode edges.
 - [ ] RED profile parent/genesis consistency, complete run request/ObservationBinding roundtrips and every profile_id/profile_revision mutation, command/subject/draft scope mismatch, action confusion, lease bounds at0/30/>30seconds, mandatory aware request expiry, final-disposition WAIVE0/24h/>24h using explicit issued_at/expires_at pairs, and non-WAIVE waiver payloads. Do not claim a request-only constructor can compute remaining TTL; A6 tests enforce absolute expiry against DB-time admission.
 - [ ] Implement frozen/extra-forbid models; use existing CanonicalJsonObject for stored metadata and temporary host metadata validation. Never store the mutable host model in a frozen public body.
 - [ ] RED golden digest vectors for every original §5.1 A tag plus the five explicit added tags. Unknown and reserved B tags fail. Key order is invariant; each normative field mutation changes its applicable digest. Checksums' own cache fields never feed themselves; future lease/receipt fields never feed preflight subjects.
 - [ ] Implement a closed exact-domain registry and verify-cache helpers using accepted M8 canonical bytes. Recompute cached body digests before declaring fixture validity; type constructors alone are not authority admission.
-- [ ] Include valid master metadata/edge fixtures and rejected mismatch fixtures. Document constructor coherence versus A5 external currentness/byte verification.
+- [ ] Include valid master metadata/edge fixtures with distinct raw-generation and M7 candidate IDs, and rejected directly comparable mismatch fixtures. Mutate each candidate identity independently and require digest changes; do not claim stateful mapping refusal in A1. Document constructor coherence versus A5 resolver/store/currentness/byte verification.
 - [ ] Run contract/digest tests twice and compare vectors; affected M8 canonical/contract regressions, relevant static gates and test audit. Commit only the five owned paths.
 
 ## Packet evidence and stop
@@ -70,3 +70,7 @@ The candidate failed one high and two medium findings; reviewer B was not starte
 ## Review be304aa58 repair
 
 Retain the absolute-expiry request contract and explicitly split temporal obligations: A1 checks known time pairs on final records/leases and request expiry awareness; A6 alone validates request remaining lifetime/policy caps against locked DB time and stamps issued/admitted/expiry without clamping caller intent. This uses the review's allowed deferral alternative, not a weaker runtime TTL gate. All decoded root/dependency resource IDs must pass the existing safe-target leaf. Add exact host-characterization SHA/mode pins and dirty protection, including deliverables and package initializers, without allowing host imports in A1. RED13fail77pass demonstrated the missing host guards; new unit and disposable-Git cases cover them. Previous FAIL remains withdrawn, no product implementation or acceptance yet.
+
+## Review14076 repair
+
+Candidate14076 received A PASS and B FAIL; neither decision accepts a later candidate. Keep raw host generation IDs and statefully projected M7 candidate-object IDs separate. A1 binds both without computing their mapping; A5 must reuse the real scoped/legacy resolver and candidate store under qualified concurrency controls, including registration races. Pin the five additional owner/ADR characterizations without extending imports. Bootstrap now explicitly requires each fixed M7/M8 acceptance to precede the fixed released V2 base. A negative merge-DAG fixture reproduced acceptance by the old check; the repaired check and read-only disposable-Git policy test must refuse it. Obtain two fresh reviews on the same repaired candidate before A0/A1.
