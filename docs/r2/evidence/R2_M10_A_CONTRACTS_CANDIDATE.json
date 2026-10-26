@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "status": "M10_A_CONTRACTS_SOURCE_CANDIDATE_NOT_RUNTIME_ACCEPTED",
+  "status": "M10_A_CONTRACTS_SOURCE_REVIEWED",
   "packet": "M10_A_A0_A1",
   "acceptance_ref": "cf18b9f6156ed9e6337c40708e217a73271027fa",
   "accepted_design_head": "97e03c2ccee778e2797940f245fca9900fbf7a8e",
@@ -133,12 +133,16 @@
     }
   ],
   "independent_implementation_review": {
-    "status": "REPAIR_REVERIFICATION_PENDING",
-    "failed_candidate_head": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
-    "no_pass_inferred": true
+    "reviewer_id": "codex-m10-a0a1-evidence-reverification-deb967963-20261026T134523Z",
+    "qualification_evidence": "Independent sealed-HEAD read-only verification of the single evidence-file correction. Compared historical source/test evidence byte-semantically against immutable Git object 2e2665e92, verified current source hashes/counts/vector and fieldset seals, confirmed history/current objects are independent, and ran the live bounded scope guard at the candidate HEAD. Reused the completed source repair verdict; no redundant test suite was run.",
+    "conflict_declaration": "NO_CONFLICT",
+    "candidate_head": "deb96796381c70d85f3680ced7a51a8660be961c",
+    "verdict": "PASS",
+    "reviewed_at": "2026-10-26T13:45:23Z",
+    "required_skips": [],
+    "material_unknowns": []
   },
   "remaining_gates": [
-    "Independent implementation review and material repair if required.",
     "Original A2-A7 and M10-B gates remain closed.",
     "A3/A5/A6 must qualify persistence, Human custodian, stateful candidate resolver/store/bytes/currentness, factual authority and real transaction interleavings."
   ],
@@ -241,5 +245,56 @@
     ],
     "product_source_unchanged_from": "40e174a3989ee7a79446e265dadfda622ca5a7fa",
     "reason": "Evidence builder reused a mutable tests dictionary; historical block is now an independent deep copy of the immutable Git record."
-  }
+  },
+  "implementation_review_history": [
+    {
+      "reviewer_id": "codex-m10-a0a1-implementation-review-2e2665e92-20261026T094408Z",
+      "qualification_evidence": "Independent sealed-HEAD, read-only Tier-2 review of the accepted A0/A1 packet, exact nine-path diff, product source, tests, digest projections, scope guard/bootstrap, source hashes, and dependency seams. The graph generation was stale and excluded/missed new paths, so every material conclusion was verified directly against the sealed checkout.",
+      "conflict_declaration": "NO_CONFLICT",
+      "candidate_head": "2e2665e929bbffd07f8f599d5bc8c3827c5f99b6",
+      "verdict": "FAIL",
+      "reviewed_at": "2026-10-26T09:44:08Z",
+      "required_skips": [],
+      "material_unknowns": [],
+      "findings": [
+        {
+          "severity": "P2",
+          "id": "UNORDERED_TUPLE_INPUT",
+          "scenario": "Pydantic accepts set/frozenset for semantic tuples and parallel observation refs/digests, yielding hash-seed-dependent digests and arbitrary pairings.",
+          "repair": "Require explicit list/tuple input before coercion; retain only documented normalizers; fresh-process regression."
+        }
+      ],
+      "limits": "Reviewer pytest stalled and was interrupted; no fresh reviewer test pass claimed. Parent455/187 hash-bound tests are historical candidate evidence."
+    },
+    {
+      "reviewer_id": "codex-m10-a0a1-repair-reverification-136ce885-20261026T134330Z",
+      "qualification_evidence": "Independent sealed-HEAD read-only repair review of the four source/test changes and candidate evidence; direct probes covered the original unordered-input defect, every current tuple-annotation path, standalone tuple digest entrypoints, list/tuple preservation, parallel binding refusal, and normalized metadata identity controls. Stale graph misses/exclusions were replaced by exact sealed-source inspection.",
+      "conflict_declaration": "NO_CONFLICT",
+      "candidate_head": "136ce885376443489ea6cc81e0baa5eceb9baac8",
+      "verdict": "FAIL",
+      "reviewed_at": "2026-10-26T13:43:30Z",
+      "required_skips": [],
+      "material_unknowns": [],
+      "product_code": "FIXED",
+      "metadata_identity": "VERIFIED",
+      "finding": "P2: historical test evidence aliased the current repaired tests dictionary; original455/187 was overwritten by476/208. Corrected from immutable Git in deb967963."
+    },
+    {
+      "reviewer_id": "codex-m10-a0a1-evidence-reverification-deb967963-20261026T134523Z",
+      "qualification_evidence": "Independent sealed-HEAD read-only verification of the single evidence-file correction. Compared historical source/test evidence byte-semantically against immutable Git object 2e2665e92, verified current source hashes/counts/vector and fieldset seals, confirmed history/current objects are independent, and ran the live bounded scope guard at the candidate HEAD. Reused the completed source repair verdict; no redundant test suite was run.",
+      "conflict_declaration": "NO_CONFLICT",
+      "candidate_head": "deb96796381c70d85f3680ced7a51a8660be961c",
+      "verdict": "PASS",
+      "reviewed_at": "2026-10-26T13:45:23Z",
+      "required_skips": [],
+      "material_unknowns": []
+    }
+  ],
+  "completed_gates": [
+    "A0 accepted Git-bootstrap custody and exact9-path scope guard.",
+    "A1 immutable37-model fieldsets, seven observation variants, closed25-domain canonical digests, embedded-cache verification and normative refusal tests.",
+    "Affected476tests and repeated208A1tests passed with zero skips; full static gates passed.",
+    "Independent implementation review: code fixes and evidence provenance independently verified PASS."
+  ],
+  "source_review_scope": "PASS binds sealed candidate deb967963 and unchanged8code/test hashes at source40e174. This final evidence-only audit records the actual decisions; it does not claim a new runtime or full-M10 acceptance."
 }
