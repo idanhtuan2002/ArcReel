@@ -1,0 +1,442 @@
+{
+  "schema_version": "1",
+  "status": "PROPOSED_A2_SOURCE_PACKET",
+  "packet": "M10_A2_PURE_FOUNDATION",
+  "implementation_base": "655080af1660707b0b3c9b08f2b313ce638500f2",
+  "a0_a1_acceptance_ref": "cf18b9f6156ed9e6337c40708e217a73271027fa",
+  "baseline_source": "40e174a3989ee7a79446e265dadfda622ca5a7fa",
+  "baseline_reviewed_candidate": "deb96796381c70d85f3680ced7a51a8660be961c",
+  "product_scope": [
+    "docs/r2/evidence/R2_M10_A2_CANDIDATE.json",
+    "r2/quality/errors.py",
+    "r2/quality/parity.py",
+    "r2/quality/ports.py",
+    "scripts/r2/verify_m10_a2_scope.py",
+    "tests/integration/scripts/r2/test_verify_m10_a2_scope.py",
+    "tests/unit/r2/quality/test_quality_errors.py",
+    "tests/unit/r2/quality/test_quality_parity.py",
+    "tests/unit/r2/quality/test_quality_ports.py",
+    "tests/unit/scripts/r2/test_verify_m10_a2_scope.py"
+  ],
+  "design_scope": [
+    "docs/research/2026-10-26-r2-m10-a2-reuse.md",
+    "docs/superpowers/specs/2026-10-26-r2-m10-a2-foundation.md",
+    "docs/superpowers/plans/2026-10-26-r2-m10-a2-foundation.md",
+    "docs/r2/evidence/R2_M10_A2_PACKET_2026-10-26.json"
+  ],
+  "acceptance_path": "docs/r2/evidence/R2_M10_A2_DESIGN_ACCEPTANCE.json",
+  "review_directory": "docs/r2/evidence/m10-a2-reviews/",
+  "baseline_pins": [
+    {
+      "path": "docs/adr/0082-m10-quality-evidence-and-export-packaging.md",
+      "sha256": "05bbaeef1a8e9b3acc7c324e903c662f9b672f21537a2df32542aeb4437dcaa8",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/adr/0106-m7-candidate-ids-are-scoped-to-user-and-project.md",
+      "sha256": "9c5a7467df8bc7cbb8631726a19d5da48c777c90022a26cb50f6eedbd4383001",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json",
+      "sha256": "51927187d6d187b7e68a972597a7f7f69789a4ae2665c70f95b66109b1304827",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.json",
+      "sha256": "82ee09ecc39b92815faf19fa39836181857a40b0dce9c5914319b00156568647",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json",
+      "sha256": "b3c78d725ad0a4842ba463d341de88cdd71d9f5f9bbbd82f2a196a8ca728c81f",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M10_MASTER_BINDING_VECTORS.json",
+      "sha256": "e7926d3706d058d370cf2b6018396e826a7319c34ba4a39b1a0103ccbce560b4",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M7_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "4cfa038beda73708891b3f9995393bcb06a6d33152cb1b4ab61cbb0572e2345c",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M8_IMPLEMENTATION_ACCEPTANCE.json",
+      "sha256": "686f5250b13befb7ec3cbad9110407989eecd2b236a7f2030cd3a4a4ddcfcda2",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE_CONTRACT_2026-09-14.json",
+      "sha256": "047551f6a198bb1a310292aec389d0c3828d997e220effcf7ac2c1c2f6369ea4",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json",
+      "sha256": "b53367f9fe9f02e0716365c26d3d79b992ec372e3f83375951e939aa39b80101",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/m10-contract-reviews/a-97e03c2cc.json",
+      "sha256": "faad14383eff9b3230123dd6bce61eeb3215a98632517bc4b6d32a5b1f6f086d",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/m10-contract-reviews/b-97e03c2cc.json",
+      "sha256": "522cd25bf0f754c913d79c9e296edc5bba8e1f3720ac25ecc7bdc49e4bfb29dd",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json",
+      "sha256": "72f980aec9c79ec0ecea7462d2fd8fc8547c7a1ef87e198fecafe44fde2f5249",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/r2/evidence/schemas/R2_M10_DESIGN_ACCEPTANCE.schema.json",
+      "sha256": "a872969b863d4556a023cbfd8768b895a16e9404cce017e33353fa2c9f8973af",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/research/2026-09-16-r2-m10-quality-evidence-packaging.md",
+      "sha256": "72290ad419f592f22d72b81ff12802c602c1bbce7d7ea03c0ead0962ca3064b5",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-16-r2-m10-quality-packaging.md",
+      "sha256": "d0b9794e8f320c81f74df309fce7ec8b3eaeb8f1aafc1132ef0cf4a1b43f7379",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-16-r2-m10a-quality-evidence-foundation.md",
+      "sha256": "38ab21192c7837d41b1ebca319ffcc3313948182cf81863d51d0498e77d57043",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md",
+      "sha256": "dc5e2b54ddbb8edbb4dd6a1dafe327cffce0e5e8194614b96f7b9889c7304406",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md",
+      "sha256": "1631f622143135038507f4977a6bd81bae181ba9ab22a3f02f6c540e49ab2ba9",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-09-16-r2-m10-quality-packaging-design.md",
+      "sha256": "ee35e4fa9f58d8598a379d0436573d58bf83f78041b958fc81cdf71036241649",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md",
+      "sha256": "9cf56774e3886ad13b9018a4cbc754b4dff63758c1746f35fbacc76a4c4cd067",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md",
+      "sha256": "9d11a47b04b00b5661866a643a5b412d0640dd3082fe7ceeb3abd19dec01dfac",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-25-r2-m10-v2-rebase.md",
+      "sha256": "876450241fe175e050b599d10f958c06a7e3446c84a4a54c04086f38daa83128",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/__init__.py",
+      "sha256": "58b1e0ba3f28dd34c03229fa5e36030cd73710b77df814067ae3c7d0a57133d9",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/artifact_manifest.py",
+      "sha256": "3d7d4afdcf4a592151348231be3d6a52d3bf9ad3062b94694967fb64dd684d28",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/env_init.py",
+      "sha256": "b4b5ec318cfe1fc5752bf24c86a4d1f5c994e360009c75fae6fd0459e6b585df",
+      "mode": "100644"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "c678cd7440d9d112db29f6b5b850eaca3c339befd33bd8871bc0b3a00a6a3fba",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/__init__.py",
+      "sha256": "548856c1c76039555912c5c6666b9dd299f65c80eb980ad0e4c298ae25fed2d9",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/advanced_creative/__init__.py",
+      "sha256": "3b047728638b83f5de1f2ef0d382b4c231116b502643e327a6cf38286c91754a",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/advanced_creative/digests.py",
+      "sha256": "f9e4357a14ab0b55405c5231b84c96069ebb4b207171c91328e9aaaa71f573fa",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/advanced_creative/errors.py",
+      "sha256": "e9fdf47bc202237071c7525c704708c747ece831776142f1ad8e38d0f4886658",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/advanced_creative/parity.py",
+      "sha256": "3ff7c9ebf257f52562210a9b8ace1b0cf7ad81ff2f169cccbc21810f55703821",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/advanced_creative/ports.py",
+      "sha256": "9b156d986128c0835ac2218f45847753ff1431ce722818974ff9ed646fce44e2",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/artifact_identity.py",
+      "sha256": "be003a037b44b1591d46dc5a54193b0e55210ee8d5aaa84aebee0c931d0a1703",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/__init__.py",
+      "sha256": "13629f976959b947ac24235ec2d5e09c5adca37da70cda98c14cb5c3d3c21abd",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/advanced_creative.py",
+      "sha256": "064ebe4dc1dba759bc9321d2cb4a5028fb36f2f0903295a5e338bfb78d537b65",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/artifact_metadata.py",
+      "sha256": "891a348d0cbb1bbfd7b9a45ff4fb7e3ac2f073ebc4c14f2c07ff83cb57ebb783",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/capabilities.py",
+      "sha256": "e78c6b3744f9b768aebb1777cc5938ca128893dc4dafcca80cf77157ebb286ca",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/common.py",
+      "sha256": "5d5f571da849881f8ae91337fe67860582185436f777a28b3834f7af9029f150",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/content_basis.py",
+      "sha256": "1b827e9fd14e4988da1beb3346cf6d9e484982266647ea4a01d1a0c7f5a49fa5",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/director.py",
+      "sha256": "502f602acfad346d815ad4597944f0081981be1c45f4304ec740a713c30b9e14",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/enums.py",
+      "sha256": "61d22bf140516c8d9275d8d895e8749c2de33730530ce7a1d3bd6b4963b289dc",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/execution.py",
+      "sha256": "503a30682b1cde97288ded588c62917186192a25617d57a53457939c3627503e",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/factual.py",
+      "sha256": "f3478d17683f5b859b7fa342b223c5babfd527d14f9365f7e598e892316bbb15",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/fingerprints.py",
+      "sha256": "a42967eb856a25b0b7341044a619af73ce692fe190d34666f6518814faa97999",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/host_hardening.py",
+      "sha256": "0e554e42b13add10fcbc20f99254ea5467b3e66a235639942861f4263ec3f076",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/narrative.py",
+      "sha256": "e640c38c9d260d6396870148595664ce515e5ffdebc66dc962cf065ddce299eb",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/narrative_context.py",
+      "sha256": "505628516ff2db6ebea7775391305a96c8bbba74d9408022f0a1dea46d03fc3c",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/narrative_lifecycle.py",
+      "sha256": "2ad9b41928b719180beb038dfda5b5142d24e44813a144f8e39b7d99cfb7d764",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/narrative_plan.py",
+      "sha256": "4eebe8c034e9f27cc9551bbe7992c95736e92469a798341705c02e11b8c76b19",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/observability.py",
+      "sha256": "a08500598a16efe61e16779583bc407281b74997129abaca05dfa18105bd1389",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/preparation.py",
+      "sha256": "e3f92a7c78de391cbd8deba7056cfee99284cc837a0699e9dcb536627575cabe",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/production.py",
+      "sha256": "22b03fe47270e36cd0967374a88bc7952d7c379ce334187818129a9cd04bf663",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/provenance.py",
+      "sha256": "5bc60b3e015937471114119fd0e1b8db3c9a3ff2115a100e9f4b8ad74530afe4",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/provider_syntax.py",
+      "sha256": "13dfd3ae381f02ce91ee3385d30449020b21eafc65409df26a70f1f09741d6b3",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/quality.py",
+      "sha256": "b8e5398d000f31d25196d5533a00ce5bb3740bfc13a7d0aab72ce869901f1384",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/results.py",
+      "sha256": "5c83a5569f496f7d7bd4c945c3fdfa0b271eafd987bf0484d0208016170221ae",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/contracts/script.py",
+      "sha256": "414e8d9788a722075e9e9f1e0b811ed939010a6118dbac8431e01309dbccc633",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/host_hardening/master_authority.py",
+      "sha256": "ca2bf5668743c0d336e6c1db71cc5e9ea071c8d79d7b640b31193b343f74952b",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/host_hardening/master_resolver.py",
+      "sha256": "6de1b6eb534da038a94503134afd5dd50568edbdfd589c73f0b67903890c802f",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/host_hardening/promotion.py",
+      "sha256": "14381eb7751270f380af5b5e15766fe9bf84e8f390de3ab05efa7e7508d16e10",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/m3/__init__.py",
+      "sha256": "fcbb93a080eefdd459356663fc0d1ce4560cc3e9b5fdbb444fc04d33318cd492",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/m3/deliverables.py",
+      "sha256": "78f3ddcbe7b16ab7206cc81fd4d9481c7162cbdb5d26507f20f031654451c785",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/m3/host_integration.py",
+      "sha256": "89c6b66b4a371253da306da56e86b1fd54d6807f604d5ce576959652a948bd03",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/production/__init__.py",
+      "sha256": "f835c29af0d56e088dbc37d1fa776ef09c55ef08895e7b24492cfb962cbe00ab",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/production/approval_service.py",
+      "sha256": "d16442ddef3c094b172d743e60fc79d65bcb5aaae817e1296b354519e012d393",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/production/artifact_metadata.py",
+      "sha256": "d1f6669f6edf483d13ee0194f10401e29f95fb2204cec6fa582309dcd8c46103",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/quality/__init__.py",
+      "sha256": "983a07c910996a8ecb7ff05e19d28c54bf5be102c1d79207c11e8faf0d2dcd6b",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/quality/digests.py",
+      "sha256": "323e748d18ad719cff57d285ebfc21e4f633086150495368337843d9751ee6e7",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/r2/verify_m10_bootstrap.py",
+      "sha256": "b861916b2b0388f49af1df0576acd6aff7aa8447f6abe5490d4cd565055d5163",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/r2/verify_m10_scope.py",
+      "sha256": "9c3574c687095370896e3c61dfba2d8c520731f71aa2d97e97b9a4bcacb5fa24",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/integration/scripts/r2/test_verify_m10_bootstrap.py",
+      "sha256": "6c56d88c624f8f4791593a792be0a7f48d7ac2c84cb5e5e22b57c30929cdc53e",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/integration/scripts/r2/test_verify_m10_scope.py",
+      "sha256": "3c1aea46a4f75a06290abf65d9456939dbe438abe3e6b76928cb10ff047f91a5",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/r2/advanced_creative/test_parity.py",
+      "sha256": "ad7d4b970e50077effd932c15eebb5255ae499b41690ebac6d6dbb963c191df3",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/r2/contracts/test_quality.py",
+      "sha256": "7090f75f2ea5f1896c54b545f9ae85e1b0485547509d9294f3d9e2eaa0cfb173",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/r2/quality/test_quality_digests.py",
+      "sha256": "72abd5ff6d6ed1caf8b9f94fdbe41cac6e26eb522e10d66542580834fec364e2",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/scripts/r2/test_verify_m10_bootstrap.py",
+      "sha256": "fe4d14ff74ce90ba9f45e349e08d7712834466709f8b08ebfddca34b46feab20",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/unit/scripts/r2/test_verify_m10_scope.py",
+      "sha256": "41ee31812e2efc2b87a3200eaf11ba2861e5f7c598aa31b29d47787cef6be9c2",
+      "mode": "100644"
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "bfca48df4104bfeb2327495a7463602bb303086826dea3c94d936e71e0b0d3c5",
+      "mode": "100644"
+    }
+  ],
+  "full_m10_gate_unchanged": true,
+  "runtime_activation_authorized": false,
+  "production_migration_authorized": false,
+  "provider_calls_authorized": false,
+  "m9_modified": false,
+  "new_digest_domains": [],
+  "new_command_operations": [],
+  "new_database_or_runtime_adapters": [],
+  "deferred": [
+    "A3 persistence/Human profile publication",
+    "A4 probe execution and M7 custody qualification",
+    "A5 Factual/currentness/run closure and stateful candidate mapping",
+    "A6 Human disposition",
+    "A7 runtime/resource parity",
+    "M10-B packaging/export"
+  ]
+}
