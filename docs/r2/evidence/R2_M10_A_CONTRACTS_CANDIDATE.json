@@ -1,0 +1,153 @@
+{
+  "schema_version": "1",
+  "status": "M10_A_CONTRACTS_SOURCE_CANDIDATE_NOT_RUNTIME_ACCEPTED",
+  "packet": "M10_A_A0_A1",
+  "acceptance_ref": "cf18b9f6156ed9e6337c40708e217a73271027fa",
+  "accepted_design_head": "97e03c2ccee778e2797940f245fca9900fbf7a8e",
+  "source_head": "fc1770e7e9aaede6cc4b7d1f2567d51caf489516",
+  "source_parent": "8ec57b535800547a87964f30210f4a622709c49e",
+  "source_sha256": {
+    "r2/contracts/quality.py": "9733e2582ab855bb9ce707aa21a0c7607e48a6b0c76be9527b16b5ae248ef8fa",
+    "r2/quality/__init__.py": "983a07c910996a8ecb7ff05e19d28c54bf5be102c1d79207c11e8faf0d2dcd6b",
+    "r2/quality/digests.py": "bad5491acdc2a180446ebbd16aa3b0442d0b9440bc0eeb526d676c6ddee24ce0",
+    "scripts/r2/verify_m10_scope.py": "9c3574c687095370896e3c61dfba2d8c520731f71aa2d97e97b9a4bcacb5fa24",
+    "tests/integration/scripts/r2/test_verify_m10_scope.py": "3c1aea46a4f75a06290abf65d9456939dbe438abe3e6b76928cb10ff047f91a5",
+    "tests/unit/r2/contracts/test_quality.py": "b90ed59d73b0ce90a6086218d53afeec7fa0665e79560cc01c4e38dd7cbf67d7",
+    "tests/unit/r2/quality/test_quality_digests.py": "3be1d6b757fb096bc3424b40721ccbe236482fefc8c31adf672210b36e707d1b",
+    "tests/unit/scripts/r2/test_verify_m10_scope.py": "41ee31812e2efc2b87a3200eaf11ba2861e5f7c598aa31b29d47787cef6be9c2"
+  },
+  "scope_allowlist": [
+    "docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json",
+    "r2/contracts/quality.py",
+    "r2/quality/__init__.py",
+    "r2/quality/digests.py",
+    "scripts/r2/verify_m10_scope.py",
+    "tests/integration/scripts/r2/test_verify_m10_scope.py",
+    "tests/unit/r2/contracts/test_quality.py",
+    "tests/unit/r2/quality/test_quality_digests.py",
+    "tests/unit/scripts/r2/test_verify_m10_scope.py"
+  ],
+  "full_m10_accepted": false,
+  "m10_a_runtime_accepted": false,
+  "runtime_activation_authorized": false,
+  "production_migration_authorized": false,
+  "provider_calls_made": false,
+  "m9_modified": false,
+  "tests": {
+    "affected": {
+      "counts": {
+        "tests": 455,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "9e2bcc1f2014e513cb09e1e8e2f87263d5ad7a7906d2cf5cd6ee46850734c9e5"
+    },
+    "repeat": {
+      "counts": {
+        "tests": 187,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "91952066efc8a7d3019ab489fca439e8e0995d50161fec8caaa2859a86235de7"
+    },
+    "affected_command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/scripts/r2/test_verify_m10_scope.py tests/integration/scripts/r2/test_verify_m10_scope.py tests/unit/scripts/r2/test_verify_m10_bootstrap.py tests/integration/scripts/r2/test_verify_m10_bootstrap.py tests/unit/scripts/r2/test_verify_m7_scope.py tests/unit/scripts/r2/test_verify_m8_scope.py tests/integration/r2/test_pure_artifact_imports.py tests/unit/r2/contracts/test_quality.py tests/unit/r2/quality/test_quality_digests.py tests/unit/r2/advanced_creative/test_digests.py tests/unit/r2/contracts/test_advanced_creative.py tests/unit/r2/contracts/test_host_hardening.py tests/unit/r2/contracts/test_pure_artifact_metadata.py tests/unit/r2/contracts/test_content_basis.py tests/unit/r2/test_artifact_identity.py -q -n 2 --dist loadfile",
+    "affected_execution_head": "cf18b9f6156ed9e6337c40708e217a73271027fa",
+    "execution_identity": "Affected gate executed on acceptance HEAD plus exact8source files now committed unchanged at source_head. Repeat ran at8ec57b535 plus identical5 A1 files. SHA256 above binds the tested bytes; no test source changed after the runs.",
+    "repeat_command": "env -u DATABASE_URL PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest tests/unit/r2/contracts/test_quality.py tests/unit/r2/quality/test_quality_digests.py -q",
+    "warnings": "2 SQLite expression-index reflection warnings in affected gate;1 in repeated A1 gate; no skipped tests."
+  },
+  "checks": {
+    "ruff": "PASS:ruff check .",
+    "format": "PASS:ruff format --check .",
+    "types": "0errors0warnings0notes:basedpyright --warnings --venvpath /home/anhtuan/content-production-os/.worktrees/r2-v2-main",
+    "audit": "0violations:python scripts/audit_tests.py --check",
+    "imports": "23kept0broken:lint-imports",
+    "dependencies": "PASS:deptry lib server alembic scripts tests r2"
+  },
+  "encoding_vectors": {
+    "domains": 25,
+    "two_fresh_process_outputs_byte_identical": true,
+    "sha256": "5a146fb458a44391d36f7e75e323b44b2083eaedecc643c6e44ff608d01bb717",
+    "vectors": {
+      "m10.accessibility-observation.v1": "sha256:8f7991bed0d61c7e11e129325c3036a0ccaf8e707d0e51690065c2d28fff0110",
+      "m10.artifact-metadata.v1": "sha256:53858f406668c333b28c30e90c3be5cb1b9ea673ccb908a2568794dac6216899",
+      "m10.assessed-subject.v1": "sha256:ea2cb1c52152c796b1af9e6353cb57b0362c98b6cc73f71a80314d9a8165d512",
+      "m10.assessment-requirements.v1": "sha256:497e0e19a8f0fb0699aa162d075b059c7fb536bd262769b577ef77abe737f8cb",
+      "m10.command-key-guard.v1": "sha256:4b7082182947e559019ee2b7bb1c3ad3808b3ffd267c392b84b684f1ad9f2fe4",
+      "m10.content-basis.v1": "sha256:0b180a93fb666c338d5d38acdddab08b272fdf5103f1e77cdb4e958e293e2e22",
+      "m10.continuity-observation.v1": "sha256:96255364f810c9c559082d4de92862eda9b5e64aa0aaa4bfdbda81f9b04c57b0",
+      "m10.disposition-request.v1": "sha256:64f9d5e9807aa029a9663958c23975e38b93b75cbbc98692e5ebf7da8f66511f",
+      "m10.disposition-subject.v1": "sha256:fd89b63f1a591182d7312986a6bf91dffc4e2baae8364cf477c27b4cc6190360",
+      "m10.factual-observation.v1": "sha256:3e18fb51d9fa965bd16741ac2c7e1d9eb8bf27aeeac8653976495c4bfcc37c5a",
+      "m10.master-binding.v1": "sha256:990e4db23229eaeb0e3d287fb4b9fa473c1d9fcf678df8edbbab799cdad2d3d6",
+      "m10.narrative-observation.v1": "sha256:0d012658c2d334d2555aefbe0fd71d8702767384532d2b007cf7ba1eb87cc8d3",
+      "m10.observation-closure.v1": "sha256:2a9acdacd92e7cd71c12f448efeeec30402fb779954a7746a7c48289745c734f",
+      "m10.perceptual-regression-observation.v1": "sha256:9a585f127d5e22397788e30d5b520c42135d04baa240bfa15787170f32ef6cb9",
+      "m10.perceptual-review-observation.v1": "sha256:3e6c9d743a95d35ffbd28eb72b679f689d938faa2a936a9caeded62e91692b27",
+      "m10.profile-publication-request.v1": "sha256:fa5ef6ce2a74e337f202b65abeda54c2e7d4ed0181e8ec988ecdb0d6796a8e64",
+      "m10.profile-publication-subject.v1": "sha256:a98007514b6875b103001be4ba2cd78370eaef3f118d291be28fe1073a080e6d",
+      "m10.quality-disposition.v1": "sha256:71ded81f5c55905b452058ad0658680046b8f436610536df9a06da7a7000232e",
+      "m10.quality-policy.v1": "sha256:61ab29a1b109d37b4b8f23dc9a59e68a0b4faefdb3a6d37f814ec3a525d0be84",
+      "m10.quality-profile-draft.v1": "sha256:e15d6d75b038b88ca6db0e5ee77b88e6e4af4ed0bfd38085454d6b1614daf2e6",
+      "m10.quality-profile.v1": "sha256:aa7ef8ca014232c57f944ee39705dda76f45179a0050c19faf8fb20d4769b3c1",
+      "m10.quality-run.v1": "sha256:208aa8836f4ba482eb3b74d4dc3f7cbc9f1f10d09be5f7d4ac2162deef96e168",
+      "m10.run-completion-request.v1": "sha256:9fe4ae80bcf7574c129a7bdb45d4242941087db10a80ec834629826a72a8eaf8",
+      "m10.technical-observation.v1": "sha256:04e027b5a292075d84d24feee92c79d5d3fc3a6f4f0abf56146ff5810bf8521e",
+      "m10.waiver-binding.v1": "sha256:0414f6408b6572610465a35568c14f2230a38d009ed1bc601125fefd7277a9ec"
+    },
+    "limits": "Encoding vectors use deterministic shape-valid fixture data; cached foreign assertions are not runtime authority. Separate cache-verifier tests recompute embedded caches."
+  },
+  "field_audit": {
+    "model_count": 37,
+    "sha256": "82b4d22a0e26535e901b99537211946d705e5317203356b59ff3b8e5314b8bdc",
+    "result": "Original and amended fieldsets match exactly; behavior requires the actual tests."
+  },
+  "live": [
+    {
+      "acceptance_ref": "cf18b9f6156ed9e6337c40708e217a73271027fa",
+      "head": "fc1770e7e9aaede6cc4b7d1f2567d51caf489516",
+      "scope_allowlist": [
+        "docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json",
+        "r2/contracts/quality.py",
+        "r2/quality/__init__.py",
+        "r2/quality/digests.py",
+        "scripts/r2/verify_m10_scope.py",
+        "tests/integration/scripts/r2/test_verify_m10_scope.py",
+        "tests/unit/r2/contracts/test_quality.py",
+        "tests/unit/r2/quality/test_quality_digests.py",
+        "tests/unit/scripts/r2/test_verify_m10_scope.py"
+      ],
+      "status": "M10_CONTRACT_SCOPE_OK",
+      "stop_codes": []
+    },
+    {
+      "head": "fc1770e7e9aaede6cc4b7d1f2567d51caf489516",
+      "packet": "full",
+      "status": "REFUSED",
+      "stop_codes": [
+        "M10_DESIGN_NOT_ACCEPTED"
+      ]
+    }
+  ],
+  "independent_implementation_review": {
+    "status": "PENDING",
+    "no_pass_inferred": true
+  },
+  "remaining_gates": [
+    "Independent implementation review and material repair if required.",
+    "Original A2-A7 and M10-B gates remain closed.",
+    "A3/A5/A6 must qualify persistence, Human custodian, stateful candidate resolver/store/bytes/currentness, factual authority and real transaction interleavings."
+  ],
+  "preserved_history": {
+    "original_acceptance": "9df2d051e18710b848fc1ac81c39eefc7ea27e4e",
+    "original_a0": "a8370f5fc02a3490ebba623decb1d80b5be3cbf9",
+    "wip_stash_retained": "d7423d6e98103b15c3a8bb43fce4ed5b9c24aa8a"
+  },
+  "limits": [
+    "Local source/contract/digest scope only; no database migration, API, UI, provider, probe or packaging/export implementation.",
+    "No broad17k backend/media suite rerun; actual affected gates listed above.",
+    "No checksum, type constructor or scope success grants Human disposition or currentness."
+  ]
+}
