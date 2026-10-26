@@ -86,10 +86,12 @@ def _body(domain: str, value: object) -> object:
         raise ValueError("unregistered M10-A digest domain")
     raw = value.model_dump(mode="python") if isinstance(value, BaseModel) else value
     if domain == "m10.observation-closure.v1":
-        observations = TypeAdapter(tuple[q.ObservationBinding, ...]).validate_python(raw)
+        observations = TypeAdapter(tuple[q.ObservationBinding, ...]).validate_python(q.require_ordered_collection(raw))
         return q.RunCompletionSubject.observation_order(observations)
     if domain == "m10.assessment-requirements.v1":
-        requirements = TypeAdapter(tuple[q.AssessmentRequirement, ...]).validate_python(raw)
+        requirements = TypeAdapter(tuple[q.AssessmentRequirement, ...]).validate_python(
+            q.require_ordered_collection(raw)
+        )
         return q.validate_requirements(requirements)
     if domain == "m10.content-basis.v1":
         immutable = CanonicalJsonObject.model_validate(raw)

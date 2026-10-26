@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterable, Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal, Self, get_origin
 from uuid import UUID
 
 from pydantic import (
@@ -60,10 +60,28 @@ M10Uuid7 = Annotated[str, BeforeValidator(_entity)]
 NonBlankText = Annotated[str, BeforeValidator(_text)]
 
 
+def require_ordered_collection(value: object) -> list[Any] | tuple[Any, ...]:
+    """Accept JSON arrays and explicit tuples, never infer order from another iterable."""
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("ordered collection requires list or tuple input")
+    return value
+
+
 class M10ContractModel(R2ContractModel):
     model_config = ConfigDict(
         frozen=True, extra="forbid", validate_assignment=True, revalidate_instances="always", allow_inf_nan=False
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def explicit_collection_order(cls, value: object) -> object:
+        if isinstance(value, M10ContractModel):
+            value = dict(value)
+        if isinstance(value, Mapping):
+            for name, field in cls.model_fields.items():
+                if name in value and (get_origin(field.annotation) is tuple or field.annotation is tuple):
+                    require_ordered_collection(value[name])
+        return value
 
 
 def _unique(values: Iterable[object]) -> None:
@@ -139,6 +157,15 @@ class ArtifactMetadataSnapshot(M10ContractModel):
             raise ValueError("metadata must already be fully normalized")
         if temporary.contract_ref.id != resource or temporary.approved_master is None:
             raise ValueError("metadata identity or approval mismatch")
+        pending: list[object] = [material]
+        while pending:
+            value = pending.pop()
+            if isinstance(value, str):
+                _exact(value)
+            elif isinstance(value, dict):
+                pending.extend(value.values())
+            elif isinstance(value, list):
+                pending.extend(value)
         return self
 
 
@@ -958,5 +985,6 @@ __all__ = [
     "SupersessionEffect",
     "TechnicalObservation",
     "WaiverBinding",
+    "require_ordered_collection",
     "validate_requirements",
 ]

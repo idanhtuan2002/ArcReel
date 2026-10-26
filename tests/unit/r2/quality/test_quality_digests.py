@@ -25,6 +25,7 @@ from tests.unit.r2.contracts.test_quality import (
     completion_data,
     disposition_data,
     draft_data,
+    non_array,
     observation_data,
     policy_data,
     subject_data,
@@ -520,3 +521,41 @@ print(json.dumps({"imported":sys.argv[2],"environment_unchanged":True}))
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert json.loads(result.stdout) == {"imported": module, "environment_unchanged": True}
+
+
+@pytest.mark.parametrize("domain", ["m10.assessment-requirements.v1", "m10.observation-closure.v1"])
+@pytest.mark.parametrize("kind", ["set", "frozenset", "generator"])
+def test_tuple_digest_domains_require_explicit_array_input(domain: str, kind: str) -> None:
+    q = importlib.import_module("r2.contracts.quality")
+    d = importlib.import_module("r2.quality.digests")
+    model = q.AssessmentRequirement if domain == "m10.assessment-requirements.v1" else q.ObservationBinding
+    values = [model.model_validate(row) for row in examples()[domain]]
+    with pytest.raises(ValueError, match="ordered collection"):
+        d.compute_digest(domain, non_array(kind, values))
+
+
+def test_fresh_processes_refuse_unordered_policy_input_instead_of_hashing_it() -> None:
+    script = r"""
+import sys,json
+sys.path.insert(0,sys.argv[1])
+from r2.quality.digests import compute_digest
+from tests.unit.r2.contracts.test_quality import policy_data
+data=policy_data()
+baseline=compute_digest("m10.quality-policy.v1",data)
+data["rule_ids"]=set(data["rule_ids"])
+try:
+    compute_digest("m10.quality-policy.v1",data)
+    refused=False
+except ValueError as exc:
+    assert "ordered collection" in str(exc)
+    refused=True
+print(json.dumps({"baseline":baseline,"unordered_refused":refused}))
+"""
+    root = Path(__file__).resolve().parents[4]
+    expected = digest_canonical({"domain": "m10.quality-policy.v1", "contract_version": "1", "body": policy_data()})
+    for _ in range(3):
+        result = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", script, str(root)], capture_output=True, text=True, timeout=30
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert json.loads(result.stdout) == {"baseline": expected, "unordered_refused": True}

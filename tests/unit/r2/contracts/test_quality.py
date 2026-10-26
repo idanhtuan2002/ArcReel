@@ -833,3 +833,59 @@ def test_command_and_lease_actions_are_closed_without_creating_a_grant() -> None
         q.ProfilePublicationAuthorizationLease.model_validate(body)
     with pytest.raises(ValidationError):
         q.DispositionAuthorizationLease.model_validate(body | {"action": "PROFILE_PUBLICATION"})
+
+
+def non_array(kind: str, values: list[Any]) -> object:
+    if kind == "set":
+        return set(values)
+    if kind == "frozenset":
+        return frozenset(values)
+    return (value for value in values)
+
+
+@pytest.mark.parametrize("kind", ["set", "frozenset", "generator"])
+def test_policy_declared_order_requires_explicit_array_input(kind: str) -> None:
+    q = importlib.import_module("r2.contracts.quality")
+    data = policy_data()
+    data["rule_ids"] = non_array(kind, data["rule_ids"])
+    with pytest.raises(ValidationError, match="ordered collection"):
+        q.QualityPolicyV1.model_validate(data)
+
+
+@pytest.mark.parametrize("field", ["observation_refs", "observation_digests"])
+@pytest.mark.parametrize("kind", ["set", "frozenset", "generator"])
+def test_parallel_observation_bindings_never_infer_array_order(field: str, kind: str) -> None:
+    q = importlib.import_module("r2.contracts.quality")
+    row = {
+        "requirement_id": "review-required",
+        "slot_id": "human",
+        "observation_refs": [UUID, OTHER_UUID],
+        "observation_digests": [DIGEST, "sha256:" + "b" * 64],
+        "distinct_independence_groups": ["independent"],
+        "state": "SATISFIED",
+        "escalation_observation_refs": [],
+    }
+    valid = q.AssessmentSlotResult.model_validate(row)
+    assert valid.observation_refs == (UUID, OTHER_UUID)
+    assert valid.observation_digests == (DIGEST, "sha256:" + "b" * 64)
+    row[field] = non_array(kind, row[field])
+    with pytest.raises(ValidationError, match="ordered collection"):
+        q.AssessmentSlotResult.model_validate(row)
+
+
+@pytest.mark.parametrize("field", ["selected_candidate_id", "host_version_ref", "selected_by"])
+def test_metadata_embedded_foreign_identities_reject_interior_control_characters(field: str) -> None:
+    q = importlib.import_module("r2.contracts.quality")
+    data = binding_data()["metadata_snapshots"][0]
+    data["body"]["approved_master"][field] = "foreign\nidentity"
+    with pytest.raises(ValidationError, match="identity"):
+        q.ArtifactMetadataSnapshot.model_validate(data)
+
+
+@pytest.mark.parametrize("resource", ["SH\x7f01", "SH\x8501"])
+def test_encoded_resource_does_not_hide_a_control_character_from_identity_validation(resource: str) -> None:
+    q = importlib.import_module("r2.contracts.quality")
+    with pytest.raises(ValidationError, match="identity"):
+        q.ArtifactMetadataSnapshot.model_validate(
+            {"artifact_key": episode_video_key(1, resource), "body": metadata_data(resource), "metadata_digest": DIGEST}
+        )
