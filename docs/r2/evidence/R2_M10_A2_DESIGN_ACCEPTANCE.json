@@ -1,0 +1,77 @@
+{
+  "schema_version": "1",
+  "status": "M10_A2_DESIGN_ACCEPTED",
+  "author_id": "codex-main",
+  "baseline_head": "655080af1660707b0b3c9b08f2b313ce638500f2",
+  "design_head": "5eda15b8931cc6537c784970672094373230e6f5",
+  "scope_allowlist": [
+    "docs/r2/evidence/R2_M10_A2_CANDIDATE.json",
+    "r2/quality/errors.py",
+    "r2/quality/parity.py",
+    "r2/quality/ports.py",
+    "scripts/r2/verify_m10_a2_scope.py",
+    "tests/integration/scripts/r2/test_verify_m10_a2_scope.py",
+    "tests/unit/r2/quality/test_quality_errors.py",
+    "tests/unit/r2/quality/test_quality_parity.py",
+    "tests/unit/r2/quality/test_quality_ports.py",
+    "tests/unit/scripts/r2/test_verify_m10_a2_scope.py"
+  ],
+  "design_artifacts": [
+    {
+      "path": "docs/research/2026-10-26-r2-m10-a2-reuse.md",
+      "sha256": "11dfa481354b09b86f463bed7c8a0a98e7912881230f25e86e908ca2382642bf"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-26-r2-m10-a2-foundation.md",
+      "sha256": "1abb58ec895db93edcc1dba6184bca9bba418f679b3f6e25714d853c9366766c"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-26-r2-m10-a2-foundation.md",
+      "sha256": "d5fdf1e976040a63d0ec996daed6d4eeac7508989e96a30145dc790d2a634965"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M10_A2_PACKET_2026-10-26.json",
+      "sha256": "c9686aa356d810d0fba94923c22e0167d6b51c2eab930276f0cafa5053adba7b"
+    }
+  ],
+  "reviewers": [
+    {
+      "reviewer_id": "codex-m10-a2-design-rereview-a-5eda15b89-20261026T165224Z",
+      "qualification_evidence": "Fresh independent repair re-review of the complete bounded M10 A2 design at 5eda15b8931cc6537c784970672094373230e6f5. Re-read the four-file repair delta and its full interface context against original M10 section 6 and A2/A5 plan obligations, exact A1 QualityProfile/slot/rule/TechnicalObservation/FactualObservation contracts and assessed-subject digest seam. Verified both prior HIGH findings are materially closed, the request-result helpers preserve later M7/Factual authority and currentness checks, the historical FAIL is retained, the delta is exactly four design files, all ten product paths and A2 acceptance/review paths remain absent, and the worktree is clean at the exact HEAD. Reused the unchanged qualified 79-pin, lineage, parity, error, source/import and scope-custody evidence from the prior whole-packet review. Tier-2 graph generation 2026-10-15T01:19:44Z is stale/other-worktree; docs are excluded and current quality sources have missing freshness, so exact current source was authoritative.",
+      "conflict_declaration": "NO_CONFLICT",
+      "rubric_version": "R2_M10_A2_DESIGN_REVIEW_V1",
+      "reviewed_candidate_head": "5eda15b8931cc6537c784970672094373230e6f5",
+      "verdict": "PASS",
+      "reviewed_at": "2026-10-26T16:52:24Z",
+      "required_skips": [],
+      "material_unknowns": []
+    },
+    {
+      "reviewer_id": "codex-m10-a2-design-review-b-5eda15b89-20261026T165618Z",
+      "qualification_evidence": "Fresh independent read-only Tier-2 graph-assisted and exact-source review of the complete bounded M10 A2 pure-foundation design at 5eda15b8931cc6537c784970672094373230e6f5. Verified the four design artifacts against original M10 spec sections 6 and 9, original A2/A5 plan obligations, accepted A1 contract/digest fields, current M8 parity fold/error/Protocol seams, exact four-path delta from 655080af, prior FAIL repairs, clean sealed HEAD, and packet authority/scope/acceptance boundaries. Graph r2-v2-main generation 2026-10-15T01:19:44Z is stale/other-worktree and excludes docs/new A1 paths; exact candidate source was read for all material claims. Parent-reported fresh 79-pin/158-check recomputation and 18 M8 parity test pass were treated as corroborating execution evidence, not independently rerun.",
+      "conflict_declaration": "NO_CONFLICT",
+      "rubric_version": "R2_M10_A2_DESIGN_REVIEW_V1",
+      "reviewed_candidate_head": "5eda15b8931cc6537c784970672094373230e6f5",
+      "verdict": "PASS",
+      "reviewed_at": "2026-10-26T16:56:18Z",
+      "required_skips": [],
+      "material_unknowns": [],
+      "findings": []
+    }
+  ],
+  "reviewer_artifacts": [
+    {
+      "path": "docs/r2/evidence/m10-a2-reviews/a-5eda15b89.json",
+      "sha256": "9e0d9fb1279e45c341a5b50acd09737a21e467b88d9e2eaf96ebfadb8c86583e"
+    },
+    {
+      "path": "docs/r2/evidence/m10-a2-reviews/b-5eda15b89.json",
+      "sha256": "2f9ee0f29ee92ef9eecf03c8e57b00ebba216d3dadedf43e095b20d177550c5c"
+    }
+  ],
+  "reviewed_at": "2026-10-26T16:56:18Z",
+  "required_skips": [],
+  "material_unknowns": [],
+  "runtime_activation_authorized": false,
+  "full_m10_accepted": false
+}
