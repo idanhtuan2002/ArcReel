@@ -1,47 +1,45 @@
 {
   "schema_version": "1",
   "status": "BOUNDED_DESIGN_CANDIDATE_NOT_ACCEPTED",
-  "tested_source_head": "d22120b58dd5e380edc582bb16dd5f7133cb7346",
+  "tested_source_head": "2eec9e7fec7ae9266e7020f1a36ae94166427135",
   "packet": "M10_A_A0_A1",
   "implementation_scope": "CONTRACTS_ONLY",
   "full_m10_accepted": false,
   "runtime_activation_authorized": false,
   "product_files_created": false,
   "source_sha256": {
-    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "b8e023f7aea2f18c61e781dc41decf7550fe08afa86a0d65c6ff8d84648bcf0e",
+    "docs/r2/evidence/R2_M10_CONTRACT_PACKET_2026-10-25.json": "b3c78d725ad0a4842ba463d341de88cdd71d9f5f9bbbd82f2a196a8ca728c81f",
     "docs/r2/evidence/schemas/R2_M10_CONTRACT_DESIGN_ACCEPTANCE.schema.json": "72f980aec9c79ec0ecea7462d2fd8fc8547c7a1ef87e198fecafe44fde2f5249",
-    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "d449937a2f8e9ecb1ae1479a928f23262b5f42024d118165f83a7795f4ba5c76",
+    "docs/superpowers/plans/2026-10-25-r2-m10-contract-foundation.md": "dc5e2b54ddbb8edbb4dd6a1dafe327cffce0e5e8194614b96f7b9889c7304406",
     "docs/superpowers/plans/2026-10-25-r2-m10-design-resume.md": "1631f622143135038507f4977a6bd81bae181ba9ab22a3f02f6c540e49ab2ba9",
-    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "17cf302f88e7b4af08fd8fe17069c2028afe3ac1d422ae433bd0f9f002f2c7b8",
+    "docs/superpowers/specs/2026-10-25-r2-m10-contract-packet.md": "9cf56774e3886ad13b9018a4cbc754b4dff63758c1746f35fbacc76a4c4cd067",
     "docs/superpowers/specs/2026-10-25-r2-m10-foundation-bindings.md": "9d11a47b04b00b5661866a643a5b412d0640dd3082fe7ceeb3abd19dec01dfac",
-    "scripts/r2/verify_m10_bootstrap.py": "22ba0dfdbf1cd4f4b2deff6a30b73553b60d59dc33ca8be40f09db8d5620ca31",
+    "scripts/r2/verify_m10_bootstrap.py": "b861916b2b0388f49af1df0576acd6aff7aa8447f6abe5490d4cd565055d5163",
     "tests/integration/scripts/r2/test_verify_m10_bootstrap.py": "6c56d88c624f8f4791593a792be0a7f48d7ac2c84cb5e5e22b57c30929cdc53e",
     "tests/unit/scripts/r2/test_verify_m10_bootstrap.py": "fe4d14ff74ce90ba9f45e349e08d7712834466709f8b08ebfddca34b46feab20"
   },
   "tests": {
     "counts": {
-      "tests": 149,
+      "tests": 143,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
-    "junit_sha256": "7feda737fb1e1ab118d4b083e763886b6e7bc70b61265f1d0d346f275bf8c37d",
-    "scope": "Affected full/bounded M10 bootstrap and real Git policy tests, M7/M8 gates, pure imports and existing scoped/legacy candidate projection tests. No A1 implementation or runtime concurrency proof.",
-    "command": "pytest tests/unit/scripts/r2/test_verify_m10_bootstrap.py tests/integration/scripts/r2/test_verify_m10_bootstrap.py tests/unit/scripts/r2/test_verify_m7_scope.py tests/unit/scripts/r2/test_verify_m8_scope.py tests/integration/r2/test_pure_artifact_imports.py tests/unit/r2/host_hardening/test_master_authority.py -q -n 2 --dist loadfile",
-    "execution_identity": "Executed on14076 plus the exact seven repaired source files committed unchanged at tested_source_head; hashes above bind the tested bytes."
+    "junit_sha256": "8933208e667809d58200abba30a0802296bb093f0ca0b932a287fe087b5e6a7f",
+    "scope": "Bounded/full bootstrap, M7/M8 gates and pure imports. Test basename amendment only; no A1 product source exists on this design branch."
   },
   "checks": {
     "ruff": "PASS",
     "format": "PASS",
-    "types": "0errors0warnings",
-    "test_audit": "0violations",
-    "import_contracts": "23kept0broken",
-    "dependencies": "PASS"
+    "types": "Focused bootstrap and mirrored tests:0errors0warnings0notes; m10-path-types.log",
+    "import_contracts": "Unchanged from prior accepted design; no project import change",
+    "dependencies": "Unchanged; no dependency change",
+    "test_audit": "Tests unchanged from prior accepted design"
   },
   "live": {
     "results": [
       {
-        "head": "d22120b58dd5e380edc582bb16dd5f7133cb7346",
+        "head": "2eec9e7fec7ae9266e7020f1a36ae94166427135",
         "packet": "full",
         "status": "REFUSED",
         "stop_codes": [
@@ -49,7 +47,7 @@
         ]
       },
       {
-        "head": "d22120b58dd5e380edc582bb16dd5f7133cb7346",
+        "head": "2eec9e7fec7ae9266e7020f1a36ae94166427135",
         "packet": "contracts",
         "status": "REFUSED",
         "stop_codes": [
@@ -59,7 +57,7 @@
     ],
     "repository_status_unchanged": true
   },
-  "review_status": "FRESH_REVIEWS_NOT_YET_OBTAINED",
+  "review_status": "FRESH_PATH_AMENDMENT_REVIEWS_PENDING",
   "limits": [
     "No M10 action custodian or factual runtime qualified.",
     "No database, migration, probe, API, provider, credential or export code allowed.",
@@ -170,7 +168,24 @@
       "Fixed predecessor-to-fixed-release ancestry enforced; RED1fail68deselected then GREEN2pass90deselected plus final149pass."
     ],
     "a1_validation_implemented": false,
-    "python_source_unchanged_from": "d22120b58dd5e380edc582bb16dd5f7133cb7346",
-    "characterized_source_count": 13
+    "characterized_source_count": 13,
+    "historical_repair_source": "d22120b58dd5e380edc582bb16dd5f7133cb7346"
+  },
+  "scope_path_amendment": {
+    "previous_accepted_design": "72958426b42629bdc506a2e252427840c53a1651",
+    "previous_acceptance_ref": "9df2d051e18710b848fc1ac81c39eefc7ea27e4e",
+    "previous_implementation_checkpoint": "a8370f5fc02a3490ebba623decb1d80b5be3cbf9",
+    "old_test_path": "tests/unit/r2/quality/test_digests.py",
+    "new_test_path": "tests/unit/r2/quality/test_quality_digests.py",
+    "scope_size_before": 9,
+    "scope_size_after": 9,
+    "normative_contract_or_digest_change": false,
+    "pytest_configuration_change": false,
+    "prior_failure": "432passed2warnings1collectionerror; duplicate bare test_digests module under default prepend mode.",
+    "reproduced": "Two-file default collection:79tests collected1import mismatch error.",
+    "disposable_renamed_probe": "93tests collected0errors, exit0, default config and tier enforcement unchanged.",
+    "probe_log_sha256": "3ec9cdad41670484b9ae8a85e3befdee5c8d86ff0ba2875a25b3bab481874fa4",
+    "preserved_wip_stash": "d7423d6e98103b15c3a8bb43fce4ed5b9c24aa8a",
+    "limits": "Preserved A1 WIP is not accepted product implementation. Two fresh independent PASS on this amended candidate and a separate acceptance are mandatory before the renamed path may be implemented."
   }
 }
