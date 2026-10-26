@@ -34,6 +34,48 @@ CONTRACT_PREPARATION_ARTIFACT = {
     "path": "docs/r2/evidence/R2_PURE_ARTIFACT_SEAMS_VERIFICATION_2026-10-25.json",
     "sha256": "b53367f9fe9f02e0716365c26d3d79b992ec372e3f83375951e939aa39b80101",
 }
+_CONTRACT_CHARACTERIZATION = (
+    {
+        "path": "lib/__init__.py",
+        "sha256": "58b1e0ba3f28dd34c03229fa5e36030cd73710b77df814067ae3c7d0a57133d9",
+        "mode": "100644",
+    },
+    {
+        "path": "lib/artifact_manifest.py",
+        "sha256": "3d7d4afdcf4a592151348231be3d6a52d3bf9ad3062b94694967fb64dd684d28",
+        "mode": "100644",
+    },
+    {
+        "path": "lib/env_init.py",
+        "sha256": "b4b5ec318cfe1fc5752bf24c86a4d1f5c994e360009c75fae6fd0459e6b585df",
+        "mode": "100644",
+    },
+    {
+        "path": "r2/m3/__init__.py",
+        "sha256": "fcbb93a080eefdd459356663fc0d1ce4560cc3e9b5fdbb444fc04d33318cd492",
+        "mode": "100644",
+    },
+    {
+        "path": "r2/m3/deliverables.py",
+        "sha256": "78f3ddcbe7b16ab7206cc81fd4d9481c7162cbdb5d26507f20f031654451c785",
+        "mode": "100644",
+    },
+    {
+        "path": "r2/m3/host_integration.py",
+        "sha256": "89c6b66b4a371253da306da56e86b1fd54d6807f604d5ce576959652a948bd03",
+        "mode": "100644",
+    },
+    {
+        "path": "r2/production/__init__.py",
+        "sha256": "f835c29af0d56e088dbc37d1fa776ef09c55ef08895e7b24492cfb962cbe00ab",
+        "mode": "100644",
+    },
+    {
+        "path": "r2/production/artifact_metadata.py",
+        "sha256": "d1f6669f6edf483d13ee0194f10401e29f95fb2204cec6fa582309dcd8c46103",
+        "mode": "100644",
+    },
+)
 _CONTRACT_IMPORTS = frozenset(
     [
         "r2/__init__.py",
@@ -353,6 +395,7 @@ def _check_contract_packet(repo: Repository, envelope: dict[str, Any]) -> None:
         definition.get("implementation_base") != CONTRACT_IMPLEMENTATION_BASE
         or definition.get("preparation_verification") != CONTRACT_PREPARATION_ARTIFACT
         or definition.get("import_closure") != sorted(_CONTRACT_IMPORTS)
+        or definition.get("characterization_sources") != list(_CONTRACT_CHARACTERIZATION)
     ):
         raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
     preparation_bytes = _bound(
@@ -391,6 +434,11 @@ def _check_contract_packet(repo: Repository, envelope: dict[str, Any]) -> None:
     base_contract = _bound(repo, CONTRACT_RELEASE_BASE, architecture, "M10_SCHEMA_FREEZE_FAILED")
     if definition.get("source_reuse") != _CONTRACT_SOURCES:
         raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
+    for ref in (CONTRACT_IMPLEMENTATION_BASE, envelope["accepted_design_head"], repo.head):
+        for artifact in _CONTRACT_CHARACTERIZATION:
+            _bound(repo, ref, artifact, "M10_SCHEMA_FREEZE_FAILED")
+            if repo.mode(ref, artifact["path"]) != artifact["mode"]:
+                raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
     for ref in (envelope["accepted_design_head"], repo.head):
         if repo.read(ref, architecture["path"]) != base_contract:
             raise BootstrapError("M10_SCHEMA_FREEZE_FAILED")
@@ -512,6 +560,7 @@ def verify(repo: Repository, *, acceptance_ref: str, schema: dict[str, Any], pac
             _check_contract_packet(repo, envelope)
             protected.update(_CONTRACT_SOURCES.values())
             protected.update(_CONTRACT_IMPORTS)
+            protected.update(row["path"] for row in _CONTRACT_CHARACTERIZATION)
             protected.add(CONTRACT_PREPARATION_ARTIFACT["path"])
             protected.add("docs/r2/evidence/R2_POST_M8_ARCHITECTURE_ACCEPTANCE_CONTRACT_2026-09-14.json")
             if any(

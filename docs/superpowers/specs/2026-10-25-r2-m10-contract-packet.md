@@ -94,9 +94,12 @@ MasterBindingV1
 
 Reuse the host metadata type for temporary validation of a thawed copy, never
 store that mutable model inside the frozen contract. Each ArtifactMetadataSnapshot
-must decode its own artifact_key with decode_episode_video_key and require the
-returned resource ID to equal body.contract_ref.id exactly, before joining a
-binding. For every consumed head (root and dependencies), its snapshot's
+must decode its own artifact_key with decode_episode_video_key, run
+validate_m3_target_ref on the returned resource ID, and require that same resource
+ID to equal body.contract_ref.id exactly, before joining a binding. This applies
+to dependency-free roots as well as every dependency. Generic episode_video_key
+accepts IDs outside this characterized host family; that does not make them valid
+M10 snapshot resources under this packet. For every consumed head (root and dependencies), its snapshot's
 artifact_key equals that head's artifact_key. Equal content/candidate/version/
 approval values never replace this identity equality. Require a complete normalized
 metadata body, one snapshot per consumed head and no extra/missing keys. Root
@@ -170,10 +173,31 @@ binds command_id separately. Final QualityDisposition retains its lease/policy/
 evidence/admitted-time fields; its digest excludes only its own cache field.
 No final digest, commit time or issued receipt can feed its own preflight subject.
 
+At A6, inside the authoritative transaction after locking/revalidation and before
+any mutation, read fresh DB time t after any lock wait (not a cached preflight
+or transaction-start timestamp) and require 0 < requested_expires_at - t <= the
+selected policy's max_disposition_ttl_seconds and the seven-day hard cap. WAIVE
+also satisfies the selected policy's max_waiver_ttl_seconds and the24-hour hard
+cap. Refuse expired/over-limit requests; never clamp or extend caller intent.
+Write final issued_at and custodian_admitted_at from that same DB admission time,
+and final expires_at exactly as the bound requested_expires_at. A1 checks the
+final record's issued_at == custodian_admitted_at as local coherence; the action
+lease's earlier issued_at is a different field and is not copied over that final
+issuance stamp. Recheck action
+lease/revocation and other admission conditions at that boundary as originally
+required. These DB operations/tests remain A6 work, not A1 implementation.
+
 Command operation is a closed A set: PUBLISH_PROFILE, COMPLETE_RUN,
 ISSUE_DISPOSITION. No packaging/export operation is admitted. Exact replay is a
 future repository property, not a constructor side effect. Validate local parent,
-revision, count, aware-time, expiry and waiver constraints in A1. Cross-record
+revision, count, aware-time and waiver-payload constraints in A1. Duration bounds
+in A1 apply to complete leases (issued_at/admit_not_after) and final dispositions
+(issued_at/expires_at), whose time pairs are present. DispositionSubject supplies
+only a required aware requested_expires_at: A1 must not infer a TTL from wall-clock
+construction time or a fabricated trusted start. An absolute-expiry request is
+intent, not an admitted disposition. Its remaining lifetime is exclusively an A6
+DB-time check; a structurally valid request can still be refused there.
+Cross-record
 authorization, external qualification, runtime currentness, evidence existence,
 DB-time admission, CAS/replay and PostgreSQL interleavings remain A3/A5/A6 proof
 obligations and are not claimed by this packet.
@@ -380,6 +404,8 @@ For each master: edge, decode parent and child artifact keys using the existing
 parent_episode, parent_resource = decode_episode_video_key(parent.artifact_key)
 child_episode, child_resource = decode_episode_video_key(child.artifact_key)
 parent_episode == child_episode
+validate_m3_target_ref(parent_resource) succeeds
+validate_m3_target_ref(child_resource) succeeds
 shot_ref = dependency_ref with exactly one leading "master:" removed
 validate_m3_target_ref(shot_ref) succeeds
 child.artifact_key == episode_video_key(parent_episode, shot_ref)
@@ -482,3 +508,30 @@ coverage is combined evidence with recorded skips, not a fabricated fresh suite.
   policy tuple order and do not treat failure codes as rule IDs.
 
 These are mandatory future A1 tests, not claims of an implemented validator.
+
+## Characterization custody and temporal test split
+
+The packet separately lists eight characterized host/namespace files with exact
+base SHA256 and Git modes, including ApprovedMasterResolver in deliverables.py.
+Bootstrap recomputes their hashes/modes at the verified base, reviewed candidate
+and live HEAD and refuses any dirty/hidden-index change. This characterizes the
+host identity/mapping contract without permitting A1 to import or execute those
+host modules; only the pure Python modules in source_reuse/import-closure remain
+importable. Configuration/lock files and host characterizations are protection
+inputs, never additions to the A1 import allowlist.
+No broad host directory or unqualified runtime adapter is thereby accepted.
+
+A1 temporal tests use explicit timestamp pairs for final dispositions: zero or
+negative windows, exactly seven days, over seven days; WAIVE exactly24hours and
+over24hours; and30-second lease boundaries. Request-only tests require aware,
+mandatory absolute expiry and digest binding but do not claim to calculate a
+relative window. A6 must separately test past expiry, expiry in2099 against a
+known DB admission clock, policy caps below hard caps, and expiry/revocation
+between preflight and the locked admission. No constructor approval substitutes
+for those transaction tests.
+
+Required A1 identity refusal cases additionally cover dependency-free unsafe root
+resources and unsafe dependency resources (dot segments, separators, colon and
+control characters) even when wire encoding, metadata ID, bytes and approvals
+otherwise match. The generic host codec's broader nonempty resource behavior
+remains unchanged; this bounded characterized family is deliberately narrower.

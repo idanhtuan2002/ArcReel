@@ -111,5 +111,47 @@
     "r2/contracts/provider_syntax.py",
     "r2/contracts/results.py",
     "r2/contracts/script.py"
+  ],
+  "characterization_sources": [
+    {
+      "path": "lib/__init__.py",
+      "sha256": "58b1e0ba3f28dd34c03229fa5e36030cd73710b77df814067ae3c7d0a57133d9",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/artifact_manifest.py",
+      "sha256": "3d7d4afdcf4a592151348231be3d6a52d3bf9ad3062b94694967fb64dd684d28",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/env_init.py",
+      "sha256": "b4b5ec318cfe1fc5752bf24c86a4d1f5c994e360009c75fae6fd0459e6b585df",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/m3/__init__.py",
+      "sha256": "fcbb93a080eefdd459356663fc0d1ce4560cc3e9b5fdbb444fc04d33318cd492",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/m3/deliverables.py",
+      "sha256": "78f3ddcbe7b16ab7206cc81fd4d9481c7162cbdb5d26507f20f031654451c785",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/m3/host_integration.py",
+      "sha256": "89c6b66b4a371253da306da56e86b1fd54d6807f604d5ce576959652a948bd03",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/production/__init__.py",
+      "sha256": "f835c29af0d56e088dbc37d1fa776ef09c55ef08895e7b24492cfb962cbe00ab",
+      "mode": "100644"
+    },
+    {
+      "path": "r2/production/artifact_metadata.py",
+      "sha256": "d1f6669f6edf483d13ee0194f10401e29f95fb2204cec6fa582309dcd8c46103",
+      "mode": "100644"
+    }
   ]
 }

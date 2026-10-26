@@ -330,6 +330,7 @@ def contract_fixture(fixture):
         *preparation["source_sha256"],
         *definition["source_reuse"].values(),
         *definition["import_closure"],
+        *[row["path"] for row in definition["characterization_sources"]],
     ]:
         for ref in [IMPLEMENTATION, CANDIDATE, ACCEPTANCE]:
             put(repo, ref, path, (source / path).read_bytes())
@@ -448,4 +449,34 @@ def test_preparation_evidence_cannot_change_at_the_candidate(contract_fixture) -
 def test_contract_source_pin_includes_regular_file_mode(contract_fixture) -> None:
     repo, _, _ = contract_fixture
     repo.modes[(ACCEPTANCE, "r2/contracts/factual.py")] = "120000"
+    assert "M10_SCHEMA_FREEZE_FAILED" in run_contracts(contract_fixture)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "lib/__init__.py",
+        "lib/artifact_manifest.py",
+        "lib/env_init.py",
+        "r2/m3/__init__.py",
+        "r2/m3/host_integration.py",
+        "r2/m3/deliverables.py",
+        "r2/production/__init__.py",
+        "r2/production/artifact_metadata.py",
+    ],
+)
+def test_characterized_host_sources_are_pinned_and_dirty_protected(contract_fixture, path: str) -> None:
+    repo, _, _ = contract_fixture
+    repo.dirty_paths = (path,)
+    assert "M10_OWNED_PATH_DIRTY" in run_contracts(contract_fixture)
+
+
+@pytest.mark.parametrize("change", ["bytes", "mode"])
+def test_characterized_resolver_cannot_drift_at_live_head(contract_fixture, change: str) -> None:
+    repo, _, _ = contract_fixture
+    path = "r2/m3/deliverables.py"
+    if change == "bytes":
+        put(repo, ACCEPTANCE, path, b"changed")
+    else:
+        repo.modes[(ACCEPTANCE, path)] = "120000"
     assert "M10_SCHEMA_FREEZE_FAILED" in run_contracts(contract_fixture)

@@ -250,7 +250,10 @@ def test_a_commit_after_repository_capture_cannot_get_stale_eligibility(accepted
     assert snapshot(repo) == before
 
 
-def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "dirty_path", ["r2/contracts/factual.py", "r2/m3/host_integration.py", "r2/m3/deliverables.py", "lib/env_init.py"]
+)
+def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_path: Path, dirty_path: str) -> None:
     from scripts.r2.verify_m10_bootstrap import (
         CONTRACT_ACCEPTANCE_PATH,
         CONTRACT_IMPLEMENTATION_BASE,
@@ -347,7 +350,7 @@ def test_contract_packet_uses_real_v2_predecessors_without_opening_full_m10(tmp_
     assert json.loads(full.stdout)["stop_codes"] == ["M10_DESIGN_NOT_ACCEPTED"]
     assert snapshot(repo) == before
 
-    imported = repo / "r2/contracts/factual.py"
+    imported = repo / dirty_path
     imported.write_text(imported.read_text() + "\n# dirty transitive import\n")
     dirty_before = snapshot(repo)
     dirty = subprocess.run(arguments, capture_output=True, text=True, env=environment, timeout=30)

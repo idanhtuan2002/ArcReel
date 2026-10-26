@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "status": "BOUNDED_DESIGN_CANDIDATE_NOT_ACCEPTED",
+  "status": "BOUNDED_DESIGN_REPAIR_NOT_ACCEPTED",
   "tested_source_head": "1d880cb0dbda2d253cd3a6e86f260b949710842f",
   "packet": "M10_A_A0_A1",
   "implementation_scope": "CONTRACTS_ONLY",
@@ -57,7 +57,7 @@
     ],
     "repository_status_unchanged": true
   },
-  "review_status": "FRESH_PAIR_NOT_YET_OBTAINED",
+  "review_status": "be304aa58_FAILED_WITHDRAWN_FRESH_REVIEWS_REQUIRED",
   "limits": [
     "No M10 action custodian or factual runtime qualified.",
     "No database, migration, probe, API, provider, credential or export code allowed.",
@@ -93,6 +93,23 @@
         "reviewed_candidate_head": "63cc4e9869a663ec190c3d1af23bd8ea69434a27",
         "verdict": "FAIL",
         "reviewed_at": "2026-10-25T15:47:14Z",
+        "required_skips": [],
+        "material_unknowns": []
+      }
+    },
+    {
+      "candidate": "be304aa58a106d547ec6167dfe3afebec3c09f53",
+      "verdict": "FAIL",
+      "material_findings": 3,
+      "disposition": "Withdrawn. Clarify A1/final versus A6/request DB-time TTL checks; pin/protect characterized host sources; require safe resources on every snapshot.",
+      "reviewer_record": {
+        "reviewer_id": "codex-m10-contract-review-a-be304aa58-20261025T161135Z",
+        "qualification_evidence": "Independent Tier-2 structural and exact-source normative review covering bounded sequencing authority, M7/M8 lineage, A0 bootstrap custody, A1 field and digest closure, host identity mapping, source/import protection, authorization separation and current refusal behavior. Graph limitations were covered by direct source reads.",
+        "conflict_declaration": "NO_CONFLICT",
+        "rubric_version": "R2_M10_CONTRACT_REVIEW_V1",
+        "reviewed_candidate_head": "be304aa58a106d547ec6167dfe3afebec3c09f53",
+        "verdict": "FAIL",
+        "reviewed_at": "2026-10-25T16:11:35Z",
         "required_skips": [],
         "material_unknowns": []
       }
