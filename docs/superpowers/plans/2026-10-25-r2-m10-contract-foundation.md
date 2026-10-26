@@ -42,7 +42,7 @@ Files: scripts/r2/verify_m10_scope.py and mirrored unit/integration tests.
 
 ## A1: Immutable contracts and digest registry
 
-Files: r2/contracts/quality.py, behavior-free r2/quality/__init__.py, r2/quality/digests.py, tests/unit/r2/contracts/test_quality.py, tests/unit/r2/quality/test_digests.py.
+Files: r2/contracts/quality.py, behavior-free r2/quality/__init__.py, r2/quality/digests.py, tests/unit/r2/contracts/test_quality.py, tests/unit/r2/quality/test_quality_digests.py.
 
 - [ ] RED field/roundtrip tests for every original A contract plus the explicitly patched draft/request/master/metadata/edge types. No B contract/type/operation may be exported.
 - [ ] RED for mutable input aliases, extra fields, nonfinite values, naive time, wrong new-entity UUIDv7, normalized foreign identity, duplicate/unknown rule/requirement/slot IDs, invalid N_OF_M, missing/cyclic escalation and source edges, wrong metadata/head approval, wrong dependency raw-generation/host-version/media-fingerprint, master:A-to-childB aliasing even with equal bytes/version, noncanonical key encoding and cross-episode edges.

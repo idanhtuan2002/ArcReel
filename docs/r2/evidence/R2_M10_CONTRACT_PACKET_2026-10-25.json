@@ -33,7 +33,7 @@
     "scripts/r2/verify_m10_scope.py",
     "tests/integration/scripts/r2/test_verify_m10_scope.py",
     "tests/unit/r2/contracts/test_quality.py",
-    "tests/unit/r2/quality/test_digests.py",
+    "tests/unit/r2/quality/test_quality_digests.py",
     "tests/unit/scripts/r2/test_verify_m10_scope.py"
   ],
   "implementation_scope": "CONTRACTS_ONLY",

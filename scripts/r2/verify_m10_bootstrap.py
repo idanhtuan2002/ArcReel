@@ -142,7 +142,7 @@ CONTRACT_SCOPE = frozenset(
         "r2/quality/__init__.py",
         "r2/quality/digests.py",
         "tests/unit/r2/contracts/test_quality.py",
-        "tests/unit/r2/quality/test_digests.py",
+        "tests/unit/r2/quality/test_quality_digests.py",
         "docs/r2/evidence/R2_M10_A_CONTRACTS_CANDIDATE.json",
     }
 )

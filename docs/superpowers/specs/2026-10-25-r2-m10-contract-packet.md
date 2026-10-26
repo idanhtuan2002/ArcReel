@@ -579,3 +579,20 @@ another project's legacy row, wrong generation/artifact/user/project mapping,
 missing candidate objects, and concurrent legacy registration/master changes.
 Use the actual pinned resolver/store call surface, never caller-supplied mapping
 claims. These are future runtime qualification gates, not A0/A1 completion claims.
+
+## Test namespace path amendment
+
+The fixed A1 digest test path is tests/unit/r2/quality/test_quality_digests.py.
+It replaces tests/unit/r2/quality/test_digests.py within the same nine-path
+allowlist. The latter basename collides with the existing un-packaged M8
+advanced_creative/test_digests.py under the repository default pytest import
+mode; focused A1 runs did not expose the combined-collection failure. Preserve
+the existing test, pytest config, collection mode and package initialization.
+No tenth path or runtime surface is authorized. All A0/A1 normative fields,
+source/import/characterization pins, release/base references, deferred proof
+obligations and full-M10 refusal remain unchanged.
+
+The original accepted design72958426b and acceptance9df2d051e remain immutable
+in Git. This amended candidate needs two fresh independent PASS decisions and
+a separate acceptance before implementing the renamed path. Preserved A0/A1
+source is unaccepted WIP, not evidence that this new scope is already eligible.
