@@ -225,3 +225,23 @@ def test_detached_unaccepted_lineage_cannot_reuse_accepted_objects(a2_repo) -> N
     assert result.returncode == 2
     assert json.loads(result.stdout)["stop_codes"] == ["M10_DESIGN_NOT_ACCEPTED"]
     assert snapshot(repo) == before
+
+
+def test_ignored_untracked_python_caches_are_preserved_without_hiding_revision_sources(a2_repo) -> None:
+    repo, runner, ref = a2_repo
+    for directory in ("alembic/versions/__pycache__", "r2/quality/__pycache__"):
+        cache = repo / directory / "fixture.cpython-313.pyc"
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(b"generated cache")
+    before = snapshot(repo)
+    result = invoke(repo, runner, ref)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout)["status"] == "M10_A2_SCOPE_OK"
+    assert snapshot(repo) == before
+    revision = repo / "alembic/versions/__pycache__/stray.py"
+    revision.write_text("revision='stray'")
+    before = snapshot(repo)
+    result = invoke(repo, runner, ref)
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["stop_codes"] == ["M10_SCHEMA_CHANGE_REQUIRED"]
+    assert snapshot(repo) == before

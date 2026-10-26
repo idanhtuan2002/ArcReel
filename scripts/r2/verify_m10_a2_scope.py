@@ -338,6 +338,20 @@ def verify_scope(root: Path, *, acceptance_ref: str) -> dict[str, Any]:
         )
         changed = set(repo.changed(ACCEPTANCE_REF, head))
         dirty = set(repo.dirty(protected))
+        # Generated, untracked bytecode is not a revision or owned source file.
+        ignored = (
+            _git(root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--", "alembic/", "r2/quality/")
+            .decode()
+            .split("\0")
+        )
+        caches = {
+            p
+            for p in ignored
+            if re.fullmatch(
+                r"(?:alembic|r2/quality)/(?:[^/]+/)*__pycache__/[^/]+\.cpython-[0-9]+(?:\.opt-[0-9]+)?\.pyc", p
+            )
+        }
+        dirty -= caches
         if any(p.startswith("alembic/") for p in changed | dirty):
             raise ScopeError("M10_SCHEMA_CHANGE_REQUIRED")
         if changed - products or any(p in protected or p.startswith("r2/quality/") for p in dirty):
