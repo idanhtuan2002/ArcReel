@@ -1,0 +1,73 @@
+{
+  "schema_id": "m10.a4-input-file-qualification.v1",
+  "status": "BOUNDED_FILE_SNAPSHOT_PRIMITIVE_ONLY_TASK3_OPEN",
+  "source_head": "776f17bf23a5099024426679900d4a7c234de51c",
+  "source_hashes": {
+    "server/services/quality_probe_inputs.py": "46d85dc866088eaf7051336d8c95e91d2d12445fb51485351a899e5d1ffeef71",
+    "tests/unit/server/services/test_quality_probe_inputs.py": "2df2b80a59c9302cd685c36617e896b10c1e4ba77b334f163e4840702c0689f6"
+  },
+  "tests": {
+    "input_and_measurement_cases": {
+      "tests": 89,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0
+    },
+    "input_cases": 13,
+    "measurement_cases": 76,
+    "duration_seconds": 1.78,
+    "legacy_format_replacement_regressions": "2passed0skips1baselinewarning,7.46s",
+    "baseline_warning": "SQLite expression-index reflection warning"
+  },
+  "static_checks": {
+    "ruff": "repositorycheckpassed",
+    "format": "2035filesalreadyformatted",
+    "basedpyright": "wholeproject0errors0warnings",
+    "import_linter": "23kept0broken",
+    "deptry": "no dependencyissues",
+    "audit_tests": "0violations",
+    "direct_source_boundary": []
+  },
+  "reuse": {
+    "source_commit": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+    "current_unchanged_source_sha256": {
+      "server/services/format_render.py": "85d908897165c0d86843383b33b6a9faf396a5c726bc63db4a43e7e6ce81f75c",
+      "lib/candidate_store.py": "24427217c79d72c140ecd6d836914f4c55be5dd042f116069e496dbb6975d9f0",
+      "lib/project_manager.py": "8b1081881949853c533ff924d360800eb6e6a9021584ecf42000843e097a82f5",
+      "r2/governance/operator_archive_reader.py": "a0d281af02b2330b141e4e9710563a3ba47090209028712b1b4babd7ec657be4"
+    },
+    "same_fixture": "actual existing verified_snapshot and new verified_probe_file copied identical bytes and cleaned their own snapshots",
+    "concrete_gaps": [
+      "format snapshot hashes/copies but lacks the needed byte ceiling and anchored nofollow walk",
+      "candidate-store parent descriptor pattern resolves its root and serves candidate publication, not bounded media snapshots",
+      "operator archive regular-file pattern has grant/archive-specific identity/device/mode authority; no authority-layer dependency was added",
+      "project-manager safe-subpath returns a pathname, not a retained descriptor with bounded copied-byte custody"
+    ]
+  },
+  "verified": [
+    "absolute stored object reference stays beneath lexical project root",
+    "all directory components opened with O_DIRECTORY/O_NOFOLLOW/CLOEXEC",
+    "regular file check after O_NONBLOCK open; FIFO refused without blocking",
+    "private0700owned scratch; exclusive0600creation then0400readonly snapshot",
+    "source digest hashes actual copied bytes and enforces initial/live growth ceilings",
+    "source replacement mid-copy preserves old verified FD bytes; no substitution under old digest",
+    "cleanup removes only the created inode; all descriptors held by ExitStack"
+  ],
+  "scope_guard": {
+    "head": "776f17bf23a5099024426679900d4a7c234de51c",
+    "status": "M10_A4_SCOPE_OK",
+    "runtime_accepted": false,
+    "stop_codes": []
+  },
+  "remaining_Task3": [
+    "authenticated scoped master/reference/caption resolution and combined ProbeInputs context",
+    "bounded supervisor and stdlib-only worker under effective cgroup/Landlock/seccomp controls",
+    "actual kernel/process-tree/output/deadline/secret-FD/environment integration fixtures"
+  ],
+  "read_authority_granted": false,
+  "A4_runtime_accepted": false,
+  "runtime_activation_authorized": false,
+  "production_migration_authorized": false,
+  "original_a3_readiness_closed": false,
+  "factual_admission_qualified": false
+}
