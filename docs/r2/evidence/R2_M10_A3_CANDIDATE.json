@@ -1,0 +1,2511 @@
+{
+  "schema_version": "1",
+  "status": "M10_A3_P_SOURCE_VERIFIED",
+  "author_id": "codex-main",
+  "generated_at": "2026-10-27T11:26:43.175172+00:00",
+  "baseline_head": "dca138da92ca7bb3e8b6adbb44cacdfce84f0f84",
+  "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+  "design_head": "2e69816123c32ba057bfbed7d5e55344b3daa7d2",
+  "acceptance_ref": "c7a86813bd7a45f119262dc7acdfe9803967e181",
+  "test_compatibility_amendment_ref": "0caf82042ae8319baa989e8bcb60ac05cd669633",
+  "scope_amendment": {
+    "id": "M10_A3_P_READINESS_DEFERRAL_V1",
+    "source_task": {
+      "path": "docs/superpowers/plans/2026-09-16-r2-m10a-quality-evidence-foundation.md",
+      "sha256": "38ab21192c7837d41b1ebca319ffcc3313948182cf81863d51d0498e77d57043",
+      "section": "Task A3; actual HISTORICAL_ONLY/REEVALUATE_CURRENT readiness scenarios"
+    },
+    "slice": "A3-P publication/persistence source and disposable-DB qualification only",
+    "retained_obligation": "Run the original actual-readiness scenarios against the A5 runtime; predicate/event tests do not replace them.",
+    "original_task_a3_gate": "OPEN_UNTIL_ACTUAL_READINESS_CASES_PASS",
+    "deferred_owner_gate": "A5 integration; not accepted by this artifact",
+    "may_mark_original_a3_complete": false,
+    "may_activate_runtime": false,
+    "factual_admission": "FACTUAL slot/freshness policy publication remains refused until separately qualified A5 Factual amendment; no ready/qualified flag."
+  },
+  "scope_amendment_sha256": "dc2184bdbf5ebff5ee5426607845e8bab095f90871e4c3da2dec50697bcfa867",
+  "source_hashes": {
+    "alembic/versions/65f53650f3a8_quality_profile_publication.py": "1b44542dee31571e39289379c10a9eec0af74091df470e262133c62c6c68d31d",
+    "lib/db/models/__init__.py": "82fe14ce615261d66aee8f10aebddbe6dc6ec67e1099b5f4165fe548a597d1ae",
+    "lib/db/models/quality.py": "e4b2e5eafad747ca163146346b17b585f1d0f337c9d75e29d9027d13198206e0",
+    "lib/db/repositories/quality.py": "37974aa89e49f120b3b6fc218b0abe5b85de7ea8a69644faf9e2ecb6ef214b47",
+    "r2/quality/profiles.py": "e157186cb62cd7beae029767e6d92c03278e2341055f24f6d37ac0a25d98c3d8",
+    "scripts/r2/verify_m10_a3_scope.py": "071e0ed119cb1748cba9ec883152edc3b278c5fd0bf8dfc6783be448f1c14269",
+    "server/services/quality_profile_custodian.py": "649213b31abcb89738a5ed99ea5d6e1655b08e4c85cdeebf76dad254f3e30673",
+    "server/services/quality_profiles.py": "51b9c22fb09a4fc608a8170972205db625d5d84c42e7e71c2e93a88e6d7935b0",
+    "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py": "477de3278457a421d5c033a07ea80a7ffa35b6ac77658879114e847cd517f972",
+    "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py": "9d2c9eaff59744ae0c3add7831dbcbae262102e31c2068d19ecfa9d2ddba4d4a",
+    "tests/integration/lib/db/migrations/test_format_projections.py": "a2275cefd205ed4e7fca98ccaf8252c1da4ff560951de51483c4fa46e7791831",
+    "tests/integration/lib/db/migrations/test_learning_observations.py": "e7c8f3d988dad3cf5c391df0ef0615e4b6e685f3a89adea787078b3d62a3b9e0",
+    "tests/integration/lib/db/migrations/test_production_binding_authority.py": "4733921fa197d153d0f21dcafa64db9511bdc77565373f5ee7361667e09c608f",
+    "tests/integration/lib/db/migrations/test_production_target_registry.py": "441edd199de26eff233fc9b3d0f3973da10c08c0f427ecf19d572fbe1ea0ae00",
+    "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py": "d0c238953f3ad468b8eb8c70226485374b7461d6a5511bf49c92edc0b4060117",
+    "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py": "e3bc00ba18961948f9bc1e183b7db9510e0504289481793c8f016bea2f567381",
+    "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py": "8595fc52d626e18a9994a41a02da2ccb2f907eecce7c74762f1471519b651f5a",
+    "tests/integration/lib/db/migrations/test_spatial_pair_authority.py": "10abdbb7c62a692b92f4b2798fb9244d671a62218eabef6411a420a312dc8213",
+    "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py": "8ac94f986f548c7564545f0faa66b20ab80dda92e63081313b77c56700ed9d66",
+    "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py": "fbfdb1faf551c4d2213e60298adaa9ba6d6e58c41bcd062c4cce8ee1163a332f",
+    "tests/integration/lib/db/migrations/test_spatial_review_custody.py": "e2d50cee359b36c701af1473233f448de3308ed3cf87d39e65c23a26db028eed",
+    "tests/integration/lib/db/repositories/test_quality_profiles_repository.py": "27ad5d134a6c2fa33e03bebbc70f70607d73b1f16daba1911206802eadf8c5e0",
+    "tests/integration/scripts/r2/test_verify_m10_a3_scope.py": "d7b4a8a890382cd90fee79a7be29a5e6af883f4d7617eae98f9951a2f4c9289b",
+    "tests/integration/server/services/test_quality_profile_custodian.py": "de0cf7a136b88b72fd84c2f25e1ee084d906d05b1b461295f6af4e33c3a3e46b",
+    "tests/integration/server/services/test_quality_profiles.py": "16dc1bf79b86589f0268b3f0c231f9dfb06638b3fbeae076cfab76913f4f93f8",
+    "tests/unit/r2/quality/test_quality_profiles.py": "feb4e0db845118864487a10c4e6f8c3abef764b8e4d9f97ee7ab1530606999a7",
+    "tests/unit/scripts/r2/test_verify_m10_a3_scope.py": "d9cd107aeb1ec287d26f887c9f581f5a790e339e13a46225de87f5a82411c85a"
+  },
+  "postgresql_qualification": {
+    "container_id": "a1af4d1227f079e900914f029bee2c0c9c080c959c3d912978c48681f1486a21",
+    "container_name": "r2-m10-a3-publisher-7dc5416b",
+    "image_id": "sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873",
+    "host": "127.0.0.1",
+    "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+    "source_hashes": {
+      "alembic/versions/65f53650f3a8_quality_profile_publication.py": "1b44542dee31571e39289379c10a9eec0af74091df470e262133c62c6c68d31d",
+      "lib/db/models/__init__.py": "82fe14ce615261d66aee8f10aebddbe6dc6ec67e1099b5f4165fe548a597d1ae",
+      "lib/db/models/quality.py": "e4b2e5eafad747ca163146346b17b585f1d0f337c9d75e29d9027d13198206e0",
+      "lib/db/repositories/quality.py": "37974aa89e49f120b3b6fc218b0abe5b85de7ea8a69644faf9e2ecb6ef214b47",
+      "r2/quality/profiles.py": "e157186cb62cd7beae029767e6d92c03278e2341055f24f6d37ac0a25d98c3d8",
+      "scripts/r2/verify_m10_a3_scope.py": "071e0ed119cb1748cba9ec883152edc3b278c5fd0bf8dfc6783be448f1c14269",
+      "server/services/quality_profile_custodian.py": "649213b31abcb89738a5ed99ea5d6e1655b08e4c85cdeebf76dad254f3e30673",
+      "server/services/quality_profiles.py": "51b9c22fb09a4fc608a8170972205db625d5d84c42e7e71c2e93a88e6d7935b0",
+      "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py": "477de3278457a421d5c033a07ea80a7ffa35b6ac77658879114e847cd517f972",
+      "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py": "9d2c9eaff59744ae0c3add7831dbcbae262102e31c2068d19ecfa9d2ddba4d4a",
+      "tests/integration/lib/db/migrations/test_format_projections.py": "a2275cefd205ed4e7fca98ccaf8252c1da4ff560951de51483c4fa46e7791831",
+      "tests/integration/lib/db/migrations/test_learning_observations.py": "e7c8f3d988dad3cf5c391df0ef0615e4b6e685f3a89adea787078b3d62a3b9e0",
+      "tests/integration/lib/db/migrations/test_production_binding_authority.py": "4733921fa197d153d0f21dcafa64db9511bdc77565373f5ee7361667e09c608f",
+      "tests/integration/lib/db/migrations/test_production_target_registry.py": "441edd199de26eff233fc9b3d0f3973da10c08c0f427ecf19d572fbe1ea0ae00",
+      "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py": "d0c238953f3ad468b8eb8c70226485374b7461d6a5511bf49c92edc0b4060117",
+      "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py": "e3bc00ba18961948f9bc1e183b7db9510e0504289481793c8f016bea2f567381",
+      "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py": "8595fc52d626e18a9994a41a02da2ccb2f907eecce7c74762f1471519b651f5a",
+      "tests/integration/lib/db/migrations/test_spatial_pair_authority.py": "10abdbb7c62a692b92f4b2798fb9244d671a62218eabef6411a420a312dc8213",
+      "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py": "8ac94f986f548c7564545f0faa66b20ab80dda92e63081313b77c56700ed9d66",
+      "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py": "fbfdb1faf551c4d2213e60298adaa9ba6d6e58c41bcd062c4cce8ee1163a332f",
+      "tests/integration/lib/db/migrations/test_spatial_review_custody.py": "e2d50cee359b36c701af1473233f448de3308ed3cf87d39e65c23a26db028eed",
+      "tests/integration/lib/db/repositories/test_quality_profiles_repository.py": "27ad5d134a6c2fa33e03bebbc70f70607d73b1f16daba1911206802eadf8c5e0",
+      "tests/integration/scripts/r2/test_verify_m10_a3_scope.py": "d7b4a8a890382cd90fee79a7be29a5e6af883f4d7617eae98f9951a2f4c9289b",
+      "tests/integration/server/services/test_quality_profile_custodian.py": "de0cf7a136b88b72fd84c2f25e1ee084d906d05b1b461295f6af4e33c3a3e46b",
+      "tests/integration/server/services/test_quality_profiles.py": "16dc1bf79b86589f0268b3f0c231f9dfb06638b3fbeae076cfab76913f4f93f8",
+      "tests/unit/r2/quality/test_quality_profiles.py": "feb4e0db845118864487a10c4e6f8c3abef764b8e4d9f97ee7ab1530606999a7",
+      "tests/unit/scripts/r2/test_verify_m10_a3_scope.py": "d9cd107aeb1ec287d26f887c9f581f5a790e339e13a46225de87f5a82411c85a"
+    },
+    "source_clean_at_start": true,
+    "port": 32790,
+    "server_version": "18.6",
+    "command": "DATABASE_URL=<owned private localhost target> PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python -m pytest -q tests/integration/server/services/test_quality_profiles.py tests/integration/server/services/test_quality_profile_custodian.py tests/integration/lib/db/repositories/test_quality_profiles_repository.py tests/integration/lib/db/repositories/test_advanced_creative.py tests/integration/r2/governance/test_checkpointed_grant_reader.py tests/unit/server/test_interactive_auth.py -o junit_logging=all --junitxml=.superpowers/sdd/2026-10-27-r2-m10-a3/a3-sealed-postgres.xml",
+    "pytest_exit_code": 0,
+    "source_hashes_unchanged": true,
+    "public_tables_after": 0,
+    "test_schemas_after": 0,
+    "counts": {
+      "tests": 77,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "cleanup": "owned container/anonymous volume/private credentials removed"
+  },
+  "migration_qualification": {
+    "status": "PASS",
+    "source_head": "4c76b71ce50c0c351583d25c846f42f2c9b64a53",
+    "dirty_paths": [
+      " M lib/db/models/__init__.py",
+      "?? alembic/versions/65f53650f3a8_quality_profile_publication.py",
+      "?? lib/db/models/quality.py",
+      "?? tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py"
+    ],
+    "source_hashes": {
+      "lib/db/models/quality.py": "e4b2e5eafad747ca163146346b17b585f1d0f337c9d75e29d9027d13198206e0",
+      "lib/db/models/__init__.py": "82fe14ce615261d66aee8f10aebddbe6dc6ec67e1099b5f4165fe548a597d1ae",
+      "alembic/versions/65f53650f3a8_quality_profile_publication.py": "1b44542dee31571e39289379c10a9eec0af74091df470e262133c62c6c68d31d"
+    },
+    "image_id": "sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873",
+    "stages": [
+      {
+        "label": "predecessor_seeded",
+        "version": "918c4a0e0001",
+        "tables": [
+          "adaptation_branches",
+          "adaptation_decisions",
+          "adaptation_evaluation_findings",
+          "adaptation_evaluation_reports",
+          "adaptation_heads",
+          "adaptation_map_entries",
+          "adaptation_map_profile_analysis_refs",
+          "adaptation_maps",
+          "adaptation_profile_sidecars",
+          "adaptation_screenplay_admissions",
+          "adaptation_screenplay_profile_analysis_refs",
+          "adaptation_screenplay_scenes",
+          "adaptation_screenplays",
+          "agent_anthropic_credentials",
+          "agent_session_entries",
+          "agent_session_event_log",
+          "agent_session_summaries",
+          "agent_session_user_message_links",
+          "agent_sessions",
+          "alembic_version",
+          "api_calls",
+          "api_keys",
+          "asset_derivatives",
+          "assets",
+          "attempt_integrity_incidents",
+          "backup_set_media_refs",
+          "backup_sets",
+          "batch_tasks",
+          "batches",
+          "budget_reservations",
+          "budget_scopes",
+          "candidate_objects",
+          "canon_branches",
+          "canon_deltas",
+          "canon_resolved_projections",
+          "canon_versions",
+          "change_set_review_decisions",
+          "change_set_review_heads",
+          "command_receipts",
+          "conflict_resolution_decision_competitors",
+          "conflict_resolution_decisions",
+          "conflict_resolution_heads",
+          "conflict_resolution_lineages",
+          "custom_endpoint",
+          "custom_provider",
+          "custom_provider_model",
+          "execution_attempts",
+          "gate_final_cut_receipts",
+          "gate_greenlight_decisions",
+          "gate_publish_approval_decisions",
+          "gate_script_lock_decisions",
+          "m8_candidate_heads",
+          "m8_candidate_revisions",
+          "m8_command_receipts",
+          "m8_format_plans",
+          "m8_format_profiles",
+          "m8_format_renders",
+          "m8_format_review_packets",
+          "m8_format_semantic_reports",
+          "m8_format_technical_reports",
+          "m8_learning_evaluations",
+          "m8_learning_observation_commands",
+          "m8_learning_observations",
+          "m8_learning_raw_records",
+          "m8_learning_recommendation_decisions",
+          "m8_learning_recommendation_evidence",
+          "m8_learning_recommendations",
+          "m8_overlay_constraint_sets",
+          "m8_promotion_authorizations",
+          "m8_promotion_previews",
+          "m8_promotion_receipts",
+          "m8_spatial_constraint_sets",
+          "m8_spatial_execution_evidence",
+          "m8_spatial_frame_receipts",
+          "m8_spatial_pair_commands",
+          "m8_spatial_pair_decisions",
+          "m8_spatial_pair_heads",
+          "m8_spatial_pair_v2_custody",
+          "m8_spatial_preview_bindings",
+          "m8_spatial_promotion_results",
+          "m8_spatial_review_acknowledgments",
+          "m8_spatial_review_deliveries",
+          "m8_spatial_review_sessions",
+          "master_authorities",
+          "master_head_versions",
+          "narrative_change_sets",
+          "narrative_compilation_attempts",
+          "narrative_compilation_conflict_resolutions",
+          "narrative_compilation_observed_heads",
+          "narrative_compilation_results",
+          "narrative_compilation_selected_change_sets",
+          "narrative_compiled_canon_deltas",
+          "narrative_decision_identities",
+          "narrative_draft_candidates",
+          "narrative_extraction_attempts",
+          "narrative_extraction_result_change_sets",
+          "narrative_extraction_results",
+          "narrative_handoff_admission_observed_heads",
+          "narrative_handoff_admissions",
+          "narrative_plan_versions",
+          "narrative_plans",
+          "narrative_revisions",
+          "operator_resolution_receipts",
+          "production_binding_commands",
+          "production_binding_heads",
+          "production_binding_versions",
+          "production_target_commands",
+          "production_target_heads",
+          "production_target_versions",
+          "project_events",
+          "promotion_receipts",
+          "provider_config",
+          "provider_credential",
+          "provider_observations",
+          "r2_showrunner_grant_events",
+          "r2_showrunner_grant_heads",
+          "revision_acceptance_decisions",
+          "revision_acceptance_heads",
+          "system_setting",
+          "tasks",
+          "users",
+          "worker_lease"
+        ],
+        "witness": "m10-witness"
+      },
+      {
+        "label": "first_upgrade",
+        "version": "65f53650f3a8",
+        "tables": [
+          "adaptation_branches",
+          "adaptation_decisions",
+          "adaptation_evaluation_findings",
+          "adaptation_evaluation_reports",
+          "adaptation_heads",
+          "adaptation_map_entries",
+          "adaptation_map_profile_analysis_refs",
+          "adaptation_maps",
+          "adaptation_profile_sidecars",
+          "adaptation_screenplay_admissions",
+          "adaptation_screenplay_profile_analysis_refs",
+          "adaptation_screenplay_scenes",
+          "adaptation_screenplays",
+          "agent_anthropic_credentials",
+          "agent_session_entries",
+          "agent_session_event_log",
+          "agent_session_summaries",
+          "agent_session_user_message_links",
+          "agent_sessions",
+          "alembic_version",
+          "api_calls",
+          "api_keys",
+          "asset_derivatives",
+          "assets",
+          "attempt_integrity_incidents",
+          "backup_set_media_refs",
+          "backup_sets",
+          "batch_tasks",
+          "batches",
+          "budget_reservations",
+          "budget_scopes",
+          "candidate_objects",
+          "canon_branches",
+          "canon_deltas",
+          "canon_resolved_projections",
+          "canon_versions",
+          "change_set_review_decisions",
+          "change_set_review_heads",
+          "command_receipts",
+          "conflict_resolution_decision_competitors",
+          "conflict_resolution_decisions",
+          "conflict_resolution_heads",
+          "conflict_resolution_lineages",
+          "custom_endpoint",
+          "custom_provider",
+          "custom_provider_model",
+          "execution_attempts",
+          "gate_final_cut_receipts",
+          "gate_greenlight_decisions",
+          "gate_publish_approval_decisions",
+          "gate_script_lock_decisions",
+          "m10_profile_publication_authorizations",
+          "m10_quality_commands",
+          "m10_quality_outbox",
+          "m10_quality_profile_heads",
+          "m10_quality_profile_revisions",
+          "m8_candidate_heads",
+          "m8_candidate_revisions",
+          "m8_command_receipts",
+          "m8_format_plans",
+          "m8_format_profiles",
+          "m8_format_renders",
+          "m8_format_review_packets",
+          "m8_format_semantic_reports",
+          "m8_format_technical_reports",
+          "m8_learning_evaluations",
+          "m8_learning_observation_commands",
+          "m8_learning_observations",
+          "m8_learning_raw_records",
+          "m8_learning_recommendation_decisions",
+          "m8_learning_recommendation_evidence",
+          "m8_learning_recommendations",
+          "m8_overlay_constraint_sets",
+          "m8_promotion_authorizations",
+          "m8_promotion_previews",
+          "m8_promotion_receipts",
+          "m8_spatial_constraint_sets",
+          "m8_spatial_execution_evidence",
+          "m8_spatial_frame_receipts",
+          "m8_spatial_pair_commands",
+          "m8_spatial_pair_decisions",
+          "m8_spatial_pair_heads",
+          "m8_spatial_pair_v2_custody",
+          "m8_spatial_preview_bindings",
+          "m8_spatial_promotion_results",
+          "m8_spatial_review_acknowledgments",
+          "m8_spatial_review_deliveries",
+          "m8_spatial_review_sessions",
+          "master_authorities",
+          "master_head_versions",
+          "narrative_change_sets",
+          "narrative_compilation_attempts",
+          "narrative_compilation_conflict_resolutions",
+          "narrative_compilation_observed_heads",
+          "narrative_compilation_results",
+          "narrative_compilation_selected_change_sets",
+          "narrative_compiled_canon_deltas",
+          "narrative_decision_identities",
+          "narrative_draft_candidates",
+          "narrative_extraction_attempts",
+          "narrative_extraction_result_change_sets",
+          "narrative_extraction_results",
+          "narrative_handoff_admission_observed_heads",
+          "narrative_handoff_admissions",
+          "narrative_plan_versions",
+          "narrative_plans",
+          "narrative_revisions",
+          "operator_resolution_receipts",
+          "production_binding_commands",
+          "production_binding_heads",
+          "production_binding_versions",
+          "production_target_commands",
+          "production_target_heads",
+          "production_target_versions",
+          "project_events",
+          "promotion_receipts",
+          "provider_config",
+          "provider_credential",
+          "provider_observations",
+          "r2_showrunner_grant_events",
+          "r2_showrunner_grant_heads",
+          "revision_acceptance_decisions",
+          "revision_acceptance_heads",
+          "system_setting",
+          "tasks",
+          "users",
+          "worker_lease"
+        ],
+        "witness": "m10-witness"
+      },
+      {
+        "label": "downgrade",
+        "version": "918c4a0e0001",
+        "tables": [
+          "adaptation_branches",
+          "adaptation_decisions",
+          "adaptation_evaluation_findings",
+          "adaptation_evaluation_reports",
+          "adaptation_heads",
+          "adaptation_map_entries",
+          "adaptation_map_profile_analysis_refs",
+          "adaptation_maps",
+          "adaptation_profile_sidecars",
+          "adaptation_screenplay_admissions",
+          "adaptation_screenplay_profile_analysis_refs",
+          "adaptation_screenplay_scenes",
+          "adaptation_screenplays",
+          "agent_anthropic_credentials",
+          "agent_session_entries",
+          "agent_session_event_log",
+          "agent_session_summaries",
+          "agent_session_user_message_links",
+          "agent_sessions",
+          "alembic_version",
+          "api_calls",
+          "api_keys",
+          "asset_derivatives",
+          "assets",
+          "attempt_integrity_incidents",
+          "backup_set_media_refs",
+          "backup_sets",
+          "batch_tasks",
+          "batches",
+          "budget_reservations",
+          "budget_scopes",
+          "candidate_objects",
+          "canon_branches",
+          "canon_deltas",
+          "canon_resolved_projections",
+          "canon_versions",
+          "change_set_review_decisions",
+          "change_set_review_heads",
+          "command_receipts",
+          "conflict_resolution_decision_competitors",
+          "conflict_resolution_decisions",
+          "conflict_resolution_heads",
+          "conflict_resolution_lineages",
+          "custom_endpoint",
+          "custom_provider",
+          "custom_provider_model",
+          "execution_attempts",
+          "gate_final_cut_receipts",
+          "gate_greenlight_decisions",
+          "gate_publish_approval_decisions",
+          "gate_script_lock_decisions",
+          "m8_candidate_heads",
+          "m8_candidate_revisions",
+          "m8_command_receipts",
+          "m8_format_plans",
+          "m8_format_profiles",
+          "m8_format_renders",
+          "m8_format_review_packets",
+          "m8_format_semantic_reports",
+          "m8_format_technical_reports",
+          "m8_learning_evaluations",
+          "m8_learning_observation_commands",
+          "m8_learning_observations",
+          "m8_learning_raw_records",
+          "m8_learning_recommendation_decisions",
+          "m8_learning_recommendation_evidence",
+          "m8_learning_recommendations",
+          "m8_overlay_constraint_sets",
+          "m8_promotion_authorizations",
+          "m8_promotion_previews",
+          "m8_promotion_receipts",
+          "m8_spatial_constraint_sets",
+          "m8_spatial_execution_evidence",
+          "m8_spatial_frame_receipts",
+          "m8_spatial_pair_commands",
+          "m8_spatial_pair_decisions",
+          "m8_spatial_pair_heads",
+          "m8_spatial_pair_v2_custody",
+          "m8_spatial_preview_bindings",
+          "m8_spatial_promotion_results",
+          "m8_spatial_review_acknowledgments",
+          "m8_spatial_review_deliveries",
+          "m8_spatial_review_sessions",
+          "master_authorities",
+          "master_head_versions",
+          "narrative_change_sets",
+          "narrative_compilation_attempts",
+          "narrative_compilation_conflict_resolutions",
+          "narrative_compilation_observed_heads",
+          "narrative_compilation_results",
+          "narrative_compilation_selected_change_sets",
+          "narrative_compiled_canon_deltas",
+          "narrative_decision_identities",
+          "narrative_draft_candidates",
+          "narrative_extraction_attempts",
+          "narrative_extraction_result_change_sets",
+          "narrative_extraction_results",
+          "narrative_handoff_admission_observed_heads",
+          "narrative_handoff_admissions",
+          "narrative_plan_versions",
+          "narrative_plans",
+          "narrative_revisions",
+          "operator_resolution_receipts",
+          "production_binding_commands",
+          "production_binding_heads",
+          "production_binding_versions",
+          "production_target_commands",
+          "production_target_heads",
+          "production_target_versions",
+          "project_events",
+          "promotion_receipts",
+          "provider_config",
+          "provider_credential",
+          "provider_observations",
+          "r2_showrunner_grant_events",
+          "r2_showrunner_grant_heads",
+          "revision_acceptance_decisions",
+          "revision_acceptance_heads",
+          "system_setting",
+          "tasks",
+          "users",
+          "worker_lease"
+        ],
+        "witness": "m10-witness"
+      },
+      {
+        "label": "second_upgrade",
+        "version": "65f53650f3a8",
+        "tables": [
+          "adaptation_branches",
+          "adaptation_decisions",
+          "adaptation_evaluation_findings",
+          "adaptation_evaluation_reports",
+          "adaptation_heads",
+          "adaptation_map_entries",
+          "adaptation_map_profile_analysis_refs",
+          "adaptation_maps",
+          "adaptation_profile_sidecars",
+          "adaptation_screenplay_admissions",
+          "adaptation_screenplay_profile_analysis_refs",
+          "adaptation_screenplay_scenes",
+          "adaptation_screenplays",
+          "agent_anthropic_credentials",
+          "agent_session_entries",
+          "agent_session_event_log",
+          "agent_session_summaries",
+          "agent_session_user_message_links",
+          "agent_sessions",
+          "alembic_version",
+          "api_calls",
+          "api_keys",
+          "asset_derivatives",
+          "assets",
+          "attempt_integrity_incidents",
+          "backup_set_media_refs",
+          "backup_sets",
+          "batch_tasks",
+          "batches",
+          "budget_reservations",
+          "budget_scopes",
+          "candidate_objects",
+          "canon_branches",
+          "canon_deltas",
+          "canon_resolved_projections",
+          "canon_versions",
+          "change_set_review_decisions",
+          "change_set_review_heads",
+          "command_receipts",
+          "conflict_resolution_decision_competitors",
+          "conflict_resolution_decisions",
+          "conflict_resolution_heads",
+          "conflict_resolution_lineages",
+          "custom_endpoint",
+          "custom_provider",
+          "custom_provider_model",
+          "execution_attempts",
+          "gate_final_cut_receipts",
+          "gate_greenlight_decisions",
+          "gate_publish_approval_decisions",
+          "gate_script_lock_decisions",
+          "m10_profile_publication_authorizations",
+          "m10_quality_commands",
+          "m10_quality_outbox",
+          "m10_quality_profile_heads",
+          "m10_quality_profile_revisions",
+          "m8_candidate_heads",
+          "m8_candidate_revisions",
+          "m8_command_receipts",
+          "m8_format_plans",
+          "m8_format_profiles",
+          "m8_format_renders",
+          "m8_format_review_packets",
+          "m8_format_semantic_reports",
+          "m8_format_technical_reports",
+          "m8_learning_evaluations",
+          "m8_learning_observation_commands",
+          "m8_learning_observations",
+          "m8_learning_raw_records",
+          "m8_learning_recommendation_decisions",
+          "m8_learning_recommendation_evidence",
+          "m8_learning_recommendations",
+          "m8_overlay_constraint_sets",
+          "m8_promotion_authorizations",
+          "m8_promotion_previews",
+          "m8_promotion_receipts",
+          "m8_spatial_constraint_sets",
+          "m8_spatial_execution_evidence",
+          "m8_spatial_frame_receipts",
+          "m8_spatial_pair_commands",
+          "m8_spatial_pair_decisions",
+          "m8_spatial_pair_heads",
+          "m8_spatial_pair_v2_custody",
+          "m8_spatial_preview_bindings",
+          "m8_spatial_promotion_results",
+          "m8_spatial_review_acknowledgments",
+          "m8_spatial_review_deliveries",
+          "m8_spatial_review_sessions",
+          "master_authorities",
+          "master_head_versions",
+          "narrative_change_sets",
+          "narrative_compilation_attempts",
+          "narrative_compilation_conflict_resolutions",
+          "narrative_compilation_observed_heads",
+          "narrative_compilation_results",
+          "narrative_compilation_selected_change_sets",
+          "narrative_compiled_canon_deltas",
+          "narrative_decision_identities",
+          "narrative_draft_candidates",
+          "narrative_extraction_attempts",
+          "narrative_extraction_result_change_sets",
+          "narrative_extraction_results",
+          "narrative_handoff_admission_observed_heads",
+          "narrative_handoff_admissions",
+          "narrative_plan_versions",
+          "narrative_plans",
+          "narrative_revisions",
+          "operator_resolution_receipts",
+          "production_binding_commands",
+          "production_binding_heads",
+          "production_binding_versions",
+          "production_target_commands",
+          "production_target_heads",
+          "production_target_versions",
+          "project_events",
+          "promotion_receipts",
+          "provider_config",
+          "provider_credential",
+          "provider_observations",
+          "r2_showrunner_grant_events",
+          "r2_showrunner_grant_heads",
+          "revision_acceptance_decisions",
+          "revision_acceptance_heads",
+          "system_setting",
+          "tasks",
+          "users",
+          "worker_lease"
+        ],
+        "witness": "m10-witness"
+      }
+    ],
+    "raw_refusals": [
+      {
+        "table": "m10_profile_publication_authorizations",
+        "operation": "UPDATE",
+        "result": "M10_IMMUTABLE_PUBLICATION_ROW"
+      },
+      {
+        "table": "m10_profile_publication_authorizations",
+        "operation": "DELETE",
+        "result": "M10_IMMUTABLE_PUBLICATION_ROW"
+      },
+      {
+        "table": "m10_quality_profile_revisions",
+        "operation": "UPDATE",
+        "result": "M10_IMMUTABLE_PUBLICATION_ROW"
+      },
+      {
+        "table": "m10_quality_profile_revisions",
+        "operation": "DELETE",
+        "result": "M10_IMMUTABLE_PUBLICATION_ROW"
+      },
+      {
+        "table": "m10_quality_outbox",
+        "operation": "UPDATE",
+        "result": "M10_IMMUTABLE_PUBLICATION_ROW"
+      },
+      {
+        "table": "m10_quality_outbox",
+        "operation": "DELETE",
+        "result": "M10_IMMUTABLE_PUBLICATION_ROW"
+      },
+      {
+        "table": "m10_quality_commands",
+        "operation": "UPDATE",
+        "result": "M10_IMMUTABLE_PUBLICATION_ROW"
+      },
+      {
+        "table": "m10_quality_commands",
+        "operation": "DELETE",
+        "result": "M10_IMMUTABLE_PUBLICATION_ROW"
+      }
+    ],
+    "container_id": "7054b022866b352bfb899580f74850c41ae1259a8f1d73c66f77ac1f9e38b588",
+    "container_name": "r2-m10-a3-schema-569de3e3",
+    "server_version": "18.6",
+    "cleanup": "owned container, anonymous volume and private credentials removed"
+  },
+  "static_gate_outputs": {
+    "ruff": "All checks passed!\n",
+    "format": "2028 files already formatted\n",
+    "types": "0 errors, 0 warnings, 0 notes\n",
+    "imports": "\n╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐\n╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │\n ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗\n ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝\n╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║\n╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝\n  └──▶║║                    ▲ \n      ╚╝────────────────────┘\n\n\n---------\nContracts\n---------\n\nAnalyzed 572 files, 2047 dependencies.\n--------------------------------------\n\nlib.config / lib.*_backends / lib.custom_provider 分层契约 KEPT\nComfyUI 端点实现不依赖声明式运行时 KEPT\nComfyUI 顶层实现模块不直接依赖声明式运行时 KEPT\n路线中立层不依赖参考生视频子包 KEPT\nC04 R2 预算端口不直连 Host DB 层 KEPT\nM4 稳定契约不依赖生产层 KEPT\nM4 Method Router 不回依赖下游或能力层 KEPT\nM4 CapabilityRegistry 不改写 MethodDecision（不 import method_router） KEPT\nM4 生产智能层不直连 Host DB 层 KEPT\nM4 PromptCompiler 只做翻译不做路由 KEPT\nR2 learning core does not depend on Host persistence KEPT\nR2 narrative core does not depend on Host persistence KEPT\nR2 narrative plan authority does not depend on Host persistence KEPT\nM5B NarrativePlanService cannot reach Canon authoritative writes KEPT\nM5B narrative context is read-only and persistence-neutral KEPT\nR2 narrative lifecycle pure ports are authority- and persistence-free KEPT\nM5C narrative evidence service holds no head-mutation capability KEPT\nM5C-2 sole head writer: only acceptance.py may append decisions or mutate heads KEPT\nM5C-3 compiler purity: no authority write port, repository, UoW, or Canon \nservice KEPT\nM5C repositories cannot import or write M5A Canon ORM models KEPT\nM6 adaptation evidence service holds no head-mutation capability KEPT\nM6 adaptation authority service carries no persistence, Canon, or provider \nimport KEPT\nM6 adaptation authority kernel carries no persistence, Canon, or provider importKEPT\n\nContracts: 23 kept, 0 broken.\n",
+    "dependencies": "Assuming the corresponding module name of package 'mutmut' is 'mutmut'. Install the package or configure a package_module_name_map entry to override this behaviour.\nScanning 2023 files...\n\n\u001b[1m\u001b[32mSuccess! No dependency issues found.\u001b[m\n",
+    "audit": "闸门通过：0 处违规\n"
+  },
+  "evidence": [
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/a3-sealed-postgres-target.json",
+      "sha256": "88a1239b84d95a09de1f8d5c892ee39c77f60f50238b046fdbc1b71189657855"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/a3-sealed-postgres.xml",
+      "sha256": "7261cafb38d642b1c2a0e2ae0363572f28897cc68cf425528db44e436c9d305b"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/a3-sealed-postgres.log",
+      "sha256": "d601398bbaec37ee81c7d647e6d5b204d6c25a6164dc1b0c3a0e95347aabf890"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/schema-postgres.json",
+      "sha256": "3d73404c05d0e2d72bc20998543f96c9272c56a3defec8dde558c91f4a0a20dc"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/schema-postgres.log",
+      "sha256": "b3c42c0bac38ded6ad4621a71428ca03d912b5d34aa89f9bad8f4897d3ac1f5f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/schema.xml",
+      "sha256": "6d56f626857efe9bbf7231df0f8693de8c886df392e6d14ce3fd7d92c0170fea"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/render-environment-probe.xml",
+      "sha256": "5efa03466c86058d5c7f50b65838ecb95f6e2b9b0f35aeca7931d90a775138d2"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/render-test-environment.json",
+      "sha256": "a60a37c39a192310121813e24fecbf946bee1b62eeff98efe7ebcae5eac8d95a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-schema-failures.json",
+      "sha256": "6fa293e03dec23607edb651d191ac4eee033ec282fe54f36fa8e50cc1a815d9c"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/repository-read-repair-red.log",
+      "sha256": "c1ea595b9c2ba988caf0e39c22c275eccd40e01fc26082af035b0835817ac75f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/repository-lease-red.log",
+      "sha256": "998ebdd37a15eb3cd5db67a2e131791c018ad2f8be31499f4b495bfa75ca5a4a"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/custodian-issuer-red.log",
+      "sha256": "3cccc089a3e1f5711a3696cf6b748bfb01399b6a68e27f1a9f918eb7baa4ed76"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/publisher-red.log",
+      "sha256": "ad811b1de0c0903ac84b0db18cac5c473c5e521fe15b5e6e15d1dd591a2d0be8"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-short-state.json",
+      "sha256": "f6c982b19995f51c494b574ee733c655cfef28dc2b4b49598605d9a9a6da578b"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-short.xml",
+      "sha256": "21c419bba9f1902af6738a255d50bf69c668ea3b58b950bc129bd1bb6a5d0a30"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-short.log",
+      "sha256": "0a8da8e89e0387f468495a496d019b0d9673edff4ef70de34a36bbc29e7c10e5"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/implementation-source-review.json",
+      "sha256": "94573f58376c5f1bba0db31d9d1b8762f7b205520261af1c43cf3caf28de09cb"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/main-review-adjudication.json",
+      "sha256": "86c7683b1f2e9dd866c13cd048bfdba4d16f28ba9a22f53d96d2fd4a86220e35"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/source-final-scope.json",
+      "sha256": "c8c4ad5a6aae4ff892bf00c6b4933fb206879c379727c6b228ec7e12a2759df0"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/render-concurrency-environment.json",
+      "sha256": "b4a9674bce42a4f27defbdcff65676c567180a9ccd7e138f36f73dfcddb978be"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/render-concurrency-probe.xml",
+      "sha256": "3e879ed3e09135b7ea0050762fde1f24ff265cce62c368961339b43b0097786f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/review-graph-coverage.json",
+      "sha256": "c975f08cd02dc3c603c80a14015b6cb8fbd1c051d051cd660f5ddfff358de149"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-verified-state.json",
+      "sha256": "c2791a3e7218fb316db14f1ff181617bc05294022c737f70410d2a09d59936cb"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-verified.xml",
+      "sha256": "cdceb80521afdb525f674d993732f45b121220c54a24b3f5fd4946291e6b3dc5"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/remotion-determinism-diagnostic.json",
+      "sha256": "d3470db6b26f0793d46e8758d600782899b3baf39f74087a8ee9293ca63e02bf"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/serial-encoding-probe-state.json",
+      "sha256": "16bdb448b4e8027bd8bafebd7e61bfe7f0a792df7ac6f36891466a366ad27b9f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/serial-encoding-probe.xml",
+      "sha256": "2703768e04fac352fb95b95f1f07268e2dbf87e9104673768afcbf1c8a681caa"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/serial-encoding-repeats.json",
+      "sha256": "d0f8994eda9739386f66c1a23a8db9ea6b867b437940358d823e717a3cd761a5"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/serial-encoding-repeat-2.xml",
+      "sha256": "eeb50bd5315f6ef08f2169e698c7f65224053332e995be416acc575f1fb2792e"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/serial-encoding-repeat-3.xml",
+      "sha256": "bca02f11ff56b50531e892821725669641938b881702799c4fd38b67add0d9d8"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/render-short-environment.json",
+      "sha256": "ee7268f99e335a87a18b8758731fccf7c5c8076ca1644aead21ecfefad07d190"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-sealed-state.json",
+      "sha256": "73dc16b1c413b0a1caaf323667b6297095362858ac0cec52f85407cdcc1f12cf"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-sealed.xml",
+      "sha256": "0bb126f6123919ab2e665af991afdab38adfe165ad3fc28460edcf3a87bbc7df"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-sealed-failures.json",
+      "sha256": "20d00c93356d972083a7b6af80b42175f77bc2bdf98edc1c08dcbabc0d24a213"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-sealed-resource-snapshot.json",
+      "sha256": "68e9a03c7ca13aa79d50788c297394a68be60c8a1fcd630058f0263b19839158"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/disk-test-environment.json",
+      "sha256": "22a91bc19bccc56f5cbd6ecad86d6386bd13b8691d202bfc49eb62251a6fb105"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/render-short-environment.json",
+      "sha256": "ee7268f99e335a87a18b8758731fccf7c5c8076ca1644aead21ecfefad07d190"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-disk-state.json",
+      "sha256": "b5c8f75017854221f43a8ef7c794944489c434f4d17605ca63cd7cb8e49797fb"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-disk.xml",
+      "sha256": "6c45f4f750c93016620b6505baae709eb249ff9232d5f67db685db5281ebed31"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-disk-failures.json",
+      "sha256": "e6d061287ca62ca00d4a052a1951eed1f453512bd52bfdc05d1bbda64d438331"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/short-disk-test-environment.json",
+      "sha256": "5b51336d7811dfb8c33949d0a2eead41c426e2709931e7cbc6b2fc849d605c94"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/short-disk-custody-probe.json",
+      "sha256": "0e48d30d0fdd9317b297f51a27c087025cba881d55f99e8165d2279970bb3c31"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/short-disk-custody-probe.xml",
+      "sha256": "520e2b1e0de5882a8fd4aa0fad8d1e9bd9169a67d0e77b9dd7fcfdf9ba4aa5b5"
+    },
+    {
+      "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/long-disk-job-cleanup.json",
+      "sha256": "440103556b00b13e61a983283b613568754b87981ed33160fbe19368e966fcd0"
+    }
+  ],
+  "backend_gate": {
+    "status": "PASS_ON_FROZEN_SOURCE",
+    "state": {
+      "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+      "source_hashes": {
+        "alembic/versions/65f53650f3a8_quality_profile_publication.py": "1b44542dee31571e39289379c10a9eec0af74091df470e262133c62c6c68d31d",
+        "lib/db/models/__init__.py": "82fe14ce615261d66aee8f10aebddbe6dc6ec67e1099b5f4165fe548a597d1ae",
+        "lib/db/models/quality.py": "e4b2e5eafad747ca163146346b17b585f1d0f337c9d75e29d9027d13198206e0",
+        "lib/db/repositories/quality.py": "37974aa89e49f120b3b6fc218b0abe5b85de7ea8a69644faf9e2ecb6ef214b47",
+        "r2/quality/profiles.py": "e157186cb62cd7beae029767e6d92c03278e2341055f24f6d37ac0a25d98c3d8",
+        "scripts/r2/verify_m10_a3_scope.py": "071e0ed119cb1748cba9ec883152edc3b278c5fd0bf8dfc6783be448f1c14269",
+        "server/services/quality_profile_custodian.py": "649213b31abcb89738a5ed99ea5d6e1655b08e4c85cdeebf76dad254f3e30673",
+        "server/services/quality_profiles.py": "51b9c22fb09a4fc608a8170972205db625d5d84c42e7e71c2e93a88e6d7935b0",
+        "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py": "477de3278457a421d5c033a07ea80a7ffa35b6ac77658879114e847cd517f972",
+        "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py": "9d2c9eaff59744ae0c3add7831dbcbae262102e31c2068d19ecfa9d2ddba4d4a",
+        "tests/integration/lib/db/migrations/test_format_projections.py": "a2275cefd205ed4e7fca98ccaf8252c1da4ff560951de51483c4fa46e7791831",
+        "tests/integration/lib/db/migrations/test_learning_observations.py": "e7c8f3d988dad3cf5c391df0ef0615e4b6e685f3a89adea787078b3d62a3b9e0",
+        "tests/integration/lib/db/migrations/test_production_binding_authority.py": "4733921fa197d153d0f21dcafa64db9511bdc77565373f5ee7361667e09c608f",
+        "tests/integration/lib/db/migrations/test_production_target_registry.py": "441edd199de26eff233fc9b3d0f3973da10c08c0f427ecf19d572fbe1ea0ae00",
+        "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py": "d0c238953f3ad468b8eb8c70226485374b7461d6a5511bf49c92edc0b4060117",
+        "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py": "e3bc00ba18961948f9bc1e183b7db9510e0504289481793c8f016bea2f567381",
+        "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py": "8595fc52d626e18a9994a41a02da2ccb2f907eecce7c74762f1471519b651f5a",
+        "tests/integration/lib/db/migrations/test_spatial_pair_authority.py": "10abdbb7c62a692b92f4b2798fb9244d671a62218eabef6411a420a312dc8213",
+        "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py": "8ac94f986f548c7564545f0faa66b20ab80dda92e63081313b77c56700ed9d66",
+        "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py": "fbfdb1faf551c4d2213e60298adaa9ba6d6e58c41bcd062c4cce8ee1163a332f",
+        "tests/integration/lib/db/migrations/test_spatial_review_custody.py": "e2d50cee359b36c701af1473233f448de3308ed3cf87d39e65c23a26db028eed",
+        "tests/integration/lib/db/repositories/test_quality_profiles_repository.py": "27ad5d134a6c2fa33e03bebbc70f70607d73b1f16daba1911206802eadf8c5e0",
+        "tests/integration/scripts/r2/test_verify_m10_a3_scope.py": "d7b4a8a890382cd90fee79a7be29a5e6af883f4d7617eae98f9951a2f4c9289b",
+        "tests/integration/server/services/test_quality_profile_custodian.py": "de0cf7a136b88b72fd84c2f25e1ee084d906d05b1b461295f6af4e33c3a3e46b",
+        "tests/integration/server/services/test_quality_profiles.py": "16dc1bf79b86589f0268b3f0c231f9dfb06638b3fbeae076cfab76913f4f93f8",
+        "tests/unit/r2/quality/test_quality_profiles.py": "feb4e0db845118864487a10c4e6f8c3abef764b8e4d9f97ee7ab1530606999a7",
+        "tests/unit/scripts/r2/test_verify_m10_a3_scope.py": "d9cd107aeb1ec287d26f887c9f581f5a790e339e13a46225de87f5a82411c85a"
+      },
+      "source_clean_at_start": true,
+      "render_environment": {
+        "status": "QUALIFIED_TEST_ENVIRONMENT_ONLY",
+        "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+        "real_npx": "/usr/bin/npx",
+        "real_node": "/usr/bin/node",
+        "wrapper": "/home/anhtuan/content-production-os/.worktrees/r2-m10-v2/.superpowers/sdd/2026-10-27-r2-m10-a3/render-serial-encoding-bin/npx",
+        "wrapper_sha256": "05b64d879dfc7e3879e3dc04c150b9696c4deafeeaed3a9051527ad4b5dce0b1",
+        "effective_change": "Only real npx remotion render receives supported --concurrency=2 --disallow-parallel-encoding; real Node has all CPUs. Inputs/outputs/assertions/timeouts/source unchanged. Fixed encoding mode removes installed renderer availableRAM-dependent mode switch.",
+        "production_configuration_changed": false,
+        "primary_sources": {
+          "vendor/openmontage/remotion-composer/node_modules/@remotion/renderer/dist/options/disallow-parallel-encoding.js": "8af4ed853dda30ed3fe6a46fa5e27c7f7c4fe39bb952bc9335956001efa6d6e1",
+          "vendor/openmontage/remotion-composer/node_modules/@remotion/renderer/dist/render-media.js": "0b067ea79e34837f87e2c6da670b842004094e79b83154b2d08bb8a09de76456",
+          "vendor/openmontage/remotion-composer/node_modules/@remotion/renderer/dist/prestitcher-memory-usage.js": "57ec85b755cfaddbfbcd600501c0082607e425b264ca935a96fa46c291650e88",
+          "vendor/openmontage/remotion-composer/node_modules/@remotion/renderer/dist/stitch-frames-to-video.js": "8bfb26ea18017a9f300a48e3db64f1effa45b2baca0d043819618a61f337306b"
+        },
+        "qualification": "3independent original byte-identical assertion passes; failed22bytemetadatawitnesspacket&decodedframehashesequal; no normalization or skipped assertion.",
+        "scratch_root": "/home/anhtuan/.m10-zc1aciaq",
+        "TMPDIR": "/home/anhtuan/.m10-zc1aciaq/t",
+        "pytest_basetemp": "/home/anhtuan/.m10-zc1aciaq/p",
+        "scratch_filesystem": "ext4 disk, not RAM-backed tmpfs",
+        "prior_tmpfs_diagnostic": "backend-sealed:7.2GiBownedpytestdataon/tmp;7ChromePageCrashesOrScreenshotOutOfMemoryDiskFailures;notacceptance",
+        "scratch_mode": "0o700",
+        "scratch_ancestors": {
+          "/home": "0o755",
+          "/home/anhtuan": "0o750",
+          "/home/anhtuan/.m10-zc1aciaq": "0o700"
+        },
+        "tmp_path_retention_policy": "failed",
+        "custody_fixture_qualification": {
+          "tests": 46,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3
+        },
+        "previous25failedcases_now_pass": true,
+        "security_checks_weakened": false,
+        "monitoring": "Read entire progress log every5s; report failure markers immediately; XML/completedexit remain authority."
+      },
+      "command": [
+        "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-n",
+        "4",
+        "--dist",
+        "loadfile",
+        "--ff",
+        "--maxfail=1",
+        "-o",
+        "tmp_path_retention_policy=failed",
+        "--basetemp=/home/anhtuan/.m10-zc1aciaq/p",
+        "--junitxml=.superpowers/sdd/2026-10-27-r2-m10-a3/backend-short.xml"
+      ],
+      "test_order": "--ff onlyreorders knownfailures; nofailfast;alltestsexecute; unchangedassertionsandtimeouts.",
+      "exit_code": 0,
+      "source_head_after": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+      "dirty_paths_after": [],
+      "source_hashes_unchanged": true
+    },
+    "counts": {
+      "tests": 18671,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 222
+    },
+    "skip_details": [
+      {
+        "class": "tests.integration.lib.test_script_generator_incremental.TestWorkflowSeesTheSameRevisions",
+        "name": "test_plan_omitting_defaulted_fields_still_matches[drama]",
+        "reason": "drama 的脚本规划没有草稿模型，两侧消费的都是磁盘原文"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_publishes_exact_candidate_under_one_archive_lock",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_denies_divergent_ledger_before_archive_mutation",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_rereads_public_files_after_final_database_await",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_quarantines_different_complete_candidate",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_quarantines_unknown_archive_entry[staging]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_quarantines_unknown_archive_entry[orphan]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[file_written-checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[file_written-high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[file_fsync-checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[file_fsync-high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[staging_fsync-checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[staging_fsync-high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[link_created-checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[link_created-high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[link_fsync-checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[link_fsync-high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[stage_unlinked-checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[stage_unlinked-high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[unlink_fsync-checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_retained_write_interruption[unlink_fsync-high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_public_write_interruption[file_written-public_high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_public_write_interruption[file_written-public_checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_public_write_interruption[file_fsync-public_high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_public_write_interruption[file_fsync-public_checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_public_write_interruption[renamed-public_high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_public_write_interruption[renamed-public_checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_public_write_interruption[directory_fsync-public_high_water]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_candidate_publisher_resumes_each_public_write_interruption[directory_fsync-public_checkpoint]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_complete_retry_fsyncs_staging_after_interrupted_unlink[publication_unlinked]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_complete_retry_fsyncs_staging_after_interrupted_unlink[linked_cleanup_unlinked]",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_publish",
+        "name": "test_pg_two_publisher_processes_serialize_on_archive_lock",
+        "reason": "candidate publisher requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_execution_attempt_repository",
+        "name": "test_concurrent_lease_acquisition_has_exactly_one_winner",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_execution_attempt_repository",
+        "name": "test_request_cancel_concurrent_commands_has_exactly_one_winner",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.adaptation.test_screenplay_admission",
+        "name": "test_bound_reader_holds_admission_head_until_caller_transaction_ends",
+        "reason": "row-lock interleaving requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.adaptation.test_screenplay_admission",
+        "name": "test_two_concurrent_admissions_of_the_same_proposal_yield_one_winner",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.server.services.test_governance_attestation",
+        "name": "test_pg_real_socket_attests_current_archive_and_reopens_each_start",
+        "reason": "attestor requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_governance_attestation",
+        "name": "test_pg_real_socket_denies_coherent_old_public_against_retained_successor",
+        "reason": "attestor requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_governance_attestation",
+        "name": "test_pg_attestor_denies_while_publisher_holds_archive_lock",
+        "reason": "attestor requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_round_trip_restores_a_verified_deployment_without_credentials",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_capture_refuses_while_a_task_is_active",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_capture_refuses_while_another_client_is_connected",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_capture_refuses_links_and_special_files",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_restore_refuses_an_altered_set_and_a_non_empty_target",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_failed_verification_does_not_poison_the_set",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_verification_resolves_selected_versions_and_artifact_manifests",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_attestation_requires_matching_passing_golden_evidence",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_database_password_never_reaches_tool_argv",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_capture_detects_changes_made_while_capturing[sequence-a sequence advanced]",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_capture_detects_changes_made_while_capturing[row-the database was written]",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_capture_detects_changes_made_while_capturing[file-data-root files changed]",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_capture_detects_changes_made_while_capturing[truncate-truncated, rewritten or altered]",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_capture_detects_changes_made_while_capturing[alter-truncated, rewritten or altered]",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_credential_files_are_never_captured_in_any_root",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_a_verified_state_without_its_attestation_is_not_restorable",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_verification_flags_a_current_record_without_a_file_and_projects_without_metadata",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_an_attested_target_cannot_be_reverified_and_attested_files_are_tamper_checked",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_attesting_with_a_corrupt_verdict_is_rejected",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_autovacuum_style_maintenance_during_capture_is_not_a_write",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_a_manifest_of_an_older_schema_version_is_not_restorable",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_deployment_backup",
+        "name": "test_an_unreadable_state_ledger_is_reported_as_an_integrity_error",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.narrative_lifecycle.test_handoff_admission",
+        "name": "test_a_supersession_concurrent_with_validation_cannot_land_invisibly",
+        "reason": "this race needs two real connections and row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.narrative_lifecycle.test_handoff_admission",
+        "name": "test_a_concurrent_duplicate_admission_replays_the_original_receipt",
+        "reason": "this race needs two real connections and row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profile_custodian",
+        "name": "test_real_activated_issuer_persists_action_receipt_and_admits_under_current_grant",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profile_custodian",
+        "name": "test_data_lease_and_unactivated_wrapper_cannot_admit",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profile_custodian",
+        "name": "test_revoked_current_grant_refuses_existing_action_lease",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profile_custodian",
+        "name": "test_final_admission_rechecks_jwt_after_authority_io",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profile_custodian",
+        "name": "test_final_admission_refuses_a_forged_action_lease[authorization_id]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profile_custodian",
+        "name": "test_final_admission_refuses_a_forged_action_lease[policy_id]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profile_custodian",
+        "name": "test_final_admission_refuses_a_forged_action_lease[subject_digest]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_narrative_lifecycle",
+        "name": "test_composite_basis_fk_rejects_an_incompatible_revision_link",
+        "reason": "the SQLite test engine runs with foreign keys disabled"
+      },
+      {
+        "class": "tests.integration.scripts.r2.test_backfill_master_authority",
+        "name": "test_a_gate_c_approval_between_the_head_check_and_the_promotion_is_not_overwritten",
+        "reason": "row locks between sessions need PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_narrative_lifecycle",
+        "name": "test_head_pointer_fk_rejects_a_decision_from_another_subject",
+        "reason": "the SQLite test engine runs with foreign keys disabled"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[empty]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[issue_match]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[two_scope_match]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[revoke_match]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[old_checkpoint]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[restored_before_revoke]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[missing_scope]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[extra_scope]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[empty_head]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[corrupt_event]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[corrupt_digest]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[corrupt_second_scope]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[wrong_signature]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[malformed_checkpoint]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_snapshot_compares_all_signed_heads[loader_failure]",
+        "reason": "full recovery scan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_recovery_snapshot",
+        "name": "test_pg_recovery_loader_runs_after_waiting_import_commits",
+        "reason": "requires PostgreSQL transaction advisory locks"
+      },
+      {
+        "class": "tests.integration.server.routers.test_spatial_execution",
+        "name": "test_pg_concurrent_identical_commands_write_one_revision",
+        "reason": "concurrent attempt admission requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.routers.test_spatial_frame_registration",
+        "name": "test_two_parents_racing_one_command_have_one_typed_conflict",
+        "reason": "cross-parent unique-key races require PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_host_hardening_promotion",
+        "name": "test_concurrent_promotion_has_exactly_one_winner",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_host_hardening_promotion",
+        "name": "test_a_promotion_waits_on_a_held_authority_row_before_appending_history",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_genesis_head_advance_scoped_read_and_historical_exact_replay",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_same_full_command_key_with_changed_semantics_conflicts",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_profile_lineage_cannot_change_genesis_cohort_or_surface[changes0]",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_profile_lineage_cannot_change_genesis_cohort_or_surface[changes1]",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_non_genesis_request_cannot_create_genesis",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_rollback_leaves_no_partial_publication_outputs",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_full_stored_bodies_and_duplicated_columns_are_revalidated[m10_quality_profile_revisions-policy_digest]",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_full_stored_bodies_and_duplicated_columns_are_revalidated[m10_quality_commands-result_digest]",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_full_stored_bodies_and_duplicated_columns_are_revalidated[m10_profile_publication_authorizations-subject_digest]",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_outbox_contains_only_bounded_publication_metadata",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_unissued_lease_cannot_stage_publication",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_oversized_request_is_rejected_before_any_sql",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_forged_lease_shape_has_sanitized_error_before_storage",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_quality_profiles_repository",
+        "name": "test_direct_profile_read_resolves_action_receipt_beyond_recomputed_digest_columns",
+        "reason": "authoritative publication requires real PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_advanced_creative",
+        "name": "test_concurrent_genesis_has_one_winner",
+        "reason": "concurrent appends need PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_advanced_creative",
+        "name": "test_concurrent_appends_on_one_head_have_one_winner",
+        "reason": "concurrent appends need PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_advanced_creative",
+        "name": "test_concurrent_replays_of_one_command_write_once",
+        "reason": "concurrent appends need PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_advanced_creative",
+        "name": "test_the_database_refuses_an_authorization_bound_to_a_preview_of_another_scope",
+        "reason": "SQLite test databases do not enforce foreign keys"
+      },
+      {
+        "class": "tests.integration.server.routers.test_spatial_frame_reader",
+        "name": "test_caller_session_lock_blocks_parent_approval_on_postgres",
+        "reason": "row-lock interleaving requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.routers.test_spatial_frame_reader",
+        "name": "test_current_reader_holds_parent_lock_through_frame_snapshot_on_postgres",
+        "reason": "row-lock interleaving requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_actual_human_publication_and_receipt_first_replay_after_archive_disappears",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_driver_crash_cuts_leave_zero_partial_state_or_exact_committed_replay[revision]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_driver_crash_cuts_leave_zero_partial_state_or_exact_committed_replay[head]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_driver_crash_cuts_leave_zero_partial_state_or_exact_committed_replay[receipt]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_driver_crash_cuts_leave_zero_partial_state_or_exact_committed_replay[event]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_driver_crash_cuts_leave_zero_partial_state_or_exact_committed_replay[before_commit]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_driver_crash_cuts_leave_zero_partial_state_or_exact_committed_replay[after_commit]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_revocation_and_publication_have_both_real_lock_orders[publication_first]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_revocation_and_publication_have_both_real_lock_orders[revocation_first]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_forced_hash_collision_serializes_without_merging_full_command_keys",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_overlapping_publications_replay_or_compare_and_set_once[same_command]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_overlapping_publications_replay_or_compare_and_set_once[genesis_cas]",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_lease_expiring_behind_held_profile_lock_uses_final_database_time",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_quality_profiles",
+        "name": "test_session_token_is_absent_from_all_durable_json_and_master_locks",
+        "reason": "activated Human publication requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_learning",
+        "name": "test_concurrent_corrections_of_one_tip_have_one_winner",
+        "reason": "concurrent admission needs PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_learning",
+        "name": "test_concurrent_originals_of_one_identity_have_one_winner",
+        "reason": "concurrent admission needs PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_learning",
+        "name": "test_identical_concurrent_corrections_replay_instead_of_conflicting",
+        "reason": "concurrent admission needs PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.r2.host_hardening.test_master_authority_unit",
+        "name": "test_a_projection_holds_the_artifact_until_it_commits",
+        "reason": "row-level write locks between sessions need PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.advanced_creative.test_promotion_atomicity",
+        "name": "test_concurrent_promotions_of_one_preview_have_one_winner",
+        "reason": "row locks between sessions need PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_importer",
+        "name": "test_pg_head_fk_cannot_point_to_another_projects_event",
+        "reason": "requires PostgreSQL foreign keys"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_importer",
+        "name": "test_pg_session_timezone_cannot_activate_future_grant",
+        "reason": "requires PostgreSQL session timezone"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_importer",
+        "name": "test_pg_first_writer_serializes_same_grant_event[False]",
+        "reason": "requires PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_importer",
+        "name": "test_pg_first_writer_serializes_same_grant_event[True]",
+        "reason": "requires PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_importer",
+        "name": "test_pg_revoke_waits_for_current_grant_reader",
+        "reason": "requires PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_offline_preflight_keeps_one_exact_archive_snapshot_through_ledger_scan",
+        "reason": "operator preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_offline_preflight_denies_old_public_pair_against_newer_retained_archive",
+        "reason": "operator preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_offline_preflight_denies_committed_grant_absent_from_checkpoint",
+        "reason": "operator preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_offline_preflight_denies_public_change_after_database_scan",
+        "reason": "operator preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_public_startup_verifies_copies_and_ledger_without_archive_access",
+        "reason": "public startup requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_public_startup_denies_committed_grant_missing_from_checkpoint",
+        "reason": "public startup requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_public_startup_denies_public_replace_after_scan",
+        "reason": "public startup requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_activated_lifespan_denies_stale_ledger_before_db_mutation_or_readiness",
+        "reason": "activated startup requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_preflight",
+        "name": "test_pg_activated_lifespan_quarantines_coherent_old_public_and_database",
+        "reason": "activated startup requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_learning_recommendations",
+        "name": "test_concurrent_final_decisions_have_one_winner",
+        "reason": "concurrent decisions need PostgreSQL locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_reconcile",
+        "name": "test_pg_reconciles_complete_retained_archive_after_full_scan[previous]",
+        "reason": "operator reconciliation requires PostgreSQL schema preflight"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_reconcile",
+        "name": "test_pg_reconciles_complete_retained_archive_after_full_scan[new_high_water]",
+        "reason": "operator reconciliation requires PostgreSQL schema preflight"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_reconcile",
+        "name": "test_pg_divergent_committed_ledger_denies_before_public_replacement",
+        "reason": "operator reconciliation requires PostgreSQL schema preflight"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_reconcile",
+        "name": "test_pg_retry_after_high_water_public_write_completes_pair",
+        "reason": "operator reconciliation requires PostgreSQL schema preflight"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_reconcile",
+        "name": "test_pg_public_temporary_recovery_requires_exact_retained_bytes[True-high-water]",
+        "reason": "operator reconciliation requires PostgreSQL schema preflight"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_reconcile",
+        "name": "test_pg_public_temporary_recovery_requires_exact_retained_bytes[True-checkpoint]",
+        "reason": "operator reconciliation requires PostgreSQL schema preflight"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_reconcile",
+        "name": "test_pg_public_temporary_recovery_requires_exact_retained_bytes[False-high-water]",
+        "reason": "operator reconciliation requires PostgreSQL schema preflight"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_reconcile",
+        "name": "test_pg_public_temporary_recovery_requires_exact_retained_bytes[False-checkpoint]",
+        "reason": "operator reconciliation requires PostgreSQL schema preflight"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_checkpointed_grant_reader",
+        "name": "test_pg_checkpointed_reader_serializes_with_import_and_rechecks_head[reader_first]",
+        "reason": "requires PostgreSQL row-lock blocker evidence"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_checkpointed_grant_reader",
+        "name": "test_pg_checkpointed_reader_serializes_with_import_and_rechecks_head[importer_first]",
+        "reason": "requires PostgreSQL row-lock blocker evidence"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_task_command_idempotency",
+        "name": "test_concurrent_duplicate_command_id_creates_exactly_one_task",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.target_registry.test_target_consumer_authority",
+        "name": "test_postgres_target_advance_between_hint_and_admission_lock_fails",
+        "reason": "forced hint/lock interleaving requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.target_registry.test_target_consumer_authority",
+        "name": "test_postgres_readmission_between_hint_and_lock_fails",
+        "reason": "forced hint/lock interleaving requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.target_registry.test_target_consumer_authority",
+        "name": "test_postgres_consumer_locks_admission_before_scene_and_shot",
+        "reason": "FOR UPDATE order is PostgreSQL-specific"
+      },
+      {
+        "class": "tests.integration.r2.target_registry.test_target_consumer_authority",
+        "name": "test_postgres_target_writer_waits_for_consumer_admission_lock",
+        "reason": "row-lock interleaving requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_format_projection_flow",
+        "name": "test_a_promotion_waits_for_a_concurrent_report_writer_and_sees_its_report",
+        "reason": "requires PostgreSQL transaction advisory locks"
+      },
+      {
+        "class": "tests.integration.server.services.test_format_projection_flow",
+        "name": "test_preparing_a_revision_takes_locks_in_the_promotion_order",
+        "reason": "requires PostgreSQL row and advisory locks"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_a11y",
+        "name": "test_the_canvas_has_no_axe_violations",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_a11y",
+        "name": "test_the_conflict_state_has_no_axe_violations",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_a11y",
+        "name": "test_nodes_are_reachable_and_removable_from_the_keyboard",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_a11y",
+        "name": "test_arrow_keys_move_a_selected_node_and_undo_restores_it",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_a11y",
+        "name": "test_the_filmstrip_reorders_shots_from_the_keyboard",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_a11y",
+        "name": "test_enter_on_a_shot_focuses_its_storyboard_on_the_canvas",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_a11y",
+        "name": "test_text_fields_have_names_and_commit_on_blur",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_adaptation",
+        "name": "test_map_referencing_an_unknown_branch_version_is_rejected",
+        "reason": "the SQLite test engine runs with foreign keys disabled"
+      },
+      {
+        "class": "tests.integration.server.services.test_format_review",
+        "name": "test_a_review_waits_for_a_concurrent_review_and_aggregates_it",
+        "reason": "requires PostgreSQL transaction advisory locks"
+      },
+      {
+        "class": "tests.integration.lib.db.repositories.test_task_repo_admission.TestConcurrentAdmission",
+        "name": "test_a_claim_of_another_task_waits_for_an_uncommitted_claim_of_the_same_project",
+        "reason": "concurrent read-committed claims need PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_ceremony",
+        "name": "test_the_ceremony_enrolls_imports_and_publishes_a_checkpoint_the_preflight_accepts",
+        "reason": "the operator ceremony requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_ceremony",
+        "name": "test_the_ceremony_refuses_a_second_enrollment_a_used_ledger_or_a_foreign_signer",
+        "reason": "the operator ceremony requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_ceremony",
+        "name": "test_a_publication_interrupted_at_any_phase_completes_when_the_same_file_is_published_again[checkpoint:file_written]",
+        "reason": "the operator ceremony requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_ceremony",
+        "name": "test_a_publication_interrupted_at_any_phase_completes_when_the_same_file_is_published_again[high_water:file_written]",
+        "reason": "the operator ceremony requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_ceremony",
+        "name": "test_a_publication_interrupted_at_any_phase_completes_when_the_same_file_is_published_again[public_checkpoint:renamed]",
+        "reason": "the operator ceremony requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_ceremony",
+        "name": "test_enrollment_refuses_an_unbound_approval_before_writing_and_import_trusts_only_the_archive",
+        "reason": "the operator ceremony requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_import_fence",
+        "name": "test_pg_grant_import_and_recovery_scan_fence_both_orders[scanner_first]",
+        "reason": "requires PostgreSQL transaction advisory locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_import_fence",
+        "name": "test_pg_grant_import_and_recovery_scan_fence_both_orders[import_first]",
+        "reason": "requires PostgreSQL transaction advisory locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_import_fence",
+        "name": "test_pg_distinct_imports_share_fence_and_rollback_releases_it",
+        "reason": "requires PostgreSQL transaction advisory locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_grant_import_fence",
+        "name": "test_pg_reader_importer_scanner_lock_chain_finishes",
+        "reason": "requires PostgreSQL transaction advisory locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_schema_preflight",
+        "name": "test_pg_schema_preflight_requires_exact_head_without_mutation[ready]",
+        "reason": "requires PostgreSQL read-only transaction"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_schema_preflight",
+        "name": "test_pg_schema_preflight_requires_exact_head_without_mutation[missing_version]",
+        "reason": "requires PostgreSQL read-only transaction"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_schema_preflight",
+        "name": "test_pg_schema_preflight_requires_exact_head_without_mutation[stale_version]",
+        "reason": "requires PostgreSQL read-only transaction"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_schema_preflight",
+        "name": "test_pg_schema_preflight_requires_exact_head_without_mutation[missing_grant_table]",
+        "reason": "requires PostgreSQL read-only transaction"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_preflight",
+        "name": "test_pg_candidate_preflight_requires_signed_successor_committed_ledger_and_stable_archive[valid]",
+        "reason": "candidate preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_preflight",
+        "name": "test_pg_candidate_preflight_requires_signed_successor_committed_ledger_and_stable_archive[bad_candidate]",
+        "reason": "candidate preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_preflight",
+        "name": "test_pg_candidate_preflight_requires_signed_successor_committed_ledger_and_stable_archive[bad_signature]",
+        "reason": "candidate preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_preflight",
+        "name": "test_pg_candidate_preflight_requires_signed_successor_committed_ledger_and_stable_archive[divergent_ledger]",
+        "reason": "candidate preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_operator_archive_candidate_preflight",
+        "name": "test_pg_candidate_preflight_requires_signed_successor_committed_ledger_and_stable_archive[changed_public]",
+        "reason": "candidate preflight requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.services.test_realize_pending_cancels",
+        "name": "test_realize_pending_cancels_concurrent_calls_have_exactly_one_winner",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_activated_governance_startup",
+        "name": "test_pg_activated_startup_requires_independent_current_archive[current]",
+        "reason": "activated startup requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_activated_governance_startup",
+        "name": "test_pg_activated_startup_requires_independent_current_archive[coherent_old]",
+        "reason": "activated startup requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_activated_governance_startup",
+        "name": "test_pg_activated_startup_requires_independent_current_archive[missing_attestor]",
+        "reason": "activated startup requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_activated_governance_startup",
+        "name": "test_pg_actual_activated_lifespan_starts_only_with_live_attestor",
+        "reason": "activated lifespan requires PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.narrative_lifecycle.test_lifecycle_concurrency",
+        "name": "test_two_concurrent_genesis_revision_decisions_yield_one_receipt_and_one_conflict",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.narrative_lifecycle.test_lifecycle_concurrency",
+        "name": "test_two_concurrent_genesis_change_set_review_decisions_yield_one_receipt_and_one_conflict",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.narrative_lifecycle.test_lifecycle_concurrency",
+        "name": "test_two_concurrent_conflict_lineage_geneses_on_one_subject_do_not_deadlock_in_reverse_order",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.narrative_lifecycle.test_lifecycle_concurrency",
+        "name": "test_a_fault_before_commit_leaves_no_partial_authority_writes",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.target_registry.test_take_registration_concurrency",
+        "name": "test_two_first_writers_serialize_absent_heads",
+        "reason": "forced row-lock interleavings require PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.target_registry.test_take_registration_concurrency",
+        "name": "test_identical_parallel_command_replays_one_receipt",
+        "reason": "forced row-lock interleavings require PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.target_registry.test_take_registration_concurrency",
+        "name": "test_same_command_id_loser_rolls_back_whole_bundle",
+        "reason": "forced row-lock interleavings require PostgreSQL"
+      },
+      {
+        "class": "tests.integration.r2.target_registry.test_take_registration_concurrency",
+        "name": "test_readmission_waits_for_registration_admission_lock",
+        "reason": "forced row-lock interleavings require PostgreSQL"
+      },
+      {
+        "class": "tests.integration.server.routers.test_spatial_promotion",
+        "name": "test_postgresql_refuses_a_binding_preview_or_receipt_without_its_sidecar",
+        "reason": "deferred coupling triggers are PostgreSQL-only"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_benchmark",
+        "name": "test_canvas_meets_the_frozen_benchmark_protocol",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.e2e.test_m8b_canvas_benchmark",
+        "name": "test_lod_renders_compact_nodes_and_turns_effects_off_while_moving",
+        "reason": "frontend/dist is missing; run (cd frontend && pnpm build)"
+      },
+      {
+        "class": "tests.integration.lib.db.migrations.test_spatial_review_repository",
+        "name": "test_postgres_review_consumers_serialize_on_same_session",
+        "reason": "requires PostgreSQL row-lock observation"
+      },
+      {
+        "class": "tests.integration.lib.db.migrations.test_spatial_review_repository",
+        "name": "test_postgres_long_transaction_cannot_consume_after_real_expiry",
+        "reason": "requires PostgreSQL transaction-clock behavior"
+      },
+      {
+        "class": "tests.integration.server.routers.test_spatial_pair_repository_real",
+        "name": "test_pair_first_writer_and_source_lock_edges_on_postgresql[commit-then-replay]",
+        "reason": "requires PostgreSQL row-lock observation"
+      },
+      {
+        "class": "tests.integration.server.routers.test_spatial_pair_repository_real",
+        "name": "test_pair_first_writer_and_source_lock_edges_on_postgresql[rollback-then-retry]",
+        "reason": "requires PostgreSQL row-lock observation"
+      },
+      {
+        "class": "tests.integration.test_mutmut_fork_isolation",
+        "name": "test_mutmut_session_resolves_proxies_without_touching_macos_sysconf",
+        "reason": "_scproxy 只在 macOS 存在"
+      },
+      {
+        "class": "tests.integration.r2.adaptation.test_adaptation_concurrency",
+        "name": "test_two_concurrent_genesis_map_approvals_on_one_branch_yield_one_winner",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.adaptation.test_adaptation_concurrency",
+        "name": "test_two_concurrent_genesis_map_approvals_on_distinct_branches_do_not_block_each_other",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.adaptation.test_m6_postgres_concurrency",
+        "name": "test_two_different_profile_branches_admit_concurrently_without_contention",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.integration.r2.adaptation.test_m6_postgres_concurrency",
+        "name": "test_two_concurrent_admissions_of_the_same_screenplay_yield_one_winner_no_deadlock",
+        "reason": "concurrency races need real row-level locking (PostgreSQL only)"
+      },
+      {
+        "class": "tests.e2e.test_m7_production_candidate_workflow",
+        "name": "test_the_operator_reviews_downloads_approves_and_reopens_restored_golden_products",
+        "reason": "ARCREEL_E2E_DATA_DIR is not set; point it at a restore-derived target"
+      },
+      {
+        "class": "tests.integration.server.routers.test_spatial_review_session_real",
+        "name": "test_review_session_requires_current_grant_and_pins_verified_png_bytes[writer_first]",
+        "reason": "forced Gate C writer-first schedule requires PostgreSQL row locks"
+      },
+      {
+        "class": "tests.integration.r2.governance.test_governance_database_restore",
+        "name": "test_pg_dump_restore_denies_old_db_and_coherent_public_before_actual_lifespan",
+        "reason": "requires DATABASE_URL pointing at a disposable PostgreSQL server"
+      },
+      {
+        "class": "tests.integration.r2.test_m5c_architecture_boundaries_db",
+        "name": "test_authority_kernel_transactions_run_at_read_committed_on_postgres",
+        "reason": "isolation level is a PostgreSQL-only precondition (spec §7.2)"
+      }
+    ],
+    "actual_log_tail": [
+      "    indexes = {index[\"name\"] for index in sa.inspect(conn).get_indexes(\"tasks\")}",
+      "",
+      "tests/integration/lib/db/test_db_engine_fork.py::test_forked_child_can_query_module_level_engine_after_parent_used_pool",
+      "  /home/anhtuan/content-production-os/.worktrees/r2-m10-v2/tests/integration/lib/db/test_db_engine_fork.py:22: DeprecationWarning: This process (pid=1546119) is multi-threaded, use of fork() may lead to deadlocks in the child.",
+      "    pid = os.fork()",
+      "",
+      "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+      "- generated xml file: /home/anhtuan/content-production-os/.worktrees/r2-m10-v2/.superpowers/sdd/2026-10-27-r2-m10-a3/backend-short.xml -",
+      "============================= slowest 25 durations =============================",
+      "1206.23s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_cross_profile_report_reuse_is_rejected_and_siblings_are_unaffected",
+      "998.55s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_two_dual_profile_slices_share_one_canon_parent_with_isolated_evidence",
+      "859.94s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_stale_map_approval_after_supersession_is_rejected",
+      "859.25s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_readmitting_an_already_locked_screenplay_is_rejected",
+      "859.14s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_reused_decision_id_with_a_different_command_is_rejected",
+      "857.79s call     tests/integration/r2/test_m6_dual_profile_acceptance.py::test_mutation_waiver_laundering_after_a_semantic_change_is_rejected",
+      "449.77s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_lineage_reaches_claim_evidence_and_source",
+      "448.59s call     tests/integration/r2/m3/test_golden_a_composition.py::test_ffmpeg_composes_real_approved_masters_into_final_mp4",
+      "426.88s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_single_run_produces_real_60_90s_final_and_three_methods",
+      "413.80s call     tests/integration/r2/m3/test_golden_a_real_media_closure.py::test_h264_factual_product_renders_real_media_with_three_distinct_methods",
+      "408.29s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_claim2_change_selectively_invalidates_expected_shots_and_final",
+      "351.59s call     tests/integration/r2/m3/test_golden_a_end_to_end.py::test_evidence_files_capture_cost_provenance_lineage_and_restart",
+      "281.22s call     tests/integration/r2/m3/test_host_integration.py::test_real_host_b_c_d_master_semantics_and_restart",
+      "144.51s call     tests/integration/r2/m3/test_local_production.py::test_deterministic_output_is_byte_stable_for_the_same_display_text",
+      "141.70s call     tests/integration/r2/m3/test_host_integration.py::test_manifest_metadata_keeps_factual_basis_and_dependencies",
+      "139.91s call     tests/integration/r2/m3/test_local_production.py::test_different_display_text_changes_the_rendered_output",
+      "127.38s call     tests/integration/r2/m3/test_local_production.py::test_reuse_production_preserves_source_and_emits_valid_mp4",
+      "80.84s call     tests/integration/server/story_authoring/test_driver.py::test_a_story_whose_every_review_fails_reaches_the_human_inside_the_default_budget",
+      "53.90s call     tests/integration/r2/test_m8f_integrated_utility.py::test_both_cohorts_beat_the_baseline_without_leaking_and_replay_identically",
+      "33.20s call     tests/integration/r2/m3/test_remotion_engine.py::test_identical_props_render_byte_identical_output",
+      "24.39s call     tests/integration/server/services/test_format_render.py::test_cancellation_kills_ffmpeg_and_leaves_no_output",
+      "21.82s call     tests/integration/r2/m3/test_remotion_engine.py::test_video_passthrough_renders_the_real_bound_source_not_a_solid_color",
+      "21.65s call     tests/integration/r2/m3/test_remotion_engine.py::test_text_card_renders_real_visible_text_not_a_solid_color",
+      "20.03s call     tests/integration/server/story_authoring/test_driver.py::test_a_scene_the_review_asks_to_rewrite_twice_has_calls_for_each_rewrite",
+      "14.04s call     tests/integration/lib/db/migrations/test_alembic_tasks_index_preservation.py::test_downgrade_keeps_indexes[26c2f9d11c8e]",
+      "======== 18449 passed, 222 skipped, 171 warnings in 6082.07s (1:41:22) ========="
+    ]
+  },
+  "independent_implementation_review": {
+    "status": "PASS_SOURCE_ONLY",
+    "actual_record": {
+      "reviewer_id": "codex-m10-a3-p-implementation-source-review-b69b2904-20261027T075436Z",
+      "qualification_evidence": "Independent read-only whole-packet source review at exact clean HEAD b69b290413d1fcbcc6f8e8c6c86887f2a4a17135 against base dca138da92ca7bb3e8b6adbb44cacdfce84f0f84. Reviewed the A3-P specification, plan, packet, immutable design acceptance, reviewer records, compatibility amendment, all changed runtime files, mirrored tests, and reused authentication/governance seams. Tier-2 graph project r2-v2-main generation 2026-10-15T01:19:44Z was used for structural verification of server.auth.get_current_interactive_user, verify_governance_activated_startup, and CheckpointedShowrunnerGrantReader.require_current_locked. Coverage reported new M10 files as freshness-missing and scripts/integration tests as excluded, so exact frozen-checkout source reads controlled all conclusions. Current SHA-256 values for all 27 sealed source/test paths exactly matched a3-sealed-postgres-target.json. Existing evidence records PostgreSQL 18.6, 77 tests with zero failures/errors/skips, stable source hashes, and cleanup; schema evidence records the reversible 918c4a0e0001 -> 65f53650f3a8 -> 918c4a0e0001 -> 65f53650f3a8 sequence and eight raw immutable-row refusals. These were assessed as prior evidence, not freshly executed by this review. No tests, providers, network, database, containers, migrations, or application runtime were executed.",
+      "conflict_declaration": "NO_CONFLICT",
+      "rubric_version": "R2_M10_A3_P_IMPLEMENTATION_REVIEW_V1",
+      "reviewed_candidate_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+      "reviewed_at": "2026-10-27T07:54:36Z",
+      "source_verdict": "PASS_SOURCE",
+      "findings": [],
+      "minor_findings": [],
+      "confirmed_defects_summary": {
+        "P1": 0,
+        "P2": 0,
+        "minor": 0
+      },
+      "verified_sound_areas": [
+        {
+          "area": "Pure envelope and Factual refusal",
+          "evidence": [
+            "r2/quality/profiles.py:17-45",
+            "r2/quality/profiles.py:48-59",
+            "tests/unit/r2/quality/test_quality_profiles.py:176-226",
+            "tests/integration/server/services/test_quality_profile_custodian.py:251-279"
+          ],
+          "conclusion": "The 255-byte UTF-8 identity bounds and inclusive 1 MiB canonical-request bound run before external I/O. FACTUAL slots and freshness rules fail closed without a readiness or qualification bypass."
+        },
+        {
+          "area": "Interactive Human and activated governance authority",
+          "evidence": [
+            "server/auth.py:459-489",
+            "server/services/governance_startup.py:41-105",
+            "server/services/governance_grants.py:238-350",
+            "server/services/quality_profile_custodian.py:55-147",
+            "server/services/quality_profile_custodian.py:157-197"
+          ],
+          "conclusion": "The implementation requires the actual interactive JWT identity, real activated independent-archive startup, current signed checkpointed grant, issuer-owned immutable authorization receipt, fixed action policy, and final JWT/database-clock revalidation after locked authority I/O. Data-only users, leases, rows, roles, and digest columns do not independently grant publication authority."
+        },
+        {
+          "area": "Receipt-first replay and transactional publication",
+          "evidence": [
+            "server/services/quality_profiles.py:30-64",
+            "lib/db/repositories/quality.py:130-190",
+            "lib/db/repositories/quality.py:225-316",
+            "lib/db/repositories/quality.py:318-422",
+            "tests/integration/server/services/test_quality_profiles.py:55-140",
+            "tests/integration/server/services/test_quality_profiles.py:328-462"
+          ],
+          "conclusion": "Historical replay reconstructs the complete request, lease, authorization and profile without consulting current grant/archive state and remains independent of the later profile head. New work uses command guard, current grant lock, profile lock, final admission, revision append, head CAS, receipt and outbox in one transaction. Full command keys remain authoritative under advisory-hash collisions."
+        },
+        {
+          "area": "Schema, migration and append-only custody",
+          "evidence": [
+            "lib/db/models/quality.py:14-231",
+            "alembic/versions/65f53650f3a8_quality_profile_publication.py:16-53",
+            "alembic/versions/65f53650f3a8_quality_profile_publication.py:56-277",
+            "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py:33-158"
+          ],
+          "conclusion": "The five scoped ORM tables and migration agree on keys, constraints and deferred genesis head reference. Four evidence tables are protected by PostgreSQL and SQLite UPDATE/DELETE refusal triggers. Downgrade removes only owned objects in dependency-safe order."
+        },
+        {
+          "area": "Compatibility amendment",
+          "evidence": [
+            "docs/r2/evidence/R2_M10_A3_TEST_COMPATIBILITY_AMENDMENT.json:1-136",
+            "scripts/r2/verify_m10_a3_scope.py:543-572",
+            "scripts/r2/verify_m10_a3_scope.py:575-688"
+          ],
+          "conclusion": "The later 0caf82042 ruling is bounded to exact prequalified bytes for twelve historical migration tests. Current hashes equal the recorded proposed hashes; the changes replace only global-head execution/assertions with singleton-head plus immutable M8 ancestry and the explicit historical endpoint 918c4a0e0001, while retaining each local predecessor assertion. This is accepted as a compatibility deviation, not treated as a new independent design PASS."
+        },
+        {
+          "area": "Scope and deferred readiness",
+          "evidence": [
+            "docs/superpowers/specs/2026-10-27-r2-m10-a3-profile-publication.md:9-20",
+            "docs/superpowers/specs/2026-10-27-r2-m10-a3-profile-publication.md:211-229",
+            "docs/r2/evidence/R2_M10_A3_PACKET_2026-10-27.json:1142-1171",
+            "docs/r2/evidence/R2_M10_A3_DESIGN_ACCEPTANCE.json:87-107",
+            "scripts/r2/verify_m10_a3_scope.py:274-304",
+            "scripts/r2/verify_m10_a3_scope.py:679-685"
+          ],
+          "conclusion": "The source and guard preserve original A3 as open, refuse Factual publication, and make no runtime activation, provider, production migration, disposition, readiness, or public read-port claim. Supersession is limited to a validated predicate and durable event."
+        }
+      ],
+      "pending_gates": [
+        {
+          "gate": "Final full backend gate",
+          "status": "PENDING_NOT_ACCEPTED",
+          "evidence": "The clean b69 run was interrupted after 18402 passed, 221 skipped and three legacy media failures/timeouts. The earlier diagnostic run had fourteen failures. Neither run is a passing acceptance gate."
+        },
+        {
+          "gate": "Versioned candidate evidence",
+          "status": "PENDING",
+          "evidence": "docs/r2/evidence/R2_M10_A3_CANDIDATE.json does not yet exist at the reviewed HEAD; .superpowers/sdd/2026-10-27-r2-m10-a3/candidate-draft.json explicitly remains pending final backend and review."
+        }
+      ],
+      "required_skips": [
+        "No fresh test, database, migration, provider, network, container or runtime execution was authorized for this source review.",
+        "The stale sibling graph could not structurally index the new M10 paths; exact source and hash verification were used for every material conclusion."
+      ],
+      "material_unknowns": [
+        "Whether the final full backend gate can complete successfully under the qualified legacy media environment.",
+        "The final contents and custody of the pending versioned R2_M10_A3_CANDIDATE.json evidence record."
+      ],
+      "declined_to_judge": [
+        {
+          "behavior": "Full backend acceptance or release readiness",
+          "reason": "The required full gate has not passed."
+        },
+        {
+          "behavior": "Original Task A3 completion and actual HISTORICAL_ONLY/REEVALUATE_CURRENT readiness behavior",
+          "reason": "Explicitly deferred to actual A5 runtime scenarios; the predicate and outbox event are not readiness integration."
+        },
+        {
+          "behavior": "FACTUAL profile publication or Factual readiness qualification",
+          "reason": "Explicitly refused pending a separately accepted and qualified A5 amendment."
+        },
+        {
+          "behavior": "Production migration, deployment or runtime activation",
+          "reason": "Not authorized or exercised by A3-P."
+        },
+        {
+          "behavior": "Router/API activation, public profile read port, outbox dispatch or consumer behavior",
+          "reason": "No such activation or implementation is in this slice."
+        },
+        {
+          "behavior": "Provider calls, A4 probes, A6 disposition, A7 integrated runtime/resource qualification, or M10-B packaging/export",
+          "reason": "Explicitly outside and deferred by the packet."
+        },
+        {
+          "behavior": "Unlimited simultaneous independent-attestor preflight availability",
+          "reason": "The packet discloses that simultaneous preflights can fail closed; concurrency qualification deliberately establishes the first preflight before overlapping publication transactions."
+        },
+        {
+          "behavior": "Final candidate-evidence approval",
+          "reason": "The versioned candidate record is pending and no later-document HEAD was reviewed."
+        },
+        {
+          "behavior": "M9 or full-M10 acceptance",
+          "reason": "A3-P acceptance grants neither."
+        }
+      ],
+      "runtime_model_metadata": {
+        "exposed": false,
+        "value": null
+      }
+    },
+    "main_critical_adjudication": {
+      "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+      "critical_acceptance_authority": "main",
+      "independent_source_assessment": {
+        "path": ".superpowers/sdd/2026-10-27-r2-m10-a3/implementation-source-review.json",
+        "sha256": "94573f58376c5f1bba0db31d9d1b8762f7b205520261af1c43cf3caf28de09cb",
+        "actual_source_verdict": "PASS_SOURCE",
+        "runtime_model_identity_exposed": false
+      },
+      "model_routing_ruling": "Reviewer custom role was selected; its supplied tool configuration declares Sol/high, but the actual child runtime model identity is not exposed. Do not assert an observed model identity. Main retains and performs critical adjudication under the project fallback; the independent report is supporting evidence, not delegated release authority.",
+      "main_source_adjudication": "Directly checked exact source/bindings, real JWT and activated grant authority, immutable issuance resolution, command->grant->profile locking, final JWT/clock after waits, historical replay, all four atomic outputs, scoped schema/SQL immutability and frozen A0/A1/A2. Agrees with no confirmed P1/P2 in this source slice. Mandatory broad compatibility gate remains open.",
+      "review_required_skips_adjudication": [
+        "Reviewer fresh execution was deliberately outside its read-only remit; required execution is the sealed77test/actualmigration evidence, not omitted tests.",
+        "Stale/excluded graph paths were directly read and hashed; no completeness claim is made from the graph."
+      ],
+      "declined_behavior_rulings": [
+        {
+          "behavior": "Full backend acceptance or release readiness",
+          "ruling": "Still OPEN. Only a complete passing frozen-source backend run can close this; interrupted reports are diagnostics.",
+          "cost_if_wrong": "False acceptance could conceal a compatibility defect."
+        },
+        {
+          "behavior": "Original A3 actual readiness",
+          "ruling": "Retain the accepted A5 deferral and originalA3=false. Predicate/event is not readiness integration.",
+          "cost_if_wrong": "Closing it now would omit runtime invalidation scenarios."
+        },
+        {
+          "behavior": "FACTUAL qualification",
+          "ruling": "Remain refused before I/O. No qualified/ready boolean; A5 needs separate acceptance.",
+          "cost_if_wrong": "Otherwise unqualified Factual evidence could be admitted."
+        },
+        {
+          "behavior": "Production migration/deployment/activation",
+          "ruling": "Remain unauthorized and unexecuted. Isolated test migration is not production evidence.",
+          "cost_if_wrong": "Incorrect promotion could cause irreversible production changes."
+        },
+        {
+          "behavior": "Router/public read-port/outbox consumer activation",
+          "ruling": "Out of this source slice; no runtime claim. Future owning gates must qualify adapters and dispatch.",
+          "cost_if_wrong": "Otherwise callers could mistake data storage for activated host behavior."
+        },
+        {
+          "behavior": "A4/A6/A7/M10-B work",
+          "ruling": "Do not infer their acceptance from A3-P. Continue only through each owning research/design/runtime gate.",
+          "cost_if_wrong": "Otherwise missing probes/disposition/export/resource integration would be hidden."
+        },
+        {
+          "behavior": "Unlimited concurrent archive preflight availability",
+          "ruling": "Not promised. Exact replay and publication transaction safety are qualified; real preflights in the collision/race fixtures are sequenced by observed barriers.",
+          "cost_if_wrong": "Concurrent new requests may fail closed and require retry; A7 operational qualification must consider availability."
+        },
+        {
+          "behavior": "Final candidate-evidence approval",
+          "ruling": "Main must finalize actual results and hashes, commit the evidence-only artifact and verify clean source equivalence. No later-document independent review is claimed.",
+          "cost_if_wrong": "Otherwise a draft or unobserved run could become false acceptance."
+        },
+        {
+          "behavior": "M9/full-M10 acceptance",
+          "ruling": "Not granted. Keep M9 and full-M10 state separate from this source slice.",
+          "cost_if_wrong": "Otherwise later work could consume unaccepted prerequisites."
+        }
+      ],
+      "full_gate_status": "PASS_ON_FROZEN_SOURCE",
+      "source_review_status": "PASS_SOURCE_ONLY",
+      "full_gate_counts": {
+        "tests": 18671,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 222
+      },
+      "full_gate_state_path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-short-state.json"
+    },
+    "later_document_head_review_claimed": false
+  },
+  "repairs": [
+    {
+      "finding": "direct profile reads checked recomputed cache columns but omitted resolution of the bound immutable action receipt",
+      "red": "repository-read-repair-red.log;1failed14deselected",
+      "green": "sealed PostgreSQL77passed0skips",
+      "commit": "e1927f222"
+    },
+    {
+      "finding": "forged action lease validation exposed a raw validation error",
+      "red": "repository-lease-red.log;1failed13passed",
+      "green": "sealed PostgreSQL77passed0skips"
+    }
+  ],
+  "limits": [
+    "Publication/persistence source slice only; actual original Task A3 readiness remains OPEN until separately qualified A5 scenarios.",
+    "FACTUAL slot/freshness publication is refused; no Factual readiness/qualification flag.",
+    "No production migration, runtime activation, deployment, providers, M9 change or new public read/router API.",
+    "Archive preflight availability under simultaneous independent-attestor clients is not claimed; concurrency cases sequence real preflights with observed barriers while publication transactions overlap.",
+    "Fixture schema-version-table input is not migration execution proof; actual SQLite and PostgreSQL migration roundtrips are separate."
+  ],
+  "original_a3_fully_accepted": false,
+  "readiness_runtime_accepted": false,
+  "runtime_activation_authorized": false,
+  "production_migration_authorized": false,
+  "provider_calls_authorized": false,
+  "source_scope_guard": {
+    "acceptance_ref": "c7a86813bd7a45f119262dc7acdfe9803967e181",
+    "head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+    "original_a3_fully_accepted": false,
+    "readiness_runtime_accepted": false,
+    "scope_allowlist": [
+      "alembic/versions/65f53650f3a8_quality_profile_publication.py",
+      "docs/r2/evidence/R2_M10_A3_CANDIDATE.json",
+      "docs/r2/evidence/R2_M10_A3_TEST_COMPATIBILITY_AMENDMENT.json",
+      "lib/db/models/__init__.py",
+      "lib/db/models/quality.py",
+      "lib/db/repositories/quality.py",
+      "r2/quality/profiles.py",
+      "scripts/r2/verify_m10_a3_scope.py",
+      "server/services/quality_profile_custodian.py",
+      "server/services/quality_profiles.py",
+      "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py",
+      "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+      "tests/integration/lib/db/migrations/test_format_projections.py",
+      "tests/integration/lib/db/migrations/test_learning_observations.py",
+      "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+      "tests/integration/lib/db/migrations/test_production_target_registry.py",
+      "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+      "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+      "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+      "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+      "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+      "tests/integration/lib/db/repositories/test_quality_profiles_repository.py",
+      "tests/integration/scripts/r2/test_verify_m10_a3_scope.py",
+      "tests/integration/server/services/test_quality_profile_custodian.py",
+      "tests/integration/server/services/test_quality_profiles.py",
+      "tests/unit/r2/quality/test_quality_profiles.py",
+      "tests/unit/scripts/r2/test_verify_m10_a3_scope.py"
+    ],
+    "status": "M10_A3_P_SCOPE_OK",
+    "stop_codes": [],
+    "test_compatibility_ref": "0caf82042ae8319baa989e8bcb60ac05cd669633"
+  },
+  "renderer_test_environment": {
+    "status": "QUALIFIED_TEST_ENVIRONMENT_ONLY",
+    "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+    "real_npx": "/usr/bin/npx",
+    "real_node": "/usr/bin/node",
+    "wrapper": "/home/anhtuan/content-production-os/.worktrees/r2-m10-v2/.superpowers/sdd/2026-10-27-r2-m10-a3/render-serial-encoding-bin/npx",
+    "wrapper_sha256": "05b64d879dfc7e3879e3dc04c150b9696c4deafeeaed3a9051527ad4b5dce0b1",
+    "effective_change": "Only real npx remotion render receives supported --concurrency=2 --disallow-parallel-encoding; real Node has all CPUs. Inputs/outputs/assertions/timeouts/source unchanged. Fixed encoding mode removes installed renderer availableRAM-dependent mode switch.",
+    "production_configuration_changed": false,
+    "primary_sources": {
+      "vendor/openmontage/remotion-composer/node_modules/@remotion/renderer/dist/options/disallow-parallel-encoding.js": "8af4ed853dda30ed3fe6a46fa5e27c7f7c4fe39bb952bc9335956001efa6d6e1",
+      "vendor/openmontage/remotion-composer/node_modules/@remotion/renderer/dist/render-media.js": "0b067ea79e34837f87e2c6da670b842004094e79b83154b2d08bb8a09de76456",
+      "vendor/openmontage/remotion-composer/node_modules/@remotion/renderer/dist/prestitcher-memory-usage.js": "57ec85b755cfaddbfbcd600501c0082607e425b264ca935a96fa46c291650e88",
+      "vendor/openmontage/remotion-composer/node_modules/@remotion/renderer/dist/stitch-frames-to-video.js": "8bfb26ea18017a9f300a48e3db64f1effa45b2baca0d043819618a61f337306b"
+    },
+    "qualification": "3independent original byte-identical assertion passes; failed22bytemetadatawitnesspacket&decodedframehashesequal; no normalization or skipped assertion.",
+    "scratch_root": "/home/anhtuan/.m10-zc1aciaq",
+    "TMPDIR": "/home/anhtuan/.m10-zc1aciaq/t",
+    "pytest_basetemp": "/home/anhtuan/.m10-zc1aciaq/p",
+    "scratch_filesystem": "ext4 disk, not RAM-backed tmpfs",
+    "prior_tmpfs_diagnostic": "backend-sealed:7.2GiBownedpytestdataon/tmp;7ChromePageCrashesOrScreenshotOutOfMemoryDiskFailures;notacceptance",
+    "scratch_mode": "0o700",
+    "scratch_ancestors": {
+      "/home": "0o755",
+      "/home/anhtuan": "0o750",
+      "/home/anhtuan/.m10-zc1aciaq": "0o700"
+    },
+    "tmp_path_retention_policy": "failed",
+    "custody_fixture_qualification": {
+      "tests": 46,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3
+    },
+    "previous25failedcases_now_pass": true,
+    "security_checks_weakened": false,
+    "monitoring": "Read entire progress log every5s; report failure markers immediately; XML/completedexit remain authority.",
+    "wrapper_source_utf8": "#!/bin/sh\nif [ \"$1\" = \"remotion\" ] && [ \"$2\" = \"render\" ]; then\n    exec /usr/bin/npx \"$@\" --concurrency=2 --disallow-parallel-encoding\nfi\nexec /usr/bin/npx \"$@\"\n",
+    "scratch_reproduction": "Create a fresh private directory on disk, outside the inspected source worktree; point TMPDIR and pytest --basetemp at separate new subdirectories. Never reuse an unrelated existing basetemp."
+  },
+  "review_gate_resolution": {
+    "full_backend": "Main observed completed full PASS with exact clean sourceHEAD and all27source hashes unchanged. Reviewer did not freshly execute this run.",
+    "candidate_evidence": "This evidence-only artifact is finalized from actual results. The following Git commit and clean scope check seal it; no later-document independent approval is claimed."
+  },
+  "historical_diagnostics": [
+    {
+      "status": "INTERRUPTED_NOT_ACCEPTANCE",
+      "passed": 18414,
+      "failed": 14,
+      "skipped": 187,
+      "collected": 18621,
+      "failures_path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-schema-failures.json",
+      "classification": "one corrected user-witness fixture, one scope check during an intermediate dirty tree, twelve real-media page crashes/resource failures; unchanged real renderer resource probe subsequently2passed"
+    },
+    {
+      "status": "INTERRUPTED_NOT_ACCEPTANCE",
+      "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+      "passed": 18402,
+      "failed": 3,
+      "skipped": 221,
+      "reason": "Overrestrictive NodeCPU0,1 caused unchanged legacy900/1500second render timeouts; supported Remotion concurrency2 with realNodeallCPUs then passed all4qualification probes.",
+      "log_path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-final.log"
+    },
+    {
+      "status": "INTERRUPTED_FAILED_NOT_ACCEPTANCE",
+      "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+      "passed": 17881,
+      "failed": 1,
+      "skipped": 198,
+      "reason": "Original identical-props byte assertion observed22bytecompressor-name metadata drift; actual packet hashes and decodedframe hashes equal. Failed pair preserved. Installed renderer selects parallel encoding from availableRAM. Supported disallow-parallel-encoding then passed the unchanged assertion in3 independent invocations.",
+      "log_path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-verified.log",
+      "state_path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-verified-state.json"
+    },
+    {
+      "status": "INTERRUPTED_FAILED_NOT_ACCEPTANCE",
+      "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+      "passed": 18434,
+      "failed": 7,
+      "skipped": 222,
+      "reason": "All7actualfailuresareChromePageCrashOrScreenshotOutOfMemoryDisk. Completedownedpytesttemp7.2GiB/372699filesoccupiedRAM-backed/tmp. Reportandfullsourcehashespreserved;onlycompletedownedtempremovedafterprovingnoactiveprocessreferences. Nextfullrunusesprivateignoredext4scratchforpytestandNodeTMPDIR,unchangedtests/assertions/timeouts/source.",
+      "log_path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-sealed.log",
+      "failure_details": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-sealed-failures.json"
+    },
+    {
+      "status": "INTERRUPTED_FAILED_NOT_ACCEPTANCE",
+      "source_head": "b69b290413d1fcbcc6f8e8c6c86887f2a4a17135",
+      "passed": 18412,
+      "failed": 25,
+      "skipped": 222,
+      "reason": "Long ext4 scratch crossed group-writable repo ancestors and exceeded Unixsocket pathbudget:19attestor/socket failures and6checkpointancestorcustody refusals. Main corrected its tail-onlyprogressupdates after wholelog audit; no candidatePASSwasissued. Shortprivate0700home scratch then executedall25failedcasesPASS;43passed3baselinePGskipsinactualtwo-moduleprobe. Nextfullrunusesfailed-onlystandardpytestretentionandwholelogmonitoring.",
+      "log_path": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-disk.log",
+      "failure_details": ".superpowers/sdd/2026-10-27-r2-m10-a3/backend-disk-failures.json"
+    }
+  ]
+}
