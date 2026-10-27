@@ -2,17 +2,29 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 import re
 import stat
+import tempfile
 import uuid
-from collections.abc import Generator
-from contextlib import ExitStack, contextmanager
+from collections.abc import AsyncGenerator, Generator
+from contextlib import ExitStack, asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from r2.quality.errors import OperationalEnvelopeExceededError, RequiredEvidenceMissingError
+from r2.quality.errors import (
+    OperationalEnvelopeExceededError,
+    ReferenceInvalidError,
+    RequiredEvidenceMissingError,
+)
+from r2.quality.ports import ProbeRequest
+from r2.quality.probes import ProbeCatalog, ProbeConfig
+
+MAX_MEDIA_BYTES = 67108864
+MAX_COMBINED_BYTES = 134217728
+MAX_CAPTION_BYTES = 262144
 
 
 @dataclass(frozen=True)
@@ -123,3 +135,65 @@ def verified_probe_file(
         except (OSError, ValueError, TypeError, AttributeError):
             raise RequiredEvidenceMissingError() from None
         yield snapshot
+
+
+@dataclass(frozen=True)
+class ProbeInputs:
+    """Supervisor-private copied bytes of one admitted recipe, ordered as measurement input identities."""
+
+    config: ProbeConfig
+    target: ProbeFile
+    caption: ProbeFile | None
+    reference: ProbeFile | None
+
+    @property
+    def input_digests(self) -> tuple[str, ...]:
+        companion = self.caption or self.reference
+        return (self.target.digest,) if companion is None else (self.target.digest, companion.digest)
+
+
+@asynccontextmanager
+async def snapshot_probe_inputs(
+    request: ProbeRequest, *, project_root: Path, catalog: ProbeCatalog
+) -> AsyncGenerator[ProbeInputs, None]:
+    """Copy the request root and its catalog-scoped companion; callers must first prove root authority."""
+    config = catalog.resolve(request)
+    binding = catalog.input_binding(request, config)
+    directory = Path(tempfile.mkdtemp(prefix="m10-probe-"))
+    with ExitStack() as stack:
+        stack.callback(os.rmdir, directory)
+        root = request.subject.master_binding.root
+        target = await asyncio.to_thread(
+            stack.enter_context,
+            verified_probe_file(
+                project_root=project_root,
+                object_ref=root.object_ref,
+                expected_digest=request.subject.artifact_digest,
+                directory=directory,
+                max_bytes=MAX_MEDIA_BYTES,
+            ),
+        )
+        caption = reference = None
+        if binding is not None:
+            is_caption = binding.role == "CAPTION"
+            limit = min(
+                MAX_CAPTION_BYTES if is_caption else MAX_MEDIA_BYTES,
+                MAX_COMBINED_BYTES - target.size_bytes,
+            )
+            try:
+                companion = await asyncio.to_thread(
+                    stack.enter_context,
+                    verified_probe_file(
+                        project_root=project_root,
+                        object_ref=str(project_root / binding.relative_path),
+                        expected_digest=binding.content_digest,
+                        directory=directory,
+                        max_bytes=limit,
+                    ),
+                )
+            except RequiredEvidenceMissingError:
+                if is_caption:
+                    raise
+                raise ReferenceInvalidError() from None
+            caption, reference = (companion, None) if is_caption else (None, companion)
+        yield ProbeInputs(config, target, caption, reference)

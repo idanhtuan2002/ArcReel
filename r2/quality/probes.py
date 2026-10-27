@@ -580,15 +580,38 @@ def tool_identity_digest(config: ProbeConfig) -> str:
     )
 
 
+class ProbeInputBinding(M10ContractModel):
+    """Host-owned scoped locator beneath a project root; public requests never supply paths."""
+
+    schema_id: Literal["m10.probe-input-binding.v1"]
+    user_id: ExactIdentity
+    project_name: ExactIdentity
+    role: Literal["CAPTION", "REFERENCE"]
+    name: StrictStr = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+    relative_path: StrictStr = Field(
+        max_length=255, pattern=r"^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*$"
+    )
+    content_digest: Sha256Digest
+
+
 class ProbeCatalog(M10ContractModel):
     schema_id: Literal["m10.probe-catalog.v1"]
     configs: tuple[ProbeConfig, ...] = Field(max_length=256)
+    bindings: tuple[ProbeInputBinding, ...] = Field(default=(), max_length=1024)
 
     @model_validator(mode="after")
     def immutable_entries(self) -> Self:
         keys = tuple((entry.config_id, entry.revision) for entry in self.configs)
         if keys != tuple(sorted(set(keys))):
             raise ValueError("catalog requires unique canonical config revisions")
+        named = [(entry.user_id, entry.project_name, entry.role, entry.name) for entry in self.bindings]
+        captions = [
+            (entry.user_id, entry.project_name, entry.content_digest)
+            for entry in self.bindings
+            if entry.role == "CAPTION"
+        ]
+        if len(set(named)) != len(named) or len(set(captions)) != len(captions):
+            raise ValueError("catalog input bindings are ambiguous")
         policies: dict[tuple[str, str, int], str] = {}
         for config in self.configs:
             for policy in (config.applicability_policy, config.threshold_policy, config.reference_policy):
@@ -627,6 +650,34 @@ class ProbeCatalog(M10ContractModel):
                     raise RequiredEvidenceMissingError()
                 return config
         raise RequiredEvidenceMissingError()
+
+    def input_binding(self, request: ProbeRequest, config: ProbeConfig) -> ProbeInputBinding | None:
+        """Select the scoped companion locator of an admitted recipe; absence keeps its typed cause."""
+        scope = (request.user_id, request.project_name)
+        if config.recipe == "CAPTIONS":
+            caption = request.subject.caption_digest
+            matches = [
+                entry
+                for entry in self.bindings
+                if entry.role == "CAPTION"
+                and (entry.user_id, entry.project_name, entry.content_digest) == (*scope, caption)
+            ]
+            if caption is None or len(matches) != 1:
+                raise RequiredEvidenceMissingError()
+            return matches[0]
+        if config.recipe == "REFERENCE_VMAF":
+            reference = config.reference_policy
+            matches = [
+                entry
+                for entry in self.bindings
+                if reference is not None
+                and entry.role == "REFERENCE"
+                and (entry.user_id, entry.project_name, entry.name) == (*scope, reference.reference_name)
+            ]
+            if len(matches) != 1:
+                raise ReferenceInvalidError()
+            return matches[0]
+        return None
 
     def digest(self) -> str:
         return _private_digest(self.schema_id, ProbeCatalog.model_validate(self))
