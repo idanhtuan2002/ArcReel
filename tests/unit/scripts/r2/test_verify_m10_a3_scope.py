@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -140,3 +141,22 @@ def test_migration_boundary_permits_only_the_exact_derived_addition() -> None:
         assert migration_problems(old, changed, target_path=target, revision="new", predecessor="old") == (
             "M10_SCHEMA_CHANGE_REQUIRED",
         )
+
+
+@pytest.mark.parametrize("variant", ["baseline", "qualified", "extra_edit", "wrong_mode"])
+def test_test_compatibility_amendment_admits_only_exact_qualified_bytes(variant: str) -> None:
+    from scripts.r2.verify_m10_a3_scope import compatibility_problems
+
+    baseline = b"immutable historical test body"
+    qualified = b"qualified historical test body"
+    row = {
+        "baseline_sha256": hashlib.sha256(baseline).hexdigest(),
+        "proposed_sha256": hashlib.sha256(qualified).hexdigest(),
+    }
+    current = (
+        baseline if variant == "baseline" else qualified + (b"\n# extra edit\n" if variant == "extra_edit" else b"")
+    )
+    mode = "100755" if variant == "wrong_mode" else "100644"
+    assert compatibility_problems(row, current, mode=mode) == (
+        () if variant in {"baseline", "qualified"} else ("POST_M8_BASE_SEAM_CHANGED",)
+    )

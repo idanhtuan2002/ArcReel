@@ -84,13 +84,14 @@ def test_one_head_and_the_exact_parent(alembic_cfg: tuple[Config, Path]) -> None
     cfg, _ = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
 
-    assert script.get_heads() == ["918c4a0e0001"]
+    assert len(script.get_heads()) == 1
+    assert "918c4a0e0001" in {item.revision for item in script.walk_revisions()}
     assert script.get_revision("8a8c4a0e0001").down_revision == "c9e1f4a2b701"
 
 
 def test_the_six_tables_have_the_named_constraints_and_match_the_orm(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     inspector = sa.inspect(_engine(db_path))
 
     assert set(inspector.get_table_names()) >= M8_TABLES
@@ -132,7 +133,7 @@ def _declared_keys(table: sa.Table) -> tuple[list[str], set[_ForeignKey]]:
 
 def test_keys_are_scoped_match_the_orm_and_never_cascade(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     inspector = sa.inspect(_engine(db_path))
     tables = M8CandidateHeadModel.metadata.tables
 
@@ -168,12 +169,12 @@ def test_keys_are_scoped_match_the_orm_and_never_cascade(alembic_cfg: tuple[Conf
 
 def test_downgrade_removes_only_the_m8_tables(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     before = set(sa.inspect(_engine(db_path)).get_table_names())
 
     command.downgrade(cfg, "c9e1f4a2b701")
     after = set(sa.inspect(_engine(db_path)).get_table_names())
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
 
     assert before - after == M8_TABLES | {
         "m8_spatial_frame_receipts",

@@ -14,6 +14,7 @@ from tests.integration.scripts.r2.test_verify_m10_a2_scope import commit, git, s
 
 SOURCE = Path(__file__).resolve().parents[4]
 ACCEPTANCE = "c7a86813bd7a45f119262dc7acdfe9803967e181"
+COMPATIBILITY = "0caf82042ae8319baa989e8bcb60ac05cd669633"
 DESIGN = "2e69816123c32ba057bfbed7d5e55344b3daa7d2"
 GUARD = "scripts/r2/verify_m10_a3_scope.py"
 
@@ -24,7 +25,7 @@ def a3_repo(tmp_path: Path) -> tuple[Path, Path]:
     subprocess.run(
         ["git", "clone", "--shared", "--no-checkout", "-q", str(SOURCE), str(repo)], check=True, capture_output=True
     )
-    git(repo, "checkout", "--detach", "-q", ACCEPTANCE)
+    git(repo, "checkout", "--detach", "-q", COMPATIBILITY)
     git(repo, "config", "user.name", "Fixture")
     git(repo, "config", "user.email", "fixture@example.invalid")
     (repo / GUARD).write_bytes((SOURCE / GUARD).read_bytes())
@@ -199,4 +200,34 @@ def test_preacceptance_branch_cannot_reuse_valid_receipt_object(a3_repo) -> None
     result = invoke(repo, runner)
     assert result.returncode == 2
     assert json.loads(result.stdout)["stop_codes"] == ["M10_DESIGN_NOT_ACCEPTED"]
+    assert snapshot(repo) == before
+
+
+@pytest.mark.parametrize("change", ["qualified", "unqualified", "dirty", "amendment"])
+def test_test_compatibility_scope_is_exact_and_preserves_inputs(a3_repo, change: str) -> None:
+    repo, runner = a3_repo
+    receipt_path = "docs/r2/evidence/R2_M10_A3_TEST_COMPATIBILITY_AMENDMENT.json"
+    receipt = json.loads((repo / receipt_path).read_text())
+    row = receipt["files"][0]
+    path = repo / row["path"]
+    if change == "amendment":
+        (repo / receipt_path).write_text("{}")
+    elif change == "qualified":
+        path.write_bytes(
+            path.read_bytes()
+            .replace(
+                b'assert script.get_heads() == ["918c4a0e0001"]',
+                b'assert len(script.get_heads()) == 1\n    assert "918c4a0e0001" in {item.revision for item in script.walk_revisions()}',
+            )
+            .replace(b'command.upgrade(cfg, "head")', b'command.upgrade(cfg, "918c4a0e0001")')
+        )
+    else:
+        with path.open("a") as stream:
+            stream.write("\n# unqualified change\n")
+    if change != "dirty":
+        commit(repo)
+    before = snapshot(repo)
+    result = invoke(repo, runner)
+    assert result.returncode == (0 if change == "qualified" else 2), result.stdout + result.stderr
+    assert json.loads(result.stdout)["stop_codes"] == ([] if change == "qualified" else ["POST_M8_BASE_SEAM_CHANGED"])
     assert snapshot(repo) == before

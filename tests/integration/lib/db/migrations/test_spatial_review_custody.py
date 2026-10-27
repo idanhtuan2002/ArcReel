@@ -27,10 +27,11 @@ TABLES = {
 def test_review_custody_revision_and_scoped_child_keys(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["918c4a0e0001"]
+    assert len(script.get_heads()) == 1
+    assert "918c4a0e0001" in {item.revision for item in script.walk_revisions()}
     assert script.get_revision("901c4a0e0001").down_revision == "8f8c4a0e0001"
 
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     engine = sa.create_engine(f"sqlite:///{db_path}")
     inspector = sa.inspect(engine)
     assert set(inspector.get_table_names()) >= TABLES
@@ -76,13 +77,13 @@ def test_review_custody_revision_and_scoped_child_keys(alembic_cfg: tuple[Config
 
     command.downgrade(cfg, "8f8c4a0e0001")
     assert TABLES.isdisjoint(sa.inspect(engine).get_table_names())
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     assert set(sa.inspect(engine).get_table_names()) >= TABLES
 
 
 def test_review_delivery_cannot_cross_session_scope(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     engine = sa.create_engine(f"sqlite:///{db_path}")
     with engine.begin() as conn:
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")

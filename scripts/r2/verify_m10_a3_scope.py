@@ -23,6 +23,10 @@ PACKET_PATH = "docs/r2/evidence/R2_M10_A3_PACKET_2026-10-27.json"
 GUARD_PATH = "scripts/r2/verify_m10_a3_scope.py"
 REGISTRY_PATH = "lib/db/models/__init__.py"
 MIGRATION_PATH = "alembic/versions/65f53650f3a8_quality_profile_publication.py"
+COMPATIBILITY_REF = "0caf82042ae8319baa989e8bcb60ac05cd669633"
+COMPATIBILITY_PARENT = "abaa866d0f53cdfcc76e9871b7f15557a1b0e24d"
+COMPATIBILITY_PATH = "docs/r2/evidence/R2_M10_A3_TEST_COMPATIBILITY_AMENDMENT.json"
+COMPATIBILITY_SHA256 = "2a0b4b6dbba45f7dab036bd9ad781b61b702931a04a6df36d35bb2d94e88bb4a"
 BOOTSTRAP_PATH = "scripts/r2/verify_m10_bootstrap.py"
 BOOTSTRAP_SHA256 = "b861916b2b0388f49af1df0576acd6aff7aa8447f6abe5490d4cd565055d5163"
 
@@ -536,6 +540,38 @@ def _accepted(bootstrap: BootstrapApi, repo: BoundRepository) -> tuple[dict[str,
     return receipt, packet
 
 
+def compatibility_problems(row: dict[str, Any], source: bytes, *, mode: str) -> tuple[str, ...]:
+    """Only exact qualified historical test bodies may supplement their baseline bytes."""
+    return (
+        ()
+        if mode == "100644" and hashlib.sha256(source).hexdigest() in {row["baseline_sha256"], row["proposed_sha256"]}
+        else ("POST_M8_BASE_SEAM_CHANGED",)
+    )
+
+
+def _compatibility(bootstrap: BootstrapApi, repo: BoundRepository) -> dict[str, dict[str, Any]]:
+    row = {"path": COMPATIBILITY_PATH, "sha256": COMPATIBILITY_SHA256}
+    _same(repo, COMPATIBILITY_REF, row)
+    _same(repo, repo.head, row)
+    if not (
+        repo.parents(COMPATIBILITY_REF) == (COMPATIBILITY_PARENT,)
+        and repo.ancestor(ACCEPTANCE_REF, COMPATIBILITY_PARENT)
+        and repo.ancestor(COMPATIBILITY_REF, repo.head)
+        and set(repo.changed(COMPATIBILITY_PARENT, COMPATIBILITY_REF)) == {COMPATIBILITY_PATH}
+    ):
+        raise ScopeError("M10_DESIGN_NOT_ACCEPTED")
+    receipt = bootstrap.load_json(repo.read(COMPATIBILITY_REF, COMPATIBILITY_PATH))
+    rows = {item["path"]: item for item in receipt["files"]}
+    if len(rows) != 12 or receipt["source_head"] != COMPATIBILITY_PARENT:
+        raise ScopeError("M10_DESIGN_NOT_ACCEPTED")
+    for path, item in rows.items():
+        _same(repo, BASELINE_REF, {"path": path, "sha256": item["baseline_sha256"]})
+        _same(repo, COMPATIBILITY_PARENT, {"path": path, "sha256": item["baseline_sha256"]})
+        if compatibility_problems(item, repo.read(repo.head, path), mode=repo.mode(repo.head, path)):
+            raise ScopeError("POST_M8_BASE_SEAM_CHANGED")
+    return rows
+
+
 def verify_scope(root: Path, *, acceptance_ref: str) -> dict[str, Any]:
     """Recompute scoped source custody; success accepts no runtime or original-A3 gate."""
     result: dict[str, Any] = {"status": "REFUSED", "acceptance_ref": acceptance_ref, "stop_codes": []}
@@ -552,7 +588,8 @@ def verify_scope(root: Path, *, acceptance_ref: str) -> dict[str, Any]:
         if repo.head != head:
             raise ScopeError("POST_M8_BASE_SEAM_CHANGED")
         receipt, packet = _accepted(bootstrap, repo)
-        products = set(packet["product_scope"])
+        compatibility = _compatibility(bootstrap, repo)
+        products = set(packet["product_scope"]) | set(compatibility) | {COMPATIBILITY_PATH}
         pins = packet["baseline_pins"]
         editable = packet["editable_baseline_pins"]
         migration = packet["migration"]
@@ -609,6 +646,8 @@ def verify_scope(root: Path, *, acceptance_ref: str) -> dict[str, Any]:
             raise ScopeError("M10_SCHEMA_CHANGE_REQUIRED")
         for row in [*pins, *migration_rows]:
             for ref in (BASELINE_REF, DESIGN_REF, head):
+                if ref == head and row["path"] in compatibility:
+                    continue
                 _same(repo, ref, row)
         for row in editable:
             _same(repo, BASELINE_REF, row)
@@ -639,7 +678,8 @@ def verify_scope(root: Path, *, acceptance_ref: str) -> dict[str, Any]:
             raise ScopeError("POST_M8_BASE_SEAM_CHANGED")
         result.update(
             status="M10_A3_P_SCOPE_OK",
-            scope_allowlist=packet["product_scope"],
+            scope_allowlist=sorted(products),
+            test_compatibility_ref=COMPATIBILITY_REF,
             original_a3_fully_accepted=False,
             readiness_runtime_accepted=False,
         )

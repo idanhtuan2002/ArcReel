@@ -21,10 +21,11 @@ def _foreign(inspector: sa.Inspector, table: str) -> set[tuple[tuple[str, ...], 
 def test_sidecar_tables_link_their_base_rows_and_authorities(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["918c4a0e0001"]
+    assert len(script.get_heads()) == 1
+    assert "918c4a0e0001" in {item.revision for item in script.walk_revisions()}
     assert script.get_revision("913c4a0e0001").down_revision == "912c4a0e0001"
 
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     inspector = sa.inspect(sa.create_engine(f"sqlite:///{db_path}"))
     assert {
         (("user_id", "project_name", "preview_id"), "m8_promotion_previews", "RESTRICT"),

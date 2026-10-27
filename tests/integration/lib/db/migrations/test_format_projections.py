@@ -15,10 +15,11 @@ from alembic import command
 def test_format_migration_has_scoped_restrict_keys_and_downgrades_alone(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["918c4a0e0001"]
+    assert len(script.get_heads()) == 1
+    assert "918c4a0e0001" in {item.revision for item in script.walk_revisions()}
     assert script.get_revision("916c4a0e0001").down_revision == "915c4a0e0001"
 
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     inspector = sa.inspect(sa.create_engine(f"sqlite:///{db_path}"))
     plans = {
         (tuple(fk["constrained_columns"]), fk["referred_table"], (fk.get("options") or {}).get("ondelete"))
@@ -48,7 +49,7 @@ def test_format_migration_has_scoped_restrict_keys_and_downgrades_alone(alembic_
 
 def test_format_genesis_previews_are_admitted_only_for_format_slots(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     engine = sa.create_engine(f"sqlite:///{db_path}")
     insert = sa.text(
         "INSERT INTO m8_promotion_previews (user_id, preview_id, project_name, preview_command_id, candidate_id,"
@@ -70,4 +71,4 @@ def test_format_genesis_previews_are_admitted_only_for_format_slots(alembic_cfg:
     with engine.begin() as connection:
         connection.execute(sa.text("DELETE FROM m8_promotion_previews"))
     command.downgrade(cfg, "916c4a0e0001")
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")

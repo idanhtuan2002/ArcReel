@@ -19,10 +19,11 @@ TABLES = {"production_target_heads", "production_target_versions", "production_t
 def test_target_registry_revision_and_scoped_constraints(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["918c4a0e0001"]
+    assert len(script.get_heads()) == 1
+    assert "918c4a0e0001" in {item.revision for item in script.walk_revisions()}
     assert script.get_revision("8c9c4a0e0001").down_revision == "8c8c4a0e0001"
 
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     engine = sa.create_engine(f"sqlite:///{db_path}")
     inspector = sa.inspect(engine)
     assert set(inspector.get_table_names()) >= TABLES
@@ -93,7 +94,7 @@ def test_target_registry_revision_and_scoped_constraints(alembic_cfg: tuple[Conf
 
 def test_target_registry_rejects_invalid_head_and_scene_links(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     engine = sa.create_engine(f"sqlite:///{db_path}")
     with engine.begin() as conn:
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")

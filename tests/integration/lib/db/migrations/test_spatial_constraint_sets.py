@@ -16,10 +16,11 @@ TABLE = "m8_spatial_constraint_sets"
 def test_constraint_set_revision_keys_and_downgrade(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, db_path = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["918c4a0e0001"]
+    assert len(script.get_heads()) == 1
+    assert "918c4a0e0001" in {item.revision for item in script.walk_revisions()}
     assert script.get_revision("912c4a0e0001").down_revision == "911c4a0e0001"
 
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "918c4a0e0001")
     inspector = sa.inspect(sa.create_engine(f"sqlite:///{db_path}"))
     assert inspector.get_pk_constraint(TABLE)["constrained_columns"] == ["user_id", "project_name", "set_id"]
     foreign = {
