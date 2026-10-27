@@ -1,10 +1,23 @@
-# M10 A3: scoped profile persistence and Human publication
+# M10 A3-P: scoped profile persistence and Human publication
 
 PROPOSED. Implementation base: `dca138da92ca7bb3e8b6adbb44cacdfce84f0f84`.
 This separately reviewed packet continues the user's sequential M10 instruction
 on V2. It does not accept M9, full M10, production activation, or deployment.
 Two independent design PASS decisions on one exact candidate and a separate
 hash-bound acceptance are required before product or migration code.
+
+This is the A3-P publication/persistence slice, not completion of original
+Task A3. The packet's exact `M10_A3_P_READINESS_DEFERRAL_V1` amendment must be
+copied and hash-bound in acceptance. Original Task A3's actual readiness
+obligation remains OPEN until its HISTORICAL_ONLY/REEVALUATE_CURRENT cases
+pass against the A5 runtime. A3-P acceptance cannot mark original A3 complete
+or accept A5. No old normative document is edited or implicitly superseded.
+The inherited Factual dependency gate is also preserved: this slice refuses
+operational publication of policies containing FACTUAL assessment slots or
+FACTUAL freshness rules with M10_PREREQUISITE_NOT_ACCEPTED before issuance or
+DB work. No boolean/configuration flag can claim that missing authority is
+qualified. Publishing those policies requires the separate A5 amendment and
+actual qualified Factual seam. A1 data constructors remain unchanged.
 
 ## Purpose, alternatives and boundary
 
@@ -54,17 +67,24 @@ not caller configuration.
 
 `InteractiveProfilePublicationCustodian` implements the unchanged A2
 `ProfilePublicationCustodianPort`. Its only supported public factory is async
-`from_activated_governance(sessions, *, interactive_token, read_directory,
-socket_directory, expected_uid, expected_gid)`. It calls the unchanged
+`for_request(request, sessions, *, interactive_token, read_directory,
+socket_directory, expected_uid, expected_gid)`. First validate the pure
+operational envelope and interactive JWT; bind the exact request, full command
+key and configuration. Factory construction performs no database/archive I/O
+and grants no authority. A later different request must refuse before I/O.
+
+Only a new issuance in `authorize_publication` calls the unchanged
 `verify_governance_activated_startup` and captures that verifier's returned
-`CheckpointedShowrunnerGrantReader`. A missing socket/configuration or failed
-archive/current-head verification refuses; the public factory accepts no
-caller-supplied reader. Internal construction requires a module-private seal
-created only after that verifier succeeds. Verify the interactive JWT before
-starting any activation/archive I/O. A public-snapshot-only reader or a
-constructed object is not an activation proof. The adapter is request-scoped
-and never caches activation across requests. Disposable fixtures must exercise
-the real verifier/independent archive protocol, not patch it to return a reader.
+`CheckpointedShowrunnerGrantReader` in private activated state. This lazy
+activation preserves receipt-first historical replay without requiring a live
+archive or new grant. A missing socket/configuration or failed archive/head
+verification refuses a new issuance; the public factory accepts no supplied
+reader. A module-private activation seal is created only after the actual
+verifier succeeds and is required for grant locking/admission. A constructed
+request wrapper, public-snapshot reader or lease alone cannot admit. The
+adapter is request-scoped and never caches activation across requests.
+Disposable fixtures exercise the real verifier/independent archive protocol,
+not a patch returning a reader.
 This packet changes no existing ceremony and performs none on production.
 The allowed external capabilities are the scoped PostgreSQL session and the
 existing read-only local governance archive IPC/file reader. Arbitrary sockets,
@@ -127,27 +147,33 @@ Downgrade removes only these tables/triggers and the owned PostgreSQL trigger
 function, in reverse dependency order, first dropping the owned head-current
 revision FK to break its genesis cycle. Upgrade/down/upgrade preserves all
 predecessor tables and seeded predecessor data. SQLite migration compatibility
-is required; authority mutations themselves require PostgreSQL and refuse
+is required; publication mutation and authoritative receipt replay require PostgreSQL and refuse
 SQLite with `M10_SCHEMA_CHANGE_REQUIRED`.
 
 Each read/admission recomputes the full typed row and compares body, scope,
 parent, caches, authority linkage and duplicated digest/time columns. Revisions
 of one profile keep the genesis cohort/product-surface pair. Never normalize,
 truncate or overwrite an identity. Operational admission bounds are 255 UTF-8
-bytes per command/scope identity and 1 MiB for canonical request JSON; exceeding
-them yields `M10_OPERATIONAL_ENVELOPE_EXCEEDED` before DB work.
+bytes per command/scope identity and 1 MiB (1,048,576 bytes) for canonical
+request JSON, inclusive. `validate_publication_envelope(request)` checks these
+before the factory, publisher or issuer performs any DB/replay/archive I/O;
+exceeding them yields `M10_OPERATIONAL_ENVELOPE_EXCEEDED`. A canonical JSON
+byte count, not character count or approximate object size, is authoritative.
 
 ## Transaction and replay
 
 `ProfilePublicationService.publish(request)` implements the existing A2 port.
 It owns its transaction/session and exposes no transaction parameter to callers.
 
-1. Verify the interactive caller and typed request. A read-only receipt lookup
+1. Run the pure envelope check, then verify the interactive caller and typed
+   request before the initial database access. A read-only receipt lookup
    may return only the exact historical result after full receipt/revision
    digest and command-binding recomputation. Different content under one full
    command key yields `M10_COMMAND_REPLAY_CONFLICT`.
+   Close this read session before starting issuance/activation.
 2. With no receipt, obtain the action lease through the qualified issuer above,
-   outside the publication transaction. Failed publication can leave an unused
+   outside the publication transaction; only this new-work branch activates
+   governance/archive custody. Failed publication can leave an unused
    immutable issuance receipt; it is not a publication.
 3. Begin the authoritative transaction. Acquire a transaction advisory guard
    over the accepted `m10.command-key-guard.v1` digest; reread the exact full-key
@@ -185,27 +211,29 @@ lock order is accepted from a diagram or a passing uncontrolled gather alone.
 ## Pure interfaces and supersession
 
 `r2/quality/profiles.py` owns only validation/building over accepted models:
+`validate_publication_envelope(request)->None` enforces the pre-I/O bounds;
 `publication_bindings(request)->tuple[str,str]` returns request/subject digests;
 `build_published_profile(request, lease, admitted_at, *, policy_id,
 policy_version)->QualityProfileRevision` checks all data bindings/window and
-builds the digest-complete body. Neither function authenticates a user, resolves
+builds the digest-complete body. These helpers do not authenticate a user, resolve
 an issuance receipt, declares grant currentness or grants Human authority.
 
 `profile_requires_reevaluation(previous, newer)->bool` returns true only for a
 strictly newer revision of the same scope/profile/cohort/surface declaring
 REEVALUATE_CURRENT. HISTORICAL_ONLY and other cohorts/surfaces do not trigger
-it. A3 persists this intent in the profile/event and leaves historical bodies
+it. A3-P persists this intent in the profile/event and leaves historical bodies
 unchanged. Actual QualityRun/readiness/disposition integration is A5/A6 work;
 this packet cannot claim it complete because those runtime readers do not yet
-exist. This explicitly narrows the original A3 readiness scenario to a tested
-input predicate and durable event; the full scenario remains an A5 gate.
+exist. Under the explicit acceptance-bound amendment, A3-P covers the tested
+input predicate and durable event. Original Task A3 remains OPEN for the full
+readiness scenario at A5; no A3-P result can close that original gate.
 
 ## Acceptance and verification
 
 The separate acceptance commit has exactly one parent, the reviewed design
 candidate, and changes only the acceptance artifact plus two actual reviewer
 artifacts in the manifest's review directory. Its record is schema_version1,
-status `M10_A3_DESIGN_ACCEPTED`, author_id, baseline_head, design_head,
+status `M10_A3_P_DESIGN_ACCEPTED`, author_id, baseline_head, design_head,
 scope_allowlist, five design_artifacts `{path,sha256,mode}` rows, two reviewers
 and reviewer_artifacts `{path,sha256}` rows, reviewed_at UTC, empty
 required_skips/material_unknowns, and explicit false runtime-activation,
@@ -215,6 +243,12 @@ records actual qualification, NO_CONFLICT, rubric
 review time. This is source/migration-authoring and disposable-test acceptance,
 not a Human grant. The implementation pins the exact acceptance Git ref and
 artifact hash; the current design/reviewer bodies must still match that seal.
+Acceptance must also contain the exact packet `scope_amendment` object and
+`scope_amendment_sha256`, with `original_a3_fully_accepted=false` and
+`readiness_runtime_accepted=false`. The amendment hash is SHA256 over UTF-8
+sorted-key compact JSON (ensure_ascii=false), design metadata only, not a new
+runtime digest domain. Missing/altered amendment or a claim closing original
+A3 refuses. This requirement is part of the A3-P guard's acceptance check.
 
 The manifest lists exact product/design/editable paths, immutable source pins,
 all predecessor migration byte/mode pins and the proposed revision. The only
@@ -243,7 +277,7 @@ provider, arbitrary network, master/production/disposition/export imports and
 generic/V1/public-only authentication fallbacks. Static checks are bounded
 source checks, not a general Python sandbox.
 
-Success is only `M10_A3_SCOPE_OK`; the original full-M10 and A2 guards remain
+Success is only `M10_A3_P_SCOPE_OK`; the original full-M10 and A2 guards remain
 unchanged and correctly refuse expanded paths. The separate acceptance permits
 source/migration authoring and disposable-DB qualification only. No production
 migration or Human activation is inferred. Required checks: focused TDD on all

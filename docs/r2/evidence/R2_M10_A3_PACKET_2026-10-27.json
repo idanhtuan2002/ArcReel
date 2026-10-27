@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "status": "PROPOSED_A3_PROFILE_PUBLICATION_PACKET",
+  "status": "PROPOSED_A3_P_PROFILE_PUBLICATION_PACKET",
   "implementation_base": "dca138da92ca7bb3e8b6adbb44cacdfce84f0f84",
   "a2_completed_head": "fc2f6812bef8a4044cd3018af857cbd24482970e",
   "product_scope": [
@@ -1147,5 +1147,45 @@
     "A7 integrated runtime/resource qualification",
     "M10-B packaging/export"
   ],
-  "review_rubric": "R2_M10_A3_DESIGN_REVIEW_V1"
+  "review_rubric": "R2_M10_A3_DESIGN_REVIEW_V1",
+  "packet": "M10_A3_P_PROFILE_PUBLICATION",
+  "scope_amendment": {
+    "id": "M10_A3_P_READINESS_DEFERRAL_V1",
+    "source_task": {
+      "path": "docs/superpowers/plans/2026-09-16-r2-m10a-quality-evidence-foundation.md",
+      "sha256": "38ab21192c7837d41b1ebca319ffcc3313948182cf81863d51d0498e77d57043",
+      "section": "Task A3; actual HISTORICAL_ONLY/REEVALUATE_CURRENT readiness scenarios"
+    },
+    "slice": "A3-P publication/persistence source and disposable-DB qualification only",
+    "retained_obligation": "Run the original actual-readiness scenarios against the A5 runtime; predicate/event tests do not replace them.",
+    "original_task_a3_gate": "OPEN_UNTIL_ACTUAL_READINESS_CASES_PASS",
+    "deferred_owner_gate": "A5 integration; not accepted by this artifact",
+    "may_mark_original_a3_complete": false,
+    "may_activate_runtime": false,
+    "factual_admission": "FACTUAL slot/freshness policy publication remains refused until separately qualified A5 Factual amendment; no ready/qualified flag."
+  },
+  "scope_amendment_sha256": "dc2184bdbf5ebff5ee5426607845e8bab095f90871e4c3da2dec50697bcfa867",
+  "acceptance_status": "M10_A3_P_DESIGN_ACCEPTED",
+  "scope_success": "M10_A3_P_SCOPE_OK",
+  "original_a3_fully_accepted": false,
+  "readiness_runtime_accepted": false,
+  "previous_design_reviews": [
+    {
+      "reviewer_id": "codex-m10-a3-design-a-cfac72fd8-20261026T193112Z",
+      "qualification_evidence": "Fresh independent bounded A3 design review of exactly the five manifest design artifacts at clean candidate cfac72fd8912af3ad5e009e73b1d351c498e7d86 against implementation base dca138da92ca7bb3e8b6adbb44cacdfce84f0f84, original M10 Task A3, immutable 2026-10-25 foundation bindings, and exact current auth, activated-governance, signed-grant, contract/digest and repository source. Confirmed the proposed interactive JWT plus independently activated archive plus immutable action receipt plus final grant/policy/body/DB-time composition does not reinterpret HUMAN_SHOWRUNNER alone, and verified the bounded schema, transaction, replay, migration and scope-custody design. Found one P1 scope/acceptance drift and one P2 operational-envelope plan/test gap. Tier-2 graph project r2-v2-main at generation 2026-10-15T01:19:44Z is a stale sibling worktree; host source paths had no recorded gaps where metadata matched, current quality files were freshness-missing and docs/tests were excluded, so exact direct reads at the reviewed candidate control. No product implementation, provider, database or test execution was performed by this review; the packet's existing test evidence was not inflated into M10 implementation proof.",
+      "conflict_declaration": "NO_CONFLICT",
+      "rubric_version": "R2_M10_A3_DESIGN_REVIEW_V1",
+      "reviewed_candidate_head": "cfac72fd8912af3ad5e009e73b1d351c498e7d86",
+      "verdict": "FAIL",
+      "reviewed_at": "2026-10-26T19:31:12Z",
+      "required_skips": [],
+      "material_unknowns": [],
+      "findings": [
+        "P1: acceptance named complete A3 while deferring original actual-readiness obligation without an acceptance-bound amendment.",
+        "P2: plan weakened pre-DB envelope limits to pre-persistence and omitted exact UTF-8/JSON byte-boundary tests."
+      ],
+      "repair": "Explicit A3-P slice/amendment in acceptance; original A3 gate stays OPEN; pure pre-I/O envelope with exact/multibyte boundaries. Request-aware factory and lazy real activation preserve both pre-I/O bounds and receipt-first historical replay."
+    }
+  ],
+  "factual_runtime_qualified": false
 }
