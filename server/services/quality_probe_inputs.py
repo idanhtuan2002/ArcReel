@@ -154,12 +154,15 @@ class ProbeInputs:
 
 @asynccontextmanager
 async def snapshot_probe_inputs(
-    request: ProbeRequest, *, project_root: Path, catalog: ProbeCatalog
+    request: ProbeRequest, *, project_root: Path, catalog: ProbeCatalog, work_root: Path | None = None
 ) -> AsyncGenerator[ProbeInputs, None]:
-    """Copy the request root and its catalog-scoped companion; callers must first prove root authority."""
+    """Copy the request root and its catalog-scoped companion; callers must first prove root authority.
+
+    ``work_root`` selects a host-owned (preferably disk-backed) parent for the private copy directory.
+    """
     config = catalog.resolve(request)
     binding = catalog.input_binding(request, config)
-    directory = Path(tempfile.mkdtemp(prefix="m10-probe-"))
+    directory = Path(tempfile.mkdtemp(prefix="m10-probe-", dir=work_root))
     with ExitStack() as stack:
         stack.callback(os.rmdir, directory)
         root = request.subject.master_binding.root

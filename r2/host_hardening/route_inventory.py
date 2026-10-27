@@ -128,7 +128,17 @@ FORMAT_RENDER_SUBMIT_FAMILIES = (
     ),
 )
 
-_ALL_SUBMIT_FAMILIES = PAID_ASYNC_SUBMIT_FAMILIES + SPATIAL_SUBMIT_FAMILIES + FORMAT_RENDER_SUBMIT_FAMILIES
+HOST_QUALITY_ADAPTER_VERSION = "host-quality-v1"
+QUALITY_PROBE_SUBMIT_FAMILIES = (
+    PaidAsyncSubmitFamily(
+        SubmitRouteKey("local-ffmpeg", "quality-probe", HOST_QUALITY_ADAPTER_VERSION),
+        "local-ffmpeg-quality-probe@host-quality-v1",
+        "server.services.quality_probes:QualityProbeService.observe",
+    ),
+)
+_ALL_SUBMIT_FAMILIES = (
+    PAID_ASYNC_SUBMIT_FAMILIES + SPATIAL_SUBMIT_FAMILIES + FORMAT_RENDER_SUBMIT_FAMILIES + QUALITY_PROBE_SUBMIT_FAMILIES
+)
 
 #: Built-in video provider ids (backend spec registry) -> the provider id their backend submits as.
 #: Every built-in ``(provider, "video")`` spec must appear here; a new one fails the inventory test.

@@ -1,0 +1,18 @@
+{
+  "schema_id": "m10.a4-scope-amendment.v1",
+  "amendment": 1,
+  "decided_by": "main agent adjudication (Claude Opus 5.5), 2026-10-28",
+  "reason": "Frozen packet admits the local quality-probe capability entry in r2/provider_capabilities/registry.json but omitted the existing unowned test that pins the real registry to 14 profiles and two OFFLINE_VERIFIED adapters; adding the specified entry necessarily changes that test.",
+  "admitted_change": {
+    "path": "tests/unit/r2/host_hardening/test_provider_capabilities.py",
+    "baseline_sha256": "0efdfcbf4b322b0805f1b14367e89ac8f2e7770a7bcdb036ac65c0020d013894",
+    "proposed_sha256": "9fa5868d04c72ea6db2ce5da8d61d2e75c5ba9e192bb63b19d86f063c08cc669",
+    "semantics": "count 14->15; the new entry must be OFFLINE_VERIFIED and its evidence_digest must equal the sha256 of docs/r2/evidence/m10-a4-reviews/route-qualification.json; all prior assertions unchanged"
+  },
+  "guard_change": "scripts/r2/verify_m10_a4_scope.py admits only that exact byte-pinned file plus this record; packet/acceptance refs unchanged.",
+  "other_guard_changes": [
+    "quality_probes.py import allowlist adds lib.video_backends.base (AmbiguousSubmitError required by the spec) and r2.host_hardening.paid_routes (current_release_mode for the existing submit-route gate)",
+    "guard unit test reads the route baseline from BASELINE_REF instead of the working file"
+  ],
+  "authority": "No production activation, migration, router or default registration."
+}

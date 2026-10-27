@@ -559,6 +559,10 @@ def _private_digest(domain: str, body: object) -> str:
     return digest_canonical({"domain": domain, "contract_version": "1", "body": body})
 
 
+def facts_digest(facts: ContainerFacts | DecodeFacts | IntervalFacts | LoudnessFacts | CaptionFacts | VmafFacts) -> str:
+    return _private_digest("m10.probe-facts.v1", type(facts).model_validate(facts))
+
+
 def probe_request_digest(request: ProbeRequest) -> str:
     validate_probe_envelope(request)
     return _private_digest("m10.probe-request.v1", ProbeRequest.model_validate(request))
@@ -864,7 +868,7 @@ def build_probe_measurement(
                 rule_id=config.rule_id,
                 severity="BLOCKING" if status == "FAIL" else "ADVISORY",
                 subject_locator=locator,
-                evidence_digest=_private_digest("m10.probe-facts.v1", facts),
+                evidence_digest=facts_digest(facts),
             ),
         )
     return ProbeMeasurement(

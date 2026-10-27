@@ -28,6 +28,14 @@ REGISTRY_PATH = "lib/db/models/__init__.py"
 ROUTE_PATH = "r2/host_hardening/route_inventory.py"
 CAPABILITY_PATH = "r2/provider_capabilities/registry.json"
 _REFUSAL = ("POST_M8_BASE_SEAM_CHANGED",)
+# Main scope amendment 1: the frozen packet admits the registry entry but missed the existing exact-count
+# registry test; only this one byte-exact adjustment of that unowned test is admitted.
+AMENDMENT_PATH = "docs/r2/evidence/R2_M10_A4_SCOPE_AMENDMENT_1.json"
+CAPABILITY_TEST_COMPATIBILITY = {
+    "path": "tests/unit/r2/host_hardening/test_provider_capabilities.py",
+    "baseline_sha256": "0efdfcbf4b322b0805f1b14367e89ac8f2e7770a7bcdb036ac65c0020d013894",
+    "proposed_sha256": "9fa5868d04c72ea6db2ce5da8d61d2e75c5ba9e192bb63b19d86f063c08cc669",
+}
 
 
 def _git(root: Path, *args: str) -> bytes:
@@ -460,6 +468,8 @@ _OWNER_IMPORTS = {
         "server.services.execution_attempts",
         "server.services.quality_probe_inputs",
         "server.services.quality_probe_runtime",
+        "lib.video_backends.base",
+        "r2.host_hardening.paid_routes",
     },
     MIGRATION_PATH: _COMMON_IMPORTS | _SQL_IMPORTS | {"alembic"},
 }
@@ -566,6 +576,8 @@ def verify(repo: Path, *, acceptance_ref: str = ACCEPTANCE_REF) -> dict[str, obj
             | {
                 PACKET_PATH,
                 ACCEPTANCE_PATH,
+                AMENDMENT_PATH,
+                CAPABILITY_TEST_COMPATIBILITY["path"],
                 "docs/r2/evidence/R2_M10_A4_CANDIDATE.json",
             }
         )
@@ -612,10 +624,10 @@ def verify(repo: Path, *, acceptance_ref: str = ACCEPTANCE_REF) -> dict[str, obj
         )
         codes += route_problems(store.read(BASELINE_REF, ROUTE_PATH), store.read(store.head, ROUTE_PATH))
         codes += capability_problems(store.read(BASELINE_REF, CAPABILITY_PATH), store.read(store.head, CAPABILITY_PATH))
-        row = packet["migration_test_compatibility"]
-        codes += compatibility_problems(
-            row, store.read(store.head, row["path"]), mode=store.mode(store.head, row["path"])
-        )
+        for row in (packet["migration_test_compatibility"], CAPABILITY_TEST_COMPATIBILITY):
+            codes += compatibility_problems(
+                row, store.read(store.head, row["path"]), mode=store.mode(store.head, row["path"])
+            )
         for path in packet["source_paths"]:
             if path != GUARD_PATH and path in store.paths(store.head, path):
                 codes += source_problems(path, store.read(store.head, path))

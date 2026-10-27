@@ -33,7 +33,9 @@ TABLES = {model.__tablename__ for model in MODELS}
 def test_exact_singleton_head_and_predecessor(alembic_cfg: tuple[Config, Path]) -> None:
     cfg, _ = alembic_cfg
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == [REVISION]
+    heads = script.get_heads()
+    assert len(heads) == 1
+    assert REVISION in {item.revision for item in script.walk_revisions(base="base", head=heads[0])}
     assert script.get_revision(REVISION).down_revision == PREDECESSOR
 
 

@@ -93,7 +93,14 @@ def test_capability_addition_cannot_rewrite_an_old_entry_or_claim_lookup() -> No
 
 
 def test_route_allows_only_the_exact_local_quality_family() -> None:
-    before = (ROOT / "r2/host_hardening/route_inventory.py").read_bytes()
+    import subprocess
+
+    before = subprocess.run(
+        ["git", "show", f"{guard().BASELINE_REF}:r2/host_hardening/route_inventory.py"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    ).stdout
     assert guard().route_problems(before, before) == ()
     after = guard().qualified_route_source(before)
     assert guard().route_problems(before, after) == ()

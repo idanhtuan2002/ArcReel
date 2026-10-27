@@ -107,6 +107,7 @@ class ProbeHost:
     tools: Mapping[str, Path]
     vmaf_model: Path | None = None
     worker: Path | None = None
+    work_root: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -172,9 +173,9 @@ def parse_manager_summary(stderr: bytes) -> tuple[str, int]:
 
 
 @contextmanager
-def scratch_files() -> Generator[tuple[Path, Path, Path], None, None]:
+def scratch_files(work_root: Path | None = None) -> Generator[tuple[Path, Path, Path], None, None]:
     """Precreate exactly three private regular scratch inodes; the restricted worker may not create files."""
-    directory = Path(tempfile.mkdtemp(prefix="m10-probe-scratch-"))
+    directory = Path(tempfile.mkdtemp(prefix="m10-probe-scratch-", dir=work_root))
     paths: list[Path] = []
     try:
         for index in range(3):
@@ -193,6 +194,18 @@ def scratch_files() -> Generator[tuple[Path, Path, Path], None, None]:
 class QualityProbeRuntime:
     def __init__(self, host: ProbeHost) -> None:
         self._host = host
+
+    @property
+    def host(self) -> ProbeHost:
+        return self._host
+
+    def preflight(self, config: ProbeConfig) -> None:
+        """Verify host tool/model bytes and control files before any durable record exists."""
+        self._tools(ProbeConfig.model_validate(config))
+        try:
+            self.control_identity_digest()
+        except OSError:
+            raise RequiredEvidenceMissingError() from None
 
     def _worker(self) -> Path:
         return self._host.worker or Path(__file__).with_name("quality_probe_worker.py")
@@ -401,7 +414,7 @@ class QualityProbeRuntime:
         request_digest = probe_request_digest(request)
         control = self.control_identity_digest()
         started_at = datetime.now(UTC)
-        with scratch_files() as scratch:
+        with scratch_files(self._host.work_root) as scratch:
             payload = json.dumps(self.worker_config(inputs, config, scratch), separators=(",", ":")).encode("utf-8")
             outcome = await self.launch(
                 payload,

@@ -1,0 +1,72 @@
+{
+  "schema_id": "m10.a4-route-qualification.v1",
+  "status": "LOCAL_QUALITY_PROBE_ROUTE_OFFLINE_VERIFIED",
+  "route": {
+    "provider_id": "local-ffmpeg",
+    "endpoint_id": "quality-probe",
+    "adapter_version": "host-quality-v1",
+    "capability_profile_ref": "local-ffmpeg-quality-probe@host-quality-v1",
+    "idempotency_mode": "NONE",
+    "not_found_semantics": "NON_AUTHORITATIVE",
+    "poll_cancel_lookup_webhook": false
+  },
+  "source_parent": "76de20a4dc9275347220bfe2ce1970a078da1013",
+  "source_sha256": {
+    "server/services/quality_probes.py": "4e7645b335ebf4f38bf4aaf0260e8bf2e4d09e1261d0ba56d5708ef7d7ab0d31",
+    "lib/db/repositories/quality_probes.py": "ccef3e978518d664347a416b847ef2aca6cbab534bf6b185010a3eb5da67b528",
+    "lib/db/models/quality_probes.py": "3272251481562f615a0c887d85f7ee07e4a3846dd6a7dd823528e51be0bd400b",
+    "alembic/versions/07fd34535384_quality_probe_evidence.py": "f8b1b2a74a601197f6488b1c9e2143764665dcb431127c0ad7c8baa089c047f8",
+    "server/services/quality_probe_runtime.py": "8d5f36c6ac6c9fd1c265a1e24d57a85cd1c640cc20e25a04366ffa1116b53731",
+    "server/services/quality_probe_worker.py": "728ddfea6c05f0d0462d318f3ede5cec299bfd004e6d439fc21113d7444a2803",
+    "server/services/quality_probe_inputs.py": "7f5282d6a8ced58726e0cb6a77833333f094276bb6bdf4dd53743bc3c1e1ff33",
+    "r2/quality/probes.py": "fd260e17ec74aa673256371112a35000a479149ef163108ebe286d087cfa4a05"
+  },
+  "environment": {
+    "postgresql": "16.15 disposable container",
+    "kernel": "7.0.0-38-generic",
+    "systemd": "259",
+    "ffmpeg": "8.0.1",
+    "vmaf": "3.2.1 f85a853"
+  },
+  "suite": {
+    "selection": [
+      "tests/integration/server/services/test_quality_probes.py",
+      "tests/integration/server/services/test_quality_probe_runtime.py",
+      "tests/integration/server/services/test_quality_probe_recipes.py",
+      "tests/integration/lib/db/repositories/test_quality_probes.py",
+      "tests/integration/lib/db/migrations/test_07fd34535384_quality_probe_evidence.py"
+    ],
+    "result": {
+      "tests": 63,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "junit_sha256": "2f3de199400be9758f04b611b5c248d2d70e01ad29018d252fc134479ac09ae8"
+  },
+  "recovery_properties": [
+    "successful call: invocation+PLANNED atomic, tools with no DB transaction, result staged inside M7 acceptance commit, SUCCEEDED+observation atomic",
+    "replay after media deletion returns the exact receipt without tool start",
+    "known tool failure -> FAILED_BEFORE_ACCEPTANCE, no observation, never rerun",
+    "unexpected runtime error or staging failure -> SUBMIT_OUTCOME_UNKNOWN, never rerun",
+    "crash after ACCEPTED finalizes on next call without second tool start",
+    "expired session after tools keeps result, no finalization",
+    "two concurrent exact calls start tools once",
+    "auth-off/API key/wrong actor/no token refused before records",
+    "changed root -> M10_SUBJECT_STALE, unpublished profile -> M10_PROFILE_STALE, nothing written",
+    "stored body or cached digest corruption refuses replay; raw UPDATE/DELETE refused on all three tables",
+    "migration upgrade/downgrade/upgrade on SQLite and PostgreSQL preserves predecessor rows"
+  ],
+  "limits": [
+    "Not production activation; no public router or default app registration.",
+    "Release-mode gating relies on existing require_submit_route semantics.",
+    "Unknown outcomes remain operator-reviewed M7 state; A4 has no resolution API."
+  ],
+  "test_sha256": {
+    "tests/integration/server/services/test_quality_probes.py": "9aaaf28f5a850b7aaa6f391f10af2e37a2e965bf96310b64ba31e112393a9279",
+    "tests/integration/server/services/test_quality_probe_runtime.py": "8d50f807446e96212f6385844f9feea2a97562b4d4ecf45d191b837492568988",
+    "tests/integration/server/services/test_quality_probe_recipes.py": "9017b5fc0414548124ed7ba8524e544364a31fda159487ac0a2408df260d3af8",
+    "tests/integration/lib/db/repositories/test_quality_probes.py": "ef097f2269ea873f58c52e2c21d3138941c228c056248a3b63393eb3796b1589",
+    "tests/integration/lib/db/migrations/test_07fd34535384_quality_probe_evidence.py": "ea347f867b13f49236be348b51d9ee300a1313b716762fe8418d989eb3bfb38f"
+  }
+}

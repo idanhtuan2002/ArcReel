@@ -98,6 +98,11 @@ from lib.db.models.quality import (
     QualityProfileHeadModel,
     QualityProfileRevisionModel,
 )
+from lib.db.models.quality_probes import (
+    QualityProbeInvocationModel,
+    QualityProbeObservationModel,
+    QualityProbeResultModel,
+)
 from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
 from lib.db.models.session_message_link import AgentSessionUserMessageLink
@@ -206,6 +211,9 @@ __all__ = [
     "PublishApprovalDecisionModel",
     "QualityCommandModel",
     "QualityOutboxModel",
+    "QualityProbeInvocationModel",
+    "QualityProbeObservationModel",
+    "QualityProbeResultModel",
     "QualityProfileHeadModel",
     "QualityProfileRevisionModel",
     "ShowrunnerGrantEventModel",
