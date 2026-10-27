@@ -1,0 +1,52 @@
+{
+  "schema_id": "m10.a4-primitives-qualification.v1",
+  "status": "PRIMITIVES_QUALIFIED_TASK2_STILL_OPEN",
+  "source_head": "fa828347928d9d229da81019b7698bb9bdcf6dc3",
+  "source_hashes": {
+    "r2/quality/probes.py": "3f0a2fd95ccdf905e3bfae6139e665ad0867672072fdd435416400f954c9ca81",
+    "tests/unit/r2/quality/test_probes.py": "0bb8a7c3d7455c5bf6180ec857b1d59cb6746c35802fb6f9a3c47bc080ae04cc"
+  },
+  "implemented": [
+    "MediaTime strict rational reduction and immutability",
+    "Interval ordered nonnegative time bounds",
+    "IntervalFacts sorted unique measured-span and EOF closure checks",
+    "LoudnessFacts explicit FINITE/SILENT/UNMEASURABLE without fake zero",
+    "canonical_decimal bounded exact decimal strings and isolated precision24 context"
+  ],
+  "pytest": {
+    "command": "python -m pytest tests/unit/r2/quality/test_probes.py tests/unit/r2/quality/test_quality_ports.py tests/unit/r2/quality/test_quality_digests.py -q --tb=short",
+    "result": {
+      "tests": 145,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0
+    },
+    "duration_seconds": 4.41,
+    "warning": "Existing SQLite expression-index reflection warning"
+  },
+  "checks": {
+    "ruff_current_repository": "all checks passed",
+    "ruff_format_current_two_files": "already formatted",
+    "basedpyright_current_two_files": "0errors0warnings",
+    "direct_source_boundary": [],
+    "import_linter": "23kept0broken",
+    "deptry": "no dependency issues",
+    "test_audit": "0violations",
+    "actual_clean_source_scope": "M10_A4_SCOPE_OKatfa828347928d9d229da81019b7698bb9bdcf6dc3"
+  },
+  "red_green": [
+    "Missing measurement module produced expected real pytestFAIL before implementation",
+    "Ambient decimal arithmetic context caused realFAIL, fixed using explicit Context; final145pass"
+  ],
+  "remaining_Task2": [
+    "container/stream, decode, caption and VMAF facts schemas",
+    "typed measurement/resources/execution-result bodies and digest helpers",
+    "trusted code-embedded config/policy catalog and bounded raw-result normalization",
+    "request envelope validation and complete Task2 targeted regression/qualification"
+  ],
+  "runtime_accepted": false,
+  "production_migration_authorized": false,
+  "runtime_activation_authorized": false,
+  "original_a3_readiness_closed": false,
+  "factual_admission_qualified": false
+}
