@@ -211,12 +211,12 @@ async def test_existing_verified_snapshot_and_new_snapshot_match_on_the_same_byt
         assert current.digest == expected
 
 
-def bound_request(recipe: str, master: Path, *, caption_digest: str | None = None):
+def bound_request(recipe: object, master: Path, *, caption_digest: str | None = None):
     from r2.quality.digests import compute_digest
     from r2.quality.ports import ProbeRequest
     from tests.unit.r2.quality.test_probes import probe_request_data, recipe_config
 
-    config = recipe_config(recipe)
+    config = recipe_config(recipe) if isinstance(recipe, str) else recipe
     from r2.quality.probes import policy_digest
 
     data = probe_request_data(config)

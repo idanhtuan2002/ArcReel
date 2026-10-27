@@ -559,6 +559,11 @@ def _private_digest(domain: str, body: object) -> str:
     return digest_canonical({"domain": domain, "contract_version": "1", "body": body})
 
 
+def probe_request_digest(request: ProbeRequest) -> str:
+    validate_probe_envelope(request)
+    return _private_digest("m10.probe-request.v1", ProbeRequest.model_validate(request))
+
+
 def config_digest(config: ProbeConfig) -> str:
     return _private_digest("m10.probe-config.v1", ProbeConfig.model_validate(config))
 
