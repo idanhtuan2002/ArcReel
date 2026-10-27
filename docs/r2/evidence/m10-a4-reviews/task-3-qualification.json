@@ -1,0 +1,76 @@
+{
+  "schema_id": "m10.a4-task3-qualification.v1",
+  "status": "TASK3_SNAPSHOTS_AND_ISOLATED_SUPERVISOR_COMPLETE",
+  "source_head": "ee6b7c322ce0f9cd4822c43b241691e3638b30c2",
+  "commits": {
+    "combined_inputs": "27c294a9f70cc58d7c6f6a917075da7c4e7a82b8",
+    "supervisor_worker": "ee6b7c322ce0f9cd4822c43b241691e3638b30c2"
+  },
+  "source_hashes": {
+    "r2/quality/probes.py": "024851d6463541b8c0519ab2a70020a024273f37cd8e64214d6e75e2726c3efd",
+    "server/services/quality_probe_inputs.py": "44437b0b95f7db123c9e805b10565db47b97bb0c8cd61bb9f094d64cd6b65876",
+    "server/services/quality_probe_runtime.py": "4d989ffcc2da26a1a530892de3f7958e40372bc1a9d8da2813edbce5efd70ea8",
+    "server/services/quality_probe_worker.py": "9b6ba22e5a3391fc96e33b9c3569faaedbd6ad602e01ef5ec72db2964c5c9034",
+    "tests/unit/server/services/test_quality_probe_inputs.py": "fa4a63ba323beb4fb3c56f6a15289882823d6c384eb0eb7bd6f1a4650044c50e",
+    "tests/unit/server/services/test_quality_probe_runtime.py": "0f3aae2079f64b431a4cd8db1464e3f8654e1126ccdde661548bfce930a21b78",
+    "tests/unit/server/services/test_quality_probe_worker.py": "3bdd6e76e34c91a3b77e78632b86cf3f24d2350273f4df79435025385bc89f11",
+    "tests/integration/server/services/test_quality_probe_runtime.py": "186c20c0480f756b6ff96157ac846077d6af9a025fe023541530fe61e0ec1ec1"
+  },
+  "host": {
+    "kernel": "7.0.0-38-generic",
+    "systemd": "259 (259.5-0ubuntu3.4)",
+    "worker_python": "/usr/bin/python3 3.14.4",
+    "landlock_abi_observed": 8,
+    "user_cgroup_controllers": "cpu memory pids"
+  },
+  "tests": {
+    "command": "UV_PROJECT_ENVIRONMENT=shared-r2-v2-main/.venv uv run --no-sync python -m pytest tests/unit/server/services/test_quality_probe_{inputs,runtime,worker}.py tests/integration/server/services/test_quality_probe_runtime.py tests/unit/r2/quality tests/unit/scripts/r2/test_verify_m10_a4_scope.py + 2 test_format_validation snapshot regressions",
+    "result": {
+      "tests": 463,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "junit_sha256": "03a093c692ea1879c257a439757180de864aed3cf1c8a5afbb230db631f6e9bd",
+    "kernel_integration_cases_executed_not_skipped": 10,
+    "kernel_cases": [
+      "bounded success with cleanup and effective caps",
+      "real worker tool verification then RECIPE_UNAVAILABLE",
+      "changed tool build output TOOL_UNQUALIFIED",
+      "read/write/create escape EACCES, AF_INET/AF_UNIX EPERM, out-of-domain signal EPERM, unlisted exec EACCES, process_vm_readv/ptrace EPERM, no inherited secret env/fd",
+      "fork exhaustion EAGAIN below TasksMax and descendants removed",
+      "700MiB allocation OOM_KILL -> M10_OPERATIONAL_ENVELOPE_EXCEEDED",
+      "output flood stopped at ceiling",
+      "RuntimeMaxSec timeout kills unit",
+      "setsid descendant removed with control group",
+      "missing user manager: only systemd-run/systemctl spawned, M10_REQUIRED_EVIDENCE_MISSING"
+    ],
+    "mutation_checks": {
+      "SystemCallFilter replaced by ~@obsolete": "escape case failed",
+      "Landlock install skipped": "escape case failed"
+    }
+  },
+  "static_gates_whole_tree": {
+    "ruff_check": "All checks passed!",
+    "ruff_format": "2040 files already formatted",
+    "basedpyright": "0 errors, 0 warnings, 0 notes",
+    "lint_imports": "23 kept, 0 broken",
+    "deptry": "no issues",
+    "audit_tests": "0 violations"
+  },
+  "scope_guard": "M10_A4_SCOPE_OK on clean ee6b7c322ce0f9cd4822c43b241691e3638b30c2",
+  "decisions": [
+    "Catalog-owned ProbeInputBinding locates caption/reference beneath project root; requests carry no paths.",
+    "Worker emits facts only; host builds ProbeMeasurement with catalog policy (policy logic stays out of the isolated worker).",
+    "systemd-run summary is parsed from the trailing block; worker stderr is redirected to /dev/null after start.",
+    "System interpreter/systemd-run are hashed at their resolved targets in the control identity; tool executables are hashed with O_NOFOLLOW."
+  ],
+  "limitations": [
+    "Recipes (Task 4) are not implemented; real worker refuses every recipe as RECIPE_UNAVAILABLE.",
+    "Kernel integration cases require a systemd user manager with delegated cpu/memory/pids; CI without it will fail these cases rather than skip.",
+    "Failure-path ResourceEvidence is not yet persisted; Task 5 owns storage of failed/ambiguous executions.",
+    "Root authority equality (MasterAuthorityRepository) must precede snapshot_probe_inputs; enforced in Task 5."
+  ],
+  "runtime_accepted": false,
+  "production_activation": false
+}
