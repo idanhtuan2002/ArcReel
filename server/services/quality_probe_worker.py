@@ -13,6 +13,7 @@ import ctypes
 import hashlib
 import json
 import os
+import re
 import selectors
 import signal
 import subprocess
@@ -20,6 +21,7 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
 
 CONFIG_SCHEMA = "m10.probe-worker-config.v1"
@@ -403,7 +405,593 @@ def verify_tools(config: dict[str, object], *, deadline: float) -> None:
             raise WorkerError("TOOL_UNQUALIFIED")
 
 
-RECIPES: dict[str, Callable[[dict[str, object], float], dict[str, object]]] = {}
+_MP4_FORMAT = "mov,mp4,m4a,3gp,3g2,mj2"
+_PROBE_ENTRIES = (
+    "format=format_name,duration:stream=index,codec_type,codec_name,width,height,pix_fmt,sample_rate,channels,"
+    "avg_frame_rate,time_base,duration_ts,start_time"
+)
+_DECIMAL = r"-?[0-9]+(?:\.[0-9]+)?"
+_MAX_CAPTION_BYTES = 262144
+_MAX_ENTRIES = 10000
+_MAX_VMAF_PIXELS = 2073600
+
+
+def _recipe(config: dict[str, object]) -> tuple[dict[str, object], dict[str, object], int]:
+    recipe = config["recipe"]
+    if type(recipe) is not dict:
+        raise WorkerError("CONFIG_INVALID")
+    parameters, inputs, cap = recipe["parameters"], recipe["inputs"], recipe["output_cap"]
+    if type(parameters) is not dict or type(inputs) is not dict or type(cap) is not int:
+        raise WorkerError("CONFIG_INVALID")
+    return (parameters, inputs, cap)
+
+
+def _tool_path(config: dict[str, object], name: str) -> str:
+    tools = config["tools"]
+    if type(tools) is not list:
+        raise WorkerError("CONFIG_INVALID")
+    for tool in tools:
+        if tool["name"] == name:
+            return tool["path"]
+    raise WorkerError("TOOL_UNQUALIFIED")
+
+
+def _vmaf_model(config: dict[str, object]) -> tuple[str, str]:
+    tools = config["tools"]
+    if type(tools) is not list:
+        raise WorkerError("CONFIG_INVALID")
+    for tool in tools:
+        if tool["name"] == "vmaf" and tool["model_path"] is not None:
+            return (tool["model_path"], tool["model_digest"])
+    raise WorkerError("TOOL_UNQUALIFIED")
+
+
+def _time(value: Fraction) -> dict[str, int]:
+    return {"numerator": value.numerator, "denominator": value.denominator}
+
+
+def _decimal(value: object, failure: str) -> Fraction:
+    if type(value) is not str or len(value) > 64 or re.fullmatch(_DECIMAL, value) is None:
+        raise WorkerError(failure)
+    return Fraction(value)
+
+
+def _rational(value: object, failure: str) -> Fraction:
+    match = re.fullmatch(r"(-?[0-9]{1,18})/([0-9]{1,18})", value) if type(value) is str else None
+    if match is None or int(match.group(2)) == 0:
+        raise WorkerError(failure)
+    return Fraction(int(match.group(1)), int(match.group(2)))
+
+
+def _parameter_decimal(parameters: dict[str, object], key: str) -> str:
+    value = parameters.get(key)
+    _decimal(value, "CONFIG_INVALID")
+    return str(value)
+
+
+def _seconds(parameters: dict[str, object], key: str) -> str:
+    value = parameters.get(key)
+    if type(value) is not int or not 0 < value <= 120000:
+        raise WorkerError("CONFIG_INVALID")
+    whole, rest = divmod(value, 1000)
+    return f"{whole}.{rest:03d}"
+
+
+def _strict_output(raw: bytes, failure: str) -> object:
+    def pairs(items: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in items:
+            if key in result:
+                raise WorkerError(failure)
+            result[key] = value
+        return result
+
+    def constant(value: str) -> None:
+        raise WorkerError(failure)
+
+    try:
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=pairs, parse_float=str, parse_constant=constant)
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        raise WorkerError(failure) from None
+
+
+def _media_argv(config: dict[str, object], path: str, *, level: str) -> list[str]:
+    return [
+        _tool_path(config, "ffmpeg"),
+        "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-v",
+        level,
+        "-threads",
+        "1",
+        "-protocol_whitelist",
+        "file",
+        "-f",
+        "mov",
+        "-i",
+        path,
+    ]
+
+
+@dataclass(frozen=True)
+class VideoShape:
+    width: int
+    height: int
+    rate: Fraction
+    start: Fraction
+
+
+@dataclass(frozen=True)
+class MediaFacts:
+    duration: Fraction
+    streams: list[dict[str, object]]
+    video: VideoShape | None
+    audio: bool
+
+
+def _input(inputs: dict[str, object], key: str) -> str | None:
+    value = inputs.get(key)
+    if value is not None and type(value) is not str:
+        raise WorkerError("CONFIG_INVALID")
+    return value
+
+
+def probe_media(config: dict[str, object], path: str, *, deadline: float, failure: str) -> MediaFacts:
+    """Fixed FFprobe whitelist over the forced MP4 demuxer; anything outside the qualified surface fails closed."""
+    _, _, cap = _recipe(config)
+    argv = [
+        _tool_path(config, "ffprobe"),
+        "-v",
+        "error",
+        "-protocol_whitelist",
+        "file",
+        "-f",
+        "mov",
+        "-show_entries",
+        _PROBE_ENTRIES,
+        "-of",
+        "json",
+        path,
+    ]
+    code, output, _ = run_tool(argv, deadline=deadline, output_cap=cap)
+    if code != 0:
+        raise WorkerError(failure)
+    data = _strict_output(output, failure)
+    if type(data) is not dict or type(data.get("format")) is not dict or type(data.get("streams")) is not list:
+        raise WorkerError(failure)
+    unsupported = "UNSUPPORTED_INPUT" if failure == "INPUT_INVALID" else failure
+    if data["format"].get("format_name") != _MP4_FORMAT:
+        raise WorkerError(unsupported)
+    duration = _decimal(data["format"].get("duration"), failure)
+    streams: list[dict[str, object]] = []
+    video: VideoShape | None = None
+    audio = False
+    for stream in data["streams"]:
+        if type(stream) is not dict or type(stream.get("index")) is not int:
+            raise WorkerError(failure)
+        time_base = _rational(stream.get("time_base"), failure)
+        length = stream.get("duration_ts")
+        stream_duration = _time(length * time_base) if type(length) is int and length >= 0 else "UNKNOWN"
+        kind = stream.get("codec_type")
+        if kind == "video" and video is None:
+            if stream.get("codec_name") != "h264" or stream.get("pix_fmt") != "yuv420p":
+                raise WorkerError(unsupported)
+            width, height = stream.get("width"), stream.get("height")
+            rate = _rational(stream.get("avg_frame_rate"), unsupported)
+            if type(width) is not int or type(height) is not int or rate <= 0:
+                raise WorkerError(unsupported)
+            start = _decimal(stream.get("start_time"), failure)
+            video = VideoShape(width, height, rate, start)
+            streams.append(
+                {
+                    "index": stream["index"],
+                    "kind": "VIDEO",
+                    "codec": "h264",
+                    "width": width,
+                    "height": height,
+                    "pixel_format": "yuv420p",
+                    "frame_rate": _time(rate),
+                    "time_base": _time(time_base),
+                    "duration": stream_duration,
+                }
+            )
+        elif kind == "audio" and not audio:
+            rate_text, channels = stream.get("sample_rate"), stream.get("channels")
+            if stream.get("codec_name") != "aac" or type(channels) is not int:
+                raise WorkerError(unsupported)
+            if type(rate_text) is not str or re.fullmatch(r"[1-9][0-9]{0,5}", rate_text) is None:
+                raise WorkerError(unsupported)
+            audio = True
+            streams.append(
+                {
+                    "index": stream["index"],
+                    "kind": "AUDIO",
+                    "codec": "aac",
+                    "sample_rate": int(rate_text),
+                    "channels": channels,
+                    "time_base": _time(time_base),
+                    "duration": stream_duration,
+                }
+            )
+        else:
+            raise WorkerError(unsupported)
+    if not streams:
+        raise WorkerError(unsupported)
+    return MediaFacts(duration, streams, video, audio)
+
+
+def _target(config: dict[str, object]) -> str:
+    _, inputs, _ = _recipe(config)
+    target = _input(inputs, "target")
+    if target is None:
+        raise WorkerError("CONFIG_INVALID")
+    return target
+
+
+def container_recipe(config: dict[str, object], deadline: float) -> dict[str, object]:
+    media = probe_media(config, _target(config), deadline=deadline, failure="INPUT_INVALID")
+    return {
+        "kind": "CONTAINER_STREAM",
+        "format": "MP4",
+        "duration": _time(media.duration),
+        "streams": media.streams,
+    }
+
+
+def decode_recipe(config: dict[str, object], deadline: float) -> dict[str, object]:
+    _, _, cap = _recipe(config)
+    media = probe_media(config, _target(config), deadline=deadline, failure="INPUT_INVALID")
+    argv = _media_argv(config, _target(config), level="error")
+    argv[6:6] = ["-xerror"]
+    argv += ["-map", "0:v?", "-map", "0:a?", "-filter_threads", "1", "-f", "null", "-"]
+    code, output, errors = run_tool(argv, deadline=deadline, output_cap=cap)
+    indices = sorted(int(str(stream["index"])) for stream in media.streams)
+    return {"kind": "DECODE", "stream_indices": indices, "complete": code == 0 and output == b"" and errors == b""}
+
+
+_INTERVAL_KEYS = {
+    "lavfi.black_start": ("BLACK", True),
+    "lavfi.black_end": ("BLACK", False),
+    "lavfi.freezedetect.freeze_start": ("FREEZE", True),
+    "lavfi.freezedetect.freeze_end": ("FREEZE", False),
+    "lavfi.silence_start": ("SILENCE", True),
+    "lavfi.silence_end": ("SILENCE", False),
+}
+_IGNORED_KEYS = frozenset({"lavfi.freezedetect.freeze_duration", "lavfi.silence_duration"})
+
+
+def parse_intervals(texts: list[str], duration: Fraction) -> list[dict[str, object]]:
+    """Exact detector boundaries from per-graph frame metadata files; an interval still open at EOF closes at the
+    independently measured duration and carries the EOF marker."""
+    found: list[tuple[Fraction, Fraction, str, bool]] = []
+    for text in texts:
+        opened: dict[str, Fraction] = {}
+
+        def close(kind: str, start: Fraction, end: Fraction) -> None:
+            eof = end >= duration
+            end = min(end, duration)
+            if start < 0 or start > end:
+                raise WorkerError("TOOL_FAILED")
+            found.append((start, end, kind, eof))
+
+        for line in text.splitlines():
+            if re.fullmatch(rf"frame:[0-9]+ +pts:-?[0-9]+ +pts_time:{_DECIMAL}", line):
+                continue
+            key, separator, value = line.partition("=")
+            if not separator or (key not in _INTERVAL_KEYS and key not in _IGNORED_KEYS):
+                raise WorkerError("TOOL_FAILED")
+            if key in _IGNORED_KEYS:
+                continue
+            kind, opening = _INTERVAL_KEYS[key]
+            moment = _decimal(value, "TOOL_FAILED")
+            if opening:
+                if kind in opened:
+                    raise WorkerError("TOOL_FAILED")
+                opened[kind] = moment
+            elif kind in opened:
+                close(kind, opened.pop(kind), moment)
+            else:
+                raise WorkerError("TOOL_FAILED")
+        for kind, start in opened.items():
+            close(kind, start, duration)
+    ordered = sorted(set(found), key=lambda item: (item[0], item[1], item[2]))
+    if len(ordered) > _MAX_ENTRIES:
+        raise WorkerError("OUTPUT_EXCEEDED")
+    return [
+        {"kind": kind, "start": _time(start), "end": _time(end), "ended_at_eof": eof}
+        for start, end, kind, eof in ordered
+    ]
+
+
+def _filter_path(path: str) -> str:
+    if re.fullmatch(r"/[A-Za-z0-9/_.-]+", path) is None:
+        raise WorkerError("CONFIG_INVALID")
+    return path
+
+
+def intervals_recipe(config: dict[str, object], deadline: float) -> dict[str, object]:
+    parameters, _, cap = _recipe(config)
+    kinds = parameters.get("interval_kinds")
+    if type(kinds) is not list or not set(kinds) <= {"BLACK", "FREEZE", "SILENCE"} or not kinds:
+        raise WorkerError("CONFIG_INVALID")
+    scratch = _paths(config["scratch"])
+    media = probe_media(config, _target(config), deadline=deadline, failure="INPUT_INVALID")
+    video_filters = []
+    if "BLACK" in kinds:
+        video_filters.append(
+            f"blackdetect=d={_seconds(parameters, 'black_min_duration_ms')}"
+            f":pic_th={_parameter_decimal(parameters, 'black_picture_ratio')}"
+            f":pix_th={_parameter_decimal(parameters, 'black_pixel_threshold')}"
+        )
+    if "FREEZE" in kinds:
+        video_filters.append(
+            f"freezedetect=n={_parameter_decimal(parameters, 'freeze_noise_db')}dB"
+            f":d={_seconds(parameters, 'freeze_min_duration_ms')}"
+        )
+    if (video_filters and media.video is None) or ("SILENCE" in kinds and not media.audio):
+        raise WorkerError("INPUT_INVALID")
+    argv = _media_argv(config, _target(config), level="error")
+    files: list[str] = []
+    if video_filters:
+        files.append(scratch[0])
+        video_filters.append(f"metadata=mode=print:file={_filter_path(scratch[0])}")
+        argv += ["-map", "0:v:0", "-vf", ",".join(video_filters)]
+    if "SILENCE" in kinds:
+        files.append(scratch[1])
+        argv += [
+            "-map",
+            "0:a:0",
+            "-af",
+            f"silencedetect=n={_parameter_decimal(parameters, 'silence_noise_db')}dB"
+            f":d={_seconds(parameters, 'silence_min_duration_ms')},"
+            f"ametadata=mode=print:file={_filter_path(scratch[1])}",
+        ]
+    argv += ["-filter_threads", "1", "-f", "null", "-"]
+    code, _, errors = run_tool(argv, deadline=deadline, output_cap=cap)
+    if code != 0 or errors:
+        raise WorkerError("TOOL_FAILED")
+    texts = [_read_bounded(path, cap, "OUTPUT_EXCEEDED").decode("utf-8", "replace") for path in files]
+    intervals = parse_intervals(texts, media.duration)
+    return {"kind": "INTERVALS", "measured_duration": _time(media.duration), "intervals": intervals}
+
+
+def parse_loudness(text: str) -> dict[str, object]:
+    """Read only the final ebur128 summary; gate-floor or -inf peak is SILENT, non-finite values UNMEASURABLE."""
+    marker = text.rfind("] Summary:")
+    if marker < 0:
+        raise WorkerError("TOOL_FAILED")
+    summary = text[marker:]
+    integrated = re.search(r"^\s+I:\s+(\S+) LUFS$", summary, re.MULTILINE)
+    peak = re.search(r"^\s+Peak:\s+(\S+) dBFS$", summary, re.MULTILINE)
+    if integrated is None or peak is None:
+        raise WorkerError("TOOL_FAILED")
+    lufs, dbfs = integrated.group(1), peak.group(1)
+    if dbfs == "-inf" or lufs == "-70.0":
+        return {"kind": "LOUDNESS", "state": "SILENT", "integrated_lufs": None, "true_peak_dbfs": None}
+    if re.fullmatch(_DECIMAL, lufs) is None or re.fullmatch(_DECIMAL, dbfs) is None:
+        return {"kind": "LOUDNESS", "state": "UNMEASURABLE", "integrated_lufs": None, "true_peak_dbfs": None}
+    return {"kind": "LOUDNESS", "state": "FINITE", "integrated_lufs": lufs, "true_peak_dbfs": dbfs}
+
+
+def loudness_recipe(config: dict[str, object], deadline: float) -> dict[str, object]:
+    _, _, cap = _recipe(config)
+    media = probe_media(config, _target(config), deadline=deadline, failure="INPUT_INVALID")
+    if not media.audio:
+        return {"kind": "LOUDNESS", "state": "UNMEASURABLE", "integrated_lufs": None, "true_peak_dbfs": None}
+    argv = _media_argv(config, _target(config), level="info")
+    argv += ["-map", "0:a:0", "-af", "ebur128=peak=true:framelog=verbose", "-filter_threads", "1", "-f", "null", "-"]
+    code, _, errors = run_tool(argv, deadline=deadline, output_cap=cap)
+    if code != 0:
+        raise WorkerError("TOOL_FAILED")
+    return parse_loudness(errors.decode("utf-8", "replace"))
+
+
+def _cue_time(hours: str | None, minutes: str, seconds: str, millis: str) -> Fraction:
+    return Fraction(int(hours or 0) * 3600 + int(minutes) * 60 + int(seconds)) + Fraction(int(millis), 1000)
+
+
+def parse_captions(raw: bytes, caption_format: object) -> list[tuple[Fraction, Fraction]]:
+    """Strict UTF-8 SRT/WebVTT timing parser; caption text is never retained."""
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise WorkerError("INPUT_INVALID") from None
+    text = text.removeprefix("\ufeff").replace("\r\n", "\n")
+    if "\r" in text or "\0" in text:
+        raise WorkerError("INPUT_INVALID")
+    blocks = [block for block in re.split(r"\n{2,}", text.strip("\n")) if block]
+    cues: list[tuple[Fraction, Fraction]] = []
+    if caption_format == "SRT":
+        timing = (
+            r"([0-9]{2,}):([0-5][0-9]):([0-5][0-9]),([0-9]{3}) --> ([0-9]{2,}):([0-5][0-9]):([0-5][0-9]),([0-9]{3})"
+        )
+        for block in blocks:
+            lines = block.split("\n")
+            match = re.fullmatch(timing, lines[1]) if len(lines) >= 3 else None
+            if match is None or re.fullmatch(r"[0-9]+", lines[0]) is None:
+                raise WorkerError("INPUT_INVALID")
+            cues.append((_cue_time(*match.groups()[:4]), _cue_time(*match.groups()[4:])))
+    elif caption_format == "WEBVTT":
+        if not blocks or re.fullmatch(r"WEBVTT(?:[ \t][^\n]*)?", blocks[0].split("\n")[0]) is None:
+            raise WorkerError("INPUT_INVALID")
+        stamp = r"(?:([0-9]{2,}):)?([0-5][0-9]):([0-5][0-9])\.([0-9]{3})"
+        for block in blocks[1:]:
+            lines = block.split("\n")
+            if re.match(r"(?:NOTE|STYLE|REGION)(?:[ \t]|$)", lines[0]):
+                continue
+            line = lines[0] if "-->" in lines[0] else (lines[1] if len(lines) > 1 else "")
+            match = re.fullmatch(rf"{stamp} --> {stamp}(?:[ \t][^\n]*)?", line)
+            if match is None:
+                raise WorkerError("INPUT_INVALID")
+            cues.append((_cue_time(*match.groups()[:4]), _cue_time(*match.groups()[4:])))
+    else:
+        raise WorkerError("CONFIG_INVALID")
+    if len(cues) > _MAX_ENTRIES:
+        raise WorkerError("INPUT_INVALID")
+    return cues
+
+
+def _read_bounded(path: str, limit: int, failure: str) -> bytes:
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        try:
+            raw = os.read(descriptor, limit + 1)
+        finally:
+            os.close(descriptor)
+    except OSError:
+        raise WorkerError(failure) from None
+    if len(raw) > limit:
+        raise WorkerError(failure)
+    return raw
+
+
+def captions_recipe(config: dict[str, object], deadline: float) -> dict[str, object]:
+    parameters, inputs, _ = _recipe(config)
+    caption = _input(inputs, "caption")
+    if caption is None:
+        raise WorkerError("CONFIG_INVALID")
+    media = probe_media(config, _target(config), deadline=deadline, failure="INPUT_INVALID")
+    duration = media.duration
+    cues = sorted(
+        parse_captions(_read_bounded(caption, _MAX_CAPTION_BYTES, "INPUT_INVALID"), parameters.get("caption_format"))
+    )
+    covered = Fraction(0)
+    right = Fraction(0)
+    overlaps = 0
+    for start, end in cues:
+        if not 0 <= start < end or end > duration:
+            raise WorkerError("INPUT_INVALID")
+        overlaps += int(start < right)
+        covered += max(Fraction(0), end - max(start, right))
+        right = max(right, end)
+    return {
+        "kind": "CAPTIONS",
+        "format": parameters.get("caption_format"),
+        "measured_duration": _time(duration),
+        "cue_count": len(cues),
+        "cue_times": [{"start": _time(start), "end": _time(end)} for start, end in cues],
+        "union_coverage": _time(covered),
+        "overlap_count": overlaps,
+    }
+
+
+def _member(value: object, key: str) -> object:
+    if type(value) is not dict or key not in value:
+        raise WorkerError("TOOL_FAILED")
+    return value[key]
+
+
+def vmaf_recipe(config: dict[str, object], deadline: float) -> dict[str, object]:
+    """Pinned VMAF over exactly the first five decoded frames of comparable, zero-offset 8-bit 4:2:0 sources."""
+    _, inputs, cap = _recipe(config)
+    reference_path = _input(inputs, "reference")
+    scratch = [str(path) for path in _paths(config["scratch"])]
+    if reference_path is None:
+        raise WorkerError("REFERENCE_INVALID")
+    target = probe_media(config, _target(config), deadline=deadline, failure="INPUT_INVALID")
+    reference = probe_media(config, reference_path, deadline=deadline, failure="REFERENCE_INVALID")
+    video, other = target.video, reference.video
+    if video is None or other is None:
+        raise WorkerError("REFERENCE_INVALID")
+    width, height, rate = video.width, video.height, video.rate
+    if (
+        (width, height, rate) != (other.width, other.height, other.rate)
+        or video.start != 0
+        or other.start != 0
+        or width % 2
+        or height % 2
+        or width * height > _MAX_VMAF_PIXELS
+        or not 1 <= rate <= 60
+    ):
+        raise WorkerError("REFERENCE_INVALID")
+    expected = width * height * 3 // 2 * 5
+    for source, destination, failure in (
+        (_target(config), scratch[0], "INPUT_INVALID"),
+        (reference_path, scratch[1], "REFERENCE_INVALID"),
+    ):
+        argv = _media_argv(config, source, level="error")
+        argv[6:6] = ["-xerror"]
+        argv += [
+            "-map",
+            "0:v:0",
+            "-frames:v",
+            "5",
+            "-filter_threads",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "yuv420p",
+            "-y",
+            destination,
+        ]
+        code, _, _ = run_tool(argv, deadline=deadline, output_cap=cap)
+        if code != 0:
+            raise WorkerError(failure)
+        if os.stat(destination).st_size != expected:
+            raise WorkerError("REFERENCE_INVALID")
+    model, model_digest = _vmaf_model(config)
+    argv = [
+        _tool_path(config, "vmaf"),
+        "--reference",
+        scratch[1],
+        "--distorted",
+        scratch[0],
+        "--width",
+        str(width),
+        "--height",
+        str(height),
+        "--pixel_format",
+        "420",
+        "--bitdepth",
+        "8",
+        "--model",
+        "path=" + model,
+        "--output",
+        scratch[2],
+        "--json",
+        "--threads",
+        "1",
+        "--cpumask",
+        "4294967295",
+        "--frame_cnt",
+        "5",
+        "--quiet",
+    ]
+    code, _, _ = run_tool(argv, deadline=deadline, output_cap=cap)
+    if code != 0:
+        raise WorkerError("TOOL_FAILED")
+    report = _strict_output(_read_bounded(scratch[2], cap, "OUTPUT_EXCEEDED"), "TOOL_FAILED")
+    frames = _member(report, "frames")
+    if type(frames) is not list or len(frames) != 5:
+        raise WorkerError("TOOL_FAILED")
+    if [_member(frame, "frameNum") for frame in frames] != [0, 1, 2, 3, 4]:
+        raise WorkerError("TOOL_FAILED")
+    scores = [_member(_member(frame, "metrics"), "vmaf") for frame in frames]
+    mean = _member(_member(_member(report, "pooled_metrics"), "vmaf"), "mean")
+    if any(type(score) is not str for score in scores) or type(mean) is not str:
+        raise WorkerError("TOOL_FAILED")
+    return {
+        "kind": "REFERENCE_VMAF",
+        "span": "FIRST_5_FRAMES",
+        "width": width,
+        "height": height,
+        "frame_rate": _time(rate),
+        "model_digest": model_digest,
+        "frames": [{"index": index, "score": score} for index, score in enumerate(scores)],
+        "mean": mean,
+    }
+
+
+RECIPES: dict[str, Callable[[dict[str, object], float], dict[str, object]]] = {
+    "CONTAINER_STREAM": container_recipe,
+    "DECODE": decode_recipe,
+    "INTERVALS": intervals_recipe,
+    "LOUDNESS": loudness_recipe,
+    "CAPTIONS": captions_recipe,
+    "REFERENCE_VMAF": vmaf_recipe,
+}
 
 
 def _emit(body: dict[str, object]) -> None:

@@ -197,3 +197,102 @@ def test_tool_output_flood_and_deadline_kill_the_whole_tool_group(tmp_path: Path
         time.sleep(0.05)
     else:
         pytest.fail("tool descendant survived the deadline")
+
+
+def test_interval_parser_keeps_exact_bounds_and_closes_open_eof_intervals() -> None:
+    from fractions import Fraction
+
+    video = "\n".join(
+        [
+            "frame:0    pts:0       pts_time:0",
+            "lavfi.black_start=0",
+            "frame:5    pts:5120    pts_time:0.5",
+            "lavfi.freezedetect.freeze_start=0",
+            "frame:10   pts:10240   pts_time:1",
+            "lavfi.black_end=1",
+            "lavfi.freezedetect.freeze_duration=1",
+            "lavfi.freezedetect.freeze_end=1",
+            "frame:35   pts:35840   pts_time:3.5",
+            "lavfi.black_start=3.5",
+            "lavfi.freezedetect.freeze_start=3",
+        ]
+    )
+    audio = "frame:7 pts:7168 pts_time:0.448\nlavfi.silence_start=0\nlavfi.silence_end=1.000063\nlavfi.silence_duration=1.000063"
+    intervals = worker.parse_intervals([video, audio], Fraction(4))
+    assert [(item["kind"], item["start"], item["end"], item["ended_at_eof"]) for item in intervals] == [
+        ("BLACK", {"numerator": 0, "denominator": 1}, {"numerator": 1, "denominator": 1}, False),
+        ("FREEZE", {"numerator": 0, "denominator": 1}, {"numerator": 1, "denominator": 1}, False),
+        ("SILENCE", {"numerator": 0, "denominator": 1}, {"numerator": 1000063, "denominator": 1000000}, False),
+        ("FREEZE", {"numerator": 3, "denominator": 1}, {"numerator": 4, "denominator": 1}, True),
+        ("BLACK", {"numerator": 7, "denominator": 2}, {"numerator": 4, "denominator": 1}, True),
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "lavfi.silence_end=1",
+        "lavfi.silence_start=0\nlavfi.silence_start=1",
+        "lavfi.black_start=5",
+        "lavfi.black_start=x",
+        "lavfi.unexpected=1",
+        "[silencedetect @ 0x1] silence_start: 0",
+    ],
+)
+def test_interval_parser_refuses_inconsistent_or_unknown_detector_output(text: str) -> None:
+    from fractions import Fraction
+
+    assert status_of(lambda: worker.parse_intervals([text], Fraction(4))) == "TOOL_FAILED"
+
+
+def loudness_summary(lufs: str, peak: str) -> str:
+    return (
+        "[Parsed_ebur128_0 @ 0x1] t: 0.1 I: -10.0 LUFS\n[Parsed_ebur128_0 @ 0x1] Summary:\n\n"
+        f"  Integrated loudness:\n    I:         {lufs} LUFS\n    Threshold: -31.7 LUFS\n\n"
+        f"  True peak:\n    Peak:      {peak} dBFS\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("lufs", "peak", "state"),
+    [
+        ("-21.7", "-18.0", "FINITE"),
+        ("-70.0", "-inf", "SILENT"),
+        ("-70.0", "-60.2", "SILENT"),
+        ("nan", "-3.0", "UNMEASURABLE"),
+        ("-inf", "-3.0", "UNMEASURABLE"),
+    ],
+)
+def test_loudness_uses_only_the_final_summary_and_explicit_absent_states(lufs: str, peak: str, state: str) -> None:
+    facts = worker.parse_loudness(loudness_summary(lufs, peak))
+    assert facts["state"] == state
+    if state == "FINITE":
+        assert (facts["integrated_lufs"], facts["true_peak_dbfs"]) == (lufs, peak)
+    else:
+        assert (facts["integrated_lufs"], facts["true_peak_dbfs"]) == (None, None)
+    assert status_of(lambda: worker.parse_loudness("no summary I: -1.0 LUFS")) == "TOOL_FAILED"
+
+
+def test_caption_parser_reads_only_timing_from_strict_srt_and_webvtt() -> None:
+    from fractions import Fraction
+
+    srt = b"\xef\xbb\xbf1\r\n00:00:00,000 --> 00:00:01,250\r\nhello\r\n\r\n2\r\n01:00:00,000 --> 01:00:01,000\r\nx\r\n"
+    assert worker.parse_captions(srt, "SRT") == [(Fraction(0), Fraction(5, 4)), (Fraction(3600), Fraction(3601))]
+    vtt = b"WEBVTT - title\n\nNOTE skipped\n\nSTYLE\n::cue {}\n\nid\n00:01.500 --> 00:02.000 line:0\ntext\n"
+    assert worker.parse_captions(vtt, "WEBVTT") == [(Fraction(3, 2), Fraction(2))]
+
+
+@pytest.mark.parametrize(
+    ("raw", "caption_format"),
+    [
+        (b"1\n00:00:00,000 -> 00:00:01,000\na\n", "SRT"),
+        (b"x\n00:00:00,000 --> 00:00:01,000\na\n", "SRT"),
+        (b"1\n00:00:00,000 --> 00:00:01,000\n", "SRT"),
+        (b"1\n00:00:00,000 --> 00:00:01,000\n\xff\n", "SRT"),
+        (b"1\r00:00:00,000 --> 00:00:01,000\ra\r", "SRT"),
+        (b"00:00.000 --> 00:01.000\na\n", "WEBVTT"),
+        (b"WEBVTT\n\n00:00,000 --> 00:01,000\na\n", "WEBVTT"),
+    ],
+)
+def test_caption_parser_refuses_malformed_or_non_utf8_input(raw: bytes, caption_format: str) -> None:
+    assert status_of(lambda: worker.parse_captions(raw, caption_format)) == "INPUT_INVALID"

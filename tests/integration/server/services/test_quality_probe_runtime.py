@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from r2.quality.errors import OperationalEnvelopeExceededError, RequiredEvidenceMissingError
+from r2.quality.errors import OperationalEnvelopeExceededError, ProbeFailedError, RequiredEvidenceMissingError
 from server.services import quality_probe_runtime as runtime
 from server.services.quality_probe_inputs import snapshot_probe_inputs
 from tests.unit.server.services.test_quality_probe_inputs import bound_request, catalog
@@ -138,9 +138,9 @@ async def test_confined_recipe_returns_a_bounded_verified_execution_result(proje
     assert resources.scratch_sizes == (0, 0, 0)
 
 
-async def test_unchanged_real_worker_verifies_tools_then_refuses_an_unimplemented_recipe(project) -> None:
+async def test_unchanged_real_worker_verifies_tools_then_refuses_non_media_input(project) -> None:
     outcome, report = await launch(project, WORKER)
-    assert report["status"] == "RECIPE_UNAVAILABLE"
+    assert report["status"] == "INPUT_INVALID"
     assert report["landlock_abi"] >= 6
     assert report["envelope"] == {
         "memory_max": 536870912,
@@ -150,7 +150,7 @@ async def test_unchanged_real_worker_verifies_tools_then_refuses_an_unimplemente
         "cpu_period_us": 100000,
     }
     assert outcome.group_cleanup_verified
-    with pytest.raises(RequiredEvidenceMissingError):
+    with pytest.raises(ProbeFailedError):
         await run(project, None)
 
 
