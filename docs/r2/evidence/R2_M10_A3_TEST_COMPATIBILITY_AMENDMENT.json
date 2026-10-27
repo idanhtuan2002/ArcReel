@@ -1,0 +1,136 @@
+{
+  "status": "M10_A3_P_TEST_COMPATIBILITY_AMENDMENT_RECORDED",
+  "source_head": "abaa866d0f53cdfcc76e9871b7f15557a1b0e24d",
+  "scope": "12 historical migration test files only; no production or old migration edits",
+  "reason": "accepted 16-path manifest cannot satisfy its full-suite requirement after adding its required successor migration",
+  "constraints": [
+    "Keep original acceptance and actual review records immutable.",
+    "Do not change the 82 historical migration bytes/modes or predecessor assertions.",
+    "New A3 migration tests assert exact singleton 65f53650f3a8, predecessor 918c4a0e0001 and actual SQLite/PostgreSQL roundtrips.",
+    "Do not present the no-op successor diagnostic as database/schema validation.",
+    "A3-P original readiness deferral and no activation/provider/production authority stay unchanged."
+  ],
+  "files": [
+    {
+      "path": "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+      "baseline_sha256": "1f50db9b2f47230daa841b1f998bfa9733147421bfece856ebce7c40564f3a8a",
+      "proposed_sha256": "9d2c9eaff59744ae0c3add7831dbcbae262102e31c2068d19ecfa9d2ddba4d4a",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_format_projections.py",
+      "baseline_sha256": "c980b58c3c333e80dd698b2e2e79176698b8bc31af3e8ca3092eea91f66275a0",
+      "proposed_sha256": "a2275cefd205ed4e7fca98ccaf8252c1da4ff560951de51483c4fa46e7791831",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_learning_observations.py",
+      "baseline_sha256": "37abc37b1ad37d307c01809711d87774417b2b111ddca7aa7e164b258aefc581",
+      "proposed_sha256": "e7c8f3d988dad3cf5c391df0ef0615e4b6e685f3a89adea787078b3d62a3b9e0",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+      "baseline_sha256": "b8d2943b6b30a95d5b88999b825458022a8c5ae4e35141cb22d38d3a65d5ba03",
+      "proposed_sha256": "4733921fa197d153d0f21dcafa64db9511bdc77565373f5ee7361667e09c608f",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_production_target_registry.py",
+      "baseline_sha256": "edbfb78f0796c3dc93bb73f149991535827ea241b1b41194741e57a0da3191e3",
+      "proposed_sha256": "441edd199de26eff233fc9b3d0f3973da10c08c0f427ecf19d572fbe1ea0ae00",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+      "baseline_sha256": "157e54fa75addf66f0d1821ed3881f5e5353abd5aa56d5c4138b156b46857a97",
+      "proposed_sha256": "d0c238953f3ad468b8eb8c70226485374b7461d6a5511bf49c92edc0b4060117",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+      "baseline_sha256": "f5572d24fe45baa4cfce98847a704a6cf5d47aaa5f774e8452301a35dd5ef257",
+      "proposed_sha256": "e3bc00ba18961948f9bc1e183b7db9510e0504289481793c8f016bea2f567381",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+      "baseline_sha256": "6626fe61df1ab4edfc141c44000dbc7cb6670f079fccd08dc40197b7eecc91a1",
+      "proposed_sha256": "8595fc52d626e18a9994a41a02da2ccb2f907eecce7c74762f1471519b651f5a",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+      "baseline_sha256": "3351c3c61a7faeefb0399cc5fac84aa18f0985b7549cbc4cf62cee68e6ac0486",
+      "proposed_sha256": "10abdbb7c62a692b92f4b2798fb9244d671a62218eabef6411a420a312dc8213",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+      "baseline_sha256": "39f1911c6b990e09dae8847a707d6afbeff22dd580344531f7c63bcfe72354c4",
+      "proposed_sha256": "8ac94f986f548c7564545f0faa66b20ab80dda92e63081313b77c56700ed9d66",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+      "baseline_sha256": "28dbe7c933b3d348f6def643bfa70e6cc4d2ad1bb65bbc4869741d072866f2a7",
+      "proposed_sha256": "fbfdb1faf551c4d2213e60298adaa9ba6d6e58c41bcd062c4cce8ee1163a332f",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+      "baseline_sha256": "3b2fa145fcfa0f4927e3b180b2a8b5ae8a0dc89d062920fe36f9a98ab67d5ea2",
+      "proposed_sha256": "e2d50cee359b36c701af1473233f448de3308ed3cf87d39e65c23a26db028eed",
+      "changed_assertions": "one head and immutable M8 ancestor; existing exact predecessor assertion retained",
+      "historical_upgrade_target": "918c4a0e0001"
+    }
+  ],
+  "schema_version": "1",
+  "author": "codex-main",
+  "authority": "Bounded implementation ruling under the user instruction to continue all necessary steps; no new runtime/architecture/production acceptance.",
+  "original_design_ref": "2e69816123c32ba057bfbed7d5e55344b3daa7d2",
+  "original_acceptance_ref": "c7a86813bd7a45f119262dc7acdfe9803967e181",
+  "ruling": "Permit only the exact baseline or prequalified replacement bytes for the twelve named historical tests. Preserve their exact local predecessor checks and all 82 predecessor migration files. The original design acceptance remains immutable; this amendment changes test compatibility scope only.",
+  "review_status": "Main-source verification; included in the final independent whole-packet implementation review, not an independent PASS claim.",
+  "qualification": {
+    "diagnostic": "12 actual existing test functions failed at old global-head assertion with a no-op successor before database access.",
+    "proposed_patch_sha256": "098c70611e9978569326088214a270646b6f1465748fc3bb7ed12aab9801ac83",
+    "test_command": [
+      "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/integration/lib/db/migrations/test_alembic_m8_exploration.py",
+      "tests/integration/lib/db/migrations/test_format_projections.py",
+      "tests/integration/lib/db/migrations/test_learning_observations.py",
+      "tests/integration/lib/db/migrations/test_production_binding_authority.py",
+      "tests/integration/lib/db/migrations/test_production_target_registry.py",
+      "tests/integration/lib/db/migrations/test_spatial_constraint_sets.py",
+      "tests/integration/lib/db/migrations/test_spatial_execution_evidence.py",
+      "tests/integration/lib/db/migrations/test_spatial_frame_receipts.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_authority.py",
+      "tests/integration/lib/db/migrations/test_spatial_pair_v2_custody.py",
+      "tests/integration/lib/db/migrations/test_spatial_promotion_sidecars.py",
+      "tests/integration/lib/db/migrations/test_spatial_review_custody.py",
+      "--junitxml=/home/anhtuan/content-production-os/.worktrees/r2-m10-v2/.superpowers/sdd/2026-10-27-r2-m10-a3/migration-amendment.xml"
+    ],
+    "result": "21 passed, zero skipped, 21 historical warnings in disposable clone with proposed patch plus no-op successor; real historical SQLite migrations; not M10 migration execution.",
+    "temporary_clone_removed": true
+  },
+  "original_a3_fully_accepted": false,
+  "readiness_runtime_accepted": false,
+  "runtime_activation_authorized": false,
+  "production_migration_authorized": false,
+  "provider_calls_authorized": false
+}
