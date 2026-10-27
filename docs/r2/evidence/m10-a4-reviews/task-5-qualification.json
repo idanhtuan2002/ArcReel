@@ -1,0 +1,68 @@
+{
+  "schema_id": "m10.a4-task5-qualification.v1",
+  "status": "TASK5_POSTGRES_M7_CUSTODY_COMPLETE",
+  "source_head": "4237571c6e09996e355a8db15f406048751e5517",
+  "source_sha256": {
+    "lib/db/models/quality_probes.py": "3272251481562f615a0c887d85f7ee07e4a3846dd6a7dd823528e51be0bd400b",
+    "lib/db/repositories/quality_probes.py": "ccef3e978518d664347a416b847ef2aca6cbab534bf6b185010a3eb5da67b528",
+    "alembic/versions/07fd34535384_quality_probe_evidence.py": "f8b1b2a74a601197f6488b1c9e2143764665dcb431127c0ad7c8baa089c047f8",
+    "server/services/quality_probes.py": "4e7645b335ebf4f38bf4aaf0260e8bf2e4d09e1261d0ba56d5708ef7d7ab0d31",
+    "r2/host_hardening/route_inventory.py": "bf142717302c6bf96202716864708b51020abdce5691595938eec6f7fc29f92a",
+    "r2/provider_capabilities/registry.json": "db5c98a7cad55154773f7676ad486ffcae718d07e5b4c85a7e221b47bc906347",
+    "lib/db/models/__init__.py": "d2eb0264c64981a554ca92c12f77f3b4d8422971106ce60670461d12f6a17008",
+    "scripts/r2/verify_m10_a4_scope.py": "1ea24b172905927fd45732af10ec3d88583b88ab47b7863b52d92660252218c3"
+  },
+  "postgresql": "16.15 disposable container (arcreel-m10-a4-test-pg), per-test schemas",
+  "runs": {
+    "related_suite_pg": {
+      "result": {
+        "tests": 1012,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "note": "run before the crash-test seam refactor and evidence refresh; affected files re-verified below",
+      "junit_sha256": "4944578a308b24765748583c6819c0cb93335646b75658cdfcc880765cfed14a"
+    },
+    "route_qualification_pg": {
+      "result": {
+        "tests": 63,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "junit_sha256": "2f3de199400be9758f04b611b5c248d2d70e01ad29018d252fc134479ac09ae8",
+      "evidence": "docs/r2/evidence/m10-a4-reviews/route-qualification.json"
+    },
+    "db_domain_sqlite": {
+      "result": {
+        "tests": 716,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 33
+      },
+      "scope": "tests/integration/lib/db tests/unit/lib/db"
+    },
+    "db_domain_pg": {
+      "result": {
+        "tests": 716,
+        "failures": 14,
+        "errors": 0,
+        "skipped": 20
+      },
+      "failures_explained": "14 failures in test_agent_credential_repo.py/test_asset_derivative_repo.py need an alembic-upgraded public schema (as the CI PG job prepares); after alembic upgrade head (base..07fd34535384 on PG) the same 15 tests passed"
+    },
+    "migration_cycle_pg": "65f53650f3a8 -> 07fd34535384 -> 65f53650f3a8 -> 07fd34535384 on fresh PG database: 3 tables, 3 triggers, deferred attempt FK, 6 JSON byte checks; downgrade removes tables and trigger function; predecessor witness row preserved"
+  },
+  "scope_amendment": "docs/r2/evidence/R2_M10_A4_SCOPE_AMENDMENT_1.json",
+  "not_run": [
+    "complete backend suite (sponsor rule 2026-10-14: only on explicit request)"
+  ],
+  "limitations": [
+    "Unknown/operator-review outcomes have no A4 resolution API (by design).",
+    "Failed-attempt sanitized reason is not persisted; a FAILED replay returns M10_PROBE_FAILED generically.",
+    "Kernel/VMAF/PG suites require the qualification host."
+  ],
+  "runtime_accepted": false,
+  "production_activation": false
+}
