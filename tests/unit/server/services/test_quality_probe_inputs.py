@@ -348,19 +348,29 @@ async def test_master_digest_mismatch_and_combined_byte_ceiling_fail_closed(medi
     with pytest.raises(RequiredEvidenceMissingError):
         async with inputs().snapshot_probe_inputs(request, project_root=project, catalog=catalog(config)):
             pytest.fail("changed master admitted")
+    import os
+
+    # Sparse sources keep the ceiling fixtures from occupying memory-backed temporary storage.
     big = b"\0" * 67108864
-    source.write_bytes(big)
-    (project / "refs").mkdir()
-    (project / "refs" / "source.mp4").write_bytes(big)
-    config, request = bound_request("REFERENCE_VMAF", source)
-    entry = binding("REFERENCE", "approved-source", "refs/source.mp4", big)
-    async with inputs().snapshot_probe_inputs(request, project_root=project, catalog=catalog(config, entry)) as got:
-        assert got.target.size_bytes + got.reference.size_bytes == 134217728
-    (project / "refs" / "source.mp4").write_bytes(big + b"x")
-    entry = binding("REFERENCE", "approved-source", "refs/source.mp4", big + b"x")
-    with pytest.raises(OperationalEnvelopeExceededError):
-        async with inputs().snapshot_probe_inputs(request, project_root=project, catalog=catalog(config, entry)):
-            pytest.fail("combined ceiling exceeded")
+    reference = project / "refs" / "source.mp4"
+    reference.parent.mkdir()
+    try:
+        for path in (source, reference):
+            path.write_bytes(b"")
+            os.truncate(path, 67108864)
+        config, request = bound_request("REFERENCE_VMAF", source)
+        entry = binding("REFERENCE", "approved-source", "refs/source.mp4", big)
+        async with inputs().snapshot_probe_inputs(request, project_root=project, catalog=catalog(config, entry)) as got:
+            assert got.reference is not None
+            assert got.target.size_bytes + got.reference.size_bytes == 134217728
+        os.truncate(reference, 67108865)
+        entry = binding("REFERENCE", "approved-source", "refs/source.mp4", big + b"\0")
+        with pytest.raises(OperationalEnvelopeExceededError):
+            async with inputs().snapshot_probe_inputs(request, project_root=project, catalog=catalog(config, entry)):
+                pytest.fail("combined ceiling exceeded")
+    finally:
+        source.unlink(missing_ok=True)
+        reference.unlink(missing_ok=True)
 
 
 def test_catalog_bindings_reject_escaping_paths_and_ambiguous_scope() -> None:
