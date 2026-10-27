@@ -1,0 +1,17 @@
+{
+  "schema_id": "m10.a4-design-scope-acceptance.v1",
+  "status": "MAIN_ADJUDICATED_IMPLEMENTATION_SCOPE",
+  "design_ref": "ec838aa1a0d96ad51509339c2d69424c3d6592f6",
+  "packet_sha256": "43d75f71491e2bd035f5df08ffee1c5676d4a984d540a60b7e82e4a42a40e697",
+  "adjudicator": "main agent",
+  "authority_basis": "User instructed sequential autonomous continuation; agent-selected technical choices are recorded, not attributed to sponsor.",
+  "builder_check": "docs/r2/evidence/m10-a4-reviews/builder-check.json",
+  "builder_questions_resolved": 7,
+  "critical_source_review_pending": true,
+  "a4_runtime_accepted": false,
+  "production_migration_authorized": false,
+  "runtime_activation_authorized": false,
+  "provider_calls_authorized": false,
+  "original_a3_readiness_closed": false,
+  "factual_admission_qualified": false
+}
