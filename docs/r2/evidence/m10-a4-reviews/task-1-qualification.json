@@ -1,0 +1,53 @@
+{
+  "schema_id": "m10.a4-task1-qualification.v1",
+  "status": "SOURCE_CUSTODY_GATE_ONLY",
+  "source_head": "9f5eb4a3d80ae5b82baeca3da92dfa8107bdc568",
+  "source_hashes": {
+    "scripts/r2/verify_m10_a4_scope.py": "b423809c15ac10dda3f2dee3ec7bfab76462ac744577388dbcfbd693dcd2c055",
+    "tests/unit/scripts/r2/test_verify_m10_a4_scope.py": "77c02547d24b77c43524650269f139c1d3655dcf748fb90f4ecd6489e47a765c",
+    "tests/integration/scripts/r2/test_verify_m10_a4_scope.py": "e66f9348411cecc2175fec25f76c289c44783b5cac757dfb23487e7419f9c162"
+  },
+  "pytest": {
+    "command": "python -m pytest tests/unit/scripts/r2/test_verify_m10_a4_scope.py tests/integration/scripts/r2/test_verify_m10_a4_scope.py tests/unit/scripts/r2/test_verify_m10_a3_scope.py -q --tb=short",
+    "result": {
+      "tests": 64,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "warning": "Existing SQLite expression-index reflection warning",
+    "final_exact_formatted_unit_rerun": "14 passed, 1 baseline warning, 2.00s",
+    "exact_committed_source_rerun": "64passed0failures0errors0skips,1baselinewarning,26.59s at exact9f5 sourcebytes"
+  },
+  "checks": {
+    "ruff": "all three current files passed; repository check passed before final declaration checks",
+    "ruff_format": "3 current files already formatted; repository2031 already formatted earlier",
+    "basedpyright": "current3files0errors0warnings; wholeproject0errors0warnings before final declaration checks",
+    "import_linter": "23kept0broken",
+    "deptry": "no dependency issues",
+    "test_audit": "0violations",
+    "scope_guard": {
+      "head": "9f5eb4a3d80ae5b82baeca3da92dfa8107bdc568",
+      "runtime_accepted": false,
+      "status": "M10_A4_SCOPE_OK",
+      "stop_codes": []
+    }
+  },
+  "red_green": [
+    "Missing guard produced real pytest FAIL, then implemented",
+    "Assigned/default/class import effects:3 FAIL then fixed/pass",
+    "Dirty config:real FAIL then protected/pass",
+    "Initial namespace226 and sandbox SQLite timeout are environment/negative evidence, not product acceptance"
+  ],
+  "review": {
+    "main_scope_review": true,
+    "independent_critical_source_review": false,
+    "complete_A4_source_review_pending": true
+  },
+  "limits": [
+    "Direct AST/import checks are not a general Python sandbox.",
+    "No probe runtime/model/repository/migration implementation exists yet.",
+    "No M7 quality-probe receipt or production activation claimed.",
+    "Full backend historicalA3 results are not newA4 execution."
+  ]
+}
