@@ -1,0 +1,110 @@
+{
+  "schema_id": "m10.a4-candidate.v1",
+  "status": "M10_A4_SOURCE_CANDIDATE",
+  "source_head": "ea5939a757cff7eccc2290bdbf397218f74b2ec0",
+  "branch": "design/r2-m10-a4-probes",
+  "commits": {
+    "task1": "9f5eb4a3d",
+    "task2": "8e38b6a0e",
+    "task3": [
+      "27c294a9f",
+      "ee6b7c322"
+    ],
+    "task4": [
+      "1bf638909",
+      "76212a174"
+    ],
+    "task5": "4237571c6",
+    "review_fixes": "ea5939a75"
+  },
+  "source_sha256": {
+    "r2/quality/probes.py": "fd260e17ec74aa673256371112a35000a479149ef163108ebe286d087cfa4a05",
+    "server/services/quality_probes.py": "50ba8d7e47e7ecb7f5e09ef5856c1a967136fb92c23bb4172fad939851ed26ec",
+    "server/services/quality_probe_inputs.py": "7f5282d6a8ced58726e0cb6a77833333f094276bb6bdf4dd53743bc3c1e1ff33",
+    "server/services/quality_probe_runtime.py": "27ab53685e6690d89d2a23f7d14fceac1e099cb8817cc5529e137efb92e3e486",
+    "server/services/quality_probe_worker.py": "79bb80a6503a569065969b75f84bbcd3335e2e1fafa9577d400f1e3cbb126ce2",
+    "lib/db/models/quality_probes.py": "3272251481562f615a0c887d85f7ee07e4a3846dd6a7dd823528e51be0bd400b",
+    "lib/db/repositories/quality_probes.py": "aa18fa1f6cdb038c14d666b961fbd1abc6bcdef74172ff7de7abce301e60dba8",
+    "alembic/versions/07fd34535384_quality_probe_evidence.py": "f8b1b2a74a601197f6488b1c9e2143764665dcb431127c0ad7c8baa089c047f8",
+    "scripts/r2/verify_m10_a4_scope.py": "1ea24b172905927fd45732af10ec3d88583b88ab47b7863b52d92660252218c3",
+    "lib/db/models/__init__.py": "d2eb0264c64981a554ca92c12f77f3b4d8422971106ce60670461d12f6a17008",
+    "r2/host_hardening/route_inventory.py": "bf142717302c6bf96202716864708b51020abdce5691595938eec6f7fc29f92a",
+    "r2/provider_capabilities/registry.json": "0a7cc0195a208e6848cb454456c22c683c631189a83efe641ef41581a3a9a97a"
+  },
+  "evidence_sha256": {
+    "docs/r2/evidence/m10-a4-reviews/builder-check.json": "f01a8f850ccf38180cc3a3d468da146f3052075e2e37faabebf6f6a6799753bd",
+    "docs/r2/evidence/m10-a4-reviews/input-file-qualification.json": "8c91a98a53edf8719fb03b96e7eaf7dae44dcb652fb587037e7c5c05baec3e69",
+    "docs/r2/evidence/m10-a4-reviews/primitives-qualification.json": "4ffde6b386438a26a6c00c3f5e396c3833819d4033ccfafd3ffa8e50fe060cb7",
+    "docs/r2/evidence/m10-a4-reviews/route-qualification.json": "e85344912856562a1399cbb75a2a637d42ad23f50b49847e149f9c76c80dd1b5",
+    "docs/r2/evidence/m10-a4-reviews/source-review.json": "db208eb4c0bdece782e04236ef781d4fa594487973a09629b4d4b3c606973241",
+    "docs/r2/evidence/m10-a4-reviews/task-1-qualification.json": "aa6f116de9e233dace3a1115ae965a52b2a188b73dfee4da030192b0dc6abb19",
+    "docs/r2/evidence/m10-a4-reviews/task-2-qualification.json": "f243f85718e2bbb9789b9ac0acf9865070084fb6cee6ee274c8baa47dd0b9446",
+    "docs/r2/evidence/m10-a4-reviews/task-3-qualification.json": "9580389270da3ffcd3ae3e7e43a000eb9995076d9ab2383d0ce0a6a68b118d26",
+    "docs/r2/evidence/m10-a4-reviews/task-4-qualification.json": "eb3cd57ff949b968ddff53830ab1beacab5915a9688d4e7fee5e4ebe4ab4f99a",
+    "docs/r2/evidence/m10-a4-reviews/task-5-qualification.json": "2fbbf18f600c6f2ef388aed7d0c17a43c609869b848cefb2a9b59d39f52e97ee",
+    "docs/r2/evidence/R2_M10_A4_SCOPE_AMENDMENT_1.json": "0747b607a20ae80ea63c4b01b3ee62d901377f2c0ec4358d171ae62daec40975",
+    "docs/r2/evidence/R2_M10_A4_HOST_CHARACTERIZATION.json": "57bcdf0c62975c7482558534d6dd21a0016a648d71c8cf1f9ad3a3c2cb54f56f",
+    "tests/fixtures/r2/quality_probes/MANIFEST.json": "648fc7f7db01400c727c63463c332a724f889f4a21c551baa50dd0ac5780e00c"
+  },
+  "gates": {
+    "static_whole_tree": {
+      "ruff_check": "All checks passed!",
+      "ruff_format": "2050 files already formatted",
+      "basedpyright": "0 errors, 0 warnings, 0 notes",
+      "lint_imports": "23 kept, 0 broken",
+      "deptry": "no issues",
+      "audit_tests": "0 violations"
+    },
+    "related_suite_pg16": {
+      "tests": 1019,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "route_qualification_pg16": {
+      "tests": 91,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "db_domain_sqlite": {
+      "tests": 716,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 33
+    },
+    "db_domain_pg16": {
+      "result": {
+        "tests": 716,
+        "failures": 14,
+        "errors": 0,
+        "skipped": 20
+      },
+      "note": "14 failures need an alembic-upgraded public schema; passed after alembic upgrade head"
+    },
+    "kernel_and_tool_suites": "real systemd/Landlock/seccomp and ffmpeg/ffprobe/VMAF cases executed, zero skips",
+    "scope_guard": "M10_A4_SCOPE_OK on clean HEAD",
+    "full_backend_suite": "NOT RUN (sponsor rule 2026-10-14: only on explicit request)"
+  },
+  "independent_review": "docs/r2/evidence/m10-a4-reviews/source-review.json",
+  "flags": {
+    "runtime_accepted": false,
+    "production_activation": false,
+    "production_migration": false,
+    "sponsor_acceptance_claimed": false,
+    "original_A3_readiness_closed": false,
+    "A5_closed": false,
+    "A6_closed": false,
+    "A7_closed": false,
+    "factual_admission_qualified": false,
+    "default_app_registration": false,
+    "public_router": false
+  },
+  "known_limits": [
+    "Kernel/VMAF/PG suites require the qualification host; CI without a systemd user manager will fail them.",
+    "VMAF binary comes from a private developer cache, not a production installation.",
+    "Failed attempts do not persist a sanitized reason; replay returns M10_PROBE_FAILED.",
+    "Tiny fixtures qualify mechanism only; no cohort thresholds."
+  ],
+  "next_gate": "M10-A5: complete run closure, foreign authority/currentness, accessibility and factual admission (design packet required first)"
+}

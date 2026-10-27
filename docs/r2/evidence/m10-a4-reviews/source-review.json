@@ -1,0 +1,55 @@
+{
+  "schema_id": "m10.a4-source-review.v1",
+  "reviewer": "Codex (codex:codex-rescue), read-only; reviewer model identity not independently verified",
+  "reviewed_head": "0b768597515042355baf776b32f65e64e1d20080",
+  "reviewed_scope": "9d06ca2a824ea8bac061f95153d3610d02e6f9c8..0b7685975: 27 source/test files (full text of added files, hunks of changed files) plus spec, plan, amendment, M7/authority/auth/contract code",
+  "result": "0 Critical, 3 High, 3 Medium",
+  "findings": [
+    {
+      "id": "H1",
+      "severity": "High",
+      "summary": "published rule max_runtime_ms/max_output_bytes ignored",
+      "adjudication": "REAL",
+      "fix": "effective_limits(request, config) = min(rule, config, host)"
+    },
+    {
+      "id": "H2",
+      "severity": "High",
+      "summary": "replay did not cross-check M7 route/request digest or provider payload",
+      "adjudication": "REAL",
+      "fix": "attempt_witness checks route_json, request digest, attempt_no; stored invocations validate provider payload binding"
+    },
+    {
+      "id": "H3",
+      "severity": "High",
+      "summary": "receipt construction after staging outside ambiguity handler",
+      "adjudication": "REAL",
+      "fix": "whole post-staging path inside rollback + AmbiguousSubmitError"
+    },
+    {
+      "id": "M1",
+      "severity": "Medium",
+      "summary": "replay required current catalog",
+      "adjudication": "REAL",
+      "fix": "catalog resolved after receipt-first replay and resumable states"
+    },
+    {
+      "id": "M2",
+      "severity": "Medium",
+      "summary": "cancellation bypassed unit cleanup",
+      "adjudication": "REAL",
+      "fix": "cancellation-safe wait with shielded kill/reap/verify"
+    },
+    {
+      "id": "M3",
+      "severity": "Medium",
+      "summary": "DECODE could PASS without required streams",
+      "adjudication": "REAL",
+      "fix": "DECODE refuses missing required stream (M10_PROBE_FAILED); DecodeFacts cannot express it"
+    }
+  ],
+  "fix_commit": "ea5939a757cff7eccc2290bdbf397218f74b2ec0",
+  "red_proof": "the five service/recipe regressions failed against the reviewed source (5 failed) and pass on the fix; limits/cancellation tests target new behaviour",
+  "second_independent_review": "not performed; fixes verified by RED-proof regressions and main adjudication",
+  "main_adjudication": "Claude Opus 5.5 main agent"
+}
