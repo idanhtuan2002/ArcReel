@@ -1,0 +1,62 @@
+{
+  "schema_id": "m10.a4-task4-qualification.v1",
+  "status": "TASK4_FIXED_RECIPES_COMPLETE",
+  "source_head": "76212a17439ced0d4116e93e38f819644494f235",
+  "commits": {
+    "recipes": "1bf638909f95a5df3a556705e3181088a510d2eb",
+    "sparse_ceiling_fixture": "76212a17439ced0d4116e93e38f819644494f235"
+  },
+  "source_hashes": {
+    "server/services/quality_probe_worker.py": "728ddfea6c05f0d0462d318f3ede5cec299bfd004e6d439fc21113d7444a2803",
+    "server/services/quality_probe_runtime.py": "4d989ffcc2da26a1a530892de3f7958e40372bc1a9d8da2813edbce5efd70ea8",
+    "tests/unit/server/services/test_quality_probe_worker.py": "799acc5279cda1375cdadb386c8cbee916bfc61bf1893fc95d1958458e08bb06",
+    "tests/integration/server/services/test_quality_probe_recipes.py": "9017b5fc0414548124ed7ba8524e544364a31fda159487ac0a2408df260d3af8",
+    "tests/integration/server/services/test_quality_probe_runtime.py": "8d50f807446e96212f6385844f9feea2a97562b4d4ecf45d191b837492568988",
+    "tests/unit/server/services/test_quality_probe_inputs.py": "f3dacdf81c1b38851f08d366e7c59edce26819c760d15208536234c0ec286061",
+    "tests/fixtures/r2/quality_probes/MANIFEST.json": "648fc7f7db01400c727c63463c332a724f889f4a21c551baa50dd0ac5780e00c"
+  },
+  "tools": {
+    "ffmpeg_ffprobe": "8.0.1-3ubuntu2+esm5 (/usr/bin)",
+    "vmaf": {
+      "version": "3.2.1",
+      "source": "f85a853692a8c730d0270cd733c8bb30b5b93b7c",
+      "executable_sha256": "55e2eeff3ecefe8585467afc215d25ab27dcba109bc03f65e71a77ea4e634cdd",
+      "model_sha256": "5950d61fa1f861bd45d8149d80539ed9f3376cfc2495b8f0fa8e9f57cb131ee3",
+      "location": "private developer cache, not production installation"
+    }
+  },
+  "tests": {
+    "result": {
+      "tests": 519,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "junit_sha256": "a04be8000b3ccc12c62893cfba8bb1b679d96ab1c3a526ad565122b7fb17fa3a",
+    "scope": "probe inputs/runtime/worker unit, runtime+recipes integration (real systemd/Landlock/seccomp + real tools), tests/integration/lib/test_audio_utils.py, tests/unit/r2/quality, scope guard unit, 2 format_validation snapshot regressions",
+    "interval_stability": "intervals case 5/5 repeated passes; metadata-file detector output identical across 20 runs",
+    "vmaf": "same1==same2 measurement digest; changed reference differs and FAILs threshold; all spans exactly 5 frames; raw scratch sizes 64*64*3/2*5"
+  },
+  "semantics": {
+    "host_validator_parity": "format_validation.media_facts/decode_errors agree on width/height/codec/fps/duration/audio/decode-clean for qualified CFR fixtures; probe is narrower: forces MP4 demuxer, file-only protocol, avg_frame_rate, refuses non-h264/aac/yuv420p and truncated containers (existing validator counts decode errors instead)",
+    "intervals": "read from metadata=mode=print files per filter graph; FFmpeg 8 log lines interleave across filter threads and were observed dropping silence_end",
+    "loudness": "SILENT when true peak -inf or integrated equals ebur128 gate floor -70.0; non-finite otherwise UNMEASURABLE; no audio stream UNMEASURABLE",
+    "errors": "malformed/truncated/unsupported media and invalid captions -> M10_PROBE_FAILED; incomparable/absent/insufficient reference -> M10_REFERENCE_INVALID; changed tool/model -> M10_REQUIRED_EVIDENCE_MISSING; output ceiling -> M10_OPERATIONAL_ENVELOPE_EXCEEDED"
+  },
+  "static_gates_whole_tree": {
+    "ruff_check": "All checks passed!",
+    "ruff_format": "2041 files already formatted",
+    "basedpyright": "0 errors, 0 warnings, 0 notes",
+    "lint_imports": "23 kept, 0 broken",
+    "deptry": "no issues",
+    "audit_tests": "0 violations"
+  },
+  "scope_guard": "M10_A4_SCOPE_OK on clean 76212a17439ced0d4116e93e38f819644494f235",
+  "limitations": [
+    "Tiny fixtures qualify mechanism only; no cohort threshold calibrated.",
+    "VMAF and kernel cases need the private VMAF cache and a systemd user manager; they fail rather than skip elsewhere.",
+    "Snapshot/scratch roots use tempfile (tmpfs on this host); Task5 makes the root host-configurable."
+  ],
+  "runtime_accepted": false,
+  "production_activation": false
+}
