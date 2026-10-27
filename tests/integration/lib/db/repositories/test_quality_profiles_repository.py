@@ -272,3 +272,26 @@ async def test_forged_lease_shape_has_sanitized_error_before_storage(quality_fac
         assert (
             await session.execute(sa.select(sa.func.count()).select_from(ProfilePublicationAuthorizationModel))
         ).scalar_one() == 0
+
+
+async def test_direct_profile_read_resolves_action_receipt_beyond_recomputed_digest_columns(
+    quality_factory: Factory,
+) -> None:
+    from r2.quality.digests import compute_digest
+    from r2.quality.errors import RequiredEvidenceMissingError
+
+    original = await append(quality_factory, request_for())
+    body = original.model_dump(mode="json")
+    body["publication_evidence_digest"] = "sha256:" + "b" * 64
+    body["profile_digest"] = compute_digest("m10.quality-profile.v1", body)
+    async with quality_factory() as session, session.begin():
+        await session.execute(sa.text("ALTER TABLE m10_quality_profile_revisions DISABLE TRIGGER USER"))
+        await session.execute(
+            sa.update(QualityProfileRevisionModel).values(body_json=body, profile_digest=body["profile_digest"])
+        )
+        await session.execute(sa.text("ALTER TABLE m10_quality_profile_revisions ENABLE TRIGGER USER"))
+    async with quality_factory() as session:
+        with pytest.raises(RequiredEvidenceMissingError):
+            await QualityProfileRepository(session).get_revision(
+                user_id="default", project_name="project", profile_id=original.profile_id, revision=1
+            )

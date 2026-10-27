@@ -105,8 +105,26 @@ class QualityProfileRepository:
                 != (row.created_by, row.created_at, row.admitted_at)
             ):
                 raise RequiredEvidenceMissingError()
+            request_body = await self.session.scalar(
+                sa.select(ProfilePublicationAuthorizationModel.request_json).filter_by(
+                    user_id=row.user_id, project_name=row.project_name, authorization_id=row.authorization_id
+                )
+            )
+            stored_request = q.ProfilePublicationAuthorizationRequest.model_validate(request_body)
+            authorization = await self.load_authorization(stored_request, row.authorization_id)
+            if authorization is None:
+                raise RequiredEvidenceMissingError()
+            expected = build_published_profile(
+                stored_request,
+                authorization.lease,
+                profile.publication_admitted_at,
+                policy_id=authorization.lease.policy_id,
+                policy_version=authorization.lease.policy_version,
+            )
+            if canonical_json_bytes(expected) != canonical_json_bytes(profile):
+                raise RequiredEvidenceMissingError()
             return profile
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, ProfilePublicationUnauthorizedError):
             raise RequiredEvidenceMissingError() from None
 
     async def replay(self, request: q.ProfilePublicationAuthorizationRequest) -> q.QualityProfileRevision | None:
