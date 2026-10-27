@@ -1,0 +1,95 @@
+{
+  "schema_id": "m10.a4-task2-qualification.v1",
+  "status": "TASK2_PURE_CONTRACTS_AND_NORMALIZATION_COMPLETE",
+  "source_head": "8e38b6a0e63159245f3417b67d9a4812e7f79453",
+  "source_hashes": {
+    "r2/quality/probes.py": "ced4ce7c3ea9a6f343eab33d59dc6f607bda4fd1c95a8e927b72217233cd1924",
+    "tests/unit/r2/quality/test_probes.py": "779701314e8b80d9b12c61e0b0ecd6ed78675bf3010fd764056a639a9461ce76"
+  },
+  "tests": {
+    "complete_quality_and_scope_regressions": {
+      "tests": 418,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0
+    },
+    "quality_domain_only": "354cases",
+    "scope_predecessor_cases": 64,
+    "duration_seconds": 37.62,
+    "required_task_done_command": "UV_PROJECT_ENVIRONMENT=shared-r2-v2-main/.venv uv run --no-sync python -m pytest tests/unit/r2/quality/test_probes.py tests/unit/r2/quality/test_quality_ports.py -q --tb=short",
+    "required_task_done_result": "98passed0failures0skips,1baselinewarning,1.78s",
+    "baseline_warning": "SQLite expression-index reflection warning"
+  },
+  "static_logs": {
+    "task2-ruff.log": {
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "text": "All checks passed!\n"
+    },
+    "task2-format.log": {
+      "sha256": "d6b838c92428962bf80ff16fadc0a195b216ea0b3d40e7c3454e147b16650390",
+      "text": "2033 files already formatted\n"
+    },
+    "task2-types.log": {
+      "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c",
+      "text": "0 errors, 0 warnings, 0 notes\n"
+    },
+    "task2-imports.log": {
+      "sha256": "6363e9fad1bc4c57415c3b4706957f6279fc532c9e970782e107ce01d5bb66db",
+      "text": "\n╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐\n╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │\n ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗\n ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝\n╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║\n╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝\n  └──▶║║                    ▲ \n      ╚╝────────────────────┘\n\n\n---------\nContracts\n---------\n\nAnalyzed 573 files, 2053 dependencies.\n--------------------------------------\n\nlib.config / lib.*_backends / lib.custom_provider 分层契约 KEPT\nComfyUI 端点实现不依赖声明式运行时 KEPT\nComfyUI 顶层实现模块不直接依赖声明式运行时 KEPT\n路线中立层不依赖参考生视频子包 KEPT\nC04 R2 预算端口不直连 Host DB 层 KEPT\nM4 稳定契约不依赖生产层 KEPT\nM4 Method Router 不回依赖下游或能力层 KEPT\nM4 CapabilityRegistry 不改写 MethodDecision（不 import method_router） KEPT\nM4 生产智能层不直连 Host DB 层 KEPT\nM4 PromptCompiler 只做翻译不做路由 KEPT\nR2 learning core does not depend on Host persistence KEPT\nR2 narrative core does not depend on Host persistence KEPT\nR2 narrative plan authority does not depend on Host persistence KEPT\nM5B NarrativePlanService cannot reach Canon authoritative writes KEPT\nM5B narrative context is read-only and persistence-neutral KEPT\nR2 narrative lifecycle pure ports are authority- and persistence-free KEPT\nM5C narrative evidence service holds no head-mutation capability KEPT\nM5C-2 sole head writer: only acceptance.py may append decisions or mutate heads KEPT\nM5C-3 compiler purity: no authority write port, repository, UoW, or Canon \nservice KEPT\nM5C repositories cannot import or write M5A Canon ORM models KEPT\nM6 adaptation evidence service holds no head-mutation capability KEPT\nM6 adaptation authority service carries no persistence, Canon, or provider \nimport KEPT\nM6 adaptation authority kernel carries no persistence, Canon, or provider importKEPT\n\nContracts: 23 kept, 0 broken.\n"
+    },
+    "task2-deptry.log": {
+      "sha256": "97da16a63a6060dcf37164a5d683493459af87377ec39f950f3c345b94ea8d05",
+      "text": "Assuming the corresponding module name of package 'mutmut' is 'mutmut'. Install the package or configure a package_module_name_map entry to override this behaviour.\nScanning 2028 files...\n\n\u001b[1m\u001b[32mSuccess! No dependency issues found.\u001b[m\n"
+    },
+    "task2-audit.log": {
+      "sha256": "f591aeb7ae019180ab0411cbdc541672aecf0992e3a48f5a907291b55afe7a55",
+      "text": "闸门通过：0 处违规\n"
+    }
+  },
+  "cold_import_fixture": {
+    "status": "EXISTING_COLD_IMPORT_FIXTURE_REUSED",
+    "fixture_path": "tests/unit/r2/quality/test_quality_digests.py",
+    "fixture_sha256": "72abd5ff6d6ed1caf8b9f94fdbe41cac6e26eb522e10d66542580834fec364e2",
+    "script_sha256": "91fe398395f541d93ef01c37811a4b1a7e8042837204e4b5aa2dbfb542768852",
+    "script": "\nimport sys,os,types,pathlib,builtins,socket,subprocess,json\nsys.path.insert(0,sys.argv[1])\noriginal=dict(os.environ)\ndef forbidden(*args,**kwargs):\n    raise AssertionError(\"pure quality import attempted authority\")\nfake=types.ModuleType(\"dotenv\")\nfake.load_dotenv=forbidden\nfake.dotenv_values=forbidden\nsys.modules[\"dotenv\"]=fake\npathlib.Path.mkdir=forbidden\nos.mkdir=forbidden\nos.makedirs=forbidden\nsubprocess.Popen=forbidden\nsocket.socket.connect=forbidden\nold_open=builtins.open\ndef guarded_open(path,mode=\"r\",*args,**kwargs):\n    if any(flag in mode for flag in \"wax+\") or str(path).endswith(\".env\"):\n        forbidden()\n    return old_open(path,mode,*args,**kwargs)\nbuiltins.open=guarded_open\n__import__(sys.argv[2])\nassert dict(os.environ)==original\nassert not any(name in {\"lib\",\"server\",\"lib.env_init\"} for name in sys.modules)\nprint(json.dumps({\"imported\":sys.argv[2],\"environment_unchanged\":True}))\n",
+    "interpreter": "/home/anhtuan/content-production-os/.worktrees/r2-v2-main/.venv/bin/python",
+    "module": "r2.quality.probes",
+    "exit_code": 0,
+    "stdout": "{\"imported\": \"r2.quality.probes\", \"environment_unchanged\": true}\n",
+    "stderr": "",
+    "probe_source_sha256": "ced4ce7c3ea9a6f343eab33d59dc6f607bda4fd1c95a8e927b72217233cd1924"
+  },
+  "implemented": [
+    "all six typed facts families and strict scalar validation",
+    "measurement/resource/execution-result models and private canonical digests",
+    "trusted immutable config/policy/tool catalog with full-body bindings",
+    "request byte/identity/cache envelope and bounded duplicate-key-safe JSON normalization",
+    "deterministic policy status/finding projection; explicit silent applicability; reference/caption input cardinality"
+  ],
+  "builder_calls": [
+    "initial qualified stream surface MP4/H264/AAC/yuv420p; unsupported codecs fail closed",
+    "caption facts include measured_duration; overlap count is number of cues intersecting prior coverage union",
+    "VMAF mean tolerance1e-6 matches pinned six-decimal frame/mean output",
+    "version constraints support exact version or ==exact only; no unverified range matcher",
+    "worker status/findings are rederived and compared under immutable host policy; raw interval facts remain evidence",
+    "default catalog remains empty until actual worker/tool/route qualification; no production cohort thresholds invented"
+  ],
+  "graph_limits": {
+    "project": "r2-v2-main",
+    "generation": "2026-10-15T01:19:44Z",
+    "new_M10_paths": "missing; direct current-source fallback",
+    "digest_trace": "positive callees only; heuristic/truncated caller list not used for exhaustive impact claims"
+  },
+  "scope_guard": {
+    "head": "8e38b6a0e63159245f3417b67d9a4812e7f79453",
+    "status": "M10_A4_SCOPE_OK",
+    "runtime_accepted": false,
+    "stop_codes": []
+  },
+  "A4_runtime_accepted": false,
+  "production_migration_authorized": false,
+  "runtime_activation_authorized": false,
+  "original_a3_readiness_closed": false,
+  "factual_admission_qualified": false,
+  "next": "Task3 anchored input snapshots and isolated resource supervisor; then actual recipes, M7/PostgreSQL custody and final source gate"
+}
