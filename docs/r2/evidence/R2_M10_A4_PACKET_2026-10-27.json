@@ -1,0 +1,133 @@
+{
+  "schema_id": "m10.a4-implementation-scope.v1",
+  "status": "DESIGN_SCOPE_RECORDED_NOT_RUNTIME_ACCEPTANCE",
+  "baseline": "2ce1478bef93a77c888f3fc8fe2a5eefd8a46d4c",
+  "sealed_a3": "9d06ca2a824ea8bac061f95153d3610d02e6f9c8",
+  "source_paths": [
+    "r2/quality/probes.py",
+    "server/services/quality_probes.py",
+    "server/services/quality_probe_inputs.py",
+    "server/services/quality_probe_runtime.py",
+    "server/services/quality_probe_worker.py",
+    "lib/db/models/quality_probes.py",
+    "lib/db/repositories/quality_probes.py",
+    "alembic/versions/07fd34535384_quality_probe_evidence.py",
+    "scripts/r2/verify_m10_a4_scope.py"
+  ],
+  "seam_paths": [
+    "lib/db/models/__init__.py",
+    "r2/host_hardening/route_inventory.py",
+    "r2/provider_capabilities/registry.json",
+    "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py"
+  ],
+  "test_paths": [
+    "tests/unit/scripts/r2/test_verify_m10_a4_scope.py",
+    "tests/integration/scripts/r2/test_verify_m10_a4_scope.py",
+    "tests/unit/r2/quality/test_probes.py",
+    "tests/unit/server/services/test_quality_probe_inputs.py",
+    "tests/unit/server/services/test_quality_probe_runtime.py",
+    "tests/unit/server/services/test_quality_probe_worker.py",
+    "tests/unit/server/services/test_quality_probes.py",
+    "tests/integration/server/services/test_quality_probe_runtime.py",
+    "tests/integration/server/services/test_quality_probe_recipes.py",
+    "tests/integration/server/services/test_quality_probes.py",
+    "tests/unit/lib/db/models/test_quality_probes.py",
+    "tests/integration/lib/db/repositories/test_quality_probes.py",
+    "tests/integration/lib/db/migrations/test_07fd34535384_quality_probe_evidence.py"
+  ],
+  "fixture_prefixes": [
+    "tests/fixtures/r2/quality_probes/"
+  ],
+  "design_artifacts": [
+    {
+      "path": "docs/research/2026-10-27-r2-m10-a4-reuse.md",
+      "sha256": "32fb31f420238a228703e1d0a09d06941a22ba32e28ee96ad1a5f348026becc6"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-27-r2-m10-a4-probes-design.md",
+      "sha256": "5c39d27fe7c31c8448470ed821e4e4f49488b4dd061c4978afa1af776cd96b30"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-27-r2-m10-a4-probes.md",
+      "sha256": "3a00f4d8da266514f4422c4025b8f918d3788adb9fa612b711e40ab556549f24"
+    },
+    {
+      "path": "docs/r2/evidence/R2_M10_A4_HOST_CHARACTERIZATION.json",
+      "sha256": "57bcdf0c62975c7482558534d6dd21a0016a648d71c8cf1f9ad3a3c2cb54f56f"
+    },
+    {
+      "path": "docs/r2/evidence/m10-a4-reviews/builder-check.json",
+      "sha256": "f01a8f850ccf38180cc3a3d468da146f3052075e2e37faabebf6f6a6799753bd"
+    }
+  ],
+  "seam_baselines": [
+    {
+      "path": "lib/db/models/__init__.py",
+      "sha256": "82fe14ce615261d66aee8f10aebddbe6dc6ec67e1099b5f4165fe548a597d1ae"
+    },
+    {
+      "path": "r2/host_hardening/route_inventory.py",
+      "sha256": "06311465ec0a722313edae9903ef8c0fed085ab21b0e1665134d2db516f7295c"
+    },
+    {
+      "path": "r2/provider_capabilities/registry.json",
+      "sha256": "3f09d2e1118175ab2e652cf5de46f7aaad137ba92887bfd24130ffe9f55c0929"
+    },
+    {
+      "path": "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py",
+      "sha256": "477de3278457a421d5c033a07ea80a7ffa35b6ac77658879114e847cd517f972"
+    }
+  ],
+  "model_exports": [
+    "QualityProbeInvocationModel",
+    "QualityProbeResultModel",
+    "QualityProbeObservationModel"
+  ],
+  "migration": {
+    "revision": "07fd34535384",
+    "down_revision": "65f53650f3a8"
+  },
+  "migration_test_compatibility": {
+    "status": "EXACT_TEST_COMPATIBILITY_GRAPH_PROOF_NOT_REAL_MIGRATION_EXECUTION",
+    "path": "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py",
+    "baseline_sha256": "477de3278457a421d5c033a07ea80a7ffa35b6ac77658879114e847cd517f972",
+    "proposed_sha256": "3373286103bbb7406995360a9b27e98d929b615350d8db8fe3bc87b36a7e243b",
+    "proposed_source": "\"\"\"The M10 publication migration preserves predecessor data and scoped immutable custody.\"\"\"\n\nfrom __future__ import annotations\n\nimport sqlite3\nfrom pathlib import Path\n\nimport pytest\nfrom alembic.config import Config\nfrom alembic.script import ScriptDirectory\n\nfrom alembic import command\nfrom lib.db.models.quality import (\n    ProfilePublicationAuthorizationModel,\n    QualityCommandModel,\n    QualityOutboxModel,\n    QualityProfileHeadModel,\n    QualityProfileRevisionModel,\n)\n\nREVISION = \"65f53650f3a8\"\nPREDECESSOR = \"918c4a0e0001\"\nMODELS = (\n    QualityProfileHeadModel,\n    QualityProfileRevisionModel,\n    ProfilePublicationAuthorizationModel,\n    QualityCommandModel,\n    QualityOutboxModel,\n)\nTABLES = {model.__tablename__ for model in MODELS}\n\n\ndef test_exact_singleton_head_and_predecessor(alembic_cfg: tuple[Config, Path]) -> None:\n    cfg, _ = alembic_cfg\n    script = ScriptDirectory.from_config(cfg)\n    heads = script.get_heads()\n    assert len(heads) == 1\n    assert REVISION in {item.revision for item in script.walk_revisions(base=\"base\", head=heads[0])}\n    assert script.get_revision(REVISION).down_revision == PREDECESSOR\n\n\ndef test_upgrade_downgrade_upgrade_preserves_predecessor_and_matches_orm(alembic_cfg: tuple[Config, Path]) -> None:\n    cfg, database = alembic_cfg\n    command.upgrade(cfg, PREDECESSOR)\n    with sqlite3.connect(database) as connection:\n        before = {row[0] for row in connection.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}\n        connection.execute(\n            \"INSERT INTO users (id,username,created_at,updated_at) VALUES ('m10-witness','m10-witness','2026-10-27 00:00:00','2026-10-27 00:00:00')\"\n        )\n    command.upgrade(cfg, REVISION)\n    with sqlite3.connect(database) as connection:\n        after = {row[0] for row in connection.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}\n        assert after - before == TABLES\n        for model in MODELS:\n            table = model.__table__\n            reflected = connection.execute(f'PRAGMA table_info(\"{table.name}\")').fetchall()\n            assert {row[1] for row in reflected} == {column.name for column in table.columns}\n            assert [row[1] for row in sorted(reflected, key=lambda row: row[5]) if row[5]] == [\n                column.name for column in table.primary_key\n            ]\n            assert {row[1]: not bool(row[3]) for row in reflected} == {\n                column.name: column.nullable for column in table.columns\n            }\n            foreign = connection.execute(f'PRAGMA foreign_key_list(\"{table.name}\")').fetchall()\n            assert any(row[2:5] == (\"users\", \"user_id\", \"id\") and row[6] == \"RESTRICT\" for row in foreign)\n            groups: dict[int, list[tuple]] = {}\n            for row in foreign:\n                groups.setdefault(row[0], []).append(row)\n            actual_keys = {\n                (\n                    tuple(row[3] for row in sorted(rows, key=lambda row: row[1])),\n                    rows[0][2],\n                    tuple(row[4] for row in sorted(rows, key=lambda row: row[1])),\n                )\n                for rows in groups.values()\n            }\n            expected_keys = {\n                (\n                    tuple(column.name for column in key.columns),\n                    key.referred_table.name,\n                    tuple(element.column.name for element in key.elements),\n                )\n                for key in table.foreign_key_constraints\n            }\n            assert actual_keys == expected_keys\n        triggers = {\n            row[0]\n            for row in connection.execute(\"SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'm10_%'\")\n        }\n        assert triggers == {\n            f\"{table}_{action}\"\n            for table in TABLES - {\"m10_quality_profile_heads\"}\n            for action in (\"no_update\", \"no_delete\")\n        }\n    command.downgrade(cfg, PREDECESSOR)\n    with sqlite3.connect(database) as connection:\n        remaining = {row[0] for row in connection.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}\n        assert remaining == before\n        assert connection.execute(\"SELECT username FROM users WHERE id='m10-witness'\").fetchone() == (\"m10-witness\",)\n        assert connection.execute(\n            \"SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'm10_%'\"\n        ).fetchone() == (0,)\n    command.upgrade(cfg, REVISION)\n    with sqlite3.connect(database) as connection:\n        assert connection.execute(\"SELECT version_num FROM alembic_version\").fetchone() == (REVISION,)\n        assert connection.execute(\"SELECT username FROM users WHERE id='m10-witness'\").fetchone() == (\"m10-witness\",)\n\n\n@pytest.mark.parametrize(\"table\", sorted(TABLES - {\"m10_quality_profile_heads\"}))\n@pytest.mark.parametrize(\"operation\", [\"UPDATE\", \"DELETE\"])\ndef test_immutable_rows_refuse_raw_update_and_delete(\n    alembic_cfg: tuple[Config, Path], table: str, operation: str\n) -> None:\n    cfg, database = alembic_cfg\n    command.upgrade(cfg, REVISION)\n    with sqlite3.connect(database) as connection:\n        connection.execute(\"PRAGMA foreign_keys=OFF\")\n        columns = connection.execute(f'PRAGMA table_info(\"{table}\")').fetchall()\n        values = {}\n        for _, name, _kind, notnull, _, primary in columns:\n            if name in {\"revision\", \"result_revision\", \"grant_sequence\"}:\n                values[name] = 1\n            elif name in {\"parent_revision\", \"previous_revision\"}:\n                values[name] = None\n            elif name == \"operation\":\n                values[name] = \"PUBLISH_PROFILE\"\n            elif name == \"action\":\n                values[name] = \"PROFILE_PUBLICATION\"\n            elif name == \"supersession_effect\":\n                values[name] = \"HISTORICAL_ONLY\"\n            elif name in {\"issued_at\", \"admitted_at\", \"committed_at\", \"created_at\"}:\n                values[name] = \"2026-10-27 00:00:00\"\n            elif name == \"admit_not_after\":\n                values[name] = \"2026-10-27 00:00:30\"\n            elif \"json\" in name:\n                values[name] = \"{}\"\n            elif notnull or primary:\n                values[name] = \"fixture\"\n        names = \",\".join(f'\"{name}\"' for name in values)\n        connection.execute(\n            f'INSERT INTO \"{table}\" ({names}) VALUES ({\",\".join(\"?\" for _ in values)})', tuple(values.values())\n        )\n        connection.commit()\n        statement = f'UPDATE \"{table}\" SET user_id=user_id' if operation == \"UPDATE\" else f'DELETE FROM \"{table}\"'\n        with pytest.raises(sqlite3.IntegrityError, match=\"M10_IMMUTABLE_PUBLICATION_ROW\"):\n            connection.execute(statement)\n        assert connection.execute(f'SELECT count(*) FROM \"{table}\"').fetchone() == (1,)\n\n\n@pytest.mark.parametrize((\"revision\", \"digest\"), [(None, \"sha256:a\"), (1, None), (0, \"sha256:a\")])\ndef test_head_revision_digest_pair_is_coherent(\n    alembic_cfg: tuple[Config, Path], revision: int | None, digest: str | None\n) -> None:\n    cfg, database = alembic_cfg\n    command.upgrade(cfg, REVISION)\n    with sqlite3.connect(database) as connection, pytest.raises(sqlite3.IntegrityError):\n        connection.execute(\n            \"INSERT INTO m10_quality_profile_heads (user_id,project_name,profile_id,current_revision,current_digest) VALUES ('default','project','profile',?,?)\",\n            (revision, digest),\n        )\n",
+    "cases": [
+      {
+        "case": "existing_singleton",
+        "historical_pass": true,
+        "proposed_pass": true
+      },
+      {
+        "case": "exact_noop_successor",
+        "historical_pass": false,
+        "proposed_pass": true
+      },
+      {
+        "case": "two_heads_refused",
+        "historical_pass": false,
+        "proposed_pass": false
+      },
+      {
+        "case": "one_head_wrong_a3_predecessor_refused",
+        "historical_pass": false,
+        "proposed_pass": false
+      }
+    ],
+    "tracked_test_changed": false,
+    "production_database_touched": false,
+    "temporary_graph_removed": true
+  },
+  "authority": {
+    "design_choices": "implementing agent under user continuous-execution instruction",
+    "sponsor_acceptance_claimed": false,
+    "independent_builder_check": true,
+    "independent_critical_source_pass": false,
+    "a4_runtime_accepted": false,
+    "production_migration_authorized": false,
+    "runtime_activation_authorized": false,
+    "original_a3_readiness_closed": false,
+    "factual_admission_qualified": false
+  }
+}

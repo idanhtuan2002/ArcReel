@@ -1,0 +1,18 @@
+{
+  "schema_id": "m10.a4-builder-check.v1",
+  "reviewer_task": "/root/m10_a4_builder_check",
+  "role": "read-only builder questions",
+  "observed_model": null,
+  "source_head": "2ce1478bef93a77c888f3fc8fe2a5eefd8a46d4c",
+  "questions": [
+    "existing M7 result staging hook",
+    "approved root byte resolution",
+    "ProbeCatalog storage and lifecycle",
+    "exact measurement schemas",
+    "unsupported-host result semantics",
+    "unknown-submit operator and new-ref path",
+    "exact migration-test ancestry edit"
+  ],
+  "resolution": "All seven clarified in design; main adjudication, no independent critical source pass claimed.",
+  "production_activation_authorized": false
+}

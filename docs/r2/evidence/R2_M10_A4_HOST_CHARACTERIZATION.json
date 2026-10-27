@@ -1,0 +1,1642 @@
+{
+  "schema_id": "m10.a4-host-characterization.v1",
+  "status": "HOST_MECHANISM_CHARACTERIZED_NOT_A4_ACCEPTED",
+  "source_head": "2ce1478bef93a77c888f3fc8fe2a5eefd8a46d4c",
+  "recorded_at": "2026-10-27T13:54:59.699381+00:00",
+  "production_configuration_changed": false,
+  "m7_receipts_qualified": false,
+  "runtime_accepted": false,
+  "full_video_vmaf_qualified": false,
+  "normalization_check": {
+    "same_frames_and_pooled_metrics_equal": true,
+    "mean_scores": {
+      "same1": 99.485749,
+      "same2": 99.485749,
+      "changed": 3.567179
+    },
+    "filesystem_signal_network_memory_checks": {
+      "allowed": "allowed",
+      "outside": {
+        "errno": 13
+      },
+      "write_input": {
+        "errno": 13
+      },
+      "socket_2": {
+        "errno": 1
+      },
+      "socket_1": {
+        "errno": 1
+      },
+      "outside_signal": {
+        "errno": 1
+      },
+      "self_signal": "allowed",
+      "process_vm_readv": {
+        "result": -1,
+        "errno": 1
+      }
+    }
+  },
+  "artifacts": {
+    "systemd-resource-probe.json": {
+      "sha256": "e270ba7aca903dd4411a92dde1163993106ad181a9fb8c329ef9cd0384b50358",
+      "body": {
+        "status": "DISPOSABLE_HOST_CAPABILITY_PROBE_NOT_A4_ACCEPTANCE",
+        "generated_at": "2026-10-27T13:17:28.361386+00:00",
+        "source_head": "2ce1478bef93a77c888f3fc8fe2a5eefd8a46d4c",
+        "systemd_run_sha256": "03a68bafb0ebc0f5eff41cbdf3cbbdf126a3bb87e21140f9147bf78edce36d88",
+        "cases": [
+          {
+            "case": "limits",
+            "unit": "m10-a4-research-b15ce02aac0f.service",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-research-b15ce02aac0f.service",
+              "-p",
+              "MemoryMax=64M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=8",
+              "-p",
+              "CPUQuota=50%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "LimitCORE=0",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import json,os\nfrom pathlib import Path\nrel=Path('/proc/self/cgroup').read_text().strip().split(':',2)[2]\np=Path('/sys/fs/cgroup')/rel.lstrip('/')\nr={'pid':os.getpid(),'cgroup':rel,'limits':{n:(p/n).read_text().strip() if (p/n).is_file() else 'MISSING' for n in ['memory.max','memory.swap.max','pids.max','cpu.max']}}\nprint(json.dumps(r),flush=True)\n"
+            ],
+            "exit_code": 0,
+            "stdout": "{\"pid\": 1884228, \"cgroup\": \"/user.slice/user-1000.slice/user@1000.service/app.slice/m10-a4-research-b15ce02aac0f.service\", \"limits\": {\"memory.max\": \"67108864\", \"memory.swap.max\": \"0\", \"pids.max\": \"8\", \"cpu.max\": \"50000 100000\"}}\n",
+            "stderr": "Running as unit: m10-a4-research-b15ce02aac0f.service; invocation ID: 0142774329014219a9f596f72925eec5\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 22ms\n             CPU time consumed: 22ms\n                   Memory peak: 5M (swap: 0B)\n",
+            "elapsed_seconds": 0.038,
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive"
+          },
+          {
+            "case": "pids",
+            "unit": "m10-a4-research-0b5ed8041e61.service",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-research-0b5ed8041e61.service",
+              "-p",
+              "MemoryMax=64M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=8",
+              "-p",
+              "CPUQuota=50%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "LimitCORE=0",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import json,os\nfrom pathlib import Path\nrel=Path('/proc/self/cgroup').read_text().strip().split(':',2)[2]\np=Path('/sys/fs/cgroup')/rel.lstrip('/')\nr={'pid':os.getpid(),'cgroup':rel,'limits':{n:(p/n).read_text().strip() if (p/n).is_file() else 'MISSING' for n in ['memory.max','memory.swap.max','pids.max','cpu.max']}}\nprint(json.dumps(r),flush=True)\nimport errno,subprocess\nchildren=[]\ntry:\n for i in range(12):\n  try:children.append(subprocess.Popen(['/usr/bin/sleep','2']))\n  except OSError as e:\n   print(json.dumps({'spawn_denied_errno':e.errno,'children':len(children)}),flush=True);break\nfinally:\n for c in children:c.terminate()\n for c in children:c.wait(timeout=2)\n"
+            ],
+            "exit_code": 0,
+            "stdout": "{\"pid\": 1884238, \"cgroup\": \"/user.slice/user-1000.slice/user@1000.service/app.slice/m10-a4-research-0b5ed8041e61.service\", \"limits\": {\"memory.max\": \"67108864\", \"memory.swap.max\": \"0\", \"pids.max\": \"8\", \"cpu.max\": \"50000 100000\"}}\n{\"spawn_denied_errno\": 11, \"children\": 7}\n",
+            "stderr": "Running as unit: m10-a4-research-0b5ed8041e61.service; invocation ID: 15288b757ab44ee7818704c717b302e3\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 30ms\n             CPU time consumed: 38ms\n                   Memory peak: 15.3M (swap: 0B)\n",
+            "elapsed_seconds": 0.046,
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive"
+          },
+          {
+            "case": "memory",
+            "unit": "m10-a4-research-94a72afb0baa.service",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-research-94a72afb0baa.service",
+              "-p",
+              "MemoryMax=64M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=8",
+              "-p",
+              "CPUQuota=50%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "LimitCORE=0",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import json,os\nfrom pathlib import Path\nrel=Path('/proc/self/cgroup').read_text().strip().split(':',2)[2]\np=Path('/sys/fs/cgroup')/rel.lstrip('/')\nr={'pid':os.getpid(),'cgroup':rel,'limits':{n:(p/n).read_text().strip() if (p/n).is_file() else 'MISSING' for n in ['memory.max','memory.swap.max','pids.max','cpu.max']}}\nprint(json.dumps(r),flush=True)\nx=bytearray(96*1024*1024)\nprint('UNEXPECTED_ALLOCATION_SUCCESS',flush=True)\n"
+            ],
+            "exit_code": 1,
+            "stdout": "{\"pid\": 1884255, \"cgroup\": \"/user.slice/user-1000.slice/user@1000.service/app.slice/m10-a4-research-94a72afb0baa.service\", \"limits\": {\"memory.max\": \"67108864\", \"memory.swap.max\": \"0\", \"pids.max\": \"8\", \"cpu.max\": \"50000 100000\"}}\n",
+            "stderr": "Running as unit: m10-a4-research-94a72afb0baa.service; invocation ID: 7eac2cb3391d4b09839f8107a4425352\n          Finished with result: oom-kill\nMain processes terminated with: code=killed, status=9/KILL\n               Service runtime: 41ms\n             CPU time consumed: 41ms\n                   Memory peak: 64M (swap: 0B)\n",
+            "elapsed_seconds": 0.059,
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive"
+          },
+          {
+            "case": "timeout",
+            "unit": "m10-a4-research-9d40ae92f505.service",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-research-9d40ae92f505.service",
+              "-p",
+              "MemoryMax=64M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=8",
+              "-p",
+              "CPUQuota=50%",
+              "-p",
+              "RuntimeMaxSec=1",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "LimitCORE=0",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import json,os\nfrom pathlib import Path\nrel=Path('/proc/self/cgroup').read_text().strip().split(':',2)[2]\np=Path('/sys/fs/cgroup')/rel.lstrip('/')\nr={'pid':os.getpid(),'cgroup':rel,'limits':{n:(p/n).read_text().strip() if (p/n).is_file() else 'MISSING' for n in ['memory.max','memory.swap.max','pids.max','cpu.max']}}\nprint(json.dumps(r),flush=True)\nimport subprocess,time\nc=subprocess.Popen(['/usr/bin/sleep','10'])\nprint(json.dumps({'child_pid':c.pid,'child_start':Path('/proc/'+str(c.pid)+'/stat').read_text().split()[21]}),flush=True)\ntime.sleep(10)\n"
+            ],
+            "exit_code": 1,
+            "stdout": "{\"pid\": 1884265, \"cgroup\": \"/user.slice/user-1000.slice/user@1000.service/app.slice/m10-a4-research-9d40ae92f505.service\", \"limits\": {\"memory.max\": \"67108864\", \"memory.swap.max\": \"0\", \"pids.max\": \"8\", \"cpu.max\": \"50000 100000\"}}\n{\"child_pid\": 1884273, \"child_start\": \"61007429\"}\n",
+            "stderr": "Running as unit: m10-a4-research-9d40ae92f505.service; invocation ID: a7dfb89a9dbd4b95b03120a68165c1c0\n          Finished with result: timeout\nMain processes terminated with: code=killed, status=15/TERM\n               Service runtime: 1.115s\n             CPU time consumed: 25ms\n                   Memory peak: 7.2M (swap: 0B)\n",
+            "child_after_timeout": {
+              "absent": true
+            },
+            "elapsed_seconds": 1.133,
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive"
+          }
+        ],
+        "production_units_changed": false
+      }
+    },
+    "systemd-namespace-probe.json": {
+      "sha256": "e6cacba8bd6e5b586f9e2b9add677025cfe0cb7d7fe704d00ed9e54fb690bc49",
+      "body": {
+        "status": "DISPOSABLE_NAMESPACE_CAPABILITY_ONLY",
+        "command": [
+          "/usr/bin/systemd-run",
+          "--user",
+          "--no-ask-password",
+          "--wait",
+          "--pipe",
+          "--collect",
+          "--service-type=exec",
+          "--expand-environment=no",
+          "--unit=m10-a4-ns-486e636fdb19.service",
+          "-p",
+          "MemoryMax=64M",
+          "-p",
+          "TasksMax=8",
+          "-p",
+          "RuntimeMaxSec=3",
+          "-p",
+          "TimeoutStopSec=1",
+          "-p",
+          "NoNewPrivileges=yes",
+          "-p",
+          "PrivateUsers=yes",
+          "-p",
+          "ProtectSystem=strict",
+          "-p",
+          "ProtectHome=tmpfs",
+          "-p",
+          "BindReadOnlyPaths=/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/namespace-fixture/input:/m10-input",
+          "-p",
+          "PrivateNetwork=yes",
+          "-p",
+          "SystemCallFilter=~@network-io",
+          "/usr/bin/python3",
+          "-I",
+          "-c",
+          "import json,socket\nfrom pathlib import Path\nr={}\nfor k,p in [('input','/m10-input'),('outside','/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/namespace-fixture/outside')]:\n try:r[k]=Path(p).read_text()\n except OSError as e:r[k]={'errno':e.errno}\nfor family in [socket.AF_INET,socket.AF_UNIX]:\n try:s=socket.socket(family);s.close();r['socket_'+str(family)]='allowed'\n except OSError as e:r['socket_'+str(family)]={'errno':e.errno}\nprint(json.dumps(r))\n"
+        ],
+        "exit_code": 226,
+        "stdout": "",
+        "stderr": "Running as unit: m10-a4-ns-486e636fdb19.service; invocation ID: 67d372149dbb47c795a5c97962e35f3b\n          Finished with result: exit-code\nMain processes terminated with: code=exited, status=226/NAMESPACE\n               Service runtime: 10ms\n             CPU time consumed: 4ms\n                   Memory peak: 2.2M (swap: 0B)\n",
+        "post_cleanup": "LoadState=not-found\nActiveState=inactive\n"
+      }
+    },
+    "landlock-probe.json": {
+      "sha256": "60c5bbb2d3de61ca2ae2c6da1dafe9b45d989fe40231259ef0021428213ad8bc",
+      "body": {
+        "status": "DISPOSABLE_LANDLOCK_AND_REAL_TOOL_CHARACTERIZATION",
+        "source_head": "2ce1478bef93a77c888f3fc8fe2a5eefd8a46d4c",
+        "fixture_generation": [
+          "/usr/bin/ffmpeg",
+          "-nostdin",
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "color=c=black:s=64x64:r=5",
+          "-f",
+          "lavfi",
+          "-i",
+          "anullsrc=r=16000:cl=mono",
+          "-t",
+          "1",
+          "-c:v",
+          "libx264",
+          "-threads",
+          "1",
+          "-c:a",
+          "aac",
+          "-y",
+          "/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4"
+        ],
+        "fixture_sha256": "4f61591b5da171fa91b064b15ca0cb20b8d52718ed5d503571f40305f67740f5",
+        "headers_sha256": {
+          "/usr/include/linux/landlock.h": "47fb9304a6d3243ad8070ce2b5435cb13c46bc4fdb44efd7a1b908abcf367bae",
+          "/usr/include/x86_64-linux-gnu/asm/unistd_64.h": "261fc370ad799ba94c342ce4a3f8a83232e5e76339ca3cea5e5090efcc22370a"
+        },
+        "cases": [
+          {
+            "case": "filesystem_network",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-landlock-751cc0699b6d.service",
+              "-p",
+              "MemoryMax=256M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=32",
+              "-p",
+              "CPUQuota=50%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "LimitCORE=0",
+              "-p",
+              "SystemCallErrorNumber=EPERM",
+              "-p",
+              "SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import ctypes,json,os,socket,sys,signal\nlibc=ctypes.CDLL(None,use_errno=True)\nlibc.syscall.restype=ctypes.c_long\nclass Rules(ctypes.Structure):_fields_=[('fs',ctypes.c_uint64),('net',ctypes.c_uint64),('scoped',ctypes.c_uint64)]\nclass Beneath(ctypes.Structure):\n _layout_='ms'\n _pack_=1\n _fields_=[('access',ctypes.c_uint64),('fd',ctypes.c_int32)]\nabi=libc.syscall(444,None,0,1)\nif abi<6:raise RuntimeError('required Landlock ABI unavailable')\nassert len(os.listdir('/proc/self/task'))==1\nattr=Rules((1<<16)-1,0,3)\nrules=libc.syscall(444,ctypes.byref(attr),ctypes.sizeof(attr),0)\nif rules<0:raise OSError(ctypes.get_errno(),'create_ruleset')\nfor path,rights in [('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4', 4), ('/usr/lib', 13), ('/usr/share', 12), ('/etc/ld.so.cache', 4), ('/dev/null', 4), ('/dev/urandom', 4), ('/usr/bin/ffprobe', 5), ('/usr/bin/ffmpeg', 5)]:\n fd=os.open(path,os.O_PATH|os.O_CLOEXEC)\n try:\n  rule=Beneath(rights,fd)\n  if libc.syscall(445,rules,1,ctypes.byref(rule),0)<0:raise OSError(ctypes.get_errno(),'add_rule')\n finally:os.close(fd)\nif libc.prctl(38,1,0,0,0)!=0:raise OSError(ctypes.get_errno(),'no_new_privileges')\nif libc.syscall(446,rules,0)<0:raise OSError(ctypes.get_errno(),'restrict_self')\nos.close(rules)\nprint(json.dumps({'landlock_abi':abi,'enforced':True,'scoped':3}),flush=True)\nr={}\nfor name,path,mode in [('allowed','/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4','rb'),('outside','/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/outside','rb'),('write_input','/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4','wb')]:\n try:\n  with open(path,mode) as f:\n   if mode=='rb':f.read(1)\n  r[name]='allowed'\n except OSError as e:r[name]={'errno':e.errno}\nfor fam in [socket.AF_INET,socket.AF_UNIX]:\n try:s=socket.socket(fam);s.close();r['socket_'+str(fam)]='allowed'\n except OSError as e:r['socket_'+str(fam)]={'errno':e.errno}\ntry:os.kill(1911272,signal.SIGCONT);r['outside_signal']='allowed'\nexcept OSError as e:r['outside_signal']={'errno':e.errno}\nos.kill(os.getpid(),signal.SIGCONT);r['self_signal']='allowed'\nctypes.set_errno(0)\nx=libc.syscall(310,os.getpid(),None,0,None,0,0)\nr['process_vm_readv']={'result':x,'errno':ctypes.get_errno()}\nprint(json.dumps(r),flush=True)\n"
+            ],
+            "exit_code": 0,
+            "stdout": "{\"landlock_abi\": 8, \"enforced\": true, \"scoped\": 3}\n{\"allowed\": \"allowed\", \"outside\": {\"errno\": 13}, \"write_input\": {\"errno\": 13}, \"socket_2\": {\"errno\": 1}, \"socket_1\": {\"errno\": 1}, \"outside_signal\": {\"errno\": 1}, \"self_signal\": \"allowed\", \"process_vm_readv\": {\"result\": -1, \"errno\": 1}}\n",
+            "stderr": "Running as unit: m10-a4-landlock-751cc0699b6d.service\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 26ms\n             CPU time consumed: 26ms\n                   Memory peak: 5.8M (swap: 0B)\n",
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive\n"
+          },
+          {
+            "case": "ffprobe",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-landlock-67bf927daf1a.service",
+              "-p",
+              "MemoryMax=256M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=32",
+              "-p",
+              "CPUQuota=50%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "LimitCORE=0",
+              "-p",
+              "SystemCallErrorNumber=EPERM",
+              "-p",
+              "SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import ctypes,json,os,socket,sys,signal\nlibc=ctypes.CDLL(None,use_errno=True)\nlibc.syscall.restype=ctypes.c_long\nclass Rules(ctypes.Structure):_fields_=[('fs',ctypes.c_uint64),('net',ctypes.c_uint64),('scoped',ctypes.c_uint64)]\nclass Beneath(ctypes.Structure):\n _layout_='ms'\n _pack_=1\n _fields_=[('access',ctypes.c_uint64),('fd',ctypes.c_int32)]\nabi=libc.syscall(444,None,0,1)\nif abi<6:raise RuntimeError('required Landlock ABI unavailable')\nassert len(os.listdir('/proc/self/task'))==1\nattr=Rules((1<<16)-1,0,3)\nrules=libc.syscall(444,ctypes.byref(attr),ctypes.sizeof(attr),0)\nif rules<0:raise OSError(ctypes.get_errno(),'create_ruleset')\nfor path,rights in [('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4', 4), ('/usr/lib', 13), ('/usr/share', 12), ('/etc/ld.so.cache', 4), ('/dev/null', 4), ('/dev/urandom', 4), ('/usr/bin/ffprobe', 5), ('/usr/bin/ffmpeg', 5)]:\n fd=os.open(path,os.O_PATH|os.O_CLOEXEC)\n try:\n  rule=Beneath(rights,fd)\n  if libc.syscall(445,rules,1,ctypes.byref(rule),0)<0:raise OSError(ctypes.get_errno(),'add_rule')\n finally:os.close(fd)\nif libc.prctl(38,1,0,0,0)!=0:raise OSError(ctypes.get_errno(),'no_new_privileges')\nif libc.syscall(446,rules,0)<0:raise OSError(ctypes.get_errno(),'restrict_self')\nos.close(rules)\nprint(json.dumps({'landlock_abi':abi,'enforced':True,'scoped':3}),flush=True)\nos.execv('/usr/bin/ffprobe',['/usr/bin/ffprobe', '-v', 'error', '-protocol_whitelist', 'file,pipe', '-show_streams', '-show_format', '-of', 'json', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4'])"
+            ],
+            "exit_code": 0,
+            "stdout": "{\"landlock_abi\": 8, \"enforced\": true, \"scoped\": 3}\n{\n    \"streams\": [\n        {\n            \"index\": 0,\n            \"codec_name\": \"h264\",\n            \"codec_long_name\": \"H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10\",\n            \"profile\": \"High\",\n            \"codec_type\": \"video\",\n            \"codec_tag_string\": \"avc1\",\n            \"codec_tag\": \"0x31637661\",\n            \"width\": 64,\n            \"height\": 64,\n            \"coded_width\": 64,\n            \"coded_height\": 64,\n            \"has_b_frames\": 2,\n            \"sample_aspect_ratio\": \"1:1\",\n            \"display_aspect_ratio\": \"1:1\",\n            \"pix_fmt\": \"yuv420p\",\n            \"level\": 10,\n            \"chroma_location\": \"left\",\n            \"field_order\": \"progressive\",\n            \"refs\": 1,\n            \"is_avc\": \"true\",\n            \"nal_length_size\": \"4\",\n            \"id\": \"0x1\",\n            \"r_frame_rate\": \"5/1\",\n            \"avg_frame_rate\": \"5/1\",\n            \"time_base\": \"1/10240\",\n            \"start_pts\": 0,\n            \"start_time\": \"0.000000\",\n            \"duration_ts\": 10240,\n            \"duration\": \"1.000000\",\n            \"bit_rate\": \"6096\",\n            \"bits_per_raw_sample\": \"8\",\n            \"nb_frames\": \"5\",\n            \"extradata_size\": 45,\n            \"disposition\": {\n                \"default\": 1,\n                \"dub\": 0,\n                \"original\": 0,\n                \"comment\": 0,\n                \"lyrics\": 0,\n                \"karaoke\": 0,\n                \"forced\": 0,\n                \"hearing_impaired\": 0,\n                \"visual_impaired\": 0,\n                \"clean_effects\": 0,\n                \"attached_pic\": 0,\n                \"timed_thumbnails\": 0,\n                \"non_diegetic\": 0,\n                \"captions\": 0,\n                \"descriptions\": 0,\n                \"metadata\": 0,\n                \"dependent\": 0,\n                \"still_image\": 0,\n                \"multilayer\": 0\n            },\n            \"tags\": {\n                \"language\": \"und\",\n                \"handler_name\": \"VideoHandler\",\n                \"vendor_id\": \"[0][0][0][0]\",\n                \"encoder\": \"Lavc62.11.100 libx264\"\n            }\n        },\n        {\n            \"index\": 1,\n            \"codec_name\": \"aac\",\n            \"codec_long_name\": \"AAC (Advanced Audio Coding)\",\n            \"profile\": \"LC\",\n            \"codec_type\": \"audio\",\n            \"codec_tag_string\": \"mp4a\",\n            \"codec_tag\": \"0x6134706d\",\n            \"sample_fmt\": \"fltp\",\n            \"sample_rate\": \"16000\",\n            \"channels\": 1,\n            \"channel_layout\": \"mono\",\n            \"bits_per_sample\": 0,\n            \"initial_padding\": 0,\n            \"id\": \"0x2\",\n            \"r_frame_rate\": \"0/0\",\n            \"avg_frame_rate\": \"0/0\",\n            \"time_base\": \"1/16000\",\n            \"start_pts\": 0,\n            \"start_time\": \"0.000000\",\n            \"duration_ts\": 16000,\n            \"duration\": \"1.000000\",\n            \"bit_rate\": \"639\",\n            \"nb_frames\": \"17\",\n            \"extradata_size\": 5,\n            \"disposition\": {\n                \"default\": 1,\n                \"dub\": 0,\n                \"original\": 0,\n                \"comment\": 0,\n                \"lyrics\": 0,\n                \"karaoke\": 0,\n                \"forced\": 0,\n                \"hearing_impaired\": 0,\n                \"visual_impaired\": 0,\n                \"clean_effects\": 0,\n                \"attached_pic\": 0,\n                \"timed_thumbnails\": 0,\n                \"non_diegetic\": 0,\n                \"captions\": 0,\n                \"descriptions\": 0,\n                \"metadata\": 0,\n                \"dependent\": 0,\n                \"still_image\": 0,\n                \"multilayer\": 0\n            },\n            \"tags\": {\n                \"language\": \"und\",\n                \"handler_name\": \"SoundHandler\",\n                \"vendor_id\": \"[0][0][0][0]\"\n            }\n        }\n    ],\n    \"format\": {\n        \"filename\": \"/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4\",\n        \"nb_streams\": 2,\n        \"nb_programs\": 0,\n        \"nb_stream_groups\": 0,\n        \"format_name\": \"mov,mp4,m4a,3gp,3g2,mj2\",\n        \"format_long_name\": \"QuickTime / MOV\",\n        \"start_time\": \"0.000000\",\n        \"duration\": \"1.000000\",\n        \"size\": \"2489\",\n        \"bit_rate\": \"19912\",\n        \"probe_score\": 100,\n        \"tags\": {\n            \"major_brand\": \"isom\",\n            \"minor_version\": \"512\",\n            \"compatible_brands\": \"isomiso2avc1mp41\",\n            \"encoder\": \"Lavf62.3.100\"\n        }\n    }\n}\n",
+            "stderr": "Running as unit: m10-a4-landlock-67bf927daf1a.service\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 58ms\n             CPU time consumed: 58ms\n                   Memory peak: 13.6M (swap: 0B)\n",
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive\n"
+          },
+          {
+            "case": "decode",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-landlock-7d84dca25c21.service",
+              "-p",
+              "MemoryMax=256M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=32",
+              "-p",
+              "CPUQuota=50%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "LimitCORE=0",
+              "-p",
+              "SystemCallErrorNumber=EPERM",
+              "-p",
+              "SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import ctypes,json,os,socket,sys,signal\nlibc=ctypes.CDLL(None,use_errno=True)\nlibc.syscall.restype=ctypes.c_long\nclass Rules(ctypes.Structure):_fields_=[('fs',ctypes.c_uint64),('net',ctypes.c_uint64),('scoped',ctypes.c_uint64)]\nclass Beneath(ctypes.Structure):\n _layout_='ms'\n _pack_=1\n _fields_=[('access',ctypes.c_uint64),('fd',ctypes.c_int32)]\nabi=libc.syscall(444,None,0,1)\nif abi<6:raise RuntimeError('required Landlock ABI unavailable')\nassert len(os.listdir('/proc/self/task'))==1\nattr=Rules((1<<16)-1,0,3)\nrules=libc.syscall(444,ctypes.byref(attr),ctypes.sizeof(attr),0)\nif rules<0:raise OSError(ctypes.get_errno(),'create_ruleset')\nfor path,rights in [('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4', 4), ('/usr/lib', 13), ('/usr/share', 12), ('/etc/ld.so.cache', 4), ('/dev/null', 4), ('/dev/urandom', 4), ('/usr/bin/ffprobe', 5), ('/usr/bin/ffmpeg', 5)]:\n fd=os.open(path,os.O_PATH|os.O_CLOEXEC)\n try:\n  rule=Beneath(rights,fd)\n  if libc.syscall(445,rules,1,ctypes.byref(rule),0)<0:raise OSError(ctypes.get_errno(),'add_rule')\n finally:os.close(fd)\nif libc.prctl(38,1,0,0,0)!=0:raise OSError(ctypes.get_errno(),'no_new_privileges')\nif libc.syscall(446,rules,0)<0:raise OSError(ctypes.get_errno(),'restrict_self')\nos.close(rules)\nprint(json.dumps({'landlock_abi':abi,'enforced':True,'scoped':3}),flush=True)\nos.execv('/usr/bin/ffmpeg',['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-protocol_whitelist', 'file,pipe', '-i', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/landlock-fixture/tiny.mp4', '-f', 'null', '-'])"
+            ],
+            "exit_code": 0,
+            "stdout": "{\"landlock_abi\": 8, \"enforced\": true, \"scoped\": 3}\n",
+            "stderr": "Running as unit: m10-a4-landlock-7d84dca25c21.service; invocation ID: 0c0b452b7f234396b537cfda589f03da\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 91ms\n             CPU time consumed: 61ms\n                   Memory peak: 24.5M (swap: 0B)\n",
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive\n"
+          }
+        ],
+        "production_configuration_changed": false
+      }
+    },
+    "vmaf-tool-cache.json": {
+      "sha256": "a45e18217c40ba9f2d406b6bd8e27a5d32a2b40d40e3ea6affef7b53df302c47",
+      "body": {
+        "status": "PINNED_OFFICIAL_ARTIFACT_DOWNLOADED_NOT_EXECUTED",
+        "source_commit": "f85a853692a8c730d0270cd733c8bb30b5b93b7c",
+        "tag": "v3.2.1",
+        "asset": {
+          "name": "vmaf-linux-x86_64-gcc.zip",
+          "size": 639955,
+          "digest": "sha256:c0bb6d354f7009530fab5749e1309bd90f9c45a5a10e90250e6e558c48cfdd02",
+          "url": "https://github.com/Netflix/vmaf/releases/download/v3.2.1/vmaf-linux-x86_64-gcc.zip"
+        },
+        "archive_sha256": "c0bb6d354f7009530fab5749e1309bd90f9c45a5a10e90250e6e558c48cfdd02",
+        "binary": "/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf",
+        "binary_sha256": "55e2eeff3ecefe8585467afc215d25ab27dcba109bc03f65e71a77ea4e634cdd",
+        "binary_bytes": 2151288,
+        "private_cache_mode": "0o700",
+        "global_dependencies_changed": false
+      }
+    },
+    "vmaf-primary-source-pins.json": {
+      "sha256": "203661f857114f7ae9565645c1bde85a7a2386726a534e38c1a509868e26e97d",
+      "body": [
+        {
+          "url": "https://raw.githubusercontent.com/Netflix/vmaf/f85a853692a8c730d0270cd733c8bb30b5b93b7c/libvmaf/tools/cli_parse.c",
+          "path": ".superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-libvmaf_tools_cli_parse.c",
+          "sha256": "5db957a82403676374dd9e19f2e7853a577ed4dbfd0228292746a36e9fbe9ce3"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/Netflix/vmaf/f85a853692a8c730d0270cd733c8bb30b5b93b7c/libvmaf/src/libvmaf.c",
+          "path": ".superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-libvmaf_src_libvmaf.c",
+          "sha256": "7e929f01218e3b2ae8ef38f602a49b45cc892ddc3a547c6e6a12e41d5b8f8266"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/Netflix/vmaf/f85a853692a8c730d0270cd733c8bb30b5b93b7c/model/vmaf_v0.6.1.json",
+          "path": ".superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-model_vmaf_v0.6.1.json",
+          "sha256": "5950d61fa1f861bd45d8149d80539ed9f3376cfc2495b8f0fa8e9f57cb131ee3"
+        }
+      ]
+    },
+    "vmaf-score-probe.json": {
+      "sha256": "7b7bc86e802028eddee67843bc2958e6c551e4cad63d6b7367accd6828fad0cf",
+      "body": {
+        "status": "REAL_VMAF_CHARACTERIZATION_NOT_PRODUCTION_ACCEPTANCE",
+        "source_commit": "f85a853692a8c730d0270cd733c8bb30b5b93b7c",
+        "binary_sha256": "55e2eeff3ecefe8585467afc215d25ab27dcba109bc03f65e71a77ea4e634cdd",
+        "model_sha256": "5950d61fa1f861bd45d8149d80539ed9f3376cfc2495b8f0fa8e9f57cb131ee3",
+        "fixture_generation": [
+          [
+            "/usr/bin/ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=64x64:r=5",
+            "-frames:v",
+            "5",
+            "-pix_fmt",
+            "yuv420p",
+            "-threads",
+            "1",
+            "-f",
+            "rawvideo",
+            "-y",
+            "/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/ref.yuv"
+          ],
+          [
+            "/usr/bin/ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "yuv420p",
+            "-video_size",
+            "64x64",
+            "-framerate",
+            "5",
+            "-i",
+            "/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/ref.yuv",
+            "-vf",
+            "hflip",
+            "-frames:v",
+            "5",
+            "-threads",
+            "1",
+            "-f",
+            "rawvideo",
+            "-y",
+            "/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/changed.yuv"
+          ]
+        ],
+        "input_sha256": {
+          "ref.yuv": "57ec48441c09f9e939744cc60dd0f4a5ad03c1ec6663d85017ee299ec180be81",
+          "same.yuv": "57ec48441c09f9e939744cc60dd0f4a5ad03c1ec6663d85017ee299ec180be81",
+          "changed.yuv": "dcd850040aa503dc3092a4737fc895a3e81a3b4d0e4383ba9491d379772a5521"
+        },
+        "cases": [
+          {
+            "case": "same1",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-vmaf-score-8c1163fcfe67.service",
+              "-p",
+              "MemoryMax=256M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=16",
+              "-p",
+              "CPUQuota=100%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "LimitCORE=0",
+              "-p",
+              "LimitFSIZE=64M",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "SystemCallErrorNumber=EPERM",
+              "-p",
+              "SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import ctypes,json,os,socket,sys,signal\nlibc=ctypes.CDLL(None,use_errno=True)\nlibc.syscall.restype=ctypes.c_long\nclass Rules(ctypes.Structure):_fields_=[('fs',ctypes.c_uint64),('net',ctypes.c_uint64),('scoped',ctypes.c_uint64)]\nclass Beneath(ctypes.Structure):\n _layout_='ms'\n _pack_=1\n _fields_=[('access',ctypes.c_uint64),('fd',ctypes.c_int32)]\nabi=libc.syscall(444,None,0,1)\nif abi<6:raise RuntimeError('required Landlock ABI unavailable')\nassert len(os.listdir('/proc/self/task'))==1\nattr=Rules((1<<16)-1,0,3)\nrules=libc.syscall(444,ctypes.byref(attr),ctypes.sizeof(attr),0)\nif rules<0:raise OSError(ctypes.get_errno(),'create_ruleset')\nfor path,rights in [('/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf', 5), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/ref.yuv', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/same.yuv', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-model_vmaf_v0.6.1.json', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/same1.json', 16390), ('/usr/lib', 13), ('/usr/share', 12), ('/etc/ld.so.cache', 4), ('/dev/null', 4), ('/dev/urandom', 4)]:\n fd=os.open(path,os.O_PATH|os.O_CLOEXEC)\n try:\n  rule=Beneath(rights,fd)\n  if libc.syscall(445,rules,1,ctypes.byref(rule),0)<0:raise OSError(ctypes.get_errno(),'add_rule')\n finally:os.close(fd)\nif libc.prctl(38,1,0,0,0)!=0:raise OSError(ctypes.get_errno(),'no_new_privileges')\nif libc.syscall(446,rules,0)<0:raise OSError(ctypes.get_errno(),'restrict_self')\nos.close(rules)\nprint(json.dumps({'landlock_abi':abi,'enforced':True,'scoped':3}),flush=True)\nos.execve('/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf',['/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf', '--reference', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/ref.yuv', '--distorted', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/same.yuv', '--width', '64', '--height', '64', '--pixel_format', '420', '--bitdepth', '8', '--model', 'path=/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-model_vmaf_v0.6.1.json', '--output', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/same1.json', '--json', '--threads', '1', '--cpumask', '4294967295', '--frame_cnt', '5', '--quiet'],{'LC_ALL': 'C', 'TZ': 'UTC', 'OMP_NUM_THREADS': '1'})"
+            ],
+            "exit_code": 0,
+            "stdout": "{\"landlock_abi\": 8, \"enforced\": true, \"scoped\": 3}\n",
+            "stderr": "Running as unit: m10-a4-vmaf-score-8c1163fcfe67.service; invocation ID: 0fcc8986682a4a58934649582bc99a48\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 28ms\n             CPU time consumed: 28ms\n                   Memory peak: 5.6M (swap: 0B)\n",
+            "result": {
+              "version": "f85a853",
+              "fps": 1913.51,
+              "frames": [
+                {
+                  "frameNum": 0,
+                  "metrics": {
+                    "integer_adm2": 1.000003,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000021,
+                    "integer_adm_scale1": 1.0000001968185463,
+                    "integer_adm_scale2": 1.0000004052777978,
+                    "integer_adm_scale3": 1.000000462848001,
+                    "VMAF_integer_feature_motion_sad_score": 0.0,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 1.0,
+                    "integer_motion2": 0.0,
+                    "integer_motion3": 5.834863,
+                    "vmaf": 97.428744
+                  }
+                },
+                {
+                  "frameNum": 1,
+                  "metrics": {
+                    "integer_adm2": 1.000003,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000022,
+                    "integer_adm_scale1": 1.0000002534632264,
+                    "integer_adm_scale2": 1.000000335439941,
+                    "integer_adm_scale3": 1.0000004286593038,
+                    "VMAF_integer_feature_motion_sad_score": 5.834863,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 0.999999,
+                    "integer_motion2": 5.834863,
+                    "integer_motion3": 5.834863,
+                    "vmaf": 100.0
+                  }
+                },
+                {
+                  "frameNum": 2,
+                  "metrics": {
+                    "integer_adm2": 1.000004,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000022,
+                    "integer_adm_scale1": 1.0000002539877828,
+                    "integer_adm_scale2": 1.0000003975332585,
+                    "integer_adm_scale3": 1.0000006410761875,
+                    "VMAF_integer_feature_motion_sad_score": 5.975352,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 1.0,
+                    "integer_motion2": 3.855872,
+                    "integer_motion3": 3.855872,
+                    "vmaf": 100.0
+                  }
+                },
+                {
+                  "frameNum": 3,
+                  "metrics": {
+                    "integer_adm2": 1.000004,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000022,
+                    "integer_adm_scale1": 1.00000026176407,
+                    "integer_adm_scale2": 1.000000403417039,
+                    "integer_adm_scale3": 1.0000005645261902,
+                    "VMAF_integer_feature_motion_sad_score": 3.855872,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 1.0,
+                    "integer_motion2": 3.855872,
+                    "integer_motion3": 3.855872,
+                    "vmaf": 100.0
+                  }
+                },
+                {
+                  "frameNum": 4,
+                  "metrics": {
+                    "integer_adm2": 1.000004,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000021,
+                    "integer_adm_scale1": 1.0000002719385768,
+                    "integer_adm_scale2": 1.0000004393946929,
+                    "integer_adm_scale3": 1.0000005729382364,
+                    "VMAF_integer_feature_motion_sad_score": 5.929175,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 0.999999,
+                    "integer_motion2": 5.929175,
+                    "integer_motion3": 5.929175,
+                    "vmaf": 100.0
+                  }
+                }
+              ],
+              "pooled_metrics": {
+                "integer_adm2": {
+                  "min": 1.000003,
+                  "max": 1.000004,
+                  "mean": 1.000004,
+                  "harmonic_mean": 1.000004
+                },
+                "integer_aim": {
+                  "min": 0.0,
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "harmonic_mean": 0.0
+                },
+                "integer_adm3": {
+                  "min": 1.000002,
+                  "max": 1.000002,
+                  "mean": 1.000002,
+                  "harmonic_mean": 1.000002
+                },
+                "integer_adm_scale0": {
+                  "min": 1.000021,
+                  "max": 1.000022,
+                  "mean": 1.000021,
+                  "harmonic_mean": 1.000021
+                },
+                "integer_adm_scale1": {
+                  "min": 1.0000001968185463,
+                  "max": 1.0000002719385768,
+                  "mean": 1.0000002475944405,
+                  "harmonic_mean": 1.00000024759444
+                },
+                "integer_adm_scale2": {
+                  "min": 1.000000335439941,
+                  "max": 1.0000004393946929,
+                  "mean": 1.0000003962125459,
+                  "harmonic_mean": 1.0000003962125454
+                },
+                "integer_adm_scale3": {
+                  "min": 1.0000004286593038,
+                  "max": 1.0000006410761875,
+                  "mean": 1.0000005340095837,
+                  "harmonic_mean": 1.000000534009581
+                },
+                "VMAF_integer_feature_motion_sad_score": {
+                  "min": 0.0,
+                  "max": 5.975352,
+                  "mean": 4.319053,
+                  "harmonic_mean": 2.048921
+                },
+                "integer_vif_scale0": {
+                  "min": 1.0,
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "harmonic_mean": 1.0
+                },
+                "integer_vif_scale1": {
+                  "min": 1.0,
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "harmonic_mean": 1.0
+                },
+                "integer_vif_scale2": {
+                  "min": 1.0,
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "harmonic_mean": 1.0
+                },
+                "integer_vif_scale3": {
+                  "min": 0.999999,
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "harmonic_mean": 1.0
+                },
+                "integer_motion2": {
+                  "min": 0.0,
+                  "max": 5.929175,
+                  "mean": 3.895156,
+                  "harmonic_mean": 1.93686
+                },
+                "integer_motion3": {
+                  "min": 3.855872,
+                  "max": 5.929175,
+                  "mean": 5.062129,
+                  "harmonic_mean": 4.890619
+                },
+                "vmaf": {
+                  "min": 97.428744,
+                  "max": 100.0,
+                  "mean": 99.485749,
+                  "harmonic_mean": 99.475058
+                }
+              },
+              "aggregate_metrics": {}
+            },
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive\n"
+          },
+          {
+            "case": "same2",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-vmaf-score-ea9f6bb88901.service",
+              "-p",
+              "MemoryMax=256M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=16",
+              "-p",
+              "CPUQuota=100%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "LimitCORE=0",
+              "-p",
+              "LimitFSIZE=64M",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "SystemCallErrorNumber=EPERM",
+              "-p",
+              "SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import ctypes,json,os,socket,sys,signal\nlibc=ctypes.CDLL(None,use_errno=True)\nlibc.syscall.restype=ctypes.c_long\nclass Rules(ctypes.Structure):_fields_=[('fs',ctypes.c_uint64),('net',ctypes.c_uint64),('scoped',ctypes.c_uint64)]\nclass Beneath(ctypes.Structure):\n _layout_='ms'\n _pack_=1\n _fields_=[('access',ctypes.c_uint64),('fd',ctypes.c_int32)]\nabi=libc.syscall(444,None,0,1)\nif abi<6:raise RuntimeError('required Landlock ABI unavailable')\nassert len(os.listdir('/proc/self/task'))==1\nattr=Rules((1<<16)-1,0,3)\nrules=libc.syscall(444,ctypes.byref(attr),ctypes.sizeof(attr),0)\nif rules<0:raise OSError(ctypes.get_errno(),'create_ruleset')\nfor path,rights in [('/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf', 5), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/ref.yuv', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/same.yuv', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-model_vmaf_v0.6.1.json', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/same2.json', 16390), ('/usr/lib', 13), ('/usr/share', 12), ('/etc/ld.so.cache', 4), ('/dev/null', 4), ('/dev/urandom', 4)]:\n fd=os.open(path,os.O_PATH|os.O_CLOEXEC)\n try:\n  rule=Beneath(rights,fd)\n  if libc.syscall(445,rules,1,ctypes.byref(rule),0)<0:raise OSError(ctypes.get_errno(),'add_rule')\n finally:os.close(fd)\nif libc.prctl(38,1,0,0,0)!=0:raise OSError(ctypes.get_errno(),'no_new_privileges')\nif libc.syscall(446,rules,0)<0:raise OSError(ctypes.get_errno(),'restrict_self')\nos.close(rules)\nprint(json.dumps({'landlock_abi':abi,'enforced':True,'scoped':3}),flush=True)\nos.execve('/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf',['/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf', '--reference', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/ref.yuv', '--distorted', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/same.yuv', '--width', '64', '--height', '64', '--pixel_format', '420', '--bitdepth', '8', '--model', 'path=/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-model_vmaf_v0.6.1.json', '--output', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/same2.json', '--json', '--threads', '1', '--cpumask', '4294967295', '--frame_cnt', '5', '--quiet'],{'LC_ALL': 'C', 'TZ': 'UTC', 'OMP_NUM_THREADS': '1'})"
+            ],
+            "exit_code": 0,
+            "stdout": "{\"landlock_abi\": 8, \"enforced\": true, \"scoped\": 3}\n",
+            "stderr": "Running as unit: m10-a4-vmaf-score-ea9f6bb88901.service; invocation ID: a92a2fce6ea4437993ae7870a3069974\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 29ms\n             CPU time consumed: 29ms\n                   Memory peak: 5.6M (swap: 0B)\n",
+            "result": {
+              "version": "f85a853",
+              "fps": 1898.97,
+              "frames": [
+                {
+                  "frameNum": 0,
+                  "metrics": {
+                    "integer_adm2": 1.000003,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000021,
+                    "integer_adm_scale1": 1.0000001968185463,
+                    "integer_adm_scale2": 1.0000004052777978,
+                    "integer_adm_scale3": 1.000000462848001,
+                    "VMAF_integer_feature_motion_sad_score": 0.0,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 1.0,
+                    "integer_motion2": 0.0,
+                    "integer_motion3": 5.834863,
+                    "vmaf": 97.428744
+                  }
+                },
+                {
+                  "frameNum": 1,
+                  "metrics": {
+                    "integer_adm2": 1.000003,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000022,
+                    "integer_adm_scale1": 1.0000002534632264,
+                    "integer_adm_scale2": 1.000000335439941,
+                    "integer_adm_scale3": 1.0000004286593038,
+                    "VMAF_integer_feature_motion_sad_score": 5.834863,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 0.999999,
+                    "integer_motion2": 5.834863,
+                    "integer_motion3": 5.834863,
+                    "vmaf": 100.0
+                  }
+                },
+                {
+                  "frameNum": 2,
+                  "metrics": {
+                    "integer_adm2": 1.000004,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000022,
+                    "integer_adm_scale1": 1.0000002539877828,
+                    "integer_adm_scale2": 1.0000003975332585,
+                    "integer_adm_scale3": 1.0000006410761875,
+                    "VMAF_integer_feature_motion_sad_score": 5.975352,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 1.0,
+                    "integer_motion2": 3.855872,
+                    "integer_motion3": 3.855872,
+                    "vmaf": 100.0
+                  }
+                },
+                {
+                  "frameNum": 3,
+                  "metrics": {
+                    "integer_adm2": 1.000004,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000022,
+                    "integer_adm_scale1": 1.00000026176407,
+                    "integer_adm_scale2": 1.000000403417039,
+                    "integer_adm_scale3": 1.0000005645261902,
+                    "VMAF_integer_feature_motion_sad_score": 3.855872,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 1.0,
+                    "integer_motion2": 3.855872,
+                    "integer_motion3": 3.855872,
+                    "vmaf": 100.0
+                  }
+                },
+                {
+                  "frameNum": 4,
+                  "metrics": {
+                    "integer_adm2": 1.000004,
+                    "integer_aim": 0.0,
+                    "integer_adm3": 1.000002,
+                    "integer_adm_scale0": 1.000021,
+                    "integer_adm_scale1": 1.0000002719385768,
+                    "integer_adm_scale2": 1.0000004393946929,
+                    "integer_adm_scale3": 1.0000005729382364,
+                    "VMAF_integer_feature_motion_sad_score": 5.929175,
+                    "integer_vif_scale0": 1.0,
+                    "integer_vif_scale1": 1.0,
+                    "integer_vif_scale2": 1.0,
+                    "integer_vif_scale3": 0.999999,
+                    "integer_motion2": 5.929175,
+                    "integer_motion3": 5.929175,
+                    "vmaf": 100.0
+                  }
+                }
+              ],
+              "pooled_metrics": {
+                "integer_adm2": {
+                  "min": 1.000003,
+                  "max": 1.000004,
+                  "mean": 1.000004,
+                  "harmonic_mean": 1.000004
+                },
+                "integer_aim": {
+                  "min": 0.0,
+                  "max": 0.0,
+                  "mean": 0.0,
+                  "harmonic_mean": 0.0
+                },
+                "integer_adm3": {
+                  "min": 1.000002,
+                  "max": 1.000002,
+                  "mean": 1.000002,
+                  "harmonic_mean": 1.000002
+                },
+                "integer_adm_scale0": {
+                  "min": 1.000021,
+                  "max": 1.000022,
+                  "mean": 1.000021,
+                  "harmonic_mean": 1.000021
+                },
+                "integer_adm_scale1": {
+                  "min": 1.0000001968185463,
+                  "max": 1.0000002719385768,
+                  "mean": 1.0000002475944405,
+                  "harmonic_mean": 1.00000024759444
+                },
+                "integer_adm_scale2": {
+                  "min": 1.000000335439941,
+                  "max": 1.0000004393946929,
+                  "mean": 1.0000003962125459,
+                  "harmonic_mean": 1.0000003962125454
+                },
+                "integer_adm_scale3": {
+                  "min": 1.0000004286593038,
+                  "max": 1.0000006410761875,
+                  "mean": 1.0000005340095837,
+                  "harmonic_mean": 1.000000534009581
+                },
+                "VMAF_integer_feature_motion_sad_score": {
+                  "min": 0.0,
+                  "max": 5.975352,
+                  "mean": 4.319053,
+                  "harmonic_mean": 2.048921
+                },
+                "integer_vif_scale0": {
+                  "min": 1.0,
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "harmonic_mean": 1.0
+                },
+                "integer_vif_scale1": {
+                  "min": 1.0,
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "harmonic_mean": 1.0
+                },
+                "integer_vif_scale2": {
+                  "min": 1.0,
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "harmonic_mean": 1.0
+                },
+                "integer_vif_scale3": {
+                  "min": 0.999999,
+                  "max": 1.0,
+                  "mean": 1.0,
+                  "harmonic_mean": 1.0
+                },
+                "integer_motion2": {
+                  "min": 0.0,
+                  "max": 5.929175,
+                  "mean": 3.895156,
+                  "harmonic_mean": 1.93686
+                },
+                "integer_motion3": {
+                  "min": 3.855872,
+                  "max": 5.929175,
+                  "mean": 5.062129,
+                  "harmonic_mean": 4.890619
+                },
+                "vmaf": {
+                  "min": 97.428744,
+                  "max": 100.0,
+                  "mean": 99.485749,
+                  "harmonic_mean": 99.475058
+                }
+              },
+              "aggregate_metrics": {}
+            },
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive\n"
+          },
+          {
+            "case": "changed",
+            "command": [
+              "/usr/bin/systemd-run",
+              "--user",
+              "--no-ask-password",
+              "--wait",
+              "--pipe",
+              "--collect",
+              "--service-type=exec",
+              "--expand-environment=no",
+              "--unit=m10-a4-vmaf-score-efedf105ce32.service",
+              "-p",
+              "MemoryMax=256M",
+              "-p",
+              "MemorySwapMax=0",
+              "-p",
+              "TasksMax=16",
+              "-p",
+              "CPUQuota=100%",
+              "-p",
+              "RuntimeMaxSec=5",
+              "-p",
+              "TimeoutStopSec=1",
+              "-p",
+              "KillMode=control-group",
+              "-p",
+              "LimitCORE=0",
+              "-p",
+              "LimitFSIZE=64M",
+              "-p",
+              "NoNewPrivileges=yes",
+              "-p",
+              "SystemCallErrorNumber=EPERM",
+              "-p",
+              "SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register",
+              "/usr/bin/python3",
+              "-I",
+              "-c",
+              "import ctypes,json,os,socket,sys,signal\nlibc=ctypes.CDLL(None,use_errno=True)\nlibc.syscall.restype=ctypes.c_long\nclass Rules(ctypes.Structure):_fields_=[('fs',ctypes.c_uint64),('net',ctypes.c_uint64),('scoped',ctypes.c_uint64)]\nclass Beneath(ctypes.Structure):\n _layout_='ms'\n _pack_=1\n _fields_=[('access',ctypes.c_uint64),('fd',ctypes.c_int32)]\nabi=libc.syscall(444,None,0,1)\nif abi<6:raise RuntimeError('required Landlock ABI unavailable')\nassert len(os.listdir('/proc/self/task'))==1\nattr=Rules((1<<16)-1,0,3)\nrules=libc.syscall(444,ctypes.byref(attr),ctypes.sizeof(attr),0)\nif rules<0:raise OSError(ctypes.get_errno(),'create_ruleset')\nfor path,rights in [('/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf', 5), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/ref.yuv', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/changed.yuv', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-model_vmaf_v0.6.1.json', 4), ('/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/changed.json', 16390), ('/usr/lib', 13), ('/usr/share', 12), ('/etc/ld.so.cache', 4), ('/dev/null', 4), ('/dev/urandom', 4)]:\n fd=os.open(path,os.O_PATH|os.O_CLOEXEC)\n try:\n  rule=Beneath(rights,fd)\n  if libc.syscall(445,rules,1,ctypes.byref(rule),0)<0:raise OSError(ctypes.get_errno(),'add_rule')\n finally:os.close(fd)\nif libc.prctl(38,1,0,0,0)!=0:raise OSError(ctypes.get_errno(),'no_new_privileges')\nif libc.syscall(446,rules,0)<0:raise OSError(ctypes.get_errno(),'restrict_self')\nos.close(rules)\nprint(json.dumps({'landlock_abi':abi,'enforced':True,'scoped':3}),flush=True)\nos.execve('/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf',['/home/anhtuan/.m10-vmaf-d1hmnn0r/vmaf', '--reference', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/ref.yuv', '--distorted', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/changed.yuv', '--width', '64', '--height', '64', '--pixel_format', '420', '--bitdepth', '8', '--model', 'path=/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-source-model_vmaf_v0.6.1.json', '--output', '/home/anhtuan/content-production-os/.worktrees/r2-m10-a4/.superpowers/sdd/2026-10-27-r2-m10-a4/vmaf-fixture/changed.json', '--json', '--threads', '1', '--cpumask', '4294967295', '--frame_cnt', '5', '--quiet'],{'LC_ALL': 'C', 'TZ': 'UTC', 'OMP_NUM_THREADS': '1'})"
+            ],
+            "exit_code": 0,
+            "stdout": "{\"landlock_abi\": 8, \"enforced\": true, \"scoped\": 3}\n",
+            "stderr": "Running as unit: m10-a4-vmaf-score-efedf105ce32.service; invocation ID: 2dfac11e15114db793b54550c220cbac\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 28ms\n             CPU time consumed: 28ms\n                   Memory peak: 5.6M (swap: 0B)\n",
+            "result": {
+              "version": "f85a853",
+              "fps": 1962.32,
+              "frames": [
+                {
+                  "frameNum": 0,
+                  "metrics": {
+                    "integer_adm2": 0.35364,
+                    "integer_aim": 0.772485,
+                    "integer_adm3": 0.290578,
+                    "integer_adm_scale0": 0.764949,
+                    "integer_adm_scale1": 0.450216,
+                    "integer_adm_scale2": 0.364438,
+                    "integer_adm_scale3": 0.106424,
+                    "VMAF_integer_feature_motion_sad_score": 0.0,
+                    "integer_vif_scale0": 0.030757,
+                    "integer_vif_scale1": 0.057344,
+                    "integer_vif_scale2": 0.065999,
+                    "integer_vif_scale3": 0.061214,
+                    "integer_motion2": 0.0,
+                    "integer_motion3": 5.834863,
+                    "vmaf": 1.352984
+                  }
+                },
+                {
+                  "frameNum": 1,
+                  "metrics": {
+                    "integer_adm2": 0.362537,
+                    "integer_aim": 0.733765,
+                    "integer_adm3": 0.314386,
+                    "integer_adm_scale0": 0.739855,
+                    "integer_adm_scale1": 0.421789,
+                    "integer_adm_scale2": 0.391289,
+                    "integer_adm_scale3": 0.099869,
+                    "VMAF_integer_feature_motion_sad_score": 5.834863,
+                    "integer_vif_scale0": 0.034388,
+                    "integer_vif_scale1": 0.078163,
+                    "integer_vif_scale2": 0.091959,
+                    "integer_vif_scale3": 0.095411,
+                    "integer_motion2": 5.834863,
+                    "integer_motion3": 5.834863,
+                    "vmaf": 1.284608
+                  }
+                },
+                {
+                  "frameNum": 2,
+                  "metrics": {
+                    "integer_adm2": 0.416248,
+                    "integer_aim": 0.711009,
+                    "integer_adm3": 0.35262,
+                    "integer_adm_scale0": 0.758282,
+                    "integer_adm_scale1": 0.427672,
+                    "integer_adm_scale2": 0.471494,
+                    "integer_adm_scale3": 0.163006,
+                    "VMAF_integer_feature_motion_sad_score": 5.975352,
+                    "integer_vif_scale0": 0.029779,
+                    "integer_vif_scale1": 0.065655,
+                    "integer_vif_scale2": 0.086303,
+                    "integer_vif_scale3": 0.099678,
+                    "integer_motion2": 3.855872,
+                    "integer_motion3": 3.855872,
+                    "vmaf": 4.147709
+                  }
+                },
+                {
+                  "frameNum": 3,
+                  "metrics": {
+                    "integer_adm2": 0.396497,
+                    "integer_aim": 0.760244,
+                    "integer_adm3": 0.318127,
+                    "integer_adm_scale0": 0.780049,
+                    "integer_adm_scale1": 0.441601,
+                    "integer_adm_scale2": 0.47932,
+                    "integer_adm_scale3": 0.060464,
+                    "VMAF_integer_feature_motion_sad_score": 3.855872,
+                    "integer_vif_scale0": 0.031691,
+                    "integer_vif_scale1": 0.053853,
+                    "integer_vif_scale2": 0.066441,
+                    "integer_vif_scale3": 0.080839,
+                    "integer_motion2": 3.855872,
+                    "integer_motion3": 3.855872,
+                    "vmaf": 4.612985
+                  }
+                },
+                {
+                  "frameNum": 4,
+                  "metrics": {
+                    "integer_adm2": 0.405738,
+                    "integer_aim": 0.732633,
+                    "integer_adm3": 0.336553,
+                    "integer_adm_scale0": 0.796639,
+                    "integer_adm_scale1": 0.46289,
+                    "integer_adm_scale2": 0.443491,
+                    "integer_adm_scale3": 0.104869,
+                    "VMAF_integer_feature_motion_sad_score": 5.929175,
+                    "integer_vif_scale0": 0.031102,
+                    "integer_vif_scale1": 0.053296,
+                    "integer_vif_scale2": 0.0646,
+                    "integer_vif_scale3": 0.062375,
+                    "integer_motion2": 5.929175,
+                    "integer_motion3": 5.929175,
+                    "vmaf": 6.437609
+                  }
+                }
+              ],
+              "pooled_metrics": {
+                "integer_adm2": {
+                  "min": 0.35364,
+                  "max": 0.416248,
+                  "mean": 0.386932,
+                  "harmonic_mean": 0.386496
+                },
+                "integer_aim": {
+                  "min": 0.711009,
+                  "max": 0.772485,
+                  "mean": 0.742027,
+                  "harmonic_mean": 0.741754
+                },
+                "integer_adm3": {
+                  "min": 0.290578,
+                  "max": 0.35262,
+                  "mean": 0.322452,
+                  "harmonic_mean": 0.322118
+                },
+                "integer_adm_scale0": {
+                  "min": 0.739855,
+                  "max": 0.796639,
+                  "mean": 0.767955,
+                  "harmonic_mean": 0.767744
+                },
+                "integer_adm_scale1": {
+                  "min": 0.421789,
+                  "max": 0.46289,
+                  "mean": 0.440833,
+                  "harmonic_mean": 0.440679
+                },
+                "integer_adm_scale2": {
+                  "min": 0.364438,
+                  "max": 0.47932,
+                  "mean": 0.430006,
+                  "harmonic_mean": 0.428574
+                },
+                "integer_adm_scale3": {
+                  "min": 0.060464,
+                  "max": 0.163006,
+                  "mean": 0.106926,
+                  "harmonic_mean": 0.105969
+                },
+                "VMAF_integer_feature_motion_sad_score": {
+                  "min": 0.0,
+                  "max": 5.975352,
+                  "mean": 4.319053,
+                  "harmonic_mean": 2.048921
+                },
+                "integer_vif_scale0": {
+                  "min": 0.029779,
+                  "max": 0.034388,
+                  "mean": 0.031543,
+                  "harmonic_mean": 0.031541
+                },
+                "integer_vif_scale1": {
+                  "min": 0.053296,
+                  "max": 0.078163,
+                  "mean": 0.061662,
+                  "harmonic_mean": 0.061581
+                },
+                "integer_vif_scale2": {
+                  "min": 0.0646,
+                  "max": 0.091959,
+                  "mean": 0.075061,
+                  "harmonic_mean": 0.074935
+                },
+                "integer_vif_scale3": {
+                  "min": 0.061214,
+                  "max": 0.099678,
+                  "mean": 0.079903,
+                  "harmonic_mean": 0.079665
+                },
+                "integer_motion2": {
+                  "min": 0.0,
+                  "max": 5.929175,
+                  "mean": 3.895156,
+                  "harmonic_mean": 1.93686
+                },
+                "integer_motion3": {
+                  "min": 3.855872,
+                  "max": 5.929175,
+                  "mean": 5.062129,
+                  "harmonic_mean": 4.890619
+                },
+                "vmaf": {
+                  "min": 1.284608,
+                  "max": 6.437609,
+                  "mean": 3.567179,
+                  "harmonic_mean": 2.650766
+                }
+              },
+              "aggregate_metrics": {}
+            },
+            "post_cleanup": "LoadState=not-found\nActiveState=inactive\n"
+          }
+        ],
+        "global_dependencies_changed": false
+      }
+    },
+    "subprocess-surface-inventory.json": {
+      "sha256": "c29ef9c5ca4ba660a2a3ac63bda5d6e885a7ba27cbb783bcf6c716cdf27f910c",
+      "body": {
+        "status": "BOUNDED_STATIC_LITERAL_FALLBACK_NOT_CALLGRAPH_COMPLETENESS",
+        "scopes": [
+          "lib",
+          "server",
+          "r2"
+        ],
+        "rows": [
+          {
+            "path": "lib/thumbnail.py",
+            "line": 132,
+            "call": "asyncio.create_subprocess_exec",
+            "keywords": [
+              "stdout",
+              "stderr"
+            ],
+            "source_sha256": "e2736154b15c6dfd4cd872f6a815c16332ecc077dc9b74b2238a5ffb120b67f1"
+          },
+          {
+            "path": "lib/thumbnail.py",
+            "line": 59,
+            "call": "asyncio.create_subprocess_exec",
+            "keywords": [
+              "stdout",
+              "stderr"
+            ],
+            "source_sha256": "e2736154b15c6dfd4cd872f6a815c16332ecc077dc9b74b2238a5ffb120b67f1"
+          },
+          {
+            "path": "lib/thumbnail.py",
+            "line": 105,
+            "call": "asyncio.create_subprocess_exec",
+            "keywords": [
+              "stdout",
+              "stderr"
+            ],
+            "source_sha256": "e2736154b15c6dfd4cd872f6a815c16332ecc077dc9b74b2238a5ffb120b67f1"
+          },
+          {
+            "path": "lib/audio_utils.py",
+            "line": 115,
+            "call": "asyncio.create_subprocess_exec",
+            "keywords": [
+              "stdout",
+              "stderr"
+            ],
+            "source_sha256": "7e45586c030a31a129ffcdc18b6f9df268925465abc57bcf5cf0afd30be00f49"
+          },
+          {
+            "path": "server/services/spatial_source.py",
+            "line": 48,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output",
+              "text",
+              "check",
+              "timeout"
+            ],
+            "source_sha256": "394d3aad5cdb632f09b304e055165031e617a926c3a2aef1898b2f472f2113f5"
+          },
+          {
+            "path": "server/services/spatial_source.py",
+            "line": 53,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output",
+              "text",
+              "check",
+              "timeout"
+            ],
+            "source_sha256": "394d3aad5cdb632f09b304e055165031e617a926c3a2aef1898b2f472f2113f5"
+          },
+          {
+            "path": "server/services/spatial_source.py",
+            "line": 110,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output",
+              "check",
+              "timeout"
+            ],
+            "source_sha256": "394d3aad5cdb632f09b304e055165031e617a926c3a2aef1898b2f472f2113f5"
+          },
+          {
+            "path": "server/services/format_render.py",
+            "line": 136,
+            "call": "asyncio.create_subprocess_exec",
+            "keywords": [
+              "stdout",
+              "stderr"
+            ],
+            "source_sha256": "85d908897165c0d86843383b33b6a9faf396a5c726bc63db4a43e7e6ce81f75c"
+          },
+          {
+            "path": "r2/m3/deliverables.py",
+            "line": 127,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output",
+              "text",
+              "check"
+            ],
+            "source_sha256": "78f3ddcbe7b16ab7206cc81fd4d9481c7162cbdb5d26507f20f031654451c785"
+          },
+          {
+            "path": "r2/m3/deliverables.py",
+            "line": 151,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output",
+              "text",
+              "check"
+            ],
+            "source_sha256": "78f3ddcbe7b16ab7206cc81fd4d9481c7162cbdb5d26507f20f031654451c785"
+          },
+          {
+            "path": "r2/m3/remotion_engine.py",
+            "line": 62,
+            "call": "subprocess.run",
+            "keywords": [
+              "cwd",
+              "check",
+              "capture_output",
+              "text"
+            ],
+            "source_sha256": "5e5eba4dea4e6155e10d87a4526a6d8bfcc79692d9ab568c319bdd40ef5e259c"
+          },
+          {
+            "path": "r2/m3/remotion_engine.py",
+            "line": 78,
+            "call": "subprocess.run",
+            "keywords": [
+              "cwd",
+              "check",
+              "capture_output",
+              "text"
+            ],
+            "source_sha256": "5e5eba4dea4e6155e10d87a4526a6d8bfcc79692d9ab568c319bdd40ef5e259c"
+          },
+          {
+            "path": "r2/m3/remotion_engine.py",
+            "line": 138,
+            "call": "subprocess.run",
+            "keywords": [
+              "cwd",
+              "check",
+              "capture_output",
+              "text"
+            ],
+            "source_sha256": "5e5eba4dea4e6155e10d87a4526a6d8bfcc79692d9ab568c319bdd40ef5e259c"
+          },
+          {
+            "path": "r2/m3/remotion_engine.py",
+            "line": 195,
+            "call": "subprocess.run",
+            "keywords": [
+              "check",
+              "capture_output",
+              "text"
+            ],
+            "source_sha256": "5e5eba4dea4e6155e10d87a4526a6d8bfcc79692d9ab568c319bdd40ef5e259c"
+          },
+          {
+            "path": "r2/m3/composition.py",
+            "line": 26,
+            "call": "subprocess.run",
+            "keywords": [
+              "check",
+              "capture_output",
+              "text"
+            ],
+            "source_sha256": "b2b7bfe363d793e3406eea65ce1485dc2991a33c3aa43f79d8a9b6f50341694a"
+          },
+          {
+            "path": "r2/m3/composition.py",
+            "line": 105,
+            "call": "subprocess.run",
+            "keywords": [
+              "check",
+              "capture_output",
+              "text"
+            ],
+            "source_sha256": "b2b7bfe363d793e3406eea65ce1485dc2991a33c3aa43f79d8a9b6f50341694a"
+          },
+          {
+            "path": "r2/m3/composition.py",
+            "line": 131,
+            "call": "subprocess.run",
+            "keywords": [
+              "check",
+              "capture_output",
+              "text"
+            ],
+            "source_sha256": "b2b7bfe363d793e3406eea65ce1485dc2991a33c3aa43f79d8a9b6f50341694a"
+          },
+          {
+            "path": "r2/host_hardening/master_authority.py",
+            "line": 73,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output",
+              "text",
+              "check"
+            ],
+            "source_sha256": "ca2bf5668743c0d336e6c1db71cc5e9ea071c8d79d7b640b31193b343f74952b"
+          },
+          {
+            "path": "r2/host_hardening/compatibility.py",
+            "line": 62,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output",
+              "text"
+            ],
+            "source_sha256": "f5f6e1c00acfb4252eedefbda1729c512cd5552a56f1df97cac1437625784fd4"
+          },
+          {
+            "path": "r2/host_hardening/compatibility.py",
+            "line": 69,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output"
+            ],
+            "source_sha256": "f5f6e1c00acfb4252eedefbda1729c512cd5552a56f1df97cac1437625784fd4"
+          },
+          {
+            "path": "r2/host_hardening/compatibility.py",
+            "line": 96,
+            "call": "subprocess.run",
+            "keywords": [
+              "input",
+              "capture_output"
+            ],
+            "source_sha256": "f5f6e1c00acfb4252eedefbda1729c512cd5552a56f1df97cac1437625784fd4"
+          },
+          {
+            "path": "r2/host_hardening/compatibility.py",
+            "line": 252,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output"
+            ],
+            "source_sha256": "f5f6e1c00acfb4252eedefbda1729c512cd5552a56f1df97cac1437625784fd4"
+          },
+          {
+            "path": "r2/host_hardening/compatibility.py",
+            "line": 263,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output"
+            ],
+            "source_sha256": "f5f6e1c00acfb4252eedefbda1729c512cd5552a56f1df97cac1437625784fd4"
+          },
+          {
+            "path": "r2/host_hardening/compatibility.py",
+            "line": 137,
+            "call": "subprocess.run",
+            "keywords": [
+              "capture_output"
+            ],
+            "source_sha256": "f5f6e1c00acfb4252eedefbda1729c512cd5552a56f1df97cac1437625784fd4"
+          },
+          {
+            "path": "r2/host_hardening/deployment_backup.py",
+            "line": 442,
+            "call": "asyncio.create_subprocess_exec",
+            "keywords": [
+              "stdout",
+              "stderr",
+              "env"
+            ],
+            "source_sha256": "af6a4c374a1fa0e18423fbba92aee52abae61f6b023f7dab1b703fdfa1163a1e"
+          },
+          {
+            "path": "r2/host_hardening/deployment_backup.py",
+            "line": 768,
+            "call": "asyncio.create_subprocess_exec",
+            "keywords": [
+              "stdout",
+              "stderr"
+            ],
+            "source_sha256": "af6a4c374a1fa0e18423fbba92aee52abae61f6b023f7dab1b703fdfa1163a1e"
+          }
+        ],
+        "parse_errors": [],
+        "limits": [
+          "Direct imports/calls only; dynamic aliases, native extensions and alternative execution libraries not exhaustively resolved.",
+          "Keyword presence is not proof of effective bounds."
+        ]
+      }
+    },
+    "migration-test-compatibility-probe.json": {
+      "sha256": "dbc7bacd2d02e7172d8ffc8e1ce54111881ba1458cdc4b2673a902199a273547",
+      "body": {
+        "status": "EXACT_TEST_COMPATIBILITY_GRAPH_PROOF_NOT_REAL_MIGRATION_EXECUTION",
+        "path": "tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py",
+        "baseline_sha256": "477de3278457a421d5c033a07ea80a7ffa35b6ac77658879114e847cd517f972",
+        "proposed_sha256": "3373286103bbb7406995360a9b27e98d929b615350d8db8fe3bc87b36a7e243b",
+        "proposed_source": "\"\"\"The M10 publication migration preserves predecessor data and scoped immutable custody.\"\"\"\n\nfrom __future__ import annotations\n\nimport sqlite3\nfrom pathlib import Path\n\nimport pytest\nfrom alembic.config import Config\nfrom alembic.script import ScriptDirectory\n\nfrom alembic import command\nfrom lib.db.models.quality import (\n    ProfilePublicationAuthorizationModel,\n    QualityCommandModel,\n    QualityOutboxModel,\n    QualityProfileHeadModel,\n    QualityProfileRevisionModel,\n)\n\nREVISION = \"65f53650f3a8\"\nPREDECESSOR = \"918c4a0e0001\"\nMODELS = (\n    QualityProfileHeadModel,\n    QualityProfileRevisionModel,\n    ProfilePublicationAuthorizationModel,\n    QualityCommandModel,\n    QualityOutboxModel,\n)\nTABLES = {model.__tablename__ for model in MODELS}\n\n\ndef test_exact_singleton_head_and_predecessor(alembic_cfg: tuple[Config, Path]) -> None:\n    cfg, _ = alembic_cfg\n    script = ScriptDirectory.from_config(cfg)\n    heads = script.get_heads()\n    assert len(heads) == 1\n    assert REVISION in {item.revision for item in script.walk_revisions(base=\"base\", head=heads[0])}\n    assert script.get_revision(REVISION).down_revision == PREDECESSOR\n\n\ndef test_upgrade_downgrade_upgrade_preserves_predecessor_and_matches_orm(alembic_cfg: tuple[Config, Path]) -> None:\n    cfg, database = alembic_cfg\n    command.upgrade(cfg, PREDECESSOR)\n    with sqlite3.connect(database) as connection:\n        before = {row[0] for row in connection.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}\n        connection.execute(\n            \"INSERT INTO users (id,username,created_at,updated_at) VALUES ('m10-witness','m10-witness','2026-10-27 00:00:00','2026-10-27 00:00:00')\"\n        )\n    command.upgrade(cfg, REVISION)\n    with sqlite3.connect(database) as connection:\n        after = {row[0] for row in connection.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}\n        assert after - before == TABLES\n        for model in MODELS:\n            table = model.__table__\n            reflected = connection.execute(f'PRAGMA table_info(\"{table.name}\")').fetchall()\n            assert {row[1] for row in reflected} == {column.name for column in table.columns}\n            assert [row[1] for row in sorted(reflected, key=lambda row: row[5]) if row[5]] == [\n                column.name for column in table.primary_key\n            ]\n            assert {row[1]: not bool(row[3]) for row in reflected} == {\n                column.name: column.nullable for column in table.columns\n            }\n            foreign = connection.execute(f'PRAGMA foreign_key_list(\"{table.name}\")').fetchall()\n            assert any(row[2:5] == (\"users\", \"user_id\", \"id\") and row[6] == \"RESTRICT\" for row in foreign)\n            groups: dict[int, list[tuple]] = {}\n            for row in foreign:\n                groups.setdefault(row[0], []).append(row)\n            actual_keys = {\n                (\n                    tuple(row[3] for row in sorted(rows, key=lambda row: row[1])),\n                    rows[0][2],\n                    tuple(row[4] for row in sorted(rows, key=lambda row: row[1])),\n                )\n                for rows in groups.values()\n            }\n            expected_keys = {\n                (\n                    tuple(column.name for column in key.columns),\n                    key.referred_table.name,\n                    tuple(element.column.name for element in key.elements),\n                )\n                for key in table.foreign_key_constraints\n            }\n            assert actual_keys == expected_keys\n        triggers = {\n            row[0]\n            for row in connection.execute(\"SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'm10_%'\")\n        }\n        assert triggers == {\n            f\"{table}_{action}\"\n            for table in TABLES - {\"m10_quality_profile_heads\"}\n            for action in (\"no_update\", \"no_delete\")\n        }\n    command.downgrade(cfg, PREDECESSOR)\n    with sqlite3.connect(database) as connection:\n        remaining = {row[0] for row in connection.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")}\n        assert remaining == before\n        assert connection.execute(\"SELECT username FROM users WHERE id='m10-witness'\").fetchone() == (\"m10-witness\",)\n        assert connection.execute(\n            \"SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'm10_%'\"\n        ).fetchone() == (0,)\n    command.upgrade(cfg, REVISION)\n    with sqlite3.connect(database) as connection:\n        assert connection.execute(\"SELECT version_num FROM alembic_version\").fetchone() == (REVISION,)\n        assert connection.execute(\"SELECT username FROM users WHERE id='m10-witness'\").fetchone() == (\"m10-witness\",)\n\n\n@pytest.mark.parametrize(\"table\", sorted(TABLES - {\"m10_quality_profile_heads\"}))\n@pytest.mark.parametrize(\"operation\", [\"UPDATE\", \"DELETE\"])\ndef test_immutable_rows_refuse_raw_update_and_delete(\n    alembic_cfg: tuple[Config, Path], table: str, operation: str\n) -> None:\n    cfg, database = alembic_cfg\n    command.upgrade(cfg, REVISION)\n    with sqlite3.connect(database) as connection:\n        connection.execute(\"PRAGMA foreign_keys=OFF\")\n        columns = connection.execute(f'PRAGMA table_info(\"{table}\")').fetchall()\n        values = {}\n        for _, name, _kind, notnull, _, primary in columns:\n            if name in {\"revision\", \"result_revision\", \"grant_sequence\"}:\n                values[name] = 1\n            elif name in {\"parent_revision\", \"previous_revision\"}:\n                values[name] = None\n            elif name == \"operation\":\n                values[name] = \"PUBLISH_PROFILE\"\n            elif name == \"action\":\n                values[name] = \"PROFILE_PUBLICATION\"\n            elif name == \"supersession_effect\":\n                values[name] = \"HISTORICAL_ONLY\"\n            elif name in {\"issued_at\", \"admitted_at\", \"committed_at\", \"created_at\"}:\n                values[name] = \"2026-10-27 00:00:00\"\n            elif name == \"admit_not_after\":\n                values[name] = \"2026-10-27 00:00:30\"\n            elif \"json\" in name:\n                values[name] = \"{}\"\n            elif notnull or primary:\n                values[name] = \"fixture\"\n        names = \",\".join(f'\"{name}\"' for name in values)\n        connection.execute(\n            f'INSERT INTO \"{table}\" ({names}) VALUES ({\",\".join(\"?\" for _ in values)})', tuple(values.values())\n        )\n        connection.commit()\n        statement = f'UPDATE \"{table}\" SET user_id=user_id' if operation == \"UPDATE\" else f'DELETE FROM \"{table}\"'\n        with pytest.raises(sqlite3.IntegrityError, match=\"M10_IMMUTABLE_PUBLICATION_ROW\"):\n            connection.execute(statement)\n        assert connection.execute(f'SELECT count(*) FROM \"{table}\"').fetchone() == (1,)\n\n\n@pytest.mark.parametrize((\"revision\", \"digest\"), [(None, \"sha256:a\"), (1, None), (0, \"sha256:a\")])\ndef test_head_revision_digest_pair_is_coherent(\n    alembic_cfg: tuple[Config, Path], revision: int | None, digest: str | None\n) -> None:\n    cfg, database = alembic_cfg\n    command.upgrade(cfg, REVISION)\n    with sqlite3.connect(database) as connection, pytest.raises(sqlite3.IntegrityError):\n        connection.execute(\n            \"INSERT INTO m10_quality_profile_heads (user_id,project_name,profile_id,current_revision,current_digest) VALUES ('default','project','profile',?,?)\",\n            (revision, digest),\n        )\n",
+        "cases": [
+          {
+            "case": "existing_singleton",
+            "historical_pass": true,
+            "proposed_pass": true
+          },
+          {
+            "case": "exact_noop_successor",
+            "historical_pass": false,
+            "proposed_pass": true
+          },
+          {
+            "case": "two_heads_refused",
+            "historical_pass": false,
+            "proposed_pass": false
+          },
+          {
+            "case": "one_head_wrong_a3_predecessor_refused",
+            "historical_pass": false,
+            "proposed_pass": false
+          }
+        ],
+        "tracked_test_changed": false,
+        "production_database_touched": false,
+        "temporary_graph_removed": true
+      }
+    }
+  },
+  "fixture_scripts": {
+    "systemd_resource_probe.py": {
+      "sha256": "ec9e22f16c82917b83eb1f7d67fb121f3ce3b462805421227850f3836021d301",
+      "source": "\"\"\"Disposable local supervisor capability characterization; no product implementation.\"\"\"\nimport hashlib,json,subprocess,time,uuid\nfrom pathlib import Path\nfrom datetime import UTC,datetime\nw=Path('.superpowers/sdd/2026-10-27-r2-m10-a4')\nbase=\"\"\"import json,os\nfrom pathlib import Path\nrel=Path('/proc/self/cgroup').read_text().strip().split(':',2)[2]\np=Path('/sys/fs/cgroup')/rel.lstrip('/')\nr={'pid':os.getpid(),'cgroup':rel,'limits':{n:(p/n).read_text().strip() if (p/n).is_file() else 'MISSING' for n in ['memory.max','memory.swap.max','pids.max','cpu.max']}}\nprint(json.dumps(r),flush=True)\n\"\"\"\npids=\"\"\"import errno,subprocess\nchildren=[]\ntry:\n for i in range(12):\n  try:children.append(subprocess.Popen(['/usr/bin/sleep','2']))\n  except OSError as e:\n   print(json.dumps({'spawn_denied_errno':e.errno,'children':len(children)}),flush=True);break\nfinally:\n for c in children:c.terminate()\n for c in children:c.wait(timeout=2)\n\"\"\"\ncases=[('limits',base,5,8),('pids',base+pids,5,8),('memory',base+\"x=bytearray(96*1024*1024)\\nprint('UNEXPECTED_ALLOCATION_SUCCESS',flush=True)\\n\",5,8),('timeout',base+\"import subprocess,time\\nc=subprocess.Popen(['/usr/bin/sleep','10'])\\nprint(json.dumps({'child_pid':c.pid,'child_start':Path('/proc/'+str(c.pid)+'/stat').read_text().split()[21]}),flush=True)\\ntime.sleep(10)\\n\",1,8)]\nrows=[]\nfor name,code,wall,tasks in cases:\n unit='m10-a4-research-'+uuid.uuid4().hex[:12]+'.service'\n cmd=['/usr/bin/systemd-run','--user','--no-ask-password','--wait','--pipe','--collect','--service-type=exec','--expand-environment=no','--unit='+unit,'-p','MemoryMax=64M','-p','MemorySwapMax=0','-p','TasksMax='+str(tasks),'-p','CPUQuota=50%','-p','RuntimeMaxSec='+str(wall),'-p','TimeoutStopSec=1','-p','KillMode=control-group','-p','NoNewPrivileges=yes','-p','LimitCORE=0','/usr/bin/python3','-I','-c',code]\n start=time.monotonic();row={'case':name,'unit':unit,'command':cmd}\n try:\n  p=subprocess.run(cmd,capture_output=True,text=True,timeout=12);row.update(exit_code=p.returncode,stdout=p.stdout,stderr=p.stderr)\n  if name=='timeout':\n   details=json.loads(p.stdout.splitlines()[-1]);stat=Path('/proc/'+str(details['child_pid'])+'/stat')\n   try:\n    fields=stat.read_text().split();row['child_after_timeout']={'same_process':fields[21]==details['child_start'],'state':fields[2]}\n   except FileNotFoundError:row['child_after_timeout']={'absent':True}\n except subprocess.TimeoutExpired:\n  row['outer_timeout']=True\n finally:\n  row['elapsed_seconds']=round(time.monotonic()-start,3)\n  # Only this fixture's random transient unit can be stopped/reset.\n  cleanup=subprocess.run(['/usr/bin/systemctl','--user','--no-ask-password','stop',unit],capture_output=True,text=True,timeout=5)\n  subprocess.run(['/usr/bin/systemctl','--user','--no-ask-password','reset-failed',unit],capture_output=True,text=True,timeout=5)\n  shown=subprocess.run(['/usr/bin/systemctl','--user','show',unit,'-p','LoadState','-p','ActiveState'],capture_output=True,text=True,timeout=5)\n  row['post_cleanup']=shown.stdout.strip()\n rows.append(row)\nr={'status':'DISPOSABLE_HOST_CAPABILITY_PROBE_NOT_A4_ACCEPTANCE','generated_at':datetime.now(UTC).isoformat(),'source_head':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'systemd_run_sha256':hashlib.sha256(Path('/usr/bin/systemd-run').read_bytes()).hexdigest(),'cases':rows,'production_units_changed':False}\n(w/'systemd-resource-probe.json').write_text(json.dumps(r,indent=2)+'\\n')\nfor row in rows:print(json.dumps({k:v for k,v in row.items() if k!='command'},indent=2))\n"
+    },
+    "systemd_namespace_probe.py": {
+      "sha256": "4d2b5474c3d6df29d4dda98f8741ff8db738a1008c656f9091d973adc11e967f",
+      "source": "\"\"\"Disposable namespace/descriptor characterization; does not configure production.\"\"\"\nimport json,subprocess,uuid\nfrom pathlib import Path\nw=Path('.superpowers/sdd/2026-10-27-r2-m10-a4');fixture=(w/'namespace-fixture').resolve();fixture.mkdir(exist_ok=True)\n(fixture/'input').write_text('owned-input');(fixture/'outside').write_text('owned-outside')\nunit='m10-a4-ns-'+uuid.uuid4().hex[:12]+'.service'\ncode=\"\"\"import json,socket\nfrom pathlib import Path\nr={}\nfor k,p in [('input','/m10-input'),('outside',OUTSIDE)]:\n try:r[k]=Path(p).read_text()\n except OSError as e:r[k]={'errno':e.errno}\nfor family in [socket.AF_INET,socket.AF_UNIX]:\n try:s=socket.socket(family);s.close();r['socket_'+str(family)]='allowed'\n except OSError as e:r['socket_'+str(family)]={'errno':e.errno}\nprint(json.dumps(r))\n\"\"\".replace('OUTSIDE',repr(str(fixture/'outside')))\ncmd=['/usr/bin/systemd-run','--user','--no-ask-password','--wait','--pipe','--collect','--service-type=exec','--expand-environment=no','--unit='+unit,'-p','MemoryMax=64M','-p','TasksMax=8','-p','RuntimeMaxSec=3','-p','TimeoutStopSec=1','-p','NoNewPrivileges=yes','-p','PrivateUsers=yes','-p','ProtectSystem=strict','-p','ProtectHome=tmpfs','-p','BindReadOnlyPaths='+str(fixture/'input')+':/m10-input','-p','PrivateNetwork=yes','-p','SystemCallFilter=~@network-io','/usr/bin/python3','-I','-c',code]\ntry:\n p=subprocess.run(cmd,capture_output=True,text=True,timeout=10);r={'status':'DISPOSABLE_NAMESPACE_CAPABILITY_ONLY','command':cmd,'exit_code':p.returncode,'stdout':p.stdout,'stderr':p.stderr}\nfinally:\n subprocess.run(['/usr/bin/systemctl','--user','stop',unit],capture_output=True,timeout=5)\n subprocess.run(['/usr/bin/systemctl','--user','reset-failed',unit],capture_output=True,timeout=5)\nshown=subprocess.run(['/usr/bin/systemctl','--user','show',unit,'-p','LoadState','-p','ActiveState'],capture_output=True,text=True,timeout=5);r['post_cleanup']=shown.stdout\n(w/'systemd-namespace-probe.json').write_text(json.dumps(r,indent=2)+'\\n');print(json.dumps({k:v for k,v in r.items() if k!='command'},indent=2))\n"
+    },
+    "landlock_probe.py": {
+      "sha256": "712ce81892e5a3a4afc010a10fb4bdd424f1b6ade618e64e6d2ef56fdec13274",
+      "source": "\"\"\"Disposable kernel/file/tool qualification; no reusable product worker.\"\"\"\nimport hashlib,json,subprocess,uuid,signal\nfrom pathlib import Path\nw=Path('.superpowers/sdd/2026-10-27-r2-m10-a4');fixture=(w/'landlock-fixture').resolve();fixture.mkdir(exist_ok=True)\n(fixture/'outside').write_text('owned-denied')\nmedia=fixture/'tiny.mp4'\ngen=['/usr/bin/ffmpeg','-nostdin','-v','error','-f','lavfi','-i','color=c=black:s=64x64:r=5','-f','lavfi','-i','anullsrc=r=16000:cl=mono','-t','1','-c:v','libx264','-threads','1','-c:a','aac','-y',str(media)]\nsubprocess.run(gen,capture_output=True,check=True,timeout=15)\nsetup=r'''import ctypes,json,os,socket,sys,signal\nlibc=ctypes.CDLL(None,use_errno=True)\nlibc.syscall.restype=ctypes.c_long\nclass Rules(ctypes.Structure):_fields_=[('fs',ctypes.c_uint64),('net',ctypes.c_uint64),('scoped',ctypes.c_uint64)]\nclass Beneath(ctypes.Structure):\n _layout_='ms'\n _pack_=1\n _fields_=[('access',ctypes.c_uint64),('fd',ctypes.c_int32)]\nabi=libc.syscall(444,None,0,1)\nif abi<6:raise RuntimeError('required Landlock ABI unavailable')\nassert len(os.listdir('/proc/self/task'))==1\nattr=Rules((1<<16)-1,0,3)\nrules=libc.syscall(444,ctypes.byref(attr),ctypes.sizeof(attr),0)\nif rules<0:raise OSError(ctypes.get_errno(),'create_ruleset')\nfor path,rights in ALLOWED:\n fd=os.open(path,os.O_PATH|os.O_CLOEXEC)\n try:\n  rule=Beneath(rights,fd)\n  if libc.syscall(445,rules,1,ctypes.byref(rule),0)<0:raise OSError(ctypes.get_errno(),'add_rule')\n finally:os.close(fd)\nif libc.prctl(38,1,0,0,0)!=0:raise OSError(ctypes.get_errno(),'no_new_privileges')\nif libc.syscall(446,rules,0)<0:raise OSError(ctypes.get_errno(),'restrict_self')\nos.close(rules)\nprint(json.dumps({'landlock_abi':abi,'enforced':True,'scoped':3}),flush=True)\n'''\nallowed=[(str(media),4),('/usr/lib',1|4|8),('/usr/share',4|8),('/etc/ld.so.cache',4),('/dev/null',4),('/dev/urandom',4),('/usr/bin/ffprobe',1|4),('/usr/bin/ffmpeg',1|4)]\nsetup=setup.replace('ALLOWED',repr(allowed))\nfs=r'''r={}\nfor name,path,mode in [('allowed',INPUT,'rb'),('outside',OUTSIDE,'rb'),('write_input',INPUT,'wb')]:\n try:\n  with open(path,mode) as f:\n   if mode=='rb':f.read(1)\n  r[name]='allowed'\n except OSError as e:r[name]={'errno':e.errno}\nfor fam in [socket.AF_INET,socket.AF_UNIX]:\n try:s=socket.socket(fam);s.close();r['socket_'+str(fam)]='allowed'\n except OSError as e:r['socket_'+str(fam)]={'errno':e.errno}\ntry:os.kill(PROTECTED_PID,signal.SIGCONT);r['outside_signal']='allowed'\nexcept OSError as e:r['outside_signal']={'errno':e.errno}\nos.kill(os.getpid(),signal.SIGCONT);r['self_signal']='allowed'\nctypes.set_errno(0)\nx=libc.syscall(310,os.getpid(),None,0,None,0,0)\nr['process_vm_readv']={'result':x,'errno':ctypes.get_errno()}\nprint(json.dumps(r),flush=True)\n'''.replace('INPUT',repr(str(media))).replace('OUTSIDE',repr(str(fixture/'outside')))\nprobe=['/usr/bin/ffprobe','-v','error','-protocol_whitelist','file,pipe','-show_streams','-show_format','-of','json',str(media)]\ndecode=['/usr/bin/ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe','-i',str(media),'-f','null','-']\nprotected=subprocess.Popen(['/usr/bin/sleep','10'])\nos_kill_baseline=__import__('os').kill(protected.pid,signal.SIGCONT)\nfs=fs.replace('PROTECTED_PID',str(protected.pid))\nrows=[]\nfor name,body in [('filesystem_network',fs),('ffprobe','os.execv('+repr(probe[0])+','+repr(probe)+')'),('decode','os.execv('+repr(decode[0])+','+repr(decode)+')')]:\n unit='m10-a4-landlock-'+uuid.uuid4().hex[:12]+'.service'\n cmd=['/usr/bin/systemd-run','--user','--no-ask-password','--wait','--pipe','--collect','--service-type=exec','--expand-environment=no','--unit='+unit,'-p','MemoryMax=256M','-p','MemorySwapMax=0','-p','TasksMax=32','-p','CPUQuota=50%','-p','RuntimeMaxSec=5','-p','TimeoutStopSec=1','-p','KillMode=control-group','-p','NoNewPrivileges=yes','-p','LimitCORE=0','-p','SystemCallErrorNumber=EPERM','-p','SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register','/usr/bin/python3','-I','-c',setup+body]\n try:\n  p=subprocess.run(cmd,capture_output=True,text=True,timeout=12);row={'case':name,'command':cmd,'exit_code':p.returncode,'stdout':p.stdout,'stderr':p.stderr}\n finally:\n  subprocess.run(['/usr/bin/systemctl','--user','stop',unit],capture_output=True,timeout=5)\n  subprocess.run(['/usr/bin/systemctl','--user','reset-failed',unit],capture_output=True,timeout=5)\n row['post_cleanup']=subprocess.run(['/usr/bin/systemctl','--user','show',unit,'-p','LoadState','-p','ActiveState'],capture_output=True,text=True,timeout=5).stdout;rows.append(row)\nprotected.terminate();protected.wait(timeout=3)\nr={'status':'DISPOSABLE_LANDLOCK_AND_REAL_TOOL_CHARACTERIZATION','source_head':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'fixture_generation':gen,'fixture_sha256':hashlib.sha256(media.read_bytes()).hexdigest(),'headers_sha256':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path('/usr/include/linux/landlock.h'),Path('/usr/include/x86_64-linux-gnu/asm/unistd_64.h')]},'cases':rows,'production_configuration_changed':False}\n(w/'landlock-probe.json').write_text(json.dumps(r,indent=2)+'\\n')\nfor row in rows:print(json.dumps({k:v for k,v in row.items() if k!='command'},indent=2))\n"
+    },
+    "vmaf_score_probe.py": {
+      "sha256": "6e2386db60fa9f1d883fbd65802bb5c09aea9b0b7251d2e1d99bd77c721191bb",
+      "source": "\"\"\"Fixed-release real-reference characterization under the qualified kernel controls.\"\"\"\nimport ast,hashlib,json,shutil,subprocess,uuid\nfrom pathlib import Path\nw=Path('.superpowers/sdd/2026-10-27-r2-m10-a4');cache=json.loads((w/'vmaf-tool-cache.json').read_text());binary=Path(cache['binary']);assert hashlib.sha256(binary.read_bytes()).hexdigest()==cache['binary_sha256'];fixture=(w/'vmaf-fixture').resolve();fixture.mkdir(exist_ok=True)\nref=fixture/'ref.yuv';same=fixture/'same.yuv';changed=fixture/'changed.yuv';model=(w/'vmaf-source-model_vmaf_v0.6.1.json').resolve()\ngen=['/usr/bin/ffmpeg','-nostdin','-v','error','-f','lavfi','-i','testsrc2=s=64x64:r=5','-frames:v','5','-pix_fmt','yuv420p','-threads','1','-f','rawvideo','-y',str(ref)]\nsubprocess.run(gen,capture_output=True,check=True,timeout=10);shutil.copyfile(ref,same)\nmutate=['/usr/bin/ffmpeg','-nostdin','-v','error','-f','rawvideo','-pixel_format','yuv420p','-video_size','64x64','-framerate','5','-i',str(ref),'-vf','hflip','-frames:v','5','-threads','1','-f','rawvideo','-y',str(changed)]\nsubprocess.run(mutate,capture_output=True,check=True,timeout=10)\nassert ref.stat().st_size==same.stat().st_size==changed.stat().st_size==64*64*3//2*5\nsetup=next(n.value.value for n in ast.parse((w/'landlock_probe.py').read_text()).body if isinstance(n,ast.Assign) and any(isinstance(a,ast.Name) and a.id=='setup' for a in n.targets) and isinstance(n.value,ast.Constant))\nrows=[]\nfor label,dist in [('same1',same),('same2',same),('changed',changed)]:\n output=fixture/(label+'.json');output.write_text('');output.chmod(0o600)\n allowed=[(str(binary),5),(str(ref),4),(str(dist),4),(str(model),4),(str(output),4|2|(1<<14)),('/usr/lib',13),('/usr/share',12),('/etc/ld.so.cache',4),('/dev/null',4),('/dev/urandom',4)]\n argv=[str(binary),'--reference',str(ref),'--distorted',str(dist),'--width','64','--height','64','--pixel_format','420','--bitdepth','8','--model','path='+str(model),'--output',str(output),'--json','--threads','1','--cpumask','4294967295','--frame_cnt','5','--quiet']\n code=setup.replace('ALLOWED',repr(allowed))+'os.execve('+repr(str(binary))+','+repr(argv)+','+repr({'LC_ALL':'C','TZ':'UTC','OMP_NUM_THREADS':'1'})+')'\n unit='m10-a4-vmaf-score-'+uuid.uuid4().hex[:12]+'.service'\n cmd=['/usr/bin/systemd-run','--user','--no-ask-password','--wait','--pipe','--collect','--service-type=exec','--expand-environment=no','--unit='+unit,'-p','MemoryMax=256M','-p','MemorySwapMax=0','-p','TasksMax=16','-p','CPUQuota=100%','-p','RuntimeMaxSec=5','-p','TimeoutStopSec=1','-p','KillMode=control-group','-p','LimitCORE=0','-p','LimitFSIZE=64M','-p','NoNewPrivileges=yes','-p','SystemCallErrorNumber=EPERM','-p','SystemCallFilter=~@network-io @debug ptrace process_vm_readv process_vm_writev kcmp io_uring_setup io_uring_enter io_uring_register','/usr/bin/python3','-I','-c',code]\n try:\n  p=subprocess.run(cmd,capture_output=True,text=True,timeout=12);row={'case':label,'command':cmd,'exit_code':p.returncode,'stdout':p.stdout,'stderr':p.stderr}\n  if p.returncode==0:\n   assert output.stat().st_size<=1048576;data=json.loads(output.read_text());row['result']=data\n finally:\n  subprocess.run(['/usr/bin/systemctl','--user','stop',unit],capture_output=True,timeout=5);subprocess.run(['/usr/bin/systemctl','--user','reset-failed',unit],capture_output=True,timeout=5)\n row['post_cleanup']=subprocess.run(['/usr/bin/systemctl','--user','show',unit,'-p','LoadState','-p','ActiveState'],capture_output=True,text=True,timeout=5).stdout;rows.append(row)\nr={'status':'REAL_VMAF_CHARACTERIZATION_NOT_PRODUCTION_ACCEPTANCE','source_commit':cache['source_commit'],'binary_sha256':cache['binary_sha256'],'model_sha256':hashlib.sha256(model.read_bytes()).hexdigest(),'fixture_generation':[gen,mutate],'input_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [ref,same,changed]},'cases':rows,'global_dependencies_changed':False};(w/'vmaf-score-probe.json').write_text(json.dumps(r,indent=2)+'\\n')\nfor row in rows:print(json.dumps({'case':row['case'],'exit_code':row['exit_code'],'pooled_metrics':row.get('result',{}).get('pooled_metrics'),'stderr_tail':row['stderr'].splitlines()[-8:],'post_cleanup':row['post_cleanup']},indent=2))\n"
+    },
+    "migration_compatibility_probe.py": {
+      "sha256": "6772a518767bc25a9361f5256d3f3fd568a98034570c80a3fed5077630d99ad9",
+      "source": "\"\"\"Exact historical assertion characterization in disposable migration graphs.\"\"\"\nfrom __future__ import annotations\nimport ast,hashlib,json,shutil,tempfile\nfrom pathlib import Path\nfrom alembic.script import ScriptDirectory\nfrom alembic.config import Config\nROOT=Path.cwd();W=ROOT/'.superpowers/sdd/2026-10-27-r2-m10-a4'\nREL='tests/integration/lib/db/migrations/test_65f53650f3a8_quality_profile_publication.py'\noriginal=(ROOT/REL).read_bytes()\nold=b'    assert script.get_heads() == [REVISION]\\n'\nnew=b'    heads = script.get_heads()\\n    assert len(heads) == 1\\n    assert REVISION in {item.revision for item in script.walk_revisions(base=\"base\", head=heads[0])}\\n'\nassert original.count(old)==1\nproposed=original.replace(old,new)\n(W/'a3-migration-test-proposed.py').write_bytes(proposed)\nREV='65f53650f3a8';PRE='918c4a0e0001'\ndef invoke(source:bytes,cfg:Config)->bool:\n node=next(n for n in ast.parse(source).body if isinstance(n,ast.FunctionDef) and n.name=='test_exact_singleton_head_and_predecessor')\n tree=ast.Module(body=[node],type_ignores=[])\n ns={'ScriptDirectory':ScriptDirectory,'Config':Config,'Path':Path,'REVISION':REV,'PREDECESSOR':PRE}\n exec(compile(tree,'exact-historical-head-test','exec'),ns)\n try:ns[node.name]((cfg,Path('unused.db')))\n except AssertionError:return False\n return True\nrows=[]\nwith tempfile.TemporaryDirectory(prefix='m10-a4-mig-') as scratch:\n dst=Path(scratch)/'alembic';shutil.copytree(ROOT/'alembic',dst,ignore=shutil.ignore_patterns('__pycache__'))\n cfg=Config();cfg.set_main_option('script_location',str(dst))\n def check(name,expected):\n  row={'case':name,'historical_pass':invoke(original,cfg),'proposed_pass':invoke(proposed,cfg)}\n  assert (row['historical_pass'],row['proposed_pass'])==expected,row\n  rows.append(row)\n check('existing_singleton',(True,True))\n successor=dst/'versions/07fd34535384_disposable_noop.py';successor.write_text(\"revision='07fd34535384'\\ndown_revision='65f53650f3a8'\\nbranch_labels=None\\ndepends_on=None\\ndef upgrade(): pass\\ndef downgrade(): pass\\n\")\n check('exact_noop_successor',(False,True))\n branch=dst/'versions/deadbeef0001_disposable_branch.py';branch.write_text(\"revision='deadbeef0001'\\ndown_revision='65f53650f3a8'\\nbranch_labels=None\\ndepends_on=None\\ndef upgrade(): pass\\ndef downgrade(): pass\\n\")\n check('two_heads_refused',(False,False));branch.unlink()\n scripts=ScriptDirectory.from_config(cfg);a3=scripts.get_revision(REV);pre=scripts.get_revision(PRE)\n p=Path(a3.path);body=p.read_text();p.write_text(body.replace(f'\"{PRE}\"',repr(pre.down_revision)).replace(f\"'{PRE}'\",repr(pre.down_revision)))\n Path(pre.path).unlink()\n assert len(ScriptDirectory.from_config(cfg).get_heads())==1\n check('one_head_wrong_a3_predecessor_refused',(False,False))\nassert (ROOT/REL).read_bytes()==original\nbody={'status':'EXACT_TEST_COMPATIBILITY_GRAPH_PROOF_NOT_REAL_MIGRATION_EXECUTION','path':REL,'baseline_sha256':hashlib.sha256(original).hexdigest(),'proposed_sha256':hashlib.sha256(proposed).hexdigest(),'proposed_source':proposed.decode(),'cases':rows,'tracked_test_changed':False,'production_database_touched':False,'temporary_graph_removed':True}\n(W/'migration-test-compatibility-probe.json').write_text(json.dumps(body,indent=2)+'\\n')\nprint(json.dumps({k:v for k,v in body.items() if k!='proposed_source'},indent=2))\n"
+    }
+  },
+  "limits": [
+    "Disposable research scripts are not the production worker.",
+    "Namespace alternative failed226/NAMESPACE and was rejected.",
+    "Tiny VMAF fixtures do not calibrate cohort thresholds.",
+    "Current graph is a stale sibling; direct source controls.",
+    "Cache creation metadata predates actual execution; the score transcript is execution authority.",
+    "Research scripts use captured absolute private fixture paths; replay requires fresh owned paths and explicit host setup."
+  ]
+}
