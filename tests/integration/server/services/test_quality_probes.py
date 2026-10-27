@@ -120,6 +120,8 @@ def bound_policy(config) -> dict[str, Any]:
     policy["probe_rules"][0].update(
         tool_identity=primary.name,
         tool_version_constraint="==" + primary.version,
+        max_runtime_ms=config.max_runtime_ms,
+        max_output_bytes=config.max_output_bytes,
         config_digest=config_digest(config),
         applicability_policy_digest=policy_digest(config.applicability_policy),
         threshold_policy_digest=policy_digest(config.threshold_policy),
@@ -424,3 +426,41 @@ async def test_raw_update_and_delete_are_refused_for_every_append_only_table(pro
         with pytest.raises(sa.exc.DBAPIError, match="M10_IMMUTABLE_PROBE_ROW"):
             async with env["factory"]() as session, session.begin():
                 await session.execute(sa.text(statement))
+
+
+async def test_replay_survives_a_retired_catalog_entry(probe_host) -> None:
+    env = probe_host
+    request = probe_request(env["profile"], env["root"])
+    observation = await (await service(env, request)).observe(request)
+    retired = env | {"catalog": ProbeCatalog(schema_id="m10.probe-catalog.v1", configs=())}
+    assert await (await service(retired, request)).observe(request) == observation
+
+
+@pytest.mark.parametrize("column", ["request_digest", "route_json"])
+async def test_replay_refuses_a_changed_m7_attempt_identity(probe_host, column: str) -> None:
+    env = probe_host
+    request = probe_request(env["profile"], env["root"])
+    await (await service(env, request)).observe(request)
+    value = "'sha256:' || repeat('0', 64)" if column == "request_digest" else '\'{"provider_id": "other"}\'::json'
+    async with env["factory"]() as session, session.begin():
+        await session.execute(sa.text("SET LOCAL session_replication_role = replica"))
+        await session.execute(sa.text(f"UPDATE execution_attempts SET {column} = {value}"))
+    with pytest.raises(RequiredEvidenceMissingError):
+        await (await service(env, request)).observe(request)
+
+
+async def test_failure_building_the_acceptance_receipt_after_staging_is_unknown(probe_host, monkeypatch) -> None:
+    from server.services import quality_probes as module
+
+    env = probe_host
+    request = probe_request(env["profile"], env["root"])
+
+    def broken(**_: object):
+        raise RuntimeError("receipt construction failed")
+
+    monkeypatch.setattr(module, "ProviderSubmitReceipt", broken)
+    with pytest.raises(RequiredEvidenceMissingError):
+        await (await service(env, request)).observe(request)
+    assert await counts(env["factory"]) == (1, 1, 0, 0)
+    async with env["factory"]() as session:
+        assert (await session.execute(sa.select(ExecutionAttemptModel.state))).scalar_one() == "SUBMIT_OUTCOME_UNKNOWN"

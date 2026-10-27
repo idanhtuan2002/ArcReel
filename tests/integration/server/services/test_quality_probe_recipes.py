@@ -299,3 +299,8 @@ async def test_container_and_decode_agree_with_the_existing_host_validator_on_id
     assert (await media_facts(FIXTURES / "mpeg4.mp4", ffprobe="/usr/bin/ffprobe")).codec == "mpeg4"
     with pytest.raises(ProbeFailedError):
         await measure(project, config_for("CONTAINER_STREAM"), "mpeg4.mp4")
+
+
+async def test_decode_refuses_media_missing_a_required_stream(project: Path) -> None:
+    with pytest.raises(ProbeFailedError):
+        await measure(project, config_for("DECODE", parameters={"require_audio": True}), "video_only.mp4")

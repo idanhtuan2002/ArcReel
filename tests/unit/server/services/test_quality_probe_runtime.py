@@ -170,3 +170,25 @@ def test_manager_environment_carries_no_inherited_secrets(monkeypatch) -> None:
     environment = runtime._manager_environment()
     assert "DATABASE_URL" not in environment
     assert set(environment) <= {"PATH", "LC_ALL", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"}
+
+
+def test_effective_limits_are_the_tightest_of_published_rule_config_and_host() -> None:
+    from r2.quality.ports import ProbeRequest
+    from tests.unit.r2.quality.test_probes import probe_request_data, recipe_config
+
+    config = recipe_config("DECODE")
+    data = probe_request_data(config)
+    data["rule"].update(max_runtime_ms=1, max_output_bytes=1)
+    for rule in data["profile"]["policy"]["probe_rules"]:
+        rule.update(max_runtime_ms=1, max_output_bytes=1)
+    from r2.quality.digests import compute_digest
+
+    data["profile"]["policy_digest"] = compute_digest("m10.quality-policy.v1", data["profile"]["policy"])
+    data["profile"]["profile_digest"] = compute_digest("m10.quality-profile.v1", data["profile"])
+    request = ProbeRequest.model_validate(data)
+    assert runtime.effective_limits(request, config) == (1, 1)
+    loose = ProbeRequest.model_validate(probe_request_data(config))
+    assert runtime.effective_limits(loose, config) == (
+        min(loose.rule.max_runtime_ms, 120000),
+        min(loose.rule.max_output_bytes, 1048576),
+    )

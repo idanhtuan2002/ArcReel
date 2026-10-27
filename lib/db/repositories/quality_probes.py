@@ -55,6 +55,23 @@ def observation_digest(observation: q.TechnicalObservation) -> str:
     return compute_digest("m10.technical-observation.v1", q.TechnicalObservation.model_validate(observation))
 
 
+def provider_payload(invocation: StoredProbeInvocation) -> dict[str, object]:
+    """The exact M7 provider payload an invocation must carry."""
+    return {
+        "schema": "m10.probe-provider-request.v1",
+        "request_digest": invocation.request_digest,
+        "config_digest": invocation.config_digest,
+        "catalog_digest": invocation.catalog_digest,
+        "tool_identity_digest": invocation.tool_identity_digest,
+        "input_digests": list(invocation.input_digests),
+    }
+
+
+def attempt_request_digest(provider_request: ProviderRequest) -> str:
+    """The M7 attempt request digest of this provider request (sha256 of its canonical JSON body)."""
+    return "sha256:" + hashlib.sha256(canonical_json_bytes(provider_request.model_dump(mode="json"))).hexdigest()
+
+
 def _bounded(value: object) -> object:
     if len(canonical_json_bytes(value)) > MAX_JSON_BYTES:
         raise RequiredEvidenceMissingError()
@@ -115,7 +132,7 @@ class QualityProbeRepository:
             inputs = tuple(row.input_digests_json)
             if not inputs or any(type(item) is not str for item in inputs):
                 raise RequiredEvidenceMissingError()
-            return StoredProbeInvocation(
+            stored = StoredProbeInvocation(
                 request=request,
                 request_digest=row.request_digest,
                 execution_id=row.execution_id,
@@ -131,15 +148,30 @@ class QualityProbeRepository:
             )
         except (ValueError, TypeError):
             raise RequiredEvidenceMissingError() from None
+        self._require_provider_binding(stored)
+        return stored
+
+    @staticmethod
+    def _require_provider_binding(invocation: StoredProbeInvocation) -> None:
+        provider = invocation.provider_request
+        if (
+            provider.host_task_ref != invocation.task_id
+            or provider.id != f"{invocation.task_id}:probe"
+            or provider.provider != invocation.route.provider_id
+            or provider.endpoint != invocation.route.endpoint_id
+            or provider.adapter_version != invocation.route.adapter_version
+            or provider.payload != provider_payload(invocation)
+            or invocation.config_digest != invocation.request.rule.config_digest
+        ):
+            raise RequiredEvidenceMissingError()
 
     async def prepare(self, invocation: StoredProbeInvocation) -> StoredProbeInvocation:
         """Stage the invocation in the caller's transaction, committed together with the PLANNED attempt."""
         self._require_postgresql()
         request = ProbeRequest.model_validate(invocation.request)
-        if probe_request_digest(request) != invocation.request_digest or request.rule.config_digest != (
-            invocation.config_digest
-        ):
+        if probe_request_digest(request) != invocation.request_digest:
             raise RequiredEvidenceMissingError()
+        self._require_provider_binding(invocation)
         self.session.add(
             QualityProbeInvocationModel(
                 **_key(request),
@@ -217,7 +249,13 @@ class QualityProbeRepository:
                 )
             )
         ).scalar_one_or_none()
-        if row is None or row.task_id != invocation.task_id:
+        if (
+            row is None
+            or row.task_id != invocation.task_id
+            or row.attempt_no != 1
+            or row.route_json != invocation.route.model_dump(mode="json")
+            or row.request_digest != attempt_request_digest(invocation.provider_request)
+        ):
             raise RequiredEvidenceMissingError()
         return (str(row.state), row.provider_job_id)
 
@@ -296,4 +334,11 @@ class QualityProbeRepository:
         return observation
 
 
-__all__ = ["MAX_JSON_BYTES", "QualityProbeRepository", "StoredProbeInvocation", "observation_digest"]
+__all__ = [
+    "MAX_JSON_BYTES",
+    "QualityProbeRepository",
+    "StoredProbeInvocation",
+    "attempt_request_digest",
+    "observation_digest",
+    "provider_payload",
+]

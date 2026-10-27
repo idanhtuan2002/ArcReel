@@ -258,7 +258,7 @@ class QualityProbeService:
     async def observe(self, request: ProbeRequest) -> q.TechnicalObservation:
         await self.require_actor(request)
         request = self._request
-        config = self._catalog.resolve(request)
+        # Receipt-first: a stored chain replays before any live catalog, media, tool or authority check.
         async with self._sessions() as session, session.begin():
             repository = QualityProbeRepository(session)
             await repository.lock_command(request)
@@ -275,6 +275,7 @@ class QualityProbeService:
         if invocation is not None and state != ExecutionAttemptState.PLANNED.value:
             # Pending, unknown or operator-review outcomes are never re-run under the same reference.
             raise RequiredEvidenceMissingError()
+        config = self._catalog.resolve(request)
         require_submit_route(
             _FAMILY.key.provider_id,
             _FAMILY.key.endpoint_id,
@@ -370,24 +371,25 @@ class QualityProbeService:
                     ) from error
                 try:
                     await repository.stage_result(invocation, result)
+                    digest = execution_result_digest(result)
+                    job_id = f"{attempt.execution_id}:{digest}"
+                    return ProviderSubmitReceipt(
+                        observation=ProviderObservation(
+                            observation_id=f"{attempt.execution_id}:accepted",
+                            kind=ProviderObservationKind.ACCEPTED,
+                            observed_at=self._clock(),
+                            provider_job_id=job_id,
+                            evidence_digest=digest,
+                        ),
+                        value=result,
+                    )
                 except Exception as error:
+                    # Nothing staged after a possible tool start may commit as an ordinary failure.
                     await session.rollback()
                     failures.append(RequiredEvidenceMissingError())
                     raise AmbiguousSubmitError(
                         provider=_FAMILY.key.provider_id, message="[create_ambiguous] quality probe outcome unknown"
                     ) from error
-                digest = execution_result_digest(result)
-                job_id = f"{attempt.execution_id}:{digest}"
-                return ProviderSubmitReceipt(
-                    observation=ProviderObservation(
-                        observation_id=f"{attempt.execution_id}:accepted",
-                        kind=ProviderObservationKind.ACCEPTED,
-                        observed_at=self._clock(),
-                        provider_job_id=job_id,
-                        evidence_digest=digest,
-                    ),
-                    value=result,
-                )
 
             outcome = await submitter.submit(
                 task_id=invocation.task_id,
@@ -427,7 +429,12 @@ class QualityProbeService:
                 raise RequiredEvidenceMissingError()
             digest = execution_result_digest(result)
             job_id = f"{invocation.execution_id}:{digest}"
-            if attempt.state is not ExecutionAttemptState.ACCEPTED or attempt.provider_job_id != job_id:
+            witness_state, witness_job = await repository.attempt_witness(invocation)
+            if (
+                attempt.state is not ExecutionAttemptState.ACCEPTED
+                or attempt.provider_job_id != job_id
+                or (witness_state, witness_job) != (ExecutionAttemptState.ACCEPTED.value, job_id)
+            ):
                 raise RequiredEvidenceMissingError()
             await self._require_current_authority(session, request)
             await self.require_actor(request)

@@ -640,8 +640,12 @@ def container_recipe(config: dict[str, object], deadline: float) -> dict[str, ob
 
 
 def decode_recipe(config: dict[str, object], deadline: float) -> dict[str, object]:
-    _, _, cap = _recipe(config)
+    parameters, _, cap = _recipe(config)
     media = probe_media(config, _target(config), deadline=deadline, failure="INPUT_INVALID")
+    if (parameters.get("require_video") is True and media.video is None) or (
+        parameters.get("require_audio") is True and not media.audio
+    ):
+        raise WorkerError("INPUT_INVALID")
     argv = _media_argv(config, _target(config), level="error")
     argv[6:6] = ["-xerror"]
     argv += ["-map", "0:v?", "-map", "0:a?", "-filter_threads", "1", "-f", "null", "-"]

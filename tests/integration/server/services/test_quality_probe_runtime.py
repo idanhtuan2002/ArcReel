@@ -104,7 +104,7 @@ async def launch(project: tuple[Path, Path], script: Path, config=None) -> tuple
     probe = runtime.QualityProbeRuntime(runtime.ProbeHost(tools=TOOLS, worker=script))
     async with snapshot_probe_inputs(request, project_root=root, catalog=catalog(config)) as inputs:
         with runtime.scratch_files() as scratch:
-            payload = json.dumps(probe.worker_config(inputs, config, scratch)).encode()
+            payload = json.dumps(probe.worker_config(request, inputs, config, scratch)).encode()
             outcome = await probe.launch(payload, budget_ms=config.max_runtime_ms, output_cap=1048576, scratch=scratch)
     if outcome.output_exceeded or not outcome.stdout.endswith(b"\n"):
         return (outcome, {})
@@ -323,3 +323,22 @@ async def test_missing_user_manager_never_falls_back_to_unisolated_execution(
         await run(project, hostile(tmp_path, DECODED))
     assert launched
     assert set(launched) <= {runtime.SYSTEMD_RUN, runtime.SYSTEMCTL}
+
+
+def probe_units(*states: str) -> str:
+    argv = ["/usr/bin/systemctl", "--user", "list-units", "--all", "--no-legend"]
+    argv += [f"--state={','.join(states)}"] if states else []
+    return subprocess.run([*argv, "m10-probe-*"], capture_output=True, text=True, check=False, timeout=10).stdout
+
+
+@pytest.mark.timeout(60)
+async def test_cancellation_kills_and_reaps_the_owned_unit(project, tmp_path: Path) -> None:
+    import asyncio
+
+    task = asyncio.create_task(run(project, hostile(tmp_path, "time.sleep(60)\nreturn {}")))
+    await asyncio.sleep(2)
+    assert "m10-probe-" in await asyncio.to_thread(probe_units)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert (await asyncio.to_thread(probe_units, "active", "activating")).strip() == ""

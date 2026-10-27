@@ -221,7 +221,12 @@ def bound_request(recipe: object, master: Path, *, caption_digest: str | None = 
 
     data = probe_request_data(config)
     primary = config.primary_tool()
-    data["rule"].update(tool_identity=primary.name, tool_version_constraint="==" + primary.version)
+    data["rule"].update(
+        tool_identity=primary.name,
+        tool_version_constraint="==" + primary.version,
+        max_runtime_ms=config.max_runtime_ms,
+        max_output_bytes=config.max_output_bytes,
+    )
     if config.reference_policy is not None:
         data["profile"]["policy"].update(
             reference_eligibility_policy_id=config.reference_policy.policy_id,

@@ -172,6 +172,14 @@ def parse_manager_summary(stderr: bytes) -> tuple[str, int]:
     return (_MANAGER_RESULTS.get(results[-1], "SIGNAL"), int(status) if code == "exited" else -int(status))
 
 
+def effective_limits(request: ProbeRequest, config: ProbeConfig) -> tuple[int, int]:
+    """Tool wall budget and combined stream ceiling: the tightest of published rule, catalog config and host."""
+    return (
+        min(request.rule.max_runtime_ms, config.max_runtime_ms, MAX_RUNTIME_MS),
+        min(request.rule.max_output_bytes, config.max_output_bytes, MAX_OUTPUT_BYTES),
+    )
+
+
 @contextmanager
 def scratch_files(work_root: Path | None = None) -> Generator[tuple[Path, Path, Path], None, None]:
     """Precreate exactly three private regular scratch inodes; the restricted worker may not create files."""
@@ -237,10 +245,11 @@ class QualityProbeRuntime:
         return tools
 
     def worker_config(
-        self, inputs: ProbeInputs, config: ProbeConfig, scratch: tuple[Path, Path, Path]
+        self, request: ProbeRequest, inputs: ProbeInputs, config: ProbeConfig, scratch: tuple[Path, Path, Path]
     ) -> dict[str, object]:
         """Schema-shaped host configuration for the fixed worker; it carries no command or filter text."""
         tools = self._tools(config)
+        budget_ms, output_cap = effective_limits(request, config)
         companions = [item for item in (inputs.caption, inputs.reference) if item is not None]
         models = [tool["model_path"] for tool in tools if tool["model_path"] is not None]
         return {
@@ -254,8 +263,8 @@ class QualityProbeRuntime:
             "recipe": {
                 "kind": config.recipe,
                 "parameters": config.parameters.model_dump(mode="json"),
-                "budget_ms": min(config.max_runtime_ms, MAX_RUNTIME_MS),
-                "output_cap": min(config.max_output_bytes, MAX_OUTPUT_BYTES),
+                "budget_ms": budget_ms,
+                "output_cap": output_cap,
                 "inputs": {
                     "target": str(inputs.target.path),
                     "caption": None if inputs.caption is None else str(inputs.caption.path),
@@ -308,6 +317,14 @@ class QualityProbeRuntime:
             await self._systemctl("stop", unit)
             await self._systemctl("reset-failed", unit)
             await asyncio.sleep(0.1)
+
+    async def _abandon[T](self, unit: str, process: asyncio.subprocess.Process, work: asyncio.Future[T]) -> None:
+        await self._systemctl("kill", "--signal=SIGKILL", unit)
+        with contextlib.suppress(ProcessLookupError):
+            process.kill()
+        with contextlib.suppress(TimeoutError, asyncio.CancelledError):
+            await asyncio.wait_for(work, CLEANUP_DEADLINE_S)
+        await self._verify_cleanup(unit)
 
     async def launch(
         self, payload: bytes, *, budget_ms: int, output_cap: int, scratch: tuple[Path, Path, Path]
@@ -379,15 +396,17 @@ class QualityProbeRuntime:
         )
         watcher = asyncio.ensure_future(exceeded.wait())
         host_deadline = (runtime_max_ms + HOST_GRACE_MS) / 1000
-        done, _ = await asyncio.wait({work, watcher}, timeout=host_deadline, return_when=asyncio.FIRST_COMPLETED)
+        try:
+            done, _ = await asyncio.wait({work, watcher}, timeout=host_deadline, return_when=asyncio.FIRST_COMPLETED)
+        except BaseException:
+            # Cancellation still kills and reaps the whole owned unit before propagating.
+            watcher.cancel()
+            await asyncio.shield(self._abandon(unit, process, work))
+            raise
         deadline_exceeded = not done
         watcher.cancel()
         if work not in done:
-            await self._systemctl("kill", "--signal=SIGKILL", unit)
-            with contextlib.suppress(ProcessLookupError):
-                process.kill()
-            with contextlib.suppress(TimeoutError, asyncio.CancelledError):
-                await asyncio.wait_for(work, CLEANUP_DEADLINE_S)
+            await self._abandon(unit, process, work)
         elapsed_ms = int((time.monotonic() - started) * 1000)
         cleanup = await self._verify_cleanup(unit)
         manager_result, exit_code = parse_manager_summary(bytes(stderr))
@@ -415,12 +434,10 @@ class QualityProbeRuntime:
         control = self.control_identity_digest()
         started_at = datetime.now(UTC)
         with scratch_files(self._host.work_root) as scratch:
-            payload = json.dumps(self.worker_config(inputs, config, scratch), separators=(",", ":")).encode("utf-8")
+            budget_ms, output_cap = effective_limits(request, config)
+            payload = json.dumps(self.worker_config(request, inputs, config, scratch), separators=(",", ":"))
             outcome = await self.launch(
-                payload,
-                budget_ms=min(config.max_runtime_ms, MAX_RUNTIME_MS),
-                output_cap=min(config.max_output_bytes, MAX_OUTPUT_BYTES),
-                scratch=scratch,
+                payload.encode("utf-8"), budget_ms=budget_ms, output_cap=output_cap, scratch=scratch
             )
         finished_at = datetime.now(UTC)
         report = _report(outcome)
