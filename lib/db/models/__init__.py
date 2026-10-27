@@ -91,6 +91,13 @@ from lib.db.models.production_target import (
     ProductionTargetHeadModel,
     ProductionTargetVersionModel,
 )
+from lib.db.models.quality import (
+    ProfilePublicationAuthorizationModel,
+    QualityCommandModel,
+    QualityOutboxModel,
+    QualityProfileHeadModel,
+    QualityProfileRevisionModel,
+)
 from lib.db.models.session import AgentSession
 from lib.db.models.session_event import AgentSessionEventLogEntry
 from lib.db.models.session_message_link import AgentSessionUserMessageLink
@@ -190,12 +197,17 @@ __all__ = [
     "ProductionTargetCommandModel",
     "ProductionTargetHeadModel",
     "ProductionTargetVersionModel",
+    "ProfilePublicationAuthorizationModel",
     "ProjectEventModel",
     "PromotionReceiptModel",
     "ProviderConfig",
     "ProviderCredential",
     "ProviderObservationModel",
     "PublishApprovalDecisionModel",
+    "QualityCommandModel",
+    "QualityOutboxModel",
+    "QualityProfileHeadModel",
+    "QualityProfileRevisionModel",
     "ShowrunnerGrantEventModel",
     "ShowrunnerGrantHeadModel",
     "SpatialConstraintSetModel",
