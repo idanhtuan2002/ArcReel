@@ -20,7 +20,7 @@
     "finalize re-verifies currentness and the published bytes, then commits SUCCEEDED with the receipt"
   ],
   "source_sha256": {
-    "server/services/package_export.py": "e44b3e33ec592d7b455e48e4f618c80612afb994e434fc065a782eba59fe6768",
+    "server/services/package_export.py": "3080dc5f49095dcadd47d45cec9fc15949837ecab14dc55266f785ca16a82eee",
     "server/services/package_export_worker.py": "08621902ad15c69da432d31a33ee81c8602bdb55b05746599908a768420bc5f7",
     "server/services/quality_probe_runtime.py": "e29ee0acd2255ffe6295a4a3d5a08cfe01e47b4597768359d01d7063d32b2ca9",
     "server/services/quality_probe_worker.py": "79bb80a6503a569065969b75f84bbcd3335e2e1fafa9577d400f1e3cbb126ce2",
@@ -39,6 +39,6 @@
       "tests/unit/server/services/test_package_export_worker.py",
       "tests/integration/lib/db/migrations/test_8a5d0f6b1e44_m10_export_custody.py"
     ],
-    "result": "export 26 passed (PG16, real confined worker incl. swapped-output and two-locale captions); worker 23 + plan 9 passed; related M10 PG 101 passed; unit/scripts/migrations 5608 passed"
+    "result": "export 30 passed (PG16, real confined worker); worker 23 + plan 10 passed; unit/scripts/migrations recorded at the B4 seal"
   }
 }

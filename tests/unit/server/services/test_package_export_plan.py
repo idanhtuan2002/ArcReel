@@ -74,3 +74,19 @@ def test_a_same_size_rewrite_with_a_restored_mtime_changes_the_generation(tmp_pa
         assert published_generation(store, "a.zip") != before
     finally:
         os.close(store)
+
+
+def test_a_worker_config_over_its_bound_is_refused_before_any_copy() -> None:
+    from dataclasses import dataclass
+
+    from server.services.package_export import admit_worker_config
+
+    @dataclass
+    class FakeWork:
+        path: Path
+
+    locales = [_localized(f"l{index}") for index in range(MAX_EXPORT_MEMBERS - 2)]
+    plan = _plan(localization_variants=locales)
+    admit_worker_config(FakeWork(Path("/p")), plan)
+    with pytest.raises(OperationalEnvelopeExceededError):
+        admit_worker_config(FakeWork(Path("/" + "x" * 1000)), plan)

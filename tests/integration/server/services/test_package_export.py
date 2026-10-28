@@ -533,3 +533,87 @@ async def test_captions_export_under_their_locale_paths(ready_host) -> None:
     assert (
         entries["captions/en.srt"] == "sha256:" + hashlib.sha256(_read(env["project"] / "captions-en.srt")).hexdigest()
     )
+
+
+class CancelledRuntime:
+    async def launch(self, payload: bytes, **_: object):
+        raise asyncio.CancelledError
+
+
+async def test_a_cancelled_launch_keeps_its_scratch_for_the_sweep(selected_host) -> None:
+    env = selected_host
+    service = PackageExportService(
+        sessions=env["factory"],
+        grant_reader=env["reader"],
+        project_root=env["project"],
+        interactive_token=auth.create_token(ACTOR),
+        runtime=CancelledRuntime(),
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await service.export(export_request(env))
+    assert [entry.name.startswith(".work-") for entry in (env["project"] / "exports").iterdir()] == [True]
+
+
+class ForeignBuilderRuntime:
+    """Runs the real confined worker but reports it as a builder other than the admitted one."""
+
+    def __init__(self, real) -> None:
+        self.real = real
+
+    async def launch(self, payload: bytes, **kwargs):
+        import dataclasses
+        import json
+
+        outcome = await self.real.launch(payload, **kwargs)
+        report = json.loads(outcome.stdout)
+        report["worker"] = {"package_export_worker.py": "sha256:" + "0" * 64}
+        return dataclasses.replace(outcome, stdout=json.dumps(report).encode())
+
+
+async def test_a_worker_other_than_the_admitted_builder_is_never_published(selected_host) -> None:
+    from server.services.package_export_worker import __file__ as worker_file
+    from server.services.quality_probe_runtime import ProbeHost, QualityProbeRuntime
+
+    env = selected_host
+    service = PackageExportService(
+        sessions=env["factory"],
+        grant_reader=env["reader"],
+        project_root=env["project"],
+        interactive_token=auth.create_token(ACTOR),
+        runtime=ForeignBuilderRuntime(QualityProbeRuntime(ProbeHost(tools={}, worker=Path(worker_file)))),
+    )
+    with pytest.raises(RequiredEvidenceMissingError):
+        await service.export(export_request(env))
+    assert await _attempt_states(env) == ["SUBMIT_OUTCOME_UNKNOWN"]
+    assert not list((env["project"] / "exports").glob("*.zip"))
+
+
+@pytest.mark.parametrize("column", ["route_json", "request_digest"])
+async def test_an_accepted_attempt_bound_to_another_route_or_request_is_not_finalized(
+    selected_host, monkeypatch, column: str
+) -> None:
+    env = selected_host
+    request = export_request(env)
+    real = ExportRepository.stage_receipt
+    failed = {"once": True}
+
+    async def crash_once(self, **kwargs):
+        if failed.pop("once", False):
+            raise RuntimeError("crash between acceptance and the receipt")
+        return await real(self, **kwargs)
+
+    monkeypatch.setattr(ExportRepository, "stage_receipt", crash_once)
+    with pytest.raises(RuntimeError):
+        await exporter(env).export(request)
+    value = (
+        "jsonb_set(route_json::jsonb, '{backend_model_id}', '\"other\"')::json"
+        if column == "route_json"
+        else "'sha256:' || repeat('0', 64)"
+    )
+    async with env["factory"]() as session, session.begin():
+        await session.execute(sa.text("SET LOCAL session_replication_role = replica"))
+        await session.execute(
+            sa.text(f"UPDATE execution_attempts SET {column} = {value} WHERE task_id LIKE 'm10b-export:%'")
+        )
+    with pytest.raises(RequiredEvidenceMissingError):
+        await exporter(env).export(request)

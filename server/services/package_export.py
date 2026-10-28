@@ -40,6 +40,7 @@ from lib.db.repositories.quality_packaging import (
     StoredExportInvocation,
     selection_digest,
 )
+from lib.db.repositories.quality_probes import attempt_request_digest
 from lib.db.repositories.quality_runs import QualityRunRepository
 from lib.video_backends.base import AmbiguousSubmitError
 from r2.advanced_creative.digests import canonical_json_bytes, digest_canonical
@@ -94,6 +95,7 @@ from server.services.quality_probe_runtime import (
     READ_FILES,
     ProbeHost,
     QualityProbeRuntime,
+    WorkerOutcome,
     worker_envelope,
 )
 from server.services.quality_runs import lock_profile_head, lock_subject_masters
@@ -186,6 +188,13 @@ def worker_file_digests() -> dict[str, str]:
         name: "sha256:" + hashlib.sha256((folder / name).read_bytes()).hexdigest()
         for name in ("package_export_worker.py", "quality_probe_worker.py")
     }
+
+
+def _same_builder(reported: object, admitted: str) -> bool:
+    """The worker that ran is exactly the builder admitted into the manifest and the M7 route."""
+    if type(reported) is not dict:
+        return False
+    return digest_canonical({"domain": "m10.export-builder.v1", "files": reported}) == admitted
 
 
 def _abi_at_least(value: object, minimum: int) -> bool:
@@ -453,6 +462,11 @@ class WorkDirectory:
         parent = self.snapshots if in_snapshots else self.descriptor
         return os.open(name, os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600, dir_fd=parent)
 
+    def mark_launch(self) -> None:
+        """Restart the sweep grace at every launch and abandonment, while ownership is still held."""
+        with contextlib.suppress(OSError):
+            os.utime(self._lock)
+
     def keep(self) -> None:
         """A worker that may still run keeps its scratch; the sweep removes it after the maximum runtime."""
         self._removable = False
@@ -597,6 +611,57 @@ def published_generation(store: int, name: str) -> tuple[int, int, int, int, int
         return None
 
 
+_WIDEST_IDENTITY: tuple[int, int] = (2**64 - 1, 2**64 - 1)
+
+
+def worker_config(
+    work: WorkDirectory,
+    members: list[tuple[BundleMember, tuple[int, int]]],
+    manifest_identity: tuple[int, int],
+    output_identity: tuple[int, int],
+) -> dict[str, object]:
+    """The exact worker configuration: snapshot directory grant, pinned member/manifest/output inodes."""
+    snapshot_dir = work.path / SNAPSHOT_DIRECTORY
+    return {
+        "schema": WORKER_CONFIG_SCHEMA,
+        "envelope": worker_envelope(),
+        "read_files": list(READ_FILES),
+        "exec_files": [],
+        "read_dirs": [*READ_DIRS, str(snapshot_dir)],
+        "scratch": [str(work.path / PARTIAL_FILE)],
+        "members": [
+            {
+                "path": member.path,
+                "source": str(member.source),
+                "digest": member.content_digest,
+                "size": member.byte_size,
+                "identity": list(identity),
+            }
+            for member, identity in members
+        ],
+        "manifest": str(snapshot_dir / MANIFEST_FILE),
+        "manifest_identity": list(manifest_identity),
+        "output": str(work.path / PARTIAL_FILE),
+        "output_identity": list(output_identity),
+    }
+
+
+def admit_worker_config(work: WorkDirectory, plan: ExportPlan) -> None:
+    """Refuse before copying or PLANNED when the largest possible worker config would exceed its bound."""
+    snapshot_dir = work.path / SNAPSHOT_DIRECTORY
+    planned: list[tuple[BundleMember, tuple[int, int]]] = [
+        (BundleMember(a.path, snapshot_dir / f"asset-{i}", a.content_digest, a.byte_size), _WIDEST_IDENTITY)
+        for i, a in enumerate(plan.assets)
+    ]
+    planned += [
+        (BundleMember(path, snapshot_dir / f"document-{i}", "sha256:" + "0" * 64, len(data)), _WIDEST_IDENTITY)
+        for i, (path, data) in enumerate(plan.documents)
+    ]
+    config = worker_config(work, planned, _WIDEST_IDENTITY, _WIDEST_IDENTITY)
+    if len(json.dumps(config, sort_keys=True).encode("utf-8")) > WORKER_CONFIG_MAX_BYTES:
+        raise OperationalEnvelopeExceededError()
+
+
 class PackageExportService:
     """Export the current selection of one PACKAGING_SLOT as a deterministic local archive."""
 
@@ -662,6 +727,7 @@ class PackageExportService:
         try:
             work = await asyncio.to_thread(WorkDirectory, store, self._project_root)
             try:
+                admit_worker_config(work, plan)
                 members = await asyncio.to_thread(snapshot_assets, self._project_root, work, plan)
                 return await self._submit(request, reader, selection, plan, members, builder_digest, store, work)
             finally:
@@ -841,32 +907,16 @@ class PackageExportService:
         output = work.create(PARTIAL_FILE)
         info = os.fstat(output)
         os.close(output)
-        snapshot_dir = work.path / SNAPSHOT_DIRECTORY
-        config = {
-            "schema": WORKER_CONFIG_SCHEMA,
-            "envelope": worker_envelope(),
-            "read_files": list(READ_FILES),
-            "exec_files": [],
-            "read_dirs": [*READ_DIRS, str(snapshot_dir)],
-            "scratch": [str(work.path / PARTIAL_FILE)],
-            "members": [
-                {
-                    "path": m.member.path,
-                    "source": str(m.member.source),
-                    "digest": m.member.content_digest,
-                    "size": m.member.byte_size,
-                    "identity": list(m.identity),
-                }
-                for m in members
-            ],
-            "manifest": str(snapshot_dir / MANIFEST_FILE),
-            "manifest_identity": list(manifest_identity),
-            "output": str(work.path / PARTIAL_FILE),
-            "output_identity": [info.st_dev, info.st_ino],
-        }
+        config = worker_config(
+            work,
+            [(m.member, m.identity) for m in members],
+            manifest_identity,
+            (info.st_dev, info.st_ino),
+        )
         payload = json.dumps(config, sort_keys=True).encode("utf-8")
         if len(payload) > WORKER_CONFIG_MAX_BYTES:
             raise OperationalEnvelopeExceededError()
+        work.mark_launch()
         try:
             outcome = await self._runtime.launch(
                 payload,
@@ -876,12 +926,29 @@ class PackageExportService:
                 fsize=plan.archive_bytes + (1 << 20),
                 unit_prefix="m10-export",
             )
+        except asyncio.CancelledError:
+            # The A4 supervisor kills the unit on cancellation but cannot prove it; keep scratch for the sweep.
+            work.keep()
+            raise
         except Exception:
             work.keep()
             raise ambiguous from None
+        finally:
+            work.mark_launch()
         if not outcome.group_cleanup_verified:
             work.keep()
             raise ambiguous
+        try:
+            return await self._accept(outcome, plan, store, work, ambiguous)
+        except (M10Error, AmbiguousSubmitError):
+            raise
+        except Exception:
+            raise ambiguous from None
+
+    async def _accept(
+        self, outcome: WorkerOutcome, plan: ExportPlan, store: int, work: WorkDirectory, ambiguous: AmbiguousSubmitError
+    ) -> str:
+        """Classify a verified-clean worker end; only a fully bound OK report is published."""
         report = _worker_report(outcome.stdout)
         status = None if report is None else report["status"]
         if report is not None and outcome.exit_code == 1 and outcome.manager_result == "EXIT_CODE":
@@ -897,7 +964,7 @@ class PackageExportService:
             or (outcome.exit_code, outcome.manager_result) != (0, "SUCCESS")
             or report.get("envelope") != worker_envelope()
             or not _abi_at_least(report.get("landlock_abi"), MIN_LANDLOCK_ABI)
-            or report.get("worker") != worker_file_digests()
+            or not _same_builder(report.get("worker"), plan.manifest.builder_identity_digest)
         ):
             raise ambiguous
         published = PurePosixPath(archive_ref(digest)).name
@@ -940,7 +1007,10 @@ class PackageExportService:
             or attempt.state is not ExecutionAttemptState.ACCEPTED
             or not job.startswith(prefix)
             or attempt.task_id != invocation.task_id
+            or invocation.task_id != export_task_id(command.user_id, command.project_name, command.command_id)
             or invocation.identity_digest != execution_identity_digest(request, invocation.manifest)
+            or attempt.request_digest != attempt_request_digest(provider_request(invocation))
+            or attempt.route != export_route(invocation.manifest.builder_identity_digest)
         ):
             raise RequiredEvidenceMissingError()
         manifest_bytes = canonical_json_bytes(invocation.manifest.model_dump(mode="json"))
@@ -1067,4 +1137,5 @@ __all__ = [
     "snapshot_assets",
     "sweep_work",
     "verify_archive",
+    "worker_config",
 ]

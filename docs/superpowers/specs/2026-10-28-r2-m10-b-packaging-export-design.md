@@ -166,8 +166,10 @@ poll/cancel/lookup/webhook, `OFFLINE_VERIFIED`), mirroring `local-ffmpeg-format-
 Recovery: ACCEPTED-but-not-finalized replays finalize from the job id (format-render `_accepted_digest` pattern).
 `SUBMIT_OUTCOME_UNKNOWN` (crash during execute) is never re-run under the same execution; the operator re-requests
 with a new command, and because the archive is deterministic the new execution produces the identical digest and
-reconciles an already-published identical object. `FAILED_BEFORE_ACCEPTANCE` (validation failed in the callback)
-replays its typed error. Disk-full and rename failures surface as known failures before acceptance; any partial
+reconciles an already-published identical object. `FAILED_BEFORE_ACCEPTANCE` (a known refusal in the callback)
+raises its typed error in that call; a later replay of the failed command reports `M10_EXPORT_INTEGRITY_FAILED`
+(export refusals are not quality evidence, so no failure record is kept; a new command re-plans and reports the
+typed refusal again). Disk-full and rename failures surface as known failures before acceptance; any partial
 file is removed. Status vocabulary is `EXPORTED`; nothing records upload/publish/visibility.
 
 Implementation (B4 review): the worker is `server/services/package_export_worker.py` launched through the A4
