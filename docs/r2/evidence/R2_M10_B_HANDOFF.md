@@ -63,10 +63,15 @@ Rewrite in place; this is the resume entry for M10-B.
   Codex is available again (user instruction 2026-10-28: call Codex review when needed, don't stop to ask).
 - `df9ada5df` B2 part 1: pure `r2/quality/packaging_check.py` + `tests/unit/r2/quality/test_packaging_check.py` (28 passed).
 
+- `652540024` B1 C5 (promotion/preview refusal of PACKAGING); B1 Codex delta review ACCEPT_WITH_CONDITIONS
+  (`b1-codex-delta-review.json`, no new findings; carried C3 PG repro limit, C4/C6 to later packets).
+- `bc47ac5a6` B2 part 2: `m10_packaging_observations` (migration `6e3b8d4f9c22`), `PackagingObservationRepository`,
+  `PackagingCheckService` (`server/services/quality_packaging.py`), `PackageCheckRequest` + frozen vector.
+  Verified: PG16 `tests/integration/server/services/test_quality_packaging.py` 10 passed; unit r2/scripts/server +
+  SQLite migrations 5526 passed; static gates clean. Codex B2 review running (`b2-codex-review.json`).
+
 ## Next step
 
-Triage the B1 Codex delta review. Then B2 part 2: `m10_packaging_observations` (append-only, migration after
-`5d2a7c3e8b11`), `PackagingCheckService` (receipt-first replay, CHECK_PACKAGE command, M8 revision + closures
-+ head-kind PACKAGING, V2 profile, master facts from the bound run's CONTAINER_STREAM probe result, asset re-hash
-from verified snapshots, finding ids uuid7, rule_results_digest), run-sealing refusal test for PACKAGING
-observations, PG tests; then Codex review of B2.
+Triage the B2 Codex review. Then B3: preview + Human selection into `PACKAGING_SLOT` (§4 global lock order,
+custodian lease like A6, `m10_package_previews`/`m10_package_selections`/`m10_packaging_heads`, writer-pair PG
+tests), then B4 export, B5 routes+UI, B6 parity, B7 pilots (Human gates), B8 seal.
