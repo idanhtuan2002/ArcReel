@@ -108,6 +108,12 @@ Rewrite in place; this is the resume entry for M10-B.
   checked). Codex B4 review running (`b4-codex-review.json`). Finalize refuses a receipt when a disposition or
   selection lands after PLANNED (attempt stays ACCEPTED, no receipt) — tested.
 
+- B4 Codex review REWORK (`b4-codex-review.json`: H1 missing D7 confinement, M1 exports symlink, M2 locale
+  collisions, M3 partial cleanup, M4 unsafe sweep, M5 envelope preflight, M6 captions layout, M7 finalize binding,
+  L1 worker grammar) → `76559a862` (worker), `e2fc6d908` (A4 launcher parametrized, probe unchanged),
+  `a971ecb4c` (service rework; real confined worker). PG export 22 passed; related M10 PG 124 passed;
+  unit/scripts/migrations 5599 passed; gates clean. Codex delta running (`b4-codex-delta-review.json`).
+
 ## Next step
 
 Triage the B4 Codex review. Then B5: authenticated routes under `/projects/{project_name}/packaging` (append
