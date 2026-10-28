@@ -1,0 +1,195 @@
+{
+  "schema_id": "m10.b2-delta2-review.v1",
+  "reviewed_head": "509a13f02",
+  "reviewer": "Codex independent second delta review; main agent; source read-only; no staging or commits",
+  "verdict": "REWORK",
+  "review_scope": {
+    "base": "7484328bf",
+    "candidate": "509a13f02501adab3d306ae818e1eb150259d64e",
+    "initial_head": "509a13f02501adab3d306ae818e1eb150259d64e",
+    "checkout": "Clean at initial and pre-artifact checks; reviewed HEAD matches the requested candidate."
+  },
+  "snapshot_decision": {
+    "judgment": "ACCEPTABLE for the B2 check; not an export-byte custody guarantee",
+    "evidence": [
+      "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:298",
+      "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:303",
+      "server/services/quality_packaging.py:140",
+      "server/services/quality_packaging.py:158"
+    ],
+    "reason": "The check retains an observation and digests, not bytes for subsequent consumption. A no-follow regular-file read whose device/inode/size/mtime/ctime are unchanged before and after, whose consumed size matches the initial stat, and whose full digest matches the declaration is appropriate historical measurement evidence on the host local filesystem. The previous reproduced mixed-generation read now refuses. Retaining a private copy at check time is unnecessary when no later consumer is entitled to reuse those bytes or infer their continuing presence from PASS.",
+    "boundary": "B4 must independently open and materialize verified private snapshots, rehash against the selected exact candidate/master digests, and build exclusively from those snapshots. A historical/replayed B2 PASS cannot authorize changed bytes, substitute for B4 custody, or prove present-day currentness. Matching stat metadata is a normal local-filesystem mutation check, not a cryptographic filesystem generation counter or protection against a privileged host fabricating stat results.",
+    "documentation_note": "Section 5 line 293 still says re-hash from verified private snapshots while lines 298-303 explicitly choose generation-checked reads without check snapshots. Update that leftover introductory phrase to match the accepted boundary."
+  },
+  "per_finding_status": {
+    "N1": {
+      "status": "RESOLVED",
+      "file": "r2/contracts/advanced_creative.py",
+      "line": 548,
+      "related_locations": [
+        "r2/contracts/advanced_creative.py:521",
+        "tests/unit/r2/contracts/test_packaging.py:774",
+        "tests/unit/r2/quality/test_packaging_check.py:292"
+      ],
+      "verified": "VariantGroup.canonical_values rejects inline value/source mismatches and malformed field shapes before any platform policy is consulted. Thus an omitted, advisory or waivable variants.bounds rule cannot admit the previously malformed title/description/tags/chapters. Persisted malformed construction cases and alternatives-without-variant-rule cases passed. Fresh direct probes of the four formerly skipped malformed field values all raised ValidationError before checking."
+    },
+    "N2": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 129,
+      "related_locations": [
+        "tests/unit/server/services/test_quality_packaging_measure.py:51"
+      ],
+      "verified": "Raw spelling must equal PurePosixPath normalization before opening. Dot components, duplicate separators, leading ./ and trailing slash fail. The regression now creates the target, proves canonical assets/x succeeds, and then proves the noncanonical spellings refuse. The persisted tests passed."
+    },
+    "H1": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 158,
+      "related_locations": [
+        "server/services/quality_packaging.py:98",
+        "server/services/quality_packaging.py:103",
+        "server/services/quality_packaging.py:167",
+        "server/services/quality_packaging.py:266",
+        "tests/unit/server/services/test_quality_packaging_measure.py:59"
+      ],
+      "verified": "Prior component-wise no-follow descriptor traversal, nonregular rejection and master device/inode comparison remain. The new pre/post generation and byte-count check rejects writes during the read. The persisted rewriting regression passed, and a fresh reproduction of the previous A-first-chunk/B-second-chunk probe now returns None. Under the explicit section 5 decision, absence of a retained check snapshot is accepted with the B4 obligations recorded above. This resolution does not claim future byte custody or eliminate B4 revalidation."
+    },
+    "M1": {
+      "status": "RESOLVED",
+      "file": "r2/contracts/advanced_creative.py",
+      "line": 549,
+      "related_locations": [
+        "r2/quality/packaging_check.py:127",
+        "r2/quality/packaging_check.py:134",
+        "tests/unit/r2/quality/test_packaging_check.py:292"
+      ],
+      "verified": "The remaining malformed-alternative admission gap is closed by N1. Valid tag/chapter alternatives still use the same metadata/chapter functions as primary values, including when variants.bounds is omitted. Existing per-rule seeded defects and clean alternatives passed. No claim that a model_copy/model_construct object is a valid external admission path."
+    },
+    "M2": {
+      "status": "PARTIAL",
+      "file": "server/services/quality_packaging.py",
+      "line": 237,
+      "related_locations": [
+        "server/services/quality_packaging.py:139",
+        "server/services/quality_packaging.py:141",
+        "server/services/quality_packaging.py:240",
+        "tests/integration/server/services/test_quality_packaging.py:458"
+      ],
+      "verified": "FIFO/nonregular rejection remains. High-level read requests now use remaining_limit+1, and an over-limit stream returns a nonmatching sentinel. wait_for maps the caller timeout to OperationalEnvelopeExceededError before the observation/stage transaction, and the new PG test asserts zero observation rows for its sleeping measurement. That test was source-read; the user reports 22 PG passes, not reviewer execution.",
+      "remaining": "wait_for cancels the coroutine/Future awaiting asyncio.to_thread, not an already running executor thread. The synchronous _assets/_measure worker has no cancellation signal, per-chunk deadline or process boundary; after the caller gets the typed error, it can continue reading and measuring further assets. Per-role byte ceilings bound consumption only if reads make progress; they do not bound the wall time of a stalled regular-file read. Repeated timed-out calls can leave default-executor workers occupied and affect unrelated to_thread users. This is the retained bounded-worker/cancellation portion of M2, not a new duplicate finding. The new PG sleep test proves caller timeout and no receipt, not worker termination. N3 separately qualifies the strict raw byte-budget claim.",
+      "evidence": "A minimal fresh wait_for(to_thread(worker),0.05) probe printed worker started=True and worker finished=False at timeout; the worker completed only after an explicit test release. Event-loop executor-shutdown cleanup subsequently timed out in this restricted environment, so this is bounded observed semantics, not a completed service/PG test. The full-service stub probe produced no completed output and was interrupted; no product claim relies on it.",
+      "fix": "Finish the already requested worker-cancellation boundary: use a managed worker whose lifetime can be bounded, or establish and enforce a narrow supported local-I/O contract plus cancellation checks that stop further assets/chunks and account for live timed-out workers in a bounded dedicated executor. A byte limit alone must not be described as a wall-time bound. Persist a test that observes worker exit/no further work after caller timeout; a sleeping function that eventually returns does not prove this."
+    },
+    "M3": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 135,
+      "verified": "Incremental UTF-8 decoding and EOF flush remain; relevant measurement tests passed in the fresh unit run. No new semantic JSON/SRT parser guarantee is inferred."
+    },
+    "M4": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 320,
+      "verified": "The prior lineage/run/profile tuple comparison is unchanged in this delta. Prior source verification is carried; PG lineage fixtures are included in the builder-reported 22 passes, not freshly executed by this reviewer."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [],
+    "L": [
+      {
+        "id": "N3",
+        "file": "server/services/quality_packaging.py",
+        "line": 139,
+        "related_locations": [
+          "server/services/quality_packaging.py:141",
+          "tests/unit/server/services/test_quality_packaging_measure.py:113",
+          "tests/unit/server/services/test_quality_packaging_measure.py:121"
+        ],
+        "title": "Buffered fdopen still fetches beyond the claimed limit-plus-one raw read budget",
+        "status": "CONFIRMED with actual raw descriptor position",
+        "scenario": "os.fdopen(descriptor, \"rb\") creates a buffered reader. For a 3 MiB file and limit=1000, _measure calls handle.read(1001), but the buffered reader has advanced the underlying raw descriptor to 4096 bytes before returning the oversized sentinel. The new Spy records only calls to BufferedReader.read, so sum(requested)<=1001 passes while the raw read budget is exceeded. This does not permit oversized data to PASS integrity and has bounded buffer-sized impact; it invalidates the exact fetch-budget claim and its regression evidence.",
+        "fix": "If limit+1 is the actual descriptor-read budget, use unbuffered reads or bounded os.read and assert the raw bytes fetched. If the intended budget is only bytes returned to the hashing loop, state that explicitly in the design/docstrings/tests instead of claiming no additional bytes are fetched."
+      }
+    ]
+  },
+  "conditions": [
+    {
+      "id": "C1",
+      "status": "PARTIAL",
+      "gate": "B2 acceptance",
+      "requirement": "Resolve the retained worker-cancellation part of M2 and qualify/fix N3. N1, N2, M1 and revised H1 are closed in this candidate. REWORK is driven by the retained M2 resource boundary, not by the accepted no-snapshot decision or the unavailable PG environment."
+    },
+    {
+      "id": "C2",
+      "status": "PARTIAL",
+      "gate": "Carried persistence verification",
+      "requirement": "The prior migration/FK/unique/JSON-ceiling, probe-result tamper and deterministic contention-evidence obligations remain carried. This patch changes no persistence model/repository/migration. The builder-reported 22 PG passes are accepted as supplied evidence of its run, not reviewer reproduction or proof of every missing gate. No redundant migration rerun was attempted after the two earlier timeouts and no relevant migration change."
+    },
+    {
+      "id": "C4",
+      "status": "PARTIAL; B2 data checks repaired",
+      "gate": "Carried Contracts/Packaging checks and future host boundary",
+      "evidence": "Malformed canonical shapes, alternatives without variants.bounds, existing-target noncanonical paths and rewrite-during-read regressions are persisted and passed. Duplicate assets/roles and pure closure regressions continue to pass.",
+      "requirement": "Retain later authenticated append/provenance obligations. The previous deterministic ancestor/root-swap regressions are still not persisted; current repository tests cover static final/ancestor links and file rewrite. Prior reviewer swap probes remain separate evidence. Add these narrow regression cases when closing the remaining M2 gate; no new symlink escape is asserted."
+    },
+    {
+      "id": "C6",
+      "status": "RESOLVED for B2; later-consumer obligations carried",
+      "gate": "Closure check at service boundary",
+      "evidence": "tests/integration/server/services/test_quality_packaging.py:483 now appends an intact M8 revision with only presentation_closure_digest forged, calls the actual service and expects FAIL located exactly at presentation_closure_digest. This closes the previously missing persisted service-boundary scenario in source; execution is builder-reported, not reviewer-run. Pure closure tests passed freshly.",
+      "requirement": "B3/B4/B5 append/load/preview/selection and export must continue exact candidate/closure/lineage verification. B4 must materialize and reverify private snapshots; B2 historical PASS does not provide their custody."
+    },
+    {
+      "id": "D5",
+      "status": "ACCEPTED design decision with B4 gate",
+      "gate": "Snapshot ownership",
+      "requirement": "No check snapshot is required because B2 retains no bytes and now validates read stability. Preserve B4 fresh immutable snapshot verification and fix the stale section 5 introductory private-snapshots phrase. Do not promote generation-checked historical evidence into proof that live paths remain unchanged."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git show --stat HEAD; git show HEAD -- changed source/design/test paths; git diff --stat 7484328bf..HEAD; git diff --check 7484328bf..509a13f02",
+      "result": "Clean checkout at 509a13f02501adab3d306ae818e1eb150259d64e. Read complete commit implementation/test delta and numbered relevant source. Whitespace check passed; pre-artifact HEAD remained pinned."
+    },
+    {
+      "command": "codebase-memory list_projects; search_graph VariantGroup/measurement_deadline/_generation; check_index_coverage for all evidence source/test/design paths",
+      "result": "No index rooted at this worktree was exposed. Search and coverage denied by approval_policy=never. Direct source/diff fallback used; no graph completeness/freshness claim; no subagents."
+    },
+    {
+      "command": "Read b2-codex-delta-review.json, changed variant contract, service path/read/generation/deadline/lineage code, checker alternative dispatch, new unit/PG regressions and revised design section 5",
+      "result": "Per-finding classifications and snapshot decision recorded above. No license review, source edits or test edits."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/m10-b-delta2-uv PYTHONDONTWRITEBYTECODE=1 timeout -k 2 50 uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/unit/server/services/test_quality_packaging_measure.py tests/unit/r2/contracts/test_packaging.py tests/unit/r2/quality/test_packaging_check.py tests/unit/r2/quality/test_runs.py",
+      "result": "PASS: 162 passed in 2.08s. No PG execution implied."
+    },
+    {
+      "command": "Python socket.create_connection((127.0.0.1, 55491), timeout=2)",
+      "result": "PermissionError: [Errno 1] Operation not permitted. PG service pytest not started; builder-reported 22 passes kept separate."
+    },
+    {
+      "command": "Inline Python validates four former malformed alternatives with actual PackagingCandidate.model_validate, and repeats actual _measure A/B 2 MiB mutation probe",
+      "result": "PASS: malformed title/description/tags/chapters all raise ValidationError independently of policy; prior mixed-generation read now returns None."
+    },
+    {
+      "command": "Inline Python wraps actual _measure BufferedReader and records underlying raw.tell() before closing for limit=1000 on a 3 MiB file",
+      "result": "CONFIRMED N3: reported oversized size=1001, underlying raw bytes fetched=4096."
+    },
+    {
+      "command": "Inline async full-service stub probe using a controlled stalled measure and fake receipt session",
+      "result": "No completed output; interrupted with exit 130. Not counted as a service pass/fail; no product conclusion depends on it."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 timeout -k 2 12 .venv/bin/python -u: minimal asyncio.wait_for(asyncio.to_thread(worker),0.05) with started/release/finished events",
+      "result": "Printed timeout with started=True, finished=False; worker only finished after explicit release. Executor-shutdown cleanup later reached external timeout (exit 124), so no overall async-program success claim. Source independently establishes that a running thread receives no cancellation signal."
+    }
+  ],
+  "not_verified": [
+    "Reviewer-run PostgreSQL service tests, worker termination under stalled kernel I/O, live migration/FK/unique/JSON ceiling enforcement and deterministic concurrent commit interleavings. User-reported 22 PG passes are distinct supplied evidence.",
+    "Generation metadata stability is evaluated for the supported host local-filesystem boundary; no hostile filesystem/privileged-host attestation is claimed. B4 snapshot creation and final archive custody are not implemented or accepted by this review.",
+    "No complete migration rerun, full suite, static gates, frozen donor parity, providers, frontend, deployment or production qualification. Source/tests untouched, no staging or commits; only the requested JSON is authored.",
+    "Graph evidence unavailable under never-approval policy. Full-service async probe did not complete; the minimal cancellation-semantics probe produced the stated observations but its shutdown timed out."
+  ]
+}

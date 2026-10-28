@@ -290,7 +290,7 @@ becomes selectable after its own check and selection. Drift → `M10_SUBJECT_STA
 
 ## 5. Packaging checks (pure)
 
-Cheap-first inside the packaging check: asset digest/size re-hash from verified private snapshots → required roles,
+Cheap-first inside the packaging check: asset digest/size re-hash from generation-stable no-follow reads → required roles,
 media types, byte ceilings → duration window vs master facts → metadata lint (lengths, tag/hashtag count and
 charset, required topic terms, banned phrases, chapter ordering/first-at-zero/min length) → locale coverage →
 variant group rules. Master facts (duration, video width/height) come from the bound run's verified `CONTAINER_STREAM` probe result

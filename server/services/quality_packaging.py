@@ -13,6 +13,7 @@ import dataclasses
 import hashlib
 import os
 import stat
+import time
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
@@ -114,7 +115,13 @@ def _open_beneath(root: Path, parts: tuple[str, ...]) -> int | None:
     return descriptor
 
 
-def _measure(root: Path, source_ref: str, declared: str, limit: int) -> MeasuredAsset | None:
+class MeasurementExpiredError(Exception):
+    """The measurement passed its monotonic deadline; the worker stops at the next chunk boundary."""
+
+
+def _measure(
+    root: Path, source_ref: str, declared: str, limit: int, deadline: float = float("inf")
+) -> MeasuredAsset | None:
     """Hash at most ``limit`` bytes of one regular file beneath the project root; None when it is not safe.
 
     The path must already be in canonical spelling. The read is accepted only when the inode's generation
@@ -136,9 +143,12 @@ def _measure(root: Path, source_ref: str, declared: str, limit: int) -> Measured
     utf8_valid = True
     size = 0
     prefix = b""
-    with os.fdopen(descriptor, "rb") as handle:
+    # Unbuffered: every read fetches at most what it asks for from the descriptor.
+    with os.fdopen(descriptor, "rb", buffering=0) as handle:
         info = os.fstat(handle.fileno())
         while chunk := handle.read(min(1 << 20, limit + 1 - size)):
+            if time.monotonic() > deadline:
+                raise MeasurementExpiredError()
             if not prefix:
                 prefix = chunk[:64]
             size += len(chunk)
@@ -213,7 +223,7 @@ class PackagingCheckService:
         sessions: Sessions,
         project_root: Path,
         clock: Callable[[], datetime],
-        measure: Callable[[Path, str, str, int], MeasuredAsset | None] = _measure,
+        measure: Callable[[Path, str, str, int, float], MeasuredAsset | None] = _measure,
         deadline_seconds: Callable[[q.PlatformConstraintSnapshot], float] | None = None,
     ) -> None:
         self._sessions = sessions
@@ -233,10 +243,13 @@ class PackagingCheckService:
             return replayed
         candidate, facts, constraints, master = await self._inputs(request)
         try:
+            seconds = self._deadline(constraints)
+            deadline = time.monotonic() + seconds
+            # The worker stops itself at the deadline; wait_for bounds the caller if a read itself stalls.
             measured = await asyncio.wait_for(
-                asyncio.to_thread(self._assets, candidate, constraints, master), self._deadline(constraints)
+                asyncio.to_thread(self._assets, candidate, constraints, master, deadline), seconds
             )
-        except TimeoutError:
+        except (TimeoutError, MeasurementExpiredError):
             # The worker stays bounded by the per-role byte ceilings; the check itself stops here.
             raise OperationalEnvelopeExceededError() from None
         facts = dataclasses.replace(facts, assets=measured)
@@ -252,7 +265,11 @@ class PackagingCheckService:
         return observation
 
     def _assets(
-        self, candidate: PackagingCandidate, constraints: q.PlatformConstraintSnapshot, master: tuple[str, str]
+        self,
+        candidate: PackagingCandidate,
+        constraints: q.PlatformConstraintSnapshot,
+        master: tuple[str, str],
+        deadline: float,
     ) -> dict[tuple[str, str | None], VerifiedAsset]:
         """Re-hash every declared asset; the primary video must be the approved master inode itself."""
         master_path, master_digest = master
@@ -260,7 +277,11 @@ class PackagingCheckService:
         limits = {role.role: role.max_bytes for role in constraints.asset_roles}
         measured: dict[tuple[str, str | None], VerifiedAsset] = {}
         for asset in candidate.assets:
-            found = self._measure(self._project_root, asset.source_ref, asset.media_type, limits.get(asset.role, 0))
+            if time.monotonic() > deadline:
+                raise MeasurementExpiredError()
+            found = self._measure(
+                self._project_root, asset.source_ref, asset.media_type, limits.get(asset.role, 0), deadline
+            )
             if found is None:
                 continue
             if (asset.role, asset.variant_id) == ("video", None) and (
