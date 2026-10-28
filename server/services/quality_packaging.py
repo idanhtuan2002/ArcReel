@@ -90,7 +90,7 @@ def _media_type(prefix: bytes, declared: str, utf8_valid: bool) -> str:
     return "application/octet-stream"
 
 
-def _open_beneath(root: Path, parts: tuple[str, ...]) -> int | None:
+def open_beneath(root: Path, parts: tuple[str, ...]) -> int | None:
     """Open a regular file by walking each component from a pinned root descriptor without following links."""
     if os.name != "posix" or not parts:
         return None
@@ -135,7 +135,7 @@ def _measure(
     relative = PurePosixPath(source_ref)
     if str(relative) != source_ref or relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
         return None
-    descriptor = _open_beneath(root, relative.parts)
+    descriptor = open_beneath(root, relative.parts)
     if descriptor is None:
         return None
     digest = hashlib.sha256()
@@ -480,4 +480,4 @@ class PackagingCheckService:
         )
 
 
-__all__ = ["CHECK_CONFIG_DIGEST", "PackagingCheckService", "require_packaging_lineage"]
+__all__ = ["CHECK_CONFIG_DIGEST", "PackagingCheckService", "open_beneath", "require_packaging_lineage"]

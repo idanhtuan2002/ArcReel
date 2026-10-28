@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lib.db.models.quality_packaging import (
+    ExportInvocationModel,
+    ExportReceiptModel,
     PackagePreviewModel,
     PackageSelectionAuthorizationModel,
     PackageSelectionModel,
@@ -16,7 +19,7 @@ from lib.db.models.quality_packaging import (
     PackagingObservationModel,
 )
 from lib.db.models.quality_probes import QualityProbeResultModel
-from r2.advanced_creative.digests import canonical_json_bytes
+from r2.advanced_creative.digests import canonical_json_bytes, digest_canonical
 from r2.contracts import packaging as p
 from r2.contracts import quality as q
 from r2.quality.digests import compute_digest, verify_caches
@@ -389,10 +392,119 @@ class PackageSelectionRepository:
         await self.session.flush()
 
 
+def receipt_digest(receipt: p.ExportBundleReceipt) -> str:
+    return digest_canonical({"domain": "m10.export-receipt.v1", "body": receipt.model_dump(mode="json")})
+
+
+@dataclass(frozen=True)
+class StoredExportInvocation:
+    request: p.ExportRequest
+    execution_id: str
+    task_id: str
+    manifest: p.ExportManifest
+    manifest_digest: str
+    identity_digest: str
+
+
+class ExportRepository:
+    """Export invocations and receipts; nothing here commits."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def invocation(self, request: p.ExportRequest) -> StoredExportInvocation | None:
+        command = request.command
+        row = (
+            await self.session.execute(
+                sa.select(ExportInvocationModel).filter_by(
+                    user_id=command.user_id,
+                    project_name=command.project_name,
+                    actor_id=command.actor_id,
+                    command_id=command.command_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        if row.request_digest != compute_digest("m10.export-request.v1", request):
+            raise CommandReplayConflictError()
+        try:
+            manifest = p.ExportManifest.model_validate(row.manifest_json)
+        except (ValueError, TypeError):
+            raise RequiredEvidenceMissingError() from None
+        if compute_digest("m10.export-manifest.v1", manifest) != row.manifest_digest:
+            raise RequiredEvidenceMissingError()
+        return StoredExportInvocation(
+            request, row.execution_id, row.task_id, manifest, row.manifest_digest, row.identity_digest
+        )
+
+    async def stage_invocation(self, invocation: StoredExportInvocation, prepared_at: datetime) -> None:
+        if self.session.get_bind().dialect.name != "postgresql":
+            raise RequiredEvidenceMissingError()
+        command = invocation.request.command
+        self.session.add(
+            ExportInvocationModel(
+                user_id=command.user_id,
+                project_name=command.project_name,
+                execution_id=invocation.execution_id,
+                actor_id=command.actor_id,
+                command_id=command.command_id,
+                request_digest=compute_digest("m10.export-request.v1", invocation.request),
+                request_json=invocation.request.model_dump(mode="json"),
+                selection_id=invocation.request.subject.selection_id,
+                task_id=invocation.task_id,
+                manifest_digest=invocation.manifest_digest,
+                manifest_json=invocation.manifest.model_dump(mode="json"),
+                identity_digest=invocation.identity_digest,
+                prepared_at=prepared_at,
+            )
+        )
+        await self.session.flush()
+
+    async def receipt(self, *, user_id: str, project_name: str, execution_id: str) -> p.ExportBundleReceipt | None:
+        row = (
+            await self.session.execute(
+                sa.select(ExportReceiptModel).filter_by(
+                    user_id=user_id, project_name=project_name, execution_id=execution_id
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        try:
+            receipt = p.ExportBundleReceipt.model_validate(row.receipt_json)
+            verify_caches(receipt)
+        except (ValueError, TypeError):
+            raise RequiredEvidenceMissingError() from None
+        if receipt_digest(receipt) != row.receipt_digest or receipt.archive_digest != row.archive_digest:
+            raise RequiredEvidenceMissingError()
+        return receipt
+
+    async def stage_receipt(self, *, user_id: str, project_name: str, receipt: p.ExportBundleReceipt) -> None:
+        self.session.add(
+            ExportReceiptModel(
+                user_id=user_id,
+                project_name=project_name,
+                receipt_id=receipt.receipt_id,
+                execution_id=receipt.execution_id,
+                archive_ref=receipt.archive_ref,
+                archive_digest=receipt.archive_digest,
+                archive_byte_size=receipt.archive_byte_size,
+                receipt_digest=receipt_digest(receipt),
+                receipt_json=receipt.model_dump(mode="json"),
+                exported_at=receipt.exported_at,
+            )
+        )
+        await self.session.flush()
+
+
 __all__ = [
+    "ExportRepository",
     "PackageSelectionRepository",
     "PackagingObservationRepository",
+    "StoredExportInvocation",
     "packaging_observation_digest",
     "preview_digest",
+    "receipt_digest",
     "selection_digest",
 ]
