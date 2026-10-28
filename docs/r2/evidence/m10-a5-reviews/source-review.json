@@ -1,0 +1,42 @@
+{
+  "schema_id": "m10.a5-source-review.v1",
+  "reviewer": "Codex (codex:codex-rescue), read-only; second round reported model gpt-5.6-sol (not independently verified)",
+  "rounds": [
+    {
+      "pinned": "10179a2e603267d5c7fbccccf1d82085562b2edc",
+      "result": "0 Critical, 6 High, 6 Medium",
+      "adjudication": "all REAL",
+      "fixes": [
+        "457434782",
+        "1fb726838"
+      ],
+      "findings": [
+        "H1 master currentness not locked through commit",
+        "H2 metadata/content basis not verified",
+        "H3 one assessor satisfying several slots",
+        "H4 escalation overriding independence",
+        "H5 evidence crossing profiles/cohorts",
+        "H6 later HISTORICAL_ONLY resurrecting superseded runs",
+        "M7 Human scope binding",
+        "M8 trusted profile digest",
+        "M9 caller time",
+        "M10 missing profile not INVALIDATED",
+        "M11 governance before replay",
+        "M12 ORM JSON ceilings"
+      ]
+    },
+    {
+      "pinned": "1fb726838",
+      "result": "10 closed, 2 partial (H1 profile-head lock, M12 parity depth); new: 1 High (profile head not locked), 4 Medium (tautological receipt digest, malformed manifest raising, H3 over-invalidating FAILED, overclaiming tests)",
+      "adjudication": "all REAL",
+      "fixes": [
+        "f5858890e"
+      ]
+    }
+  ],
+  "third_review": "not performed; second-round items verified by regression tests (real promotion during wait, both commit orders, receipt drift, malformed manifest, DDL expressions both dialects)",
+  "residual": [
+    "Grant reader performs checkpoint filesystem I/O inside the transaction (inherited A3 reader design)."
+  ],
+  "main_adjudication": "Claude Opus 5.5 main agent"
+}

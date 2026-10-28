@@ -1,0 +1,83 @@
+{
+  "schema_id": "m10.a5-candidate.v1",
+  "status": "M10_A5_SOURCE_CANDIDATE",
+  "source_head": "f5858890e1722b38543d831dd32c2652f1cf9a3f",
+  "base": "a57d7c631 (A4 candidate)",
+  "branch": "design/r2-m10-a5-run-closure",
+  "decisions": {
+    "D1_factual": "FactualReadPort without authoritative implementation; FACTUAL slots fail closed (A3 already refuses publishing them)",
+    "D2_human_qualification": "current signed HUMAN_SHOWRUNNER grant, policy m10.qualification.human-showrunner.v1"
+  },
+  "changed_paths": [
+    "alembic/versions/57f67bae0cb4_quality_run_closure.py",
+    "docs/research/2026-10-28-r2-m10-a5-run-closure.md",
+    "docs/superpowers/plans/2026-10-28-r2-m10-a5-run-closure.md",
+    "docs/superpowers/specs/2026-10-28-r2-m10-a5-run-closure-design.md",
+    "lib/db/models/__init__.py",
+    "lib/db/models/quality_probes.py",
+    "lib/db/models/quality_runs.py",
+    "lib/db/repositories/quality_runs.py",
+    "r2/quality/runs.py",
+    "server/services/quality_runs.py",
+    "tests/integration/lib/db/migrations/test_07fd34535384_quality_probe_evidence.py",
+    "tests/integration/lib/db/migrations/test_57f67bae0cb4_quality_run_closure.py",
+    "tests/integration/lib/db/repositories/test_quality_runs.py",
+    "tests/integration/server/services/test_quality_probes.py",
+    "tests/integration/server/services/test_quality_runs.py",
+    "tests/unit/r2/quality/test_runs.py"
+  ],
+  "out_of_owned_seams": {
+    "lib/db/models/quality_probes.py": "A4 model gains dialect-specific JSON ceilings (review M12)",
+    "tests/integration/lib/db/migrations/test_07fd34535384_quality_probe_evidence.py": "A4 parity test compares checks",
+    "tests/integration/server/services/test_quality_probes.py": "A4 helper gains optional requirement/dependency/selected parameters"
+  },
+  "source_sha256": {
+    "r2/quality/runs.py": "16ca7a3487a66088f1a375dfd0cf71865993e507bedfe8ba7442f129ab816e53",
+    "lib/db/models/quality_runs.py": "8378d669a07411ada2c402cd4f88dda1c814052d4e40625779bfae1218891c76",
+    "lib/db/repositories/quality_runs.py": "78606818e62c2fa81041bbb26be3a6a34aca3151d672a16344d04f8fa6a16a91",
+    "server/services/quality_runs.py": "81916361661dd8541c792f1bd42e2c586f4f63c2840bad01811f473a02504c42",
+    "alembic/versions/57f67bae0cb4_quality_run_closure.py": "e41dea229fe1f2c80bf30776ea94dc37b6b4518bad3b754881bf7c6039751082",
+    "lib/db/models/__init__.py": "1d38f80adbc1e3607915b2114229efba1f461c6c65dca2680c2182223c3cb0be",
+    "lib/db/models/quality_probes.py": "9d590bf90c337c2c984fe0d2d549fb8f8fd1c2706b10b707519b1b5e873ef571"
+  },
+  "evidence_sha256": {
+    "docs/r2/evidence/m10-a5-reviews/source-review.json": "2ebb86c3338cfcaf33ee877cb6fd254dd696701424c0072c5f48d725fcfd4c5c",
+    "docs/research/2026-10-28-r2-m10-a5-run-closure.md": "fbfd2c12892ede04f3f3348bfc619f12dc24785449f0fd029afc8787f1f6f8b4",
+    "docs/superpowers/specs/2026-10-28-r2-m10-a5-run-closure-design.md": "77eae46334445a08cdf35ca93bb68d9cd579a8e1309cb74e894dc55bcf1c9c18",
+    "docs/superpowers/plans/2026-10-28-r2-m10-a5-run-closure.md": "4e518038b8cc23effb54232568f05e207813bbeee99f47235862976538e3e297"
+  },
+  "gates": {
+    "static_whole_tree": {
+      "ruff_check": "All checks passed!",
+      "ruff_format": "2059 files already formatted",
+      "basedpyright": "0 errors, 0 warnings, 0 notes",
+      "lint_imports": "23 kept, 0 broken",
+      "deptry": "no issues",
+      "audit_tests": "0 violations"
+    },
+    "related_suite_pg16": {
+      "tests": 1689,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 20
+    },
+    "skips": "20 pre-existing (spatial/production-binding synthetic vectors, spatial row-lock), none A5",
+    "migration_cycle_pg16": "07fd34535384 -> 57f67bae0cb4 -> 07fd34535384 -> head with witness row preserved; rerun after column change OK",
+    "full_backend_suite": "NOT RUN (sponsor rule 2026-10-14)"
+  },
+  "flags": {
+    "runtime_accepted": false,
+    "production_activation": false,
+    "sponsor_acceptance_claimed": false,
+    "A6_closed": false,
+    "A7_closed": false,
+    "factual_admission_qualified": false,
+    "public_router": false
+  },
+  "known_limits": [
+    "No HTTP router; services are host-configured only.",
+    "Grant reader checkpoint I/O inside transaction (inherited).",
+    "A4 candidate bytes for lib/db/models/quality_probes.py differ from the sealed A4 candidate; the M10-A candidate (A7) must bind the final bytes."
+  ],
+  "next_gate": "M10-A6 Human disposition authority"
+}
