@@ -114,6 +114,12 @@ Rewrite in place; this is the resume entry for M10-B.
   `a971ecb4c` (service rework; real confined worker). PG export 22 passed; related M10 PG 124 passed;
   unit/scripts/migrations 5599 passed; gates clean. Codex delta running (`b4-codex-delta-review.json`).
 
+- B4 delta1 REWORK (`b4-codex-delta-review.json`: N1 path-based worker authority, N2 ctime, N3 classification,
+  N4 config path count, N5 work-dir init leaks, M3/M4/M5/M7 partial) → `fdb666848` (inode-pinned worker I/O,
+  report/digest checks, owned work-dir publication, envelope-first planning, full archive verification).
+  PG export 26 passed (real confined worker); related M10 PG 101 passed; unit/scripts/migrations 5608 passed;
+  gates clean. Codex delta2 running (`b4-codex-delta2-review.json`).
+
 ## Next step
 
 Triage the B4 Codex review. Then B5: authenticated routes under `/projects/{project_name}/packaging` (append
