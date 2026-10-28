@@ -332,6 +332,22 @@ def check_request_data() -> dict[str, Any]:
     return {"command": command_data("CHECK_PACKAGE"), "subject": subject}
 
 
+def preview_request_data() -> dict[str, Any]:
+    subject = {
+        "user_id": "owner",
+        "project_name": "project",
+        "actor_id": "owner",
+        "slot": slot_data(),
+        "candidate_id": "package",
+        "candidate_revision": 1,
+        "candidate_payload_digest": DIGEST,
+        "packaging_observation_id": UUID,
+        "selected_variant_ids": ["t2"],
+        "waivers": [],
+    }
+    return {"command": command_data("PREVIEW_PACKAGE"), "subject": subject}
+
+
 def selection_request_data() -> dict[str, Any]:
     return {"command": command_data("SELECT_PACKAGE"), "subject": selection_subject_data()}
 
@@ -379,6 +395,7 @@ GOLDEN = {
     "m10.packaging-subject.v1": "sha256:f208230301d3d046a0d3ef218d1a093b708caf69f95caa932e267de5987fadf1",
     "m10.package-preview.v1": "sha256:0793a828d317d220e3d890e6b0124fb98fab6503b93d051e9c1e291aeac8b21c",
     "m10.packaging-observation.v1": "sha256:813d52209fa4aa9b0963652aa4ec5317cf7f079a8dd76dcca8a2708a845df2d4",
+    "m10.package-preview-request.v1": "sha256:0a0352a4637feae5156a6a48c588e009e2e0455901801c5165a6c841096dfc27",
     "m10.package-check-request.v1": "sha256:57a3153e866c251da60683215bfe0e6e5ee757ad7d3d7b49af82f9d049bb8713",
     "m10.package-selection-request.v1": "sha256:ebba74e34d7f90494fbb6d701f0b01dbd40487c1dc1b7e1af78791970bd19407",
     "m10.package-selection.v1": "sha256:abbdb9846b39a3f1b86dd745663bfc5e21bfa9e6ac31bbf390c41bedabc4334c",
@@ -402,6 +419,7 @@ def golden_inputs() -> dict[str, tuple[str, object]]:
         "m10.export-manifest.v1": ("m10.export-manifest.v1", manifest_data()),
         "m10.packaging-observation.v1": ("m10.packaging-observation.v1", packaging_observation_data()),
         "m10.package-check-request.v1": ("m10.package-check-request.v1", check_request_data()),
+        "m10.package-preview-request.v1": ("m10.package-preview-request.v1", preview_request_data()),
         "m10.package-selection-request.v1": ("m10.package-selection-request.v1", selection_request_data()),
         "m10.package-selection.v1": ("m10.package-selection.v1", selection_data()),
         "m10.export-request.v1": ("m10.export-request.v1", export_request_data()),

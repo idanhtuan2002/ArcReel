@@ -37,7 +37,9 @@ def _window(start: AwareDatetime, end: AwareDatetime, maximum: int) -> None:
 
 
 def _command(
-    command: CommandEnvelope, subject: PackageCheckSubject | PackageSelectionSubject | ExportSubject, operation: str
+    command: CommandEnvelope,
+    subject: PackageCheckSubject | PackagePreviewSubject | PackageSelectionSubject | ExportSubject,
+    operation: str,
 ) -> None:
     if command.operation != operation or (command.user_id, command.project_name, command.actor_id) != (
         subject.user_id,
@@ -106,6 +108,48 @@ class PackageWaiver(M10ContractModel):
     rule_id: ExactIdentity
     finding_id: M10Uuid7
     reason: NonBlankText
+
+
+class PackagePreviewSubject(M10ContractModel):
+    """What an operator asks to preview; the server binds the current run, disposition and head itself."""
+
+    user_id: ExactIdentity
+    project_name: ExactIdentity
+    actor_id: ExactIdentity
+    slot: PackagingSlotKey
+    candidate_id: ExactIdentity
+    candidate_revision: StrictInt = Field(ge=1)
+    candidate_payload_digest: Sha256Digest
+    packaging_observation_id: M10Uuid7
+    selected_variant_ids: tuple[ExactIdentity, ...]
+    waivers: tuple[PackageWaiver, ...]
+
+    @field_validator("selected_variant_ids")
+    @classmethod
+    def variant_order(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        _unique(value)
+        return tuple(sorted(value, key=lambda item: item.encode("utf-8")))
+
+    @field_validator("waivers")
+    @classmethod
+    def waiver_order(cls, value: tuple[PackageWaiver, ...]) -> tuple[PackageWaiver, ...]:
+        _unique(w.finding_id for w in value)
+        return tuple(sorted(value, key=lambda w: w.finding_id))
+
+
+class PackagePreviewRequest(M10ContractModel):
+    command: CommandEnvelope
+    subject: PackagePreviewSubject
+
+    @model_validator(mode="after")
+    def coherent(self) -> Self:
+        _command(self.command, self.subject, "PREVIEW_PACKAGE")
+        if (self.subject.slot.user_id, self.subject.slot.project_name) != (
+            self.subject.user_id,
+            self.subject.project_name,
+        ):
+            raise ValueError("preview slot scope mismatch")
+        return self
 
 
 class PackagePreview(M10ContractModel):
@@ -322,6 +366,8 @@ __all__ = [
     "PackageCheckRequest",
     "PackageCheckSubject",
     "PackagePreview",
+    "PackagePreviewRequest",
+    "PackagePreviewSubject",
     "PackageSelection",
     "PackageSelectionRequest",
     "PackageSelectionSubject",

@@ -50,6 +50,7 @@ DIGEST_DOMAINS = (
     "m10.packaging-subject.v1",
     "m10.packaging-observation.v1",
     "m10.package-check-request.v1",
+    "m10.package-preview-request.v1",
     "m10.package-preview.v1",
     "m10.package-selection-request.v1",
     "m10.package-selection.v1",
@@ -100,6 +101,7 @@ _MODELS = MappingProxyType(
         "m10.packaging-subject.v1": p.PackagingAssessedSubject,
         "m10.packaging-observation.v1": p.PackagingObservation,
         "m10.package-check-request.v1": p.PackageCheckRequest,
+        "m10.package-preview-request.v1": p.PackagePreviewRequest,
         "m10.package-preview.v1": p.PackagePreview,
         "m10.package-selection-request.v1": p.PackageSelectionRequest,
         "m10.package-selection.v1": p.PackageSelection,
@@ -123,6 +125,7 @@ _REQUESTS = MappingProxyType(
         "m10.run-completion-request.v1": q.CompleteRunCommand,
         "m10.disposition-request.v1": q.DispositionAuthorizationRequest,
         "m10.package-check-request.v1": p.PackageCheckRequest,
+        "m10.package-preview-request.v1": p.PackagePreviewRequest,
         "m10.package-selection-request.v1": p.PackageSelectionRequest,
         "m10.export-request.v1": p.ExportRequest,
     }
