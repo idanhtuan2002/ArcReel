@@ -1,0 +1,164 @@
+{
+  "schema_id": "m10.a7-kalinga-parity-baseline.v1",
+  "rule": "R2-DEC-031: frozen before any M10 measurement; every measured row PARITY or IMPROVED in all eight dimensions, or wholly EXCLUDED with an intentional difference",
+  "donor": {
+    "repository_url": "https://github.com/desaultkhan/Kalinga-Shorts-Factory",
+    "commit_sha": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+    "selected_paths": [
+      "pipeline/src/validate.py",
+      "pipeline/src/make_video.py"
+    ],
+    "blob_sha256": {
+      "pipeline/src/validate.py": "a34d680faee8d0452a22d3d20794c38f73a9679a2ca19e8ddd0b5daf82bd2b10",
+      "pipeline/src/make_video.py": "617dc1f64ae22c215ea3f1e974f33563a4d741f0f5855e16a9e1e94b4a91b56a"
+    },
+    "runtime_identity": "CPython 3.13 executing the exact pinned function sources from donor_functions.json against /usr/bin/ffprobe and /usr/bin/ffmpeg; template window [1, 10] s"
+  },
+  "dimension_criteria": {
+    "functionality": "M10 detects every condition the donor detects on the same fixture",
+    "correctness": "M10 outcome matches the fixture ground truth; IMPROVED where the donor is wrong on a defect fixture",
+    "determinism": "two M10 runs on one fixture give equal measurement_digest (IMPROVED: digest-bound) or, for pure rules, equal outputs (PARITY)",
+    "failure_safety": "on defect fixtures M10 never yields a passing outcome where the donor silently passes or crashes untyped (IMPROVED); PARITY where both refuse",
+    "data_integrity": "M10 binds the measured input content digest (IMPROVED over path-only donor); PARITY for pure rules over identical inputs",
+    "observability": "M10 returns typed status/codes (IMPROVED over free text); PARITY when both are typed",
+    "performance": "PARITY iff M10 median wall time <= donor median + 1500 ms and within the config max_runtime_ms; never IMPROVED",
+    "resources": "IMPROVED iff M10 runs under declared runtime/output ceilings with ResourceEvidence; donor subprocess is unbounded; PARITY for pure rules"
+  },
+  "fixtures_sha256": {
+    "tests/fixtures/r2/quality_probes/av.mp4": "10a13ccfcde96a6fe9bfd558d88e715a6dec407eb2830f78b47217b5f1602200",
+    "tests/fixtures/r2/quality_probes/video_only.mp4": "0c213941d967dd3d041aaa28555c1c45638db7c9d316e2df3fcb5c75b73efe11",
+    "tests/fixtures/r2/quality_probes/silent.mp4": "edf70af04734e1b00a56ef904f3deaf6eb9171a8c19edb847044502642060f32",
+    "tests/fixtures/r2/quality_probes/intervals.mp4": "852f9b825cd31bd42f3d828a41521c3cd25e6a6a7881e3f5beb2fed6aaa2af1a",
+    "tests/fixtures/r2/quality_probes/truncated.mp4": "419715512bbe5c8ff83e104f896a25374bf22ed226c68840fc4564ee0f6ba436",
+    "tests/fixtures/r2/quality_probes/mpeg4.mp4": "e09b85662c5e4bdebb29815f5e44e599d23d1dd14cfb4dd65f94267ca52196e7",
+    "tests/fixtures/r2/quality_probes/good.srt": "7a06d92d85333840b72b2682f4279558f1c3e9ce4c5cd177c9a9c3cd8f484903",
+    "tests/fixtures/r2/m10_kalinga/sparse.srt": "9a95fa922553ea58b62df7a16f4416fbc538b993ac895a447ae7b134dcb1880f",
+    "tests/fixtures/r2/m10_kalinga/donor_functions.json": "26ad8eb4a102e360abf42eeb047a1df4d066e6594f3a226d43f48f00005c3b39"
+  },
+  "rows": [
+    {
+      "behavior_id": "missing_master",
+      "donor_refs": [
+        "validate.tech_qc:33-34"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": null,
+      "criteria": {
+        "m10": "changed/missing master is refused with M10_REQUIRED_EVIDENCE_MISSING before any probe subprocess"
+      }
+    },
+    {
+      "behavior_id": "audio_stream_required",
+      "donor_refs": [
+        "validate.tech_qc:40-43"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/quality_probes/av.mp4",
+        "tests/fixtures/r2/quality_probes/video_only.mp4"
+      ],
+      "intentional_difference": null,
+      "criteria": {
+        "m10": "CONTAINER_STREAM require_audio PASS/FAIL"
+      }
+    },
+    {
+      "behavior_id": "loudness_sanity",
+      "donor_refs": [
+        "validate.tech_qc:44-53"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/quality_probes/av.mp4",
+        "tests/fixtures/r2/quality_probes/intervals.mp4",
+        "tests/fixtures/r2/quality_probes/silent.mp4"
+      ],
+      "intentional_difference": null,
+      "criteria": {
+        "m10": "LOUDNESS INTEGRATED_LUFS [-35,-8], REQUIRED applicability; SILENT is FAIL, explicit SILENT_AUDIO_INAPPLICABLE is INAPPLICABLE"
+      }
+    },
+    {
+      "behavior_id": "caption_timing_present",
+      "donor_refs": [
+        "validate.tech_qc:54-60"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/quality_probes/av.mp4",
+        "tests/fixtures/r2/quality_probes/good.srt",
+        "tests/fixtures/r2/m10_kalinga/sparse.srt"
+      ],
+      "intentional_difference": null,
+      "criteria": {
+        "m10": "CAPTIONS coverage ratio >= 0.6; donor passes any single word timing and skips a missing audio.json; M10 refuses missing caption evidence typed"
+      }
+    },
+    {
+      "behavior_id": "advisory_failure_never_ready",
+      "donor_refs": [
+        "validate.run:159",
+        "validate.virality_gate:95-98",
+        "make_video._safe_validate:317-323"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/m10_kalinga/donor_functions.json"
+      ],
+      "intentional_difference": null,
+      "criteria": {
+        "m10": "missing/failed/indeterminate slots are unmet: PASS refused, readiness NOT_READY"
+      }
+    },
+    {
+      "behavior_id": "tool_failure_typed",
+      "donor_refs": [
+        "make_video.ffprobe_duration:159-161",
+        "validate.tech_qc:35"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/quality_probes/truncated.mp4",
+        "tests/fixtures/r2/quality_probes/mpeg4.mp4"
+      ],
+      "intentional_difference": null,
+      "criteria": {
+        "m10": "truncated/unqualified media is M10_PROBE_FAILED; donor raises untyped ValueError or misreports"
+      }
+    },
+    {
+      "behavior_id": "duration_window",
+      "donor_refs": [
+        "validate.tech_qc:36-39"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": "Template duration window is a platform/format constraint owned by the M10-B typed platform-constraint profile amendment (2026-09-16 spec §7); M10-A records exact container duration facts. Carried to M10-B."
+    },
+    {
+      "behavior_id": "seo_lint",
+      "donor_refs": [
+        "validate.seo_lint"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": "Metadata lint is packaging, owned by M10-B."
+    },
+    {
+      "behavior_id": "virality_gate",
+      "donor_refs": [
+        "validate.virality_gate"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": "Self-scored virality is rejected as quality authority (2026-09-16 spec §2: no self-score)."
+    },
+    {
+      "behavior_id": "ai_review_repair",
+      "donor_refs": [
+        "kalinga.run_to_done:461-468",
+        "evaluator.review_and_repair"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": "Automatic AI repair requires a remote provider and self-approves; M10-A exposes REWORK repair routing only, with no mutation port."
+    }
+  ],
+  "not_claimed": [
+    "volumedetect regex-miss silent pass: no admissible fixture produced it; not a row"
+  ],
+  "notes": [
+    "Donor run() executes every gate with no short-circuit beyond the missing-file prerequisite, so cost ordering beyond missing_master is not a donor behavior to match."
+  ]
+}
