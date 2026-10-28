@@ -343,6 +343,60 @@ class DispositionService:
             return disposition
 
 
+async def readiness_in(
+    session: AsyncSession,
+    reader: CheckpointedShowrunnerGrantReader,
+    *,
+    project_root: Path,
+    user_id: str,
+    project_name: str,
+    subject_digest: str,
+    profile_id: str,
+) -> tuple[Readiness, q.QualityDisposition | None, q.QualityRun | None]:
+    """Readiness inside the caller's transaction, with the disposition and run it was computed from.
+
+    Integrity failures raise; callers decide whether that is NOT_READY or a refusal.
+    """
+    dispositions = QualityDispositionRepository(session)
+    runs = QualityRunRepository(session)
+    now = await dispositions.database_now()
+    head_run_id = await runs.head(
+        user_id=user_id, project_name=project_name, subject_digest=subject_digest, profile_id=profile_id
+    )
+    disposition = await dispositions.head_disposition(
+        user_id=user_id, project_name=project_name, subject_digest=subject_digest, profile_id=profile_id
+    )
+    run_id = disposition.quality_run_id if disposition is not None else head_run_id
+    if run_id is None:
+        return Readiness("NOT_READY", ("NO_RUN",), ()), disposition, None
+    run = await runs.run(user_id=user_id, project_name=project_name, run_id=run_id)
+    profile = (
+        None
+        if run is None
+        else await QualityProfileRepository(session).get_revision(
+            user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
+        )
+    )
+    if run is None or profile is None:
+        return Readiness("NOT_READY", ("RUN_NOT_INTACT",), ()), disposition, run
+    observations, _ = await load_run_observations(
+        session, reader, user_id=user_id, project_name=project_name, profile=profile, run=run
+    )
+    validity = await validity_in(
+        session, reader, project_root=project_root, user_id=user_id, project_name=project_name, run_id=run.run_id
+    )
+    readiness = project_readiness(
+        disposition,
+        profile,
+        run,
+        run_state=validity.state,
+        run_is_head=head_run_id == run.run_id,
+        now=now,
+        observations=observations,
+    )
+    return readiness, disposition, run
+
+
 async def quality_readiness(
     sessions: async_sessionmaker[AsyncSession],
     grant_reader: GrantReaderFactory,
@@ -357,51 +411,19 @@ async def quality_readiness(
     reader = await grant_reader()
     async with sessions() as session, session.begin():
         await session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
-        dispositions = QualityDispositionRepository(session)
-        runs = QualityRunRepository(session)
-        now = await dispositions.database_now()
         try:
-            head_run_id = await runs.head(
-                user_id=user_id, project_name=project_name, subject_digest=subject_digest, profile_id=profile_id
-            )
-            disposition = await dispositions.head_disposition(
-                user_id=user_id, project_name=project_name, subject_digest=subject_digest, profile_id=profile_id
-            )
-            run_id = disposition.quality_run_id if disposition is not None else head_run_id
-            if run_id is None:
-                return Readiness("NOT_READY", ("NO_RUN",), ())
-            run = await runs.run(user_id=user_id, project_name=project_name, run_id=run_id)
-            profile = (
-                None
-                if run is None
-                else await QualityProfileRepository(session).get_revision(
-                    user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
-                )
-            )
-            if run is None or profile is None:
-                return Readiness("NOT_READY", ("RUN_NOT_INTACT",), ())
-            observations, _ = await load_run_observations(
-                session, reader, user_id=user_id, project_name=project_name, profile=profile, run=run
-            )
-            validity = await validity_in(
+            readiness, _, _ = await readiness_in(
                 session,
                 reader,
                 project_root=project_root,
                 user_id=user_id,
                 project_name=project_name,
-                run_id=run.run_id,
+                subject_digest=subject_digest,
+                profile_id=profile_id,
             )
         except (M10Error, ValueError):
             return Readiness("NOT_READY", ("EVIDENCE_NOT_INTACT",), ())
-        return project_readiness(
-            disposition,
-            profile,
-            run,
-            run_state=validity.state,
-            run_is_head=head_run_id == run.run_id,
-            now=now,
-            observations=observations,
-        )
+        return readiness
 
 
 __all__ = [
@@ -410,4 +432,5 @@ __all__ = [
     "DispositionCustodian",
     "DispositionService",
     "quality_readiness",
+    "readiness_in",
 ]
