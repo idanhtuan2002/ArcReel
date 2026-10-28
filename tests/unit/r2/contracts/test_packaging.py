@@ -755,3 +755,37 @@ def test_request_digests_exclude_their_own_cache_and_bind_every_subject_field(do
     changed = copy.deepcopy(body)
     changed["subject"]["selection_id" if "selection_id" in changed["subject"] else "preview_id"] = OTHER_UUID
     assert compute_digest(domain, changed) != base
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "asset_role"),
+    [
+        ("tags", {"tags": "history"}, None),
+        ("tags", {"tags": ["history"], "extra": 1}, None),
+        ("tags", {"tags": [1]}, None),
+        ("chapters", {"chapters": [{"start_ms": -1, "title": "A"}]}, None),
+        ("chapters", {"chapters": "0:00 Intro"}, None),
+        ("title", {"tags": ["history"]}, None),
+        ("description", {"text": 3}, None),
+        ("title", None, "thumbnail"),
+        ("thumbnail", {"text": "x"}, None),
+    ],
+)
+def test_malformed_alternatives_cannot_be_constructed(field: str, value: Any, asset_role: str | None) -> None:
+    data = candidate_data()
+    data["variant_groups"] = [
+        {
+            "group_id": "g",
+            "field": field,
+            "variants": [
+                {
+                    "variant_id": "v",
+                    "value": value,
+                    "asset_role": asset_role,
+                    "provenance": {"author_kind": "AGENT", "actor_id": "agent"},
+                }
+            ],
+        }
+    ]
+    with pytest.raises(ValidationError):
+        PackagingCandidate.model_validate(data)

@@ -30,7 +30,12 @@ from r2.contracts import packaging as p
 from r2.contracts import quality as q
 from r2.contracts.advanced_creative import ExplorationKind, PackagingCandidate
 from r2.quality.digests import compute_digest
-from r2.quality.errors import ProfileStaleError, RequiredEvidenceMissingError, SubjectStaleError
+from r2.quality.errors import (
+    OperationalEnvelopeExceededError,
+    ProfileStaleError,
+    RequiredEvidenceMissingError,
+    SubjectStaleError,
+)
 from r2.quality.packaging_check import (
     CHECKS,
     PackagingCheckResult,
@@ -112,13 +117,16 @@ def _open_beneath(root: Path, parts: tuple[str, ...]) -> int | None:
 def _measure(root: Path, source_ref: str, declared: str, limit: int) -> MeasuredAsset | None:
     """Hash at most ``limit`` bytes of one regular file beneath the project root; None when it is not safe.
 
+    The path must already be in canonical spelling. The read is accepted only when the inode's generation
+    (device, inode, size, mtime, ctime) is identical before and after, so a file rewritten in place is refused.
+
     Every component is opened relative to its parent's descriptor with no-follow, so neither a final nor an
     ancestor symlink, nor a component swapped after a check, can redirect the read. A FIFO or device is rejected
     by fstat before any read, and the open itself never blocks. More than ``limit`` bytes yields a size above the
     limit and a digest that matches no declaration.
     """
     relative = PurePosixPath(source_ref)
-    if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+    if str(relative) != source_ref or relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
         return None
     descriptor = _open_beneath(root, relative.parts)
     if descriptor is None:
@@ -130,7 +138,7 @@ def _measure(root: Path, source_ref: str, declared: str, limit: int) -> Measured
     prefix = b""
     with os.fdopen(descriptor, "rb") as handle:
         info = os.fstat(handle.fileno())
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
+        while chunk := handle.read(min(1 << 20, limit + 1 - size)):
             if not prefix:
                 prefix = chunk[:64]
             size += len(chunk)
@@ -147,10 +155,17 @@ def _measure(root: Path, source_ref: str, declared: str, limit: int) -> Measured
                 decoder.decode(b"", final=True)
             except UnicodeDecodeError:
                 utf8_valid = False
+        if _generation(os.fstat(handle.fileno())) != _generation(info) or size != info.st_size:
+            # The inode changed while it was read: the digest names no byte sequence that ever existed whole.
+            return None
     return MeasuredAsset(
         VerifiedAsset("sha256:" + digest.hexdigest(), size, _media_type(prefix, declared, utf8_valid)),
         (info.st_dev, info.st_ino),
     )
+
+
+def _generation(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
 def _identity(path: str) -> FileIdentity | None:
@@ -164,6 +179,11 @@ def _identity(path: str) -> FileIdentity | None:
     finally:
         os.close(descriptor)
     return (info.st_dev, info.st_ino) if stat.S_ISREG(info.st_mode) else None
+
+
+def measurement_deadline(constraints: q.PlatformConstraintSnapshot) -> float:
+    """30 s plus 1 s per 50 MiB of the largest admissible asset closure."""
+    return 30.0 + sum(role.max_bytes for role in constraints.asset_roles) / (50 << 20)
 
 
 def _master_facts(result_facts: ContainerFacts) -> tuple[int, int, int]:
@@ -194,11 +214,13 @@ class PackagingCheckService:
         project_root: Path,
         clock: Callable[[], datetime],
         measure: Callable[[Path, str, str, int], MeasuredAsset | None] = _measure,
+        deadline_seconds: Callable[[q.PlatformConstraintSnapshot], float] | None = None,
     ) -> None:
         self._sessions = sessions
         self._project_root = project_root
         self._clock = clock
         self._measure = measure
+        self._deadline = deadline_seconds or measurement_deadline
 
     async def check(self, request: p.PackageCheckRequest) -> p.PackagingObservation:
         if request.command.request_digest != compute_digest("m10.package-check-request.v1", request):
@@ -210,7 +232,13 @@ class PackagingCheckService:
         if replayed is not None:
             return replayed
         candidate, facts, constraints, master = await self._inputs(request)
-        measured = await asyncio.to_thread(self._assets, candidate, constraints, master)
+        try:
+            measured = await asyncio.wait_for(
+                asyncio.to_thread(self._assets, candidate, constraints, master), self._deadline(constraints)
+            )
+        except TimeoutError:
+            # The worker stays bounded by the per-role byte ceilings; the check itself stops here.
+            raise OperationalEnvelopeExceededError() from None
         facts = dataclasses.replace(facts, assets=measured)
         result = check_package(candidate, constraints, facts)
         observation = self._observation(request, candidate, result, facts)

@@ -1,0 +1,196 @@
+{
+  "schema_id": "m10.b2-delta-review.v1",
+  "reviewed_head": "7484328bf",
+  "reviewer": "Codex independent delta review; main agent; source read-only; no staging or commits",
+  "verdict": "REWORK",
+  "review_scope": {
+    "base": "bc47ac5a6",
+    "candidate": "7484328bfe3d04ad7f0b740213335b4b22d41948",
+    "initial_head": "7484328bfe3d04ad7f0b740213335b4b22d41948",
+    "later_head": "c85c079da2a39bf3064a393a05cbc5a896b8b5ed",
+    "head_note": "HEAD advanced externally during review. git diff 7484328bf HEAD contains only docs/r2/evidence/R2_M10_B_HANDOFF.md; reviewed implementation, design and tests remain candidate-equivalent. Initial checkout clean."
+  },
+  "per_finding_status": {
+    "H1": {
+      "status": "PARTIAL",
+      "file": "server/services/quality_packaging.py",
+      "line": 93,
+      "related_locations": [
+        "server/services/quality_packaging.py:98",
+        "server/services/quality_packaging.py:101",
+        "server/services/quality_packaging.py:131",
+        "server/services/quality_packaging.py:156",
+        "server/services/quality_packaging.py:231",
+        "tests/unit/server/services/test_quality_packaging_measure.py:34"
+      ],
+      "verified": "The original resolve/open ancestor-symlink escape is repaired. Every source component is opened with O_NOFOLLOW using dir_fd; the root descriptor pins traversal, and a final fstat requires a regular file. Fresh independent deterministic ancestor-swap and root-swap probes both retained original bytes. _assets compares the measured device/inode and digest with the opened master identity, and a fresh copy-versus-hardlink probe distinguishes different objects with identical bytes. Existing symlink and copy-refusal tests are present; the unit measurement tests passed.",
+      "remaining": "The original private-snapshot requirement remains unimplemented: _measure streams the live inode, does not materialize a private immutable snapshot or verify a stable file generation. A fresh probe read the first 1 MiB of A bytes, overwrote the same inode with 2 MiB of B bytes, and returned the predeclared digest of A*1MiB+B*1MiB. No retained snapshot backs that measured body, and the current file has another digest. Descriptor-relative path safety does not establish immutable-byte custody. _identity also closes the master descriptor before asset measurement; the inode comparison itself is an improvement, not proof of retained snapshot custody.",
+      "fix": "Complete the already requested verified private snapshot boundary and measure its retained bytes; establish the approved-master object identity from pinned descriptors. Persist mutation-during-read, ancestor-swap and root-swap regressions. The independent race probes do not replace repository tests."
+    },
+    "M1": {
+      "status": "PARTIAL",
+      "file": "r2/quality/packaging_check.py",
+      "line": 89,
+      "related_locations": [
+        "r2/quality/packaging_check.py:108",
+        "r2/quality/packaging_check.py:127",
+        "r2/quality/packaging_check.py:134",
+        "r2/quality/packaging_check.py:364",
+        "tests/unit/r2/quality/test_packaging_check.py:231"
+      ],
+      "verified": "Validly shaped tag alternatives now traverse count, duplicate, charset, length and banned-phrase checks; chapter alternatives traverse ordering, first-zero, title and duration/minimum checks. Inline values have one recognized key and malformed values produce VARIANT_VALUE_MALFORMED when variants.bounds is declared. The new clean/defect fixtures passed.",
+      "remaining": "Malformed alternatives are silently omitted by _alternatives. The only malformed-value finding lives in optional variants.bounds. A valid published constraint snapshot may omit that rule while retaining blocking title.length and other metadata rules. Then malformed title/description/tag/chapter alternatives PASS without applicable checks. The title case is a new regression, detailed in N1.",
+      "fix": "Resolve N1 and add profiles with variants.bounds absent or advisory to the malformed-shape regressions; do not test only all_rules_constraints."
+    },
+    "M2": {
+      "status": "PARTIAL",
+      "file": "server/services/quality_packaging.py",
+      "line": 91,
+      "related_locations": [
+        "server/services/quality_packaging.py:106",
+        "server/services/quality_packaging.py:133",
+        "server/services/quality_packaging.py:137",
+        "server/services/quality_packaging.py:213",
+        "tests/unit/server/services/test_quality_packaging_measure.py:53",
+        "tests/unit/server/services/test_quality_packaging_measure.py:59"
+      ],
+      "verified": "The reproduced FIFO hang is repaired: O_NONBLOCK is applied before fstat, nonregular descriptors are closed without reading, and the FIFO unit test completes. Role limits are passed from constraints and bytes exceeding the limit return a deliberately nonmatching sentinel. Unbounded file growth can no longer cause unbounded total bytes hashed.",
+      "remaining": "The previous requested bounded-worker/deadline and cancellation coverage is absent: asyncio.to_thread still has no worker timeout, and O_NONBLOCK does not make regular-file I/O cancellable. The stated at-most-limit read is also approximate: each read requests 1 MiB before checking size, so actual bytes fetched may exceed the role limit by up to a chunk. This is not the old FIFO exploit, and no new regular-file I/O hang was executed.",
+      "fix": "Complete the previously requested bounded execution/cancellation gate, preferably through the verified snapshot reader, and use remaining-limit-plus-one sized reads if the byte limit is a read budget. Persist a controlled stalled-reader/cancellation regression."
+    },
+    "M3": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 127,
+      "related_locations": [
+        "server/services/quality_packaging.py:142",
+        "server/services/quality_packaging.py:147",
+        "server/services/quality_packaging.py:151",
+        "tests/unit/server/services/test_quality_packaging_measure.py:68"
+      ],
+      "verified": "One incremental decoder sees all chunks and is flushed at EOF. Invalid tails are rejected as text, truncated final multibyte sequences fail, and a valid character split at the old 64-byte prefix is accepted. The persisted test passed. An additional fresh probe split a three-byte Han character across the actual 1 MiB read boundary and correctly obtained text/plain. Magic-byte classification remains separate from UTF-8 validation. Semantic JSON/SRT parsing is not claimed."
+    },
+    "M4": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 292,
+      "related_locations": [
+        "server/services/quality_packaging.py:303",
+        "server/services/quality_packaging.py:310",
+        "tests/integration/server/services/test_quality_packaging.py:376"
+      ],
+      "verified": "Before obtaining container facts, the service compares lineage project, content basis, approved master id/digest, creative profile id/version and policy digest with the verified run/profile. Every mismatching field refuses SubjectStaleError. Six parameterized PG cases recompute the legitimate M8 payload+lineage digest and alter each substantive binding separately. These are source-verified tests; the reported 20-pass PG16 result is user-supplied and was not independently reproduced here. Future append/load paths retain their own binding obligations."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [
+      {
+        "id": "N1",
+        "file": "r2/quality/packaging_check.py",
+        "line": 113,
+        "related_locations": [
+          "r2/quality/packaging_check.py:364",
+          "r2/quality/packaging_check.py:403",
+          "r2/contracts/quality.py:516",
+          "tests/unit/r2/quality/test_packaging_check.py:257"
+        ],
+        "title": "Skipping unparseable alternatives bypasses blocking metadata rules when variants.bounds is absent",
+        "status": "CONFIRMED by old/new execution against the identical sealed candidate and valid snapshot",
+        "scenario": "Use constraints_data(), which has mandatory safety rules and blocking title.length but no variants.bounds. Seal a title group whose inline value is {\"tags\":[\"history\"]}. At bc47ac5a6 the exact candidate returns FAIL with title.length/TITLE_EMPTY. At 7484328bf variant_value returns None, _alternatives drops the variant, and check_package returns PASS with no findings. Likewise malformed description {\"text\":3}, tags {\"tags\":\"bad!\"} and negative chapter values all disappear under corresponding declared checks when the optional variant rule is omitted. The repair test helper always declares all rules, masking this valid policy configuration.",
+        "fix": "Make structural value-shape admission independent of optional or advisory variant-count policy, or make each applicable metadata check fail on an unparseable alternative instead of skipping it. Add differential RED cases using a valid snapshot without variants.bounds, and an advisory variant rule with blocking metadata checks. Preserve the rule that every alternative is checked like its primary value.",
+        "design_basis": "Design section 3.3 every variant is checked like the primary value; D4 only six safety checks are mandatory, so variants.bounds cannot be assumed present."
+      }
+    ],
+    "L": [
+      {
+        "id": "N2",
+        "file": "tests/unit/server/services/test_quality_packaging_measure.py",
+        "line": 48,
+        "related_locations": [
+          "server/services/quality_packaging.py:120"
+        ],
+        "title": "New normalized-path refusal cases pass only because their target file is missing",
+        "status": "CONFIRMED with an existing target",
+        "scenario": "The test passes assets/./x and assets//x but never creates assets/x. PurePosixPath removes dot and repeated-separator components before the guard examines parts. With assets/x present, both spellings are measured successfully, contrary to what the test name and these cases claim. This does not escape the root; it is a false regression-proof claim.",
+        "fix": "Create the target before testing these cases, then either validate raw path spelling before normalization if canonical spelling is required, or explicitly test normalization acceptance and remove the refusal claim. Keep actual absolute/parent-traversal cases separate."
+      }
+    ]
+  },
+  "conditions": [
+    {
+      "id": "C1",
+      "status": "PARTIAL",
+      "gate": "B2 repair acceptance",
+      "evidence": "151 permitted relevant unit tests passed. M3/M4 source fixes are sound; H1/M1/M2 retain the stated parts and N1 is a reproduced regression. Repair SHA is pinned.",
+      "requirement": "Resolve N1 and the retained H1/M2 requirements, add the missing regressions, and re-review the exact repair SHA. Verdict is REWORK on implementation evidence, independently of the unavailable PostgreSQL environment."
+    },
+    {
+      "id": "C2",
+      "status": "PARTIAL",
+      "gate": "Persistence acceptance",
+      "evidence": "New PG tests cover six lineage mismatches, wrong run digest, absent technical/container evidence, replay after master deletion, stored observation body/digest tamper and same-command concurrent checks. Existing changed-command conflict and append-only cases remain. The claimed PG16 20 passed is recorded as supplied evidence, not a fresh reviewer run. The migration pytest emitted one dot then timed out after 40 seconds. Persistence model/repository/migration are unchanged in this delta.",
+      "remaining": "No new probe-result body/digest tamper regression, deterministic barrier proving simultaneous same-command writers reached the commit race, or new live PG FK/unique/JSON-ceiling enforcement proof. asyncio.gather plus a final count is useful functional coverage but does not itself prove a particular contention interleaving. The unchanged SQLite migration test disables FKs for its fixture row and checks CHECK names rather than ceiling enforcement.",
+      "requirement": "Complete the migration round trip, probe-result tamper and required PG enforcement/interleaving gates in a reachable environment; retain exact commands/output. Do not reclassify the supplied 20-test result as reviewer-executed."
+    },
+    {
+      "id": "C4",
+      "status": "PARTIAL",
+      "gate": "Carried B1 Contracts/Packaging checks",
+      "evidence": "Duplicate-asset and presentation-only closure probes are now persisted in test_packaging_check.py:275 and passed; duplicate-role refusal already exists at test_packaging.py:541. New malformed variant tests pass under the all-rules snapshot, but N1 remains. Static final/ancestor symlink and FIFO cases are persisted; deterministic mutation/swap cases were reviewer probes only.",
+      "requirement": "Resolve N1; persist stable-snapshot and path-swap regressions. Authenticated server-derived field/variant provenance remains a later host append boundary obligation, not something established by the pure checker."
+    },
+    {
+      "id": "C6",
+      "status": "PARTIAL",
+      "gate": "Carried B1 closure check/load/append",
+      "evidence": "Mandatory pure closure.content and closure.presentation still recompute both caches. The new test_packaging_check.py:275 proves a source_ref-only mutation yields exactly closure.presentation/CLOSURE_MISMATCH; M8 semantic lineage checking is now implemented.",
+      "remaining": "The specifically requested presentation-only tamper test through PackagingCheckService.check is absent: the new assertion calls the pure check directly. Authenticated append and later preview/selection/load boundaries are outside this patch.",
+      "requirement": "Add the service-boundary presentation tamper RED case and keep explicit closure checks on each future consumer. Lack of a direct verify_packaging_closures helper call is not itself a bypass; equivalent recomputation is present."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git show --stat 7484328bf; git show 7484328bf -- server/services/quality_packaging.py r2/quality/packaging_check.py tests/unit/server/services/test_quality_packaging_measure.py tests/unit/r2/quality/test_packaging_check.py tests/integration/server/services/test_quality_packaging.py; git diff --stat bc47ac5a6..7484328bf; git diff --check bc47ac5a6..7484328bf",
+      "result": "Pinned requested SHA and reviewed complete implementation/test delta. Whitespace check passed; initial checkout clean. Later HEAD has only a handoff-doc change."
+    },
+    {
+      "command": "codebase-memory list_projects; search_graph for _open_beneath/_measure/_identity/variant_value; check_index_coverage for all relied-on source/test/design paths",
+      "result": "Project listing contains no root at this worktree. Search and both coverage calls denied by approval_policy=never. Used direct source/diff fallback; no graph coverage/freshness claim. Review performed by main agent without delegating critical conclusions."
+    },
+    {
+      "command": "Read complete changed source/tests, prior b2-codex-review.json, relevant contract safety/variant/role code, design D4 and sections 3.3/5, and complete migration test file",
+      "result": "Per-finding and per-condition results recorded above. No license work, source edits or test edits."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/m10-b-delta-uv PYTHONDONTWRITEBYTECODE=1 timeout -k 2 50 uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/unit/server/services/test_quality_packaging_measure.py tests/unit/r2/quality/test_packaging_check.py tests/unit/r2/contracts/test_packaging.py tests/unit/r2/quality/test_runs.py",
+      "result": "PASS: 151 passed in 2.06s."
+    },
+    {
+      "command": "Python socket.create_connection((127.0.0.1, 55491), timeout=2)",
+      "result": "PermissionError: [Errno 1] Operation not permitted. PG service tests not started; user-reported 20-pass PG16 result remains external evidence."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/m10-b-delta-uv PYTHONDONTWRITEBYTECODE=1 timeout -k 2 40 uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/integration/lib/db/migrations/test_6e3b8d4f9c22_m10_packaging_observations.py",
+      "result": "Exit 124 after one progress dot. No completed migration round-trip claim."
+    },
+    {
+      "command": "Inline Python loads prior checker via git show bc47ac5a6:r2/quality/packaging_check.py into an isolated module and calls old/new check_package with identical sealed malformed-title candidate, constraints_data snapshot and facts; also probes malformed alternatives without variants.bounds",
+      "result": "CONFIRMED N1: old FAIL title.length/TITLE_EMPTY; new PASS with no findings. Malformed title/description/tags/chapters are all skipped when variants.bounds is absent."
+    },
+    {
+      "command": "Inline Python temporary-root probes: patched os.open swaps an already opened ancestor or root to an outside symlink; actual 1 MiB UTF-8 chunk split; copy/hardlink inode identities; existing-file noncanonical source paths",
+      "result": "PASS: original bytes retained after both descriptor-pinned swaps; valid UTF-8 chunk split accepted; identical-byte copy has different identity and hardlink matches. CONFIRMED N2: assets/./x and assets//x are accepted when assets/x exists. Embedded NUL still raises ValueError, but this predates the patch and is not raised as a new delta finding."
+    },
+    {
+      "command": "Inline Python wraps actual _measure file reads: after first 1 MiB read, overwrite the same inode from A*2MiB to B*2MiB",
+      "result": "CONFIRMED residual H1: returned digest equals A*1MiB+B*1MiB and differs from the current complete file. No private snapshot is created or retained by the service."
+    }
+  ],
+  "not_verified": [
+    "No reviewer-run PostgreSQL tests, concurrency interleavings, trigger/FK/unique/JSON-ceiling enforcement or complete migration round trip. The supplied 20-pass report is not contradicted by sandbox socket denial and was not independently reproduced.",
+    "No new source or tests written. No formatter, full suite, providers, deployment, release/production acceptance, staging or commits. Only this delta-review JSON is authored.",
+    "No complete donor parity rerun or B3/B4/B5 append/selection/export qualification. Previous B6 donor parity condition remains carried.",
+    "Graph search/coverage unavailable under never-approval policy. Conclusions are bounded direct-source and fresh-test/probe evidence."
+  ]
+}

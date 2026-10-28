@@ -453,3 +453,40 @@ async def test_concurrent_exact_checks_record_one_observation(packaging_host) ->
     async with env["factory"]() as session:
         rows = (await session.execute(sa.select(sa.func.count()).select_from(PackagingObservationModel))).scalar_one()
     assert rows == 1
+
+
+async def test_a_stalled_measurement_stops_at_its_deadline(packaging_host) -> None:
+    import time
+
+    from r2.quality.errors import OperationalEnvelopeExceededError
+
+    env = packaging_host
+    candidate = await append_candidate(env, candidate_for(env))
+
+    def stalled(*_: object):
+        time.sleep(1.0)
+
+    slow = PackagingCheckService(
+        sessions=env["factory"],
+        project_root=env["project"],
+        clock=lambda: NOW,
+        measure=stalled,
+        deadline_seconds=lambda _constraints: 0.05,
+    )
+    with pytest.raises(OperationalEnvelopeExceededError):
+        await slow.check(check_request(env, candidate))
+    async with env["factory"]() as session:
+        rows = (await session.execute(sa.select(sa.func.count()).select_from(PackagingObservationModel))).scalar_one()
+    assert rows == 0
+
+
+async def test_a_presentation_only_tamper_fails_at_the_service_boundary(packaging_host) -> None:
+    env = packaging_host
+    payload = candidate_for(env)
+    forged = PackagingCandidate.model_validate(
+        payload.model_dump(mode="python") | {"presentation_closure_digest": "sha256:" + "e" * 64}
+    )
+    candidate = await append_candidate(env, forged)
+    observation = await service(env).check(check_request(env, candidate))
+    assert observation.status is q.ObservationStatus.FAIL
+    assert [f.subject_locator for f in observation.findings] == ["presentation_closure_digest"]

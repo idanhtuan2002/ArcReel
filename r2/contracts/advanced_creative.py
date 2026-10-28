@@ -518,10 +518,42 @@ class PackagingVariant(M8ContractModel):
         return self
 
 
+def _variant_value_shape_ok(field: str, value: CanonicalJsonObject) -> bool:
+    body = value.model_dump(mode="json")
+    key = {"title": "text", "description": "text", "tags": "tags", "chapters": "chapters"}.get(field)
+    if key is None or set(body) != {key}:
+        return False
+    item = body[key]
+    if field in {"title", "description"}:
+        return isinstance(item, str)
+    if field == "tags":
+        return isinstance(item, list) and all(isinstance(tag, str) for tag in item)
+    if not isinstance(item, list):
+        return False
+    try:
+        for chapter in item:
+            PackagingChapter.model_validate(chapter)
+    except ValueError:
+        return False
+    return True
+
+
 class VariantGroup(M8ContractModel):
+    """One selectable field; every inline alternative has that field's single canonical value shape."""
+
     group_id: str
     field: Literal["title", "description", "tags", "chapters", "thumbnail"]
     variants: tuple[PackagingVariant, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def canonical_values(self) -> Self:
+        for variant in self.variants:
+            if self.field == "thumbnail":
+                if variant.asset_role is None:
+                    raise ValueError("a thumbnail alternative references an asset role")
+            elif variant.value is None or not _variant_value_shape_ok(self.field, variant.value):
+                raise ValueError("an inline alternative must have its field's canonical value shape")
+        return self
 
 
 class AudienceClassification(M8ContractModel):

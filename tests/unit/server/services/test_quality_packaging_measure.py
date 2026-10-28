@@ -45,9 +45,80 @@ def test_final_and_ancestor_symlinks_are_never_followed(tmp_path: Path, link: st
     assert _measure(root, source, "text/plain", 1 << 20) is None
 
 
-@pytest.mark.parametrize("source", ["../outside.txt", "/etc/hostname", "assets/./x", "assets//x", ""])
-def test_unsafe_relative_paths_are_refused(tmp_path: Path, source: str) -> None:
-    assert _measure(_root(tmp_path), source, "text/plain", 1 << 20) is None
+@pytest.mark.parametrize(
+    "source", ["../outside.txt", "/etc/hostname", "assets/./x", "assets//x", "assets/x/", "./assets/x", ""]
+)
+def test_unsafe_or_non_canonical_paths_are_refused_even_when_the_target_exists(tmp_path: Path, source: str) -> None:
+    root = _root(tmp_path)
+    (root / "assets" / "x").write_text("present", encoding="utf-8")
+    (tmp_path / "outside.txt").write_text("outside", encoding="utf-8")
+    assert _measure(root, "assets/x", "text/plain", 1 << 20) is not None
+    assert _measure(root, source, "text/plain", 1 << 20) is None
+
+
+def test_a_file_rewritten_while_it_is_read_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from server.services import quality_packaging
+
+    root = _root(tmp_path)
+    target = root / "assets" / "x"
+    target.write_bytes(b"a" * 4096)
+    real_fdopen = os.fdopen
+
+    class Rewriting:
+        def __init__(self, handle) -> None:
+            self.handle = handle
+
+        def __enter__(self):
+            self.handle.__enter__()
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            self.handle.__exit__(*exc)
+
+        def fileno(self) -> int:
+            return self.handle.fileno()
+
+        def read(self, size: int = -1) -> bytes:
+            chunk = self.handle.read(size)
+            with target.open("r+b") as writer:
+                writer.write(b"b" * 16)
+            return chunk
+
+    monkeypatch.setattr(quality_packaging.os, "fdopen", lambda fd, mode: Rewriting(real_fdopen(fd, mode)))
+    assert _measure(root, "assets/x", "text/plain", 1 << 20) is None
+
+
+def test_reads_never_fetch_more_than_the_limit_plus_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from server.services import quality_packaging
+
+    root = _root(tmp_path)
+    (root / "assets" / "big.txt").write_bytes(b"a" * (3 << 20))
+    requested: list[int] = []
+    real_fdopen = os.fdopen
+
+    class Spy:
+        def __init__(self, handle) -> None:
+            self.handle = handle
+
+        def __enter__(self):
+            self.handle.__enter__()
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            self.handle.__exit__(*exc)
+
+        def fileno(self) -> int:
+            return self.handle.fileno()
+
+        def read(self, size: int = -1) -> bytes:
+            requested.append(size)
+            return self.handle.read(size)
+
+    monkeypatch.setattr(quality_packaging.os, "fdopen", lambda fd, mode: Spy(real_fdopen(fd, mode)))
+    measured = _measure(root, "assets/big.txt", "text/plain", 1000)
+    assert measured is not None
+    assert measured.asset.byte_size == 1001
+    assert sum(requested) <= 1001
 
 
 def test_a_fifo_is_refused_without_blocking(tmp_path: Path) -> None:

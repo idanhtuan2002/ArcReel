@@ -111,9 +111,6 @@ def _seed(defect: str, body: dict[str, Any]) -> dict[str, Any]:
         body["chapters"] = [{"start_ms": 0, "title": "Source"}, {"start_ms": 5000, "title": "Delta"}]
     elif defect == "locale_missing":
         body["localization_variants"][0]["locale"] = "fr"
-    elif defect == "variant_source":
-        body["variant_groups"][0]["variants"][0]["value"] = None
-        body["variant_groups"][0]["variants"][0]["asset_role"] = "thumbnail"
     elif defect == "undeclared_role":
         body["assets"].append(copy.deepcopy(body["assets"][0]) | {"role": "poster"})
     elif defect == "missing_required":
@@ -138,7 +135,6 @@ def _seed(defect: str, body: dict[str, Any]) -> dict[str, Any]:
         ("chapter_not_zero", "chapters.rules", "FIRST_CHAPTER_NOT_AT_ZERO"),
         ("chapter_short", "chapters.rules", "CHAPTER_TOO_SHORT"),
         ("locale_missing", "locales.coverage", "LOCALE_MISSING"),
-        ("variant_source", "variants.bounds", "VARIANT_SOURCE_MISMATCH"),
         ("undeclared_role", "asset.integrity", "UNDECLARED_ROLE"),
         ("missing_required", "asset.required", "REQUIRED_ASSET_MISSING"),
         ("media_type", "asset.integrity", "MEDIA_TYPE_NOT_ALLOWED"),
@@ -248,10 +244,6 @@ def _with_variant(field: str, value: dict[str, Any] | None) -> dict[str, Any]:
             "CHAPTERS_NOT_ASCENDING",
         ),
         ("title", {"text": "history " * 20}, "TITLE_TOO_LONG"),
-        ("tags", {"tags": "history"}, "VARIANT_VALUE_MALFORMED"),
-        ("tags", {"tags": ["history"], "extra": 1}, "VARIANT_VALUE_MALFORMED"),
-        ("chapters", {"chapters": [{"start_ms": -1, "title": "A"}]}, "VARIANT_VALUE_MALFORMED"),
-        ("title", {"tags": ["history"]}, "VARIANT_VALUE_MALFORMED"),
     ],
 )
 def test_every_alternative_is_checked_like_the_primary_value(field: str, value: dict[str, Any], code: str) -> None:
@@ -287,3 +279,18 @@ def test_duplicate_assets_and_a_presentation_only_tamper_are_refused() -> None:
         for f in check_package(forged, q.PlatformConstraintSnapshot.model_validate(constraints), facts(forged)).failures
     }
     assert codes == {("closure.presentation", "CLOSURE_MISMATCH")}
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "code"),
+    [
+        ("title", {"text": "history " * 20}, "TITLE_TOO_LONG"),
+        ("tags", {"tags": ["bad!"]}, "TAG_CHARSET"),
+        ("chapters", {"chapters": [{"start_ms": 5000, "title": "Late"}]}, "FIRST_CHAPTER_NOT_AT_ZERO"),
+    ],
+)
+def test_alternatives_are_checked_even_without_a_variants_rule(field: str, value: dict[str, Any], code: str) -> None:
+    constraints = all_rules_constraints()
+    constraints["rules"] = [r for r in constraints["rules"] if r["check_id"] != "variants.bounds"]
+    result = run(_with_variant(field, value), constraints)
+    assert code in {f.code for f in result.failures}
