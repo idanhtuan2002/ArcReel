@@ -1,0 +1,205 @@
+{
+  "schema_id": "m10.b3-delta-review.v1",
+  "reviewed_head": "3d96e7dd3",
+  "reviewer": "Codex independent critical delta review; main agent; source read-only; no staging or commits",
+  "verdict": "REWORK",
+  "scope": {
+    "base": "27073a10e",
+    "candidate": "3d96e7dd3456c1e58042842b3226096f43978dd5",
+    "branch": "design/r2-m10-b",
+    "checkout": "Clean at the exact candidate at start and at pre-artifact verification.",
+    "reason_for_verdict": "H1 and M1 are fixed in the implementation. M2 and M3 remain partial acceptance gaps: the added tests do not identify the intended blockers/lock modes and omit several explicitly required refusal paths. These are remaining prior findings, not newly counted runtime defects.",
+    "graph": "Tier 2 attempted. list_projects succeeded but listed no r2-m10-b project; the parent project points at another checkout. index_status, search_graph and check_index_coverage for the parent project were rejected with 'MCP tool call requires approval, but approval policy is never'. Used direct source/diff fallback; no generation or graph coverage completeness claim.",
+    "source_changes": "Only server/services/quality_package_selection.py and tests/integration/server/services/test_quality_package_selection.py changed in the source/test delta. Other changed paths are the handoff and previous review artifact."
+  },
+  "per_finding_status": {
+    "H1": {
+      "status": "FIXED",
+      "qualification": "Implementation verified by source and a bounded mock-execution probe; no reviewer-run PostgreSQL deadlock proof.",
+      "file": "server/services/quality_package_selection.py",
+      "line": 472,
+      "related_locations": [
+        "server/services/quality_package_selection.py:476",
+        "server/services/quality_package_selection.py:481",
+        "server/services/quality_package_selection.py:498",
+        "server/services/quality_runs.py:141",
+        "server/services/quality_runs.py:559",
+        "tests/integration/server/services/test_quality_package_selection.py:564"
+      ],
+      "verified": "After packaging-head locking and before readiness_in, select explicitly locks {selector} union human_principals(run.observation_refs). The existing helper sorts the complete set and takes FOR UPDATE per principal. Readiness's assessor-only re-locks and admit's selector re-lock therefore target already-held locks. This removes the previously described late-selector grant cycle for arbitrary principal names, including disjoint-master writers.",
+      "multi_principal_judgment": "The fix is correct by construction; a full multi-principal PG fixture is not required to establish that the union and sorted helper eliminate this particular inversion. A reviewer inline probe evaluated the actual select AST's principals expression and called the real lock_grant_heads with a recording session: selector a/assessor z and selector z/assessor a both issued a then z; a three-principal case issued a, m, z. This does not exercise PG scheduling. The persisted spy has selector == assessor == ACTOR and sorts the input for its own log, so it would also pass after replacing the union with selector-only or assessor-only locking. Add a distinct-selector/assessor regression, with selector sorting before the assessor; include disjoint masters in the PG test if claiming reproduction/closure of the historical interleaving. That remaining test requirement is tracked under M2, not as an unfixed runtime H1."
+    },
+    "M1": {
+      "status": "FIXED",
+      "qualification": "Fresh preview/selection implementation closed; persisted tamper-after-preview service regressions still absent.",
+      "file": "server/services/quality_package_selection.py",
+      "line": 99,
+      "related_locations": [
+        "server/services/quality_package_selection.py:137",
+        "server/services/quality_package_selection.py:160",
+        "server/services/quality_package_selection.py:161",
+        "server/services/quality_package_selection.py:176",
+        "server/services/quality_package_selection.py:205",
+        "server/services/quality_package_selection.py:453",
+        "server/services/quality_package_selection.py:465",
+        "server/services/quality_packaging.py:222",
+        "lib/db/repositories/quality_packaging.py:84"
+      ],
+      "verified": "Both preview creation and fresh selection call resolve_package_evidence. It loads the exact candidate revision, verifies its stored/requested digest, calls the shared payload/closure/lineage verifier, loads the repository-verified packaging observation and its run, resolves the verified V2 profile, recomputes the constraint snapshot, compares candidate/observation snapshots and base-subject binding, checks the full five-column slot scope, and validates variants and exact waivers. Fresh selection also compares the resolved run ID and recomputed observation digest with the preview. Existing run-digest and disposition-digest/current-head checks remain. Replay intentionally returns the verified historical receipt before resolving live package evidence.",
+      "probe": "With mocked repository reads and real candidate/observation/policy contracts and verifier functions, a coherent package resolved; wrong slot, missing group choice, stray waiver, tampered candidate and wrong observation snapshot refused. This is bounded function-level evidence, not real DB tamper-after-preview coverage."
+    },
+    "M2": {
+      "status": "PARTIAL",
+      "severity": "M",
+      "file": "tests/integration/server/services/test_quality_package_selection.py",
+      "line": 422,
+      "related_locations": [
+        "tests/integration/server/services/test_quality_package_selection.py:431",
+        "tests/integration/server/services/test_quality_package_selection.py:460",
+        "tests/integration/server/services/test_quality_package_selection.py:477",
+        "tests/integration/server/services/test_quality_package_selection.py:505",
+        "tests/integration/server/services/test_quality_package_selection.py:523",
+        "tests/integration/server/services/test_quality_package_selection.py:541",
+        "tests/integration/server/services/test_quality_package_selection.py:564",
+        "server/services/quality_dispositions.py:239",
+        "server/services/quality_dispositions.py:148",
+        "tests/integration/lib/db/repositories/test_quality_profiles_repository.py:98"
+      ],
+      "improvement": "New Event gates pause a real writer with locks held, then start a contender and poll pg_stat_activity. Pair tests now exist for disposition in both orders, seal, publication and another selection. This is meaningful progress over gather-only races. The publication repository test can exercise a genuine profile FOR UPDATE waiting behind selection's FOR SHARE.",
+      "remaining_scenarios": [
+        "wait_for_lock_waiter counts any Lock waiter in the entire database, excluding only its own backend. It neither identifies the contender PID nor checks pg_blocking_pids against the gated writer, target relation or requested/held mode. An unrelated test/backend can satisfy it. Thus the tests cannot assert which waiter or lock was observed.",
+        "In selection-first disposition, the gate is after selection has locked the ACTOR grant. issue() still needs authorize_disposition(), whose separate lease transaction locks the same ACTOR grant before the owning disposition write transaction starts. The observed wait can therefore be lease issuance, not disposition-head FOR UPDATE behind selection's FOR SHARE. Pre-authorize the contender before pausing selection.",
+        "Reverse disposition, run-seal and same-slot selection fixtures share master rows. They can block at the first no-op master UPDATE before reaching run/disposition/packaging heads. In particular the test named waits_on_the_slot_head does not establish that the slot lock was reached. Removing later row locks could leave these tests passing.",
+        "The publication case calls the repository test append helper with synthetic custody and omits ProfilePublicationService's activated custodian/grant admission. It proves only the narrower repository/profile-head interaction; it does not prove the full publication writer pair.",
+        "Only disposition has both controlled writer orders. Seal-first refusal is tested sequentially by newer_run, not as a blocked selection. Publication-first invalidation is absent. The principal-order spy has no distinct principals and cannot detect dropping either side of the union.",
+        "The waiter helper contains asyncio.sleep(0.05), whereas design section 4 explicitly requires no sleeps. Outcome sequencing uses Events, but polling still needs an explicit accepted exception or a compliant observation seam."
+      ],
+      "fix": "Bind each observation to contender and blocker backend PIDs, assert pg_blocking_pids and the intended lock/mode or instrument the exact lock seam; pre-issue leases; arrange or separately probe the head-level conflicts so common master locks do not mask them. Exercise the actual publication service or label its repository-only limit and add the real service pair. Add the missing reverse-currentness orders and a distinct-principal union regression. Retain all required B3 writer-pair evidence before claiming the section 4 gate closed."
+    },
+    "M3": {
+      "status": "PARTIAL",
+      "severity": "M",
+      "file": "tests/integration/server/services/test_quality_package_selection.py",
+      "line": 319,
+      "related_locations": [
+        "tests/integration/server/services/test_quality_package_selection.py:272",
+        "tests/integration/server/services/test_quality_package_selection.py:283",
+        "tests/integration/server/services/test_quality_package_selection.py:292",
+        "tests/integration/server/services/test_quality_package_selection.py:304",
+        "tests/integration/server/services/test_quality_package_selection.py:341",
+        "tests/integration/server/services/test_quality_package_selection.py:354",
+        "tests/integration/server/services/test_quality_package_selection.py:372",
+        "tests/integration/server/services/test_quality_package_selection.py:380",
+        "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:352"
+      ],
+      "improvement": "Added meaningful exact allowed waiver, absent/wrong-rule waiver, unwaivable integrity failure, another-command lease, expired lease, newer run, zero/multiple/unknown alternatives, selection-command conflict and concurrent identical-command cases. Collection independently confirms 26 PG cases. Builder reports all 26 passed on PG16; reviewer execution was blocked before the first body.",
+      "remaining_scenarios": [
+        "The +31s database_now seam tests lease admission expiry only. There is no expired-preview selection test, no independent disposition-expiry test, and no assertion that preview expiry is capped by a shorter disposition. Pure contract window validation does not cover these service decisions.",
+        "No stale master, invalidating profile publication, or wrong source/cohort/surface/project slot refusal is persisted at the B3 service boundary. The publication test exercises successful selection before a later publication, not refusal when publication wins.",
+        "The cross-request lease test changes only command_id while reusing the same preview. It does not prove a lease for preview A cannot authorize preview B's changed choices/waivers, nor the exact stored-lease/request/preview digest checks independently.",
+        "No B3 grant revocation/sequence change after lease issuance, API-key/auth-disabled refusal, crash-after-lease, or candidate/lineage/observation tamper-after-preview test. No positive multi-group selection; the new group test uses one group and stops at preview.",
+        "Waiver refusal tests run at preview. They do not exercise changed checked evidence at fresh selection; extra/partial multi-finding coverage is not persisted. Several refusals also omit no-selection/no-head assertions, and _counts checks head row count rather than an existing head's version/selection identity."
+      ],
+      "fix": "Add focused service RED tests for the outstanding design section 8 cases, particularly independent preview/disposition expiry, stale master/profile, slot confusion, changed-preview/waiver lease binding and tamper after preview. Assert no selection and no change to an existing packaging head on refusal. Add distinct multi-group and grant-change cases. Keep A6 tests as regression evidence for A6, not substitutes for the copied B3 custodian and new resolver."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [],
+    "L": []
+  },
+  "new_findings_note": "No additional runtime defect confirmed in the bounded delta. Newly identified weaknesses in the added waiter/spy tests are detailed under the still-open M2/M3 rather than double-counted as new findings.",
+  "conditions": [
+    {
+      "id": "C6",
+      "status": "CLOSED for fresh B3 preview/selection implementation; regression evidence incomplete",
+      "requirement": "Keep the shared resolver and observation-digest comparison. Persist tamper-after-preview tests; carry private-snapshot verification and exact evidence resolution into B4. Historical replay remains a receipt lookup, not a currentness authorization."
+    },
+    {
+      "id": "LOCK_ORDER",
+      "status": "SOURCE FIXED for the H1 grant set; section 4 test gate PARTIAL",
+      "requirement": "The complete selector/assessor set now precedes readiness and admission. Do not describe current one-principal/common-master races as disjoint-master multi-principal deadlock proof, or generic Lock waiters as proof of every intended head mode. Close M2 before acceptance."
+    },
+    {
+      "id": "A6_REGRESSION",
+      "status": "UNCHANGED source; execution unverified in reviewer environment",
+      "requirement": "No A6 source changes in this delta. The prior source-equivalence assessment of readiness_in remains; the attempted B3+A6 command failed at initial DB setup. A6 passing execution must be supplied or run in a socket-capable environment."
+    },
+    {
+      "id": "SCHEMA",
+      "status": "CARRIED, no new closure",
+      "requirement": "Migration, models and repositories are unchanged in this delta. Preserve the previous bounded synchronous/DDL-compilation evidence and its limits. Full semantic FK/unique/immutability/JSON-ceiling and refusing-downgrade evidence remains distinct from the 26 service passes."
+    },
+    {
+      "id": "VERIFIED_SOURCE_BOUNDARIES",
+      "status": "PRESERVED; M2/M3 prevent packet acceptance",
+      "requirement": "No change to interactive Human custody, stored lease/grant admission, final expiry comparison, exact variant/waiver semantics, five-part slot storage, CAS or receipt-first replay. Do not elevate inspected source and builder results into independently executed PG acceptance."
+    },
+    {
+      "id": "B4_AND_B5",
+      "status": "CARRIED",
+      "requirement": "Export writer pairs/private snapshots, later authenticated append provenance and actual interactive-only route/UI custody remain future gates. Preserve LOCAL_REGULAR_FILE_IO. License issues excluded."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git show --stat --oneline HEAD; git show --format=fuller --no-patch HEAD; git status --short; git diff --stat 27073a10e..HEAD; git diff 27073a10e..HEAD -- server/services/quality_package_selection.py tests/integration/server/services/test_quality_package_selection.py",
+      "result": "Exact requested candidate, clean checkout, inspected two-dot delta."
+    },
+    {
+      "command": "git diff --check 27073a10e..HEAD",
+      "result": "PASS, exit 0."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest -q --maxfail=1 --tb=short tests/integration/server/services/test_quality_package_selection.py tests/integration/server/services/test_quality_dispositions.py",
+      "result": "UNAVAILABLE: 1 setup error in 1.51s; sandbox socket creation raised PermissionError [Errno 1] Operation not permitted. Stopped after first error. No B3 or A6 test body executed; not a product failure."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest -q tests/unit/r2/contracts/test_packaging.py",
+      "result": "PASS: 80 passed in 1.13s, exit 0. Pure contracts; no PG connection required."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest --collect-only -q tests/integration/server/services/test_quality_package_selection.py",
+      "result": "26 tests collected in 0.32s, exit 0. Collection is not execution."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (inline AST/real-helper grant-order probe)",
+      "procedure": "Parsed PackageSelectionService.select; compiled its actual lock_grant_heads principals expression with PyCF_ALLOW_TOP_LEVEL_AWAIT; evaluated it with selector/assessor combinations a/{z}, z/{a}, m/{a,m,z}; invoked the real lock_grant_heads on a recording session and asserted each statement requests FOR UPDATE and principal order equals the sorted union.",
+      "result": "PASS, exit 0: a,z; a,z; a,m,z. Source-expression and mock SQL-call evidence only."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (inline resolver probe)",
+      "procedure": "Mocked the four repository read interfaces while using real packaging/policy/lineage contracts, digests, closure/lineage verifier and variant/waiver logic. Called resolve_package_evidence with a coherent fixture and independently changed slot, choice coverage, stray waiver, candidate payload and observation snapshot.",
+      "result": "PASS, exit 0: coherent package accepted; all five altered inputs refused. Repository integrity and select orchestration are inspected source, not exercised DB behavior in this probe."
+    },
+    {
+      "command": "Targeted nl/sed/rg reads over files_read; MCP list_projects, index_status, search_graph and check_index_coverage attempts",
+      "result": "Direct source inspected. Graph list returned other indexed worktrees; remaining graph/coverage calls were approval-blocked."
+    }
+  ],
+  "not_verified": [
+    "Builder's reported 26 PG16 passes were not independently reproduced. The exact 26-case inventory was independently collected.",
+    "No real PG lock waiter, blocker identity, queued mode, deadlock or concurrency trace observed by this reviewer; network sockets denied.",
+    "No current graph generation/coverage evidence; graph operation approvals unavailable.",
+    "No fresh migration suite, A6 test-body execution, full suite or static gate run. No source changes requiring implementation checks were made.",
+    "Inline probes use mock repository/session interfaces and do not establish full database, custody or transaction behavior."
+  ],
+  "files_read": [
+    "server/services/quality_package_selection.py",
+    "tests/integration/server/services/test_quality_package_selection.py",
+    "server/services/quality_runs.py (grant set, observation loading, seal, validity)",
+    "server/services/quality_dispositions.py (lease issuance, owning transaction, readiness)",
+    "server/services/quality_packaging.py (shared lineage/closure helper)",
+    "server/services/quality_profiles.py (publication orchestration)",
+    "lib/db/repositories/quality_packaging.py (observation/preview/selection verification)",
+    "lib/db/repositories/quality_runs.py (run-head mutation)",
+    "lib/db/repositories/quality.py (profile-head locking)",
+    "tests/integration/lib/db/repositories/test_quality_profiles_repository.py (append/record helpers)",
+    "tests/integration/server/services/test_quality_dispositions.py (issue helper)",
+    "tests/integration/server/services/test_quality_packaging.py (targeted tamper-test inventory)",
+    "tests/unit/r2/contracts/test_packaging.py (real contract fixtures used by probes)",
+    "docs/r2/evidence/m10-b-reviews/b3-codex-review.json",
+    "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json (C6)",
+    "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md (sections 4 and 8)"
+  ]
+}

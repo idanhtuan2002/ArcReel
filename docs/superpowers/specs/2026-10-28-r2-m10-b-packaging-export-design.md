@@ -271,6 +271,13 @@ load_run_observations re-take the same set, which is idempotent) → M7 attempt 
   still name that run and `validity_in` must not report `newer_run`/SUPERSEDED, otherwise `M10_DISPOSITION_STALE`.
   Because the run head is FOR SHARE-locked, a concurrent run seal (which locks it exclusively) serializes against
   selection and finalize instead of slipping between read and write.
+- Serialization points actually observed (B3 barrier tests identify the blocked backend via `pg_blocking_pids`
+  and its statement): for one subject every writer first serializes on the subject's master rows (or, for an
+  issuer/sealer, already on the shared Human grant head its lease/grant transaction reads), so the later run,
+  disposition and packaging head modes are reached only by the winner; across subjects contention exists only on
+  the profile head (publication FOR UPDATE waits behind selection FOR SHARE) and on grant heads, which every writer
+  takes as one sorted set. Multi-principal disjoint-master cycles are excluded by construction (one sorted grant
+  set per writer), not by a dedicated fixture.
 - Absent packaging heads are inserted under the head-keyed advisory lock, so two different commands for the same
   slot serialize on the head, not only on their command keys.
 - Disposition writers and run seals never take a preview, packaging or export lock; M7 workers lock only the

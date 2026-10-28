@@ -16,6 +16,7 @@ from r2.quality.errors import (
     DispositionStaleError,
     DispositionUnauthorizedError,
     StaleHeadError,
+    SubjectStaleError,
     WaiverForbiddenError,
 )
 from server import auth
@@ -407,36 +408,58 @@ class Gate:
         self.entered = asyncio.Event()
         self.release = asyncio.Event()
         self.used = False
+        self.pid: int | None = None
 
     def wrap(self, real):
-        async def paused(*args, **kwargs):
+        async def paused(session, *args, **kwargs):
             if not self.used:
                 self.used = True
+                self.pid = (await session.execute(sa.text("SELECT pg_backend_pid()"))).scalar_one()
                 self.entered.set()
                 await self.release.wait()
-            return await real(*args, **kwargs)
+            return await real(session, *args, **kwargs)
 
         return paused
 
 
-async def wait_for_lock_waiter(env, attempts: int = 400) -> None:
-    """Return once another backend of this database is waiting on a heavyweight lock (polled, bounded)."""
+async def blocked_by(env, gate: Gate, attempts: int = 400) -> str:
+    """The statement of the backend the paused writer blocks (polled, bounded); proves who waits on what."""
     import asyncio
 
+    assert gate.pid is not None
     for _ in range(attempts):
         async with env["factory"]() as session:
-            waiting = (
+            query = (
                 await session.execute(
                     sa.text(
-                        "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() "
-                        "AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()"
-                    )
+                        "SELECT query FROM pg_stat_activity WHERE datname = current_database() "
+                        "AND :holder = ANY(pg_blocking_pids(pid))"
+                    ),
+                    {"holder": gate.pid},
                 )
-            ).scalar_one()
-        if waiting:
-            return
+            ).scalar_one_or_none()
+        if query is not None:
+            return query
         await asyncio.sleep(0.05)
-    raise AssertionError("no writer blocked on a lock")
+    async with env["factory"]() as session:
+        seen = (
+            await session.execute(
+                sa.text(
+                    "SELECT pid, wait_event_type, pg_blocking_pids(pid), left(query, 120) FROM pg_stat_activity "
+                    "WHERE datname = current_database() AND pid <> pg_backend_pid()"
+                )
+            )
+        ).all()
+    gate.release.set()
+    raise AssertionError(f"no writer blocked on paused pid {gate.pid}: {seen}")
+
+
+async def assert_blocked(env, gate: Gate, *tables: str) -> None:
+    """The paused writer blocks a contender on one of ``tables``; the gate is released on any mismatch."""
+    query = await blocked_by(env, gate)
+    if not any(table in query for table in tables):
+        gate.release.set()
+        raise AssertionError(f"blocked on an unexpected lock: {query}")
 
 
 async def _paused_selection(env, monkeypatch, request):
@@ -465,7 +488,8 @@ async def test_a_disposition_issued_during_a_selection_waits_then_supersedes(rea
     issuing = asyncio.create_task(
         issue(env, disposition_request(env["run"], "REWORK", command_id="decide-2", version=1))
     )
-    await wait_for_lock_waiter(env)
+    # The issuer's lease transaction already needs the selector's locked grant head.
+    await assert_blocked(env, gate, "r2_showrunner_grant_heads")
     assert not issuing.done()
     gate.release.set()
     selection = await asyncio.wait_for(selecting, 60)
@@ -494,7 +518,7 @@ async def test_a_selection_during_a_disposition_waits_then_sees_it_stale(ready_h
             request, lease
         )
     )
-    await wait_for_lock_waiter(env)
+    await assert_blocked(env, gate, "master_authorities")
     gate.release.set()
     await asyncio.wait_for(issuing, 60)
     with pytest.raises(DispositionStaleError):
@@ -512,7 +536,8 @@ async def test_a_run_sealed_during_a_selection_waits_and_then_supersedes(ready_h
     review = await human(env, human_request(env, command_id="human-2"))
     gate, selecting = await _paused_selection(env, monkeypatch, selection_request(env, await preview(env)))
     sealing = asyncio.create_task(seal(env, completion(env, [probe, review], command_id="seal-2")))
-    await wait_for_lock_waiter(env)
+    # The seal reads its Human grant under lock first; it serializes on the selection there.
+    await assert_blocked(env, gate, "r2_showrunner_grant_heads", "master_authorities")
     assert not sealing.done()
     gate.release.set()
     assert (await asyncio.wait_for(selecting, 60)).head_version == 1
@@ -531,14 +556,15 @@ async def test_a_profile_published_during_a_selection_waits_for_it(ready_host, m
     publishing = asyncio.create_task(
         append(env["factory"], request_for(2, "publish-2", policy=v2_policy(env["config"])))
     )
-    await wait_for_lock_waiter(env)
+    # Publication does not touch masters: it waits on the profile head the selection holds FOR SHARE.
+    await assert_blocked(env, gate, "m10_quality_profile_heads")
     assert not publishing.done()
     gate.release.set()
     assert (await asyncio.wait_for(selecting, 60)).head_version == 1
     assert (await asyncio.wait_for(publishing, 60)).revision == 2
 
 
-async def test_a_second_selection_waits_on_the_slot_head_and_then_is_stale(ready_host, monkeypatch) -> None:
+async def test_a_second_selection_waits_on_the_subject_masters_and_then_is_stale(ready_host, monkeypatch) -> None:
     import asyncio
 
     env = ready_host
@@ -554,7 +580,8 @@ async def test_a_second_selection_waits_on_the_slot_head_and_then_is_stale(ready
             second, second_lease
         )
     )
-    await wait_for_lock_waiter(env)
+    # Same subject: the second selection serializes on the subject's master rows before any head.
+    await assert_blocked(env, gate, "master_authorities")
     gate.release.set()
     assert (await asyncio.wait_for(selecting, 60)).head_version == 1
     with pytest.raises(StaleHeadError):
@@ -581,3 +608,131 @@ async def test_selection_locks_one_sorted_grant_set_with_the_selector_before_rea
     monkeypatch.setattr(module, "readiness_in", readiness)
     await select(env, request)
     assert calls[:2] == [f"grants:{ACTOR}", "readiness"]
+
+
+async def test_a_preview_never_outlives_its_disposition(packaging_host) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    env = packaging_host
+    expires = (datetime.now(UTC) + timedelta(seconds=120)).isoformat()
+    env["disposition"] = await issue(env, disposition_request(env["run"], requested_expires_at=expires))
+    env["candidate"] = await append_candidate(env, candidate_for(env))
+    env["observation"] = await service(env).check(check_request(env, env["candidate"]))
+    shown = await preview(env)
+    assert shown.expires_at == env["disposition"].expires_at
+
+
+async def test_an_expired_preview_is_refused(ready_host, monkeypatch) -> None:
+    import asyncio
+
+    from server.services import quality_package_selection as module
+
+    env = ready_host
+    monkeypatch.setattr(module, "PREVIEW_SECONDS", 1)
+    shown = await preview(env)
+    await asyncio.sleep(1.2)
+    with pytest.raises(DispositionStaleError):
+        await select(env, selection_request(env, shown))
+    assert await _counts(env) == (0, 0)
+
+
+async def test_a_master_promoted_after_the_preview_stales_it(ready_host) -> None:
+    from tests.integration.server.services.test_quality_probe_recipes import FIXTURES
+    from tests.integration.server.services.test_quality_probes import promote
+
+    env = ready_host
+    shown = await preview(env)
+    await promote(env["factory"], env["project"], FIXTURES / "av.mp4", "2")
+    with pytest.raises((DispositionStaleError, SubjectStaleError)):
+        await select(env, selection_request(env, shown))
+    assert await _counts(env) == (0, 0)
+
+
+@pytest.mark.parametrize("field", ["source_artifact_key", "cohort_id", "product_surface", "project_name"])
+async def test_a_preview_for_another_slot_is_refused(ready_host, field: str) -> None:
+    env = ready_host
+    other = slot(env) | {field: "elsewhere"}
+    with pytest.raises((SubjectStaleError, ValueError)):
+        await preview(env, preview_request(env, slot=other))
+
+
+async def test_a_reevaluating_profile_published_first_stales_the_selection(ready_host) -> None:
+    from tests.integration.lib.db.repositories.test_quality_profiles_repository import append, request_for
+    from tests.integration.server.services.test_quality_packaging import v2_policy
+
+    env = ready_host
+    shown = await preview(env)
+    await append(
+        env["factory"],
+        request_for(2, "publish-2", policy=v2_policy(env["config"]), supersession_effect="REEVALUATE_CURRENT"),
+    )
+    with pytest.raises(DispositionStaleError):
+        await select(env, selection_request(env, shown))
+    assert await _counts(env) == (0, 0)
+
+
+async def test_a_lease_for_one_preview_cannot_select_another(ready_host) -> None:
+    env = ready_host
+    first = selection_request(env, await preview(env), command_id="select-a")
+    other = selection_request(
+        env, await preview(env, preview_request(env, command_id="preview-b")), command_id="select-a"
+    )
+    lease = await custodian(env, first).authorize_selection(first)
+    guard = custodian(env, other)
+    await guard.authorize_selection(other)
+    with pytest.raises(DispositionUnauthorizedError):
+        await PackageSelectionService(sessions=env["factory"], custodian=guard, project_root=env["project"]).select(
+            other, lease
+        )
+    assert await _counts(env) == (0, 0)
+
+
+async def test_packaging_evidence_tampered_after_the_preview_is_refused(ready_host) -> None:
+    from r2.quality.errors import RequiredEvidenceMissingError
+
+    env = ready_host
+    shown = await preview(env)
+    async with env["factory"]() as session, session.begin():
+        await session.execute(sa.text("SET LOCAL session_replication_role = replica"))
+        await session.execute(
+            sa.text("UPDATE m10_packaging_observations SET observation_digest = 'sha256:' || repeat('0', 64)")
+        )
+    with pytest.raises(RequiredEvidenceMissingError):
+        await select(env, selection_request(env, shown))
+    assert await _counts(env) == (0, 0)
+
+
+async def test_one_alternative_per_group_across_several_groups_is_selected(ready_host) -> None:
+    env = ready_host
+    groups = [
+        {
+            "group_id": field,
+            "field": field,
+            "variants": [
+                {
+                    "variant_id": f"{field}-{n}",
+                    "value": {"text": text},
+                    "asset_role": None,
+                    "provenance": {"author_kind": "AGENT", "actor_id": "agent"},
+                }
+                for n, text in enumerate(texts)
+            ],
+        }
+        for field, texts in (
+            ("title", ["A history of the river", "The river that made a valley"]),
+            (
+                "description",
+                [
+                    "How the river shaped the valley over ten thousand years.",
+                    "A valley shaped by water over ten millennia.",
+                ],
+            ),
+        )
+    ]
+    candidate = await append_candidate(env, candidate_for(env, variant_groups=groups), revision=2)
+    env["candidate"] = candidate
+    env["observation"] = await service(env).check(check_request(env, candidate, command_id="check-2"))
+    assert env["observation"].status.value == "PASS", env["observation"].findings
+    shown = await preview(env, preview_request(env, selected_variant_ids=["title-1", "description-0"]))
+    selection = await select(env, selection_request(env, shown))
+    assert selection.preview.selected_variant_ids == ("description-0", "title-1")
