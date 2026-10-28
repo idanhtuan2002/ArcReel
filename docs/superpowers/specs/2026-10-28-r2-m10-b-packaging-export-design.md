@@ -183,7 +183,15 @@ Finalize verifies outside locks that the published object is exactly the stored 
 fixed fields, manifest bytes, digest) and that the stored request reproduces the execution identity and M7 task,
 then rechecks the pinned file generation under the lock. Worker refusals (`INTEGRITY_FAILED`,
 `ENVELOPE_EXCEEDED`) fail the attempt; any other worker result is `SUBMIT_OUTCOME_UNKNOWN` and is never rebuilt
-under that command. The sweep removes only work directories whose owner lock it can take.
+under that command. The sweep removes only work directories whose owner lock it can take and whose
+lock is older than the longest worker runtime. Delta (B4 review 2): work directories are created under a
+`.creating-` name and renamed only after their owner flock is held; the worker reopens every snapshot, the
+manifest and the output with no-follow and requires the exact `(dev, ino)` the host created, so an ancestor swap
+can redirect neither a read nor a write; the worker reports its own and the confinement module's digests, the
+envelope and the Landlock ABI, all checked by the host; a refusal is known only with exit 1 and a verified unit
+cleanup, otherwise the attempt is unknown and its scratch is kept for the sweep; the published-file generation
+includes ctime. The project root itself is a trusted host path (`LOCAL_REGULAR_FILE_IO`): only components below it
+are walked no-follow.
 
 Envelope: closure total and every member must stay below 2^31 bytes, otherwise `M10_OPERATIONAL_ENVELOPE_EXCEEDED`
 before PLANNED, so zipfile never emits ZIP64 extras (`allowZip64=False`). Orphans: a `.partial-<execution_id>.zip`

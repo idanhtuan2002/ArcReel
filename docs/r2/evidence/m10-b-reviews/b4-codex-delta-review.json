@@ -1,0 +1,207 @@
+{
+  "schema_id": "m10.b4-delta-review.v1",
+  "reviewed_head": "a971ecb4c",
+  "reviewer": "Codex; independent primary-agent critical review; no subagents",
+  "verdict": "REWORK",
+  "reviewed_range": "795d6a399..a971ecb4c",
+  "per_finding_status": {
+    "H1": {
+      "status": "PARTIAL",
+      "location": "server/services/package_export.py:515,554-555,726-747; server/services/package_export_worker.py:150-189; server/services/quality_probe_runtime.py:335-438",
+      "verified": "The in-process archive build is replaced by package_export_worker.main in the A4 owned transient unit, with m10-export prefix, export FSIZE/runtime limits and reused cgroup/seccomp/NoNewPrivs/Landlock confinement. The launcher waits for cleanup on cancellation. Source confinement is present, and the shared A4 defaults remain intact.",
+      "remaining": "The worker consumes mutable pathnames rather than the host-pinned snapshot/output inodes (N1). builder_identity_digest records bytes before snapshotting but neither the launcher nor worker checks that the file actually loaded still matches that digest; the separately loaded quality_probe_worker.py is not included in that export identity. Export does not use the A4 control_identity_digest/report verification path. The stdout report is accepted without checking its schema, envelope or Landlock identity. Real confined-worker/network/runtime enforcement is builder-supplied evidence, not reviewer execution. Close the path/identity and outcome gaps before declaring the complete D7 boundary closed."
+    },
+    "M1": {
+      "status": "PARTIAL",
+      "location": "server/services/package_export.py:342-395,398-434,726-747; server/services/package_export_worker.py:184-185",
+      "verified": "An exports leaf symlink is refused; host snapshot creation, publication rename and store fsync now use no-follow directory descriptors. _publish does not follow a destination symlink.",
+      "remaining": "WorkDirectory.path and BundleMember.source reconstruct project-relative pathnames for the worker. A swapped work-directory ancestor can redirect its Landlock grant and output open away from the host-pinned inode. N1 was reproduced using the actual Landlock helper. open_export_store also opens project_root as one pathname: its O_NOFOLLOW protects the final component, not every ancestor as its docstring claims; no arbitrary trusted-root completeness claim is made."
+    },
+    "M2": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:271-335; tests/integration/server/services/test_package_export.py:270-293",
+      "verified": "plan_export claims every normalized case-folded destination before insertion. Primary metadata is claimed first; metadata and en/EN collisions raise instead of overwriting. Localized documents are a sequence rather than a lossy dict. Source and regression cases match the requested refusal; PG execution was unavailable to reviewer."
+    },
+    "M3": {
+      "status": "PARTIAL",
+      "location": "server/services/package_export.py:377-395,556-563,713-775; tests/integration/server/services/test_package_export.py:325-350",
+      "verified": "A successfully constructed work directory owns all snapshots/partial output; export finally removes it on normal failure and cancellation after launch cleanup. Known scripted refusal and unknown same-command refusal tests were added. _publish maps rename/fsync OSError to a typed integrity error.",
+      "remaining": "Constructor failure occurs before the export try/finally and leaks resources/orphans (N5). Supervisor exceptions and unverified cleanup can still become ordinary FAILED_BEFORE_ACCEPTANCE (N3). ENVELOPE_EXCEEDED is raised inside the callback, but _submit and _resume map every FAILED_BEFORE_ACCEPTANCE to ExportIntegrityFailedError, losing the original typed envelope refusal. Persisted ENOSPC/fsync/rename and before/after-publication failure tests remain absent."
+    },
+    "M4": {
+      "status": "PARTIAL",
+      "location": "server/services/package_export.py:377-383,883-916; tests/integration/server/services/test_package_export.py:190-207",
+      "verified": "The sweep skips a held owner.lock and skips work directories without an owner.lock. The stable held-lock versus orphan regression passed freshly.",
+      "remaining": "owner.lock becomes visible at os.open before the creator takes flock. A sweep in that window takes the lock and removes the live directory; then the creator flocks an unlinked inode and its next create fails. A deterministic boundary probe reproduced this. Serialize directory/owner-lock publication with the sweep, or publish an already-owned directory atomically. Owner-process death also does not prove a separately owned worker unit has stopped; qualify sweep policy against that lifecycle rather than claiming every free flock proves no export is running."
+    },
+    "M5": {
+      "status": "PARTIAL",
+      "location": "server/services/package_export.py:285-335; server/services/package_export_worker.py:63-74; r2/contracts/packaging.py:283-328",
+      "verified": "The plan is computed before opening scratch/copying media and before PLANNED. Exact ZIP headers/central-directory/manifest bytes, member-count cap and the zipfile 1.05 member-size margin are included. Golden/exact-size/no-ZIP64 tests passed. A 2,100,000,000-byte member now produces OperationalEnvelopeExceededError before copying.",
+      "remaining": "A payload closure over the contract sum cap fails ExportManifest validation and is translated to ExportIntegrityFailedError, bypassing the operational-envelope handler. An individual entry over the contract cap can raise Pydantic ValidationError outside the try block. Probes of a 2,147,483,647-byte video plus metadata and two 1.2GB assets returned ExportIntegrityFailedError, not the required OperationalEnvelopeExceededError. Preflight also omits the actual reused confinement config path-count cap (N4)."
+    },
+    "M6": {
+      "status": "FIXED",
+      "location": "server/services/package_export.py:206-221,287-291; docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:180-181; tests/integration/server/services/test_package_export.py:411-424",
+      "verified": "The design now explicitly defines captions-<locale> roles. Both asset planning and manifest creation use member_path, mapping captions-en and captions-zh-Hans to the documented names. The five layout parameter cases passed freshly.",
+      "remaining_condition": "As user disclosed, there is still no checked/selected caption-role profile exported through the real worker with ZIP/member-manifest assertions. Carry this as a named required integration test; function-level layout coverage does not establish the full role/profile/check/selection/export path."
+    },
+    "M7": {
+      "status": "PARTIAL",
+      "location": "lib/db/repositories/quality_packaging.py:429-440; server/services/package_export.py:150-173,448-485,798-878",
+      "verified": "Stored request_json and selection_id are compared to the supplied request. Finalize recomputes execution_identity_digest, compares the attempt task id, reads the accepted job digest, verifies the ZIP outside locks, then rechecks the named file generation and currentness before atomic SUCCEEDED/receipt. It now compares member names, selected fixed fields, declared sizes and exact embedded manifest bytes.",
+      "remaining": "verify_archive never hashes/decompresses the non-manifest member bytes against ExportManifestEntry.content_digest (or even checks their CRCs). A real ZIP declaring good in the embedded manifest but containing evil was accepted by the actual verifier. It also omits several frozen ZipInfo checks (create_system, create_version, extract_version, flag_bits, member comment). execution_identity_digest does not assert that manifest.slot/selection_id/selection_digest match request.subject, and finalize does not compare the reconstructed provider request digest or route to the M7 attempt. Comparing the stored task id to the attempt task id does not prove either equals export_task_id of this command. Finally generation excludes ctime and can be preserved across a rewrite (N2). Add semantic member verification and full request/manifest/task/route/attempt cross-binding refusals, not just self-consistent cached digest comparisons."
+    },
+    "L1": {
+      "status": "FIXED",
+      "location": "server/services/package_export_worker.py:57-87,104-130; tests/unit/server/services/test_package_export_worker.py:92-126",
+      "verified": "The standalone writer now validates the complete lowercase normalized grammar, explicit NUL and reserved-manifest rejection, and uniqueness before destination creation. Uppercase, dot/double-separator, backslash, colon, space and NUL vectors passed. Golden bytes are preserved. The case-collision-named test actually duplicates an identical lowercase path; uppercase is independently rejected by grammar, so this does not leave an identified implementation defect."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [
+      {
+        "id": "N1",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:381,422,429,729-744; server/services/package_export_worker.py:184-185; server/services/quality_probe_worker.py:244-260",
+        "title": "Worker scratch confinement re-resolves mutable paths instead of the host-pinned inodes",
+        "scenario": "After WorkDirectory pins its directory descriptor, replace its named path with a symlink to a sibling outside directory containing an empty archive.partial. The host retains the original empty output inode, but the worker config still names work.path/archive.partial. The actual A4 install_landlock uses O_PATH|O_NOFOLLOW only on the final component, so its rule grants the outside regular inode through the symlink ancestor; the worker reopens that same outside path with O_NOFOLLOW and writes it. A child-process probe installed real Landlock ABI 8, successfully wrote outside-written-after-landlock into the outside file, and left the host-pinned original output empty. Host-side postverification may fail, but the outside write has already occurred. The probe exercises real Landlock path resolution, not a full systemd/cgroup launch.",
+        "fix": "Make the worker receive the exact verified snapshot/output inode identities through a secure descriptor or private mount/namespace handoff. Do not rebuild the authority boundary from mutable project paths. At minimum perform descriptor-relative ancestor traversal and bind/open/revalidate the same exact inodes, retaining them across confinement and writing; account for confine closing inherited descriptors. Add a raced work-directory/exports ancestor swap regression proving zero outside writes and that the worker output is the host-pinned inode. This is the residual M1/D7 boundary, not another claim that host _publish follows destination links."
+      },
+      {
+        "id": "N2",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:444-445,482-491,817-846",
+        "title": "The generation recheck accepts a same-size rewrite with restored mtime",
+        "scenario": "VerifiedArchive.generation contains only dev, inode, size and mtime_ns. After verification, overwrite bytes in the same inode without changing length and restore mtime with os.utime. The final published_generation check returns the previous tuple although content changed. The live probe confirmed generation equality and a changed ctime. Thus the metadata transaction can receipt bytes different from the verified digest without a SHA256 collision.",
+        "fix": "Include at least ctime_ns in the generation and retain a verified file descriptor. Establish an enforced publication immutability or mutation-fencing boundary through final acceptance, rather than relying solely on mutable metadata; descriptor identity alone does not freeze bytes. Add a deterministic rewrite-between-verify-and-final-stat regression preserving size/mtime and assert no SUCCEEDED/receipt."
+      },
+      {
+        "id": "N3",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:685-704,740-767; r2/host_hardening/execution.py:154-179",
+        "title": "Unverified cleanup and supervisor exceptions can be committed as definite failures",
+        "scenario": "INTEGRITY_FAILED/ENVELOPE_EXCEEDED reports are handled before exit/manager/group-cleanup validation. A fake outcome with group_cleanup_verified=False and INTEGRITY_FAILED escaped as ExportIntegrityFailedError. A RuntimeError raised by launch after a possible worker start escaped unwrapped. The real M7 service classifies every ordinary Exception as FAILED_BEFORE_ACCEPTANCE; only AmbiguousSubmitError yields SUBMIT_OUTCOME_UNKNOWN. The caller then removes scratch even when worker cleanup is unverified. Neither case is the D7 promise that all other worker outcomes remain unknown.",
+        "fix": "Validate the full expected report schema and supervisor/cleanup evidence before treating a refusal as known. Catch unexpected exceptions after possible worker start and map them to AmbiguousSubmitError, preserving only demonstrably known startup/build/publication failures. Keep scratch ownership until worker termination is established, and retain/replay typed known failure evidence where required. Add cleanup-false known-status and supervisor-exception-after-start tests that assert UNKNOWN, no same-command rebuild and safe scratch lifetime."
+      },
+      {
+        "id": "N4",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:271-335,729-747; server/services/quality_probe_worker.py:118-121,244-247; server/services/package_export_worker.py:174-178,194-195",
+        "title": "Plan admission ignores the reused confinement configuration limits",
+        "scenario": "The reused A4 _paths rejects more than 64 read_files. Export appends READ_FILES, manifest.bytes and every asset/document. A plan with 64 localized documents was accepted with 65 document members, 68 read paths and a roughly 1MB archive; the exact _paths helper then rejected it with CONFIG_INVALID. On the real route this happens only after PLANNED, inside confine; main converts it to WORKER_FAILED and the command becomes UNKNOWN. The ZIP preflight permits up to 65,535 entries, and no candidate localization count cap reconciles that with the reused worker limit. The worker also reads at most 1MiB of JSON config without export-side serialized-config admission.",
+        "fix": "Validate the actual export worker config envelope before snapshots and PLANNED, including all path counts and serialized configuration bytes. Either explicitly support an export-specific bounded path count in the shared helper or refuse excess with OperationalEnvelopeExceededError during planning. Persist exact boundary tests (64/65 total read paths and max config bytes) asserting zero invocation/attempt on refusal."
+      },
+      {
+        "id": "N5",
+        "status": "CONFIRMED",
+        "location": "server/services/package_export.py:377-383,556-563,898-903",
+        "title": "Work-directory initialization failures leak descriptors and unsweepable scratch",
+        "scenario": "WorkDirectory opens its directory before creating owner.lock, but constructor failure has no rollback. export obtains the store and constructs WorkDirectory before entering its try/finally. Injecting ENOSPC at owner.lock creation for three constructors leaked three directory descriptors and left three lockless work directories; sweep_work removed zero because it deliberately skips lockless directories. The full export path additionally leaves its store descriptor open when construction raises. Repeated failures can exhaust server descriptors during an existing disk-full incident.",
+        "fix": "Make WorkDirectory construction exception-safe: close partially acquired descriptors and remove any newly created directory if ownership initialization fails. Put store ownership under an outer try/finally before invoking the constructor. Resolve this together with the atomic lock-publication/sweep protocol in M4, and persist ENOSPC/failure-at-each-acquisition tests asserting stable FD counts and no abandoned work directories."
+      }
+    ],
+    "L": []
+  },
+  "conditions": [
+    {
+      "id": "VERIFIED_SOUND",
+      "status": "SOURCE-VERIFIED / targeted tests passed",
+      "requirement": "Preserve one M7 job truth, invocation in the PLANNED commit, no metadata transaction during worker build, no same-command rebuild of unknown/failed attempts, currentness lock order at prepare/finalize, and SUCCEEDED/receipt atomicity. The diff does not modify those owning M7/A5/A6/B3 transaction helpers. _require_current still locks sorted masters, profile/run/disposition and selection head, re-resolves evidence and requires READY. B2 closure/lineage reuse and snapshot/member hashing during ordinary build remain in place. Independent replay verifier deficiencies are recorded under M7."
+    },
+    {
+      "id": "A4_COMPATIBILITY",
+      "status": "DEFAULT BEHAVIOR PRESERVED on inspected source and fresh tests",
+      "requirement": "e2fc6d908 keeps service_properties runtime defaults, LimitFSIZE default, m10-probe prefix and the three-scratch launch caller unchanged. WorkerOutcome generalizes scratch_sizes to variable length; the A4 resource projection explicitly reconstitutes its original three-element tuple. No command/filter/launcher/cancellation algorithm was changed by that diff. Reviewer ran the complete two focused A4 runtime/worker unit files in the commands below; this supports bounded source/default compatibility, not fresh real-systemd or all-host A4 acceptance. Builder 61-test report is separate evidence."
+    },
+    {
+      "id": "CAPTION_ROLE_E2E",
+      "status": "CARRIED named test gap; implementation mapping fixed",
+      "requirement": "Before B4 caption/export integration acceptance, add an actual profile with captions-<locale> asset roles, checked/selected candidate and real-worker export; inspect ZIP bytes and manifest path/digest binding for at least two locales. The unit/function layout cases do not replace this explicitly disclosed gap."
+    },
+    {
+      "id": "B4_CRASH_AND_RED_MATRIX",
+      "status": "PARTIAL; still required before recovery acceptance",
+      "requirement": "New tests cover ordinary scripted worker refusal, scripted unknown same-command refusal/new-command success, unconfined worker refusal, exports leaf symlink, metadata collisions and post-ACCEPTED file mutation. The unknown script creates no archive, so it does not prove recovery reconciles an already-published identical object. Still missing: ENOSPC, fsync/rename failure cleanup, interruption before rename and after rename before ACCEPTED commit, original-command crash/unknown with existing deterministic object, work-constructor/sweep race and worker lifecycle failures. Neither existing concurrency test pauses actual finalize; preserve the requested finalize-versus-run-seal/disposition/selection commit-order barrier evidence gate. No such PG interleaving was freshly executed here."
+    },
+    {
+      "id": "SCHEMA_ROUTE_AND_SCOPE",
+      "status": "SCHEMA unchanged / route hash and capability checks passed",
+      "requirement": "No migration/model delta; prior full PG enforcement and migration round-trip limitations are carried rather than requalified. All eight qualification source hashes match the candidate, submit_route_inventory_problems() is empty and registry capability tests passed. Route claims of confinement do not close N1/N3 or missing worker identity/runtime evidence. No upload, network/provider call, Production Authority, UI or route activation is authorized by this review; license work excluded."
+    },
+    {
+      "id": "B3_AND_B2_CARRIED",
+      "status": "PRESERVED",
+      "requirement": "Keep REVOCATION_AFTER_LEASE and CRASH_AFTER_LEASE tests before B5 Human route activation; keep authenticated server-derived provenance at the append boundary, existing serialization evidence limits, and LOCAL_REGULAR_FILE_IO for host snapshot reads. D5 byte copies/hashes are implemented, but storage locality is not a hard bound on a blocked snapshot syscall or proof of worker inode binding."
+    },
+    {
+      "id": "EXECUTION_LIMITS",
+      "status": "REVIEWER LIMITS, not product test failures",
+      "requirement": "PG socket creation is denied by sandbox; reviewer did not rerun builder-reported 22 PG16 exports with real confined units, related 124 PG cases or 5599 broader checks. Real cgroup/seccomp/systemd runtime, cancellation and FSIZE enforcement were not freshly qualified. The successful child Landlock probe isolates a real filesystem confinement flaw and is explicitly distinct from a full confined export launch."
+    },
+    {
+      "id": "GRAPH_AND_PIN",
+      "status": "DIRECT SOURCE FALLBACK / candidate preserved",
+      "requirement": "list_projects succeeded but listed the main repository graph, not this M10-B worktree. index_status, search_graph and check_index_coverage were all rejected because MCP requires approval while approval_policy is never. No generation or coverage/completeness claim is made. Direct numbered reads/diffs supplied the evidence. Initial HEAD was exact a971ecb4c3b086d87e56b247ffae38355cfbc85f and clean. During review HEAD advanced to b36755b587c800b51a29b3ce555bcfff61ee8b06, changing only R2_M10_B_HANDOFF.md; all reviewed code/tests/design/qualification remain byte-identical to the candidate. Do not overwrite that unrelated update."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD && git status --short && git branch --show-current && git log 795d6a399..a971ecb4c --oneline && git diff --stat 795d6a399..a971ecb4c",
+      "result": "Initially exact a971ecb4c3b086d87e56b247ffae38355cfbc85f, clean design/r2-m10-b. Reviewed the requested three implementation commits and preceding handoff/review-artifact additions."
+    },
+    {
+      "command": "list_projects; index_status(project=home-anhtuan-content-production-os, verbose=true); search_graph(export/runtime symbols); check_index_coverage(reviewed source/test/design/evidence paths)",
+      "result": "list_projects returned the main repository and other worktrees, not an M10-B index. Remaining calls returned MCP tool call requires approval, but approval policy is never. Source fallback used; no graph result relied upon."
+    },
+    {
+      "command": "git diff 795d6a399..a971ecb4c -- server/services/quality_probe_runtime.py lib/db/repositories/quality_packaging.py docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md; complete numbered package_export.py/package_export_worker.py reads; bounded A4 runtime/worker, packaging contracts, M7 host_submit/execution and test reads",
+      "result": "Inspected all changed implementation and relevant governing design/test/qualification paths; traced launch/config/confinement/report, fd publication/sweep, recovery/currentness, and exception classification. No source edits."
+    },
+    {
+      "command": "DATABASE_URL=sqlite+aiosqlite:////tmp/codex-b4-delta-unused.db timeout 55s .venv/bin/python -m pytest -q -p no:cacheprovider --tb=short tests/unit/server/services/test_package_export_worker.py tests/unit/server/services/test_quality_probe_runtime.py tests/unit/r2/host_hardening/test_provider_capabilities.py",
+      "result": "PASS: 92 passed in 1.17s, exit 0."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test timeout 45s .venv/bin/python -m pytest -q -p no:cacheprovider --maxfail=1 --tb=short tests/integration/server/services/test_package_export.py",
+      "result": "UNAVAILABLE: 1 setup error in 1.68s, AF_INET socket PermissionError [Errno 1] Operation not permitted; stopped before first test body. No product failure or PG pass claimed."
+    },
+    {
+      "command": "DATABASE_URL=sqlite+aiosqlite:////tmp/codex-b4-delta-unused.db timeout 45s .venv/bin/python -m pytest -q -p no:cacheprovider --tb=short tests/unit/server/services/test_quality_probe_worker.py tests/integration/server/services/test_package_export.py::test_only_unowned_work_directories_are_swept tests/integration/server/services/test_package_export.py::test_the_worker_refuses_to_build_when_it_is_not_confined tests/integration/server/services/test_package_export.py::test_the_bundle_layout_maps_roles_to_fixed_paths",
+      "result": "PASS: 54 passed in 2.30s, exit 0. Together with prior command: 146 targeted tests passed. These seven selected export cases require no PG fixture."
+    },
+    {
+      "command": ".venv/bin/python - (TemporaryDirectory probe with actual build_archive/verify_archive, published_generation and patched os.open boundary for WorkDirectory creation)",
+      "result": "Verifier accepted a real ZIP containing evil while its canonical manifest declared SHA256 of good. Same-size in-place rewrite plus restored mtime retained published_generation although ctime changed. Sweeping immediately after owner.lock creation and before flock removed the live directory; constructor then returned with a lock on the unlinked inode and work.create failed FileNotFoundError. Probe files removed."
+    },
+    {
+      "command": ".venv/bin/python - (temporary work-directory rename/symlink plus child process calling actual quality_probe_worker.install_landlock, then opening configured scratch output with O_NOFOLLOW)",
+      "result": "CONFIRMED real Landlock ABI 8 path redirect: child exit 0; outside output became outside-written-after-landlock, while original host-pinned archive.partial remained empty. Direct Landlock helper execution only; no systemd/cgroup claim, no network action. Original directory restored for cleanup."
+    },
+    {
+      "command": ".venv/bin/python - (plan_export boundary probes with validated candidates/selections and declared sizes; no large media allocation)",
+      "result": "2,100,000,000-byte member -> OperationalEnvelopeExceededError; 2,147,483,647-byte video plus documents -> ExportIntegrityFailedError; two 1.2GB assets -> ExportIntegrityFailedError. Confirms preflight improvements and remaining error-domain gap."
+    },
+    {
+      "command": ".venv/bin/python - (actual _build_and_publish with minimal fake launch outcome and post-start supervisor exception)",
+      "result": "INTEGRITY_FAILED with group_cleanup_verified=False escaped as ExportIntegrityFailedError; RuntimeError from launch escaped as RuntimeError. M7 source confirms both ordinary exceptions transition to FAILED_BEFORE_ACCEPTANCE, whereas AmbiguousSubmitError is required for UNKNOWN. Scratch was temporary and removed."
+    },
+    {
+      "command": ".venv/bin/python - (plan_export with 64 localizations, then actual A4 _paths on its required read-file list)",
+      "result": "Plan accepted 65 document members and 68 read paths, archive size 1,080,134; _paths refused with WorkerError CONFIG_INVALID. No PG record or large file created."
+    },
+    {
+      "command": ".venv/bin/python - (ENOSPC injection at owner.lock creation; actual WorkDirectory and sweep_work; /proc/self/fd comparison)",
+      "result": "Three failed constructors leaked three open directory descriptors and left three lockless work directories; sweep removed zero. Probe explicitly closed leaked descriptors before TemporaryDirectory cleanup."
+    },
+    {
+      "command": ".venv/bin/python - (SHA256 of export-route-qualification.json source_sha256 plus submit_route_inventory_problems())",
+      "result": "All eight source hashes match; inventory problems []. Capability evidence/entry digests also passed the focused registry tests."
+    },
+    {
+      "command": "git diff --check 795d6a399..a971ecb4c; git log a971ecb4c..HEAD --oneline; git diff --stat a971ecb4c..HEAD; git diff --name-only a971ecb4c..HEAD; git diff --quiet a971ecb4c -- [reviewed source/test/design/qualification paths]",
+      "result": "Whitespace PASS; only subsequent b36755b58 handoff-doc commit. Reviewed implementation/test/design/qualification paths unchanged from candidate; no reset, checkout, formatting, staging or commit."
+    }
+  ]
+}

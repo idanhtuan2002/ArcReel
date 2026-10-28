@@ -15,9 +15,10 @@ import importlib.util
 import json
 import os
 import re
+import stat
 import sys
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
@@ -101,7 +102,16 @@ def _info(path: str, size: int) -> zipfile.ZipInfo:
     return info
 
 
-def write_archive(handle: BinaryIO, members: Sequence[BundleMember], manifest: bytes) -> str:
+type Opener = Callable[[BundleMember], BinaryIO]
+
+
+def _open_source(member: BundleMember) -> BinaryIO:
+    return member.source.open("rb")
+
+
+def write_archive(
+    handle: BinaryIO, members: Sequence[BundleMember], manifest: bytes, opener: Opener = _open_source
+) -> str:
     """Write the archive into an empty, seekable ``handle``, fsync it and return its sha256 digest."""
     entries = _entries(members)
     archive_size([(m.path, m.byte_size) for m in members], len(manifest))
@@ -112,7 +122,7 @@ def write_archive(handle: BinaryIO, members: Sequence[BundleMember], manifest: b
                 with archive.open(_info(path, len(manifest)), "w", force_zip64=False) as stream:
                     stream.write(manifest)
                 continue
-            _copy_member(archive, path, member)
+            _copy_member(archive, path, member, opener)
     handle.flush()
     os.fsync(handle.fileno())
     handle.seek(0)
@@ -130,11 +140,11 @@ def build_archive(destination: Path, members: Sequence[BundleMember], manifest: 
         return write_archive(handle, members, manifest)
 
 
-def _copy_member(archive: zipfile.ZipFile, path: str, member: BundleMember) -> None:
+def _copy_member(archive: zipfile.ZipFile, path: str, member: BundleMember, opener: Opener) -> None:
     digest = hashlib.sha256()
     size = 0
     with (
-        member.source.open("rb") as source,
+        opener(member) as source,
         archive.open(_info(path, member.byte_size), "w", force_zip64=False) as stream,
     ):
         while chunk := source.read(min(_CHUNK, member.byte_size + 1 - size)):
@@ -164,29 +174,63 @@ def _emit(body: dict[str, object]) -> None:
     sys.stdout.buffer.flush()
 
 
+def worker_digests() -> dict[str, str]:
+    """The exact bytes of this worker and the confinement module it loads."""
+    here = Path(__file__)
+    return {
+        name: "sha256:" + hashlib.sha256((here.parent / name).read_bytes()).hexdigest()
+        for name in ("package_export_worker.py", "quality_probe_worker.py")
+    }
+
+
+def _pinned(path: str, identity: object, flags: int) -> int:
+    """Open ``path`` without following a final link and require it to be exactly the host's regular inode."""
+    if type(identity) is not list or len(identity) != 2 or not all(type(item) is int for item in identity):
+        raise ExportBuildError("CONFIG_INVALID")
+    descriptor = os.open(path, flags | os.O_NOFOLLOW | os.O_CLOEXEC)
+    info = os.fstat(descriptor)
+    if not stat.S_ISREG(info.st_mode) or [info.st_dev, info.st_ino] != identity:
+        os.close(descriptor)
+        raise ExportBuildError("IDENTITY_MISMATCH")
+    return descriptor
+
+
 def main() -> int:
-    """Confined worker: read the host config from stdin, confine, build into the precreated output, report."""
+    """Confined worker: read the host config from stdin, confine, build into the pinned output inode, report.
+
+    Every input and the output are reopened after confinement and must be the exact inodes the host created, so a
+    swapped path can neither redirect a read nor a write.
+    """
     devnull = os.open("/dev/null", os.O_WRONLY | os.O_CLOEXEC)
     os.dup2(devnull, 2)
     os.close(devnull)
     body: dict[str, object] = {"schema": WORKER_OUTPUT_SCHEMA, "status": "WORKER_FAILED", "digest": None}
     try:
+        body["worker"] = worker_digests()
         config = json.loads(sys.stdin.buffer.read(1 << 20))
         if type(config) is not dict or config.get("schema") != WORKER_CONFIG_SCHEMA:
             raise ExportBuildError("CONFIG_INVALID")
         probe = _confinement()
         confinement = probe.confine(config)
         body.update(envelope=confinement.envelope, landlock_abi=confinement.landlock_abi)
-        members = [
-            BundleMember(str(item["path"]), Path(str(item["source"])), str(item["digest"]), int(item["size"]))
-            for item in config["members"]
-        ]
-        manifest = Path(str(config["manifest"])).read_bytes()
-        output = os.open(str(config["output"]), os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC)
+        sources: dict[str, int] = {}
+        members: list[BundleMember] = []
+        for item in config["members"]:
+            member = BundleMember(str(item["path"]), Path(str(item["source"])), str(item["digest"]), int(item["size"]))
+            sources[member.path] = _pinned(str(member.source), item["identity"], os.O_RDONLY)
+            members.append(member)
+        manifest_fd = _pinned(str(config["manifest"]), config["manifest_identity"], os.O_RDONLY)
+        with os.fdopen(manifest_fd, "rb") as handle:
+            manifest = handle.read(1 << 20)
+        output = _pinned(str(config["output"]), config["output_identity"], os.O_RDWR)
+
+        def opener(member: BundleMember) -> BinaryIO:
+            return os.fdopen(sources.pop(member.path), "rb", buffering=0)
+
         with os.fdopen(output, "w+b") as handle:
             if os.fstat(handle.fileno()).st_size != 0:
                 raise ExportBuildError("OUTPUT_NOT_EMPTY")
-            body.update(status="OK", digest=write_archive(handle, members, manifest))
+            body.update(status="OK", digest=write_archive(handle, members, manifest, opener))
     except ExportEnvelopeError:
         body.update(status="ENVELOPE_EXCEEDED")
     except ExportBuildError:
@@ -212,5 +256,6 @@ __all__ = [
     "build_archive",
     "main",
     "validate_path",
+    "worker_digests",
     "write_archive",
 ]

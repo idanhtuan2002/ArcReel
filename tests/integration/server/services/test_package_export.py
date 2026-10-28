@@ -198,13 +198,22 @@ def test_only_unowned_work_directories_are_swept(tmp_path: Path) -> None:
         (store / name / "owner.lock").write_bytes(b"")
         (store / name / "archive.partial").write_bytes(b"x")
     (store / "keep.zip").write_bytes(b"k")
+    for name in (".work-active", ".work-orphan"):
+        os.utime(store / name / "owner.lock", (1, 1))
+    (store / ".work-recent").mkdir()
+    (store / ".work-recent" / "owner.lock").write_bytes(b"")
     held = os.open(store / ".work-active" / "owner.lock", os.O_RDWR)
     fcntl.flock(held, fcntl.LOCK_EX)
     try:
         assert sweep_work(tmp_path) == 1
     finally:
         os.close(held)
-    assert sorted(entry.name for entry in store.iterdir()) == [".work-active", ".work-creating", "keep.zip"]
+    assert sorted(entry.name for entry in store.iterdir()) == [
+        ".work-active",
+        ".work-creating",
+        ".work-recent",
+        "keep.zip",
+    ]
 
 
 async def test_a_disposition_issued_during_export_prepare_waits_for_it(selected_host, monkeypatch) -> None:
@@ -422,3 +431,105 @@ def test_the_bundle_layout_maps_roles_to_fixed_paths(role: str, variant: str | N
     from server.services.package_export import member_path
 
     assert member_path(role, variant, media) == path
+
+
+class SwappingRuntime:
+    """Delegates to the real confined runtime after replacing the precreated output with a foreign inode."""
+
+    def __init__(self, real) -> None:
+        self.real = real
+        self.foreign: Path | None = None
+
+    async def launch(self, payload: bytes, **kwargs):
+        import json
+        import os
+
+        output = Path(json.loads(payload)["output"])
+        os.unlink(output)
+        _write(output, b"")
+        self.foreign = output
+        return await self.real.launch(payload, **kwargs)
+
+
+async def test_a_swapped_output_inode_is_never_written_by_the_confined_worker(selected_host) -> None:
+    from server.services.package_export_worker import __file__ as worker_file
+    from server.services.quality_probe_runtime import ProbeHost, QualityProbeRuntime
+
+    env = selected_host
+    swapping = SwappingRuntime(QualityProbeRuntime(ProbeHost(tools={}, worker=Path(worker_file))))
+    service = PackageExportService(
+        sessions=env["factory"],
+        grant_reader=env["reader"],
+        project_root=env["project"],
+        interactive_token=auth.create_token(ACTOR),
+        runtime=swapping,
+    )
+    with pytest.raises(ExportIntegrityFailedError):
+        await service.export(export_request(env))
+    assert await _attempt_states(env) == ["FAILED_BEFORE_ACCEPTANCE"]
+    assert not list((env["project"] / "exports").glob("*.zip"))
+
+
+class RaisingRuntime:
+    async def launch(self, payload: bytes, **_: object):
+        raise RuntimeError("supervisor lost the unit")
+
+
+class UncleanRuntime(ScriptedRuntime):
+    async def launch(self, payload: bytes, **kwargs: object):
+        import dataclasses
+
+        outcome = await super().launch(payload, **kwargs)
+        return dataclasses.replace(outcome, group_cleanup_verified=False)
+
+
+@pytest.mark.parametrize("runtime", ["raising", "unclean"])
+async def test_an_unverified_worker_end_is_unknown_and_keeps_its_scratch(selected_host, runtime: str) -> None:
+    env = selected_host
+    service = PackageExportService(
+        sessions=env["factory"],
+        grant_reader=env["reader"],
+        project_root=env["project"],
+        interactive_token=auth.create_token(ACTOR),
+        runtime=RaisingRuntime() if runtime == "raising" else UncleanRuntime("INTEGRITY_FAILED"),
+    )
+    with pytest.raises(RequiredEvidenceMissingError):
+        await service.export(export_request(env))
+    assert await _attempt_states(env) == ["SUBMIT_OUTCOME_UNKNOWN"]
+    assert [entry.name.startswith(".work-") for entry in (env["project"] / "exports").iterdir()] == [True]
+
+
+async def test_captions_export_under_their_locale_paths(ready_host) -> None:
+    from tests.integration.server.services.test_quality_packaging import append_candidate, candidate_for, check_request
+    from tests.integration.server.services.test_quality_packaging import service as check_service
+
+    env = ready_host
+    payload = candidate_for(env)
+    assets = [payload.assets[0].model_dump(mode="python")]
+    for locale, text in (("en", "River"), ("vi", "Dòng sông")):
+        data = f"1\n00:00:00,000 --> 00:00:01,000\n{text}\n".encode()
+        _write(env["project"] / f"captions-{locale}.srt", data)
+        assets.append(
+            {
+                "role": f"captions-{locale}",
+                "variant_id": None,
+                "source_ref": f"captions-{locale}.srt",
+                "content_digest": "sha256:" + hashlib.sha256(data).hexdigest(),
+                "media_type": "application/x-subrip",
+                "byte_size": len(data),
+                "constraint_rule_id": "asset-thumbnail",
+            }
+        )
+    candidate = await append_candidate(env, candidate_for(env, assets=assets), revision=2)
+    env["candidate"] = candidate
+    env["observation"] = await check_service(env).check(check_request(env, candidate, command_id="check-2"))
+    assert env["observation"].status.value == "PASS", env["observation"].findings
+    env["selection"] = await select(env, selection_request(env, await preview(env)))
+    receipt = await exporter(env).export(export_request(env))
+    with zipfile.ZipFile(env["project"] / archive_ref(receipt.archive_digest)) as bundle:
+        assert bundle.read("captions/vi.srt") == _read(env["project"] / "captions-vi.srt")
+        assert {"captions/en.srt", "captions/vi.srt"} <= set(bundle.namelist())
+    entries = {e.path: e.content_digest for e in receipt.manifest.entries}
+    assert (
+        entries["captions/en.srt"] == "sha256:" + hashlib.sha256(_read(env["project"] / "captions-en.srt")).hexdigest()
+    )

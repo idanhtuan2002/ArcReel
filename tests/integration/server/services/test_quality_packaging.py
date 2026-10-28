@@ -58,7 +58,18 @@ PACKAGING_MIGRATIONS = (
 
 
 def v2_policy(config) -> dict[str, Any]:
-    constraints = constraints_data() | {
+    constraints = constraints_data()
+    for locale in ("en", "vi"):
+        constraints["asset_roles"].append(
+            {
+                "role": f"captions-{locale}",
+                "constraint_rule_id": "asset-thumbnail",
+                "required": False,
+                "media_types": ["application/x-subrip"],
+                "max_bytes": 1048576,
+            }
+        )
+    constraints = constraints | {
         "width": 64,
         "height": 64,
         "min_duration_ms": 1000,

@@ -18,6 +18,7 @@ import json
 import os
 import shutil
 import stat
+import time
 import uuid
 import zipfile
 from collections.abc import Awaitable, Callable
@@ -64,6 +65,7 @@ from r2.quality.digests import compute_digest
 from r2.quality.errors import (
     DispositionStaleError,
     ExportIntegrityFailedError,
+    M10Error,
     OperationalEnvelopeExceededError,
     RequiredEvidenceMissingError,
     StaleHeadError,
@@ -77,6 +79,7 @@ from server.services.package_export_worker import (
     MANIFEST_PATH,
     MEMBER_MODE,
     WORKER_CONFIG_SCHEMA,
+    WORKER_OUTPUT_SCHEMA,
     ZIP_EPOCH,
     BundleMember,
     ExportEnvelopeError,
@@ -109,12 +112,20 @@ _MEDIA_SUFFIX = {
 CAPTIONS_ROLE_PREFIX = "captions-"
 PRIMARY_METADATA = "metadata/metadata.json"
 WORK_PREFIX = ".work-"
+CREATING_PREFIX = ".creating-"
+SNAPSHOT_DIRECTORY = "snapshots"
+#: The most entries one export may carry: bounds the worker config well below its 1 MiB read.
+MAX_EXPORT_MEMBERS = 1024
+#: A kept work directory is swept only after any worker that could still use it has hit its runtime limit.
+SWEEP_AFTER_SECONDS = 300
 OWNER_LOCK = "owner.lock"
 MANIFEST_FILE = "manifest.bytes"
 PARTIAL_FILE = "archive.partial"
 WORKER_BASE_MS = 30000
 WORKER_BYTES_PER_SECOND = 50 << 20
 WORKER_OUTPUT_CAP = 65536
+WORKER_CONFIG_MAX_BYTES = 1 << 19
+MIN_LANDLOCK_ABI = 6
 _NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 _DIRECTORY = getattr(os, "O_DIRECTORY", 0)
 _NONBLOCK = getattr(os, "O_NONBLOCK", 0)
@@ -125,8 +136,8 @@ type SubmitterFactory = Callable[[AsyncSession, str, str, str], AttemptSubmitter
 
 
 def builder_identity_digest() -> str:
-    """The archive builder is pinned by the exact bytes of its stdlib-only module."""
-    return "sha256:" + hashlib.sha256(Path(package_export_worker.__file__).read_bytes()).hexdigest()
+    """The archive builder is pinned by the exact bytes of its worker and confinement modules."""
+    return digest_canonical({"domain": "m10.export-builder.v1", "files": worker_file_digests()})
 
 
 def export_task_id(user_id: str, project_name: str, command_id: str) -> str:
@@ -149,6 +160,13 @@ def export_route(builder_digest: str) -> ProviderRouteSnapshot:
 
 def execution_identity_digest(request: p.ExportRequest, manifest: p.ExportManifest) -> str:
     """The M7 request identity, recomputed from the stored request and manifest on every read."""
+    subject = request.subject
+    if (manifest.slot, manifest.selection_id, manifest.selection_digest) != (
+        subject.slot,
+        subject.selection_id,
+        subject.selection_digest,
+    ):
+        raise RequiredEvidenceMissingError()
     identity = p.ExportExecutionIdentity(
         schema_id="m10.export-execution.v1",
         slot=request.subject.slot,
@@ -159,6 +177,35 @@ def execution_identity_digest(request: p.ExportRequest, manifest: p.ExportManife
         adapter_version=HOST_EXPORT_ADAPTER_VERSION,
     )
     return compute_digest("m10.export-execution.v1", identity)
+
+
+def worker_file_digests() -> dict[str, str]:
+    """The exact worker and confinement module bytes the host expects the worker to report."""
+    folder = Path(package_export_worker.__file__).parent
+    return {
+        name: "sha256:" + hashlib.sha256((folder / name).read_bytes()).hexdigest()
+        for name in ("package_export_worker.py", "quality_probe_worker.py")
+    }
+
+
+def _abi_at_least(value: object, minimum: int) -> bool:
+    return type(value) is int and value >= minimum
+
+
+def _worker_report(stdout: bytes) -> dict[str, object] | None:
+    """The worker's report when it has exactly the expected schema and keys; anything else is no report."""
+    try:
+        report = json.loads(stdout)
+    except ValueError:
+        return None
+    if (
+        type(report) is not dict
+        or report.get("schema") != WORKER_OUTPUT_SCHEMA
+        or report.get("status") not in {"OK", "INTEGRITY_FAILED", "ENVELOPE_EXCEEDED", "WORKER_FAILED"}
+        or not set(report) <= {"schema", "status", "digest", "worker", "envelope", "landlock_abi"}
+    ):
+        return None
+    return report
 
 
 def provider_request(invocation: StoredExportInvocation) -> ProviderRequest:
@@ -283,17 +330,13 @@ def plan_export(selection: p.PackageSelection, evidence: PackageEvidence, builde
         return path
 
     assets: list[PlannedAsset] = []
-    entries: list[p.ExportManifestEntry] = []
+    raw: list[tuple[str, str, int, str]] = []
     for asset in candidate.assets:
         if asset.variant_id is not None and asset.variant_id not in chosen_ids:
             continue
         path = claim(member_path(asset.role, asset.variant_id, asset.media_type))
         assets.append(PlannedAsset(path, asset.source_ref, asset.content_digest, asset.byte_size))
-        entries.append(
-            p.ExportManifestEntry(
-                path=path, media_type=asset.media_type, byte_size=asset.byte_size, content_digest=asset.content_digest
-            )
-        )
+        raw.append((path, asset.media_type, asset.byte_size, asset.content_digest))
     documents: list[tuple[str, bytes]] = [
         (claim(PRIMARY_METADATA), canonical_json_bytes(metadata_document(candidate, values)))
     ]
@@ -301,15 +344,20 @@ def plan_export(selection: p.PackageSelection, evidence: PackageEvidence, builde
         (claim(f"metadata/{_slug(localized.locale)}.json"), canonical_json_bytes(localized.model_dump(mode="json")))
         for localized in candidate.localization_variants
     )
-    for path, data in documents:
-        entries.append(
-            p.ExportManifestEntry(
-                path=path,
-                media_type="application/json",
-                byte_size=len(data),
-                content_digest="sha256:" + hashlib.sha256(data).hexdigest(),
-            )
-        )
+    raw.extend(
+        (path, "application/json", len(data), "sha256:" + hashlib.sha256(data).hexdigest()) for path, data in documents
+    )
+    # The operational envelope is admitted before any contract model can refuse the same sizes as integrity.
+    if len(raw) > MAX_EXPORT_MEMBERS:
+        raise OperationalEnvelopeExceededError()
+    try:
+        archive_size([(path, size) for path, _, size, _ in raw], 0)
+    except ExportEnvelopeError:
+        raise OperationalEnvelopeExceededError() from None
+    entries = [
+        p.ExportManifestEntry(path=path, media_type=media, byte_size=size, content_digest=digest)
+        for path, media, size, digest in raw
+    ]
     try:
         manifest = p.ExportManifest(
             schema_id="m10.export-manifest.v1",
@@ -368,36 +416,75 @@ def open_export_store(project_root: Path) -> int:
 
 
 class WorkDirectory:
-    """A private per-export scratch directory under the pinned store, owned through an exclusive flock.
+    """A private per-export scratch directory under the pinned store, published already owned.
 
-    Snapshots, the manifest file and the partial archive live inside; a sweep removes only directories whose
-    owner lock it can take, so an export in progress is never touched.
+    It is created under a `.creating-` name, its exclusive owner flock is taken, and only then is it renamed to
+    `.work-<uuid>`, so a sweep can never see an unowned live directory. Snapshots live in `snapshots/`; the
+    manifest bytes and the precreated output inode live beside it.
     """
 
     def __init__(self, store: int, project_root: Path) -> None:
-        self.name = f"{WORK_PREFIX}{uuid.uuid4().hex}"
+        token = uuid.uuid4().hex
+        self.name = f"{WORK_PREFIX}{token}"
         self._store = store
-        self.descriptor = _open_directory(store, self.name, create=True)
+        self._removable = True
+        creating = f"{CREATING_PREFIX}{token}"
+        acquired: list[int] = []
+        try:
+            directory = _open_directory(store, creating, create=True)
+            acquired.append(directory)
+            lock = os.open(OWNER_LOCK, os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600, dir_fd=directory)
+            acquired.append(lock)
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            snapshots = _open_directory(directory, SNAPSHOT_DIRECTORY, create=True)
+            acquired.append(snapshots)
+            os.rename(creating, self.name, src_dir_fd=store, dst_dir_fd=store)
+        except BaseException:
+            for descriptor in reversed(acquired):
+                with contextlib.suppress(OSError):
+                    os.close(descriptor)
+            with contextlib.suppress(OSError):
+                shutil.rmtree(creating, dir_fd=store)
+            raise
+        self.descriptor, self._lock, self.snapshots = acquired
         self.path = project_root / EXPORT_DIRECTORY / self.name
-        self._lock = os.open(OWNER_LOCK, os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600, dir_fd=self.descriptor)
-        fcntl.flock(self._lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-    def create(self, name: str) -> int:
-        return os.open(name, os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600, dir_fd=self.descriptor)
+    def create(self, name: str, *, in_snapshots: bool = False) -> int:
+        parent = self.snapshots if in_snapshots else self.descriptor
+        return os.open(name, os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600, dir_fd=parent)
+
+    def keep(self) -> None:
+        """A worker that may still run keeps its scratch; the sweep removes it after the maximum runtime."""
+        self._removable = False
 
     def close(self) -> None:
-        """Remove everything this export created and release ownership."""
-        with contextlib.suppress(OSError):
-            shutil.rmtree(self.name, dir_fd=self._store)
-        with contextlib.suppress(OSError):
-            os.close(self._lock)
-        with contextlib.suppress(OSError):
-            os.close(self.descriptor)
+        """Remove everything this export created (unless kept) and release ownership."""
+        if self._removable:
+            with contextlib.suppress(OSError):
+                shutil.rmtree(self.name, dir_fd=self._store)
+        for descriptor in (self.snapshots, self._lock, self.descriptor):
+            with contextlib.suppress(OSError):
+                os.close(descriptor)
 
 
-def snapshot_assets(root: Path, work: WorkDirectory, plan: ExportPlan) -> tuple[BundleMember, ...]:
-    """Private verified copies of every planned asset plus the documents; any drift is an integrity failure."""
-    members: list[BundleMember] = []
+@dataclass(frozen=True)
+class PinnedMember:
+    member: BundleMember
+    identity: tuple[int, int]
+
+
+def _write_pinned(work: WorkDirectory, name: str, data: bytes, *, in_snapshots: bool) -> tuple[int, int]:
+    with os.fdopen(work.create(name, in_snapshots=in_snapshots), "wb") as sink:
+        sink.write(data)
+        sink.flush()
+        os.fsync(sink.fileno())
+        info = os.fstat(sink.fileno())
+    return (info.st_dev, info.st_ino)
+
+
+def snapshot_assets(root: Path, work: WorkDirectory, plan: ExportPlan) -> tuple[PinnedMember, ...]:
+    """Private verified copies of every planned asset plus the documents, each with its inode identity."""
+    members: list[PinnedMember] = []
     for index, asset in enumerate(plan.assets):
         relative = PurePosixPath(asset.source_ref)
         if str(relative) != asset.source_ref or relative.is_absolute() or ".." in relative.parts:
@@ -408,7 +495,10 @@ def snapshot_assets(root: Path, work: WorkDirectory, plan: ExportPlan) -> tuple[
         name = f"asset-{index}"
         hasher = hashlib.sha256()
         copied = 0
-        with os.fdopen(source, "rb", buffering=0) as reader, os.fdopen(work.create(name), "wb") as sink:
+        with (
+            os.fdopen(source, "rb", buffering=0) as reader,
+            os.fdopen(work.create(name, in_snapshots=True), "wb") as sink,
+        ):
             while chunk := reader.read(min(1 << 20, asset.byte_size + 1 - copied)):
                 copied += len(chunk)
                 if copied > asset.byte_size:
@@ -417,20 +507,23 @@ def snapshot_assets(root: Path, work: WorkDirectory, plan: ExportPlan) -> tuple[
                 sink.write(chunk)
             sink.flush()
             os.fsync(sink.fileno())
+            info = os.fstat(sink.fileno())
         if (copied, "sha256:" + hasher.hexdigest()) != (asset.byte_size, asset.content_digest):
             raise ExportIntegrityFailedError()
-        members.append(BundleMember(asset.path, work.path / name, asset.content_digest, asset.byte_size))
+        source_path = work.path / SNAPSHOT_DIRECTORY / name
+        members.append(
+            PinnedMember(
+                BundleMember(asset.path, source_path, asset.content_digest, asset.byte_size),
+                (info.st_dev, info.st_ino),
+            )
+        )
     for index, (path, data) in enumerate(plan.documents):
         name = f"document-{index}"
-        with os.fdopen(work.create(name), "wb") as sink:
-            sink.write(data)
-            sink.flush()
-            os.fsync(sink.fileno())
-        members.append(BundleMember(path, work.path / name, "sha256:" + hashlib.sha256(data).hexdigest(), len(data)))
-    with os.fdopen(work.create(MANIFEST_FILE), "wb") as sink:
-        sink.write(plan.manifest_bytes)
-        sink.flush()
-        os.fsync(sink.fileno())
+        identity = _write_pinned(work, name, data, in_snapshots=True)
+        digest = "sha256:" + hashlib.sha256(data).hexdigest()
+        members.append(
+            PinnedMember(BundleMember(path, work.path / SNAPSHOT_DIRECTORY / name, digest, len(data)), identity)
+        )
     return tuple(members)
 
 
@@ -438,11 +531,12 @@ def snapshot_assets(root: Path, work: WorkDirectory, plan: ExportPlan) -> tuple[
 class VerifiedArchive:
     digest: str
     byte_size: int
-    generation: tuple[int, int, int, int]
+    generation: tuple[int, int, int, int, int]
 
 
-def _generation(info: os.stat_result) -> tuple[int, int, int, int]:
-    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+def _generation(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    """Identity plus size, mtime and ctime; any write to the inode moves ctime, which no caller can restore."""
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
 
 
 def verify_archive(store: int, name: str, manifest: p.ExportManifest, manifest_bytes: bytes) -> VerifiedArchive:
@@ -466,14 +560,25 @@ def verify_archive(store: int, name: str, manifest: p.ExportManifest, manifest_b
                 if [i.filename for i in infos] != expected or archive.comment != b"":
                     raise ExportIntegrityFailedError()
                 sizes = {e.path: e.byte_size for e in manifest.entries} | {MANIFEST_PATH: len(manifest_bytes)}
+                digests = {e.path: e.content_digest for e in manifest.entries}
                 for info in infos:
                     if (
                         info.compress_type != zipfile.ZIP_STORED
                         or info.date_time != ZIP_EPOCH
+                        or (info.create_system, info.create_version, info.extract_version) != (3, 20, 20)
+                        or info.flag_bits != 0
                         or info.external_attr >> 16 != MEMBER_MODE
                         or info.extra != b""
+                        or info.comment != b""
                         or info.file_size != sizes[info.filename]
                     ):
+                        raise ExportIntegrityFailedError()
+                    member = hashlib.sha256()
+                    with archive.open(info) as stream:
+                        for chunk in iter(lambda: stream.read(1 << 20), b""):
+                            member.update(chunk)
+                    expected_digest = digests.get(info.filename, "sha256:" + hashlib.sha256(manifest_bytes).hexdigest())
+                    if "sha256:" + member.hexdigest() != expected_digest:
                         raise ExportIntegrityFailedError()
                 if archive.read(MANIFEST_PATH) != manifest_bytes:
                     raise ExportIntegrityFailedError()
@@ -485,7 +590,7 @@ def verify_archive(store: int, name: str, manifest: p.ExportManifest, manifest_b
     return VerifiedArchive("sha256:" + hasher.hexdigest(), before.st_size, _generation(before))
 
 
-def published_generation(store: int, name: str) -> tuple[int, int, int, int] | None:
+def published_generation(store: int, name: str) -> tuple[int, int, int, int, int] | None:
     try:
         return _generation(os.stat(name, dir_fd=store, follow_symlinks=False))
     except OSError:
@@ -554,12 +659,14 @@ class PackageExportService:
         builder_digest = builder_identity_digest()
         plan = plan_export(selection, evidence, builder_digest)
         store = await asyncio.to_thread(open_export_store, self._project_root)
-        work = await asyncio.to_thread(WorkDirectory, store, self._project_root)
         try:
-            members = await asyncio.to_thread(snapshot_assets, self._project_root, work, plan)
-            return await self._submit(request, reader, selection, plan, members, builder_digest, store, work)
+            work = await asyncio.to_thread(WorkDirectory, store, self._project_root)
+            try:
+                members = await asyncio.to_thread(snapshot_assets, self._project_root, work, plan)
+                return await self._submit(request, reader, selection, plan, members, builder_digest, store, work)
+            finally:
+                await asyncio.to_thread(work.close)
         finally:
-            await asyncio.to_thread(work.close)
             os.close(store)
 
     async def _resolve(
@@ -654,7 +761,7 @@ class PackageExportService:
         reader: CheckpointedShowrunnerGrantReader,
         selection: p.PackageSelection,
         plan: ExportPlan,
-        members: tuple[BundleMember, ...],
+        members: tuple[PinnedMember, ...],
         builder_digest: str,
         store: int,
         work: WorkDirectory,
@@ -669,6 +776,7 @@ class PackageExportService:
             manifest_digest=manifest_digest,
             identity_digest=execution_identity_digest(request, plan.manifest),
         )
+        known: list[M10Error] = []
         async with self._sessions() as session:
             try:
                 await session.begin()
@@ -683,7 +791,11 @@ class PackageExportService:
             submitter = self._submitter_for(session, command.user_id, command.project_name, invocation.execution_id)
 
             async def submit(attempt: AttemptSnapshot) -> ProviderSubmitReceipt[str]:
-                digest = await self._build_and_publish(attempt.execution_id, plan, members, store, work)
+                try:
+                    digest = await self._build_and_publish(attempt.execution_id, plan, members, store, work)
+                except (ExportIntegrityFailedError, OperationalEnvelopeExceededError) as error:
+                    known.append(error)
+                    raise
                 return ProviderSubmitReceipt(
                     observation=ProviderObservation(
                         observation_id=f"{attempt.execution_id}:accepted",
@@ -707,71 +819,92 @@ class PackageExportService:
         if outcome.snapshot.state is ExecutionAttemptState.ACCEPTED:
             return await self._finalize(invocation, reader)
         if outcome.snapshot.state is ExecutionAttemptState.FAILED_BEFORE_ACCEPTANCE:
-            raise ExportIntegrityFailedError()
+            # In-process the typed refusal is kept; a later replay of the failed command reports integrity.
+            raise known[-1] if known else ExportIntegrityFailedError()
         raise RequiredEvidenceMissingError()
 
     async def _build_and_publish(
-        self, execution_id: str, plan: ExportPlan, members: tuple[BundleMember, ...], store: int, work: WorkDirectory
+        self, execution_id: str, plan: ExportPlan, members: tuple[PinnedMember, ...], store: int, work: WorkDirectory
     ) -> str:
-        """Build in the confined worker into one precreated output, then publish it content-addressed.
+        """Build in the confined worker into one precreated output inode, then publish it content-addressed.
 
-        Known refusals (integrity, envelope) are ordinary failures; anything else after the worker may have run is
-        ambiguous and is never rebuilt under this command.
+        A refusal is known only when the worker reported it, exited 1 and its unit is verified gone; every other
+        result after a possible start is ambiguous, keeps its scratch for the sweep and is never rebuilt.
         """
-        output = work.create(PARTIAL_FILE)
-        os.close(output)
+        ambiguous = AmbiguousSubmitError(
+            provider=_FAMILY.key.provider_id, message="[create_ambiguous] export outcome unknown"
+        )
         budget_ms = WORKER_BASE_MS + plan.archive_bytes * 1000 // WORKER_BYTES_PER_SECOND
         if budget_ms > MAX_RUNTIME_MS:
             raise OperationalEnvelopeExceededError()
+        manifest_identity = _write_pinned(work, MANIFEST_FILE, plan.manifest_bytes, in_snapshots=True)
+        output = work.create(PARTIAL_FILE)
+        info = os.fstat(output)
+        os.close(output)
+        snapshot_dir = work.path / SNAPSHOT_DIRECTORY
         config = {
             "schema": WORKER_CONFIG_SCHEMA,
             "envelope": worker_envelope(),
-            "read_files": [*READ_FILES, str(work.path / MANIFEST_FILE), *(str(m.source) for m in members)],
+            "read_files": list(READ_FILES),
             "exec_files": [],
-            "read_dirs": list(READ_DIRS),
+            "read_dirs": [*READ_DIRS, str(snapshot_dir)],
             "scratch": [str(work.path / PARTIAL_FILE)],
             "members": [
-                {"path": m.path, "source": str(m.source), "digest": m.content_digest, "size": m.byte_size}
+                {
+                    "path": m.member.path,
+                    "source": str(m.member.source),
+                    "digest": m.member.content_digest,
+                    "size": m.member.byte_size,
+                    "identity": list(m.identity),
+                }
                 for m in members
             ],
-            "manifest": str(work.path / MANIFEST_FILE),
+            "manifest": str(snapshot_dir / MANIFEST_FILE),
+            "manifest_identity": list(manifest_identity),
             "output": str(work.path / PARTIAL_FILE),
+            "output_identity": [info.st_dev, info.st_ino],
         }
-        outcome = await self._runtime.launch(
-            json.dumps(config, sort_keys=True).encode("utf-8"),
-            budget_ms=budget_ms,
-            output_cap=WORKER_OUTPUT_CAP,
-            scratch=(work.path / PARTIAL_FILE,),
-            fsize=plan.archive_bytes + (1 << 20),
-            unit_prefix="m10-export",
-        )
-        try:
-            report = json.loads(outcome.stdout)
-        except ValueError:
-            report = {}
-        status = report.get("status") if isinstance(report, dict) else None
-        if status == "INTEGRITY_FAILED":
-            raise ExportIntegrityFailedError()
-        if status == "ENVELOPE_EXCEEDED":
+        payload = json.dumps(config, sort_keys=True).encode("utf-8")
+        if len(payload) > WORKER_CONFIG_MAX_BYTES:
             raise OperationalEnvelopeExceededError()
-        digest = report.get("digest") if isinstance(report, dict) else None
-        if (
-            status != "OK"
-            or not isinstance(digest, str)
-            or outcome.exit_code != 0
-            or outcome.manager_result != "SUCCESS"
-            or not outcome.group_cleanup_verified
-        ):
-            raise AmbiguousSubmitError(
-                provider=_FAMILY.key.provider_id, message="[create_ambiguous] export outcome unknown"
+        try:
+            outcome = await self._runtime.launch(
+                payload,
+                budget_ms=budget_ms,
+                output_cap=WORKER_OUTPUT_CAP,
+                scratch=(work.path / PARTIAL_FILE,),
+                fsize=plan.archive_bytes + (1 << 20),
+                unit_prefix="m10-export",
             )
+        except Exception:
+            work.keep()
+            raise ambiguous from None
+        if not outcome.group_cleanup_verified:
+            work.keep()
+            raise ambiguous
+        report = _worker_report(outcome.stdout)
+        status = None if report is None else report["status"]
+        if report is not None and outcome.exit_code == 1 and outcome.manager_result == "EXIT_CODE":
+            if status == "INTEGRITY_FAILED":
+                raise ExportIntegrityFailedError()
+            if status == "ENVELOPE_EXCEEDED":
+                raise OperationalEnvelopeExceededError()
+        digest = None if report is None else report["digest"]
+        if (
+            report is None
+            or status != "OK"
+            or not isinstance(digest, str)
+            or (outcome.exit_code, outcome.manager_result) != (0, "SUCCESS")
+            or report.get("envelope") != worker_envelope()
+            or not _abi_at_least(report.get("landlock_abi"), MIN_LANDLOCK_ABI)
+            or report.get("worker") != worker_file_digests()
+        ):
+            raise ambiguous
         published = PurePosixPath(archive_ref(digest)).name
         await asyncio.to_thread(_publish, store, work, published)
         verified = await asyncio.to_thread(verify_archive, store, published, plan.manifest, plan.manifest_bytes)
         if verified.digest != digest or verified.byte_size != plan.archive_bytes:
-            raise AmbiguousSubmitError(
-                provider=_FAMILY.key.provider_id, message="[create_ambiguous] export outcome unknown"
-            )
+            raise ambiguous
         return digest
 
     async def _resume(self, invocation: StoredExportInvocation) -> p.ExportBundleReceipt:
@@ -896,9 +1029,14 @@ def sweep_work(project_root: Path) -> int:
             except OSError:
                 continue
             try:
-                # A directory without its lock may still be in creation; it is never inferred to be an orphan.
+                # Directories are published already owned, so a missing lock means a damaged directory: keep it.
                 lock = os.open(OWNER_LOCK, os.O_RDWR | _NOFOLLOW, dir_fd=directory)
             except OSError:
+                os.close(directory)
+                continue
+            if time.time() - os.fstat(lock).st_mtime < SWEEP_AFTER_SECONDS:
+                # A kept directory may belong to a worker that is still within its runtime limit.
+                os.close(lock)
                 os.close(directory)
                 continue
             try:
