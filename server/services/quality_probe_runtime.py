@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from r2.quality.errors import (
+    M10Error,
     OperationalEnvelopeExceededError,
     ProbeFailedError,
     ReferenceInvalidError,
@@ -440,36 +441,16 @@ class QualityProbeRuntime:
                 payload.encode("utf-8"), budget_ms=budget_ms, output_cap=output_cap, scratch=scratch
             )
         finished_at = datetime.now(UTC)
-        report = _report(outcome)
-        facts = _FACTS[config.recipe].model_validate(report["facts"])
-        measurement = build_probe_measurement(config, input_digests=inputs.input_digests, facts=facts)
-        accounting = report["accounting"]
-        kernel = report["kernel"]
-        if type(accounting) is not dict or type(kernel) is not dict:
+        try:
+            report = _report(outcome)
+            facts = _FACTS[config.recipe].model_validate(report["facts"])
+            measurement = build_probe_measurement(config, input_digests=inputs.input_digests, facts=facts)
+        except M10Error as error:
+            error.resources = _failure_resources(outcome, control, config)  # pyright: ignore[reportAttributeAccessIssue]
+            raise
+        resources = _resources(outcome, report, control, config)
+        if resources is None:
             raise ProbeFailedError()
-        resources = ResourceEvidence(
-            schema_id="m10.probe-resources.v1",
-            memory_max_bytes=MEMORY_MAX_BYTES,
-            swap_max_bytes=SWAP_MAX_BYTES,
-            tasks_max=TASKS_MAX,
-            cpu_quota_us=CPU_QUOTA_US,
-            cpu_period_us=CPU_PERIOD_US,
-            wall_elapsed_ms=outcome.wall_elapsed_ms,
-            peak_memory_bytes=accounting.get("peak_memory_bytes"),
-            peak_tasks=accounting.get("peak_tasks"),
-            stdout_bytes=len(outcome.stdout),
-            stderr_bytes=outcome.stderr_bytes,
-            scratch_sizes=outcome.scratch_sizes,
-            exit_code=outcome.exit_code,
-            manager_result="SUCCESS",
-            oom_killed=False,
-            deadline_exceeded=False,
-            output_exceeded=False,
-            group_cleanup_verified=True,
-            kernel_identity_digest=_canonical_digest({"kernel": kernel, "landlock_abi": report["landlock_abi"]}),
-            control_identity_digest=control,
-            tool_identity_digest=tool_identity_digest(config),
-        )
         return ProbeExecutionResult(
             schema_id="m10.probe-execution-result.v1",
             request_digest=request_digest,
@@ -479,6 +460,75 @@ class QualityProbeRuntime:
             started_at=started_at,
             finished_at=finished_at,
         )
+
+
+def failure_resources(error: BaseException) -> ResourceEvidence | None:
+    """The bounded-launch accounting a failed run carried, when the confined worker reported it."""
+    evidence = getattr(error, "resources", None)
+    return evidence if isinstance(evidence, ResourceEvidence) else None
+
+
+def _resources(
+    outcome: WorkerOutcome, report: dict[str, object], control: str, config: ProbeConfig
+) -> ResourceEvidence | None:
+    accounting = report.get("accounting")
+    kernel = report.get("kernel")
+    abi = report.get("landlock_abi")
+    if type(accounting) is not dict or type(kernel) is not dict or type(abi) is not int:
+        return None
+    oom = accounting.get("oom_kill")
+    return ResourceEvidence(
+        schema_id="m10.probe-resources.v1",
+        memory_max_bytes=MEMORY_MAX_BYTES,
+        swap_max_bytes=SWAP_MAX_BYTES,
+        tasks_max=TASKS_MAX,
+        cpu_quota_us=CPU_QUOTA_US,
+        cpu_period_us=CPU_PERIOD_US,
+        wall_elapsed_ms=outcome.wall_elapsed_ms,
+        peak_memory_bytes=accounting.get("peak_memory_bytes"),
+        peak_tasks=accounting.get("peak_tasks"),
+        stdout_bytes=len(outcome.stdout),
+        stderr_bytes=outcome.stderr_bytes,
+        scratch_sizes=outcome.scratch_sizes,
+        exit_code=outcome.exit_code,
+        manager_result=outcome.manager_result,  # pyright: ignore[reportArgumentType]  # validated by the model
+        oom_killed=outcome.manager_result == "OOM_KILL" or (type(oom) is int and oom > 0),
+        deadline_exceeded=outcome.deadline_exceeded,
+        output_exceeded=outcome.output_exceeded,
+        group_cleanup_verified=outcome.group_cleanup_verified,
+        kernel_identity_digest=_canonical_digest({"kernel": kernel, "landlock_abi": abi}),
+        control_identity_digest=control,
+        tool_identity_digest=tool_identity_digest(config),
+    )
+
+
+def _failure_resources(outcome: WorkerOutcome, control: str, config: ProbeConfig) -> ResourceEvidence | None:
+    """Failure accounting exists only for a cleaned-up unit whose worker emitted one parseable confined report."""
+    if not outcome.group_cleanup_verified or outcome.manager_result == "STARTUP_FAILED":
+        return None
+    try:
+        report = _parse(outcome.stdout)
+    except ProbeFailedError:
+        return None
+    if report.get("envelope") != _ENVELOPE:
+        return None
+    try:
+        return _resources(outcome, report, control, config)
+    except ValueError:
+        return None
+
+
+def _parse(stdout: bytes) -> dict[str, object]:
+    lines = stdout.split(b"\n")
+    if len(lines) != 2 or lines[1] != b"":
+        raise ProbeFailedError()
+    try:
+        report = json.loads(lines[0].decode("utf-8"), object_pairs_hook=_strict_pairs, parse_constant=_reject_constant)
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        raise ProbeFailedError() from None
+    if type(report) is not dict or report.get("schema") != "m10.probe-worker-output.v1":
+        raise ProbeFailedError()
+    return report
 
 
 def _manager_environment() -> dict[str, str]:
@@ -508,15 +558,7 @@ def _report(outcome: WorkerOutcome) -> dict[str, object]:
         raise OperationalEnvelopeExceededError()
     if outcome.manager_result == "STARTUP_FAILED":
         raise RequiredEvidenceMissingError()
-    lines = outcome.stdout.split(b"\n")
-    if len(lines) != 2 or lines[1] != b"":
-        raise ProbeFailedError()
-    try:
-        report = json.loads(lines[0].decode("utf-8"), object_pairs_hook=_strict_pairs, parse_constant=_reject_constant)
-    except (UnicodeDecodeError, ValueError, RecursionError):
-        raise ProbeFailedError() from None
-    if type(report) is not dict or report.get("schema") != "m10.probe-worker-output.v1":
-        raise ProbeFailedError()
+    report = _parse(outcome.stdout)
     status = report.get("status")
     if status in _MISSING:
         raise RequiredEvidenceMissingError()

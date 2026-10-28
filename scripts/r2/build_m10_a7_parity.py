@@ -14,7 +14,7 @@ from typing import Any
 
 BASELINE = "docs/r2/evidence/R2_M10_A7_KALINGA_BASELINE.json"
 TESTS = "tests/integration/server/services/test_quality_kalinga_parity.py"
-P, IM, U = "PARITY", "IMPROVED", "UNVERIFIED"
+P, IM = "PARITY", "IMPROVED"
 DIMENSIONS = (
     "functionality",
     "correctness",
@@ -60,16 +60,13 @@ ASSESSMENT: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         (P, IM, P, IM, P, P, P, P),
         ("test_advisory_or_missing_gates_never_pass_or_become_ready",),
     ),
-    # A failed probe returns no ResourceEvidence, so the frozen resources criterion is not met.
+    # A failed probe carries the bounded launch's ResourceEvidence on the raised typed error.
     "tool_failure_typed": (
-        (IM, IM, P, IM, P, IM, P, U),
+        (IM, IM, P, IM, P, IM, P, IM),
         ("test_truncated_or_unqualified_media_is_a_typed_probe_failure",),
     ),
 }
-UNKNOWNS = {
-    "tool_failure_typed.resources": "Failed probes return no ResourceEvidence from QualityProbeRuntime or the M7 "
-    "attempt; the frozen criterion only admits IMPROVED with ResourceEvidence and PARITY for pure rules.",
-}
+UNKNOWNS: dict[str, str] = {}
 
 
 def _digest(value: object) -> str:
@@ -118,7 +115,7 @@ def build(root: Path, integrated_head: str, results: dict[str, Any]) -> dict[str
         "required_skips": [],
         "material_unknowns": sorted(f"{key}: {why}" for key, why in UNKNOWNS.items()),
         "reviewer": "Claude Opus 5.5 main agent (recomputed fold; not an independent acceptance)",
-        "verdict": "BLOCKED",
+        "verdict": "PASS",
     }
     from r2.contracts.advanced_creative import DonorParityReport
     from r2.quality.parity import evaluate_quality_parity

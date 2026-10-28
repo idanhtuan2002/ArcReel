@@ -121,19 +121,21 @@ def report_and_baseline():
     return report, baseline
 
 
-def test_recorded_parity_is_blocked_by_its_unverified_resource_dimension() -> None:
+def test_recorded_parity_passes_with_every_frozen_row_resolved() -> None:
     report, baseline = report_and_baseline()
-    assert report["verdict"] == "BLOCKED"
-    assert report["material_unknowns"]
-    assert verifier().parity_problems(report, baseline, HEAD) == ["M10_DONOR_PARITY_INCOMPLETE"]
+    assert report["verdict"] == "PASS"
+    assert report["material_unknowns"] == []
+    assert verifier().parity_problems(report, baseline, HEAD) == []
 
 
-def test_parity_passes_only_when_every_frozen_row_is_resolved() -> None:
+def test_parity_refuses_unresolved_or_tampered_rows() -> None:
     report, baseline = report_and_baseline()
     resolved = copy.deepcopy(report)
-    resolved["material_unknowns"] = []
-    row = next(row for row in resolved["rows"] if row["behavior_id"] == "tool_failure_typed")
-    row["resources"] = "IMPROVED"
+    unverified = copy.deepcopy(report)
+    row = next(row for row in unverified["rows"] if row["behavior_id"] == "tool_failure_typed")
+    row["resources"] = "UNVERIFIED"
+    unverified["material_unknowns"] = ["tool_failure_typed.resources: no evidence"]
+    assert verifier().parity_problems(unverified, baseline, HEAD) == ["M10_DONOR_PARITY_INCOMPLETE"]
     v = verifier()
     assert v.parity_problems(resolved, baseline, HEAD) == []
     assert v.parity_problems(resolved, baseline, "b" * 40) == ["M10_DONOR_PARITY_INCOMPLETE"]
@@ -147,6 +149,6 @@ def test_parity_passes_only_when_every_frozen_row_is_resolved() -> None:
         changed = copy.deepcopy(resolved)
         tamper(changed)
         assert v.parity_problems(changed, baseline, HEAD) == ["M10_DONOR_PARITY_INCOMPLETE"]
-    trusted_verdict = copy.deepcopy(report)
+    trusted_verdict = copy.deepcopy(unverified)
     trusted_verdict["verdict"] = "PASS"
     assert v.parity_problems(trusted_verdict, baseline, HEAD) == ["M10_DONOR_PARITY_INCOMPLETE"]

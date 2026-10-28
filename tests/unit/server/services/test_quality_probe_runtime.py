@@ -192,3 +192,64 @@ def test_effective_limits_are_the_tightest_of_published_rule_config_and_host() -
         min(loose.rule.max_runtime_ms, 120000),
         min(loose.rule.max_output_bytes, 1048576),
     )
+
+
+CONTROL = "sha256:" + "c" * 64
+
+
+@pytest.mark.parametrize(
+    ("changes", "expected"),
+    [
+        (
+            {"exit_code": 70, "manager_result": "EXIT_CODE", "body": {"status": "TOOL_FAILED", "facts": None}},
+            ("EXIT_CODE", 70, False, False),
+        ),
+        (
+            {"manager_result": "TIMEOUT", "exit_code": -9, "deadline_exceeded": True},
+            ("TIMEOUT", -9, True, False),
+        ),
+        ({"output_exceeded": True}, ("SUCCESS", 0, False, True)),
+    ],
+)
+def test_failed_launch_after_tool_start_keeps_its_bounded_resource_accounting(
+    changes: dict[str, object], expected: tuple[str, int, bool, bool]
+) -> None:
+    from tests.unit.r2.quality.test_probes import recipe_config
+
+    config = recipe_config("DECODE")
+    evidence = runtime._failure_resources(outcome(**changes), CONTROL, config)
+    assert evidence is not None
+    assert (evidence.manager_result, evidence.exit_code, evidence.deadline_exceeded, evidence.output_exceeded) == (
+        expected
+    )
+    assert (evidence.memory_max_bytes, evidence.swap_max_bytes, evidence.tasks_max) == (
+        runtime.MEMORY_MAX_BYTES,
+        runtime.SWAP_MAX_BYTES,
+        runtime.TASKS_MAX,
+    )
+    assert (evidence.peak_memory_bytes, evidence.peak_tasks, evidence.group_cleanup_verified) == (1, 1, True)
+    assert evidence.control_identity_digest == CONTROL
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"group_cleanup_verified": False},
+        {"manager_result": "STARTUP_FAILED", "exit_code": -1, "stdout": b""},
+        {"stdout": b"not json\n"},
+        {"body": {"envelope": ENVELOPE | {"tasks_max": 64}}},
+        {"body": {"accounting": None}},
+        {"body": {"accounting": {"peak_memory_bytes": -1, "peak_tasks": 1, "oom_kill": 0}}},
+    ],
+)
+def test_failure_without_a_confined_cleaned_up_report_carries_no_resource_claim(changes: dict[str, object]) -> None:
+    from tests.unit.r2.quality.test_probes import recipe_config
+
+    assert runtime._failure_resources(outcome(**changes), CONTROL, recipe_config("DECODE")) is None
+
+
+def test_failure_resources_reads_only_a_typed_attached_evidence() -> None:
+    error = ProbeFailedError()
+    assert runtime.failure_resources(error) is None
+    error.resources = "forged"
+    assert runtime.failure_resources(error) is None

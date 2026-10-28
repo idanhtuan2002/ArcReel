@@ -240,9 +240,19 @@ async def test_truncated_or_unqualified_media_is_a_typed_probe_failure(donor, pr
                 donor["tech_qc"](donor_folder, TEMPLATE)
             donor_ms.append((time.perf_counter() - started) * 1000)
             started = time.perf_counter()
-            with pytest.raises(ProbeFailedError):
+            with pytest.raises(ProbeFailedError) as failure:
                 await measure(project, audio_config(), media)
             m10_ms.append((time.perf_counter() - started) * 1000)
+            resources = runtime.failure_resources(failure.value)
+            assert resources is not None
+            assert resources.group_cleanup_verified
+            assert (resources.memory_max_bytes, resources.swap_max_bytes) == (
+                runtime.MEMORY_MAX_BYTES,
+                runtime.SWAP_MAX_BYTES,
+            )
+            assert resources.peak_memory_bytes is not None
+            assert resources.peak_memory_bytes <= resources.memory_max_bytes
+            assert resources.wall_elapsed_ms <= audio_config().max_runtime_ms
         print(
             f"PERF FAILURE {media} donor_median_ms={statistics.median(donor_ms):.0f} m10_median_ms={statistics.median(m10_ms):.0f}"
         )
