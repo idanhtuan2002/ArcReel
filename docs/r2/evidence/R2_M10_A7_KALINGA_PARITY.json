@@ -13,7 +13,7 @@
     "donor_test_inventory_digest": "sha256:c1c3fa291e0e85535d085ceeb4522af24571f06071874af6aab030bef8575aa9",
     "fixture_set_digest": "sha256:f01585ba5817a1dd1783b780b55f5abdb43c321a0385700823f5d7d8348cc188"
   },
-  "integrated_head": "b8238b197db330f167ec828e3bb2b47215c2e553",
+  "integrated_head": "cf232e2c59a2f1c2b23b924e1a94f31554954603",
   "rows": [
     {
       "behavior_id": "missing_master",
@@ -230,28 +230,28 @@
   ],
   "commands": [
     {
-      "command": "pytest tests/unit/server/services/test_quality_probe_runtime.py tests/integration/server/services/test_quality_kalinga_parity.py tests/integration/server/services/test_quality_runs.py tests/unit/scripts/r2/test_verify_m10_a_candidate.py tests/unit/scripts/r2/test_verify_m10_a4_scope.py",
-      "result": "118 passed",
+      "command": "pytest tests/unit/r2/quality tests/unit/server/services/test_quality_probe_runtime.py tests/integration/server/services/test_quality_probe_runtime.py tests/integration/server/services/test_quality_probe_recipes.py tests/integration/server/services/test_quality_probes.py tests/integration/server/services/test_quality_kalinga_parity.py tests/integration/server/services/test_quality_runs.py tests/integration/server/services/test_quality_dispositions.py tests/unit/scripts/r2",
+      "result": "907 passed",
       "timings_ms": {
         "CONTAINER_STREAM": [
           106,
-          190
+          193
         ],
         "LOUDNESS": [
-          110,
-          261
+          107,
+          264
         ],
         "CAPTIONS": [
-          106,
-          194
+          107,
+          189
         ],
         "failure_truncated": [
-          31,
-          260
+          30,
+          265
         ],
         "failure_mpeg4": [
           62,
-          263
+          260
         ]
       }
     }
