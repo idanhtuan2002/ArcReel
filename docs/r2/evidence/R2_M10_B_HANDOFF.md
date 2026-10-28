@@ -125,11 +125,17 @@ Rewrite in place; this is the resume entry for M10-B.
   before/after-publication interruption, unknown recovery against an already-published object, finalize × run-seal
   writer pair; LOCAL_REGULAR_FILE_IO / trusted project root.
 
+- B5: `821978d23` routes (`server/routers/packaging.py`, `server/services/packaging_candidates.py`), Codex review
+  NOT ACCEPTED (`b5-codex-review.json`: H1 embedded-agent JWT passed Human checks, H2/H3 download currentness and
+  integrity, M1 replay, M2 500s, M3 crash coverage) → `ccc4bb4da` (embedded-agent token carries `via`, refused by
+  `get_current_interactive_user` everywhere; verified-snapshot download under the lock order; semantic replay).
+  Route tests 12 passed; related PG 103 passed; unit 5630 passed. Codex delta running (`b5-codex-delta-review.json`).
+- `27f90c235` UI: `frontend/src/features/packaging/` (route `packaging`, sidebar entry, en/vi/zh copy, axe-core
+  test); `pnpm check` exit 0 (235 files / 2637 tests).
+
 ## Next step
 
-B5: authenticated routes under `/projects/{project_name}/packaging` (find the V2 router pattern for M10-A quality
-routes first): append candidate revision with server-set provenance (closes B2 C4, refuse client provenance),
-check, preview, select via `PackageSelectionCustodian` (interactive Human only), export, status/history, download
-(scoped short-lived token purpose `m10-export`, revalidate currentness). Plus REVOCATION_AFTER_LEASE and
-CRASH_AFTER_LEASE tests (B3). Then projection-only UI panel in the V2 project workflow with i18n keys for every
-locale in `frontend/src/i18n/` and axe-core; then B6 donor parity, B7 pilots (sponsor as Human), B8 seal.
+Triage the B5 delta review (then Codex review of the UI if needed). Then B6 donor parity (OpenMontage export_bundle
++ Kalinga seo_lint/variants, pinned donors, frozen-before-measure, A7 pattern in `scripts/r2/build_m10_a7_parity.py`),
+B7 pilot preregistration + agent-side preparation (sponsor must make the Human disposition/selection decisions),
+B8 seal with the carried B4 crash-cut conditions.
