@@ -219,9 +219,8 @@ def finding(rule_id: str, number: int) -> dict[str, Any]:
 def failing_review(
     rules_ids: list[str], waiverable: list[str], non_waivable: list[str], findings: list[dict[str, Any]]
 ):
-    from tests.unit.r2.quality.test_quality_profiles import publication_request, publish
-
     from tests.unit.r2.contracts.test_quality import policy_data
+    from tests.unit.r2.quality.test_quality_profiles import publication_request, publish
 
     policy = policy_data()
     policy["assessment_requirements"] = [requirement("review-required", [human_slot("human", rule_ids=rules_ids)])]

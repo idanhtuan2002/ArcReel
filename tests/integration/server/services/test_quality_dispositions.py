@@ -23,6 +23,8 @@ from r2.quality.errors import (
 )
 from r2.quality.runs import run_digest
 from server import auth
+from server.services import quality_dispositions as dispositions_service
+from server.services.governance_startup import GovernanceStartupUnavailable
 from server.services.quality_dispositions import DispositionCustodian, DispositionService, quality_readiness
 from tests.integration.server.services.test_quality_probe_recipes import FIXTURES
 from tests.integration.server.services.test_quality_probes import ACTOR, promote
@@ -46,6 +48,21 @@ async def decision_host(closure_host):
         connection = await session.connection()
         await connection.run_sync(install("bed415be3608_quality_disposition.py"))
     return closure_host
+
+
+def race_writers(monkeypatch: pytest.MonkeyPatch, parties: int) -> None:
+    """The attestor answers one challenge at a time, so leases are taken in turn; then every writer races."""
+    original = DispositionCustodian.authorize_disposition
+    turn = asyncio.Lock()
+    ready = asyncio.Barrier(parties)
+
+    async def authorize(self, request):
+        async with turn:
+            lease = await original(self, request)
+        await ready.wait()
+        return lease
+
+    monkeypatch.setattr(DispositionCustodian, "authorize_disposition", authorize)
 
 
 def request_for(
@@ -176,9 +193,10 @@ async def test_head_cas_supersedes_in_order_and_refuses_a_stale_version(decision
     assert (await readiness(env, run)).state == "READY"
 
 
-async def test_concurrent_first_issues_converge_on_one_head(decision_host) -> None:
+async def test_concurrent_first_issues_converge_on_one_head(decision_host, monkeypatch) -> None:
     env = decision_host
     run = await sealed(env)
+    race_writers(monkeypatch, 2)
     outcomes = await asyncio.gather(
         issue(env, request_for(run, command_id="decide-a")),
         issue(env, request_for(run, command_id="decide-b")),
@@ -322,6 +340,21 @@ async def test_crash_before_the_lease_records_nothing(decision_host, monkeypatch
             assert (await session.execute(sa.select(sa.func.count()).select_from(model))).scalar_one() == 0
 
 
+async def test_unavailable_or_overlapping_attestation_refuses_before_any_lease(decision_host, monkeypatch) -> None:
+    env = decision_host
+    run = await sealed(env)
+
+    async def busy(*_args, **_kwargs):
+        raise GovernanceStartupUnavailable
+
+    monkeypatch.setattr(dispositions_service, "verify_governance_activated_startup", busy)
+    with pytest.raises(DispositionUnauthorizedError):
+        await issue(env, request_for(run))
+    async with env["factory"]() as session:
+        for model in (DispositionAuthorizationModel, QualityDispositionModel):
+            assert (await session.execute(sa.select(sa.func.count()).select_from(model))).scalar_one() == 0
+
+
 @pytest.mark.timeout(120)
 async def test_a_lease_admitted_after_its_window_is_refused(decision_host, monkeypatch) -> None:
     env = decision_host
@@ -337,10 +370,11 @@ async def test_a_lease_admitted_after_its_window_is_refused(decision_host, monke
         await issue(env, request_for(run))
 
 
-async def test_concurrent_identical_commands_converge_on_one_disposition(decision_host) -> None:
+async def test_concurrent_identical_commands_converge_on_one_disposition(decision_host, monkeypatch) -> None:
     env = decision_host
     run = await sealed(env)
     request = request_for(run)
+    race_writers(monkeypatch, 2)
     first, second = await asyncio.gather(issue(env, request), issue(env, request))
     assert first == second
     async with env["factory"]() as session:
