@@ -42,9 +42,9 @@ def unmet_slots(profile: q.QualityProfileRevision, run: q.QualityRun) -> tuple[t
             for slot, state in present
             if state not in {"SATISFIED", "NOT_APPLICABLE"}
         ]
-        if len(satisfied) < needed or (requirement.mode == q.RequirementMode.ALL and failing):
-            unmet.extend(failing)
-            missing = {slot.slot_id for slot in requirement.slots} - {slot for slot, _ in present}
+        missing = {slot.slot_id for slot in requirement.slots} - {slot for slot, _ in present}
+        unmet.extend(failing)
+        if len(satisfied) < needed:
             unmet.extend((requirement.requirement_id, slot, "MISSING") for slot in sorted(missing))
     return tuple(sorted(unmet))
 
@@ -62,8 +62,52 @@ def _check_expiry(profile: q.QualityProfileRevision, subject: q.DispositionSubje
         raise WaiverForbiddenError()
 
 
+type _Observed = q.TechnicalObservation | q.NarrativeObservation
+
+
+def waiver_requirements(
+    profile: q.QualityProfileRevision, run: q.QualityRun, observations: tuple[_Observed, ...] | list[_Observed]
+) -> set[tuple[str, str | None, str]]:
+    """(rule, finding, scope) of every BLOCKING finding behind a failed slot; refuses what can never be waived."""
+    rule = profile.policy.disposition_rule
+    slots = {
+        (requirement.requirement_id, slot.slot_id): slot
+        for requirement in profile.policy.assessment_requirements
+        for slot in requirement.slots
+    }
+    unmet = unmet_slots(profile, run)
+    if not unmet or any(state != "FAILED" for _, _, state in unmet):
+        raise WaiverForbiddenError()
+    required: set[tuple[str, str | None, str]] = set()
+    for requirement_id, slot_id, _ in unmet:
+        findings = [
+            finding
+            for observation in observations
+            if (observation.requirement_id, observation.slot_id) == (requirement_id, slot_id)
+            and observation.status == q.ObservationStatus.FAIL
+            for finding in observation.findings
+            if finding.severity == "BLOCKING"
+        ]
+        if not findings:
+            raise WaiverForbiddenError()
+        for finding in findings:
+            if (
+                finding.rule_id not in slots[(requirement_id, slot_id)].rule_ids
+                or finding.rule_id not in rule.waiverable_rule_ids
+                or finding.rule_id in rule.non_waiverable_failure_codes
+            ):
+                raise WaiverForbiddenError()
+            required.add((finding.rule_id, finding.finding_id, f"{requirement_id}:{slot_id}"))
+    return required
+
+
 def evaluate_decision(
-    profile: q.QualityProfileRevision, run: q.QualityRun, subject: q.DispositionSubject, *, now: datetime
+    profile: q.QualityProfileRevision,
+    run: q.QualityRun,
+    subject: q.DispositionSubject,
+    *,
+    now: datetime,
+    observations: tuple[_Observed, ...] | list[_Observed] = (),
 ) -> None:
     """Refuse a decision the sealed run does not support; the caller has verified run currentness."""
     profile = q.QualityProfileRevision.model_validate(profile)
@@ -83,29 +127,9 @@ def evaluate_decision(
         return
     if subject.decision == q.DispositionDecision.REWORK:
         return
-    rule = profile.policy.disposition_rule
-    slots = {
-        (requirement.requirement_id, slot.slot_id): slot
-        for requirement in profile.policy.assessment_requirements
-        for slot in requirement.slots
-    }
-    if not unmet or any(state != "FAILED" for _, _, state in unmet):
-        raise WaiverForbiddenError()
-    failed = {f"{requirement}:{slot}" for requirement, slot, _ in unmet}
-    covered: set[str] = set()
-    for binding in subject.waiver_bindings:
-        requirement, _, slot_id = binding.scope.partition(":")
-        slot = slots.get((requirement, slot_id))
-        if (
-            binding.scope not in failed
-            or slot is None
-            or binding.rule_id not in slot.rule_ids
-            or binding.rule_id not in rule.waiverable_rule_ids
-            or binding.rule_id in rule.non_waiverable_failure_codes
-        ):
-            raise WaiverForbiddenError()
-        covered.add(binding.scope)
-    if covered != failed:
+    required = waiver_requirements(profile, run, observations)
+    covered = {(binding.rule_id, binding.finding_id, binding.scope) for binding in subject.waiver_bindings}
+    if covered != required:
         raise WaiverForbiddenError()
 
 
@@ -124,6 +148,7 @@ def project_readiness(
     run_state: str,
     run_is_head: bool,
     now: datetime,
+    observations: tuple[_Observed, ...] | list[_Observed] = (),
 ) -> Readiness:
     """READY only for an unexpired PASS/WAIVE bound to the current head run; everything else is NOT_READY."""
     repair = tuple((requirement, slot) for requirement, slot, _ in unmet_slots(profile, run))
@@ -145,12 +170,16 @@ def project_readiness(
     if disposition.decision == q.DispositionDecision.REWORK:
         reasons.append("REWORK")
     elif disposition.decision == q.DispositionDecision.WAIVE:
-        waived = {binding.scope for binding in disposition.waiver_bindings}
-        if waived != {f"{requirement}:{slot}" for requirement, slot in repair}:
+        waived = {(binding.rule_id, binding.finding_id, binding.scope) for binding in disposition.waiver_bindings}
+        try:
+            required = waiver_requirements(profile, run, observations)
+        except WaiverForbiddenError:
+            required = set()
+        if not required or waived != required:
             reasons.append("WAIVER_COVERAGE_CHANGED")
     elif repair:
         reasons.append("REQUIREMENTS_UNMET")
     return Readiness("READY" if not reasons else "NOT_READY", tuple(reasons), repair)
 
 
-__all__ = ["Readiness", "evaluate_decision", "project_readiness", "unmet_slots"]
+__all__ = ["Readiness", "evaluate_decision", "project_readiness", "unmet_slots", "waiver_requirements"]

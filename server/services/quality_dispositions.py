@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Self
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import r2.contracts.quality as q
@@ -33,7 +33,14 @@ from r2.quality.runs import run_digest
 from server.auth import get_current_interactive_user
 from server.services.governance_grants import CheckpointedShowrunnerGrantReader, ShowrunnerGrantUnavailableError
 from server.services.governance_startup import GovernanceStartupUnavailable, verify_governance_activated_startup
-from server.services.quality_runs import lock_profile_head, lock_subject_masters, validity_in
+from server.services.quality_runs import (
+    human_principals,
+    load_run_observations,
+    lock_grant_heads,
+    lock_profile_head,
+    lock_subject_masters,
+    validity_in,
+)
 
 DISPOSITION_POLICY_ID = "m10.disposition.interactive-human.v1"
 DISPOSITION_POLICY_VERSION = "1"
@@ -237,7 +244,6 @@ class DispositionService:
             replayed = await repository.receipt(key, digest)
             if replayed is not None:
                 return replayed
-            now = await self._custodian.admit(session, request, lease)
             run = await QualityRunRepository(session).run(
                 user_id=subject.user_id, project_name=subject.project_name, run_id=subject.quality_run_id
             )
@@ -267,16 +273,6 @@ class DispositionService:
             )
             if head_run != run.run_id:
                 raise DispositionStaleError()
-            validity = await validity_in(
-                session,
-                self._custodian.reader,
-                project_root=self._project_root,
-                user_id=subject.user_id,
-                project_name=subject.project_name,
-                run_id=run.run_id,
-            )
-            if validity.state != "CURRENT":
-                raise DispositionStaleError()
             profile = await QualityProfileRepository(session).get_revision(
                 user_id=subject.user_id,
                 project_name=subject.project_name,
@@ -285,7 +281,38 @@ class DispositionService:
             )
             if profile is None:
                 raise DispositionStaleError()
-            evaluate_decision(profile, run, subject, now=now)
+            await lock_grant_heads(
+                session,
+                user_id=subject.user_id,
+                project_name=subject.project_name,
+                principals={subject.actor_id}
+                | await human_principals(
+                    session,
+                    user_id=subject.user_id,
+                    project_name=subject.project_name,
+                    observation_ids=list(run.observation_refs),
+                ),
+            )
+            observations, intact = await load_run_observations(
+                session,
+                self._custodian.reader,
+                user_id=subject.user_id,
+                project_name=subject.project_name,
+                profile=profile,
+                run=run,
+            )
+            now = await self._custodian.admit(session, request, lease)
+            validity = await validity_in(
+                session,
+                self._custodian.reader,
+                project_root=self._project_root,
+                user_id=subject.user_id,
+                project_name=subject.project_name,
+                run_id=run.run_id,
+            )
+            if validity.state != "CURRENT" or not intact:
+                raise DispositionStaleError()
+            evaluate_decision(profile, run, subject, now=now, observations=observations)
             if subject.expected_disposition_version != version:
                 raise StaleHeadError()
             await self._custodian.require_actor(request)
@@ -326,39 +353,54 @@ async def quality_readiness(
     subject_digest: str,
     profile_id: str,
 ) -> Readiness:
-    """Recompute readiness at database time from the head disposition, the head run and its validity."""
+    """Recompute readiness at database time from one consistent snapshot; any integrity failure is NOT_READY."""
     reader = await grant_reader()
     async with sessions() as session, session.begin():
+        await session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
         dispositions = QualityDispositionRepository(session)
         runs = QualityRunRepository(session)
         now = await dispositions.database_now()
-        head_run_id = await runs.head(
-            user_id=user_id, project_name=project_name, subject_digest=subject_digest, profile_id=profile_id
-        )
         try:
+            head_run_id = await runs.head(
+                user_id=user_id, project_name=project_name, subject_digest=subject_digest, profile_id=profile_id
+            )
             disposition = await dispositions.head_disposition(
                 user_id=user_id, project_name=project_name, subject_digest=subject_digest, profile_id=profile_id
             )
-        except M10Error:
-            return Readiness("NOT_READY", ("DISPOSITION_NOT_INTACT",), ())
-        run_id = disposition.quality_run_id if disposition is not None else head_run_id
-        if run_id is None:
-            return Readiness("NOT_READY", ("NO_RUN",), ())
-        run = await runs.run(user_id=user_id, project_name=project_name, run_id=run_id)
-        profile = (
-            None
-            if run is None
-            else await QualityProfileRepository(session).get_revision(
-                user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
+            run_id = disposition.quality_run_id if disposition is not None else head_run_id
+            if run_id is None:
+                return Readiness("NOT_READY", ("NO_RUN",), ())
+            run = await runs.run(user_id=user_id, project_name=project_name, run_id=run_id)
+            profile = (
+                None
+                if run is None
+                else await QualityProfileRepository(session).get_revision(
+                    user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
+                )
             )
-        )
-        if run is None or profile is None:
-            return Readiness("NOT_READY", ("RUN_NOT_INTACT",), ())
-        validity = await validity_in(
-            session, reader, project_root=project_root, user_id=user_id, project_name=project_name, run_id=run.run_id
-        )
+            if run is None or profile is None:
+                return Readiness("NOT_READY", ("RUN_NOT_INTACT",), ())
+            observations, _ = await load_run_observations(
+                session, reader, user_id=user_id, project_name=project_name, profile=profile, run=run
+            )
+            validity = await validity_in(
+                session,
+                reader,
+                project_root=project_root,
+                user_id=user_id,
+                project_name=project_name,
+                run_id=run.run_id,
+            )
+        except (M10Error, ValueError):
+            return Readiness("NOT_READY", ("EVIDENCE_NOT_INTACT",), ())
         return project_readiness(
-            disposition, profile, run, run_state=validity.state, run_is_head=head_run_id == run.run_id, now=now
+            disposition,
+            profile,
+            run,
+            run_state=validity.state,
+            run_is_head=head_run_id == run.run_id,
+            now=now,
+            observations=observations,
         )
 
 

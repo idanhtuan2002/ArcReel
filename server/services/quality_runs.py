@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import r2.contracts.quality as q
 from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifestAdapter
+from lib.db.models.governance_grant import ShowrunnerGrantHeadModel
 from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.db.repositories.quality import QualityProfileRepository
@@ -135,6 +136,34 @@ async def lock_profile_head(session: AsyncSession, *, user_id: str, project_name
     ).scalar_one_or_none()
     if head is None:
         raise ProfileStaleError()
+
+
+async def lock_grant_heads(session: AsyncSession, *, user_id: str, project_name: str, principals: set[str]) -> None:
+    """Lock every grant head a writer will read, sorted by principal, so all M10 writers share one order:
+    command -> master rows -> profile/run/disposition heads -> grant heads (sorted) -> grant checks."""
+    for principal in sorted(principals):
+        await session.execute(
+            select(ShowrunnerGrantHeadModel.principal)
+            .filter_by(user_id=user_id, project_name=project_name, principal=principal)
+            .with_for_update()
+        )
+
+
+async def human_principals(
+    session: AsyncSession, *, user_id: str, project_name: str, observation_ids: list[str]
+) -> set[str]:
+    repository = QualityRunRepository(session)
+    principals: set[str] = set()
+    for observation_id in observation_ids:
+        try:
+            stored = await repository.human_observation(
+                user_id=user_id, project_name=project_name, observation_id=observation_id
+            )
+        except M10Error:
+            continue
+        if stored is not None:
+            principals.add(stored.observation.assessor_identity)
+    return principals
 
 
 async def _require_profile(session: AsyncSession, profile: q.QualityProfileRevision) -> None:
@@ -275,6 +304,9 @@ class HumanObservationService:
             await _require_profile(session, request.profile)
             if not await _subject_authoritative(session, self._project_root, request.subject):
                 raise SubjectStaleError()
+            await lock_grant_heads(
+                session, user_id=request.user_id, project_name=request.project_name, principals={request.actor_id}
+            )
             grant = await _grant(reader, session, GrantScopeV1(request.user_id, request.project_name, request.actor_id))
             await _require_actor(self._token, request.user_id, request.actor_id)
             now = self._clock()
@@ -455,6 +487,21 @@ class QualityRunService:
             )
             if not await _subject_authoritative(session, self._project_root, subject.subject):
                 raise SubjectStaleError()
+            await lock_grant_heads(
+                session,
+                user_id=subject.user_id,
+                project_name=subject.project_name,
+                principals=await human_principals(
+                    session,
+                    user_id=subject.user_id,
+                    project_name=subject.project_name,
+                    observation_ids=[
+                        binding.observation_id
+                        for binding in subject.observations
+                        if binding.observation_type == q.ObservationType.NARRATIVE
+                    ],
+                ),
+            )
             admitted = [
                 await _admit(
                     session,
@@ -490,6 +537,58 @@ class QualityRunService:
             return run
 
 
+async def load_run_observations(
+    session: AsyncSession,
+    reader: CheckpointedShowrunnerGrantReader,
+    *,
+    user_id: str,
+    project_name: str,
+    profile: q.QualityProfileRevision,
+    run: q.QualityRun,
+) -> tuple[list[q.TechnicalObservation | q.NarrativeObservation], bool]:
+    """Re-verify every observation a sealed run names; returns those still admitted and whether all were."""
+    kinds = {
+        (requirement.requirement_id, slot.slot_id): slot.kind
+        for requirement in profile.policy.assessment_requirements
+        for slot in requirement.slots
+    }
+    types = {
+        q.AssessorKind.TECHNICAL: q.ObservationType.TECHNICAL,
+        q.AssessorKind.NARRATIVE: q.ObservationType.NARRATIVE,
+    }
+    await lock_grant_heads(
+        session,
+        user_id=user_id,
+        project_name=project_name,
+        principals=await human_principals(
+            session, user_id=user_id, project_name=project_name, observation_ids=list(run.observation_refs)
+        ),
+    )
+    observations: list[q.TechnicalObservation | q.NarrativeObservation] = []
+    intact = True
+    for result in run.slot_results:
+        observation_type = types.get(kinds.get((result.requirement_id, result.slot_id)))  # pyright: ignore[reportArgumentType]
+        for observation_id, expected in zip(result.observation_refs, result.observation_digests, strict=True):
+            if observation_type is None:
+                intact = False
+                continue
+            binding = q.ObservationBinding(
+                observation_id=observation_id,
+                observation_type=observation_type,
+                observation_digest=expected,
+                requirement_id=result.requirement_id,
+                slot_id=result.slot_id,
+            )
+            try:
+                admitted = await _admit(
+                    session, reader, user_id=user_id, project_name=project_name, profile=profile, binding=binding
+                )
+                observations.append(admitted.observation)
+            except M10Error:
+                intact = False
+    return (observations, intact)
+
+
 async def run_validity(
     sessions: async_sessionmaker[AsyncSession],
     grant_reader: GrantReaderFactory,
@@ -518,7 +617,7 @@ async def validity_in(
 ) -> RunValidity:
     """Validity inside the caller's PostgreSQL transaction, so writers can decide under their own locks."""
     _require_postgresql_transaction(session)
-    now = (await session.execute(select(func.now()))).scalar_one()
+    now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
     repository = QualityRunRepository(session)
     run = await repository.run(user_id=user_id, project_name=project_name, run_id=run_id)
     if run is None:
@@ -532,37 +631,9 @@ async def validity_in(
         profile = None
     if profile is None or profile.profile_digest != run.profile_digest:
         return RunValidity("INVALIDATED", ("PROFILE_NOT_INTACT",))
-    kinds = {
-        (requirement.requirement_id, slot.slot_id): slot.kind
-        for requirement in profile.policy.assessment_requirements
-        for slot in requirement.slots
-    }
-    types = {
-        q.AssessorKind.TECHNICAL: q.ObservationType.TECHNICAL,
-        q.AssessorKind.NARRATIVE: q.ObservationType.NARRATIVE,
-    }
-    observations: list[q.TechnicalObservation | q.NarrativeObservation] = []
-    intact = True
-    for result in run.slot_results:
-        observation_type = types.get(kinds.get((result.requirement_id, result.slot_id)))  # pyright: ignore[reportArgumentType]
-        for observation_id, expected in zip(result.observation_refs, result.observation_digests, strict=True):
-            if observation_type is None:
-                intact = False
-                continue
-            binding = q.ObservationBinding(
-                observation_id=observation_id,
-                observation_type=observation_type,
-                observation_digest=expected,
-                requirement_id=result.requirement_id,
-                slot_id=result.slot_id,
-            )
-            try:
-                admitted = await _admit(
-                    session, reader, user_id=user_id, project_name=project_name, profile=profile, binding=binding
-                )
-                observations.append(admitted.observation)
-            except M10Error:
-                intact = False
+    observations, intact = await load_run_observations(
+        session, reader, user_id=user_id, project_name=project_name, profile=profile, run=run
+    )
     head = await repository.head(
         user_id=user_id, project_name=project_name, subject_digest=run.subject_digest, profile_id=run.profile_id
     )
@@ -594,6 +665,9 @@ __all__ = [
     "HUMAN_ASSESSOR_VERSION",
     "HumanObservationService",
     "QualityRunService",
+    "human_principals",
+    "load_run_observations",
+    "lock_grant_heads",
     "lock_profile_head",
     "lock_subject_masters",
     "run_validity",

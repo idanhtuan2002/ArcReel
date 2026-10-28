@@ -84,19 +84,21 @@ def test_waive_covers_exactly_the_failed_waiverable_slots() -> None:
     from tests.unit.r2.quality.test_quality_profiles import publication_request, publish
 
     revision = publish(publication_request(policy=policy))
-    run = close(
-        revision,
-        admitted(revision, "TECHNICAL", "technical-required", "technical", "FAIL"),
-        admitted(revision, "NARRATIVE", "review-required", "human"),
-    )
-    rules().evaluate_decision(revision, run, subject(run, "WAIVE", waivers=[waiver()]), now=NOW)
+    blocking = finding("probe", 4)
+    technical = admitted(revision, "TECHNICAL", "technical-required", "technical", "FAIL", findings=[blocking])
+    run = close(revision, technical, admitted(revision, "NARRATIVE", "review-required", "human"))
+    observations = [technical.observation]
+    exact = waiver() | {"finding_id": blocking["finding_id"]}
+    rules().evaluate_decision(revision, run, subject(run, "WAIVE", waivers=[exact]), now=NOW, observations=observations)
     for bad in (
         [waiver(scope="review-required:human", rule_id="review")],
         [waiver(), waiver(scope="review-required:human", rule_id="review")],
         [waiver(rule_id="review")],
     ):
         with pytest.raises(WaiverForbiddenError):
-            rules().evaluate_decision(revision, run, subject(run, "WAIVE", waivers=bad), now=NOW)
+            rules().evaluate_decision(
+                revision, run, subject(run, "WAIVE", waivers=bad), now=NOW, observations=observations
+            )
 
 
 def test_rules_outside_the_waiverable_set_and_incomplete_evidence_cannot_be_waived() -> None:
@@ -202,3 +204,93 @@ def test_rework_is_not_ready_and_routes_the_unmet_slots() -> None:
     )
     assert projected.state == "NOT_READY"
     assert projected.repair_slots == (("technical-required", "technical"),)
+
+
+def finding(rule_id: str, number: int) -> dict[str, Any]:
+    return {
+        "finding_id": f"0199f00d-0000-7000-8000-00000000f{number:03d}",
+        "rule_id": rule_id,
+        "severity": "BLOCKING",
+        "subject_locator": "media",
+        "evidence_digest": DIGEST,
+    }
+
+
+def failing_review(
+    rules_ids: list[str], waiverable: list[str], non_waivable: list[str], findings: list[dict[str, Any]]
+):
+    from tests.unit.r2.quality.test_quality_profiles import publication_request, publish
+
+    from tests.unit.r2.contracts.test_quality import policy_data
+
+    policy = policy_data()
+    policy["assessment_requirements"] = [requirement("review-required", [human_slot("human", rule_ids=rules_ids)])]
+    policy["rule_ids"] = sorted(set(policy["rule_ids"]) | set(rules_ids))
+    policy["disposition_rule"].update(waiverable_rule_ids=waiverable, non_waiverable_failure_codes=non_waivable)
+    revision = publish(publication_request(policy=policy))
+    observation = admitted(revision, "NARRATIVE", "review-required", "human", "FAIL", findings=findings)
+    return revision, close(revision, observation), [observation.observation]
+
+
+def test_waiver_must_cover_the_actual_failing_findings_not_another_slot_rule() -> None:
+    blocking = finding("identity_check", 1)
+    revision, run, observations = failing_review(["style", "identity_check"], ["style"], [], [blocking])
+    forged = {"rule_id": "style", "finding_id": None, "scope": "review-required:human", "justification": "x"}
+    with pytest.raises(WaiverForbiddenError):
+        rules().evaluate_decision(
+            revision, run, subject(run, "WAIVE", waivers=[forged]), now=NOW, observations=observations
+        )
+
+
+def test_non_waivable_failure_codes_refuse_even_when_listed_waiverable() -> None:
+    blocking = finding("identity_check", 2)
+    revision, run, observations = failing_review(["identity_check"], ["identity_check"], ["identity_check"], [blocking])
+    binding = {
+        "rule_id": "identity_check",
+        "finding_id": blocking["finding_id"],
+        "scope": "review-required:human",
+        "justification": "x",
+    }
+    with pytest.raises(WaiverForbiddenError):
+        rules().evaluate_decision(
+            revision, run, subject(run, "WAIVE", waivers=[binding]), now=NOW, observations=observations
+        )
+
+
+def test_exact_finding_waiver_is_admitted() -> None:
+    blocking = finding("style", 3)
+    revision, run, observations = failing_review(["style"], ["style"], [], [blocking])
+    binding = {
+        "rule_id": "style",
+        "finding_id": blocking["finding_id"],
+        "scope": "review-required:human",
+        "justification": "x",
+    }
+    assert (
+        rules().evaluate_decision(
+            revision, run, subject(run, "WAIVE", waivers=[binding]), now=NOW, observations=observations
+        )
+        is None
+    )
+
+
+def test_a_failure_without_findings_cannot_be_waived() -> None:
+    revision, run, observations = failing_review(["style"], ["style"], [], [])
+    binding = {"rule_id": "style", "finding_id": None, "scope": "review-required:human", "justification": "x"}
+    with pytest.raises(WaiverForbiddenError):
+        rules().evaluate_decision(
+            revision, run, subject(run, "WAIVE", waivers=[binding]), now=NOW, observations=observations
+        )
+
+
+def test_n_of_m_pass_is_blocked_by_a_present_failed_slot() -> None:
+    revision = profile(
+        requirement("review-required", [human_slot("a"), human_slot("b")], mode="N_OF_M", minimum_satisfied_slots=1)
+    )
+    run = close(
+        revision,
+        admitted(revision, "NARRATIVE", "review-required", "a", "PASS", independence_group="human:a"),
+        admitted(revision, "NARRATIVE", "review-required", "b", "FAIL", independence_group="human:b"),
+    )
+    with pytest.raises(DispositionUnauthorizedError):
+        rules().evaluate_decision(revision, run, subject(run, "PASS"), now=NOW)

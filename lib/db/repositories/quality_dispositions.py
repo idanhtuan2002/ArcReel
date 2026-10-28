@@ -127,6 +127,9 @@ class QualityDispositionRepository:
             return None
         if row.request_digest != request_digest:
             raise CommandReplayConflictError()
+        stored_row = await self.session.get(QualityDispositionModel, (key.user_id, key.project_name, row.result_ref))
+        if stored_row is None or (stored_row.actor_id, stored_row.command_id) != (key.actor_id, key.command_id):
+            raise RequiredEvidenceMissingError()
         stored = await self.disposition(
             user_id=key.user_id, project_name=key.project_name, disposition_id=row.result_ref
         )

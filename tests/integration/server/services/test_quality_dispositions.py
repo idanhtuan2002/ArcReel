@@ -241,3 +241,109 @@ async def test_raw_update_and_delete_are_refused(decision_host, table: str) -> N
         with pytest.raises(sa.exc.DBAPIError, match="M10_IMMUTABLE_DISPOSITION_ROW"):
             async with env["factory"]() as session, session.begin():
                 await session.execute(sa.text(statement))
+
+
+async def failed_review_run(env):
+    from r2.advanced_creative.exploration import uuid7
+
+    finding = {
+        "finding_id": uuid7(),
+        "rule_id": "review",
+        "severity": "BLOCKING",
+        "subject_locator": "media",
+        "evidence_digest": "sha256:" + "c" * 64,
+    }
+    probe = await technical(env)
+    review = await human(env, human_request(env, status="FAIL", findings=[finding]))
+    run = await seal(env, completion(env, [probe, review]))
+    return run, finding
+
+
+async def test_exact_finding_waiver_is_issued_and_ready(decision_host) -> None:
+    env = decision_host
+    run, finding = await failed_review_run(env)
+    binding = {
+        "rule_id": "review",
+        "finding_id": finding["finding_id"],
+        "scope": "review-required:human",
+        "justification": "accepted for the export-only pilot",
+    }
+    soon = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
+    disposition = await issue(env, request_for(run, "WAIVE", waiver_bindings=[binding], requested_expires_at=soon))
+    assert disposition.decision == q.DispositionDecision.WAIVE
+    assert (await readiness(env, run)).state == "READY"
+
+
+async def test_waiver_naming_another_finding_or_rule_is_forbidden(decision_host) -> None:
+    env = decision_host
+    run, _ = await failed_review_run(env)
+    forged = {"rule_id": "review", "finding_id": None, "scope": "review-required:human", "justification": "x"}
+    with pytest.raises(WaiverForbiddenError):
+        await issue(env, request_for(run, "WAIVE", waiver_bindings=[forged]))
+
+
+async def test_actor_without_a_grant_cannot_obtain_a_lease(decision_host) -> None:
+    env = decision_host
+    run = await sealed(env)
+    request = request_for(run).model_dump(mode="json")
+    request["command"]["actor_id"] = request["subject"]["actor_id"] = "intruder"
+    request["command"]["request_digest"] = compute_digest("m10.disposition-request.v1", request)
+    intruder = q.DispositionAuthorizationRequest.model_validate(request)
+    root_dir, socket_dir = env["governance"]
+    custodian = await DispositionCustodian.for_request(
+        intruder,
+        env["factory"],
+        interactive_token=auth.create_token("intruder"),
+        read_directory=root_dir / "read",
+        socket_directory=socket_dir,
+        expected_uid=os.getuid(),
+        expected_gid=os.getgid(),
+    )
+    with pytest.raises(DispositionUnauthorizedError):
+        await DispositionService(env["factory"], custodian=custodian, project_root=env["project"]).issue(intruder)
+    async with env["factory"]() as session:
+        assert (
+            await session.execute(sa.select(sa.func.count()).select_from(DispositionAuthorizationModel))
+        ).scalar_one() == 0
+
+
+async def test_crash_before_the_lease_records_nothing(decision_host, monkeypatch) -> None:
+    env = decision_host
+    run = await sealed(env)
+
+    async def crash(self, request):
+        raise SystemExit("process lost before the lease")
+
+    monkeypatch.setattr(DispositionCustodian, "authorize_disposition", crash)
+    with pytest.raises(SystemExit):
+        await issue(env, request_for(run))
+    async with env["factory"]() as session:
+        for model in (DispositionAuthorizationModel, QualityDispositionModel):
+            assert (await session.execute(sa.select(sa.func.count()).select_from(model))).scalar_one() == 0
+
+
+@pytest.mark.timeout(120)
+async def test_a_lease_admitted_after_its_window_is_refused(decision_host, monkeypatch) -> None:
+    env = decision_host
+    run = await sealed(env)
+    original = DispositionCustodian.admit
+
+    async def late(self, session, request, lease):
+        await asyncio.sleep(31)
+        return await original(self, session, request, lease)
+
+    monkeypatch.setattr(DispositionCustodian, "admit", late)
+    with pytest.raises(DispositionUnauthorizedError):
+        await issue(env, request_for(run))
+
+
+async def test_concurrent_identical_commands_converge_on_one_disposition(decision_host) -> None:
+    env = decision_host
+    run = await sealed(env)
+    request = request_for(run)
+    first, second = await asyncio.gather(issue(env, request), issue(env, request))
+    assert first == second
+    async with env["factory"]() as session:
+        assert (
+            await session.execute(sa.select(sa.func.count()).select_from(QualityDispositionModel))
+        ).scalar_one() == 1
