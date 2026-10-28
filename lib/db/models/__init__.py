@@ -106,6 +106,8 @@ from lib.db.models.quality_dispositions import (
     QualityDispositionModel,
 )
 from lib.db.models.quality_packaging import (
+    ExportInvocationModel,
+    ExportReceiptModel,
     PackagePreviewModel,
     PackageSelectionAuthorizationModel,
     PackageSelectionModel,
@@ -187,6 +189,8 @@ __all__ = [
     "DispositionHeadModel",
     "DispositionOutboxModel",
     "ExecutionAttemptModel",
+    "ExportInvocationModel",
+    "ExportReceiptModel",
     "FinalCutReceiptModel",
     "FormatPlanModel",
     "FormatProfileModel",

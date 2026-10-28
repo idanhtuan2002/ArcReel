@@ -182,7 +182,86 @@ class PackagingHeadModel(Base):
     updated_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
 
 
+class ExportInvocationModel(Base):
+    """One prepared export: the M7 execution it is bound to and the manifest it must materialize."""
+
+    __tablename__ = "m10_export_invocations"
+    __table_args__ = (
+        *json_ceiling("m10_export_invocations", "manifest_json"),
+        *json_ceiling("m10_export_invocations", "request_json"),
+        sa.PrimaryKeyConstraint("user_id", "project_name", "execution_id", name="pk_m10_export_invocations"),
+        sa.UniqueConstraint(
+            "user_id", "project_name", "actor_id", "command_id", name="uq_m10_export_invocations_command"
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id", "project_name", "selection_id"],
+            [
+                "m10_package_selections.user_id",
+                "m10_package_selections.project_name",
+                "m10_package_selections.selection_id",
+            ],
+            name="fk_m10_export_invocations_selection",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id", "project_name", "execution_id"],
+            ["execution_attempts.user_id", "execution_attempts.project_name", "execution_attempts.execution_id"],
+            name="fk_m10_export_invocations_attempt",
+            ondelete="RESTRICT",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+    )
+
+    user_id: Mapped[str] = mapped_column(sa.String, sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    project_name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    execution_id: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    actor_id: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    command_id: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    request_digest: Mapped[str] = mapped_column(sa.String(71), nullable=False)
+    request_json: Mapped[dict[str, Any]] = mapped_column(sa.JSON, nullable=False)
+    selection_id: Mapped[str] = mapped_column(sa.String(36), nullable=False)
+    task_id: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    manifest_digest: Mapped[str] = mapped_column(sa.String(71), nullable=False)
+    manifest_json: Mapped[dict[str, Any]] = mapped_column(sa.JSON, nullable=False)
+    identity_digest: Mapped[str] = mapped_column(sa.String(71), nullable=False)
+    prepared_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+
+
+class ExportReceiptModel(Base):
+    __tablename__ = "m10_export_receipts"
+    __table_args__ = (
+        *json_ceiling("m10_export_receipts", "receipt_json"),
+        sa.PrimaryKeyConstraint("user_id", "project_name", "receipt_id", name="pk_m10_export_receipts"),
+        sa.UniqueConstraint("user_id", "project_name", "execution_id", name="uq_m10_export_receipts_execution"),
+        sa.ForeignKeyConstraint(
+            ["user_id", "project_name", "execution_id"],
+            [
+                "m10_export_invocations.user_id",
+                "m10_export_invocations.project_name",
+                "m10_export_invocations.execution_id",
+            ],
+            name="fk_m10_export_receipts_invocation",
+            ondelete="RESTRICT",
+        ),
+        sa.CheckConstraint("archive_byte_size > 0", name="ck_m10_export_receipts_size"),
+    )
+
+    user_id: Mapped[str] = mapped_column(sa.String, sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    project_name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    receipt_id: Mapped[str] = mapped_column(sa.String(36), nullable=False)
+    execution_id: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    archive_ref: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    archive_digest: Mapped[str] = mapped_column(sa.String(71), nullable=False)
+    archive_byte_size: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    receipt_digest: Mapped[str] = mapped_column(sa.String(71), nullable=False)
+    receipt_json: Mapped[dict[str, Any]] = mapped_column(sa.JSON, nullable=False)
+    exported_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+
+
 __all__ = [
+    "ExportInvocationModel",
+    "ExportReceiptModel",
     "PackagePreviewModel",
     "PackageSelectionAuthorizationModel",
     "PackageSelectionModel",
