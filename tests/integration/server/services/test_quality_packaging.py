@@ -50,7 +50,11 @@ from tests.unit.r2.contracts.test_packaging import candidate_body, constraints_d
 type Factory = async_sessionmaker[AsyncSession]
 
 NOW = datetime(2026, 10, 29, tzinfo=UTC)
-PACKAGING_MIGRATION = "6e3b8d4f9c22_m10_packaging_observations.py"
+PACKAGING_MIGRATIONS = (
+    "bed415be3608_quality_disposition.py",
+    "6e3b8d4f9c22_m10_packaging_observations.py",
+    "7f4c9e5a0d33_m10_package_selection.py",
+)
 
 
 def v2_policy(config) -> dict[str, Any]:
@@ -81,7 +85,7 @@ async def packaging_host(session_factory: Factory, tmp_path: Path, monkeypatch: 
         if session.get_bind().dialect.name != "postgresql":
             pytest.skip("packaging custody requires real PostgreSQL")
         connection = await session.connection()
-        for name in (*MIGRATIONS, PACKAGING_MIGRATION):
+        for name in (*MIGRATIONS, *PACKAGING_MIGRATIONS):
             await connection.run_sync(install(name))
     (tmp_path / "governance").mkdir(mode=0o700)
     root_dir, socket_dir, *_ = await prepare_qualified_custody(factory, tmp_path / "governance")
@@ -117,6 +121,7 @@ async def packaging_host(session_factory: Factory, tmp_path: Path, monkeypatch: 
         ),
         "catalog": ProbeCatalog(schema_id="m10.probe-catalog.v1", configs=(config,)),
         "reader": reader,
+        "governance": (root_dir, socket_dir),
     }
     write_manifest(project, subject_of(env))
     async with serve_governance_attestor(
