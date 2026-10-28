@@ -129,7 +129,8 @@ ceiling, required locales, variant group bounds (§3.3), and the declared `rules
 `PackagingSelectionAuthorizationLease` (`action = PACKAGING_SELECTION`, ≤30 s, DB-time admission) from the signed
 HUMAN_SHOWRUNNER grant, outside the transaction, reusing the A6 custodian/attestor pattern and `require_actor`
 JWT binding. The lease's `evidence_digest` binds the preview digest, which binds the observation digest and the
-waived finding ids. The agent cannot obtain it.
+waived finding ids. The agent cannot obtain it. Lease refusals use the frozen `M10_DISPOSITION_UNAUTHORIZED`
+("Human custodian lease is absent/invalid"); no new stop code is added.
 
 **D6 Export is a ZIP_STORED archive.** Every `ZipInfo` field fixed: `compress_type=ZIP_STORED`,
 `date_time=(1980,1,1,0,0,0)`, `create_system=3`, `create_version=extract_version=20`, `flag_bits=0` (member paths are

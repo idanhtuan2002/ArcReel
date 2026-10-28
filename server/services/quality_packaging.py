@@ -29,8 +29,8 @@ from r2.advanced_creative.digests import digest_canonical, digest_payload
 from r2.advanced_creative.exploration import uuid7
 from r2.contracts import packaging as p
 from r2.contracts import quality as q
-from r2.contracts.advanced_creative import ExplorationKind, PackagingCandidate
-from r2.quality.digests import compute_digest
+from r2.contracts.advanced_creative import ExplorationKind, ExplorationRevision, PackagingCandidate
+from r2.quality.digests import compute_digest, verify_packaging_closures
 from r2.quality.errors import (
     OperationalEnvelopeExceededError,
     ProfileStaleError,
@@ -219,6 +219,43 @@ def _finding(outcome: RuleOutcome) -> q.QualityFinding:
     )
 
 
+def require_packaging_lineage(
+    revision: ExplorationRevision, run: q.QualityRun, profile: q.QualityProfileRevision, project_name: str
+) -> PackagingCandidate:
+    """A PACKAGING revision whose digests, closures and M8 lineage name exactly this run, master and profile."""
+    payload = revision.payload
+    if (
+        revision.kind is not ExplorationKind.PACKAGING
+        or not isinstance(payload, PackagingCandidate)
+        or digest_payload(payload, revision.lineage) != revision.payload_digest
+    ):
+        raise SubjectStaleError()
+    try:
+        verify_packaging_closures(payload)
+    except ValueError:
+        raise SubjectStaleError() from None
+    lineage = revision.lineage
+    if (
+        lineage.project_name,
+        lineage.content_basis_digest,
+        lineage.approved_master_id,
+        lineage.approved_master_digest,
+        lineage.creative_profile_id,
+        lineage.creative_profile_version,
+        lineage.policy_digest,
+    ) != (
+        project_name,
+        run.subject.content_basis_digest,
+        run.subject.master_binding.root.candidate_id,
+        run.subject.artifact_digest,
+        run.profile_id,
+        str(run.profile_revision),
+        profile.policy_digest,
+    ):
+        raise SubjectStaleError()
+    return payload
+
+
 class PackagingCheckService:
     def __init__(
         self,
@@ -341,25 +378,7 @@ class PackagingCheckService:
                 raise ProfileStaleError()
             if not isinstance(profile.policy, q.QualityPolicyV2):
                 raise ProfileStaleError()
-            lineage = revision.lineage
-            if (
-                lineage.project_name,
-                lineage.content_basis_digest,
-                lineage.approved_master_id,
-                lineage.approved_master_digest,
-                lineage.creative_profile_id,
-                lineage.creative_profile_version,
-                lineage.policy_digest,
-            ) != (
-                project_name,
-                run.subject.content_basis_digest,
-                run.subject.master_binding.root.candidate_id,
-                run.subject.artifact_digest,
-                run.profile_id,
-                str(run.profile_revision),
-                profile.policy_digest,
-            ):
-                raise SubjectStaleError()
+            require_packaging_lineage(revision, run, profile, project_name)
             duration_ms, width, height = await self._container_facts(session, run, user_id, project_name)
         facts = PackagingFacts(
             approved_master_id=run.subject.master_binding.root.candidate_id,
@@ -461,4 +480,4 @@ class PackagingCheckService:
         )
 
 
-__all__ = ["CHECK_CONFIG_DIGEST", "PackagingCheckService"]
+__all__ = ["CHECK_CONFIG_DIGEST", "PackagingCheckService", "require_packaging_lineage"]
