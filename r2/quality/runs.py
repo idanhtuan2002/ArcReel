@@ -14,7 +14,7 @@ from typing import Literal
 
 import r2.contracts.quality as q
 from r2.advanced_creative.digests import digest_canonical
-from r2.quality.digests import compute_digest
+from r2.quality.digests import compute_digest, verify_caches
 from r2.quality.errors import ProfileStaleError, RequiredEvidenceMissingError, SubjectStaleError
 
 HUMAN_SHOWRUNNER_POLICY_ID = "m10.qualification.human-showrunner.v1"
@@ -167,6 +167,11 @@ def close_run(
     """Seal complete evidence into a `QualityRun`; every digest is recomputed, none is trusted."""
     profile = q.QualityProfileRevision.model_validate(profile)
     subject = q.AssessedSubject.model_validate(subject)
+    try:
+        verify_caches(profile)
+        verify_caches(subject)
+    except ValueError:
+        raise RequiredEvidenceMissingError() from None
     policy = profile.policy
     subject_digest = compute_digest("m10.assessed-subject.v1", subject)
     slots = {
@@ -221,11 +226,20 @@ def close_run(
                 resolved = "SATISFIED"
             elif arbiter_states == {"FAILED"}:
                 resolved = "FAILED"
+        finals: dict[str, SlotState] = {}
         for item in items:
             assessed = states[(requirement.requirement_id, item.slot.slot_id)]
             state: SlotState = "INDETERMINATE" if assessed == "DISAGREEMENT" else assessed
-            if disagreement:
+            # Escalation resolves only judgment disagreement, never an independence or admission deficiency.
+            if disagreement and assessed in {"SATISFIED", "FAILED", "DISAGREEMENT"}:
                 state = resolved or "INDETERMINATE"
+            finals[item.slot.slot_id] = state
+        groups = {item.slot.slot_id: {o.independence_group for o in item.observations} for item in items}
+        counted = [slot_id for slot_id, state in finals.items() if state != "INDETERMINATE"]
+        for slot_id in counted:
+            if any(other != slot_id and groups[slot_id] & groups[other] for other in counted):
+                finals[slot_id] = "INDETERMINATE"
+        for item in items:
             ordered = sorted(item.observations, key=lambda o: o.observation_id)
             results.append(
                 q.AssessmentSlotResult(
@@ -237,7 +251,7 @@ def close_run(
                         for o in ordered
                     ),
                     distinct_independence_groups=tuple(sorted({o.independence_group for o in ordered})),
-                    state=state,
+                    state=finals[item.slot.slot_id],
                     escalation_observation_refs=escalation,
                 )
             )

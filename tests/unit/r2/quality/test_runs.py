@@ -283,3 +283,45 @@ def test_validity_is_a_projection_with_fixed_precedence() -> None:
     assert state(newer_profile_reevaluates=True) == "SUPERSEDED"
     assert state(subject_current=False, newer_run=True) == "STALE"
     assert state(evidence_intact=False, subject_current=False) == "INVALIDATED"
+
+
+def test_one_assessor_cannot_satisfy_several_slots_of_a_requirement() -> None:
+    pair = profile(requirement("review-required", [human_slot("a"), human_slot("b")]))
+    run = close(
+        pair,
+        admitted(pair, "NARRATIVE", "review-required", "a"),
+        admitted(pair, "NARRATIVE", "review-required", "b"),
+    )
+    assert {r.state for r in run.slot_results} == {"INDETERMINATE"}
+
+
+def test_escalation_never_overrides_insufficient_independence() -> None:
+    pair = profile(
+        requirement(
+            "review-required",
+            [human_slot("a", required_independence_groups=2), human_slot("b"), human_slot("c")],
+            escalation_requirement_id="escalate",
+        ),
+        requirement("escalate", [human_slot("arbiter")]),
+    )
+    run = close(
+        pair,
+        admitted(pair, "NARRATIVE", "review-required", "a", independence_group="human:a"),
+        admitted(pair, "NARRATIVE", "review-required", "b", "PASS", independence_group="human:b"),
+        admitted(pair, "NARRATIVE", "review-required", "c", "FAIL", independence_group="human:c"),
+        admitted(pair, "NARRATIVE", "escalate", "arbiter", "PASS", independence_group="human:arbiter"),
+    )
+    states = {r.slot_id: r.state for r in run.slot_results}
+    assert states["a"] == "INDETERMINATE"
+    assert states["b"] == states["c"] == "SATISFIED"
+
+
+def test_forged_profile_or_subject_cache_is_refused() -> None:
+    revision = profile()
+    forged = revision.model_copy(update={"profile_digest": "sha256:" + "f" * 64})
+    with pytest.raises(RequiredEvidenceMissingError):
+        close(
+            forged,
+            admitted(forged, "TECHNICAL", "technical-required", "technical"),
+            admitted(forged, "NARRATIVE", "review-required", "human"),
+        )
