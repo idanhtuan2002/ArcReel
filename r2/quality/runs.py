@@ -248,7 +248,8 @@ def close_run(
                 state = resolved or "INDETERMINATE"
             finals[item.slot.slot_id] = state
         groups = {item.slot.slot_id: {o.independence_group for o in item.observations} for item in items}
-        counted = [slot_id for slot_id, state in finals.items() if state != "INDETERMINATE"]
+        # One assessor may not satisfy several slots; a concrete failure stays a failure.
+        counted = [slot_id for slot_id, state in finals.items() if state == "SATISFIED"]
         for slot_id in counted:
             if any(other != slot_id and groups[slot_id] & groups[other] for other in counted):
                 finals[slot_id] = "INDETERMINATE"

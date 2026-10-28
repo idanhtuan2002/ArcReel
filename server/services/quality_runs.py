@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import r2.contracts.quality as q
-from lib.artifact_manifest import ProjectArtifactManifestAdapter
+from lib.artifact_manifest import ArtifactManifestError, ProjectArtifactManifestAdapter
 from lib.db.models.quality import QualityProfileHeadModel
 from lib.db.repositories.host_hardening import MasterAuthorityRepository
 from lib.db.repositories.quality import QualityProfileRepository
@@ -43,6 +43,7 @@ from r2.quality.runs import (
     human_request_digest,
     human_showrunner_policy_digest,
     project_validity,
+    run_digest,
 )
 from server.auth import get_current_interactive_user
 from server.services.governance_grants import CheckpointedShowrunnerGrantReader, ShowrunnerGrantUnavailableError
@@ -95,7 +96,10 @@ async def _subject_authoritative(session: AsyncSession, project_root: Path, subj
     """Every head is the database master (with the manifest projection agreeing) and every embedded
     metadata body equals the manifest's semantic metadata for that artifact."""
     binding = subject.master_binding
-    manifest = await asyncio.to_thread(_manifest_metadata, project_root)
+    try:
+        manifest = await asyncio.to_thread(_manifest_metadata, project_root)
+    except (ArtifactManifestError, OSError, ValueError):
+        return False
     for snapshot in binding.metadata_snapshots:
         stored = manifest.get(snapshot.artifact_key)
         try:
@@ -113,11 +117,24 @@ async def _subject_authoritative(session: AsyncSession, project_root: Path, subj
             current = await resolver.get_exact(
                 user_id=binding.user_id, project_name=binding.project_name, artifact_key=head.artifact_key
             )
-        except MasterDivergedError:
+        except (MasterDivergedError, ArtifactManifestError, OSError, ValueError):
             return False
         if current is None or canonical_json_bytes(current) != canonical_json_bytes(head):
             return False
     return True
+
+
+async def _lock_profile_head(session: AsyncSession, *, user_id: str, project_name: str, profile_id: str) -> None:
+    """Share-lock the effective profile head so a concurrent publication serializes after this writer."""
+    head = (
+        await session.execute(
+            select(QualityProfileHeadModel.current_revision)
+            .filter_by(user_id=user_id, project_name=project_name, profile_id=profile_id)
+            .with_for_update(read=True)
+        )
+    ).scalar_one_or_none()
+    if head is None:
+        raise ProfileStaleError()
 
 
 async def _require_profile(session: AsyncSession, profile: q.QualityProfileRevision) -> None:
@@ -249,6 +266,12 @@ class HumanObservationService:
             if replayed is not None:
                 return replayed
             await _lock_masters(session, request.subject)
+            await _lock_profile_head(
+                session,
+                user_id=request.user_id,
+                project_name=request.project_name,
+                profile_id=request.profile.profile_id,
+            )
             await _require_profile(session, request.profile)
             if not await _subject_authoritative(session, self._project_root, request.subject):
                 raise SubjectStaleError()
@@ -383,7 +406,7 @@ class QualityRunService:
         if stored is None:
             return None
         run = await repository.run(user_id=key.user_id, project_name=key.project_name, run_id=stored.result_ref)
-        if run is None or (run.run_id, stored.result_digest) != (stored.result_ref, stored.result_digest):
+        if run is None or (run.run_id, run_digest(run)) != (stored.result_ref, stored.result_digest):
             raise RequiredEvidenceMissingError()
         return run
 
@@ -413,6 +436,9 @@ class QualityRunService:
             if replayed is not None:
                 return replayed
             await _lock_masters(session, subject.subject)
+            await _lock_profile_head(
+                session, user_id=subject.user_id, project_name=subject.project_name, profile_id=subject.profile_id
+            )
             profile = await QualityProfileRepository(session).get_revision(
                 user_id=subject.user_id,
                 project_name=subject.project_name,

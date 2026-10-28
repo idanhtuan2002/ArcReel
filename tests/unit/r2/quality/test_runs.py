@@ -351,3 +351,13 @@ def test_human_request_scope_must_match_profile_and_subject_scope() -> None:
     }
     with pytest.raises(ValidationError):
         runs().HumanObservationRequest.model_validate(body)
+
+
+def test_a_shared_assessor_does_not_erase_a_concrete_failure() -> None:
+    pair = profile(requirement("review-required", [human_slot("a"), human_slot("b")]))
+    run = close(
+        pair,
+        admitted(pair, "NARRATIVE", "review-required", "a", "FAIL"),
+        admitted(pair, "NARRATIVE", "review-required", "b", "FAIL"),
+    )
+    assert {r.state for r in run.slot_results} == {"FAILED"}

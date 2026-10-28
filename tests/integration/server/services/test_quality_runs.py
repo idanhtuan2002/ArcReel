@@ -415,6 +415,74 @@ async def test_raw_update_and_delete_are_refused(closure_host, table: str) -> No
                 await session.execute(sa.text(statement))
 
 
+async def test_a_master_promotion_committed_while_sealing_waits_makes_the_seal_stale(closure_host) -> None:
+    import asyncio
+    import shutil
+
+    from server.services.format_render import file_digest
+    from server.services.master_authority import lock_current_master_rows, master_authority_unit
+
+    env = closure_host
+    probe = await technical(env)
+    review = await human(env, human_request(env))
+    command = completion(env, [probe, review])
+    keys = [env["root"].artifact_key, env["dependency"].artifact_key]
+    source = env["project"] / "render-2.mp4"
+    shutil.copyfile(FIXTURES / "video_only.mp4", source)
+    async with env["factory"]() as writer, writer.begin():
+        await lock_current_master_rows(writer, user_id="default", project_name="project", artifact_keys=keys)
+        task = asyncio.create_task(seal(env, command))
+        done, _ = await asyncio.wait({task}, timeout=1.5)
+        assert not done
+        await master_authority_unit(writer, defer_commit=True).promote_staged(
+            user_id="default",
+            project_name="project",
+            project_dir=env["project"],
+            artifact_key=env["root"].artifact_key,
+            generation_candidate_id="candidate-2",
+            version_file=source,
+            expected_content_digest=file_digest(source),
+            approval_record="APR-2",
+            command_id="seed-2",
+        )
+    with pytest.raises(SubjectStaleError):
+        await asyncio.wait_for(task, timeout=30)
+
+
+async def test_a_seal_committed_first_is_kept_and_a_later_promotion_only_makes_it_stale(closure_host) -> None:
+    env = closure_host
+    run = await sealed(env)
+    await promote(env["factory"], env["project"], FIXTURES / "video_only.mp4", "2")
+    assert await validity(env, run) == "STALE"
+    async with env["factory"]() as session:
+        assert (await session.execute(sa.select(sa.func.count()).select_from(QualityRunModel))).scalar_one() == 1
+
+
+async def test_receipt_digest_drift_refuses_replay(closure_host) -> None:
+    env = closure_host
+    probe = await technical(env)
+    review = await human(env, human_request(env))
+    command = completion(env, [probe, review])
+    await seal(env, command)
+    async with env["factory"]() as session, session.begin():
+        await session.execute(sa.text("SET LOCAL session_replication_role = replica"))
+        await session.execute(
+            sa.text(
+                "UPDATE m10_quality_run_commands SET result_digest = 'sha256:' || repeat('0', 64) "
+                "WHERE operation = 'COMPLETE_RUN'"
+            )
+        )
+    with pytest.raises(RequiredEvidenceMissingError):
+        await seal(env, command)
+
+
+async def test_malformed_manifest_projects_stale_instead_of_raising(closure_host) -> None:
+    env = closure_host
+    run = await sealed(env)
+    (env["project"] / ".arcreel_artifacts.json").write_text("{not json", encoding="utf-8")
+    assert await validity(env, run) == "STALE"
+
+
 async def test_sealing_waits_for_a_concurrent_master_authority_writer(closure_host) -> None:
     import asyncio
 

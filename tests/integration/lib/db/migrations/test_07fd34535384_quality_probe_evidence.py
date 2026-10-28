@@ -18,6 +18,7 @@ from lib.db.models.quality_probes import (
 )
 
 REVISION = "07fd34535384"
+MIGRATION_SUFFIX = "quality_probe_evidence"
 PREDECESSOR = "65f53650f3a8"
 MODELS = (QualityProbeInvocationModel, QualityProbeResultModel, QualityProbeObservationModel)
 TABLES = {model.__tablename__ for model in MODELS}
@@ -144,3 +145,25 @@ def test_json_bodies_are_bounded_to_one_mebibyte(alembic_cfg: tuple[Config, Path
         connection.execute("PRAGMA foreign_keys=OFF")
         with pytest.raises(sqlite3.IntegrityError, match="bytes"):
             _insert(connection, table, json_value='"' + "x" * 1048576 + '"')
+
+
+@pytest.mark.parametrize("dialect", ["postgresql", "sqlite"])
+def test_orm_json_ceilings_compile_to_the_migration_expressions(dialect: str) -> None:
+    import importlib.util
+
+    from sqlalchemy.dialects import postgresql, sqlite
+    from sqlalchemy.schema import CreateTable
+
+    path = Path(__file__).resolve().parents[5] / "alembic/versions" / f"{REVISION}_{MIGRATION_SUFFIX}.py"
+    spec = importlib.util.spec_from_file_location("m10_ceiling_migration", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    compiler = postgresql.dialect() if dialect == "postgresql" else sqlite.dialect()
+    for table, columns in module._JSON_COLUMNS.items():
+        model = next(m for m in MODELS if m.__tablename__ == table)
+        ddl = str(CreateTable(model.__table__).compile(dialect=compiler))
+        for constraint in module._json_ceilings(table, dialect):
+            assert f"CONSTRAINT {constraint.name} CHECK ({constraint.sqltext})" in ddl
+        assert len(columns) == ddl.count("<= 1048576")
