@@ -49,9 +49,14 @@ Rewrite in place; this is the resume entry for M10-B.
   `docs/r2/evidence/m10-b-reviews/design-r2-delta-review.json`.
 - Review substitute: separate Claude Opus subagent (Codex quota out until 2026-11-02 15:12); condition C5 = Codex
   re-review when quota returns.
+- `9a16ddf91` design r3: r2 delta review ACCEPT_WITH_CONDITIONS (`design-r2-delta-review.json`), N1–N7 resolved in §12.
+- `eb70e4c3f` B1: `PackagingCandidate` in M8 kernel + migration `5d2a7c3e8b11` (CHECK broadening, refusing downgrade),
+  `QualityPolicyFields`/V1/V2 (non-waivable rule classes), `r2/contracts/packaging.py`, digest domains + frozen vectors
+  (`tests/unit/r2/contracts/test_packaging.py`). Verified: unit r2 + scripts/r2 + SQLite migrations 3146 passed;
+  PG16 M8 repo/profile/run/disposition 110 passed, profile repo 16 passed; static gates clean.
+  Codex review pending: `docs/r2/evidence/m10-b-reviews/b1-codex-review.json`.
 
 ## Next step
 
-Triage the r2 delta review; on ACCEPT start B1 (contracts in `r2/contracts/advanced_creative.py` kernel +
-`r2/contracts/packaging.py`, `ExplorationKind.PACKAGING` + CHECK migration, `QualityPolicyV2` union, golden vectors,
-differential M8/M10-A vector tests).
+Triage the B1 Codex review, then B2: pure packaging check (`r2/quality/packaging_check.py`), Kalinga seo_lint port,
+`m10_packaging_observations` table, service + replay, run-sealing refusal test.
