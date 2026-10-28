@@ -1,0 +1,143 @@
+{
+ "schema_id": "m10.b7-pilot-preregistration.v1",
+ "status": "FROZEN_BEFORE_ANY_PILOT_RUN",
+ "frozen_at": "2026-10-29",
+ "design": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md §7",
+ "order": [
+  "western_explainer",
+  "vertical_factual_short",
+  "zh_shuang"
+ ],
+ "cohorts": {
+  "western_explainer": {
+   "surface": "long-form 16:9",
+   "locale": "en",
+   "duration_window_ms": [
+    60000,
+    900000
+   ],
+   "dimensions": [
+    1920,
+    1080
+   ]
+  },
+  "vertical_factual_short": {
+   "surface": "short 9:16",
+   "locale": "en",
+   "duration_window_ms": [
+    5000,
+    60000
+   ],
+   "dimensions": [
+    1080,
+    1920
+   ]
+  },
+  "zh_shuang": {
+   "surface": "short 9:16",
+   "locale": "zh-Hans",
+   "duration_window_ms": [
+    5000,
+    180000
+   ],
+   "dimensions": [
+    1080,
+    1920
+   ]
+  }
+ },
+ "corpora": "one approved V2 final per cohort, chosen by the sponsor before the run; its artifact key and master digest are recorded in the pilot dossier before any check",
+ "seeded_defects": {
+  "rule": "per cohort a seeded-defect copy of the clean package draft with these >= 6 defects, each in its own revision",
+  "defects": [
+   {
+    "id": "missing_required_asset",
+    "rule": "asset.required",
+    "change": "omit the video asset"
+   },
+   {
+    "id": "byte_drift",
+    "rule": "asset.integrity",
+    "change": "declare a thumbnail whose byte_size is off by one"
+   },
+   {
+    "id": "duration_out_of_window",
+    "rule": "duration.window",
+    "change": "check against a profile whose window excludes the master"
+   },
+   {
+    "id": "over_long_title",
+    "rule": "title.length",
+    "change": "title one character over the platform limit"
+   },
+   {
+    "id": "banned_phrase",
+    "rule": "phrases.banned",
+    "change": "insert a banned phrase into the description"
+   },
+   {
+    "id": "chapter_not_at_zero",
+    "rule": "chapters.rules",
+    "change": "first chapter starts at 5 s"
+   },
+   {
+    "id": "missing_locale",
+    "rule": "locales.coverage",
+    "change": "drop the required locale variant"
+   }
+  ]
+ },
+ "reviewer": {
+  "identity": "sponsor as HUMAN_SHOWRUNNER",
+  "independence_limit": "single reviewer; the reviewer also authored the brief and selects the package"
+ },
+ "metrics": {
+  "seeded_recall": {
+   "threshold": ">= 5 of the seeded defects caught per cohort",
+   "record": "caught/missed per defect id; false negatives listed"
+  },
+  "false_positives_on_clean": {
+   "threshold": "<= 1 per cohort as judged by the reviewer",
+   "record": "every finding on the clean final with the reviewer's verdict"
+  },
+  "reviewer_disagreement": {
+   "threshold": "reported in full, no threshold",
+   "record": "per finding: check verdict vs reviewer verdict"
+  },
+  "runtime_per_bundle_ms": {
+   "threshold": "<= 30000",
+   "record": "export wall time from request to receipt"
+  },
+  "peak_rss_bytes": {
+   "threshold": "<= 536870912",
+   "record": "confined worker cgroup memory.peak"
+  },
+  "storage_bytes": {
+   "threshold": "reported against master bytes",
+   "record": "archive byte size / master byte size"
+  },
+  "determinism": {
+   "threshold": "byte-identical archives from two clean roots",
+   "record": "archive digest from two exports with fresh commands"
+  }
+ },
+ "smallest_useful_effect": "seeded recall threshold met in every cohort AND at least one of: a real defect caught on a clean final, or a correction made through the packaging page and re-checked to PASS; 'nothing found' on clean finals never satisfies the effect alone",
+ "runtime_network": "the archive builder runs in the confined export unit (SystemCallFilter ~@network-io, EPERM); the dossier records the unit properties; the static scan covers host code",
+ "human_gates": [
+  "publish the cohort's V2 quality profile (A3 custodian)",
+  "issue the disposition on the sealed run (A6 custodian)",
+  "select the package (B3 custodian)"
+ ],
+ "agent_may_prepare": [
+  "profile drafts",
+  "probe and human-observation requests",
+  "package drafts including the seeded-defect revisions",
+  "checks, previews and exports after the Human selection",
+  "the dossier"
+ ],
+ "agent_must_not": [
+  "approve, waive, dispose or select on the sponsor's behalf",
+  "use provider APIs or network",
+  "upload or publish"
+ ]
+}
