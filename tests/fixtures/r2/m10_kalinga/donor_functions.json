@@ -1,0 +1,65 @@
+{
+  "schema_id": "m10.a7-kalinga-donor-functions.v1",
+  "repository_url": "https://github.com/desaultkhan/Kalinga-Shorts-Factory",
+  "commit_sha": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+  "files": {
+    "pipeline/src/validate.py": "a34d680faee8d0452a22d3d20794c38f73a9679a2ca19e8ddd0b5daf82bd2b10",
+    "pipeline/src/make_video.py": "617dc1f64ae22c215ea3f1e974f33563a4d741f0f5855e16a9e1e94b4a91b56a"
+  },
+  "functions": [
+    {
+      "path": "pipeline/src/validate.py",
+      "name": "tech_qc",
+      "lineno": 30,
+      "end_lineno": 61,
+      "sha256": "f9b800e83a94b4a8d10e8388512cac666442fcd44439d9e71b586946a8eb55c3",
+      "source": "def tech_qc(folder: Path, tpl: dict) -> list[str]:\n    issues = []\n    final = folder / \"short.mp4\"\n    if not final.exists():\n        return [\"short.mp4 missing\"]\n    dur = ffprobe_duration(final)\n    lo, hi = tpl[\"duration_range\"]\n    if not lo <= dur <= hi:\n        issues.append(f\"duration {dur:.1f}s outside [{lo}, {hi}]s \"\n                      \"(viral sweet spot is 15-30s, hard drop past 45s)\")\n    streams = sh([\"ffprobe\", \"-v\", \"quiet\", \"-show_entries\",\n                  \"stream=codec_type\", \"-of\", \"csv=p=0\", str(final)]).stdout\n    if \"audio\" not in streams:\n        issues.append(\"no audio stream\")\n    else:\n        vol = sh([\"ffmpeg\", \"-i\", str(final), \"-af\", \"volumedetect\",\n                  \"-f\", \"null\", \"-\"]).stderr\n        m = re.search(r\"mean_volume:\\s*(-?[\\d.]+) dB\", vol)\n        if m:\n            mean = float(m.group(1))\n            if mean < -35:\n                issues.append(f\"audio very quiet (mean {mean:.0f} dB)\")\n            elif mean > -8:\n                issues.append(f\"audio very hot (mean {mean:.0f} dB)\")\n    audio = folder / \"audio.json\"\n    if audio.exists():\n        a = json.loads(audio.read_text())\n        if not any(s.get(\"words\") for s in a[\"segments\"]):\n            issues.append(\"no word timings -> no karaoke captions \"\n                          \"(~85% of Shorts start muted; TTS_ENGINE=edge \"\n                          \"or ffmpeg-full would fix)\")\n    return issues\n"
+    },
+    {
+      "path": "pipeline/src/validate.py",
+      "name": "parse_virality",
+      "lineno": 65,
+      "end_lineno": 89,
+      "sha256": "fc1788244330a8a63b055e6954958f42d785978e63c53950b2a91fca7476837a",
+      "source": "def parse_virality(folder: Path) -> dict | None:\n    \"\"\"Tolerant extraction of scores from virality.md (raw job JSON dump).\n    Returns {\"overall\": int?, \"hook\": int?, \"sustain\": int?, \"report\": url?}\n    or None when the file is missing/unparseable.\"\"\"\n    vp = folder / \"virality.md\"\n    if not vp.exists():\n        return None\n    text = vp.read_text()\n    out = {}\n    m = re.search(r\"https://[^\\s\\\"')]+(?:virality|resultJobId)[^\\s\\\"')]*\", text)\n    if m:\n        out[\"report\"] = m.group(0)\n    # keys observed in brain_activity params; match generously\n    patterns = {\n        \"overall\": r'\"(?:overall(?:_score)?|total_score|score)\"\\s*:\\s*([\\d.]+)',\n        \"hook\": r'\"(?:peak_)?hook(?:_score|_strength|_percent)?\"\\s*:\\s*([\\d.]+)',\n        \"sustain\": r'\"sustain(?:_score|_percent)?\"\\s*:\\s*([\\d.]+)',\n        \"attention\": r'\"attention(?:_score)?\"\\s*:\\s*([\\d.]+)',\n    }\n    for key, pat in patterns.items():\n        m = re.search(pat, text, re.IGNORECASE)\n        if m:\n            v = float(m.group(1))\n            out[key] = round(v * 100) if v <= 1.0 else round(v)\n    return out or None\n"
+    },
+    {
+      "path": "pipeline/src/validate.py",
+      "name": "virality_gate",
+      "lineno": 92,
+      "end_lineno": 108,
+      "sha256": "eecb53e7c2bdabe32846848a4abfae046fe83a40e864e375a3338e14a4cccf1f",
+      "source": "def virality_gate(folder: Path, tpl: dict) -> dict:\n    \"\"\"{\"status\": \"pass\"|\"weak\"|\"unknown\", \"scores\": {...}, \"why\": str}\"\"\"\n    scores = parse_virality(folder)\n    if not scores or not any(k in scores for k in\n                             (\"overall\", \"hook\", \"attention\")):\n        return {\"status\": \"unknown\", \"scores\": scores or {},\n                \"why\": \"virality.md missing or unparseable — gate skipped\"}\n    weak = []\n    if scores.get(\"overall\", 100) < tpl[\"virality_min_overall\"]:\n        weak.append(f\"overall {scores['overall']} < \"\n                    f\"{tpl['virality_min_overall']}\")\n    if scores.get(\"hook\", 100) < tpl[\"virality_min_hook\"]:\n        weak.append(f\"hook {scores['hook']} < {tpl['virality_min_hook']}\")\n    if weak:\n        return {\"status\": \"weak\", \"scores\": scores, \"why\": \"; \".join(weak)}\n    return {\"status\": \"pass\", \"scores\": scores,\n            \"why\": \"above template thresholds\"}\n"
+    },
+    {
+      "path": "pipeline/src/make_video.py",
+      "name": "sh",
+      "lineno": 148,
+      "end_lineno": 152,
+      "sha256": "e62cb12c0a1ac2a358dd5139f0bf7124179d896f9c64caee3cff91243fcffe3b",
+      "source": "def sh(cmd: list, **kw) -> subprocess.CompletedProcess:\n    # stdin closed: ffmpeg reads interactive controls from an inherited\n    # stdin and would swallow the interactive session's piped/typed input\n    kw.setdefault(\"stdin\", subprocess.DEVNULL)\n    return subprocess.run(cmd, capture_output=True, text=True, **kw)\n"
+    },
+    {
+      "path": "pipeline/src/make_video.py",
+      "name": "ffprobe_duration",
+      "lineno": 159,
+      "end_lineno": 161,
+      "sha256": "3e42c18e98951bb542803d72771c54e4a267368826e0b9401e6bc75c8e0a7c60",
+      "source": "def ffprobe_duration(p: Path) -> float:\n    return float(sh([\"ffprobe\", \"-v\", \"quiet\", \"-show_entries\",\n                     \"format=duration\", \"-of\", \"csv=p=0\", str(p)]).stdout.strip())\n"
+    },
+    {
+      "path": "pipeline/src/make_video.py",
+      "name": "_safe_validate",
+      "lineno": 317,
+      "end_lineno": 323,
+      "sha256": "94148210b932fe04c14b58d181c9078aa684e105ba640b30135ca59b0f49c735",
+      "source": "def _safe_validate(fn, out: Path) -> bool:\n    \"\"\"Run a generate() validate callback, swallowing any error (a flaky check\n    must never block a real generation — treat an erroring check as 'pass').\"\"\"\n    try:\n        return bool(fn(out))\n    except Exception:        # noqa: BLE001\n        return True\n"
+    }
+  ],
+  "run_ok_expression": {
+    "path": "pipeline/src/validate.py",
+    "lineno": 159,
+    "source": "ok = not qc and vir[\"status\"] != \"weak\" and not seo",
+    "sha256": "f39a4510f4b38b1b92abb804d301bba00d0f8ae4097ab638f60ef22f87af25fa"
+  }
+}
