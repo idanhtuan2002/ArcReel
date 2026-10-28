@@ -121,7 +121,7 @@ class WorkerOutcome:
     output_exceeded: bool
     group_cleanup_verified: bool
     wall_elapsed_ms: int
-    scratch_sizes: tuple[int, int, int]
+    scratch_sizes: tuple[int, ...]
 
 
 def _sha256_file(path: Path) -> str:
@@ -142,7 +142,12 @@ def _canonical_digest(body: object) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def service_properties(runtime_max_ms: int) -> tuple[str, ...]:
+def worker_envelope() -> dict[str, int]:
+    """The exact cgroup envelope every confined M10 worker verifies before doing anything."""
+    return dict(_ENVELOPE)
+
+
+def service_properties(runtime_max_ms: int, fsize: int = SCRATCH_MAX_BYTES) -> tuple[str, ...]:
     """Exact admitted unit envelope; effective values are re-read by the worker before any media parsing."""
     properties = (
         f"MemoryMax={MEMORY_MAX_BYTES}",
@@ -154,7 +159,7 @@ def service_properties(runtime_max_ms: int) -> tuple[str, ...]:
         "KillMode=control-group",
         "NoNewPrivileges=yes",
         "LimitCORE=0",
-        f"LimitFSIZE={SCRATCH_MAX_BYTES}",
+        f"LimitFSIZE={fsize}",
         "UMask=0077",
         "SystemCallErrorNumber=EPERM",
         "SystemCallFilter=" + SYSTEM_CALL_FILTER,
@@ -328,12 +333,19 @@ class QualityProbeRuntime:
         await self._verify_cleanup(unit)
 
     async def launch(
-        self, payload: bytes, *, budget_ms: int, output_cap: int, scratch: tuple[Path, Path, Path]
+        self,
+        payload: bytes,
+        *,
+        budget_ms: int,
+        output_cap: int,
+        scratch: tuple[Path, ...],
+        fsize: int = SCRATCH_MAX_BYTES,
+        unit_prefix: str = "m10-probe",
     ) -> WorkerOutcome:
         """Start the fixed worker in a fresh owned unit, bound its streams and deadline, and verify group cleanup."""
         if not 0 < budget_ms <= MAX_RUNTIME_MS or not 0 < output_cap <= MAX_OUTPUT_BYTES:
             raise OperationalEnvelopeExceededError()
-        unit = f"m10-probe-{uuid.uuid4().hex}.service"
+        unit = f"{unit_prefix}-{uuid.uuid4().hex}.service"
         runtime_max_ms = budget_ms + STARTUP_ALLOWANCE_MS
         argv = (
             SYSTEMD_RUN,
@@ -346,7 +358,7 @@ class QualityProbeRuntime:
             "--expand-environment=no",
             "--working-directory=/",
             f"--unit={unit}",
-            *service_properties(runtime_max_ms),
+            *service_properties(runtime_max_ms, fsize),
             PYTHON,
             "-I",
             "-B",
@@ -423,7 +435,7 @@ class QualityProbeRuntime:
             output_exceeded=exceeded.is_set(),
             group_cleanup_verified=cleanup,
             wall_elapsed_ms=elapsed_ms,
-            scratch_sizes=(sizes[0], sizes[1], sizes[2]),
+            scratch_sizes=sizes,
         )
 
     async def run(self, request: ProbeRequest, inputs: ProbeInputs, config: ProbeConfig) -> ProbeExecutionResult:
@@ -492,7 +504,7 @@ def _resources(
         peak_tasks=accounting.get("peak_tasks"),
         stdout_bytes=len(outcome.stdout),
         stderr_bytes=outcome.stderr_bytes,
-        scratch_sizes=outcome.scratch_sizes,
+        scratch_sizes=(outcome.scratch_sizes[0], outcome.scratch_sizes[1], outcome.scratch_sizes[2]),
         exit_code=outcome.exit_code,
         manager_result=outcome.manager_result,  # pyright: ignore[reportArgumentType]  # validated by the model
         oom_killed=outcome.manager_result == "OOM_KILL" or (type(oom) is int and oom > 0),
