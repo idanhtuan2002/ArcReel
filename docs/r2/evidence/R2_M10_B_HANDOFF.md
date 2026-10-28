@@ -37,7 +37,15 @@ Rewrite in place; this is the resume entry for M10-B.
   (`tools/publishers/export_bundle.py`) is NOT cloned locally.
 - Pilots need Human PASS/REWORK/WAIVE dispositions: the agent cannot issue them; the sponsor must act as Human.
 
+## Progress
+
+- `1751a23bc` design amendment `docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md` (CANDIDATE).
+- `d59be1e11` B0/F1: `m10_quality_probe_failures` + migration `4c1f0e2a9b10`, replay returns recorded evidence.
+  Verified on PG16 (disposable container :55491): `tests/integration/server/services/test_quality_probes.py`
+  + `tests/integration/lib/db/repositories/test_quality_probes.py` 27 passed; SQLite
+  `tests/integration/lib/db/migrations` 218 passed; ruff/basedpyright/lint-imports/deptry/audit_tests clean.
+- Independent review of design + B0: `docs/r2/evidence/m10-b-reviews/design-b0-review.json` (pending).
+
 ## Next step
 
-Write the M10-B design amendment (contracts, PackagingCandidate/PACKAGING_SLOT evolution, selection, export,
-F1, pilots, UI), independent review, then packetized implementation.
+Triage the design/B0 review, then B1 (contracts + M8 PACKAGING evolution + policy V2).
