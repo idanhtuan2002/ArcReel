@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import r2.contracts.quality as q
 from lib.db.models.host_hardening import ExecutionAttemptModel
 from lib.db.models.quality_probes import (
+    PROBE_FAILURE_CODES,
+    QualityProbeFailureModel,
     QualityProbeInvocationModel,
     QualityProbeObservationModel,
     QualityProbeResultModel,
@@ -20,13 +22,15 @@ from r2.advanced_creative.digests import canonical_json_bytes
 from r2.contracts.execution import ProviderRequest
 from r2.contracts.host_hardening import ProviderRouteSnapshot
 from r2.quality.digests import compute_digest
-from r2.quality.errors import CommandReplayConflictError, RequiredEvidenceMissingError
+from r2.quality.errors import CommandReplayConflictError, M10Error, RequiredEvidenceMissingError, error_for_code
 from r2.quality.ports import ProbeRequest, validate_probe_result_binding
 from r2.quality.probes import (
     ProbeExecutionResult,
+    ResourceEvidence,
     execution_result_digest,
     measurement_digest,
     probe_request_digest,
+    resource_evidence_digest,
     validate_probe_envelope,
 )
 
@@ -214,6 +218,48 @@ class QualityProbeRepository:
             )
         )
         await self.session.flush()
+
+    async def stage_failure(
+        self, invocation: StoredProbeInvocation, error: M10Error, resources: ResourceEvidence | None, at: datetime
+    ) -> None:
+        """Flush a known failure for M7 to commit atomically with FAILED_BEFORE_ACCEPTANCE; never commits."""
+        if error.code not in PROBE_FAILURE_CODES:
+            raise RequiredEvidenceMissingError()
+        evidence = None if resources is None else ResourceEvidence.model_validate(resources)
+        self.session.add(
+            QualityProbeFailureModel(
+                user_id=invocation.request.user_id,
+                project_name=invocation.request.project_name,
+                execution_id=invocation.execution_id,
+                error_code=error.code,
+                resources_json=None if evidence is None else _bounded(evidence.model_dump(mode="json")),
+                resources_digest=None if evidence is None else resource_evidence_digest(evidence),
+                recorded_at=at,
+            )
+        )
+        await self.session.flush()
+
+    async def failure(self, invocation: StoredProbeInvocation) -> M10Error | None:
+        """The recorded known failure as a fresh typed error carrying its stored ResourceEvidence."""
+        row = await self.session.get(
+            QualityProbeFailureModel,
+            (invocation.request.user_id, invocation.request.project_name, invocation.execution_id),
+        )
+        if row is None:
+            return None
+        if row.error_code not in PROBE_FAILURE_CODES:
+            raise RequiredEvidenceMissingError()
+        resources = None
+        if row.resources_json is not None:
+            try:
+                resources = ResourceEvidence.model_validate(row.resources_json)
+            except (ValueError, TypeError):
+                raise RequiredEvidenceMissingError() from None
+            if resource_evidence_digest(resources) != row.resources_digest:
+                raise RequiredEvidenceMissingError()
+        error = error_for_code(row.error_code)
+        error.resources = resources
+        return error
 
     async def result(self, invocation: StoredProbeInvocation) -> ProbeExecutionResult | None:
         """The stored result, recomputed from its complete body; cached digest drift refuses."""

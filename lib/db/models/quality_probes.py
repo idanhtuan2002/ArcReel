@@ -144,3 +144,41 @@ __all__ = [
     "QualityProbeResultModel",
     "json_ceiling",
 ]
+
+
+PROBE_FAILURE_CODES = ("M10_PROBE_FAILED", "M10_REFERENCE_INVALID", "M10_OPERATIONAL_ENVELOPE_EXCEEDED")
+
+
+class QualityProbeFailureModel(Base):
+    """A known probe failure recorded with its M7 FAILED_BEFORE_ACCEPTANCE attempt; resources only when reported."""
+
+    __tablename__ = "m10_quality_probe_failures"
+    __table_args__ = (
+        *json_ceiling("m10_quality_probe_failures", "resources_json"),
+        sa.PrimaryKeyConstraint("user_id", "project_name", "execution_id", name="pk_m10_quality_probe_failures"),
+        sa.ForeignKeyConstraint(
+            ["user_id", "project_name", "execution_id"],
+            [
+                "m10_quality_probe_invocations.user_id",
+                "m10_quality_probe_invocations.project_name",
+                "m10_quality_probe_invocations.execution_id",
+            ],
+            name="fk_m10_probe_failures_invocation",
+            ondelete="RESTRICT",
+        ),
+        sa.CheckConstraint(
+            "error_code IN ('M10_PROBE_FAILED', 'M10_REFERENCE_INVALID', 'M10_OPERATIONAL_ENVELOPE_EXCEEDED')",
+            name="ck_m10_quality_probe_failures_code",
+        ),
+        sa.CheckConstraint(
+            "(resources_json IS NULL) = (resources_digest IS NULL)", name="ck_m10_quality_probe_failures_resources"
+        ),
+    )
+
+    user_id: Mapped[str] = mapped_column(sa.String, sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    project_name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    execution_id: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    error_code: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    resources_json: Mapped[dict[str, Any] | None] = mapped_column(sa.JSON(none_as_null=True), nullable=True)
+    resources_digest: Mapped[str | None] = mapped_column(sa.String(71), nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)

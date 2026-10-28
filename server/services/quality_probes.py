@@ -64,7 +64,7 @@ from r2.quality.probes import (
 from server.auth import get_current_interactive_user
 from server.services.execution_attempts import build_execution_attempt_service, capability_resolver
 from server.services.quality_probe_inputs import ProbeInputs, snapshot_probe_inputs
-from server.services.quality_probe_runtime import QualityProbeRuntime
+from server.services.quality_probe_runtime import QualityProbeRuntime, failure_resources
 
 ASSESSOR_IDENTITY = "host-quality-probe"
 INDEPENDENCE_GROUP = "host-deterministic-probe"
@@ -265,13 +265,18 @@ class QualityProbeService:
             replayed = await repository.replay(request)
             invocation = await repository.invocation(request)
             state = None if invocation is None else (await repository.attempt_witness(invocation))[0]
+            recorded = (
+                await repository.failure(invocation)
+                if invocation is not None and state == ExecutionAttemptState.FAILED_BEFORE_ACCEPTANCE.value
+                else None
+            )
         if replayed is not None:
             await self.require_actor(request)
             return replayed
         if invocation is not None and state == ExecutionAttemptState.ACCEPTED.value:
             return await self._finalize(invocation)
         if invocation is not None and state == ExecutionAttemptState.FAILED_BEFORE_ACCEPTANCE.value:
-            raise ProbeFailedError()
+            raise recorded if recorded is not None else ProbeFailedError()
         if invocation is not None and state != ExecutionAttemptState.PLANNED.value:
             # Pending, unknown or operator-review outcomes are never re-run under the same reference.
             raise RequiredEvidenceMissingError()
@@ -362,6 +367,15 @@ class QualityProbeService:
                 try:
                     result = await self._runtime.run(request, inputs, config)
                 except _KNOWN_FAILURES as error:
+                    try:
+                        # M7 commits this row together with FAILED_BEFORE_ACCEPTANCE.
+                        await repository.stage_failure(invocation, error, failure_resources(error), self._clock())
+                    except Exception as staging:
+                        await session.rollback()
+                        failures.append(RequiredEvidenceMissingError())
+                        raise AmbiguousSubmitError(
+                            provider=_FAMILY.key.provider_id, message="[create_ambiguous] quality probe outcome unknown"
+                        ) from staging
                     failures.append(error)
                     raise
                 except Exception as error:
@@ -405,7 +419,11 @@ class QualityProbeService:
             return await self._finalize(invocation)
         if state is ExecutionAttemptState.FAILED_BEFORE_ACCEPTANCE:
             known = [error for error in failures if isinstance(error, _KNOWN_FAILURES)]
-            raise known[-1] if known else ProbeFailedError()
+            if known:
+                raise known[-1]
+            async with self._sessions() as session:
+                recorded = await QualityProbeRepository(session).failure(invocation)
+            raise recorded if recorded is not None else ProbeFailedError()
         if state is ExecutionAttemptState.SUCCEEDED:
             return await self.observe(request)
         raise RequiredEvidenceMissingError()

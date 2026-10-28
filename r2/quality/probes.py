@@ -399,6 +399,11 @@ def execution_result_digest(result: ProbeExecutionResult) -> str:
     return digest_canonical({"domain": "m10.probe-execution-result.v1", "contract_version": "1", "body": normalized})
 
 
+def resource_evidence_digest(resources: ResourceEvidence) -> str:
+    normalized = ResourceEvidence.model_validate(resources)
+    return digest_canonical({"domain": "m10.probe-resources.v1", "contract_version": "1", "body": normalized})
+
+
 class ToolIdentity(M10ContractModel):
     name: Literal["ffmpeg", "ffprobe", "vmaf"]
     version: StrictStr = Field(pattern=r"^[0-9]+\.[0-9]+\.[0-9]+$", max_length=64)

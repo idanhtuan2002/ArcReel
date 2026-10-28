@@ -465,7 +465,7 @@ class QualityProbeRuntime:
 def failure_resources(error: BaseException) -> ResourceEvidence | None:
     """The bounded-launch accounting a failed run carried, when the confined worker reported it.
 
-    In-process only: the probe service re-raises known failures with it and does not persist it.
+    The probe service persists it with the failed attempt and replays it from that row.
     """
     evidence = getattr(error, "resources", None)
     return evidence if isinstance(evidence, ResourceEvidence) else None

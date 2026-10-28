@@ -106,6 +106,7 @@ from lib.db.models.quality_dispositions import (
     QualityDispositionModel,
 )
 from lib.db.models.quality_probes import (
+    QualityProbeFailureModel,
     QualityProbeInvocationModel,
     QualityProbeObservationModel,
     QualityProbeResultModel,
@@ -230,6 +231,7 @@ __all__ = [
     "QualityDispositionModel",
     "QualityHumanObservationModel",
     "QualityOutboxModel",
+    "QualityProbeFailureModel",
     "QualityProbeInvocationModel",
     "QualityProbeObservationModel",
     "QualityProbeResultModel",

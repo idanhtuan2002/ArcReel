@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from lib.db.models.host_hardening import ExecutionAttemptModel
 from lib.db.models.quality_probes import (
+    QualityProbeFailureModel,
     QualityProbeInvocationModel,
     QualityProbeObservationModel,
     QualityProbeResultModel,
@@ -27,13 +28,15 @@ from lib.db.repositories.quality_probes import QualityProbeRepository
 from r2.quality.digests import compute_digest
 from r2.quality.errors import (
     CommandReplayConflictError,
+    OperationalEnvelopeExceededError,
     ProbeFailedError,
     ProfileStaleError,
+    ReferenceInvalidError,
     RequiredEvidenceMissingError,
     SubjectStaleError,
 )
 from r2.quality.ports import ProbeRequest, validate_probe_result_binding
-from r2.quality.probes import ProbeCatalog, config_digest, policy_digest
+from r2.quality.probes import ProbeCatalog, config_digest, policy_digest, resource_evidence_digest
 from server import auth
 from server.services import quality_probe_runtime as runtime
 from server.services.format_render import file_digest
@@ -52,6 +55,7 @@ USER = "default"
 PROJECT = "project"
 ACTOR = "actor"
 MIGRATION = Path(__file__).resolve().parents[4] / "alembic/versions/07fd34535384_quality_probe_evidence.py"
+FAILURE_MIGRATION = Path(__file__).resolve().parents[4] / "alembic/versions/4c1f0e2a9b10_quality_probe_failures.py"
 
 
 class CountingRuntime:
@@ -83,14 +87,15 @@ class CountingRuntime:
 async def probe_host(quality_factory: Factory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AUTH_ENABLED", "true")
     monkeypatch.setenv("AUTH_TOKEN_SECRET", SECRET)
-    spec = importlib.util.spec_from_file_location("m10_probe_migration_fixture", MIGRATION)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    async with quality_factory() as session, session.begin():
-        connection = await session.connection()
-        await connection.run_sync(module.install_immutability)
+    for name, path in (("m10_probe_migration_fixture", MIGRATION), ("m10_probe_failure_fixture", FAILURE_MIGRATION)):
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        async with quality_factory() as session, session.begin():
+            connection = await session.connection()
+            await connection.run_sync(module.install_immutability)
     project = tmp_path / "project"
     project.mkdir(mode=0o700)
     (tmp_path / "work").mkdir(mode=0o700)
@@ -341,10 +346,41 @@ async def test_known_tool_failure_is_a_failed_attempt_without_observation_and_ne
         assert (
             await session.execute(sa.select(ExecutionAttemptModel.state))
         ).scalar_one() == "FAILED_BEFORE_ACCEPTANCE"
+    async with env["factory"]() as session:
+        row = (await session.execute(sa.select(QualityProbeFailureModel))).scalar_one()
+    assert (row.error_code, row.resources_digest) == ("M10_PROBE_FAILED", resource_evidence_digest(evidence))
     again = CountingRuntime(env["runtime"])
-    with pytest.raises(ProbeFailedError):
+    with pytest.raises(ProbeFailedError) as replayed:
         await (await service(env, request, run=again)).observe(request)
     assert again.starts == 0
+    assert replayed.value is not error
+    assert runtime.failure_resources(replayed.value) == evidence
+    for statement in (
+        "UPDATE m10_quality_probe_failures SET user_id = user_id",
+        "DELETE FROM m10_quality_probe_failures",
+    ):
+        with pytest.raises(sa.exc.DBAPIError, match="M10_IMMUTABLE_PROBE_ROW"):
+            async with env["factory"]() as session, session.begin():
+                await session.execute(sa.text(statement))
+
+
+@pytest.mark.parametrize(
+    ("fail", "expected"),
+    [
+        (ReferenceInvalidError(), ReferenceInvalidError),
+        (OperationalEnvelopeExceededError(), OperationalEnvelopeExceededError),
+    ],
+)
+async def test_every_known_failure_replays_its_recorded_code_without_evidence(probe_host, fail, expected) -> None:
+    env = probe_host
+    request = probe_request(env["profile"], env["root"])
+    with pytest.raises(expected):
+        await (await service(env, request, run=CountingRuntime(env["runtime"], fail=fail))).observe(request)
+    again = CountingRuntime(env["runtime"])
+    with pytest.raises(expected) as replayed:
+        await (await service(env, request, run=again)).observe(request)
+    assert again.starts == 0
+    assert runtime.failure_resources(replayed.value) is None
 
 
 async def test_unexpected_runtime_error_after_possible_start_is_unknown_and_never_reruns(probe_host) -> None:
@@ -490,6 +526,25 @@ async def test_replay_refuses_a_changed_m7_attempt_identity(probe_host, column: 
         await session.execute(sa.text(f"UPDATE execution_attempts SET {column} = {value}"))
     with pytest.raises(RequiredEvidenceMissingError):
         await (await service(env, request)).observe(request)
+
+
+async def test_a_failure_row_that_cannot_be_staged_leaves_the_outcome_unknown(probe_host, monkeypatch) -> None:
+    env = probe_host
+    request = probe_request(env["profile"], env["root"])
+
+    async def broken(*_: object, **__: object) -> None:
+        raise RuntimeError("failure staging failed")
+
+    monkeypatch.setattr(QualityProbeRepository, "stage_failure", broken)
+    with pytest.raises(RequiredEvidenceMissingError):
+        await (await service(env, request, run=CountingRuntime(env["runtime"], fail=ProbeFailedError()))).observe(
+            request
+        )
+    async with env["factory"]() as session:
+        assert (await session.execute(sa.select(ExecutionAttemptModel.state))).scalar_one() == "SUBMIT_OUTCOME_UNKNOWN"
+        assert (
+            await session.execute(sa.select(sa.func.count()).select_from(QualityProbeFailureModel))
+        ).scalar_one() == 0
 
 
 async def test_failure_building_the_acceptance_receipt_after_staging_is_unknown(probe_host, monkeypatch) -> None:
