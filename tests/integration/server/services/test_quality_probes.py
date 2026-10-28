@@ -134,10 +134,10 @@ async def publish(factory: Factory, config):
     return await append(factory, publication_request(user_id=USER, revision=1, parent_revision=None, policy=policy))
 
 
-async def promote(factory: Factory, project: Path, media: Path, tag: str):
+async def promote(factory: Factory, project: Path, media: Path, tag: str, *, key: str | None = None):
     from tests.unit.r2.contracts.test_quality import binding_data
 
-    key = binding_data()["root"]["artifact_key"]
+    key = key or binding_data()["root"]["artifact_key"]
     source = project / f"render-{tag}.mp4"
     shutil.copyfile(media, source)
     async with factory() as session:
@@ -160,7 +160,16 @@ async def promote(factory: Factory, project: Path, media: Path, tag: str):
     return current
 
 
-def probe_request(profile, root, *, actor: str = ACTOR, execution_ref: str = "probe-1", slot_id: str = "technical"):
+def probe_request(
+    profile,
+    root,
+    *,
+    actor: str = ACTOR,
+    execution_ref: str = "probe-1",
+    slot_id: str = "technical",
+    requirement_id: str = "review-required",
+    dependencies: tuple = (),
+):
     from tests.unit.r2.quality.test_quality_digests import valid_subject
 
     data: dict[str, Any] = probe_data()
@@ -168,11 +177,30 @@ def probe_request(profile, root, *, actor: str = ACTOR, execution_ref: str = "pr
     binding = subject["master_binding"]
     binding.update(user_id=USER, project_name=PROJECT)
     binding["root"].update(root.model_dump(mode="json"))
+    promoted = {head.artifact_key: head for head in (root, *dependencies)}
+    for head in binding["dependency_heads"]:
+        if head["artifact_key"] in promoted:
+            head.update(promoted[head["artifact_key"]].model_dump(mode="json"))
     for snapshot in binding["metadata_snapshots"]:
-        if snapshot["artifact_key"] == root.artifact_key:
+        if snapshot["artifact_key"] in promoted:
+            current = promoted[snapshot["artifact_key"]]
             snapshot["body"]["approved_master"].update(
-                approval_record=root.approval_record, selected_candidate_id=root.candidate_id
+                approval_record=current.approval_record, selected_candidate_id=current.candidate_id
             )
+    bodies = {snapshot["artifact_key"]: snapshot["body"] for snapshot in binding["metadata_snapshots"]}
+    for edge in binding["dependency_edges"]:
+        child = promoted.get(edge["child_artifact_key"])
+        if child is None:
+            continue
+        approved = bodies[edge["child_artifact_key"]]["approved_master"]
+        for dependency in bodies[edge["parent_artifact_key"]]["direct_dependencies"]:
+            if dependency["ref"] == edge["dependency_ref"]:
+                dependency.update(
+                    version=approved["selected_candidate_id"] + "@" + approved["host_version_ref"],
+                    fingerprint="sha256:" + child.content_digest.removeprefix("sha256:"),
+                )
+    for snapshot in binding["metadata_snapshots"]:
+        snapshot["metadata_digest"] = compute_digest("m10.artifact-metadata.v1", snapshot)
         snapshot["metadata_digest"] = compute_digest("m10.artifact-metadata.v1", snapshot)
     subject["master_binding_digest"] = compute_digest("m10.master-binding.v1", binding)
     subject.update(
@@ -185,6 +213,7 @@ def probe_request(profile, root, *, actor: str = ACTOR, execution_ref: str = "pr
         actor_id=actor,
         execution_ref=execution_ref,
         slot_id=slot_id,
+        requirement_id=requirement_id,
         subject=subject,
         profile=profile_body,
         rule=profile_body["policy"]["probe_rules"][0],

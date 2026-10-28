@@ -55,6 +55,31 @@ def run_digest(run: q.QualityRun) -> str:
     return compute_digest("m10.quality-run.v1", q.QualityRun.model_validate(run))
 
 
+class HumanObservationRequest(q.M10ContractModel):
+    """A showrunner's rubric judgment; identity, qualification, independence and digests are host-derived."""
+
+    user_id: q.ExactIdentity
+    project_name: q.ExactIdentity
+    actor_id: q.ExactIdentity
+    command_id: q.ExactIdentity
+    subject: q.AssessedSubject
+    profile: q.QualityProfileRevision
+    requirement_id: q.ExactIdentity
+    slot_id: q.ExactIdentity
+    status: q.ObservationStatus
+    rubric_id: q.ExactIdentity
+    rubric_digest: q.Sha256Digest
+    segment_closure_digest: q.Sha256Digest
+    reviewer_evidence_digest: q.Sha256Digest
+    findings: tuple[q.QualityFinding, ...]
+    evidence_refs: tuple[q.ExactIdentity, ...]
+    evidence_digest: q.Sha256Digest
+
+
+def human_request_digest(request: HumanObservationRequest) -> str:
+    return _private_digest("m10.human-observation-request.v1", HumanObservationRequest.model_validate(request))
+
+
 @dataclass(frozen=True)
 class AdmittedObservation:
     """An observation whose stored custody the caller already re-verified, with its producing class."""
@@ -292,9 +317,11 @@ def project_validity(
 __all__ = [
     "HUMAN_SHOWRUNNER_POLICY_ID",
     "AdmittedObservation",
+    "HumanObservationRequest",
     "RunValidity",
     "ValidityInputs",
     "close_run",
+    "human_request_digest",
     "human_showrunner_policy_digest",
     "project_validity",
     "run_digest",
