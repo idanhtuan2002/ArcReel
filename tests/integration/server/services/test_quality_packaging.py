@@ -99,7 +99,9 @@ async def packaging_host(session_factory: Factory, tmp_path: Path, monkeypatch: 
         for name in (*MIGRATIONS, *PACKAGING_MIGRATIONS):
             await connection.run_sync(install(name))
     (tmp_path / "governance").mkdir(mode=0o700)
-    root_dir, socket_dir, *_ = await prepare_qualified_custody(factory, tmp_path / "governance")
+    root_dir, socket_dir, importer, grant_key, grant_event = await prepare_qualified_custody(
+        factory, tmp_path / "governance"
+    )
     project = tmp_path / "project"
     project.mkdir(mode=0o700)
     (tmp_path / "work").mkdir(mode=0o700)
@@ -133,6 +135,7 @@ async def packaging_host(session_factory: Factory, tmp_path: Path, monkeypatch: 
         "catalog": ProbeCatalog(schema_id="m10.probe-catalog.v1", configs=(config,)),
         "reader": reader,
         "governance": (root_dir, socket_dir),
+        "grant": (importer, grant_key, grant_event),
     }
     write_manifest(project, subject_of(env))
     async with serve_governance_attestor(

@@ -207,6 +207,11 @@ class PackageSelectionRepository:
         head = (await self.session.execute(statement)).scalar_one_or_none()
         return (None, 0) if head is None else (head.current_selection_id, head.head_version)
 
+    async def current_head(self, slot: p.PackagingSlotKey) -> tuple[str | None, int]:
+        """The slot's current selection and version without locking (read-only projections)."""
+        head = await self.session.get(PackagingHeadModel, tuple(_slot(slot).values()))
+        return (None, 0) if head is None else (head.current_selection_id, head.head_version)
+
     async def head_version(self, slot: p.PackagingSlotKey) -> int:
         head = await self.session.get(PackagingHeadModel, tuple(_slot(slot).values()))
         return 0 if head is None else head.head_version

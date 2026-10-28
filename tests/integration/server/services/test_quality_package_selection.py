@@ -741,3 +741,52 @@ async def test_one_alternative_per_group_across_several_groups_is_selected(ready
     shown = await preview(env, preview_request(env, selected_variant_ids=["title-1", "description-0"]))
     selection = await select(env, selection_request(env, shown))
     assert selection.preview.selected_variant_ids == ("description-0", "title-1")
+
+
+async def test_a_grant_revoked_after_the_lease_refuses_the_selection(ready_host) -> None:
+    from r2.governance.grant_transition import GrantScopeV1
+    from tests.integration.r2.governance.test_grant_importer import _event, _signed
+
+    env = ready_host
+    request = selection_request(env, await preview(env))
+    guard = custodian(env, request)
+    lease = await guard.authorize_selection(request)
+    importer, key, event = env["grant"]
+    body = _event("REVOKE", 2, event.event_digest, "2026-10-27T00:00:00Z", project_name="project")
+    body.update(user_id="default", principal=ACTOR, signer_key_id="grant-key-a")
+    await importer.import_event(_signed(body, key), scope=GrantScopeV1("default", "project", ACTOR))
+    # Revocation also invalidates the run's Human evidence, so readiness may refuse before lease admission.
+    with pytest.raises((DispositionUnauthorizedError, DispositionStaleError)):
+        await PackageSelectionService(sessions=env["factory"], custodian=guard, project_root=env["project"]).select(
+            request, lease
+        )
+    assert await _counts(env) == (0, 0)
+
+
+async def test_a_lease_whose_selection_crashed_leaves_nothing_and_a_retry_selects(ready_host, monkeypatch) -> None:
+    from lib.db.repositories.quality_packaging import PackageSelectionRepository
+
+    env = ready_host
+    request = selection_request(env, await preview(env))
+    guard = custodian(env, request)
+    lease = await guard.authorize_selection(request)
+    real = PackageSelectionRepository.append_selection
+    failed = {"once": True}
+
+    async def crash_once(self, *args, **kwargs):
+        if failed.pop("once", False):
+            raise RuntimeError("crash after the lease, inside the selection write")
+        return await real(self, *args, **kwargs)
+
+    monkeypatch.setattr(PackageSelectionRepository, "append_selection", crash_once)
+    service = PackageSelectionService(sessions=env["factory"], custodian=guard, project_root=env["project"])
+    with pytest.raises(RuntimeError):
+        await service.select(request, lease)
+    assert await _counts(env) == (0, 0)
+    retry_guard = custodian(env, request)
+    retry_lease = await retry_guard.authorize_selection(request)
+    selection = await PackageSelectionService(
+        sessions=env["factory"], custodian=retry_guard, project_root=env["project"]
+    ).select(request, retry_lease)
+    assert selection.head_version == 1
+    assert await _counts(env) == (1, 1)
