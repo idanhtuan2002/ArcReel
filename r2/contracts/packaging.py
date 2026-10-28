@@ -36,7 +36,9 @@ def _window(start: AwareDatetime, end: AwareDatetime, maximum: int) -> None:
         raise ValueError("invalid explicit time window")
 
 
-def _command(command: CommandEnvelope, subject: PackageSelectionSubject | ExportSubject, operation: str) -> None:
+def _command(
+    command: CommandEnvelope, subject: PackageCheckSubject | PackageSelectionSubject | ExportSubject, operation: str
+) -> None:
     if command.operation != operation or (command.user_id, command.project_name, command.actor_id) != (
         subject.user_id,
         subject.project_name,
@@ -66,6 +68,27 @@ class PackagingObservation(ObservationBase[Literal[ObservationType.PACKAGING]]):
     def bound_snapshot(self) -> Self:
         if self.constraint_snapshot_digest != self.packaging_subject.constraint_snapshot_digest:
             raise ValueError("constraint snapshot mismatch")
+        return self
+
+
+class PackageCheckSubject(M10ContractModel):
+    user_id: ExactIdentity
+    project_name: ExactIdentity
+    actor_id: ExactIdentity
+    candidate_id: ExactIdentity
+    candidate_revision: StrictInt = Field(ge=1)
+    candidate_payload_digest: Sha256Digest
+    quality_run_id: M10Uuid7
+    quality_run_digest: Sha256Digest
+
+
+class PackageCheckRequest(M10ContractModel):
+    command: CommandEnvelope
+    subject: PackageCheckSubject
+
+    @model_validator(mode="after")
+    def coherent(self) -> Self:
+        _command(self.command, self.subject, "CHECK_PACKAGE")
         return self
 
 
@@ -296,6 +319,8 @@ __all__ = [
     "ExportManifestEntry",
     "ExportRequest",
     "ExportSubject",
+    "PackageCheckRequest",
+    "PackageCheckSubject",
     "PackagePreview",
     "PackageSelection",
     "PackageSelectionRequest",

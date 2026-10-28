@@ -79,8 +79,10 @@ edit** and lets one run carry observations for different candidates. Instead:
   its `subject_digest` is the digest of a `PackagingAssessedSubject` (base subject digest + candidate id/revision/
   payload digest + constraint snapshot digest). Run sealing is unchanged and continues to reject any observation
   whose subject is not the base subject, so a packaging observation can never enter a `QualityRun`.
-- Packaging observations are stored append-only in `m10_packaging_observations`, one per
-  `(candidate_id, revision, constraint_snapshot_digest, check_config_digest)`; replay recomputes the pure check.
+- Packaging observations are stored append-only in `m10_packaging_observations`, one per check command
+  (`CHECK_PACKAGE`, `m10.package-check-request.v1`), FK-bound to the exact M8 revision; an exact replay returns the
+  stored observation after digest verification, a different request under the same command id conflicts, and the
+  preview binds one exact `observation_id`.
 - Selection requires (a) a **current** M10-A PASS/WAIVE disposition for the base subject and profile, and (b) a
   packaging observation for the **exact** candidate payload digest and the profile's constraint snapshot whose
   status is PASS, or whose BLOCKING findings are all in the profile's `packaging_waiverable_rule_ids` and are

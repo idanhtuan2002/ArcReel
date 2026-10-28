@@ -361,3 +361,20 @@ def test_a_shared_assessor_does_not_erase_a_concrete_failure() -> None:
         admitted(pair, "NARRATIVE", "review-required", "b", "FAIL"),
     )
     assert {r.state for r in run.slot_results} == {"FAILED"}
+
+
+@pytest.mark.parametrize("subject", ["base", "package"])
+def test_a_packaging_observation_never_enters_a_quality_run(subject: str) -> None:
+    from r2.contracts import packaging as p
+    from tests.unit.r2.contracts.test_packaging import packaging_observation_data
+
+    revision = profile()
+    data = packaging_observation_data() | {"requirement_id": "technical-required", "slot_id": "technical"}
+    if subject == "base":
+        data["subject_digest"] = compute_digest("m10.assessed-subject.v1", valid_subject())
+    packaging = runs().AdmittedObservation(
+        observation=p.PackagingObservation.model_validate(data),
+        assessor_class=q.AssessorClass.DETERMINISTIC,
+    )
+    with pytest.raises((RequiredEvidenceMissingError, SubjectStaleError)):
+        close(revision, packaging, admitted(revision, "NARRATIVE", "review-required", "human"))

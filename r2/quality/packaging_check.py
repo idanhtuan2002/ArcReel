@@ -10,6 +10,7 @@ import re
 import unicodedata
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
+from typing import Literal
 
 from r2.contracts import quality as q
 from r2.contracts.advanced_creative import PackagingCandidate, PackagingChapter
@@ -43,7 +44,7 @@ class PackagingFacts:
 class RuleOutcome:
     rule_id: str
     check_id: str
-    severity: str
+    severity: Literal["BLOCKING", "ADVISORY"]
     locator: str
     code: str
 

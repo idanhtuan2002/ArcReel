@@ -105,6 +105,7 @@ from lib.db.models.quality_dispositions import (
     DispositionOutboxModel,
     QualityDispositionModel,
 )
+from lib.db.models.quality_packaging import PackagingObservationModel
 from lib.db.models.quality_probes import (
     QualityProbeFailureModel,
     QualityProbeInvocationModel,
@@ -214,6 +215,7 @@ __all__ = [
     "NarrativeRevisionModel",
     "OperatorResolutionReceiptModel",
     "OverlayConstraintSetModel",
+    "PackagingObservationModel",
     "ProductionBindingCommandModel",
     "ProductionBindingHeadModel",
     "ProductionBindingVersionModel",
