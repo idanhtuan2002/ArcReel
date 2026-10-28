@@ -113,7 +113,7 @@ def _admit(
     slots: dict[tuple[str, str], tuple[q.AssessmentRequirement, q.AssessmentSlot]],
     *,
     subject_digest: str,
-    policy: q.QualityPolicyV1,
+    policy: q.QualityPolicyV1 | q.QualityPolicyV2,
 ) -> tuple[tuple[str, str], q.ObservationBinding]:
     observation = item.observation
     key = (observation.requirement_id, observation.slot_id)

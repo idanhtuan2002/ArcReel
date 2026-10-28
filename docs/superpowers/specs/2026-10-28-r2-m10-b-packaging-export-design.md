@@ -74,7 +74,8 @@ seals observations whose `subject_digest` equals the base `AssessedSubject` dige
 putting package observations in the run would force a new run **and a new Human disposition for every metadata
 edit** and lets one run carry observations for different candidates. Instead:
 
-- `PackagingObservation` is a new member of the observation union with every common `ObservationBase` field;
+- `PackagingObservation` uses the new `ObservationType.PACKAGING` with every common `ObservationBase` field; it is
+  **not** added to the run's `QualityObservation` union (it lives in `r2/contracts/packaging.py`);
   its `subject_digest` is the digest of a `PackagingAssessedSubject` (base subject digest + candidate id/revision/
   payload digest + constraint snapshot digest). Run sealing is unchanged and continues to reject any observation
   whose subject is not the base subject, so a packaging observation can never enter a `QualityRun`.

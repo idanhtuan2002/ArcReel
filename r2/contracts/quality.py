@@ -430,8 +430,9 @@ class AccessibilityRule(M10ContractModel):
     audio_description_policy_digest: Sha256Digest
 
 
-class QualityPolicyV1(M10ContractModel):
-    schema_id: Literal["m10.quality-policy.v1"]
+class QualityPolicyFields(M10ContractModel):
+    """Every V1 policy field and invariant; each policy schema adds only its `schema_id` and extensions."""
+
     probe_rules: tuple[ProbeRule, ...]
     assessment_requirements: tuple[AssessmentRequirement, ...]
     freshness_rules: tuple[FreshnessRule, ...]
@@ -460,6 +461,103 @@ class QualityPolicyV1(M10ContractModel):
         return self
 
 
+class QualityPolicyV1(QualityPolicyFields):
+    schema_id: Literal["m10.quality-policy.v1"]
+
+
+class PackagingRuleClass(StrEnum):
+    INTEGRITY = "INTEGRITY"
+    REQUIRED_ASSET = "REQUIRED_ASSET"
+    CLOSURE = "CLOSURE"
+    CURRENTNESS = "CURRENTNESS"
+    DURATION = "DURATION"
+    METADATA_LINT = "METADATA_LINT"
+    CHAPTER = "CHAPTER"
+    LOCALE = "LOCALE"
+    VARIANT = "VARIANT"
+
+
+NON_WAIVABLE_PACKAGING_CLASSES = frozenset(
+    {
+        PackagingRuleClass.INTEGRITY,
+        PackagingRuleClass.REQUIRED_ASSET,
+        PackagingRuleClass.CLOSURE,
+        PackagingRuleClass.CURRENTNESS,
+    }
+)
+
+
+class PackagingRule(M10ContractModel):
+    rule_id: ExactIdentity
+    rule_class: PackagingRuleClass
+    severity: Literal["BLOCKING", "ADVISORY"]
+
+
+class PackagingAssetRole(M10ContractModel):
+    role: ExactIdentity
+    constraint_rule_id: ExactIdentity
+    required: StrictBool
+    media_types: tuple[ExactIdentity, ...] = Field(min_length=1)
+    max_bytes: StrictInt = Field(gt=0, lt=2**31)
+
+
+class PlatformConstraintSnapshot(M10ContractModel):
+    schema_id: Literal["m10.platform-constraints.v1"]
+    platform_profile_id: ExactIdentity
+    platform_profile_revision: StrictInt = Field(ge=1)
+    min_duration_ms: StrictInt = Field(ge=0)
+    max_duration_ms: StrictInt = Field(gt=0)
+    width: StrictInt = Field(gt=0)
+    height: StrictInt = Field(gt=0)
+    title_max_chars: StrictInt = Field(gt=0)
+    description_max_chars: StrictInt = Field(gt=0)
+    max_tags: StrictInt = Field(ge=0)
+    max_tag_chars: StrictInt = Field(gt=0)
+    max_hashtags: StrictInt = Field(ge=0)
+    required_topic_terms: tuple[NonBlankText, ...]
+    banned_phrases: tuple[NonBlankText, ...]
+    chapter_min_ms: StrictInt = Field(gt=0)
+    max_chapters: StrictInt = Field(ge=0)
+    required_locales: tuple[ExactIdentity, ...]
+    max_variant_groups: StrictInt = Field(ge=0)
+    max_variants_per_group: StrictInt = Field(ge=1)
+    asset_roles: tuple[PackagingAssetRole, ...]
+    rules: tuple[PackagingRule, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def coherent(self) -> Self:
+        if self.min_duration_ms >= self.max_duration_ms:
+            raise ValueError("empty duration window")
+        _unique(self.required_locales)
+        _unique(r.role for r in self.asset_roles)
+        _unique(r.rule_id for r in self.rules)
+        if not {r.constraint_rule_id for r in self.asset_roles} <= {r.rule_id for r in self.rules}:
+            raise ValueError("unknown asset rule")
+        return self
+
+
+class QualityPolicyV2(QualityPolicyFields):
+    """V1 plus the platform constraints a packaging check enforces."""
+
+    schema_id: Literal["m10.quality-policy.v2"]
+    platform_constraints: PlatformConstraintSnapshot
+    packaging_waiverable_rule_ids: tuple[ExactIdentity, ...]
+
+    @model_validator(mode="after")
+    def bounded_packaging_waivers(self) -> Self:
+        _unique(self.packaging_waiverable_rule_ids)
+        classes = {r.rule_id: r.rule_class for r in self.platform_constraints.rules}
+        for rule_id in self.packaging_waiverable_rule_ids:
+            if rule_id not in classes:
+                raise ValueError("unknown packaging rule")
+            if classes[rule_id] in NON_WAIVABLE_PACKAGING_CLASSES:
+                raise ValueError("authority, integrity, closure and currentness rules are never waivable")
+        return self
+
+
+QualityPolicy = Annotated[QualityPolicyV1 | QualityPolicyV2, Field(discriminator="schema_id")]
+
+
 class QualityProfileDraft(M10ContractModel):
     user_id: ExactIdentity
     project_name: ExactIdentity
@@ -468,7 +566,7 @@ class QualityProfileDraft(M10ContractModel):
     parent_revision: Annotated[StrictInt, Field(ge=1)] | None
     cohort_id: ExactIdentity
     product_surface: ExactIdentity
-    policy: QualityPolicyV1
+    policy: QualityPolicy
     policy_digest: Sha256Digest
     supersession_effect: SupersessionEffect
     created_by: ExactIdentity
@@ -485,7 +583,7 @@ class QualityProfileRevision(M10ContractModel):
     revision: StrictInt = Field(ge=1)
     cohort_id: ExactIdentity
     product_surface: ExactIdentity
-    policy: QualityPolicyV1
+    policy: QualityPolicy
     policy_digest: Sha256Digest
     profile_digest: Sha256Digest
     parent_revision: Annotated[StrictInt, Field(ge=1)] | None
@@ -534,6 +632,7 @@ class ObservationType(StrEnum):
     PERCEPTUAL_REGRESSION = "PERCEPTUAL_REGRESSION"
     PERCEPTUAL_REVIEW = "PERCEPTUAL_REVIEW"
     ACCESSIBILITY = "ACCESSIBILITY"
+    PACKAGING = "PACKAGING"
 
 
 class QualityFinding(M10ContractModel):
@@ -723,7 +822,15 @@ class CommandEnvelope(M10ContractModel):
     user_id: ExactIdentity
     project_name: ExactIdentity
     actor_id: ExactIdentity
-    operation: Literal["PUBLISH_PROFILE", "COMPLETE_RUN", "ISSUE_DISPOSITION"]
+    operation: Literal[
+        "PUBLISH_PROFILE",
+        "COMPLETE_RUN",
+        "ISSUE_DISPOSITION",
+        "CHECK_PACKAGE",
+        "PREVIEW_PACKAGE",
+        "SELECT_PACKAGE",
+        "EXPORT_PACKAGE",
+    ]
     command_id: ExactIdentity
     request_digest: Sha256Digest
 
@@ -937,6 +1044,7 @@ class CompleteRunCommand(M10ContractModel):
 
 
 __all__ = [
+    "NON_WAIVABLE_PACKAGING_CLASSES",
     "AccessibilityObservation",
     "AccessibilityRule",
     "ArtifactMetadataSnapshot",
@@ -967,8 +1075,12 @@ __all__ = [
     "ObservationBinding",
     "ObservationStatus",
     "ObservationType",
+    "PackagingAssetRole",
+    "PackagingRule",
+    "PackagingRuleClass",
     "PerceptualRegressionObservation",
     "PerceptualReviewObservation",
+    "PlatformConstraintSnapshot",
     "ProbeRule",
     "ProfilePublicationAuthorizationLease",
     "ProfilePublicationAuthorizationRequest",
@@ -976,7 +1088,10 @@ __all__ = [
     "QualityDisposition",
     "QualityFinding",
     "QualityObservation",
+    "QualityPolicy",
+    "QualityPolicyFields",
     "QualityPolicyV1",
+    "QualityPolicyV2",
     "QualityProfileDraft",
     "QualityProfileRevision",
     "QualityRun",

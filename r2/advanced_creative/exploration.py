@@ -214,6 +214,8 @@ class ExplorationService:
             raise ExplorationNotFoundError("the revision is not in this scope")
         if candidate.kind is ExplorationKind.SPATIAL:
             raise CandidateConflictError("spatial revisions require server-owned spatial execution")
+        if candidate.kind is ExplorationKind.PACKAGING:
+            raise CandidateConflictError("packaging revisions require the M10 packaging service")
         head = await self._store.append_revision(
             user_id=user_id,
             project_name=project_name,

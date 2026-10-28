@@ -10,7 +10,7 @@ import pytest
 
 from r2.advanced_creative.digests import canonical_json_bytes
 from r2.contracts import quality as q
-from r2.quality.digests import compute_digest, verify_caches
+from r2.quality.digests import compute_digest, policy_domain, verify_caches
 from r2.quality.errors import (
     OperationalEnvelopeExceededError,
     PrerequisiteNotAcceptedError,
@@ -29,7 +29,9 @@ POLICY_ID = "m10.profile-publication.interactive-human.v1"
 
 def publication_request(**draft_changes: Any) -> q.ProfilePublicationAuthorizationRequest:
     draft = draft_data() | draft_changes
-    draft["policy_digest"] = compute_digest("m10.quality-policy.v1", draft["policy"])
+    draft["policy_digest"] = compute_digest(
+        policy_domain(q.QualityProfileDraft.model_validate(draft).policy), draft["policy"]
+    )
     subject = {
         "user_id": draft["user_id"],
         "project_name": draft["project_name"],

@@ -19,6 +19,7 @@ from lib.db.models.quality import (
     QualityProfileRevisionModel,
 )
 from lib.db.repositories.quality import QualityProfileRepository
+from r2.contracts import quality as q
 from r2.quality.errors import (
     CommandReplayConflictError,
     M10Error,
@@ -137,6 +138,16 @@ async def test_genesis_head_advance_scoped_read_and_historical_exact_replay(qual
         assert (await session.execute(sa.select(QualityProfileHeadModel.current_revision))).scalar_one() == 2
         for model in [QualityProfileRevisionModel, QualityCommandModel, QualityOutboxModel]:
             assert (await session.execute(sa.select(sa.func.count()).select_from(model))).scalar_one() == 2
+
+
+async def test_a_v2_packaging_policy_publishes_and_replays_through_the_same_path(quality_factory: Factory) -> None:
+    from tests.unit.r2.contracts.test_packaging import policy_v2_data
+
+    request = request_for(policy=policy_v2_data())
+    published = await append(quality_factory, request)
+    assert isinstance(published.policy, q.QualityPolicyV2)
+    async with quality_factory() as session:
+        assert await QualityProfileRepository(session).replay(request) == published
 
 
 async def test_same_full_command_key_with_changed_semantics_conflicts(quality_factory: Factory) -> None:

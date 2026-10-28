@@ -274,6 +274,31 @@ async def test_public_append_rejects_unverified_spatial_revision_before_write() 
     assert world.events == []
 
 
+async def test_public_append_rejects_packaging_revisions_before_write() -> None:
+    from r2.contracts.advanced_creative import PackagingCandidate
+    from tests.unit.r2.contracts.test_packaging import candidate_data
+
+    packaging = PackagingCandidate.model_validate(candidate_data())
+    base = _revision()
+    revision = ExplorationRevision(
+        **(
+            base.model_dump(mode="python")
+            | {
+                "kind": ExplorationKind.PACKAGING,
+                "payload": packaging,
+                "payload_digest": digest_payload(packaging, LINEAGE),
+            }
+        )
+    )
+    world = _World(revision)
+
+    with pytest.raises(CandidateConflictError, match="M10 packaging service"):
+        await _service(world).append_revision(
+            user_id="u1", project_name="demo", candidate=revision, expected_head_version=None, command_id="package-1"
+        )
+    assert world.events == []
+
+
 def test_uuid7_ids_are_version_7_and_time_ordered() -> None:
     first, second = uuid7(), uuid7()
 

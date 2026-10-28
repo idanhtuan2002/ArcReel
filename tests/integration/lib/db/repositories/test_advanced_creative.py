@@ -303,3 +303,61 @@ async def test_the_database_refuses_an_authorization_bound_to_a_preview_of_anoth
         session.add(authorization(PROJECT))
         await session.commit()
     assert await _count(session_factory, M8PromotionAuthorizationModel) == 1
+
+
+def _packaging_revision(revision: int, *, title: str = "A history of the river") -> ExplorationRevision:
+    from r2.contracts.advanced_creative import PackagingCandidate
+    from tests.unit.r2.contracts.test_packaging import candidate_data
+
+    payload = PackagingCandidate.model_validate(candidate_data() | {"title": title})
+    lineage = LineageBinding(
+        project_name=PROJECT,
+        content_basis_digest=DIGEST,
+        approved_master_id="master",
+        approved_master_digest=DIGEST,
+        creative_profile_id="0199f00d-0000-7000-8000-000000000001",
+        creative_profile_version="1",
+        policy_digest=DIGEST,
+    )
+    return ExplorationRevision(
+        candidate_id=CANDIDATE,
+        revision=revision,
+        kind=ExplorationKind.PACKAGING,
+        parent_revision=None if revision == 1 else revision - 1,
+        payload=payload,
+        payload_digest=digest_payload(payload, lineage),
+        lineage=lineage,
+        created_by="actor-1",
+        created_at=NOW,
+    )
+
+
+async def test_packaging_revisions_share_the_kernel_cas_and_read_back_exactly(session_factory: Factory) -> None:
+    first = _packaging_revision(1)
+    assert await _append(session_factory, first, None, "pkg-1") == CandidateHead(
+        candidate_id=CANDIDATE, current_revision=1, head_version=1
+    )
+    await _append(session_factory, _packaging_revision(2, title="The river that made a valley"), 1, "pkg-2")
+    with pytest.raises(CandidateConflictError):
+        await _append(session_factory, _packaging_revision(3), 1, "pkg-3")
+    async with session_factory() as session:
+        stored = await ExplorationRepository(session).get_exact(
+            user_id=USER, project_name=PROJECT, candidate_id=CANDIDATE, revision=1
+        )
+        kinds = (await session.execute(select(M8CandidateRevisionModel.kind))).scalars().all()
+    assert stored == first
+    assert sorted(kinds) == ["PACKAGING", "PACKAGING"]
+
+
+async def test_the_kernel_does_not_bind_kind_across_revisions(session_factory: Factory) -> None:
+    """Characterization: kind continuity is the packaging service's check, not the kernel's."""
+    await _append(session_factory, _packaging_revision(1), None, "pkg-1")
+    canvas = _revision(2)
+    await _append(session_factory, canvas, 1, "canvas-2")
+    async with session_factory() as session:
+        kinds = (
+            (await session.execute(select(M8CandidateRevisionModel.kind).order_by(M8CandidateRevisionModel.revision)))
+            .scalars()
+            .all()
+        )
+    assert kinds == ["PACKAGING", "CANVAS"]

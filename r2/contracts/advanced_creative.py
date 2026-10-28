@@ -32,6 +32,7 @@ class ExplorationKind(StrEnum):
     CANVAS = "CANVAS"
     SPATIAL = "SPATIAL"
     FORMAT = "FORMAT"
+    PACKAGING = "PACKAGING"
 
 
 class EvidenceClass(StrEnum):
@@ -471,8 +472,100 @@ class FormatCandidate(M8ContractModel):
     execution_id: str
 
 
+class PackagingAsset(M8ContractModel):
+    role: str
+    variant_id: str | None
+    source_ref: str
+    content_digest: Sha256Digest
+    media_type: str
+    byte_size: int = Field(ge=0)
+    constraint_rule_id: str
+
+
+class PackagingChapter(M8ContractModel):
+    start_ms: int = Field(ge=0)
+    title: str
+
+
+class LocalizedPackagingMetadata(M8ContractModel):
+    locale: str
+    title: str
+    description: str
+    tags: tuple[str, ...]
+    hashtags: tuple[str, ...]
+    chapters: tuple[PackagingChapter, ...]
+
+
+class PackagingVariant(M8ContractModel):
+    """One alternative for a variant group: inline text/list/chapters, or a reference to an asset by role."""
+
+    variant_id: str
+    value: CanonicalJsonObject | None
+    asset_role: str | None
+
+    @model_validator(mode="after")
+    def exactly_one_source(self) -> Self:
+        if (self.value is None) == (self.asset_role is None):
+            raise ValueError("a variant carries exactly one of value or asset_role")
+        return self
+
+
+class VariantGroup(M8ContractModel):
+    group_id: str
+    field: Literal["title", "description", "tags", "chapters", "thumbnail"]
+    variants: tuple[PackagingVariant, ...] = Field(min_length=1)
+
+
+class AudienceClassification(M8ContractModel):
+    audience_category: str
+    age_restriction: str | None
+    classification_policy_digest: Sha256Digest
+
+
+class DisclosureSet(M8ContractModel):
+    synthetic_media: bool
+    paid_promotion: bool
+    disclosure_policy_digest: Sha256Digest
+
+
+class PackagingProvenance(M8ContractModel):
+    """Who authored a field group; the server sets it from the authenticated principal."""
+
+    field_group: Literal["content", "presentation"]
+    author_kind: Literal["HUMAN", "AGENT"]
+    actor_id: str
+
+
+class PackagingCandidate(M8ContractModel):
+    """Pure package data; every M10 rule is enforced by the M10 packaging check, not here."""
+
+    kind: Literal[ExplorationKind.PACKAGING]
+    approved_master_id: str
+    approved_master_digest: Sha256Digest
+    assessed_subject_digest: Sha256Digest
+    quality_profile_id: str
+    quality_profile_revision: int = Field(ge=1)
+    quality_profile_digest: Sha256Digest
+    platform_profile_id: str
+    platform_profile_revision: int = Field(ge=1)
+    constraint_snapshot_digest: Sha256Digest
+    title: str
+    description: str
+    tags: tuple[str, ...]
+    hashtags: tuple[str, ...]
+    chapters: tuple[PackagingChapter, ...]
+    localization_variants: tuple[LocalizedPackagingMetadata, ...]
+    audience_classification: AudienceClassification
+    disclosure: DisclosureSet
+    variant_groups: tuple[VariantGroup, ...]
+    assets: tuple[PackagingAsset, ...]
+    content_closure_digest: Sha256Digest
+    presentation_closure_digest: Sha256Digest
+    provenance: tuple[PackagingProvenance, ...]
+
+
 CandidatePayload = Annotated[
-    CanvasCandidate | SpatialCandidate | FormatCandidate,
+    CanvasCandidate | SpatialCandidate | FormatCandidate | PackagingCandidate,
     Field(discriminator="kind"),
 ]
 

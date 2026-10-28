@@ -182,14 +182,7 @@ def test_every_domain_hashes_the_complete_hand_built_normative_body(domain: str)
 @pytest.mark.parametrize(
     "domain",
     [
-        "m10.packaging-observation.v1",
-        "m10.packaging-candidate.v1",
-        "m10.package-selection-request.v1",
-        "m10.package-selection.v1",
-        "m10.export-request.v1",
-        "m10.export-manifest.v1",
         "m10.export-execution.v1",
-        "m10.quality-policy.v2",
         "m10.unknown.v1",
     ],
 )

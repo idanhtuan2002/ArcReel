@@ -71,7 +71,7 @@ class M8CandidateRevisionModel(_EvidenceOwner, Base):
             ["m8_candidate_heads.user_id", "m8_candidate_heads.project_name", "m8_candidate_heads.candidate_id"],
             name="fk_m8_candidate_revisions_candidate",
         ),
-        CheckConstraint("kind IN ('CANVAS', 'SPATIAL', 'FORMAT')", name="ck_m8_candidate_revisions_kind"),
+        CheckConstraint("kind IN ('CANVAS', 'SPATIAL', 'FORMAT', 'PACKAGING')", name="ck_m8_candidate_revisions_kind"),
         CheckConstraint("revision >= 1", name="ck_m8_candidate_revisions_revision"),
         CheckConstraint(
             "parent_revision IS NULL OR parent_revision = revision - 1", name="ck_m8_candidate_revisions_parent"

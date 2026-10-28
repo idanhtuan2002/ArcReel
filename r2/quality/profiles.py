@@ -6,7 +6,7 @@ from datetime import datetime
 
 import r2.contracts.quality as q
 from r2.advanced_creative.digests import canonical_json_bytes
-from r2.quality.digests import compute_digest, verify_caches
+from r2.quality.digests import compute_digest, policy_domain, verify_caches
 from r2.quality.errors import (
     OperationalEnvelopeExceededError,
     PrerequisiteNotAcceptedError,
@@ -86,7 +86,7 @@ def build_published_profile(
             raise ProfilePublicationUnauthorizedError()
         draft = normalized.subject.profile_draft
         body = draft.model_dump(mode="python") | {
-            "policy_digest": compute_digest("m10.quality-policy.v1", draft.policy),
+            "policy_digest": compute_digest(policy_domain(draft.policy), draft.policy),
             "profile_digest": "sha256:" + "0" * 64,
             "publication_authorization_id": resolved.authorization_id,
             "publication_policy_id": resolved.policy_id,
