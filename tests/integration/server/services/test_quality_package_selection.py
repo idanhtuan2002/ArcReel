@@ -89,8 +89,13 @@ def preview_request(env, *, command_id: str = "preview-1", **subject_changes: An
     return p.PackagePreviewRequest.model_validate(body)
 
 
-async def preview(env, request=None) -> p.PackagePreview:
-    service = PackagePreviewService(sessions=env["factory"], grant_reader=env["reader"], project_root=env["project"])
+async def preview(env, request=None, *, seconds: int | None = None) -> p.PackagePreview:
+    service = PackagePreviewService(
+        sessions=env["factory"],
+        grant_reader=env["reader"],
+        project_root=env["project"],
+        **({} if seconds is None else {"preview_seconds": seconds}),
+    )
     return await service.preview(request or preview_request(env))
 
 
@@ -622,14 +627,11 @@ async def test_a_preview_never_outlives_its_disposition(packaging_host) -> None:
     assert shown.expires_at == env["disposition"].expires_at
 
 
-async def test_an_expired_preview_is_refused(ready_host, monkeypatch) -> None:
+async def test_an_expired_preview_is_refused(ready_host) -> None:
     import asyncio
 
-    from server.services import quality_package_selection as module
-
     env = ready_host
-    monkeypatch.setattr(module, "PREVIEW_SECONDS", 1)
-    shown = await preview(env)
+    shown = await preview(env, seconds=1)
     await asyncio.sleep(1.2)
     with pytest.raises(DispositionStaleError):
         await select(env, selection_request(env, shown))

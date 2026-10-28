@@ -179,10 +179,18 @@ async def resolve_package_evidence(
 
 
 class PackagePreviewService:
-    def __init__(self, *, sessions: Sessions, grant_reader: GrantReaderFactory, project_root: Path) -> None:
+    def __init__(
+        self,
+        *,
+        sessions: Sessions,
+        grant_reader: GrantReaderFactory,
+        project_root: Path,
+        preview_seconds: int = PREVIEW_SECONDS,
+    ) -> None:
         self._sessions = sessions
         self._grant_reader = grant_reader
         self._project_root = project_root
+        self._preview_seconds = preview_seconds
 
     async def preview(self, request: p.PackagePreviewRequest) -> p.PackagePreview:
         if request.command.request_digest != compute_digest("m10.package-preview-request.v1", request):
@@ -249,7 +257,7 @@ class PackagePreviewService:
                 waivers=subject.waivers,
                 expected_head_version=await repository.head_version(slot),
                 created_at=now,
-                expires_at=min(now + timedelta(seconds=PREVIEW_SECONDS), disposition.expires_at),
+                expires_at=min(now + timedelta(seconds=self._preview_seconds), disposition.expires_at),
             )
             await repository.stage_preview(request, preview)
         return preview
