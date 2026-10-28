@@ -1,0 +1,88 @@
+{
+  "schema_id": "m10.a-acceptance.v1",
+  "status": "M10_A_ACCEPTED_WITH_CONDITIONS",
+  "accepted_source_head": "b904bc000b79217cabc459b0029bf9fea1d6f773",
+  "candidate_evidence": "docs/r2/evidence/R2_M10_A_CANDIDATE.json at 8fd838db1",
+  "review": "docs/r2/evidence/m10-a-reviews/acceptance-review.json",
+  "sponsor_authorization": "2026-10-28 sponsor instruction: use a separate Claude subagent as acceptance reviewer, then continue until M10 is complete",
+  "conditions": {
+    "1_durable_failure_resources": "CARRIED: named follow-up packet M10-A-F1 (append-only failure ResourceEvidence table + migration); must land before any operator UI, readiness rule or audit relies on historical failure accounting",
+    "2_lock_order": "DONE b904bc000: publication locks profile head before grant head; tests/integration/server/services/test_quality_profiles.py::test_revocation_never_waits_behind_a_publication_blocked_before_its_grant_lock is RED on the old order and GREEN on the new",
+    "3_service_evidence_test": "DONE b904bc000: test_quality_probes.py known-failure test asserts failure_resources survives QualityProbeService",
+    "4_independence": "RECORDED: same-family reviewer; Codex re-review of A6, A7, amendment and this acceptance is recommended after 2026-11-02 15:12",
+    "5_sequence": "sponsor authorization above releases M10-B sequence lock"
+  },
+  "post_review_change": {
+    "commit": "b904bc000",
+    "files": [
+      "server/services/quality_profiles.py",
+      "tests/integration/server/services/test_quality_profiles.py",
+      "tests/integration/server/services/test_quality_probes.py"
+    ],
+    "reviewed": false,
+    "note": "condition fixes after the review; covered by the run below"
+  },
+  "commands": [
+    {
+      "command": "pytest -n 4 --dist loadfile tests/unit/r2/quality tests/unit/server/services/test_quality_probe_runtime.py tests/integration/server/services/test_quality_{profiles,profile_custodian,probe_runtime,probe_recipes,probes,kalinga_parity,runs,dispositions}.py tests/unit/scripts/r2 (PG16 disposable)",
+      "code_head": "b904bc000",
+      "result": "942 passed"
+    },
+    {
+      "command": "ruff check / ruff format --check / basedpyright on changed files; audit_tests.py --check",
+      "code_head": "b904bc000",
+      "result": "clean / formatted / 0 errors 0 warnings / 0 violations"
+    },
+    {
+      "command": "python scripts/r2/verify_m10_a_candidate.py --parity docs/r2/evidence/R2_M10_A7_KALINGA_PARITY.json",
+      "code_head": "b904bc000b79217cabc459b0029bf9fea1d6f773",
+      "result": {
+        "status": "M10_A_CANDIDATE_OK",
+        "stop_codes": [],
+        "m10_modules": 26,
+        "importers_scanned": 882,
+        "migrations": 86,
+        "parity": "PASS"
+      }
+    }
+  ],
+  "m10_modules_sha256": {
+    "lib/db/models/quality.py": "e4b2e5eafad747ca163146346b17b585f1d0f337c9d75e29d9027d13198206e0",
+    "lib/db/models/quality_dispositions.py": "aef6270b1787c988edf056b2a8083006a37dddea92a1e0b70f0f85e9d26f2d63",
+    "lib/db/models/quality_probes.py": "9d590bf90c337c2c984fe0d2d549fb8f8fd1c2706b10b707519b1b5e873ef571",
+    "lib/db/models/quality_runs.py": "8378d669a07411ada2c402cd4f88dda1c814052d4e40625779bfae1218891c76",
+    "lib/db/repositories/quality.py": "37974aa89e49f120b3b6fc218b0abe5b85de7ea8a69644faf9e2ecb6ef214b47",
+    "lib/db/repositories/quality_dispositions.py": "5e86db5da1fe265ac5a84a666f14664303aead8d983c3315b00bf23d79e5a428",
+    "lib/db/repositories/quality_probes.py": "aa18fa1f6cdb038c14d666b961fbd1abc6bcdef74172ff7de7abce301e60dba8",
+    "lib/db/repositories/quality_runs.py": "78606818e62c2fa81041bbb26be3a6a34aca3151d672a16344d04f8fa6a16a91",
+    "r2/contracts/quality.py": "b8e5398d000f31d25196d5533a00ce5bb3740bfc13a7d0aab72ce869901f1384",
+    "r2/quality/__init__.py": "983a07c910996a8ecb7ff05e19d28c54bf5be102c1d79207c11e8faf0d2dcd6b",
+    "r2/quality/digests.py": "323e748d18ad719cff57d285ebfc21e4f633086150495368337843d9751ee6e7",
+    "r2/quality/dispositions.py": "ce1902badf6be6956b34e25a64cba444b062b9081a81ca0f54d5d6b169910ac9",
+    "r2/quality/errors.py": "e5ab9d4ac83c482134d91e6b24aa0be65d3fdfc5a903735c677dcfba83162608",
+    "r2/quality/parity.py": "9d8d3d581e293db700e388ce01bc1cde322004344e91cfe89287f9bf54636141",
+    "r2/quality/ports.py": "c8f274c70e027b572602d91c861d91c388a550a16085ec0befebcb5362e04145",
+    "r2/quality/probes.py": "fd260e17ec74aa673256371112a35000a479149ef163108ebe286d087cfa4a05",
+    "r2/quality/profiles.py": "e157186cb62cd7beae029767e6d92c03278e2341055f24f6d37ac0a25d98c3d8",
+    "r2/quality/runs.py": "16ca7a3487a66088f1a375dfd0cf71865993e507bedfe8ba7442f129ab816e53",
+    "server/services/quality_dispositions.py": "38e2097d398defbc398cd7b83ccb3f856de8b515ad7dc60dc8438b44e0c578d2",
+    "server/services/quality_probe_inputs.py": "7f5282d6a8ced58726e0cb6a77833333f094276bb6bdf4dd53743bc3c1e1ff33",
+    "server/services/quality_probe_runtime.py": "7740db371ddcd5f4d4436f90957405b899b9c2f1537c1a84a674c7f76638c6b5",
+    "server/services/quality_probe_worker.py": "79bb80a6503a569065969b75f84bbcd3335e2e1fafa9577d400f1e3cbb126ce2",
+    "server/services/quality_probes.py": "50ba8d7e47e7ecb7f5e09ef5856c1a967136fb92c23bb4172fad939851ed26ec",
+    "server/services/quality_profile_custodian.py": "649213b31abcb89738a5ed99ea5d6e1655b08e4c85cdeebf76dad254f3e30673",
+    "server/services/quality_profiles.py": "9b3f6740df0960db7e9d200c8eeb9ae8f21db323c4b74d707aec8ba748072c7a",
+    "server/services/quality_runs.py": "88fbfd73877db1b351152bd3047e88c2903ec4678d5bcd9d9d8947ca570d4692"
+  },
+  "flags": {
+    "runtime_accepted": false,
+    "production_activation": false,
+    "pushed": false
+  },
+  "known_limits": [
+    "failure ResourceEvidence not persisted (M10-A-F1)",
+    "static direct-import surface scan only",
+    "downgrades drop M10 history (L5)",
+    "repo-wide lint/typecheck last run at 4bc2bb9ee; later checks on changed files"
+  ]
+}

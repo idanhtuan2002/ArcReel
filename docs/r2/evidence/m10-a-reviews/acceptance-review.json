@@ -1,0 +1,31 @@
+{
+  "schema_id": "m10.a-acceptance-review.v1",
+  "reviewed_head": "8fd838db1",
+  "source_head": "cf232e2c5",
+  "reviewer": "separate Claude Opus subagent (same model family as the builder; sponsor-authorized substitute for Codex, quota exhausted until 2026-11-02 15:12)",
+  "verdict": "ACCEPT_WITH_CONDITIONS",
+  "reviewer_reran": [
+    "verify_m10_a_candidate.py at 8fd838db1: M10_A_CANDIDATE_OK, parity PASS, module hashes match",
+    "pytest tests/unit/r2/quality tests/unit/server/services/test_quality_probe_runtime.py tests/unit/scripts/r2: 790 passed"
+  ],
+  "reviewer_not_verified": [
+    "PG16 integration runs",
+    "migration round trips",
+    "parity timings"
+  ],
+  "findings": {
+    "H": [],
+    "M1_lock_order": "profile publication locked grant head before profile head, inverse of run closure/disposition (deadlock risk for the same Human)",
+    "M2_durability": "failure ResourceEvidence in-process only; not blocking under the frozen R2-DEC-031 resources criterion and the A4 spec",
+    "L1": "no service-level test that failure evidence survives QualityProbeService",
+    "L2": "failure-path landlock_abi not re-checked >= 6 (worker enforces)",
+    "L3": "downgrades of 57f67bae0cb4 and bed415be3608 drop M10 history (known limit L5)"
+  },
+  "conditions": [
+    "1 carry M2 durability as a named follow-up packet",
+    "2 fix/test publication-vs-disposition lock order before runtime activation",
+    "3 add the service-level evidence test",
+    "4 record same-family review; optional Codex re-review of A6/A7/amendment after 2026-11-02",
+    "5 no M10-B before sponsor records acceptance"
+  ]
+}
