@@ -1,0 +1,234 @@
+{
+  "schema_id": "m10.a-candidate.v1",
+  "status": "M10_A_SOURCE_CANDIDATE_PARITY_BLOCKED",
+  "source_head": "4bc2bb9ee8107ee32edb612d7eaf3cde631bea68",
+  "source_parent": "bac7fe21667830aa1f3f060ad2731580b24dffd8",
+  "parity_report_commit": "af6b39416ab01a268302edb9b35b2ea2c65c2227",
+  "branch": "design/r2-m10-a7-parity",
+  "packet_chain": {
+    "A4_probes": "a57d7c631 (R2_M10_A4_CANDIDATE.json)",
+    "A5_run_closure": "d84993648 (R2_M10_A5_CANDIDATE.json)",
+    "A6_disposition": "source af67ea71b, evidence 9ee0652de (R2_M10_A6_CANDIDATE.json)",
+    "A7_parity": "c32efc968 baseline frozen before measurement; eaf5f8ed9, 7138ada79 parity tests; bac7fe216 verifier/builder; 4bc2bb9ee extractor"
+  },
+  "commands": [
+    {
+      "command": "pytest tests/unit/r2/quality tests/unit/r2/contracts/test_quality.py tests/unit/r2/advanced_creative/test_parity.py tests/unit/lib/db tests/integration/lib/db tests/integration/server/services/test_quality_*.py tests/unit/server/services/test_quality_*.py tests/unit/r2/host_hardening tests/unit/scripts/r2/test_verify_m10*.py tests/integration/scripts/r2/test_verify_m10*.py -n 4 --dist loadfile (PG16 disposable)",
+      "code_head": "bac7fe216",
+      "result": "2185 passed, 0 failed, 0 errors, 20 skipped",
+      "skips": "20 pre-existing, none M10: production_binding_current 7, spatial_pair_current 7, spatial_pair_writes 4, spatial_review_repository 2",
+      "head_delta_to_source": "bac7fe216..4bc2bb9ee adds the unimported extractor script and deletes two doc copies; no tested code changed"
+    },
+    {
+      "command": "pytest test_quality_kalinga_parity.py test_verify_m10_a_candidate.py",
+      "code_head": "4bc2bb9ee8107ee32edb612d7eaf3cde631bea68",
+      "result": "37 passed"
+    },
+    {
+      "command": "ruff check . / ruff format --check . / basedpyright --warnings",
+      "code_head": "4bc2bb9ee8107ee32edb612d7eaf3cde631bea68",
+      "result": "All checks passed / 2073 files already formatted / 0 errors, 0 warnings, 0 notes"
+    },
+    {
+      "command": "lint-imports / deptry lib server alembic scripts tests r2 / audit_tests.py --check / git diff --check",
+      "code_head": "bac7fe216",
+      "result": "23 kept 0 broken / no issues / 0 violations / clean"
+    },
+    {
+      "command": "python scripts/r2/verify_m10_a_candidate.py --parity docs/r2/evidence/R2_M10_A7_KALINGA_PARITY.json",
+      "code_head": "af6b39416ab01a268302edb9b35b2ea2c65c2227",
+      "result": {
+        "status": "M10_A_CANDIDATE_REFUSED",
+        "stop_codes": [
+          "M10_DONOR_PARITY_INCOMPLETE"
+        ],
+        "m10_modules": 26,
+        "importers_scanned": 882,
+        "migrations": 86,
+        "parity": "BLOCKED"
+      }
+    }
+  ],
+  "migration_proof": {
+    "chain": "65f53650f3a8 -> 07fd34535384 (A4) -> 57f67bae0cb4 (A5) -> bed415be3608 (A6), single head (verifier)",
+    "restoration": "per-revision upgrade -> downgrade -> upgrade tests with predecessor rows preserved and ORM parity ran in the 2185-test PG16 suite",
+    "known_limit": "downgrades of 57f67bae0cb4 and bed415be3608 drop M10 history (A6 review L5)"
+  },
+  "parity": {
+    "report": "docs/r2/evidence/R2_M10_A7_KALINGA_PARITY.json",
+    "recomputed_verdict": "BLOCKED",
+    "rows": {
+      "missing_master": {
+        "functionality": "PARITY",
+        "correctness": "PARITY",
+        "determinism": "PARITY",
+        "failure_safety": "IMPROVED",
+        "data_integrity": "IMPROVED",
+        "observability": "IMPROVED",
+        "performance": "PARITY",
+        "resources": "PARITY"
+      },
+      "audio_stream_required": {
+        "functionality": "PARITY",
+        "correctness": "PARITY",
+        "determinism": "IMPROVED",
+        "failure_safety": "PARITY",
+        "data_integrity": "IMPROVED",
+        "observability": "IMPROVED",
+        "performance": "PARITY",
+        "resources": "IMPROVED"
+      },
+      "loudness_sanity": {
+        "functionality": "PARITY",
+        "correctness": "PARITY",
+        "determinism": "IMPROVED",
+        "failure_safety": "PARITY",
+        "data_integrity": "IMPROVED",
+        "observability": "IMPROVED",
+        "performance": "PARITY",
+        "resources": "IMPROVED"
+      },
+      "caption_timing_present": {
+        "functionality": "PARITY",
+        "correctness": "IMPROVED",
+        "determinism": "IMPROVED",
+        "failure_safety": "IMPROVED",
+        "data_integrity": "IMPROVED",
+        "observability": "IMPROVED",
+        "performance": "PARITY",
+        "resources": "IMPROVED"
+      },
+      "advisory_failure_never_ready": {
+        "functionality": "PARITY",
+        "correctness": "IMPROVED",
+        "determinism": "PARITY",
+        "failure_safety": "IMPROVED",
+        "data_integrity": "PARITY",
+        "observability": "PARITY",
+        "performance": "PARITY",
+        "resources": "PARITY"
+      },
+      "tool_failure_typed": {
+        "functionality": "IMPROVED",
+        "correctness": "IMPROVED",
+        "determinism": "PARITY",
+        "failure_safety": "IMPROVED",
+        "data_integrity": "PARITY",
+        "observability": "IMPROVED",
+        "performance": "PARITY",
+        "resources": "UNVERIFIED"
+      },
+      "duration_window": "EXCLUDED",
+      "seo_lint": "EXCLUDED",
+      "virality_gate": "EXCLUDED",
+      "ai_review_repair": "EXCLUDED"
+    },
+    "material_unknowns": [
+      "tool_failure_typed.resources: Failed probes return no ResourceEvidence from QualityProbeRuntime or the M7 attempt; the frozen criterion only admits IMPROVED with ResourceEvidence and PARITY for pure rules."
+    ],
+    "required_skips": []
+  },
+  "resource_evidence": {
+    "median_ms_donor_vs_m10": {
+      "CONTAINER_STREAM": [
+        107,
+        191
+      ],
+      "LOUDNESS": [
+        108,
+        267
+      ],
+      "CAPTIONS": [
+        108,
+        195
+      ],
+      "FAILURE_truncated": [
+        31,
+        271
+      ],
+      "FAILURE_mpeg4": [
+        64,
+        262
+      ]
+    },
+    "asserted": "every successful probe: manager_result SUCCESS, group cleanup verified, wall_elapsed_ms <= max_runtime_ms, stdout+stderr <= max_output_bytes",
+    "gap": "failed probes return no ResourceEvidence"
+  },
+  "forbidden_surface_proof": {
+    "verifier": "scripts/r2/verify_m10_a_candidate.py (Git objects at ref; 20 unit tests of each refusal)",
+    "result": "no network, export/packaging, credential or out-of-adapter subprocess import in 26 M10-A modules; only the model registry and the accepted M7 local-ffmpeg quality-probe submit entry reach M10-A; no server router or app import",
+    "limits": "static direct-import scan, not a transitive closure or sandbox; quality_dispositions reaches governance startup whose attestation uses a local Unix socket (accepted M9 governance, not network publication)"
+  },
+  "blocker": {
+    "code": "M10_DONOR_PARITY_INCOMPLETE",
+    "row": "tool_failure_typed.resources = UNVERIFIED",
+    "fact": "QualityProbeRuntime raises ProbeFailedError without ResourceEvidence and the M7 attempt records none, while the frozen criterion admits IMPROVED only with ResourceEvidence (PARITY only for pure rules).",
+    "options": [
+      "RECOMMENDED: amend A4 so a failure after tool start returns typed failure evidence carrying ResourceEvidence (contract + M7 failed-attempt recording), review it, then rerun the parity tests",
+      "Acceptance-recorded criterion deviation: treat failure-path resources as PARITY when the same ceilings are applied before start, then re-measure"
+    ],
+    "why_not_self_resolved": "changing the accepted A4 adapter or a frozen R2-DEC-031 criterion after measurement is an acceptance decision"
+  },
+  "dirty_paths": {
+    "worktree": [],
+    "main_checkout": "unrelated uncommitted docs on design/r2-m5b-narrative-context, preserved"
+  },
+  "a7_source_sha256": {
+    "scripts/r2/verify_m10_a_candidate.py": "b9eba079ca175059d2cee75fe91046e462cda3da04c5eb7c8ad083fff8c09e28",
+    "scripts/r2/build_m10_a7_parity.py": "2dafa6732032a1fcf094d23bd03ba522cf9220eb42522a8344344e1f9d5bdadf",
+    "scripts/r2/extract_m10_a7_kalinga_fixture.py": "e4ff4c92611b482003eb538959671cccf451f4b9306a508bb222234156cecfee",
+    "tests/integration/server/services/test_quality_kalinga_parity.py": "c676eb8e521e94d80f6a07c6539bb911162d0f3d4f1fc07c78c0f286168f4e5b",
+    "tests/unit/scripts/r2/test_verify_m10_a_candidate.py": "f66bdc2a5ff1bd4a75c7ab4f1e8a2e5e71efd800a407821d8375bafda9330777"
+  },
+  "evidence_sha256": {
+    "docs/r2/evidence/R2_M10_A4_CANDIDATE.json": "ccadd3f1f1d1c29551874674c4cf9b06fd4a77fc1baf5ccb33b1e171e80a14cc",
+    "docs/r2/evidence/R2_M10_A5_CANDIDATE.json": "c2907d27845df34b99d8048f58bce80e5faf5479643baaaaeee89c05b075541d",
+    "docs/r2/evidence/R2_M10_A6_CANDIDATE.json": "4ed5397d9ee5ab2f56d171292408d503d141834f31de1ec8c1d3bb8de52bce12",
+    "docs/r2/evidence/R2_M10_A7_KALINGA_BASELINE.json": "2780c7e97ee78969907cc82a834d3dcf80ea46c218459bcc7353d0208488151d",
+    "docs/r2/evidence/R2_M10_A7_KALINGA_PARITY.json": "0d3e2ba51adc2266a9155b168c445961acd00e0b81c5d1f56ed0dfc0f8f0cadc",
+    "tests/fixtures/r2/m10_kalinga/donor_functions.json": "26ad8eb4a102e360abf42eeb047a1df4d066e6594f3a226d43f48f00005c3b39",
+    "tests/fixtures/r2/m10_kalinga/sparse.srt": "9a95fa922553ea58b62df7a16f4416fbc538b993ac895a447ae7b134dcb1880f"
+  },
+  "m10_modules_sha256": {
+    "lib/db/models/quality.py": "e4b2e5eafad747ca163146346b17b585f1d0f337c9d75e29d9027d13198206e0",
+    "lib/db/models/quality_dispositions.py": "aef6270b1787c988edf056b2a8083006a37dddea92a1e0b70f0f85e9d26f2d63",
+    "lib/db/models/quality_probes.py": "9d590bf90c337c2c984fe0d2d549fb8f8fd1c2706b10b707519b1b5e873ef571",
+    "lib/db/models/quality_runs.py": "8378d669a07411ada2c402cd4f88dda1c814052d4e40625779bfae1218891c76",
+    "lib/db/repositories/quality.py": "37974aa89e49f120b3b6fc218b0abe5b85de7ea8a69644faf9e2ecb6ef214b47",
+    "lib/db/repositories/quality_dispositions.py": "5e86db5da1fe265ac5a84a666f14664303aead8d983c3315b00bf23d79e5a428",
+    "lib/db/repositories/quality_probes.py": "aa18fa1f6cdb038c14d666b961fbd1abc6bcdef74172ff7de7abce301e60dba8",
+    "lib/db/repositories/quality_runs.py": "78606818e62c2fa81041bbb26be3a6a34aca3151d672a16344d04f8fa6a16a91",
+    "r2/contracts/quality.py": "b8e5398d000f31d25196d5533a00ce5bb3740bfc13a7d0aab72ce869901f1384",
+    "r2/quality/__init__.py": "983a07c910996a8ecb7ff05e19d28c54bf5be102c1d79207c11e8faf0d2dcd6b",
+    "r2/quality/digests.py": "323e748d18ad719cff57d285ebfc21e4f633086150495368337843d9751ee6e7",
+    "r2/quality/dispositions.py": "ce1902badf6be6956b34e25a64cba444b062b9081a81ca0f54d5d6b169910ac9",
+    "r2/quality/errors.py": "6761338f13560c95e19f57d465744bb731e0250768d445a36052d86ec2d99f59",
+    "r2/quality/parity.py": "9d8d3d581e293db700e388ce01bc1cde322004344e91cfe89287f9bf54636141",
+    "r2/quality/ports.py": "c8f274c70e027b572602d91c861d91c388a550a16085ec0befebcb5362e04145",
+    "r2/quality/probes.py": "fd260e17ec74aa673256371112a35000a479149ef163108ebe286d087cfa4a05",
+    "r2/quality/profiles.py": "e157186cb62cd7beae029767e6d92c03278e2341055f24f6d37ac0a25d98c3d8",
+    "r2/quality/runs.py": "16ca7a3487a66088f1a375dfd0cf71865993e507bedfe8ba7442f129ab816e53",
+    "server/services/quality_dispositions.py": "38e2097d398defbc398cd7b83ccb3f856de8b515ad7dc60dc8438b44e0c578d2",
+    "server/services/quality_probe_inputs.py": "7f5282d6a8ced58726e0cb6a77833333f094276bb6bdf4dd53743bc3c1e1ff33",
+    "server/services/quality_probe_runtime.py": "27ab53685e6690d89d2a23f7d14fceac1e099cb8817cc5529e137efb92e3e486",
+    "server/services/quality_probe_worker.py": "79bb80a6503a569065969b75f84bbcd3335e2e1fafa9577d400f1e3cbb126ce2",
+    "server/services/quality_probes.py": "50ba8d7e47e7ecb7f5e09ef5856c1a967136fb92c23bb4172fad939851ed26ec",
+    "server/services/quality_profile_custodian.py": "649213b31abcb89738a5ed99ea5d6e1655b08e4c85cdeebf76dad254f3e30673",
+    "server/services/quality_profiles.py": "51b9c22fb09a4fc608a8170972205db625d5d84c42e7e71c2e93a88e6d7935b0",
+    "server/services/quality_runs.py": "88fbfd73877db1b351152bd3047e88c2903ec4678d5bcd9d9d8947ca570d4692"
+  },
+  "carried_to_m10_b": [
+    "duration window (platform-constraint profile amendment)",
+    "SEO/metadata lint",
+    "OpenMontage export/layout parity"
+  ],
+  "flags": {
+    "runtime_accepted": false,
+    "production_activation": false,
+    "M10_A_accepted": false,
+    "M10_B_started": false,
+    "pushed": false
+  },
+  "reviews": "A4 independent (Codex); A5 Codex; A6 Claude subagent (Codex quota out until 2026-11-02 15:12); A7 not yet reviewed",
+  "next_gate": "Independent M10-A acceptance review; resolve the parity blocker per the chosen option. Do not begin M10-B."
+}
