@@ -141,6 +141,7 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
       ? []
       : [
           { key: "formats", path: "/formats", label: t("dashboard:workspace_nav_formats"), icon: Proportions },
+          { key: "packaging", path: "/packaging", label: t("dashboard:workspace_nav_packaging"), icon: Package },
           { key: "learning", path: "/learning", label: t("dashboard:workspace_nav_learning"), icon: ChartLine },
         ]),
     // 商品资产仅广告/短片项目使用（v1 单商品设定），其余模式隐藏入口

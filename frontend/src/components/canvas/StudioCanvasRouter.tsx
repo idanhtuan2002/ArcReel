@@ -6,6 +6,7 @@ import {
   WORKSPACE_ROUTE_CLUES,
   WORKSPACE_ROUTE_LEARNING,
   WORKSPACE_ROUTE_FORMATS,
+  WORKSPACE_ROUTE_PACKAGING,
   WORKSPACE_ROUTE_STORY,
   WORKSPACE_ROUTE_SOURCE,
   WORKSPACE_ROUTE_CHARACTERS,
@@ -66,6 +67,7 @@ const SpatialAnalysisPage = lazy(() => import("@/features/spatial-analysis/ui/Sp
 const ShotWorkflowPage = lazy(() => import("@/features/spatial-analysis/ui/ShotWorkflowPage"));
 const LearningPage = lazy(() => import("@/features/learning/ui/LearningPage"));
 const FormatsPage = lazy(() => import("@/features/formats/ui/FormatsPage"));
+const PackagingPage = lazy(() => import("@/features/packaging/ui/PackagingPage"));
 const StoryAuthoringPage = lazy(() => import("@/features/story-authoring/ui/StoryAuthoringPage"));
 
 /** 集级路由 path，与渲染该集的 `<Route>` 共用一份。 */
@@ -621,6 +623,17 @@ export function StudioCanvasRouter() {
         ) : (
           <Suspense fallback={null}>
             <FormatsPage key={currentProjectName} projectName={currentProjectName} />
+          </Suspense>
+        )}
+      </Route>
+
+      <Route path={`/${WORKSPACE_ROUTE_PACKAGING}`}>
+        {/* 演示项目在后端不存在，没有可投影的母版；直接输入 URL 时回到概览 */}
+        {demoMode ? (
+          <Redirect to="/" />
+        ) : (
+          <Suspense fallback={null}>
+            <PackagingPage key={currentProjectName} projectName={currentProjectName} />
           </Suspense>
         )}
       </Route>
