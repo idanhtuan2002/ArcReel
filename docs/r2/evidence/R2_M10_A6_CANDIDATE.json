@@ -1,0 +1,103 @@
+{
+  "schema_id": "m10.a6-candidate.v1",
+  "status": "M10_A6_SOURCE_CANDIDATE",
+  "source_head": "af67ea71b5baf86bb453b9efa080a5bf76706f08",
+  "base": "d84993648 (A5 candidate)",
+  "branch": "design/r2-m10-a6-disposition",
+  "commits": [
+    "16dfac22c docs",
+    "c340171bd pure rules",
+    "f4b90103b persistence (migration bed415be3608)",
+    "4c453cced services",
+    "e71697eb8 review fixes",
+    "af67ea71b deterministic race tests"
+  ],
+  "decisions": {
+    "issuer": "interactive Human JWT plus current signed HUMAN_SHOWRUNNER grant (D2); persisted DB-time lease <= 30 s, capped at grant expiry, admitted under the write transaction",
+    "waive": "exact (rule, finding, scope) coverage of every BLOCKING finding behind a FAILED slot; INDETERMINATE and non-waivable codes never waived",
+    "pass": "every counted requirement met and no present failed slot",
+    "rework": "routes unmet slots only; no mutation port",
+    "readiness": "READY only for an unexpired PASS/WAIVE bound to the CURRENT head run; one REPEATABLE READ snapshot; integrity errors -> NOT_READY",
+    "lock_order": "command -> masters -> profile/run/disposition heads -> grant heads sorted by principal -> grant checks"
+  },
+  "changed_paths": [
+    "alembic/versions/bed415be3608_quality_disposition.py",
+    "docs/research/2026-10-28-r2-m10-a6-disposition.md",
+    "docs/superpowers/plans/2026-10-28-r2-m10-a6-disposition.md",
+    "docs/superpowers/specs/2026-10-28-r2-m10-a6-disposition-design.md",
+    "lib/db/models/__init__.py",
+    "lib/db/models/quality_dispositions.py",
+    "lib/db/repositories/quality_dispositions.py",
+    "r2/quality/dispositions.py",
+    "server/services/quality_dispositions.py",
+    "server/services/quality_runs.py",
+    "tests/integration/lib/db/migrations/test_bed415be3608_quality_disposition.py",
+    "tests/integration/lib/db/repositories/test_quality_dispositions.py",
+    "tests/integration/server/services/test_quality_dispositions.py",
+    "tests/integration/server/services/test_quality_runs.py",
+    "tests/unit/r2/quality/test_dispositions.py"
+  ],
+  "out_of_owned_seams": {
+    "server/services/quality_runs.py": "A5 service: validity_in refactor, lock_grant_heads/human_principals and the shared lock order (review M1)",
+    "tests/integration/server/services/test_quality_runs.py": "A5 fixture reused by A6 integration tests"
+  },
+  "source_sha256": {
+    "alembic/versions/bed415be3608_quality_disposition.py": "b964d9458d81b65c24e59791c60292db8172870b8fed46d5db4b33a8299ec115",
+    "lib/db/models/__init__.py": "cddfe58f7db0f8d7946df2e3f3dfcc73ac022671f37bd500acb834b09e8ac048",
+    "lib/db/models/quality_dispositions.py": "aef6270b1787c988edf056b2a8083006a37dddea92a1e0b70f0f85e9d26f2d63",
+    "lib/db/repositories/quality_dispositions.py": "5e86db5da1fe265ac5a84a666f14664303aead8d983c3315b00bf23d79e5a428",
+    "r2/quality/dispositions.py": "ce1902badf6be6956b34e25a64cba444b062b9081a81ca0f54d5d6b169910ac9",
+    "server/services/quality_dispositions.py": "38e2097d398defbc398cd7b83ccb3f856de8b515ad7dc60dc8438b44e0c578d2",
+    "server/services/quality_runs.py": "88fbfd73877db1b351152bd3047e88c2903ec4678d5bcd9d9d8947ca570d4692",
+    "tests/integration/lib/db/migrations/test_bed415be3608_quality_disposition.py": "1e1fd4b16a9f23ec38ad23d2c7a2f9fe64831c4e0afb8d137ac0af5663500fcb",
+    "tests/integration/lib/db/repositories/test_quality_dispositions.py": "5c2e086f6299f8e87656f3316a5b2bbf5c68a9a8b7387e11faf28f94a93207cb",
+    "tests/integration/server/services/test_quality_dispositions.py": "19bb4c67e5173060b812c3f1c2b821d1cf51c71d9418ed5bb48ff04efa393e06",
+    "tests/integration/server/services/test_quality_runs.py": "d683738503fc6532aa4ba7fbcd62ef2fb99620cc17b5757cb1dca51a40ee31a8",
+    "tests/unit/r2/quality/test_dispositions.py": "03f880076635eaca7e9aa7fd770fd7c6be702a37fdd7c2bb891576ed0651682f"
+  },
+  "evidence_sha256": {
+    "docs/research/2026-10-28-r2-m10-a6-disposition.md": "c3c28b711e5de721eb7e0087e230b7c899bc6dbee77c3f61fa2ff166327dc101",
+    "docs/superpowers/plans/2026-10-28-r2-m10-a6-disposition.md": "f7668501d72aaf2bef73ad6fa50b81ac362f9a312d62499995743cffa258e51c",
+    "docs/superpowers/specs/2026-10-28-r2-m10-a6-disposition-design.md": "d9dd3bf6817f02913d717b6376f7c0232ef2ff62072da436361c5c60d5973fbd",
+    "docs/r2/evidence/m10-a6-reviews/source-review.json": "4e386f2405bfc51548658c98bc9e14427d44506260ca470ee11ab582a45c9a2c"
+  },
+  "gates": {
+    "static_whole_tree": {
+      "ruff_check": "All checks passed!",
+      "ruff_format": "2068 files already formatted",
+      "basedpyright": "0 errors, 0 warnings, 0 notes",
+      "lint_imports": "23 kept, 0 broken",
+      "deptry": "no issues",
+      "audit_tests": "0 violations"
+    },
+    "related_suite_pg16": {
+      "command": "pytest tests/unit/r2/quality tests/unit/lib/db tests/integration/lib/db tests/integration/server/services/test_quality_*.py tests/unit/server/services/test_quality_probe*.py tests/unit/r2/host_hardening -n 4 --dist loadfile",
+      "tests": 1723,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 20
+    },
+    "race_tests_under_cpu_load": "3/3 runs green with 8 CPU burners (concurrent first issues, identical commands, attestation refusal)",
+    "skips": "20 pre-existing (spatial/production-binding synthetic vectors, spatial row-lock), none A6",
+    "migration_cycle_pg16": "tests/integration/lib/db/migrations/test_bed415be3608_quality_disposition.py 16 passed: 57f67bae0cb4 -> bed415be3608 -> 57f67bae0cb4 -> bed415be3608 with predecessor rows preserved and ORM parity; append-only triggers; 1 MiB JSON ceilings",
+    "full_backend_suite": "NOT RUN (sponsor rule 2026-10-14)"
+  },
+  "flags": {
+    "runtime_accepted": false,
+    "production_activation": false,
+    "sponsor_acceptance_claimed": false,
+    "A7_closed": false,
+    "M10_A_accepted": false,
+    "public_router": false,
+    "export": false
+  },
+  "known_limits": [
+    "No HTTP router; services are host-configured only.",
+    "Each issue performs activated governance startup; the attestor answers one challenge at a time, so overlapping issuers fail closed with DispositionUnauthorizedError and must retry.",
+    "Downgrade of bed415be3608 drops disposition history (same pattern as 57f67bae0cb4) (review L5).",
+    "No DB constraint ties m10_disposition_heads to the referenced disposition subject/profile; enforced in the repository (review L6).",
+    "Review was a same-family Claude subagent because Codex quota was exhausted; the M10-A acceptance review should be independent.",
+    "Grant reader checkpoint I/O inside transaction (inherited A3 design)."
+  ],
+  "next_gate": "M10-A7 Kalinga quality parity and the M10-A candidate"
+}

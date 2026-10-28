@@ -1,0 +1,38 @@
+{
+  "schema_id": "m10.a6-source-review.v1",
+  "reviewer": "Claude Opus 5.5 general-purpose subagent, read-only, static only (Codex codex:codex-rescue unavailable: quota exhausted until 2026-11-02 15:12); not an independent model family",
+  "rounds": [
+    {
+      "pinned": "4c453cced",
+      "result": "0 Critical, 1 High, 3 Medium, 6 Low",
+      "adjudication": "all REAL",
+      "fixes": [
+        "e71697eb8",
+        "af67ea71b"
+      ],
+      "findings": [
+        "H1 WAIVE could cover a non-waivable failure by naming a different rule (findings never loaded)",
+        "M1 lock-order inversion with A5 writers (grant head before masters) -> deadlock / untyped 40P01",
+        "M2 N_OF_M PASS admitted with a present FAILED/INDETERMINATE slot",
+        "M3 missing RED gates: grantless actor, late lease, crash before lease, WAIVE success, same-command concurrency",
+        "L1 readiness not snapshot-consistent and took FOR UPDATE grant locks",
+        "L2 readiness errors escaped instead of NOT_READY",
+        "L3 mixed now()/clock_timestamp() clocks",
+        "L4 receipt did not cross-check row actor/command",
+        "L5 downgrade drops disposition history (pattern shared with 57f67bae0cb4)",
+        "L6 no DB constraint tying heads to the referenced disposition subject/profile"
+      ],
+      "closure": {
+        "H1": "finding-exact (rule, finding, scope) coverage in waiver_requirements; readiness applies the same coverage",
+        "M1": "single global order command -> masters -> profile/run/disposition heads -> grant heads sorted by principal -> grant checks; lease admit after head locks",
+        "M2": "present failed slot blocks PASS in every mode",
+        "M3": "integration tests added; race tests made deterministic in af67ea71b (attestor answers one challenge at a time, so leases are serialized and writers released together by a barrier)",
+        "L1-L4": "fixed in e71697eb8",
+        "L5-L6": "recorded as known limits"
+      }
+    }
+  ],
+  "post_fix_finding": "Under -n 4 load the two race tests failed intermittently: GovernanceArchiveAttestor refuses an overlapping startup challenge (busy lock, accepted M9 behavior, covered by test_attestor_denies_competing_challenge_while_preflight_runs), so one issuer failed closed with DispositionUnauthorizedError before the CAS. Service behavior is correct fail-closed; tests were nondeterministic. Reproduced with 8 CPU-burner processes (2 failed/1 failed runs), fixed, then 3/3 green under the same load.",
+  "second_review": "not performed; fixes verified by regression tests on PG16",
+  "main_adjudication": "Claude Opus 5.5 main agent"
+}
