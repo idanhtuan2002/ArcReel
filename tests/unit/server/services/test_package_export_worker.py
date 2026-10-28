@@ -87,3 +87,40 @@ def test_an_existing_destination_is_never_overwritten(tmp_path: Path) -> None:
     with pytest.raises(FileExistsError):
         build_archive(tmp_path / "a.zip", _members(tmp_path / "src"), MANIFEST)
     assert (tmp_path / "a.zip").read_bytes() == b"keep"
+
+
+@pytest.mark.parametrize(
+    "path", ["Video/output.mp4", "video//output.mp4", "video/./output.mp4", "video\\output.mp4", "a:b", "a\x00b", "a b"]
+)
+def test_the_worker_boundary_enforces_the_full_export_grammar(tmp_path: Path, path: str) -> None:
+    members = _members(tmp_path / "src")
+    members.append(BundleMember(path, members[0].source, members[0].content_digest, members[0].byte_size))
+    with pytest.raises(ExportBuildError):
+        build_archive(tmp_path / "a.zip", members, MANIFEST)
+
+
+def test_case_colliding_members_are_refused(tmp_path: Path) -> None:
+    from server.services.package_export_worker import validate_path
+
+    validate_path("assets/a.txt")
+    members = _members(tmp_path / "src")
+    members.append(BundleMember("captions/en.srt.", members[2].source, members[2].content_digest, members[2].byte_size))
+    members.append(BundleMember("captions/en.srt.", members[2].source, members[2].content_digest, members[2].byte_size))
+    with pytest.raises(ExportBuildError):
+        build_archive(tmp_path / "a.zip", members, MANIFEST)
+
+
+def test_the_preflight_size_is_the_exact_archive_size(tmp_path: Path) -> None:
+    from server.services.package_export_worker import archive_size
+
+    members = _members(tmp_path / "src")
+    build_archive(tmp_path / "a.zip", members, MANIFEST)
+    assert archive_size([(m.path, m.byte_size) for m in members], len(MANIFEST)) == (tmp_path / "a.zip").stat().st_size
+
+
+@pytest.mark.parametrize("sizes", [[("video/output.mp4", 2_100_000_000)], [("a", 1_500_000_000), ("b", 700_000_000)]])
+def test_the_no_zip64_envelope_is_refused_before_any_copy(sizes: list[tuple[str, int]]) -> None:
+    from server.services.package_export_worker import ExportEnvelopeError, archive_size
+
+    with pytest.raises(ExportEnvelopeError):
+        archive_size(sizes, 1024)
