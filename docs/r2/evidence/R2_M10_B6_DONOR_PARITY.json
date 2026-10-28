@@ -1,0 +1,438 @@
+{
+  "schema_id": "m10.b6-donor-parity.v1",
+  "baseline": "docs/r2/evidence/R2_M10_B6_DONOR_BASELINE.json",
+  "reports": {
+    "kalinga": {
+      "contract_version": "1",
+      "donor": {
+        "repository_url": "https://github.com/desaultkhan/Kalinga-Shorts-Factory",
+        "commit_sha": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+        "selected_paths": [
+          "pipeline/src/validate.py"
+        ],
+        "reachable_surface_digest": "sha256:5e4e5db1c29d7a61003baa8eb348e966e19be31d7c88b8f90efe4303e26f00ba",
+        "runtime_identity": "CPython 3.13 executing the exact pinned function sources from donor_functions.json in-process against the same metadata and asset fixtures as the M10 packaging check and export",
+        "behavior_inventory_digest": "sha256:7a241747872de31cd3eeb6681d476c1e61f2e28960631c59709d16965fd3fcf3",
+        "donor_test_inventory_digest": "sha256:0040c80cc2abbbcd418292b5d37c3a4fac2480000f91198836dc7394d35c7731",
+        "fixture_set_digest": "sha256:f2b45c49fd1b62633f4d63ab7a47afc3dddb8e35ff40185bd69cc3fe6c673900"
+      },
+      "integrated_head": "f4509c145886159349056d4914805c471c54fe12",
+      "rows": [
+        {
+          "behavior_id": "kalinga_title_length",
+          "donor_test_refs": [
+            "validate.seo_lint:122-123"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_every_donor_seo_finding_is_detected_by_its_m10_rule[kalinga_title_length]",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_m10_check_stays_within_the_frozen_performance_rule",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_clean_package_passes_both_the_donor_and_m10"
+          ]
+        },
+        {
+          "behavior_id": "kalinga_title_terms",
+          "donor_test_refs": [
+            "validate.seo_lint:124-127"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_every_donor_seo_finding_is_detected_by_its_m10_rule[kalinga_title_terms]",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_m10_check_stays_within_the_frozen_performance_rule",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_clean_package_passes_both_the_donor_and_m10"
+          ]
+        },
+        {
+          "behavior_id": "kalinga_description_terms",
+          "donor_test_refs": [
+            "validate.seo_lint:128-132"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_every_donor_seo_finding_is_detected_by_its_m10_rule[kalinga_description_terms]",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_m10_check_stays_within_the_frozen_performance_rule",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_clean_package_passes_both_the_donor_and_m10"
+          ]
+        },
+        {
+          "behavior_id": "kalinga_plain_text",
+          "donor_test_refs": [
+            "validate.seo_lint:133-138"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_every_donor_seo_finding_is_detected_by_its_m10_rule[kalinga_plain_text]",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_m10_check_stays_within_the_frozen_performance_rule",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_clean_package_passes_both_the_donor_and_m10"
+          ]
+        },
+        {
+          "behavior_id": "kalinga_description_min",
+          "donor_test_refs": [
+            "validate.seo_lint:139-140"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_every_donor_seo_finding_is_detected_by_its_m10_rule[kalinga_description_min]",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_m10_check_stays_within_the_frozen_performance_rule",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_clean_package_passes_both_the_donor_and_m10"
+          ]
+        },
+        {
+          "behavior_id": "kalinga_hashtag_count",
+          "donor_test_refs": [
+            "validate.seo_lint:141-143"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_every_donor_seo_finding_is_detected_by_its_m10_rule[kalinga_hashtag_count]",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_m10_check_stays_within_the_frozen_performance_rule",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_clean_package_passes_both_the_donor_and_m10"
+          ]
+        },
+        {
+          "behavior_id": "kalinga_tag_min",
+          "donor_test_refs": [
+            "validate.seo_lint:144-145"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_every_donor_seo_finding_is_detected_by_its_m10_rule[kalinga_tag_min]",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_m10_check_stays_within_the_frozen_performance_rule",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_clean_package_passes_both_the_donor_and_m10"
+          ]
+        },
+        {
+          "behavior_id": "kalinga_metadata_missing",
+          "donor_test_refs": [
+            "validate.seo_lint:113-115"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "IMPROVED",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_missing_metadata_is_a_donor_issue_and_cannot_even_be_constructed_in_m10"
+          ]
+        },
+        {
+          "behavior_id": "kalinga_media_variants",
+          "donor_test_refs": [
+            "make_video (music/no-music media variants)"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": "M10-B variants are metadata/thumbnail alternatives chosen by the showrunner; media variants are separate approved masters governed by M8/M10-A, not packaging alternatives",
+          "functionality": "EXCLUDED",
+          "correctness": "EXCLUDED",
+          "determinism": "EXCLUDED",
+          "failure_safety": "EXCLUDED",
+          "data_integrity": "EXCLUDED",
+          "observability": "EXCLUDED",
+          "performance": "EXCLUDED",
+          "resources": "EXCLUDED",
+          "evidence_refs": []
+        }
+      ],
+      "commands": [
+        {
+          "command": "uv run python -m pytest -q -p no:cacheprovider tests/integration/server/services/test_packaging_donor_parity.py",
+          "exit_code": 0,
+          "summary": "17 passed, 1 warning in 2.09s",
+          "junit_sha256": "7742dbd010664892cebe92ee4f2bd39c41f651ff2ea4fed0870918de280a5322",
+          "wall_ms": 5625
+        }
+      ],
+      "required_skips": [],
+      "material_unknowns": [],
+      "reviewer": "Claude Opus 5.5 main agent (recomputed fold; not an independent acceptance)",
+      "verdict": "PASS"
+    },
+    "openmontage": {
+      "contract_version": "1",
+      "donor": {
+        "repository_url": "https://github.com/calesthio/OpenMontage",
+        "commit_sha": "08e2151fa02de28a5d6a312b3d575692bf147ad7",
+        "selected_paths": [
+          "tools/publishers/export_bundle.py"
+        ],
+        "reachable_surface_digest": "sha256:a7a4f5d386e13768df9d1b3bf96965aed9f6014804025261be04312c002a648c",
+        "runtime_identity": "CPython 3.13 executing the exact pinned function sources from donor_functions.json in-process against the same metadata and asset fixtures as the M10 packaging check and export",
+        "behavior_inventory_digest": "sha256:e7c1f21e0726bad6d28a1827cbc928fd9cf8f771f406fcb67c5d8267a6eda4a2",
+        "donor_test_inventory_digest": "sha256:a55112f3fe5efca8f21050f072c664534e4ae72e6a692faa18f990631c926f4a",
+        "fixture_set_digest": "sha256:f2b45c49fd1b62633f4d63ab7a47afc3dddb8e35ff40185bd69cc3fe6c673900"
+      },
+      "integrated_head": "f4509c145886159349056d4914805c471c54fe12",
+      "rows": [
+        {
+          "behavior_id": "openmontage_missing_video",
+          "donor_test_refs": [
+            "export_bundle.execute:160-162"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_missing_video_is_refused_by_both"
+          ]
+        },
+        {
+          "behavior_id": "openmontage_missing_optional_asset",
+          "donor_test_refs": [
+            "export_bundle.execute:167-172"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_a_declared_optional_asset_that_is_missing_is_refused_by_both"
+          ]
+        },
+        {
+          "behavior_id": "openmontage_layout",
+          "donor_test_refs": [
+            "export_bundle.execute:180-197,240-247"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "IMPROVED",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "PARITY",
+          "performance": "PARITY",
+          "resources": "IMPROVED",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_bundle_layout_matches_the_donor_for_video_metadata_and_thumbnail",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_confined_export_stays_within_the_frozen_performance_rule"
+          ]
+        },
+        {
+          "behavior_id": "openmontage_determinism",
+          "donor_test_refs": [
+            "export_bundle.execute:249-251"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "IMPROVED",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "PARITY",
+          "performance": "PARITY",
+          "resources": "IMPROVED",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_donor_bundle_is_not_byte_stable_and_the_m10_archive_is",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_confined_export_stays_within_the_frozen_performance_rule"
+          ]
+        },
+        {
+          "behavior_id": "openmontage_no_upload",
+          "donor_test_refs": [
+            "export_bundle.execute:250-256 status exported"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "PARITY",
+          "failure_safety": "PARITY",
+          "data_integrity": "PARITY",
+          "observability": "IMPROVED",
+          "performance": "PARITY",
+          "resources": "IMPROVED",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_both_export_locally_without_uploading",
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_confined_export_stays_within_the_frozen_performance_rule"
+          ]
+        },
+        {
+          "behavior_id": "openmontage_metadata_document",
+          "donor_test_refs": [
+            "export_bundle.execute:202-212"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": null,
+          "functionality": "PARITY",
+          "correctness": "PARITY",
+          "determinism": "IMPROVED",
+          "failure_safety": "PARITY",
+          "data_integrity": "IMPROVED",
+          "observability": "PARITY",
+          "performance": "PARITY",
+          "resources": "PARITY",
+          "evidence_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py::test_the_metadata_document_covers_every_donor_metadata_field"
+          ]
+        },
+        {
+          "behavior_id": "openmontage_chapter_text",
+          "donor_test_refs": [
+            "export_bundle._format_chapter_time",
+            "export_bundle._chapter_lines",
+            "export_bundle.execute:214-237"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": "M10 exports structured chapters (start_ms, title) in metadata.json; pasteable description.txt/tags.txt/chapters.txt text is a platform publisher presentation concern outside export-only M10-B",
+          "functionality": "EXCLUDED",
+          "correctness": "EXCLUDED",
+          "determinism": "EXCLUDED",
+          "failure_safety": "EXCLUDED",
+          "data_integrity": "EXCLUDED",
+          "observability": "EXCLUDED",
+          "performance": "EXCLUDED",
+          "resources": "EXCLUDED",
+          "evidence_refs": []
+        },
+        {
+          "behavior_id": "openmontage_subtitles_path",
+          "donor_test_refs": [
+            "export_bundle.execute:189-196 video/subtitles.srt"
+          ],
+          "fixture_refs": [
+            "tests/integration/server/services/test_packaging_donor_parity.py (metadata defects and assets built in-test from tests/unit/r2/quality/test_packaging_check.py fixtures)"
+          ],
+          "intentional_difference": "M10 places captions per locale under captions/<locale>.<ext> from captions-<locale> roles, so multi-locale captions never collide",
+          "functionality": "EXCLUDED",
+          "correctness": "EXCLUDED",
+          "determinism": "EXCLUDED",
+          "failure_safety": "EXCLUDED",
+          "data_integrity": "EXCLUDED",
+          "observability": "EXCLUDED",
+          "performance": "EXCLUDED",
+          "resources": "EXCLUDED",
+          "evidence_refs": []
+        }
+      ],
+      "commands": [
+        {
+          "command": "uv run python -m pytest -q -p no:cacheprovider tests/integration/server/services/test_packaging_donor_parity.py",
+          "exit_code": 0,
+          "summary": "17 passed, 1 warning in 2.09s",
+          "junit_sha256": "7742dbd010664892cebe92ee4f2bd39c41f651ff2ea4fed0870918de280a5322",
+          "wall_ms": 5625
+        }
+      ],
+      "required_skips": [],
+      "material_unknowns": [],
+      "reviewer": "Claude Opus 5.5 main agent (recomputed fold; not an independent acceptance)",
+      "verdict": "PASS"
+    }
+  }
+}
