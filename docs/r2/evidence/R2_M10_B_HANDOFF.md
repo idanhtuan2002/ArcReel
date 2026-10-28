@@ -82,19 +82,15 @@ Rewrite in place; this is the resume entry for M10-B.
   server-derived provenance at the B5 append boundary; C6 closure+lineage verification in every B3/B4 consumer;
   D5 B4 must materialize and re-verify private snapshots.
 
+- B3 (preview + Human selection): `673b2deae` readiness_in refactor (A6 tests 22 passed), `80871276a` schema
+  (migration `7f4c9e5a0d33`), `982bbf504` repository + shared `require_packaging_lineage`, `27073a10e` services
+  (`server/services/quality_package_selection.py`). PG: `test_quality_package_selection.py` 8 passed,
+  packaging + dispositions 49 passed; unit/scripts/migrations 5573 passed; gates clean. Codex B3 review running
+  (`b3-codex-review.json`). Selection lease refusals reuse frozen `M10_DISPOSITION_UNAUTHORIZED`.
+
 ## Next step
 
-B3: preview + Human selection into `PACKAGING_SLOT`.
-- Contracts exist (`PackagePreview`, `PackageSelectionRequest`, `PackagingSelectionAuthorizationLease`,
-  `PackageSelection`, `PackagingSlotKey`); add a `PREVIEW_PACKAGE` request contract + frozen vector.
-- Tables: `m10_package_previews`, `m10_package_selections` (append-only), `m10_packaging_heads` (CAS, unique slot
-  five-tuple); migration after `6e3b8d4f9c22`.
-- Custodian: mirror `server/services/quality_dispositions.py` `DispositionCustodian` (authorize → DB-time lease
-  ≤30 s, `admit` under the write tx) with action `PACKAGING_SELECTION`.
-- Preview binds: exact M8 revision (closures + lineage, C6), current PASS/WAIVE disposition of the run (A
-  `validity_in` CURRENT), packaging observation PASS or only waivable BLOCKING findings listed with reasons,
-  chosen variant per group.
-- Selection lock order (design §4): receipt replay → command guard → `lock_subject_masters` → `lock_profile_head`
-  (FOR SHARE) → run head (FOR SHARE) → disposition head (FOR SHARE) → preview (FOR UPDATE) → packaging-head
-  advisory + row (FOR UPDATE) → `lock_grant_heads` → (validity_in inside). Newer run stales.
-- PG writer-pair tests per §4. Then Codex review, B4 export.
+Triage the B3 Codex review. Then B4 export: M7 host-local family `local-zip-package-export@host-export-v1`
+(route inventory + registry + scope verifier updates), `m10_export_invocations`/`m10_export_receipts`, private
+verified snapshots (D5), deterministic ZIP_STORED builder in the export envelope, finalize under §4 order,
+recovery by job id, download token; then B5 routes+UI, B6 parity, B7 pilots (Human), B8 seal.
