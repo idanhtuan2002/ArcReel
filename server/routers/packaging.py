@@ -8,6 +8,7 @@ revalidate that the export is still the slot's current, ready selection.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from collections.abc import Awaitable, Callable
@@ -20,7 +21,6 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
-from starlette.background import BackgroundTask
 
 from lib.api_errors import ApiError, ConflictError, NotFoundError, ServiceUnavailableError, UnprocessableError
 from lib.db import async_session_factory
@@ -46,7 +46,7 @@ from server.auth import (
 )
 from server.services.governance_grants import CheckpointedShowrunnerGrantReader
 from server.services.governance_startup import verify_governance_activated_startup
-from server.services.package_export import PackageExportService
+from server.services.package_export import Download, PackageExportService
 from server.services.packaging_candidates import PackagingDraft, append_packaging_revision
 from server.services.quality_package_selection import (
     PackagePreviewService,
@@ -402,6 +402,20 @@ def _verify_export_token(token: str, project_name: str, archive_digest: str) -> 
     return subject
 
 
+class _ClosingStream(StreamingResponse):
+    """Releases the download's snapshot and scratch however the response ends: done, failed or cancelled."""
+
+    def __init__(self, download: Download, content: Any, **kwargs: Any) -> None:
+        super().__init__(content, **kwargs)
+        self._download = download
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await asyncio.to_thread(self._download.close)
+
+
 @download_router.get("/projects/{project_name}/packaging/exports/{archive_hex}/archive")
 async def download_export(project_name: str, archive_hex: str, token: str, deps: Deps) -> StreamingResponse:
     if len(archive_hex) != 64 or any(c not in "0123456789abcdef" for c in archive_hex):
@@ -421,11 +435,11 @@ async def download_export(project_name: str, archive_hex: str, token: str, deps:
             while chunk := handle.read(1 << 20):
                 yield chunk
 
-    return StreamingResponse(
+    return _ClosingStream(
+        download,
         chunks(),
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="package-{archive_hex[:12]}.zip"'},
-        background=BackgroundTask(download.close),
     )
 
 

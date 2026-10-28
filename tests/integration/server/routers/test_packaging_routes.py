@@ -423,3 +423,27 @@ def _bytes(path) -> bytes:
 
 def _put(path, data: bytes) -> None:
     path.write_bytes(data)
+
+
+async def test_concurrent_retries_of_one_revision_command_return_one_revision(http) -> None:
+    import asyncio
+
+    env = http
+    body = {"command_id": "rev-1", "quality_run_id": env["run"].run_id, "draft": _draft(env)}
+    first, second = await asyncio.gather(
+        env["client"].post("/api/v1/projects/project/packaging/revisions", json=body, headers=_headers()),
+        env["client"].post("/api/v1/projects/project/packaging/revisions", json=body, headers=_headers()),
+    )
+    assert first.status_code == second.status_code == 200
+    assert first.json() == second.json()
+
+
+async def test_a_retry_cannot_change_its_genesis_or_update_shape(http) -> None:
+    env = http
+    body = {"command_id": "rev-1", "quality_run_id": env["run"].run_id, "draft": _draft(env)}
+    first = await env["client"].post("/api/v1/projects/project/packaging/revisions", json=body, headers=_headers())
+    reshaped = body | {"candidate_id": first.json()["revision"]["candidate_id"], "expected_head_version": 0}
+    response = await env["client"].post(
+        "/api/v1/projects/project/packaging/revisions", json=reshaped, headers=_headers()
+    )
+    assert response.status_code == 409

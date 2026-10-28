@@ -90,3 +90,24 @@ def test_a_worker_config_over_its_bound_is_refused_before_any_copy() -> None:
     admit_worker_config(FakeWork(Path("/p")), plan)
     with pytest.raises(OperationalEnvelopeExceededError):
         admit_worker_config(FakeWork(Path("/" + "x" * 1000)), plan)
+
+
+def test_a_failed_snapshot_target_never_leaks_the_source_descriptor(tmp_path: Path) -> None:
+    from server.services.package_export import _snapshot_archive
+
+    store_dir = tmp_path / "exports"
+    store_dir.mkdir()
+    (store_dir / "a.zip").write_bytes(b"zip")
+    store = os.open(store_dir, os.O_RDONLY)
+
+    class FullWork:
+        def create(self, name: str) -> int:
+            raise OSError(28, "No space left on device")
+
+    before = len(os.listdir("/proc/self/fd"))
+    try:
+        with pytest.raises(OSError, match="No space left"):
+            _snapshot_archive(store, FullWork(), "a.zip", "sha256:" + "0" * 64, 3)
+        assert len(os.listdir("/proc/self/fd")) == before
+    finally:
+        os.close(store)

@@ -160,6 +160,14 @@ async def append_packaging_revision(
         if profile is None or profile.profile_digest != run.profile_digest:
             raise ProfileStaleError()
         m8 = ExplorationRepository(session)
+        # Serialize every call of this command before replay, so concurrent retries see one recorded result.
+        await m8.lock_command_key(
+            user_id=user_id,
+            project_name=project_name,
+            actor_scope=user_id,
+            operation=APPEND_REVISION,
+            command_id=command_id,
+        )
         replayed = await _replay(m8, user_id=user_id, project_name=project_name, command_id=command_id)
         if replayed is not None:
             revision, head = replayed
@@ -183,7 +191,7 @@ async def append_packaging_revision(
             )
             if (
                 expected != revision.payload
-                or (candidate_id is not None and candidate_id != revision.candidate_id)
+                or candidate_id != (None if revision.revision == 1 else revision.candidate_id)
                 or expected_head_version != (None if revision.revision == 1 else revision.revision - 1)
                 or revision.lineage.creative_profile_id != run.profile_id
             ):

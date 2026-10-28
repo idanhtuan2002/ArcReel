@@ -46,7 +46,7 @@ def extract(roots: dict[str, Path]) -> dict[str, object]:
     for key, donor in DONORS.items():
         files: dict[str, str] = {}
         functions: list[dict[str, object]] = []
-        for path, names in donor["selected"].items():  # pyright: ignore[reportAttributeAccessIssue]
+        for path, names in donor["selected"].items():
             raw = subprocess.run(
                 ["git", "-C", str(roots[key]), "show", f"{donor['commit_sha']}:{path}"], capture_output=True, check=True
             ).stdout

@@ -671,7 +671,13 @@ class Download:
     work: WorkDirectory
     store: int
 
+    closed: bool = False
+
     def close(self) -> None:
+        """Idempotent: the first call releases everything, later calls do nothing."""
+        if self.closed:
+            return
+        self.closed = True
         with contextlib.suppress(OSError):
             os.close(self.descriptor)
         self.work.close()
@@ -687,9 +693,9 @@ def _snapshot_archive(
         source = os.open(name, os.O_RDONLY | _NOFOLLOW | _NONBLOCK, dir_fd=store)
     except OSError:
         raise ExportIntegrityFailedError() from None
-    target = work.create(DOWNLOAD_FILE)
-    try:
-        with os.fdopen(source, "rb", buffering=0) as reader:
+    with os.fdopen(source, "rb", buffering=0) as reader:
+        target = work.create(DOWNLOAD_FILE)
+        try:
             before = os.fstat(reader.fileno())
             if not stat.S_ISREG(before.st_mode) or before.st_size != size:
                 raise ExportIntegrityFailedError()
@@ -705,12 +711,12 @@ def _snapshot_archive(
                     view = view[os.write(target, view) :]
             if _generation(os.fstat(reader.fileno())) != _generation(before):
                 raise ExportIntegrityFailedError()
-        if (copied, "sha256:" + hasher.hexdigest()) != (size, digest):
-            raise ExportIntegrityFailedError()
-        os.lseek(target, 0, os.SEEK_SET)
-    except BaseException:
-        os.close(target)
-        raise
+            if (copied, "sha256:" + hasher.hexdigest()) != (size, digest):
+                raise ExportIntegrityFailedError()
+            os.lseek(target, 0, os.SEEK_SET)
+        except BaseException:
+            os.close(target)
+            raise
     return target, _generation(before)
 
 

@@ -1,0 +1,275 @@
+{
+  "schema_id": "m10.b5-delta-review.v1",
+  "reviewed_head": "ccc4bb4da",
+  "reviewed_head_full": "ccc4bb4dab14649baa476570fa789224ba80e64a",
+  "base_head": "821978d23",
+  "reviewer": "Codex independent critical source re-review; main agent",
+  "verdict": "NOT ACCEPTED",
+  "scope": "B5 backend delta 821978d23..ccc4bb4da against b5-codex-review.json, including shared A3/A6 credential impact. Source read-only except this JSON; no staging or commit. Unrelated frontend work preserved. License issues excluded.",
+  "per_finding_status": {
+    "H1": {
+      "status": "FIXED",
+      "file": "server/auth.py",
+      "line": 110,
+      "related_locations": [
+        "server/auth.py:127",
+        "server/auth.py:481",
+        "server/agent_runtime/options_assembler.py:399",
+        "server/routers/packaging.py:153",
+        "tests/unit/server/test_auth.py:79",
+        "tests/integration/server/routers/test_packaging_routes.py:289"
+      ],
+      "evidence": "create_token now optionally emits via; the actual SDK issuer supplies via=embedded-agent. The unchanged interactive helper refuses any non-null via, while ordinary JWT verification/get_current_user continues accepting it. Real-token probe admitted ordinary authentication, refused interactive authentication with 401 and derived AGENT in _author_kind. The new route test checks AGENT/embedded-agent provenance and 401 on selection/export. All 30 auth unit tests passed independently. Existing unmarked tokens issued before this change remain valid until their existing expiry; no immediate revocation claim."
+    },
+    "H2": {
+      "status": "FIXED",
+      "file": "server/services/package_export.py",
+      "line": 790,
+      "related_locations": [
+        "server/services/package_export.py:828",
+        "server/services/package_export.py:871",
+        "server/routers/packaging.py:417",
+        "lib/db/repositories/quality_packaging.py:448"
+      ],
+      "evidence": "open_download resolves verified stored invocation/receipt pairs, scopes to the current default user, acquires the activated reader, snapshots the archive and calls the existing _require_current within session.begin. That path locks subject masters, profile head, run head, disposition head and packaging head before re-resolving evidence/readiness and its grant locks. Exact run/disposition/digest/current-slot comparisons remain in place. published_generation is checked in the same transaction after readiness. Return authorizes a verified snapshot at this guarded instant; it does not promise to revoke bytes already streaming after later authority changes. The superseded-disposition HTTP regression is present. PG execution, lock waiters and invalidation schedules were not independently runnable."
+    },
+    "H3": {
+      "status": "FIXED for the original path/byte integrity defect",
+      "file": "server/services/package_export.py",
+      "line": 682,
+      "related_locations": [
+        "server/services/package_export.py:412",
+        "server/services/package_export.py:813",
+        "server/services/package_export.py:829",
+        "server/routers/packaging.py:419"
+      ],
+      "evidence": "The service reuses descriptor-pinned no-follow export-store access and creates a private WorkDirectory copy. _snapshot_archive requires a regular source with the receipted size, hashes all copied bytes with a size-plus-one bound, compares receipt digest/size, checks source generation before/after copying, and rewinds the snapshot. After currentness it compares the published generation again. The response duplicates and streams the snapshot fd rather than reopening the public archive path. The altered-byte refusal and normal scratch cleanup test are present. The separate failure/cancellation ownership defects introduced by the new snapshot/response lifecycle are N1/N2 below; they do not restore the original unverified-path read."
+    },
+    "M1": {
+      "status": "PARTIAL / NOT CLOSED",
+      "file": "server/services/packaging_candidates.py",
+      "line": 163,
+      "related_locations": [
+        "server/services/packaging_candidates.py:176",
+        "server/services/packaging_candidates.py:184",
+        "server/services/packaging_candidates.py:192",
+        "server/services/packaging_candidates.py:232",
+        "lib/db/repositories/advanced_creative.py:235",
+        "lib/db/repositories/advanced_creative.py:336"
+      ],
+      "evidence": "Rebuilding with the original parent now compares actual draft/provenance and rejects changed actor/content; the added HTTP changed-draft/agent tests are useful. It still does not serialize the outer replay before generating the revision. Two identical genesis requests can both miss _replay, generate distinct candidate UUIDs/timestamps and reach the M8 command guard with different append_command_digest values; one returns a command conflict rather than the recorded success. A deterministic coroutine probe forced both real append functions past the empty receipt read and used the real M8 digest with an in-memory serialized comparison: one tuple and one CommandConflictError resulted even with the same fixed clock. This is a modeled repository boundary, not a PG schedule. A separate real-function replay probe returned revision 2 after candidate_id was omitted (with expected_head_version=1, an invalid genesis shape on a fresh command); changing run_id to another run with identical derived bindings was also accepted. No stable incoming-request identity is recorded/compared; only the derived payload and a subset of request fields are checked. Run/profile reads still precede replay.",
+      "scenario": "Concurrent retries of a successful append are not reliably idempotent. An update retry can also change its create/update shape without conflict by omitting candidate_id, and output-equivalent runs are collapsed without an explicit documented equivalence rule.",
+      "fix": "Serialize the packaging append command before replay and before generating UUID/time; compare a stable normalized incoming semantic request or document and enforce an explicit equivalence rule. Bind actor, author class, create/update shape, run identity and expected version consistently, then reuse the recorded revision for exact retries. Preserve the underlying M8 CAS. Add observed simultaneous-identical PG requests and create/update-shape/run-change regressions."
+    },
+    "M2": {
+      "status": "FIXED",
+      "file": "server/routers/packaging.py",
+      "line": 107,
+      "related_locations": [
+        "server/routers/packaging.py:120",
+        "server/routers/packaging.py:417",
+        "tests/integration/server/routers/test_packaging_routes.py:337"
+      ],
+      "evidence": "_run now catches M8Error; ExplorationNotFoundError maps to 404 and other M8 errors to 409. Real-exception probes confirmed CandidateConflictError=409, CommandConflictError=409 and ExplorationNotFoundError=404. The download service call is also inside _run, so its M10 evidence refusals receive the typed API boundary. Stale-CAS HTTP coverage was added. New raw filesystem failures are not automatically domain errors; their resource cleanup is addressed separately in N1."
+    },
+    "M3": {
+      "status": "FIXED in test source; PG result builder-supplied",
+      "file": "tests/integration/server/services/test_quality_package_selection.py",
+      "line": 795,
+      "related_locations": [
+        "tests/integration/server/services/test_quality_package_selection.py:806",
+        "tests/integration/server/services/test_quality_package_selection.py:820",
+        "tests/integration/server/services/test_quality_package_selection.py:827"
+      ],
+      "evidence": "The new regression starts with a real existing selection/head, stages both replacement selection and CAS via the real repository append, raises before commit, verifies the original head/id/version and (1 selection,1 head), then retries with fresh custody and asserts version 2 and (2 selections,1 head). The injection is after both writes rather than literally between them, which exercises rollback of at least the same uncommitted writes and addresses the prior partial-state/existing-head gap. It is a Python exception/transaction rollback test, not an abrupt-process kill. Existing exact selection replay coverage remains separate. Reviewer could collect but could not execute the PG body."
+    },
+    "L1": {
+      "status": "FIXED",
+      "file": "server/routers/packaging.py",
+      "line": 377,
+      "related_locations": [
+        "server/routers/packaging.py:383",
+        "server/routers/packaging.py:393",
+        "tests/integration/server/routers/test_packaging_routes.py:403"
+      ],
+      "evidence": "Verifier requires exp/iat/sub, validates a nonempty subject, numeric times and positive lifetime no greater than 300 seconds; PyJWT verifies signature, expiry and future issuance. Purpose/project/archive exact matching is retained. In-memory signed-token probes admitted valid 300-second tokens, refused missing expiry/overlong/expired tokens with 401 and refused purpose/project/archive mismatch with 403. auth-disabled bypass is the established local-mode behavior and is not described as authenticated verification."
+    },
+    "L2": {
+      "status": "PARTIAL; field issue FIXED, asset interpretation remains a note only",
+      "file": "server/services/packaging_candidates.py",
+      "line": 76,
+      "related_locations": [
+        "server/services/packaging_candidates.py:102"
+      ],
+      "evidence": "Both map construction and lookup now use (group_id,field,variant_id), so moving the same value from title to description no longer carries the old author. Asset-role variant comparison still compares asset_role rather than the referenced PackagingAsset content digest; the original clarification about whether provenance attests the role choice or its bytes remains unresolved. This is carried Low context only, not an acceptance blocker or a new defect."
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [
+      {
+        "id": "N1",
+        "file": "server/services/package_export.py",
+        "line": 690,
+        "related_locations": [
+          "server/services/package_export.py:687",
+          "server/services/package_export.py:691",
+          "server/services/package_export.py:838"
+        ],
+        "title": "Snapshot target creation failure leaks the already-open archive source fd",
+        "status": "CONFIRMED by source and injected ENOSPC probe",
+        "scenario": "_snapshot_archive opens source, then calls work.create(DOWNLOAD_FILE) before entering the try/with that owns source. If target creation fails with ENOSPC, EDQUOT or another OSError, source is never closed. open_download closes work/store but has no reference to this fd. Repeated requests while storage is full can exhaust host descriptors as well as failing the downloads. A probe supplied a real /dev/null descriptor for the source and injected ENOSPC in work.create; os.fstat on the source still succeeded after the function raised. The reviewer manually closed it after measurement.",
+        "fix": "Take ownership of source immediately after os.open (e.g. an ExitStack or enclosing try/finally), and create the target inside that scope. Ensure every acquired fd is reclaimed on failure and map operational filesystem refusal deliberately. Add a target-create ENOSPC/EDQUOT regression asserting no fd/scratch leaks."
+      },
+      {
+        "id": "N2",
+        "file": "server/routers/packaging.py",
+        "line": 424,
+        "related_locations": [
+          "server/routers/packaging.py:419",
+          "server/routers/packaging.py:428",
+          "server/services/package_export.py:667",
+          "uv.lock:3407"
+        ],
+        "title": "BackgroundTask is not guaranteed cleanup for a failed or cancelled stream",
+        "status": "CONFIRMED source control flow; ASGI 2.4 send-error probe",
+        "scenario": "The Download retains the original snapshot fd, the WorkDirectory fds/flock and export-store fd; the chunks generator owns only an os.dup. The sole Download.close call is a StreamingResponse BackgroundTask. In installed/pinned Starlette 1.6.0, background execution is after streaming rather than in a finally: stream exceptions/cancellation can exit before it runs. A direct invocation of the real route response under ASGI 2.4 with send raising OSError produced ClientDisconnect and never called the supplied Download.close, even when failing before the first chunk. Scratch remains flock-owned and cannot be reclaimed by the normal active-work sweep; fd exhaustion can follow repeated failures. Current Uvicorn advertises ASGI 2.3, so this probe does not claim its ordinary disconnect branch was executed; source shows exceptions/cancellation in that branch also bypass the trailing background call.",
+        "fix": "Own Download around the response ASGI call with unconditional finally cleanup, including failure before iteration starts; make close safe to invoke exactly once/idempotently. Closing only the duplicated generator handle is insufficient. Add send/read failure, early disconnect and response cancellation tests checking all descriptors, flock and scratch removal. Also audit cancellation during to_thread snapshot acquisition so a worker result cannot outlive its cleanup owner; no completed cancellation-during-copy execution is claimed here."
+      }
+    ],
+    "L": []
+  },
+  "conditions": [
+    {
+      "id": "AUTH_SHARED_A3_A6",
+      "status": "POSITIVE SHARED BOUNDARY CHANGE; NO REGRESSION FOUND IN INSPECTED PATHS",
+      "evidence": "Profile publication require_actor (quality_profile_custodian.py:80-91) and disposition require_actor (quality_dispositions.py:109-118) both call the same interactive helper. Real request-bound probes admitted ordinary session JWTs and refused via=embedded-agent JWTs for the same principal, mapping respectively to M10_PROFILE_PUBLICATION_UNAUTHORIZED and M10_DISPOSITION_UNAUTHORIZED. get_current_user still admits delegated JWTs, and default create_token emits the original unmarked login shape, so ordinary API access and Human login remain compatible. Replays recheck actor on these custody paths; grant activation, lease issuance and DB-time admission logic are unchanged. This improves the previously leaky delegated boundary; it is not an independent PG acceptance of all A3/A6 flows."
+    },
+    {
+      "id": "AUTH_CREDENTIAL_ROLLOUT",
+      "status": "LOW NOTE ONLY",
+      "evidence": "Credentials issued before this commit have no via claim and are not distinguishable by the new marker. Their existing expiry is still enforced; embedded issuance uses a 900-second TTL. Source closure applies to new issuance and does not assert immediate invalidation of pre-change credentials."
+    },
+    {
+      "id": "B2_C4_D5",
+      "status": "AUTHENTICATED PROVENANCE AND NEW-CREDENTIAL HUMAN REFUSAL SOURCE-CLOSED; APPEND IDEMPOTENCY REMAINS OPEN",
+      "evidence": "The source closes the actual embedded issuer gap, retains forbidden extra authority fields and server-derived bindings/closures, and stamps AGENT for delegated authentication. M1 still prevents full append acceptance. API-key/via/auth-disabled behavior in the shared helper is preserved; the delta HTTP matrix directly covers embedded JWT but is not exhaustive."
+    },
+    {
+      "id": "REVOCATION_AFTER_LEASE",
+      "status": "PRIOR SIGNED-TRANSITION TEST PRESERVED; PG RUNTIME BUILDER-SUPPLIED",
+      "evidence": "The signed REVOKE-after-lease fixture from the base remains present. This delta does not weaken custody admission. No fresh independent PG body ran."
+    },
+    {
+      "id": "CRASH_AFTER_LEASE",
+      "status": "SOURCE GAP CLOSED BY EXISTING-HEAD ROLLBACK/RETRY TEST",
+      "evidence": "See M3. Exception after the real append stages both writes, before commit, exercises preservation of the previously committed head and retry. Abrupt-process crash recovery and live PostgreSQL execution remain outside reviewer evidence."
+    },
+    {
+      "id": "DOWNLOAD_AUTHORIZATION_LINEARIZATION",
+      "status": "SOURCE SOUND FOR SUCCESSFUL GUARDED SNAPSHOT; RESOURCE FAILURE PATHS OPEN",
+      "evidence": "Copy/size/hash/source-generation checks precede currentness; the same established export currentness path runs under the owning transaction, and published generation is compared before return. Stream bytes are the private copied fd. This authorizes the snapshot at a defined instant and does not hold authority locks throughout network delivery. N1/N2 concern ownership and cleanup. No fresh concurrent PG writer schedule or actual filesystem-swap download was run."
+    },
+    {
+      "id": "PG_BUILDER_EVIDENCE",
+      "status": "SUPPLIED, NOT INDEPENDENTLY REPRODUCED",
+      "evidence": "User reports PG16 12 cases including the new selection crash case and 103 related PG passes. Current source collection found 11 route tests plus 40 selection tests (51 total); the new crash case is in the selection file, so 11 route + 1 new crash accounts for the stated 12 delta-facing cases. Collection is not execution. The supplied 103-pass claim has not been promoted into an independent reviewer pass or broader acceptance."
+    },
+    {
+      "id": "B5_SCOPE",
+      "status": "BACKEND DELTA ONLY",
+      "evidence": "The earlier status/history DTO and UI/later B5 conditions remain outside this repair delta. Unrelated frontend dirty paths were not reviewed or changed. No production activation, full-suite, migration or license acceptance is claimed."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git show --stat --oneline HEAD; git diff --stat 821978d23..HEAD; git diff 821978d23..HEAD -- reviewed backend and test paths",
+      "result": "Exact ccc4bb4dab14649baa476570fa789224ba80e64a confirmed; inspected requested range and preserved pre-existing frontend edits. No tracked backend/test modifications observed."
+    },
+    {
+      "command": "git diff --check 821978d23..ccc4bb4da",
+      "result": "PASS, exit 0."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache timeout 30s uv run pytest -q --tb=short tests/unit/server/test_auth.py",
+      "result": "PASS: 30 passed in 4.36s, exit 0."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache uv run pytest -q --maxfail=1 --tb=short tests/integration/server/routers/test_packaging_routes.py tests/integration/server/services/test_quality_package_selection.py",
+      "result": "UNAVAILABLE: exit 1, first fixture failed in 1.66s with socket.socket PermissionError [Errno 1] Operation not permitted, before the first PG test body."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache timeout 20s uv run pytest --collect-only -q tests/integration/server/routers/test_packaging_routes.py tests/integration/server/services/test_quality_package_selection.py",
+      "result": "PASS collection: 51 tests (11 route, 40 selection), 0.34s, exit 0; no body execution."
+    },
+    {
+      "command": "Initial uv run pytest -q --tb=short tests/unit/server/test_auth.py without supplied DATABASE_URL; timeout 45s .venv/bin/python -m pytest -q --tb=short tests/unit/server/test_auth.py tests/unit/server/agent_runtime/test_options_assembler.py; timeout 30s .venv/bin/python -u -m pytest -vv -s --tb=short tests/unit/server/test_auth.py",
+      "result": "Initial run interrupted with exit 130 after no completed output; direct bounded attempts exited 124. Verbose run collected 30 and stopped in first-test setup. Root conftest performs shared migrations for its self-created SQLite URL; switching to the supplied external URL avoids that fixture path and allowed the separate auth suite to finish. No product pass/fail inferred from these timeouts."
+    },
+    {
+      "command": "With PYTHONDONTWRITEBYTECODE=1 and supplied DATABASE_URL: timeout 45s uv run pytest -q --tb=short tests/unit/server/test_auth.py tests/unit/server/agent_runtime/test_options_assembler.py; timeout 30s uv run pytest -q --tb=short tests/unit/server/agent_runtime/test_options_assembler.py -k build_injects_short_lived_arcreel_api_credentials",
+      "result": "Both exited 124 without a completed summary (combined run printed 32 progress dots; selected run printed one). Do not count them as passing suites or completed options-assembler verification. Source assertion for via is inspected; auth-only suite independently completed."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (real-function authentication, replay, token, mapping and cleanup probes)",
+      "procedure": "Used real contracts/build_payload and in-memory repository/session stand-ins. Rebuilt an actual saved revision-2 payload and called real append_packaging_revision/_replay with candidate_id omitted and with another run id whose derived bindings were equal; both returned the saved result. Injected a real opened /dev/null source fd and ENOSPC from work.create into _snapshot_archive, verified fstat still succeeded, then manually closed it. Called real route/StreamingResponse with a Download stand-in under ASGI 2.4 and a send OSError, recording whether close was called. Probed shared auth, request-bound A3/A6 custody, required token claims/lifetime/scope and real M8 exception mappings without DB/network/filesystem writes.",
+      "result": "Completed probes confirmed the per-finding evidence above. Initial replay probe rejected extra variant provenance before execution; corrected draft removed it and completed. Initial A6 request used owner rather than default user and correctly refused both credentials; corrected, resealed request admitted Human/refused delegated. An additional ASGI 2.3/cancellation-during-copy draft was interrupted (exit 130) without completed output; no runtime conclusion is drawn from it."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (identical append interleaving model)",
+      "procedure": "Ran two real append_packaging_revision coroutines with identical HTTP inputs and fixed NOW. Receipt-reader barrier forced both to observe no receipt. An in-memory lock modeled the M8 command guard and compared the real append_command_digest of the generated revisions, raising real CommandConflictError on mismatch.",
+      "result": "Exit 0: results [CommandConflictError, tuple]. Demonstrates that current request construction yields incompatible identities even with the same fixed clock. This is not a real PG interleaving."
+    },
+    {
+      "command": "codebase-memory list_projects; search_graph; check_index_coverage for reviewed files and dependencies; numbered direct source reads",
+      "result": "Project list returned an index rooted in the main checkout, not this worktree. Search and both path-coverage calls were approval-blocked. Direct source fallback used; no graph generation/completeness claim."
+    },
+    {
+      "command": "Parse/assert delta JSON schema, reviewed head, all eight prior-finding keys and H/M/L new-finding keys; git rev-parse HEAD; git show --stat --oneline HEAD; git diff --name-only ccc4bb4da..HEAD; git diff --name-only ccc4bb4da -- server lib r2 tests; git status --short",
+      "result": "JSON validated. Concurrent HEAD advancement to 988321186a2d6bb233a2bde9aeeec4dc066e1fc3 detected and recorded; backend implementation and reviewed test sources unchanged. Only added B6 donor fixture differs under server/lib/r2/tests. Review JSON remains the only untracked reviewer artifact."
+    }
+  ],
+  "not_verified": [
+    "Independent PG execution of the 11 route/40 selection cases or builder-reported 103 related cases; custody sockets, actual lock waiters and simultaneous append schedules.",
+    "Abrupt-process kill/recovery, live download authority interleavings, source/ancestor swaps and actual streaming over a live ASGI server. ASGI 2.4 send-error cleanup is a direct response probe; current Uvicorn 2.3 ordinary disconnect was not reproduced.",
+    "Completed options-assembler pytest run (bounded attempts timed out), full A3/A6 PG custody flows, migrations, worker/export confinement regression, full static gates, full suite and UI.",
+    "Cancellation-during-copy runtime probe did not complete and was stopped; the report does not claim that schedule was reproduced.",
+    "Codebase graph freshness/coverage, blocked by approval policy. No remote provider/network/license research performed."
+  ],
+  "files_read": [
+    "docs/r2/evidence/m10-b-reviews/b5-codex-review.json",
+    "server/auth.py",
+    "server/agent_runtime/options_assembler.py (issuer delta)",
+    "server/routers/packaging.py",
+    "server/services/packaging_candidates.py",
+    "server/services/package_export.py (store/work/snapshot/download/currentness/cleanup)",
+    "lib/db/repositories/quality_packaging.py (invocation, receipt, receipted_invocations and selection writes)",
+    "lib/db/repositories/advanced_creative.py (append command digest, guard and conflict comparison)",
+    "server/services/quality_profile_custodian.py (constructor/require_actor)",
+    "server/services/quality_profiles.py (publication/replay orchestration)",
+    "server/services/quality_dispositions.py (constructor/require_actor)",
+    "tests/integration/server/routers/test_packaging_routes.py",
+    "tests/integration/server/services/test_quality_package_selection.py (crash/revocation delta)",
+    "tests/unit/server/test_auth.py",
+    "tests/unit/server/agent_runtime/test_options_assembler.py (issuer regression/delta)",
+    "tests/unit/r2/contracts/test_packaging.py (probe fixtures)",
+    "tests/unit/r2/contracts/test_quality.py (probe fixtures)",
+    "tests/unit/r2/quality/test_quality_profiles.py (publication fixture)",
+    "tests/unit/r2/quality/test_quality_digests.py (disposition fixture)",
+    "tests/conftest.py (shared-schema setup)",
+    "pyproject.toml (pytest settings)",
+    "uv.lock (Starlette pin)",
+    ".venv/lib/python3.13/site-packages/starlette/responses.py:224-283",
+    ".venv/lib/python3.13/site-packages/jwt/api_jwt.py (time validators)",
+    ".venv/lib/python3.13/site-packages/uvicorn/protocols/http/httptools_impl.py (ASGI version)",
+    ".venv/lib/python3.13/site-packages/uvicorn/protocols/http/h11_impl.py (ASGI version)"
+  ],
+  "workspace_preservation": {
+    "review_authored": [
+      "docs/r2/evidence/m10-b-reviews/b5-codex-delta-review.json"
+    ],
+    "head_at_start": "ccc4bb4dab14649baa476570fa789224ba80e64a",
+    "head_at_end": "988321186a2d6bb233a2bde9aeeec4dc066e1fc3",
+    "note": "Concurrent work committed the pre-existing frontend changes and later B6 docs/scripts/donor fixture during final verification. This review neither authored nor altered those files. Requested reviewed backend implementation and test source remain identical to ccc4bb4da; the newly added tests/fixtures/r2/m10_b6_donors/donor_functions.json is outside review scope. Verdict covers ccc4bb4da only."
+  }
+}
