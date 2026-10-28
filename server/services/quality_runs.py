@@ -73,7 +73,7 @@ def _heads(subject: q.AssessedSubject) -> tuple[q.MasterHeadSnapshot, ...]:
     return tuple(sorted((binding.root, *binding.dependency_heads), key=lambda head: head.artifact_key))
 
 
-async def _lock_masters(session: AsyncSession, subject: q.AssessedSubject) -> None:
+async def lock_subject_masters(session: AsyncSession, subject: q.AssessedSubject) -> None:
     """Hold the sorted master authority rows of every consumed head through commit."""
     binding = subject.master_binding
     try:
@@ -124,7 +124,7 @@ async def _subject_authoritative(session: AsyncSession, project_root: Path, subj
     return True
 
 
-async def _lock_profile_head(session: AsyncSession, *, user_id: str, project_name: str, profile_id: str) -> None:
+async def lock_profile_head(session: AsyncSession, *, user_id: str, project_name: str, profile_id: str) -> None:
     """Share-lock the effective profile head so a concurrent publication serializes after this writer."""
     head = (
         await session.execute(
@@ -265,8 +265,8 @@ class HumanObservationService:
             replayed = await self._replayed(repository, key, digest)
             if replayed is not None:
                 return replayed
-            await _lock_masters(session, request.subject)
-            await _lock_profile_head(
+            await lock_subject_masters(session, request.subject)
+            await lock_profile_head(
                 session,
                 user_id=request.user_id,
                 project_name=request.project_name,
@@ -435,8 +435,8 @@ class QualityRunService:
             replayed = await self._replayed(repository, key, digest)
             if replayed is not None:
                 return replayed
-            await _lock_masters(session, subject.subject)
-            await _lock_profile_head(
+            await lock_subject_masters(session, subject.subject)
+            await lock_profile_head(
                 session, user_id=subject.user_id, project_name=subject.project_name, profile_id=subject.profile_id
             )
             profile = await QualityProfileRepository(session).get_revision(
@@ -502,77 +502,100 @@ async def run_validity(
     """Recompute a sealed run's operational validity at database time; the historical run never changes."""
     reader = await grant_reader()
     async with sessions() as session, session.begin():
-        _require_postgresql_transaction(session)
-        now = (await session.execute(select(func.now()))).scalar_one()
-        repository = QualityRunRepository(session)
-        run = await repository.run(user_id=user_id, project_name=project_name, run_id=run_id)
-        if run is None:
-            raise RequiredEvidenceMissingError()
-        profiles = QualityProfileRepository(session)
-        try:
-            profile = await profiles.get_revision(
-                user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
-            )
-        except (M10Error, ValueError):
-            profile = None
-        if profile is None or profile.profile_digest != run.profile_digest:
-            return RunValidity("INVALIDATED", ("PROFILE_NOT_INTACT",))
-        kinds = {
-            (requirement.requirement_id, slot.slot_id): slot.kind
-            for requirement in profile.policy.assessment_requirements
-            for slot in requirement.slots
-        }
-        types = {
-            q.AssessorKind.TECHNICAL: q.ObservationType.TECHNICAL,
-            q.AssessorKind.NARRATIVE: q.ObservationType.NARRATIVE,
-        }
-        observations: list[q.TechnicalObservation | q.NarrativeObservation] = []
-        intact = True
-        for result in run.slot_results:
-            observation_type = types.get(kinds.get((result.requirement_id, result.slot_id)))  # pyright: ignore[reportArgumentType]
-            for observation_id, expected in zip(result.observation_refs, result.observation_digests, strict=True):
-                if observation_type is None:
-                    intact = False
-                    continue
-                binding = q.ObservationBinding(
-                    observation_id=observation_id,
-                    observation_type=observation_type,
-                    observation_digest=expected,
-                    requirement_id=result.requirement_id,
-                    slot_id=result.slot_id,
-                )
-                try:
-                    admitted = await _admit(
-                        session, reader, user_id=user_id, project_name=project_name, profile=profile, binding=binding
-                    )
-                    observations.append(admitted.observation)
-                except M10Error:
-                    intact = False
-        head = await repository.head(
-            user_id=user_id, project_name=project_name, subject_digest=run.subject_digest, profile_id=run.profile_id
+        return await validity_in(
+            session, reader, project_root=project_root, user_id=user_id, project_name=project_name, run_id=run_id
         )
-        current_revision = (
-            await session.execute(
-                select(QualityProfileHeadModel.current_revision).filter_by(
-                    user_id=user_id, project_name=project_name, profile_id=run.profile_id
-                )
-            )
-        ).scalar_one_or_none()
-        reevaluates = False
-        for revision in range(run.profile_revision + 1, (current_revision or 0) + 1):
-            later = await profiles.get_revision(
-                user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=revision
-            )
-            if later is None or later.supersession_effect == q.SupersessionEffect.REEVALUATE_CURRENT:
-                reevaluates = True
-                break
-        inputs = ValidityInputs(
-            evidence_intact=intact,
-            subject_current=await _subject_authoritative(session, project_root, run.subject),
-            newer_run=head != run.run_id,
-            newer_profile_reevaluates=reevaluates,
-        )
-        return project_validity(run, profile, observations, inputs, now=now)
 
 
-__all__ = ["HUMAN_ASSESSOR_VERSION", "HumanObservationService", "QualityRunService", "run_validity"]
+async def validity_in(
+    session: AsyncSession,
+    reader: CheckpointedShowrunnerGrantReader,
+    *,
+    project_root: Path,
+    user_id: str,
+    project_name: str,
+    run_id: str,
+) -> RunValidity:
+    """Validity inside the caller's PostgreSQL transaction, so writers can decide under their own locks."""
+    _require_postgresql_transaction(session)
+    now = (await session.execute(select(func.now()))).scalar_one()
+    repository = QualityRunRepository(session)
+    run = await repository.run(user_id=user_id, project_name=project_name, run_id=run_id)
+    if run is None:
+        raise RequiredEvidenceMissingError()
+    profiles = QualityProfileRepository(session)
+    try:
+        profile = await profiles.get_revision(
+            user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
+        )
+    except (M10Error, ValueError):
+        profile = None
+    if profile is None or profile.profile_digest != run.profile_digest:
+        return RunValidity("INVALIDATED", ("PROFILE_NOT_INTACT",))
+    kinds = {
+        (requirement.requirement_id, slot.slot_id): slot.kind
+        for requirement in profile.policy.assessment_requirements
+        for slot in requirement.slots
+    }
+    types = {
+        q.AssessorKind.TECHNICAL: q.ObservationType.TECHNICAL,
+        q.AssessorKind.NARRATIVE: q.ObservationType.NARRATIVE,
+    }
+    observations: list[q.TechnicalObservation | q.NarrativeObservation] = []
+    intact = True
+    for result in run.slot_results:
+        observation_type = types.get(kinds.get((result.requirement_id, result.slot_id)))  # pyright: ignore[reportArgumentType]
+        for observation_id, expected in zip(result.observation_refs, result.observation_digests, strict=True):
+            if observation_type is None:
+                intact = False
+                continue
+            binding = q.ObservationBinding(
+                observation_id=observation_id,
+                observation_type=observation_type,
+                observation_digest=expected,
+                requirement_id=result.requirement_id,
+                slot_id=result.slot_id,
+            )
+            try:
+                admitted = await _admit(
+                    session, reader, user_id=user_id, project_name=project_name, profile=profile, binding=binding
+                )
+                observations.append(admitted.observation)
+            except M10Error:
+                intact = False
+    head = await repository.head(
+        user_id=user_id, project_name=project_name, subject_digest=run.subject_digest, profile_id=run.profile_id
+    )
+    current_revision = (
+        await session.execute(
+            select(QualityProfileHeadModel.current_revision).filter_by(
+                user_id=user_id, project_name=project_name, profile_id=run.profile_id
+            )
+        )
+    ).scalar_one_or_none()
+    reevaluates = False
+    for revision in range(run.profile_revision + 1, (current_revision or 0) + 1):
+        later = await profiles.get_revision(
+            user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=revision
+        )
+        if later is None or later.supersession_effect == q.SupersessionEffect.REEVALUATE_CURRENT:
+            reevaluates = True
+            break
+    inputs = ValidityInputs(
+        evidence_intact=intact,
+        subject_current=await _subject_authoritative(session, project_root, run.subject),
+        newer_run=head != run.run_id,
+        newer_profile_reevaluates=reevaluates,
+    )
+    return project_validity(run, profile, observations, inputs, now=now)
+
+
+__all__ = [
+    "HUMAN_ASSESSOR_VERSION",
+    "HumanObservationService",
+    "QualityRunService",
+    "lock_profile_head",
+    "lock_subject_masters",
+    "run_validity",
+    "validity_in",
+]

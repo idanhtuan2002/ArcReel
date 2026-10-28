@@ -111,6 +111,7 @@ async def closure_host(session_factory: Factory, tmp_path: Path, monkeypatch: py
         ),
         "catalog": ProbeCatalog(schema_id="m10.probe-catalog.v1", configs=(config,)),
         "reader": reader,
+        "governance": (root_dir, socket_dir),
     }
     write_manifest(project, subject_of(env))
     async with serve_governance_attestor(

@@ -70,7 +70,8 @@ def test_pass_requires_every_requirement_met() -> None:
 
 def test_rework_is_always_admissible_over_a_sealed_run() -> None:
     revision, run = sealed(technical="FAIL", human="INDETERMINATE")
-    rules().evaluate_decision(revision, run, subject(run, "REWORK"), now=NOW)
+    assert rules().evaluate_decision(revision, run, subject(run, "REWORK"), now=NOW) is None
+    assert {state for _, _, state in rules().unmet_slots(revision, run)} == {"FAILED", "INDETERMINATE"}
 
 
 def test_waive_covers_exactly_the_failed_waiverable_slots() -> None:
