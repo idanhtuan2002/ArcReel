@@ -490,3 +490,52 @@ async def test_a_presentation_only_tamper_fails_at_the_service_boundary(packagin
     observation = await service(env).check(check_request(env, candidate))
     assert observation.status is q.ObservationStatus.FAIL
     assert [f.subject_locator for f in observation.findings] == ["presentation_closure_digest"]
+
+
+async def test_a_tampered_probe_result_yields_no_master_facts(packaging_host) -> None:
+    from r2.quality.errors import RequiredEvidenceMissingError
+
+    env = packaging_host
+    candidate = await append_candidate(env, candidate_for(env))
+    async with env["factory"]() as session, session.begin():
+        await session.execute(sa.text("SET LOCAL session_replication_role = replica"))
+        await session.execute(
+            sa.text("UPDATE m10_quality_probe_results SET result_digest = 'sha256:' || repeat('0', 64)")
+        )
+    with pytest.raises(RequiredEvidenceMissingError):
+        await service(env).check(check_request(env, candidate))
+
+
+@pytest.mark.parametrize("violation", ["unknown_revision", "duplicate_command", "oversized_json", "status"])
+async def test_postgres_enforces_keys_status_and_the_json_ceiling(packaging_host, violation: str) -> None:
+    env = packaging_host
+    candidate = await append_candidate(env, candidate_for(env))
+    observation = await service(env).check(check_request(env, candidate))
+    columns = (
+        "user_id, project_name, observation_id, actor_id, command_id, request_digest, candidate_id, candidate_revision,"
+        " candidate_payload_digest, quality_run_id, constraint_snapshot_digest, status, observation_digest,"
+        " observation_json, recorded_at"
+    )
+    values = {
+        "observation_id": "0199f00d-0000-7000-8000-0000000000ff",
+        "command_id": "other-command",
+        "revision": 1,
+        "status": "PASS",
+        "json": "{}",
+    }
+    if violation == "unknown_revision":
+        values["revision"] = 99
+    elif violation == "duplicate_command":
+        values["command_id"] = "check-1"
+    elif violation == "oversized_json":
+        values["json"] = '"' + "x" * 1048576 + '"'
+    else:
+        values["status"] = "WAIVED"
+    statement = sa.text(
+        f"INSERT INTO m10_packaging_observations ({columns}) VALUES ('default', 'project', :observation_id, 'default',"
+        " :command_id, 'd', 'package', :revision, 'd', 'r', 'd', :status, 'd', CAST(:json AS json), now())"
+    )
+    assert observation.observation_id
+    with pytest.raises(sa.exc.IntegrityError):
+        async with env["factory"]() as session, session.begin():
+            await session.execute(statement, values)

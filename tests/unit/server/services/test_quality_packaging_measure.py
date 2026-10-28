@@ -183,8 +183,34 @@ def test_a_measurement_past_its_deadline_stops_itself(tmp_path: Path) -> None:
 
     root = _root(tmp_path)
     (root / "assets" / "x").write_bytes(b"a" * 4096)
-    with pytest.raises(MeasurementExpiredError):
-        _measure(root, "assets/x", "text/plain", 1 << 20, time.monotonic() - 1)
+    reads: list[int] = []
+    from server.services import quality_packaging
+
+    real_fdopen = os.fdopen
+
+    class Counting:
+        def __init__(self, handle) -> None:
+            self.handle = handle
+
+        def __enter__(self):
+            self.handle.__enter__()
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            self.handle.__exit__(*exc)
+
+        def fileno(self) -> int:
+            return self.handle.fileno()
+
+        def read(self, size: int = -1) -> bytes:
+            reads.append(size)
+            return self.handle.read(size)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(quality_packaging.os, "fdopen", lambda fd, mode, **kw: Counting(real_fdopen(fd, mode, **kw)))
+        with pytest.raises(MeasurementExpiredError):
+            _measure(root, "assets/x", "text/plain", 1 << 20, time.monotonic() - 1)
+    assert reads == []
 
 
 def test_the_asset_worker_stops_before_the_next_asset_once_expired(tmp_path: Path) -> None:

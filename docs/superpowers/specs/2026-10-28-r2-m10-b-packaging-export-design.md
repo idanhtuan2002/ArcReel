@@ -301,7 +301,11 @@ reading at most the role byte ceiling plus one byte with full UTF-8 validation f
 read only when the inode generation (device, inode, size, mtime, ctime) is identical before and after; the whole
 measurement has a deadline (`M10_OPERATIONAL_ENVELOPE_EXCEEDED`). The check retains no bytes, so it keeps no
 snapshot; B4 export materializes verified private snapshots before building. The `video` role must be the master
-inode itself. Every inline variant has its field's canonical value shape, enforced by the kernel contract. The pure check lives in
+inode itself. Every inline variant has its field's canonical value shape, enforced by the kernel contract. Supported storage
+(`LOCAL_REGULAR_FILE_IO`): the in-process measurement worker is supported only on host-managed local storage where
+regular-file open/read/stat return; the caller's wait is bounded by the event-loop timeout and the worker stops
+cooperatively before each asset and each read, but a read blocked inside the kernel (e.g. a hung network mount)
+cannot be interrupted in-process. Broader storage needs the confined-unit envelope before activation. The pure check lives in
 `r2/quality/packaging_check.py`: every declared rule runs in declaration order and the observation is FAIL iff a
 BLOCKING rule failed. Kalinga `seo_lint` and OpenMontage chapter formatting are reimplemented as pure functions;
 the donors run only in parity tests from digest-checked pinned sources (A7 pattern).

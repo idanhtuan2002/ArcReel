@@ -1,0 +1,181 @@
+{
+  "schema_id": "m10.b2-delta3-review.v1",
+  "reviewed_head": "b4c88db6a",
+  "reviewer": "Codex independent third delta review; main agent; source read-only; no staging or commits",
+  "verdict": "ACCEPT_WITH_CONDITIONS",
+  "review_scope": {
+    "base": "509a13f02",
+    "candidate": "b4c88db6adc48bec9d350409afad978ee97039cc",
+    "initial_head": "b4c88db6adc48bec9d350409afad978ee97039cc",
+    "checkout": "Initially clean; HEAD remained at requested candidate through pre-artifact verification."
+  },
+  "deadline_judgment": {
+    "judgment": "Cooperative cancellation plus byte ceilings is sufficient for this host-local read-only check under the named LOCAL_REGULAR_FILE_IO condition; it is not a hard worker wall-time guarantee.",
+    "reason": "The worker now receives the same absolute monotonic deadline as its caller, refuses the next asset once expired, and raises at nonempty chunk boundaries. Unlike the prior implementation, an ordinarily progressing worker no longer processes the rest of its closure after caller timeout. Expiry is mapped to OperationalEnvelopeExceededError before observation construction or persistence. Combined with no-follow regular-file admission, bounded raw reads and generation/digest checks, this is a reasonable cooperative boundary for ordinary local storage.",
+    "limit": "A thread in open, read or filesystem metadata I/O cannot be forcibly stopped by wait_for or the cooperative clock. Byte ceilings bound total bytes, not syscall latency. A stalled syscall can continue to occupy the shared executor until it returns. The new code does not prove process isolation or hard termination. N4 additionally identifies an avoidable read launched before checking an expired deadline.",
+    "required_condition": "LOCAL_REGULAR_FILE_IO below must be recorded as an operating constraint; do not advertise this as a hard worker wall-time bound or extend it to hostile, remote, FUSE or potentially indefinitely blocking storage without a stronger worker lifecycle boundary."
+  },
+  "per_finding_status": {
+    "M2": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 247,
+      "related_locations": [
+        "server/services/quality_packaging.py:149",
+        "server/services/quality_packaging.py:150",
+        "server/services/quality_packaging.py:252",
+        "server/services/quality_packaging.py:280",
+        "tests/unit/server/services/test_quality_packaging_measure.py:179",
+        "tests/unit/server/services/test_quality_packaging_measure.py:190"
+      ],
+      "verified": "An absolute time.monotonic deadline is propagated through check -> _assets -> _measure. The asset loop raises before measuring another asset once expired. The chunk loop raises MeasurementExpiredError on an expired nonempty read, and check maps either worker expiry or caller TimeoutError to OperationalEnvelopeExceededError. Unit tests prove an expired measurement refuses and an asset worker that expires during its first injected measurement never invokes its second asset. Both passed freshly. The previous caller-timeout/no-observation PG test remains unchanged; its 22-pass result is builder-supplied, not reviewer-run.",
+      "qualification": "Resolution accepts cooperative cancellation for ordinary host-local filesystem I/O, not termination of a blocked syscall. The Low guard-ordering issue N4 and the named storage condition must remain explicit.",
+      "status_detail": "RESOLVED within LOCAL_REGULAR_FILE_IO; N4 is a remaining Low refinement"
+    },
+    "N3": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 147,
+      "related_locations": [
+        "server/services/quality_packaging.py:149",
+        "tests/unit/server/services/test_quality_packaging_measure.py:91"
+      ],
+      "verified": "fdopen now uses buffering=0, so the Spy delegates directly to unbuffered FileIO.read. Fresh independent measurement of a 3 MiB file with limit=1000 observes requested bytes=1001 and raw descriptor position=1001 before close, compared with 4096 in the previous candidate. The oversized sentinel still fails integrity. The persisted read-budget test passed."
+    },
+    "H1": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 168,
+      "verified": "Generation-stable no-follow reads, regular-file admission and master inode/digest comparison are unchanged. Mutation/path regression tests passed. The accepted B2 no-snapshot decision remains appropriate because the check retains no bytes; B4 must materialize and reverify its own private snapshots.",
+      "status_detail": "RESOLVED; prior closure preserved"
+    },
+    "N1": {
+      "status": "RESOLVED",
+      "file": "r2/contracts/advanced_creative.py",
+      "line": 549,
+      "verified": "No variant contract/checker change in this delta. The existing unconditional canonical-shape rejection and alternatives-without-variants.bounds cases passed again in the fresh unit run.",
+      "status_detail": "RESOLVED; unchanged"
+    },
+    "N2": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 136,
+      "verified": "Canonical raw path spelling guard remains, and existing-target noncanonical path refusal tests passed again.",
+      "status_detail": "RESOLVED; unchanged"
+    },
+    "M1": {
+      "status": "RESOLVED",
+      "file": "r2/quality/packaging_check.py",
+      "line": 127,
+      "verified": "Primary/alternative shared metadata and chapter rules are unchanged; the relevant unit tests passed again.",
+      "status_detail": "RESOLVED; unchanged"
+    },
+    "M3": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 142,
+      "verified": "Full incremental UTF-8 validation and EOF flush are unchanged; relevant unit tests passed again.",
+      "status_detail": "RESOLVED; unchanged"
+    },
+    "M4": {
+      "status": "RESOLVED",
+      "file": "server/services/quality_packaging.py",
+      "line": 341,
+      "verified": "No lineage logic change in this delta. Prior source closure is carried, and the builder reports the PG service suite still has 22 passes. No fresh reviewer PG execution is claimed.",
+      "status_detail": "RESOLVED; prior source closure carried"
+    }
+  },
+  "new_findings": {
+    "H": [],
+    "M": [],
+    "L": [
+      {
+        "id": "N4",
+        "file": "server/services/quality_packaging.py",
+        "line": 149,
+        "related_locations": [
+          "server/services/quality_packaging.py:150",
+          "tests/unit/server/services/test_quality_packaging_measure.py:186"
+        ],
+        "title": "Chunk expiry is tested after starting the next read",
+        "status": "CONFIRMED by actual unbuffered read-position probe",
+        "scenario": "The while condition performs handle.read before time.monotonic is checked. Calling _measure with an already-expired deadline on a nonempty file consumes 1 MiB, then raises MeasurementExpiredError; the new expiry test passes without checking that I/O happened first. In production, expiry can occur during path opening or processing the previous chunk, so the worker can launch an avoidable extra read after expiry. An empty/EOF read also bypasses that clock check. The caller remains wait_for-bounded and integrity checks are not bypassed, so this is Low under LOCAL_REGULAR_FILE_IO.",
+        "fix": "Check the monotonic deadline immediately before each read, including the first and the EOF probe, and retain a post-read check to catch time spent inside I/O. Add a Spy asserting zero reads for an already-expired deadline and a controlled clock test proving no next read starts after expiry. This does not solve an already-blocked syscall; keep the named operating condition."
+      }
+    ]
+  },
+  "conditions": [
+    {
+      "id": "LOCAL_REGULAR_FILE_IO",
+      "status": "REQUIRED operating condition",
+      "gate": "B2 supported host storage / before broader activation",
+      "requirement": "Support this in-process cooperative worker only on ordinary host-managed local storage where regular-file open/read/stat operations are expected to return. Document that the caller wait uses the event-loop timeout but worker exit is cooperative and may await one filesystem operation. Do not claim a hard total worker wall-time bound. If hostile/remote/FUSE storage, indefinite device stalls, or hard resource isolation must be supported, use a separately managed worker or an equivalent enforceable lifecycle boundary; byte ceilings and wait_for alone are insufficient.",
+      "scope": "This names the residual syscall-latency limitation requested by the sponsor; it is not a claim that the candidate enforces filesystem provenance or recovers a stuck kernel I/O thread."
+    },
+    {
+      "id": "C1",
+      "status": "ACCEPT_WITH_CONDITIONS",
+      "gate": "B2 closure",
+      "requirement": "Keep LOCAL_REGULAR_FILE_IO explicit, address N4 before the packet final gate, and preserve carried persistence/host/export obligations. No new High/Medium defect found in the bounded third-delta scope; no further worker isolation redesign is required for the stated ordinary host-local check."
+    },
+    {
+      "id": "C2",
+      "status": "PARTIAL; carried unchanged",
+      "gate": "Persistence verification",
+      "requirement": "Prior full migration/FK/unique/JSON-ceiling enforcement, probe-result tamper and deterministic contention-evidence conditions are not closed by this filesystem-only patch. PG sockets remain denied here. Builder-reported 22 service passes are supplied evidence, not reviewer execution or proof of every carried persistence gate. No redundant migration rerun was performed."
+    },
+    {
+      "id": "C4",
+      "status": "RESOLVED for requested B2 ancestor-swap regression; future host provenance carried",
+      "gate": "B2 regression / later authenticated append",
+      "evidence": "tests/unit/server/services/test_quality_packaging_measure.py:155 replaces the ancestor directory with an outside symlink at the component-open boundary, and asserts _measure refuses. This meaningful regression is now persisted and passed. Existing generation, canonical-path, FIFO, malformed-alternative, duplicate-asset/role and closure cases also passed.",
+      "requirement": "Keep authenticated server-derived field/variant provenance at the later append boundary. The new test covers the requested ancestor swap, not every possible root/mount mutation; previous descriptor-pinning source evidence remains distinct."
+    },
+    {
+      "id": "C6",
+      "status": "RESOLVED for B2 service test; later consumers carried",
+      "gate": "Closure verification",
+      "evidence": "The service-level presentation-only tamper test at tests/integration/server/services/test_quality_packaging.py:483 remains unchanged. Source was re-read; execution is builder-reported. Pure closure tests passed freshly.",
+      "requirement": "Preserve explicit closure/candidate/lineage verification on future append/load/preview/selection/export consumers and B4 private-snapshot digest revalidation."
+    },
+    {
+      "id": "D5",
+      "status": "RESOLVED",
+      "gate": "Section 5 snapshot boundary documentation",
+      "evidence": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:293 now says generation-stable no-follow reads, consistent with lines 298-303 and the decision that the check retains no bytes.",
+      "requirement": "B4 still materializes and verifies private snapshots before archive construction. B2 historical/replayed PASS never substitutes for current byte custody."
+    }
+  ],
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git show --stat HEAD; git show HEAD -- server/services/quality_packaging.py tests/unit/server/services/test_quality_packaging_measure.py docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md; git diff --name-only 509a13f02..b4c88db6a; git diff --check 509a13f02..b4c88db6a",
+      "result": "Pinned clean candidate b4c88db6adc48bec9d350409afad978ee97039cc. Complete changed source/test/design diff reviewed; whitespace check passed. Source/lineage/contracts/persistence outside this delta were not requalified wholesale."
+    },
+    {
+      "command": "codebase-memory list_projects; search_graph for _measure/_assets/MeasurementExpiredError; check_index_coverage for all evidence source/test/design paths",
+      "result": "No graph project rooted at this worktree exposed. Search and both coverage calls denied by approval_policy=never. Direct source/diff fallback; no graph generation/coverage claim. Review stayed on main agent."
+    },
+    {
+      "command": "Read b2-codex-delta2-review.json; numbered worker/open/read/deadline/error mapping code, all measurement regressions, unchanged PG timeout/presentation cases and design section 5",
+      "result": "Per-finding closure and the cooperative worker/storage judgment recorded above. No source or test changes."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/m10-b-delta3-uv PYTHONDONTWRITEBYTECODE=1 timeout -k 2 50 uv run --offline --no-sync python -m pytest -q -p no:cacheprovider tests/unit/server/services/test_quality_packaging_measure.py tests/unit/r2/contracts/test_packaging.py tests/unit/r2/quality/test_packaging_check.py tests/unit/r2/quality/test_runs.py",
+      "result": "PASS: 165 passed in 2.14s, including all 18 measurement tests. PG execution not implied."
+    },
+    {
+      "command": "Python socket.create_connection((127.0.0.1, 55491), timeout=2)",
+      "result": "PermissionError: [Errno 1] Operation not permitted. PG service tests not started; builder-reported 22 passes kept separate."
+    },
+    {
+      "command": "Inline Python wraps actual unbuffered _measure FileIO, records requested read sizes and actual descriptor position before close on a 3 MiB file; repeat with an already-expired deadline",
+      "result": "N3 CLOSED: limit=1000 -> requested sum=1001, raw position=1001. N4 CONFIRMED: already-expired deadline still requests and fetches 1048576 bytes before MeasurementExpiredError."
+    }
+  ],
+  "not_verified": [
+    "Fresh reviewer PostgreSQL service/migration/enforcement/concurrency results; supplied builder PG22 result remains separately attributed. No full migration retry after unchanged source and repeated prior timeouts.",
+    "Hard termination of a blocked filesystem syscall, filesystem provenance enforcement, dedicated executor saturation control or arbitrary hostile storage. The named operating condition is necessary, not proof of those capabilities.",
+    "No full suite, static gates, donor parity rerun, providers, frontend, deployment, release/production qualification or B3/B4/B5 consumer acceptance. Only the requested JSON is written; no source/tests/staging/commits.",
+    "Graph tools denied after project listing. All new conclusions use candidate source, actual selected tests and the stated raw I/O probes."
+  ]
+}

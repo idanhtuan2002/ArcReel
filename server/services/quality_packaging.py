@@ -146,9 +146,12 @@ def _measure(
     # Unbuffered: every read fetches at most what it asks for from the descriptor.
     with os.fdopen(descriptor, "rb", buffering=0) as handle:
         info = os.fstat(handle.fileno())
-        while chunk := handle.read(min(1 << 20, limit + 1 - size)):
+        while True:
             if time.monotonic() > deadline:
                 raise MeasurementExpiredError()
+            chunk = handle.read(min(1 << 20, limit + 1 - size))
+            if not chunk:
+                break
             if not prefix:
                 prefix = chunk[:64]
             size += len(chunk)
