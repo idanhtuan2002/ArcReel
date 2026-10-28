@@ -1,0 +1,187 @@
+{
+  "schema_id": "m10.b-design-b0-review.v1",
+  "reviewed_head": "b660f3aea",
+  "reviewed_commits": {
+    "design_amendment": "1751a23bc docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+    "b0_f1_code": "d59be1e11"
+  },
+  "reviewer": "Separate Claude Opus subagent (claude-opus-5-5), same model family as the builder; sponsor-authorized substitute for Codex (Codex quota exhausted). Not an independent model family.",
+  "verdict": "REWORK",
+  "verdict_by_part": {
+    "design_amendment": "REWORK (two H findings are document-level fixes; no re-research needed)",
+    "b0_f1_code": "ACCEPT_WITH_CONDITIONS (condition M8)"
+  },
+  "reviewer_reran": [
+    {
+      "command": "docker run postgres:16-alpine on 127.0.0.1:55492; DATABASE_URL=... uv run alembic upgrade head",
+      "result": "PASS: bed415be3608 -> 4c1f0e2a9b10 applied; single head 4c1f0e2a9b10"
+    },
+    {
+      "command": "uv run alembic downgrade bed415be3608 (empty table), then upgrade head; inspect pg_proc/pg_trigger/pg_constraint",
+      "result": "PASS: downgrade drops table and m10_probe_failure_immutable_row(); re-upgrade recreates trigger m10_quality_probe_failures_immutable and constraints ck_..._code, ck_..._resources, ck_..._resources_json_bytes, fk_m10_probe_failures_invocation, users fkey, pk"
+    },
+    {
+      "command": "insert one failure row (session_replication_role=replica) then uv run alembic downgrade bed415be3608",
+      "result": "PASS: RuntimeError M10_PROBE_FAILURE_HISTORY_PRESENT; alembic_version stays 4c1f0e2a9b10; row retained"
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://...:55492/arcreel_test uv run python -m pytest -q tests/integration/server/services/test_quality_probes.py tests/integration/lib/db/migrations/test_4c1f0e2a9b10_quality_probe_failures.py tests/integration/lib/db/migrations/test_bed415be3608_quality_disposition.py",
+      "result": "49 passed, 20 warnings in 77.51s"
+    },
+    {
+      "command": "uv run ruff check <8 B0 files>; uv run basedpyright <8 B0 files>; uv run lint-imports",
+      "result": "ruff: All checks passed; basedpyright: 0 errors, 0 warnings; lint-imports: 23 kept, 0 broken"
+    }
+  ],
+  "reviewer_not_verified": [
+    "Full test suite (not run, by policy); M10-A test files other than those listed were not rerun",
+    "Real crash injection between tool failure and M7 commit: reasoned from code (session rollback on close; FAILED and the row commit in one session.commit in r2/host_hardening/execution.py plan_and_submit), no kill test run",
+    "Import-cycle claim in M3 is an inference from current import graph (r2/contracts/quality.py -> r2.advanced_creative.digests -> r2.contracts.advanced_creative); not executed against a prototype",
+    "PostgreSQL row-lock queueing behaviour in H1 is reasoned from PG tuple-lock semantics; no both-order deadlock test was run",
+    "Donor (OpenMontage/Kalinga) pins and fixtures were not re-inspected",
+    "Frontend consumers of M8 kind (frontend/src/features/creative-canvas/*) were only located, not analysed"
+  ],
+  "findings": {
+    "H": [
+      {
+        "id": "H1",
+        "where": "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:103-106 (Selection vs Export finalize lock orders)",
+        "issue": "Export finalize locks packaging head (FOR SHARE) before disposition head (FOR SHARE); selection locks disposition head before packaging head (which it must write, so FOR UPDATE). The two orders are inverted. Finalize also locks neither master rows, profile head nor run head, although section 4 'Currentness' requires all of them to be exactly as bound at finalize.",
+        "scenario": "Selection S holds the disposition head (it reuses QualityDispositionRepository.lock_head-style advisory + FOR UPDATE, lib/db/repositories/quality_dispositions.py:166-173) and waits for packaging head FOR UPDATE; Export finalize E holds packaging head FOR SHARE and waits for disposition head -> deadlock. Even if S takes the disposition head FOR SHARE, a queued disposition issuer D (FOR UPDATE) makes E's FOR SHARE wait behind D, D waits on S, S waits on E -> cycle. Separately, a concurrent REEVALUATE_CURRENT profile publication or a master promotion can commit between finalize's check and its commit because finalize does not hold those rows.",
+        "fix": "Make export finalize a suffix-compatible subsequence of the selection order: command key -> export binding row -> sorted master rows (FOR SHARE / lock_current_master_rows) -> profile head (FOR SHARE) -> run head (FOR SHARE) -> disposition head (FOR SHARE) -> packaging head (FOR SHARE). State the lock mode for every step in both orders, and add the PostgreSQL both-order barrier test for selection x finalize and disposition x finalize."
+      },
+      {
+        "id": "H2",
+        "where": "design amendment :67-70 (D7) and :97-99 (m10_export_jobs 'state + fencing generation')",
+        "issue": "D7 introduces an M10 export job table with its own state machine and fencing generation guarding the builder. The V2 rebase (docs/superpowers/specs/2026-10-25-r2-m10-v2-rebase.md, audit row 6) requires 'use existing execution attempts and receipts; no second job/lease truth', and plan Task B requires 'record M7 execution and immutable receipt'. M10-A's probe family already shows the accepted shape: an immutable invocation row bound to an M7 execution_attempts row, with M7 owning state, lease and fence.",
+        "scenario": "Two lease truths diverge after a crash: M7 reclaims an expired SUBMITTING lease (reconcile_expired) while m10_export_jobs still shows the old fencing generation as owner; recovery logic has to pick one, and a stale builder can finalize under one fence while the other says it lost the lease.",
+        "fix": "Replace m10_export_jobs(state, fencing generation) with an append-only export invocation row (selection/manifest/request binding + reserved M7 execution_id), mirroring m10_quality_probe_invocations. All state, lease and fence come from M7 (AttemptSubmitter / ExecutionAttemptService). Specify the M7 capability idempotency mode for the export family and what reconcile does for SUBMIT_OUTCOME_UNKNOWN (content-addressed lookup vs NEEDS_OPERATOR)."
+      }
+    ],
+    "M": [
+      {
+        "id": "M1",
+        "where": "design amendment :33-37, :97-107; rebase 'Packaging slot identity/cardinality'",
+        "issue": "PACKAGING_SLOT, required by plan Task B, ADR-0080:112 and ADR-0082, is never named. The m10_packaging_heads key is not defined, although the rebase fixes it as one head per (user_id, project_name, source_artifact_key, cohort_id, product_surface), with encoding, delimiter, case and cross-scope fixtures. Absent heads are 'created under the command advisory key and a unique constraint'. That serializes only the same command, not two different commands that both create the first head.",
+        "scenario": "Two operators select for the same master/cohort/surface with different command_ids. Both see no head, and one gets a unique violation that surfaces as a 500 instead of M10_STALE_HEAD. Or a vertical-Short selection replaces the explainer head because the key omits product_surface.",
+        "fix": "Define PACKAGING_SLOT as the M10 head key above, with its normalized encoding, and freeze it in B1. Serialize head creation with a head-keyed advisory lock, as M10-A does with m10.disposition-head.v1. Map a unique violation to M10_STALE_HEAD."
+      },
+      {
+        "id": "M2",
+        "where": "design amendment :39-41 (D2), :99; plan Task B step 1; r2/advanced_creative/exploration.py:181,215; server/routers/advanced_creative.py:97; lib/db/repositories/advanced_creative.py:215-321; r2/contracts/advanced_creative.py:31-35,148-156,474-477",
+        "issue": "Task B step 1 says to verify that accepted M8 exposes a schema-evolution path, and to stop otherwise. The amendment records no verification and no inventory of the M8 seam it edits. M8 has no evolution mechanism: the ExplorationKind enum, the closed CandidatePayload union and the CHECK ck_m8_candidate_revisions_kind are all edited in place. Several points are left unspecified. (a) ExplorationService.append_revision refuses only SPATIAL, so a PACKAGING revision would pass the generic M8 service. (b) The LineageBinding values a PACKAGING revision carries (creative_profile_id/version, policy_digest, content_basis_digest) and how require_server_lineage applies are not given. (c) append_revision writes an M8 APPEND_REVISION receipt under the M8 advisory key, but the amendment says 'M10 command receipts reused'. (d) get_head has no FOR SHARE mode, so selection's 'candidate head (FOR SHARE)' needs an M8 repository change. (e) promotable_format already refuses non-FORMAT kinds with m8_promotion_target_unavailable.",
+        "scenario": "An internal caller, or a future M8 route, appends PACKAGING through ExplorationService with no M10 constraint validation, and the result is a selectable candidate that bypassed packaging checks. The implementer must also invent the lineage and receipt semantics at B1.",
+        "fix": "Add a B1 seam-verification evidence record listing every consumer of ExplorationKind and CandidatePayload (backend and frontend) with its disposition. Specify a service-level refusal of PACKAGING in ExplorationService.append_revision, so only the M10 packaging service appends, and the exact LineageBinding for PACKAGING. State that candidate append idempotency is the M8 APPEND_REVISION receipt and that M10 receipts cover preview, selection and export only. Name the minimal additive M8 repository changes, such as a share-lock read."
+      },
+      {
+        "id": "M3",
+        "where": "design amendment :79 (module r2/contracts/packaging.py) vs r2/contracts/advanced_creative.py:474 and r2/advanced_creative/digests.py imports",
+        "issue": "PackagingCandidate must be a member of CandidatePayload in r2/contracts/advanced_creative.py. If it lives in r2/contracts/packaging.py on M10ContractModel/Sha256Digest from r2/contracts/quality.py, the import chain becomes r2.contracts.advanced_creative -> r2.contracts.packaging -> r2.contracts.quality -> r2.advanced_creative.digests -> r2.contracts.advanced_creative, which is circular (this is an inference). M8ContractModel and M10ContractModel configs also differ.",
+        "scenario": "ImportError or a partially initialized module at B1, which forces an unreviewed restructuring of M8 or M10 contract modules.",
+        "fix": "Decide the placement now. For example, put the PackagingCandidate payload in a leaf module that imports only r2.contracts.common/advanced_creative primitives, or in advanced_creative.py itself, and keep the rest of the M10-B contracts in packaging.py. State which base model it uses and prove with the differential test that M8 digests are unchanged."
+      },
+      {
+        "id": "M4",
+        "where": "design amendment :43-48 (D3); r2/quality/runs.py:127; server/services/quality_runs.py:658; r2/quality/runs.py:327",
+        "issue": "D3 has gaps. (a) It does not say that ObservationBase.subject_digest of a PackagingObservation is the base AssessedSubject digest. Run sealing rejects any other value (runs.py:127). (b) A run can carry several PACKAGING observations for different candidate digests, and slot N-of-M evaluation could mix them. (c) It does not say whether a WAIVE disposition, or a waived packaging finding, satisfies the 'PASS packaging observation' requirement. (d) It does not state the lifecycle consequence: every packaging revision needs a new run for the same (subject, profile). That new run sets newer_run, which supersedes the prior run's validity, so the current selection stops being exportable and a new Human disposition is needed.",
+        "scenario": "A run includes candidate rev1 PASS and rev2 FAIL in the same slot, the slot is satisfied, and selection of rev2 passes the 'run contains a PASS for' check through the wrong digest. Or operators are surprised that editing a tag invalidates a live selection.",
+        "fix": "Require every PACKAGING observation in a run to bind one packaging candidate digest, and enforce it at sealing. Fix subject_digest equal to base_subject_digest. Specify the WAIVE rule. Document the revision -> run -> disposition -> selection lifecycle, and add it to the validity transition tests."
+      },
+      {
+        "id": "M5",
+        "where": "design amendment :81-86 vs ADR-0082 Decision bullet 4 and design section 4.2 PackagingCandidate/PackagingAsset",
+        "issue": "Several fields are dropped without a stated mapping. ADR-0082 requires the candidate revision to bind 'content and presentation payload digests'; section 4.2 has content_closure_digest, presentation_closure_digest, platform_profile_id/revision and PackagingAsset.constraint_rule_id. The amendment drops all of them, plus payload_digest (which now lives on ExplorationRevision), and adds byte_size.",
+        "scenario": "A reviewer cannot tell whether caption or thumbnail presentation drift is bound. Assets cannot be traced to the constraint rule that made them required or optional.",
+        "fix": "Either restore the fields, or state exactly which bound digest covers each one (for example, assessed_subject_digest covers the content closure; the asset digests plus the constraint snapshot cover presentation). Keep a per-asset constraint_rule_id or derive it deterministically, and record the deviation from section 4.2 explicitly."
+      },
+      {
+        "id": "M6",
+        "where": "design amendment :27-29, :60-63; rebase 'Packet and product boundaries'",
+        "issue": "The rebase keeps 'generated title/description/tags/chapters/thumbnail variants' as required B capabilities, with provenance and Human selection, and plan Task B ports Kalinga variant fixtures. The amendment does not say how variants are represented: as several candidates, several revisions, or a variant set inside one candidate. The export layout has only one thumbnail.",
+        "scenario": "The B2/B3 implementer improvises a variant model, and B6 Kalinga variant parity has no contract to target.",
+        "fix": "Define the variant representation and how Human selection picks one variant per field group. State whether alternative thumbnails can exist in the candidate and whether only the selected one is exported."
+      },
+      {
+        "id": "M7",
+        "where": "design amendment :130-136 (section 7) and :152 (Surface gate); plan Task B last three bullets; M10-A known_limits",
+        "issue": "(a) The smallest useful effect, '>=1 real defect caught or confirmed none', can be met by finding nothing, so it does not measure utility. (b) The plan's correction usefulness, disagreement, false-positive/negative review and storage metrics are not preregistered. (c) The plan requires 'static/runtime absence of network and credential seams', but the Surface gate does not say how the runtime absence is proven, and M10-A sealed with 'static direct-import surface scan only'.",
+        "scenario": "A pilot passes with zero signal, and the M10-B seal repeats the static-only limit that M10-A carried.",
+        "fix": "Require detection of every seeded defect class on the seeded copy, plus counted false positives on the real copy. Preregister the FP/FN, disagreement, correction-usefulness and storage metrics with baselines. Specify a runtime no-network harness, such as socket or DNS denial during packaging, export and pilot runs, with a negative control."
+      },
+      {
+        "id": "M8",
+        "where": "lib/db/repositories/quality_probes.py failure() (digest/JSON verification branch); server/services/quality_probes.py:421-426 (post-outcome recorded read)",
+        "issue": "B0 code: two load-bearing branches have no test. (1) Replay refuses with RequiredEvidenceMissingError when resources_json fails validation or its digest mismatches. (2) In _submit, when M7 returns an already-FAILED snapshot and there is no in-process known failure, the row is read in a fresh session. This is the concurrent caller that saw PLANNED.",
+        "scenario": "A regression drops the digest check or returns ProbeFailedError without evidence for the concurrent caller, and no test fails.",
+        "fix": "Add a PostgreSQL test that corrupts resources_json or resources_digest (session_replication_role=replica, or the trigger disabled within the test) and asserts refusal on replay. Add a test where caller B passes the observe() PLANNED check, A commits FAILED with the row, and B's _submit raises the recorded typed error with its evidence."
+      }
+    ],
+    "L": [
+      {
+        "id": "L1",
+        "where": "design amendment :60-64 (D6)",
+        "issue": "Determinism with stdlib zipfile also depends on ZipInfo.create_system (0 on Windows, 3 on Unix), create_version/extract_version, flag_bits, compress_type and the ZIP64 threshold. 'mode 0o100644' alone does not pin these.",
+        "scenario": "A Windows host produces different archive bytes from the Linux golden vector.",
+        "fix": "Pin every ZipInfo field explicitly in the spec and cover it with the golden vector."
+      },
+      {
+        "id": "L2",
+        "where": "r2/quality/probes.py resource_evidence_digest; m10_quality_probe_failures",
+        "issue": "The stored digest covers ResourceEvidence only. error_code and execution_id are protected by the append-only trigger and CHECK, not by the digest.",
+        "scenario": "Out-of-band tampering by a superuser that swaps error_code is not detected on replay.",
+        "fix": "Optional: digest {execution_id, error_code, resources} under a failure-record domain."
+      },
+      {
+        "id": "L3",
+        "where": "r2/host_hardening/host_submit.py submit_observation (AttemptIdentityMismatch before the callback); design amendment :142",
+        "issue": "FAILED_BEFORE_ACCEPTANCE can commit without a failure row when an error is raised before the tool callback. Replay then returns a generic ProbeFailedError with no evidence. This is correct (no tool ran), but the F1 matrix wording ('failure evidence persisted with the FAILED attempt') overstates it.",
+        "scenario": "An auditor expects a row for every FAILED attempt.",
+        "fix": "Reword the matrix to 'every known tool failure', and note the pre-callback case."
+      },
+      {
+        "id": "L4",
+        "where": "design amendment :85-86 (provenance HUMAN|AGENT)",
+        "issue": "It does not say who sets author kind.",
+        "scenario": "The agent labels its text HUMAN. Provenance is falsified, though no gate is crossed.",
+        "fix": "Derive author kind server-side from the authenticated principal: an interactive Human JWT versus the agent runtime identity."
+      },
+      {
+        "id": "L5",
+        "where": "design amendment :39-41 (D2)",
+        "issue": "Having M8 promotion raise M10_PACKAGING_TARGET_FORBIDDEN makes M8 depend on M10 error vocabulary.",
+        "scenario": "An import-linter layering break, or M8 importing r2.quality.errors.",
+        "fix": "Keep the M8-native refusal (m8_promotion_target_unavailable, already raised by promotable_format) and map it to the M10 code at the M10 boundary, or add an explicit import-linter allowance."
+      },
+      {
+        "id": "L6",
+        "where": "design amendment :138-152 vs plan Task B RED lists",
+        "issue": "The matrix does not explicitly list mutable-payload, command-conflict, missing-asset, byte-drift or disk-full cases.",
+        "scenario": "A RED case is silently omitted.",
+        "fix": "Add them to the Selection and Export rows."
+      },
+      {
+        "id": "L7",
+        "where": "alembic M10-A migrations (07fd34535384, 57f67bae0cb4, bed415be3608, 65f53650f3a8)",
+        "issue": "Only the new table refuses a lossy downgrade. The earlier M10 downgrades still drop history (the carried M10-A L5). The amendment says 'downgrade refuses when M10-B rows exist', which is consistent with this, but the full M10 chain still allows losing history.",
+        "scenario": "Downgrading below bed415be3608 discards dispositions.",
+        "fix": "Carry this as a named limit in the M10-B seal, or extend the refusal to the M10-A migrations in a later packet."
+      }
+    ]
+  },
+  "b0_trace_summary": {
+    "first_submit_known_failure": "Runtime raises a _KNOWN_FAILURES error. stage_failure flushes the row in the M7 session, then plan_and_submit's except Exception moves SUBMITTING to FAILED_BEFORE_ACCEPTANCE and commits row and state together (r2/host_hardening/execution.py). Verified by test_known_tool_failure_* and test_every_known_failure_*.",
+    "replay_via_observe": "Under lock_command, observe() reads the attempt state. If it is FAILED, it reads the row; failure() validates ResourceEvidence and recomputes the digest, then raises a fresh typed error carrying the evidence, without starting the tool (again.starts == 0).",
+    "concurrent_caller": "A caller that sees no invocation and reaches _submit after A's PLANNED commit is refused (current vs existing mismatch). A caller that saw PLANNED gets an already-FAILED snapshot from M7 and reads the committed row in a fresh session (untested, see M8). Row and state commit atomically, so a FAILED read always sees the row.",
+    "crash_between_failure_and_commit": "The row is only flushed. Closing the session rolls it back, the attempt stays SUBMITTING, and reconcile_expired moves it to UNKNOWN or NEEDS_OPERATOR. No row is written. A fencing loss in transition_worker also propagates without a commit.",
+    "staging_failure": "The session rolls back and AmbiguousSubmitError is raised, so the state becomes SUBMIT_OUTCOME_UNKNOWN with no row. Verified by test_a_failure_row_that_cannot_be_staged_leaves_the_outcome_unknown.",
+    "iff_conclusion": "A row exists only if the attempt committed FAILED_BEFORE_ACCEPTANCE. FAILED implies a row for every known tool failure. FAILED without a row is possible only when the error is raised before the tool callback (L3).",
+    "migration_orm_parity": "Columns, nullability, PK, FKs (users RESTRICT, composite invocation RESTRICT), the three named CHECKs and the 1 MiB JSON ceiling match the ORM (json_ceiling uses the same dialect expressions). The triggers are migration-owned and the fixture installs them. Downgrade refuses while rows exist (verified on PG and SQLite) and drops the function after the table."
+  },
+  "conditions": [
+    "C1 (blocks B1): fix H1 and H2 in the design amendment and have the revision re-reviewed (a delta review is enough).",
+    "C2 (before B1 freeze): resolve M1-M6 in the amendment. M2 and M3 need a written seam-verification record for plan Task B step 1.",
+    "C3 (before B7 preregistration): resolve M7.",
+    "C4 (B0 closure, before any operator UI or readiness rule relies on failure history): add the two tests in M8.",
+    "C5: independence limit. This review is same-family; a Codex re-review of the amendment and B0 is recommended once quota is available, consistent with M10-A condition 4."
+  ]
+}

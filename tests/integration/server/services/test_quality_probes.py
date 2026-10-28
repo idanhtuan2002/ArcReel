@@ -323,6 +323,19 @@ async def test_same_reference_with_a_different_body_conflicts(probe_host) -> Non
         await (await service(env, other)).observe(other)
 
 
+def resource_evidence():
+    from tests.unit.r2.quality.test_probes import recipe_config
+    from tests.unit.server.services.test_quality_probe_runtime import CONTROL, outcome
+
+    evidence = runtime._failure_resources(
+        outcome(exit_code=70, manager_result="EXIT_CODE", body={"status": "TOOL_FAILED", "facts": None}),
+        CONTROL,
+        recipe_config("DECODE"),
+    )
+    assert evidence is not None
+    return evidence
+
+
 async def test_known_tool_failure_is_a_failed_attempt_without_observation_and_never_reruns(probe_host) -> None:
     env = probe_host
     request = probe_request(env["profile"], env["root"])
@@ -526,6 +539,52 @@ async def test_replay_refuses_a_changed_m7_attempt_identity(probe_host, column: 
         await session.execute(sa.text(f"UPDATE execution_attempts SET {column} = {value}"))
     with pytest.raises(RequiredEvidenceMissingError):
         await (await service(env, request)).observe(request)
+
+
+async def test_recorded_failure_tamper_refuses_replay(probe_host) -> None:
+    env = probe_host
+    request = probe_request(env["profile"], env["root"])
+    error = ProbeFailedError()
+    error.resources = resource_evidence()
+    with pytest.raises(ProbeFailedError):
+        await (await service(env, request, run=CountingRuntime(env["runtime"], fail=error))).observe(request)
+    for statement in (
+        "UPDATE m10_quality_probe_failures SET resources_digest = 'sha256:' || repeat('0', 64)",
+        "UPDATE m10_quality_probe_failures SET resources_json = "
+        "jsonb_set(resources_json::jsonb, '{tasks_max}', '33')::json",
+    ):
+        async with env["factory"]() as session, session.begin():
+            await session.execute(sa.text("SET LOCAL session_replication_role = replica"))
+            savepoint = await session.begin_nested()
+            await session.execute(sa.text(statement))
+            invocation = await QualityProbeRepository(session).invocation(request)
+            assert invocation is not None
+            with pytest.raises(RequiredEvidenceMissingError):
+                await QualityProbeRepository(session).failure(invocation)
+            await savepoint.rollback()
+
+
+async def test_a_caller_that_saw_planned_replays_the_recorded_failure_after_the_lock(probe_host, monkeypatch) -> None:
+    env = probe_host
+    request = probe_request(env["profile"], env["root"])
+    error = OperationalEnvelopeExceededError()
+    error.resources = resource_evidence()
+    with pytest.raises(OperationalEnvelopeExceededError):
+        await (await service(env, request, run=CountingRuntime(env["runtime"], fail=error))).observe(request)
+    witness = QualityProbeRepository.attempt_witness
+    stale = {"once": True}
+
+    async def planned_once(self, invocation):
+        if stale.pop("once", False):
+            return ("PLANNED", None)
+        return await witness(self, invocation)
+
+    monkeypatch.setattr(QualityProbeRepository, "attempt_witness", planned_once)
+    again = CountingRuntime(env["runtime"])
+    with pytest.raises(OperationalEnvelopeExceededError) as replayed:
+        await (await service(env, request, run=again)).observe(request)
+    assert again.starts == 0
+    assert runtime.failure_resources(replayed.value) == error.resources
 
 
 async def test_a_failure_row_that_cannot_be_staged_leaves_the_outcome_unknown(probe_host, monkeypatch) -> None:
