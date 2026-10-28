@@ -1,0 +1,267 @@
+{
+  "contract_version": "1",
+  "donor": {
+    "repository_url": "https://github.com/desaultkhan/Kalinga-Shorts-Factory",
+    "commit_sha": "e4b5a2173ca03d365aad565a89fcc43159b44f9b",
+    "selected_paths": [
+      "pipeline/src/validate.py",
+      "pipeline/src/make_video.py"
+    ],
+    "reachable_surface_digest": "sha256:4a84735b6630ac511e6f8c0dc80da71d81899e262521109387f86f4ceb215f25",
+    "runtime_identity": "CPython 3.13 executing the exact pinned function sources from donor_functions.json against /usr/bin/ffprobe and /usr/bin/ffmpeg; template window [1, 10] s",
+    "behavior_inventory_digest": "sha256:ac88d6880bd711edccc76418766d9f9fec0bdeb0257105329d2d26fbd0ca5dac",
+    "donor_test_inventory_digest": "sha256:c1c3fa291e0e85535d085ceeb4522af24571f06071874af6aab030bef8575aa9",
+    "fixture_set_digest": "sha256:f01585ba5817a1dd1783b780b55f5abdb43c321a0385700823f5d7d8348cc188"
+  },
+  "integrated_head": "4bc2bb9ee8107ee32edb612d7eaf3cde631bea68",
+  "rows": [
+    {
+      "behavior_id": "missing_master",
+      "donor_test_refs": [
+        "validate.tech_qc:33-34"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "PARITY",
+      "failure_safety": "IMPROVED",
+      "data_integrity": "IMPROVED",
+      "observability": "IMPROVED",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_missing_master_is_refused_before_any_probe"
+      ]
+    },
+    {
+      "behavior_id": "audio_stream_required",
+      "donor_test_refs": [
+        "validate.tech_qc:40-43"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/quality_probes/av.mp4",
+        "tests/fixtures/r2/quality_probes/video_only.mp4"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "IMPROVED",
+      "failure_safety": "PARITY",
+      "data_integrity": "IMPROVED",
+      "observability": "IMPROVED",
+      "performance": "PARITY",
+      "resources": "IMPROVED",
+      "evidence_refs": [
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_audio_stream_requirement_matches_the_donor",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_measurements_are_digest_deterministic[CONTAINER_STREAM-None]",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_bounded_probes_stay_within_the_frozen_performance_rule[CONTAINER_STREAM-None]"
+      ]
+    },
+    {
+      "behavior_id": "loudness_sanity",
+      "donor_test_refs": [
+        "validate.tech_qc:44-53"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/quality_probes/av.mp4",
+        "tests/fixtures/r2/quality_probes/intervals.mp4",
+        "tests/fixtures/r2/quality_probes/silent.mp4"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "PARITY",
+      "determinism": "IMPROVED",
+      "failure_safety": "PARITY",
+      "data_integrity": "IMPROVED",
+      "observability": "IMPROVED",
+      "performance": "PARITY",
+      "resources": "IMPROVED",
+      "evidence_refs": [
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_sane_loudness_passes_in_both",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_silent_audio_fails_in_both_and_inapplicability_is_explicit",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_measurements_are_digest_deterministic[LOUDNESS-None]",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_bounded_probes_stay_within_the_frozen_performance_rule[LOUDNESS-None]"
+      ]
+    },
+    {
+      "behavior_id": "caption_timing_present",
+      "donor_test_refs": [
+        "validate.tech_qc:54-60"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/quality_probes/av.mp4",
+        "tests/fixtures/r2/quality_probes/good.srt",
+        "tests/fixtures/r2/m10_kalinga/sparse.srt"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "IMPROVED",
+      "determinism": "IMPROVED",
+      "failure_safety": "IMPROVED",
+      "data_integrity": "IMPROVED",
+      "observability": "IMPROVED",
+      "performance": "PARITY",
+      "resources": "IMPROVED",
+      "evidence_refs": [
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_caption_timing_present_passes_in_both",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_caption_without_any_timing_is_detected_by_both",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_sparse_caption_timing_passes_the_donor_but_fails_coverage",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_missing_caption_evidence_is_skipped_by_the_donor_but_refused",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_measurements_are_digest_deterministic[CAPTIONS-good.srt]",
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_bounded_probes_stay_within_the_frozen_performance_rule[CAPTIONS-good.srt]"
+      ]
+    },
+    {
+      "behavior_id": "advisory_failure_never_ready",
+      "donor_test_refs": [
+        "validate.run:159",
+        "validate.virality_gate:95-98",
+        "make_video._safe_validate:317-323"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/m10_kalinga/donor_functions.json"
+      ],
+      "intentional_difference": null,
+      "functionality": "PARITY",
+      "correctness": "IMPROVED",
+      "determinism": "PARITY",
+      "failure_safety": "IMPROVED",
+      "data_integrity": "PARITY",
+      "observability": "PARITY",
+      "performance": "PARITY",
+      "resources": "PARITY",
+      "evidence_refs": [
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_advisory_or_missing_gates_never_pass_or_become_ready"
+      ]
+    },
+    {
+      "behavior_id": "tool_failure_typed",
+      "donor_test_refs": [
+        "make_video.ffprobe_duration:159-161",
+        "validate.tech_qc:35"
+      ],
+      "fixture_refs": [
+        "tests/fixtures/r2/quality_probes/truncated.mp4",
+        "tests/fixtures/r2/quality_probes/mpeg4.mp4"
+      ],
+      "intentional_difference": null,
+      "functionality": "IMPROVED",
+      "correctness": "IMPROVED",
+      "determinism": "PARITY",
+      "failure_safety": "IMPROVED",
+      "data_integrity": "PARITY",
+      "observability": "IMPROVED",
+      "performance": "PARITY",
+      "resources": "UNVERIFIED",
+      "evidence_refs": [
+        "tests/integration/server/services/test_quality_kalinga_parity.py::test_truncated_or_unqualified_media_is_a_typed_probe_failure"
+      ]
+    },
+    {
+      "behavior_id": "duration_window",
+      "donor_test_refs": [
+        "validate.tech_qc:36-39"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": "Template duration window is a platform/format constraint owned by the M10-B typed platform-constraint profile amendment (2026-09-16 spec §7); M10-A records exact container duration facts. Carried to M10-B.",
+      "functionality": "EXCLUDED",
+      "correctness": "EXCLUDED",
+      "determinism": "EXCLUDED",
+      "failure_safety": "EXCLUDED",
+      "data_integrity": "EXCLUDED",
+      "observability": "EXCLUDED",
+      "performance": "EXCLUDED",
+      "resources": "EXCLUDED",
+      "evidence_refs": []
+    },
+    {
+      "behavior_id": "seo_lint",
+      "donor_test_refs": [
+        "validate.seo_lint"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": "Metadata lint is packaging, owned by M10-B.",
+      "functionality": "EXCLUDED",
+      "correctness": "EXCLUDED",
+      "determinism": "EXCLUDED",
+      "failure_safety": "EXCLUDED",
+      "data_integrity": "EXCLUDED",
+      "observability": "EXCLUDED",
+      "performance": "EXCLUDED",
+      "resources": "EXCLUDED",
+      "evidence_refs": []
+    },
+    {
+      "behavior_id": "virality_gate",
+      "donor_test_refs": [
+        "validate.virality_gate"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": "Self-scored virality is rejected as quality authority (2026-09-16 spec §2: no self-score).",
+      "functionality": "EXCLUDED",
+      "correctness": "EXCLUDED",
+      "determinism": "EXCLUDED",
+      "failure_safety": "EXCLUDED",
+      "data_integrity": "EXCLUDED",
+      "observability": "EXCLUDED",
+      "performance": "EXCLUDED",
+      "resources": "EXCLUDED",
+      "evidence_refs": []
+    },
+    {
+      "behavior_id": "ai_review_repair",
+      "donor_test_refs": [
+        "kalinga.run_to_done:461-468",
+        "evaluator.review_and_repair"
+      ],
+      "fixture_refs": [],
+      "intentional_difference": "Automatic AI repair requires a remote provider and self-approves; M10-A exposes REWORK repair routing only, with no mutation port.",
+      "functionality": "EXCLUDED",
+      "correctness": "EXCLUDED",
+      "determinism": "EXCLUDED",
+      "failure_safety": "EXCLUDED",
+      "data_integrity": "EXCLUDED",
+      "observability": "EXCLUDED",
+      "performance": "EXCLUDED",
+      "resources": "EXCLUDED",
+      "evidence_refs": []
+    }
+  ],
+  "commands": [
+    {
+      "command": "pytest tests/integration/server/services/test_quality_kalinga_parity.py tests/unit/scripts/r2/test_verify_m10_a_candidate.py -q -s",
+      "code_head": "4bc2bb9ee8107ee32edb612d7eaf3cde631bea68",
+      "result": "37 passed, 0 failed, 0 skipped",
+      "median_ms_donor_vs_m10": {
+        "CONTAINER_STREAM": [
+          107,
+          191
+        ],
+        "LOUDNESS": [
+          108,
+          267
+        ],
+        "CAPTIONS": [
+          108,
+          195
+        ],
+        "FAILURE_truncated": [
+          31,
+          271
+        ],
+        "FAILURE_mpeg4": [
+          64,
+          262
+        ]
+      },
+      "performance_budget_ms": 1500
+    }
+  ],
+  "required_skips": [],
+  "material_unknowns": [
+    "tool_failure_typed.resources: Failed probes return no ResourceEvidence from QualityProbeRuntime or the M7 attempt; the frozen criterion only admits IMPROVED with ResourceEvidence and PARITY for pure rules."
+  ],
+  "reviewer": "Claude Opus 5.5 main agent (recomputed fold; not an independent acceptance)",
+  "verdict": "BLOCKED"
+}
