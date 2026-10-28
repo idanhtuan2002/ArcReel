@@ -253,6 +253,16 @@ async def test_truncated_or_unqualified_media_is_a_typed_probe_failure(donor, pr
             assert resources.peak_memory_bytes is not None
             assert resources.peak_memory_bytes <= resources.memory_max_bytes
             assert resources.wall_elapsed_ms <= audio_config().max_runtime_ms
+            assert resources.stdout_bytes + resources.stderr_bytes <= audio_config().max_output_bytes
+            assert resources.peak_tasks is not None
+            assert resources.peak_tasks <= resources.tasks_max == runtime.TASKS_MAX
+            assert resources.manager_result == "EXIT_CODE"
+            assert resources.exit_code != 0
+            assert (resources.oom_killed, resources.deadline_exceeded, resources.output_exceeded) == (
+                False,
+                False,
+                False,
+            )
         print(
             f"PERF FAILURE {media} donor_median_ms={statistics.median(donor_ms):.0f} m10_median_ms={statistics.median(m10_ms):.0f}"
         )

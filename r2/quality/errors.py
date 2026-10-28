@@ -15,7 +15,12 @@ def _registered_code(error_type: type[BaseException]) -> str:
 
 
 class M10Error(Exception):
-    """Only exact registered classes identify outward failures."""
+    """Only exact registered classes identify outward failures.
+
+    `resources` is an in-process slot for a probe launch's ResourceEvidence; it never enters the payload.
+    """
+
+    resources: object = None
 
     def __init__(self, *details: object, **context: object) -> None:
         Exception.__init__(self, _registered_code(type(self)))

@@ -446,7 +446,7 @@ class QualityProbeRuntime:
             facts = _FACTS[config.recipe].model_validate(report["facts"])
             measurement = build_probe_measurement(config, input_digests=inputs.input_digests, facts=facts)
         except M10Error as error:
-            error.resources = _failure_resources(outcome, control, config)  # pyright: ignore[reportAttributeAccessIssue]
+            error.resources = _failure_resources(outcome, control, config)
             raise
         resources = _resources(outcome, report, control, config)
         if resources is None:
@@ -463,7 +463,10 @@ class QualityProbeRuntime:
 
 
 def failure_resources(error: BaseException) -> ResourceEvidence | None:
-    """The bounded-launch accounting a failed run carried, when the confined worker reported it."""
+    """The bounded-launch accounting a failed run carried, when the confined worker reported it.
+
+    In-process only: the probe service re-raises known failures with it and does not persist it.
+    """
     evidence = getattr(error, "resources", None)
     return evidence if isinstance(evidence, ResourceEvidence) else None
 
@@ -514,7 +517,7 @@ def _failure_resources(outcome: WorkerOutcome, control: str, config: ProbeConfig
         return None
     try:
         return _resources(outcome, report, control, config)
-    except ValueError:
+    except Exception:
         return None
 
 

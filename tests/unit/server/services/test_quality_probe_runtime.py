@@ -253,3 +253,63 @@ def test_failure_resources_reads_only_a_typed_attached_evidence() -> None:
     assert runtime.failure_resources(error) is None
     error.resources = "forged"
     assert runtime.failure_resources(error) is None
+
+
+def fake_run(monkeypatch, launched: runtime.WorkerOutcome):
+    from types import SimpleNamespace
+
+    from tests.unit.r2.quality.test_probes import recipe_config
+
+    config = recipe_config("DECODE")
+
+    async def launch(self, payload: bytes, **_: object) -> runtime.WorkerOutcome:
+        return launched
+
+    monkeypatch.setattr(runtime, "probe_request_digest", lambda request: CONTROL)
+    monkeypatch.setattr(runtime, "effective_limits", lambda request, config: (1, 1))
+    monkeypatch.setattr(runtime.QualityProbeRuntime, "control_identity_digest", lambda self: CONTROL)
+    monkeypatch.setattr(runtime.QualityProbeRuntime, "worker_config", lambda self, *args: {})
+    monkeypatch.setattr(runtime.QualityProbeRuntime, "launch", launch)
+    inputs = SimpleNamespace(config=config, input_digests=())
+    return runtime.QualityProbeRuntime(runtime.ProbeHost(tools={})).run(object(), inputs, config)
+
+
+@pytest.mark.parametrize(
+    ("changes", "error", "oom"),
+    [
+        (
+            {"exit_code": 70, "manager_result": "EXIT_CODE", "body": {"status": "TOOL_FAILED", "facts": None}},
+            ProbeFailedError,
+            False,
+        ),
+        ({"manager_result": "OOM_KILL", "exit_code": -9}, OperationalEnvelopeExceededError, True),
+        (
+            {"body": {"accounting": {"peak_memory_bytes": 1, "peak_tasks": 1, "oom_kill": 1}}},
+            RequiredEvidenceMissingError,
+            True,
+        ),
+    ],
+)
+async def test_run_attaches_failure_resources_to_the_raised_typed_error(
+    monkeypatch, changes: dict[str, object], error, oom: bool
+) -> None:
+    with pytest.raises(error) as raised:
+        await fake_run(monkeypatch, outcome(**changes))
+    evidence = runtime.failure_resources(raised.value)
+    assert evidence is not None
+    assert evidence.oom_killed is oom
+    assert str(raised.value) == raised.value.code
+
+
+async def test_run_attaches_nothing_when_cleanup_is_unverified(monkeypatch) -> None:
+    with pytest.raises(RequiredEvidenceMissingError) as raised:
+        await fake_run(monkeypatch, outcome(group_cleanup_verified=False))
+    assert runtime.failure_resources(raised.value) is None
+
+
+async def test_invalid_facts_on_an_ok_report_escape_untyped_without_resources(monkeypatch) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError) as raised:
+        await fake_run(monkeypatch, outcome(body={"facts": {"kind": "DECODE"}}))
+    assert runtime.failure_resources(raised.value) is None
