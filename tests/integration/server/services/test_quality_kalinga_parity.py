@@ -6,6 +6,7 @@ Rows and winning rules are frozen in `R2_M10_A7_KALINGA_BASELINE.json`.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import re
@@ -150,8 +151,7 @@ async def test_silent_audio_fails_in_both_and_inapplicability_is_explicit(donor,
 
 
 async def test_caption_timing_present_passes_in_both(donor, project: Path, tmp_path: Path) -> None:
-    words = [[{"word": "first", "start": 0.0, "end": 1.0}], [{"word": "second", "start": 1.5, "end": 2.5}]]
-    assert donor["tech_qc"](folder(tmp_path, "av.mp4", words=words), TEMPLATE) == []
+    assert donor["tech_qc"](folder(tmp_path, "av.mp4", words=WORDS), TEMPLATE) == []
     result = await measure(project, caption_config(), "av.mp4", caption="good.srt")
     assert result.measurement.status == "PASS"
 
@@ -160,6 +160,19 @@ async def test_sparse_caption_timing_passes_the_donor_but_fails_coverage(donor, 
     sparse = [[], [{"word": "x", "start": 0.0, "end": 0.1}]]
     assert donor["tech_qc"](folder(tmp_path, "av.mp4", words=sparse), TEMPLATE) == []
     result = await measure_caption(project, caption_config(), "av.mp4", KALINGA / "sparse.srt")
+    assert result.measurement.status == "FAIL"
+
+
+async def test_caption_without_any_timing_is_detected_by_both(donor, project: Path, tmp_path: Path) -> None:
+    issues = donor["tech_qc"](folder(tmp_path, "av.mp4", words=[[]]), TEMPLATE)
+    assert len(issues) == 1
+    assert issues[0].startswith("no word timings")
+    empty = tmp_path / "empty.srt"
+    empty.write_bytes(b"")
+    try:
+        result = await measure_caption(project, caption_config(), "av.mp4", empty)
+    except ProbeFailedError:
+        return
     assert result.measurement.status == "FAIL"
 
 
@@ -210,41 +223,75 @@ def test_advisory_or_missing_gates_never_pass_or_become_ready(donor, tmp_path: P
     assert "REQUIREMENTS_UNMET" in projected.reasons
 
 
+WORDS = [[{"word": "first", "start": 0.0, "end": 1.0}], [{"word": "second", "start": 1.5, "end": 2.5}]]
+
+
 async def test_truncated_or_unqualified_media_is_a_typed_probe_failure(donor, project: Path, tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="could not convert string to float"):
-        donor["tech_qc"](folder(tmp_path, "truncated.mp4"), TEMPLATE)
-    assert donor["tech_qc"](folder(tmp_path, "mpeg4.mp4"), TEMPLATE) == ["no audio stream"]
+    for _ in range(2):
+        with pytest.raises(ValueError, match="could not convert string to float"):
+            donor["tech_qc"](folder(tmp_path, "truncated.mp4"), TEMPLATE)
+        assert donor["tech_qc"](folder(tmp_path, "mpeg4.mp4"), TEMPLATE) == ["no audio stream"]
     for media in ("truncated.mp4", "mpeg4.mp4"):
-        with pytest.raises(ProbeFailedError):
-            await measure(project, audio_config(), media)
-
-
-async def test_measurements_are_digest_deterministic(donor, project: Path, tmp_path: Path) -> None:
-    for config in (audio_config(), loudness_config()):
-        first = await measure(project, config, "av.mp4")
-        second = await measure(project, config, "av.mp4")
-        assert measurement_digest(first.measurement) == measurement_digest(second.measurement)
-    donor_folder = folder(tmp_path, "silent.mp4")
-    assert donor["tech_qc"](donor_folder, TEMPLATE) == donor["tech_qc"](donor_folder, TEMPLATE)
-
-
-async def test_bounded_probes_stay_within_the_frozen_performance_rule(donor, project: Path, tmp_path: Path) -> None:
-    donor_folder = folder(tmp_path, "av.mp4")
-    for config in (audio_config(), loudness_config()):
+        donor_folder = folder(tmp_path, media)
         donor_ms, m10_ms = [], []
         for _ in range(3):
             started = time.perf_counter()
-            donor["tech_qc"](donor_folder, TEMPLATE)
+            with contextlib.suppress(ValueError):
+                donor["tech_qc"](donor_folder, TEMPLATE)
             donor_ms.append((time.perf_counter() - started) * 1000)
             started = time.perf_counter()
-            result = await measure(project, config, "av.mp4")
+            with pytest.raises(ProbeFailedError):
+                await measure(project, audio_config(), media)
             m10_ms.append((time.perf_counter() - started) * 1000)
-            resources = result.resources
-            assert resources.manager_result == "SUCCESS"
-            assert resources.group_cleanup_verified
-            assert resources.wall_elapsed_ms <= config.max_runtime_ms
-            assert resources.stdout_bytes + resources.stderr_bytes <= config.max_output_bytes
         print(
-            f"PERF {config.recipe} donor_median_ms={statistics.median(donor_ms):.0f} m10_median_ms={statistics.median(m10_ms):.0f}"
+            f"PERF FAILURE {media} donor_median_ms={statistics.median(donor_ms):.0f} m10_median_ms={statistics.median(m10_ms):.0f}"
         )
         assert statistics.median(m10_ms) <= statistics.median(donor_ms) + OVERHEAD_MS
+
+
+async def run_case(project: Path, config, caption: str | None):
+    return await measure(project, config, "av.mp4", caption=caption)
+
+
+CASES = (("CONTAINER_STREAM", None), ("LOUDNESS", None), ("CAPTIONS", "good.srt"))
+
+
+def case_config(recipe: str):
+    return {"CONTAINER_STREAM": audio_config, "LOUDNESS": loudness_config, "CAPTIONS": caption_config}[recipe]()
+
+
+@pytest.mark.parametrize(("recipe", "caption"), CASES)
+async def test_measurements_are_digest_deterministic(
+    donor, project: Path, tmp_path: Path, recipe: str, caption: str | None
+) -> None:
+    config = case_config(recipe)
+    first = await run_case(project, config, caption)
+    second = await run_case(project, config, caption)
+    assert measurement_digest(first.measurement) == measurement_digest(second.measurement)
+    donor_folder = folder(tmp_path, "silent.mp4", words=WORDS)
+    assert donor["tech_qc"](donor_folder, TEMPLATE) == donor["tech_qc"](donor_folder, TEMPLATE)
+
+
+@pytest.mark.parametrize(("recipe", "caption"), CASES)
+async def test_bounded_probes_stay_within_the_frozen_performance_rule(
+    donor, project: Path, tmp_path: Path, recipe: str, caption: str | None
+) -> None:
+    config = case_config(recipe)
+    donor_folder = folder(tmp_path, "av.mp4", words=WORDS if caption else None)
+    donor_ms, m10_ms = [], []
+    for _ in range(3):
+        started = time.perf_counter()
+        donor["tech_qc"](donor_folder, TEMPLATE)
+        donor_ms.append((time.perf_counter() - started) * 1000)
+        started = time.perf_counter()
+        result = await run_case(project, config, caption)
+        m10_ms.append((time.perf_counter() - started) * 1000)
+        resources = result.resources
+        assert resources.manager_result == "SUCCESS"
+        assert resources.group_cleanup_verified
+        assert resources.wall_elapsed_ms <= config.max_runtime_ms
+        assert resources.stdout_bytes + resources.stderr_bytes <= config.max_output_bytes
+    print(
+        f"PERF {recipe} donor_median_ms={statistics.median(donor_ms):.0f} m10_median_ms={statistics.median(m10_ms):.0f}"
+    )
+    assert statistics.median(m10_ms) <= statistics.median(donor_ms) + OVERHEAD_MS
