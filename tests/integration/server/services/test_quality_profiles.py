@@ -195,8 +195,11 @@ async def seed_empty_head(sessions: Factory, request) -> None:
         )
 
 
-@pytest.mark.parametrize("order", ["publication_first", "revocation_first"])
-async def test_revocation_and_publication_have_both_real_lock_orders(publication_host, order: str) -> None:
+@pytest.mark.parametrize("held", ["profile_head", "command"])
+async def test_revocation_never_waits_behind_a_publication_blocked_before_its_grant_lock(
+    publication_host, held: str
+) -> None:
+    """Publication locks the profile head before the grant head, so a waiting publication holds no grant lock."""
     import asyncio
 
     from lib.db.repositories.quality import QualityProfileRepository
@@ -206,7 +209,7 @@ async def test_revocation_and_publication_have_both_real_lock_orders(publication
 
     sessions, (root, runtime, importer, key, event) = publication_host
     request = publication_request(user_id="default")
-    if order == "publication_first":
+    if held == "profile_head":
         await seed_empty_head(sessions, request)
     body = _event("REVOKE", 2, event.event_digest, "2026-10-27T00:00:00Z", project_name="project")
     body.update(user_id="default", principal="actor", signer_key_id="grant-key-a")
@@ -216,7 +219,7 @@ async def test_revocation_and_publication_have_both_real_lock_orders(publication
         root, runtime, session_factory=sessions, expected_uid=os.getuid(), expected_gid=os.getgid()
     ):
         async with sessions() as holder, holder.begin():
-            if order == "publication_first":
+            if held == "profile_head":
                 await holder.execute(sa.select(QualityProfileHeadModel).with_for_update())
             else:
                 await QualityProfileRepository(holder).lock_command(request.command)
@@ -226,14 +229,12 @@ async def test_revocation_and_publication_have_both_real_lock_orders(publication
             publication = asyncio.create_task(service.publish(request))
             tasks.append(publication)
             try:
-                publication_pid = (await wait_for_blockers(sessions, holder_pid))[0]
+                await wait_for_blockers(sessions, holder_pid)
                 revocation = asyncio.create_task(
                     importer.import_event(raw, scope=GrantScopeV1("default", "project", "actor"))
                 )
                 tasks.append(revocation)
-                if order == "publication_first":
-                    assert await wait_for_blockers(sessions, publication_pid)
-                else:
+                async with asyncio.timeout(20):
                     assert (await revocation).body.event_type == "REVOKE"
             except BaseException:
                 for task in tasks:
@@ -241,16 +242,10 @@ async def test_revocation_and_publication_have_both_real_lock_orders(publication
                 await asyncio.gather(*tasks, return_exceptions=True)
                 raise
         results = await asyncio.gather(*tasks, return_exceptions=True)
-    if order == "publication_first":
-        assert not isinstance(results[0], BaseException)
-        assert results[0].revision == 1
-    else:
-        assert isinstance(results[0], ProfilePublicationUnauthorizedError)
+    assert isinstance(results[0], ProfilePublicationUnauthorizedError)
     assert not isinstance(results[1], BaseException)
     async with sessions() as probe:
-        assert (await probe.execute(sa.select(sa.func.count()).select_from(QualityCommandModel))).scalar_one() == int(
-            order == "publication_first"
-        )
+        assert (await probe.execute(sa.select(sa.func.count()).select_from(QualityCommandModel))).scalar_one() == 0
 
 
 async def test_forced_hash_collision_serializes_without_merging_full_command_keys(publication_host) -> None:

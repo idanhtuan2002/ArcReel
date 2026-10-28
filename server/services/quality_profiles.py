@@ -46,7 +46,7 @@ class ProfilePublicationService:
                 if prior is not None:
                     await self._custodian.require_actor(request)
                     return prior
-                await self._custodian.lock_current_grant(session, request, lease)
+                # Profile head before grant head, the same order as run closure and disposition.
                 await repository.lock_profile(request)
                 admitted_at = await self._custodian.admit_locked(session, request, lease)
                 revision = build_published_profile(

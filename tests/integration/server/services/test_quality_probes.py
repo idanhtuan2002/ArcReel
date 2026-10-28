@@ -321,9 +321,21 @@ async def test_same_reference_with_a_different_body_conflicts(probe_host) -> Non
 async def test_known_tool_failure_is_a_failed_attempt_without_observation_and_never_reruns(probe_host) -> None:
     env = probe_host
     request = probe_request(env["profile"], env["root"])
-    failing = CountingRuntime(env["runtime"], fail=ProbeFailedError())
-    with pytest.raises(ProbeFailedError):
+    from tests.unit.r2.quality.test_probes import recipe_config
+    from tests.unit.server.services.test_quality_probe_runtime import CONTROL, outcome
+
+    error = ProbeFailedError()
+    evidence = runtime._failure_resources(
+        outcome(exit_code=70, manager_result="EXIT_CODE", body={"status": "TOOL_FAILED", "facts": None}),
+        CONTROL,
+        recipe_config("DECODE"),
+    )
+    error.resources = evidence
+    failing = CountingRuntime(env["runtime"], fail=error)
+    with pytest.raises(ProbeFailedError) as raised:
         await (await service(env, request, run=failing)).observe(request)
+    assert evidence is not None
+    assert runtime.failure_resources(raised.value) == evidence
     assert await counts(env["factory"]) == (1, 1, 0, 0)
     async with env["factory"]() as session:
         assert (
