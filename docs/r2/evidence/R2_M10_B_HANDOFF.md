@@ -88,6 +88,12 @@ Rewrite in place; this is the resume entry for M10-B.
   packaging + dispositions 49 passed; unit/scripts/migrations 5573 passed; gates clean. Codex B3 review running
   (`b3-codex-review.json`). Selection lease refusals reuse frozen `M10_DISPOSITION_UNAUTHORIZED`.
 
+- B3 Codex review REWORK (`b3-codex-review.json`: H1 selector/assessor grant order, M1 selection re-verification,
+  M2 barrier tests, M3 refusals) → `3d96e7dd3`; delta1 REWORK on test evidence (`b3-codex-delta-review.json`) →
+  `84f6e32f4` (pg_blocking_pids-identified waiters, more refusals, design §4 serialization points) + `89d23439f`
+  (preview duration seam; note `| tail -1` hid an audit failure once — check gate exit codes directly).
+  PG `test_quality_package_selection.py` 37 passed. Codex delta2 running (`b3-codex-delta2-review.json`).
+
 ## Next step
 
 Triage the B3 Codex review. Then B4 export: M7 host-local family `local-zip-package-export@host-export-v1`
