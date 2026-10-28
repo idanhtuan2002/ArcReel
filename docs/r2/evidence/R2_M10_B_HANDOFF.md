@@ -98,9 +98,28 @@ Rewrite in place; this is the resume entry for M10-B.
   **B3 accepted with conditions.** Carried named conditions: REVOCATION_AFTER_LEASE and CRASH_AFTER_LEASE tests
   before B5 route activation; serialization evidence boundary as stated in design §4.
 
+- `8a28db334` B4 part 1: `server/services/package_export_worker.py` (deterministic ZIP builder, golden
+  `sha256:99ff4053…`), `tests/unit/server/services/test_package_export_worker.py` 12 passed.
+
 ## Next step
 
-Triage the B3 Codex review. Then B4 export: M7 host-local family `local-zip-package-export@host-export-v1`
-(route inventory + registry + scope verifier updates), `m10_export_invocations`/`m10_export_receipts`, private
-verified snapshots (D5), deterministic ZIP_STORED builder in the export envelope, finalize under §4 order,
-recovery by job id, download token; then B5 routes+UI, B6 parity, B7 pilots (Human), B8 seal.
+B4 part 2 (export through M7; design D6/D7, §4 order, carried B2 D5 and B3 C6):
+1. `HOST_EXPORT_ADAPTER_VERSION = "host-export-v1"` + `PACKAGE_EXPORT_SUBMIT_FAMILIES` in
+   `r2/host_hardening/route_inventory.py` (`SubmitRouteKey("local-zip","package-export",…)`, ref
+   `local-zip-package-export@host-export-v1`, entry `server.services.package_export:PackageExportService.export`);
+   registry entry in `r2/provider_capabilities/registry.json` (idempotency NONE, NON_AUTHORITATIVE, no
+   poll/cancel/lookup/webhook, OFFLINE_VERIFIED, `evidence_digest` of a new
+   `docs/r2/evidence/m10-b-reviews/export-route-qualification.json`, `entry_digest` via
+   `compute_entry_digest`); update exact-count registry/route-inventory/scope-verifier tests (follow commit
+   `4237571c6` pattern for the quality-probe family).
+2. Tables `m10_export_invocations` (append-only, bound to M7 execution id, manifest digest precomputed) and
+   `m10_export_receipts`; migration after `7f4c9e5a0d33`.
+3. `PackageExportService.export(ExportRequest)`: receipt-first replay; prepare under §4 order (masters, profile,
+   run, disposition, packaging head FOR SHARE; selection must be the head's current one; readiness READY;
+   resolve_package_evidence); materialize verified private snapshots (D5) of every member; M7 submit callback
+   runs `build_archive` into `exports/.partial-<execution>.zip`, rename to `exports/<sha256>.zip`, fsync dir,
+   job id `<execution>:<digest>`; finalize SUCCEEDED + receipt in one tx after re-verifying the object; recovery
+   from ACCEPTED via job id (format_render `_accepted_digest` pattern); orphan partial sweep.
+4. PG tests incl. export finalize × disposition / × selection writer pairs, crash cuts, two-root determinism.
+Then Codex review of B4; B5 routes+UI (+ REVOCATION_AFTER_LEASE / CRASH_AFTER_LEASE from B3), B6 parity,
+B7 pilots (Human), B8 seal.
