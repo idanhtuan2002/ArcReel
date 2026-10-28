@@ -9,6 +9,7 @@ head, disposition head, preview, packaging head, grant heads. Nothing here write
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -49,7 +50,7 @@ from server.services.governance_grants import CheckpointedShowrunnerGrantReader,
 from server.services.governance_startup import GovernanceStartupUnavailable, verify_governance_activated_startup
 from server.services.quality_dispositions import readiness_in
 from server.services.quality_packaging import require_packaging_lineage
-from server.services.quality_runs import lock_profile_head, lock_subject_masters
+from server.services.quality_runs import human_principals, lock_grant_heads, lock_profile_head, lock_subject_masters
 
 SELECTION_POLICY_ID = "m10.package-selection.interactive-human.v1"
 SELECTION_POLICY_VERSION = "1"
@@ -87,6 +88,96 @@ def _waivers(observation: p.PackagingObservation, policy: q.QualityPolicyV2, wai
         raise WaiverForbiddenError()
 
 
+@dataclass(frozen=True)
+class PackageEvidence:
+    candidate: PackagingCandidate
+    observation: p.PackagingObservation
+    run: q.QualityRun
+    profile: q.QualityProfileRevision
+
+
+async def resolve_package_evidence(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    project_name: str,
+    slot: p.PackagingSlotKey,
+    candidate_id: str,
+    candidate_revision: int,
+    candidate_payload_digest: str,
+    observation_id: str,
+    selected_variant_ids: tuple[str, ...],
+    waivers: tuple[p.PackageWaiver, ...],
+) -> PackageEvidence:
+    """Re-derive and verify every package input from immutable evidence; shared by preview and selection.
+
+    The exact PACKAGING revision (payload, closures, lineage), a PACKAGING head, the packaging observation and the
+    sealed run it was checked against, the published V2 profile and its constraint snapshot, the slot identity,
+    one chosen alternative per group and exact waivers of waivable blocking findings.
+    """
+    m8 = ExplorationRepository(session)
+    revision = await m8.get_exact(
+        user_id=user_id, project_name=project_name, candidate_id=candidate_id, revision=candidate_revision
+    )
+    head = await m8.get_head(user_id=user_id, project_name=project_name, candidate_id=candidate_id)
+    current = (
+        None
+        if head is None
+        else await m8.get_exact(
+            user_id=user_id, project_name=project_name, candidate_id=candidate_id, revision=head.current_revision
+        )
+    )
+    if (
+        revision is None
+        or current is None
+        or current.kind is not ExplorationKind.PACKAGING
+        or revision.payload_digest != candidate_payload_digest
+    ):
+        raise SubjectStaleError()
+    found = await PackagingObservationRepository(session).get_with_run(
+        user_id=user_id, project_name=project_name, observation_id=observation_id
+    )
+    if found is None:
+        raise RequiredEvidenceMissingError()
+    observation, run_id = found
+    bound = observation.packaging_subject
+    if (bound.packaging_candidate_id, bound.packaging_candidate_revision, bound.packaging_candidate_digest) != (
+        candidate_id,
+        candidate_revision,
+        candidate_payload_digest,
+    ):
+        raise SubjectStaleError()
+    run = await QualityRunRepository(session).run(user_id=user_id, project_name=project_name, run_id=run_id)
+    if run is None:
+        raise RequiredEvidenceMissingError()
+    profile = await QualityProfileRepository(session).get_revision(
+        user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
+    )
+    if profile is None or profile.profile_digest != run.profile_digest:
+        raise ProfileStaleError()
+    if not isinstance(profile.policy, q.QualityPolicyV2):
+        raise ProfileStaleError()
+    candidate = require_packaging_lineage(revision, run, profile, project_name)
+    snapshot = compute_digest("m10.platform-constraints.v1", profile.policy.platform_constraints)
+    if (
+        (slot.user_id, slot.project_name, slot.source_artifact_key, slot.cohort_id, slot.product_surface)
+        != (
+            user_id,
+            project_name,
+            run.subject.master_binding.root.artifact_key,
+            profile.cohort_id,
+            profile.product_surface,
+        )
+        or bound.base_subject_digest != run.subject_digest
+        or observation.constraint_snapshot_digest != snapshot
+        or candidate.constraint_snapshot_digest != snapshot
+    ):
+        raise SubjectStaleError()
+    _chosen_variants(candidate, selected_variant_ids)
+    _waivers(observation, profile.policy, waivers)
+    return PackageEvidence(candidate, observation, run, profile)
+
+
 class PackagePreviewService:
     def __init__(self, *, sessions: Sessions, grant_reader: GrantReaderFactory, project_root: Path) -> None:
         self._sessions = sessions
@@ -111,64 +202,20 @@ class PackagePreviewService:
             replayed = await repository.replay_preview(request)
             if replayed is not None:
                 return replayed
-            m8 = ExplorationRepository(session)
-            revision = await m8.get_exact(
+            evidence = await resolve_package_evidence(
+                session,
                 user_id=user_id,
                 project_name=project_name,
+                slot=subject.slot,
                 candidate_id=subject.candidate_id,
-                revision=subject.candidate_revision,
+                candidate_revision=subject.candidate_revision,
+                candidate_payload_digest=subject.candidate_payload_digest,
+                observation_id=subject.packaging_observation_id,
+                selected_variant_ids=subject.selected_variant_ids,
+                waivers=subject.waivers,
             )
-            head = await m8.get_head(user_id=user_id, project_name=project_name, candidate_id=subject.candidate_id)
-            current = (
-                None
-                if head is None
-                else await m8.get_exact(
-                    user_id=user_id,
-                    project_name=project_name,
-                    candidate_id=subject.candidate_id,
-                    revision=head.current_revision,
-                )
-            )
-            if (
-                revision is None
-                or current is None
-                or current.kind is not ExplorationKind.PACKAGING
-                or revision.payload_digest != subject.candidate_payload_digest
-            ):
-                raise SubjectStaleError()
-            found = await PackagingObservationRepository(session).get_with_run(
-                user_id=user_id, project_name=project_name, observation_id=subject.packaging_observation_id
-            )
-            if found is None:
-                raise RequiredEvidenceMissingError()
-            observation, run_id = found
-            bound = observation.packaging_subject
-            if (bound.packaging_candidate_id, bound.packaging_candidate_revision, bound.packaging_candidate_digest) != (
-                subject.candidate_id,
-                subject.candidate_revision,
-                subject.candidate_payload_digest,
-            ):
-                raise SubjectStaleError()
-            run = await QualityRunRepository(session).run(user_id=user_id, project_name=project_name, run_id=run_id)
-            if run is None:
-                raise RequiredEvidenceMissingError()
-            profile = await QualityProfileRepository(session).get_revision(
-                user_id=user_id, project_name=project_name, profile_id=run.profile_id, revision=run.profile_revision
-            )
-            if profile is None or profile.profile_digest != run.profile_digest:
-                raise ProfileStaleError()
-            if not isinstance(profile.policy, q.QualityPolicyV2):
-                raise ProfileStaleError()
-            candidate = require_packaging_lineage(revision, run, profile, project_name)
-            slot = subject.slot
-            if (slot.source_artifact_key, slot.cohort_id, slot.product_surface) != (
-                run.subject.master_binding.root.artifact_key,
-                profile.cohort_id,
-                profile.product_surface,
-            ) or bound.base_subject_digest != run.subject_digest:
-                raise SubjectStaleError()
-            _chosen_variants(candidate, subject.selected_variant_ids)
-            _waivers(observation, profile.policy, subject.waivers)
+            candidate, observation, run = evidence.candidate, evidence.observation, evidence.run
+            run_id, slot = run.run_id, subject.slot
             readiness, disposition, ready_run = await readiness_in(
                 session,
                 reader,
@@ -403,6 +450,34 @@ class PackageSelectionService:
             _, version = await repository.lock_head(preview.slot, for_update=True)
             if version != preview.expected_head_version or version != subject.expected_head_version:
                 raise StaleHeadError()
+            evidence = await resolve_package_evidence(
+                session,
+                user_id=user_id,
+                project_name=project_name,
+                slot=preview.slot,
+                candidate_id=preview.candidate_id,
+                candidate_revision=preview.candidate_revision,
+                candidate_payload_digest=preview.candidate_payload_digest,
+                observation_id=preview.packaging_observation_id,
+                selected_variant_ids=preview.selected_variant_ids,
+                waivers=preview.waivers,
+            )
+            if (
+                evidence.run.run_id != preview.quality_run_id
+                or compute_digest("m10.packaging-observation.v1", evidence.observation)
+                != preview.packaging_observation_digest
+            ):
+                raise SubjectStaleError()
+            # One sorted grant-head set (selector and every Human assessor), as the A6 issuer takes it.
+            await lock_grant_heads(
+                session,
+                user_id=user_id,
+                project_name=project_name,
+                principals={request.command.actor_id}
+                | await human_principals(
+                    session, user_id=user_id, project_name=project_name, observation_ids=list(run.observation_refs)
+                ),
+            )
             readiness, disposition, ready_run = await readiness_in(
                 session,
                 self._custodian.reader,
@@ -445,7 +520,9 @@ __all__ = [
     "PREVIEW_SECONDS",
     "SELECTION_POLICY_ID",
     "SELECTION_POLICY_VERSION",
+    "PackageEvidence",
     "PackagePreviewService",
     "PackageSelectionCustodian",
     "PackageSelectionService",
+    "resolve_package_evidence",
 ]

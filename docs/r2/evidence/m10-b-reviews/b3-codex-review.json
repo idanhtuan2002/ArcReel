@@ -1,0 +1,199 @@
+{
+  "schema_id": "m10.b3-review.v1",
+  "reviewed_head": "27073a10e",
+  "reviewer": "Codex independent critical review, main agent; source read-only; no staging or commits",
+  "verdict": "REWORK",
+  "scope": {
+    "base": "8089ed056",
+    "candidate": "27073a10e4aef3e543e240fc0b82575783608365",
+    "branch": "design/r2-m10-b",
+    "initial_checkout": "Clean at the exact candidate.",
+    "final_checkout_head": "a4f8a540d11cd5441f6ccf2b0ef7b65ebc36b58e",
+    "concurrent_change": "HEAD advanced externally during review. git diff --name-only 27073a10e..HEAD lists only docs/r2/evidence/R2_M10_B_HANDOFF.md. Reviewed source and test files remain identical to the requested candidate. The verdict is for 27073a10e, not acceptance of the later commit.",
+    "graph": "No graph tools were exposed in ALL_TOOLS. list_projects/index_status, graph discovery and check_index_coverage could not be called. Direct numbered source reads and targeted rg were used; no graph completeness claim.",
+    "exclusions": "License issues excluded. No provider calls, deployment, source changes or commits. Export writer pairs remain B4 work."
+  },
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git branch --show-current",
+      "result": "Initially 27073a10e4aef3e543e240fc0b82575783608365, clean, design/r2-m10-b. Later HEAD advancement is recorded in scope."
+    },
+    {
+      "command": "git diff --stat 8089ed056..27073a10e; git log --oneline 8089ed056..27073a10e; targeted git diff, nl, sed and rg over the files_read inventory",
+      "result": "Reviewed the requested two-dot range and directly inspected custody, repositories, contracts, locking helpers, A5/A6/publication callers, schema, tests, design and carried C6."
+    },
+    {
+      "command": "git diff --check 8089ed056..27073a10e",
+      "result": "PASS, exit 0."
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest -q tests/integration/lib/db/migrations/test_7f4c9e5a0d33_m10_package_selection.py tests/unit/r2/contracts/test_packaging.py",
+      "result": "UNAVAILABLE: shared_db_schema autouse fixture stalled in Alembic's async SQLite setup before test bodies. Timeout stack showed aiosqlite worker / asyncio wait. Interrupted with exit 130; no product pass or failure inferred."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest -q tests/integration/server/services/test_quality_package_selection.py tests/integration/server/services/test_quality_dispositions.py",
+      "result": "UNAVAILABLE: 30 setup errors in 9.18s, exit 1. Socket construction failed with PermissionError [Errno 1] Operation not permitted in the sandbox. No service test body executed; this is not a product failure."
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest -q tests/unit/r2/contracts/test_packaging.py",
+      "result": "UNAVAILABLE in default environment: same shared async SQLite fixture stall; interrupted, exit 130. Successfully rerun below with an externally supplied DATABASE_URL to bypass the owned shared schema setup."
+    },
+    {
+      "command": "UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest -vv -o faulthandler_timeout=20 tests/integration/lib/db/migrations/test_7f4c9e5a0d33_m10_package_selection.py",
+      "result": "Collected 3 tests. Faulthandler located the stall in tests/conftest.py:233 shared_db_schema -> alembic/env.py:93 -> async SQLite. Interrupted, exit 130. Migration test bodies remain unverified."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-b3-uv-cache uv run pytest -q tests/unit/r2/contracts/test_packaging.py",
+      "result": "PASS: 80 passed in 1.07s, exit 0. These pure tests did not require a PostgreSQL connection."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (inline synchronous schema probe)",
+      "procedure": "Imported the requested migration with importlib.util; compiled CreateTable for the four B3 ORM tables under PostgreSQL and SQLite, asserting dialect-specific JSON ceiling expressions for all three JSON tables. On sqlite:///:memory:, used Operations.context(MigrationContext.configure(conn)) to run this migration's upgrade directly. Inserted a synthetic row into each immutable table with foreign keys unenforced; attempted UPDATE and DELETE and required M10_IMMUTABLE_PACKAGING_ROW; attempted a second row with 1048577 JSON bytes and required the named _bytes check refusal.",
+      "result": "PASS, exit 0: both dialect compilations, all three immutable-table UPDATE/DELETE refusals and oversized JSON refusals. This is a bounded supplemental probe, not the full migration suite, FK enforcement proof, or PostgreSQL execution."
+    },
+    {
+      "command": "git log -1 --oneline; git diff --name-only 27073a10e..HEAD; git diff --stat 27073a10e..HEAD; git status --short",
+      "result": "External docs-only advancement to a4f8a540d; clean before writing this review artifact."
+    }
+  ],
+  "not_verified": [
+    "Real PostgreSQL execution, observed lock waits, deadlock reproduction and service regression results: sandbox forbids sockets and escalation is unavailable.",
+    "The requested migration pytest suite: shared async SQLite fixture stalled. Supplemental synchronous checks do not replace its chain/round-trip coverage.",
+    "No live graph generation or index coverage evidence; graph tools unavailable.",
+    "No fresh A6 regression pass, despite source equivalence of the readiness refactor's ordinary projections. No full suite or static gates were run for this source-read-only review.",
+    "No B4 export runtime or export writer-pair acceptance, and no B5 route/UI authority claim."
+  ],
+  "findings": {
+    "H": [
+      {
+        "id": "H1",
+        "file": "server/services/quality_package_selection.py",
+        "line": 406,
+        "related_locations": [
+          "server/services/quality_package_selection.py:423",
+          "server/services/quality_package_selection.py:325",
+          "server/services/quality_dispositions.py:382",
+          "server/services/quality_runs.py:559",
+          "server/services/quality_runs.py:141",
+          "server/services/quality_dispositions.py:284"
+        ],
+        "title": "Selection acquires the selector grant after the assessor grant set, violating the global sorted order",
+        "status": "CONFIRMED source defect; PostgreSQL interleaving not executed",
+        "scenario": "Selection readiness calls load_run_observations, which FOR UPDATE-locks the sorted narrative-assessor grants. The selector is absent from that set unless also an assessor. Later custodian.admit locks the selector grant separately. For disjoint master sets in the same project, selection S can hold assessor Z's grant and wait for selector A's grant. A concurrent A6 disposition on the other master set, issued by A with assessor Z, takes the correct sorted union A then Z: it holds A and waits for Z. This is a cycle. Two selections with exchanged selector/assessor roles can also cycle. Profile FOR SHARE locks are compatible and disjoint masters do not serialize these writers. Current fixtures use one actor and common masters, masking this case.",
+        "fix": "Before readiness_in, at the grant-head position after the packaging head, call lock_grant_heads once over {request.command.actor_id} union human_principals for the bound run, as A6 does. Every later grant check must re-take only this already locked set. Add barrier-controlled PostgreSQL tests with distinct principals and disjoint master sets for selection versus A6 and selection versus selection, observing the intended waiter."
+      }
+    ],
+    "M": [
+      {
+        "id": "M1",
+        "file": "server/services/quality_package_selection.py",
+        "line": 360,
+        "related_locations": [
+          "server/services/quality_package_selection.py:162",
+          "server/services/quality_package_selection.py:440",
+          "lib/db/repositories/quality_packaging.py:230",
+          "lib/db/repositories/quality_packaging.py:324",
+          "server/services/quality_packaging.py:222",
+          "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json:135"
+        ],
+        "title": "C6 is implemented at preview creation but omitted at the selection boundary",
+        "status": "CONFIRMED missing verification; no ordinary append-only writer bypass claimed",
+        "scenario": "After loading a digest-valid preview, select reloads the run and disposition but never reloads the exact M8 revision or PackagingObservation. It never re-runs candidate payload/closure/lineage verification, compares the observation body to the preview's observation digest and profile constraint snapshot, or rechecks variant/waiver coverage. A corrupt candidate or packaging observation after preview creation can therefore be newly selected while run/disposition readiness remains intact. Normal append-only triggers prevent ordinary updates, but the explicitly carried C6 requirement is fail-closed verification at every consuming boundary, including selection/load; cached historical preview data is not that verification. Repository selection load verifies the receipt and embedded preview digest only.",
+        "fix": "Share an exact package-evidence resolver between preview and fresh selection: load the pinned revision, recompute payload and both closures, verify lineage against the bound run/profile, load and verify the observation and its exact run/candidate/snapshot binding, compare its recomputed digest with the preview, then validate chosen variants and waivers. Use it before appending a fresh selection. Keep historical replay semantics explicit. Add candidate/lineage/observation tamper-after-preview tests proving no selection/head advancement."
+      },
+      {
+        "id": "M2",
+        "file": "tests/integration/server/services/test_quality_package_selection.py",
+        "line": 229,
+        "related_locations": [
+          "tests/integration/server/services/test_quality_package_selection.py:206",
+          "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:281"
+        ],
+        "title": "B3 writer-pair tests do not establish the required blocked-waiter interleavings",
+        "status": "CONFIRMED acceptance evidence gap",
+        "scenario": "The selection/disposition and selection/selection tests merely gather tasks. They contain no barriers, no observed PostgreSQL blocked waiter, and no queued FOR UPDATE behind FOR SHARE assertion. They can pass with effectively serial execution. There is no selection/run-seal or profile-publication/selection test in this file. Thus newer-run rejection and publication/currentness serialization, and both writer orders, lack the design's required proof. Same-master no-op UPDATE locking can serialize these fixtures before the interesting head/grant locks are reached.",
+        "fix": "Add deterministic real-PG selection x run seal, selection x disposition, profile publication x selection and selection x selection tests with explicit barriers and pg lock/waiter observations, covering both commit orders, refusal after a competing head wins, and a queued FOR UPDATE behind FOR SHARE. Include the disjoint-master/multiple-principal case from H1. Keep export pairs scheduled for B4 rather than claiming them in B3."
+      },
+      {
+        "id": "M3",
+        "file": "tests/integration/server/services/test_quality_package_selection.py",
+        "line": 187,
+        "related_locations": [
+          "tests/integration/server/services/test_quality_package_selection.py:169",
+          "tests/integration/server/services/test_quality_package_selection.py:199",
+          "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md:352"
+        ],
+        "title": "Selection RED coverage omits the central lease, waiver, expiry and currentness refusal cases",
+        "status": "CONFIRMED acceptance evidence gap",
+        "scenario": "The test named unwaived_blocking_findings_and_stray_waivers_are_refused only exercises a stray waiver against the clean observation. It does not exercise FAIL, allowed exact waivers, incomplete/extra/wrong-rule coverage, or an unwaivable BLOCKING rule. The suite also lacks changed request/preview lease binding, expired lease and preview, grant revocation/change after lease issuance, API-key refusal, invalid group choices, stale master/profile/newer run, target-slot confusion, selection-command conflict, concurrent identical-command replay and crash-after-lease assertions. Existing pure tests check window shapes and canonicalization, not these DB-time service decisions. A6 tests cover A6 implementations and cannot prove this separate copied custodian/service.",
+        "fix": "Persist focused service tests for these B3 refusal paths and a valid multi-group/waived selection. Assert no selection or head advancement on every refusal, distinguish preview versus disposition versus lease expiry using DB-time seams, verify the same lease cannot authorize changed choices/waivers, and test historical replay versus a changed body under the same selection command."
+      }
+    ],
+    "L": []
+  },
+  "conditions": [
+    {
+      "id": "C6",
+      "status": "PARTIAL / NOT CLOSED for B3",
+      "requirement": "Preview creation now explicitly invokes require_packaging_lineage, which recomputes payload and closure digests and compares M8 lineage. Fresh selection does not repeat this verification. Close M1 before acceptance; carry exact closure/lineage checks and private-snapshot digest revalidation into B4."
+    },
+    {
+      "id": "A6_REGRESSION",
+      "status": "SOURCE EQUIVALENT on inspected normal/error projections; runtime unverified",
+      "requirement": "readiness_in preserves the previous head/disposition/run/profile resolution, observation loading, validity and project_readiness arguments. quality_readiness retains REPEATABLE READ and M10Error/ValueError fail-closed handling. No new A6 semantic regression was identified by source inspection. Rerun test_quality_dispositions.py in a socket-capable environment before claiming A6 compatibility."
+    },
+    {
+      "id": "VERIFIED_SOURCE_BOUNDARIES",
+      "status": "SOURCE SOUND subject to findings and execution limits",
+      "requirement": "Interactive JWT verification rejects API keys/delegated via credentials/auth-disabled mode; actor binding and activated signed grant custody mirror A6. Stored leases bind command/request/preview, current grant sequence/digest, policy and DB-time admission. Preview expiry is capped by disposition expiry and selection compares final admission time against preview expiry. Variants require exactly one known choice per group; waivers require exact BLOCKING finding/rule coverage and packaging_waiverable_rule_ids. Slot storage uses the five columns and a canonical head advisory key, with CAS and exact-command replay/conflict. These are source observations, not missing RED-test passes."
+    },
+    {
+      "id": "SCHEMA",
+      "status": "PARTIAL execution evidence",
+      "requirement": "Source comparison found matching B3 model/migration columns, keys, checks and FK declarations. Migration installs immutable-row triggers on previews, leases and selections and no-delete on heads. Synchronous probe verified all three immutable tables and JSON ceilings; ORM dialect compilation passed. Persist migration/ORM semantic parity and PG enforcement coverage, including full FK pairings, unique slot/command/lease constraints, both immutable operations on previews/selections, head no-delete and refusing downgrade. Existing parity tests primarily compare names/columns, not all constraint semantics."
+    },
+    {
+      "id": "LOCK_ORDER",
+      "status": "PARTIAL; H1 blocks acceptance",
+      "requirement": "Selection takes master write locks, profile FOR SHARE, run/disposition FOR SHARE, preview FOR UPDATE and packaging advisory/head FOR UPDATE in the stated order. Profile publication takes its head FOR UPDATE before grants; A6 takes run FOR SHARE and disposition exclusive before grants. A5 first takes a run advisory and later takes the actual run-head FOR UPDATE in append_run; identical-subject writers also serialize on master authority locks. Do not treat the design shorthand as evidence that A5 locks its row before every grant check, or claim queued-mode/deadlock proof without the required PG interleavings. H1's late selector grant violates the sorted grant-set invariant independently."
+    },
+    {
+      "id": "B4_AND_B5",
+      "status": "CARRIED, outside B3 acceptance",
+      "requirement": "B4 must implement export writer-pair tests and private snapshot/digest validation. B5 must preserve the actual interactive-Human-only route to custody and authenticated server-derived provenance. This review establishes no route/UI or export acceptance. Keep the accepted LOCAL_REGULAR_FILE_IO operating constraint."
+    }
+  ],
+  "files_read": [
+    "server/services/quality_package_selection.py",
+    "lib/db/repositories/quality_packaging.py",
+    "lib/db/models/quality_packaging.py",
+    "lib/db/models/__init__.py (changed registrations)",
+    "alembic/versions/7f4c9e5a0d33_m10_package_selection.py",
+    "r2/contracts/packaging.py",
+    "r2/quality/digests.py",
+    "r2/quality/dispositions.py (readiness projection)",
+    "r2/quality/packaging_check.py (targeted variant/fact logic)",
+    "server/services/quality_dispositions.py",
+    "server/services/quality_packaging.py",
+    "server/services/quality_runs.py (master/profile/grant locks, seal, observation load, validity)",
+    "lib/db/repositories/quality_runs.py (head locks, replay, observation load, append)",
+    "server/services/quality_profiles.py",
+    "lib/db/repositories/quality.py (publication locks)",
+    "server/services/quality_profile_custodian.py (targeted custody/lock discovery)",
+    "server/services/governance_grants.py (current/checkpointed grant verification)",
+    "server/services/master_authority.py (master write locks)",
+    "server/auth.py (interactive authentication)",
+    "lib/db/repositories/advanced_creative.py (revision reconstruction/exact load)",
+    "lib/db/models/quality_probes.py (dialect JSON ceiling helper)",
+    "tests/integration/server/services/test_quality_package_selection.py",
+    "tests/integration/server/services/test_quality_dispositions.py (targeted fixtures and test inventory)",
+    "tests/integration/server/services/test_quality_packaging.py (fixture and changed migration registration)",
+    "tests/integration/lib/db/migrations/test_7f4c9e5a0d33_m10_package_selection.py",
+    "tests/unit/r2/contracts/test_packaging.py",
+    "tests/conftest.py (database fixtures)",
+    "CONTRIBUTING.md",
+    "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+    "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json",
+    "docs/r2/evidence/R2_M10_B_HANDOFF.md (requested-range diff)"
+  ]
+}
