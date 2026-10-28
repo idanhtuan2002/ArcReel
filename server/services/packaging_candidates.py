@@ -40,7 +40,7 @@ from r2.contracts.advanced_creative import (
     VariantProvenance,
 )
 from r2.quality.digests import compute_digest
-from r2.quality.errors import ProfileStaleError, StaleHeadError, SubjectStaleError
+from r2.quality.errors import CommandReplayConflictError, ProfileStaleError, StaleHeadError, SubjectStaleError
 
 type Sessions = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 type AuthorKind = Literal["HUMAN", "AGENT"]
@@ -73,10 +73,10 @@ class PackagingDraft(M8ContractModel):
     assets: tuple[PackagingAsset, ...]
 
 
-def _carried(parent: PackagingCandidate | None) -> dict[tuple[str, str], PackagingVariant]:
+def _carried(parent: PackagingCandidate | None) -> dict[tuple[str, str, str], PackagingVariant]:
     if parent is None:
         return {}
-    return {(g.group_id, v.variant_id): v for g in parent.variant_groups for v in g.variants}
+    return {(g.group_id, g.field, v.variant_id): v for g in parent.variant_groups for v in g.variants}
 
 
 def build_payload(
@@ -99,7 +99,7 @@ def build_payload(
         variants = []
         for variant in group.variants:
             fresh = {"variant_id": variant.variant_id, "value": variant.value, "asset_role": variant.asset_role}
-            previous = carried.get((group.group_id, variant.variant_id))
+            previous = carried.get((group.group_id, group.field, variant.variant_id))
             same = (
                 previous is not None
                 and PackagingVariant.model_validate(fresh | {"provenance": previous.provenance}) == previous
@@ -162,7 +162,33 @@ async def append_packaging_revision(
         m8 = ExplorationRepository(session)
         replayed = await _replay(m8, user_id=user_id, project_name=project_name, command_id=command_id)
         if replayed is not None:
-            return replayed
+            revision, head = replayed
+            # The same command must be the same semantic request: rebuild it and compare with what it recorded.
+            parent_payload = None
+            if revision.revision > 1:
+                parent = await m8.get_exact(
+                    user_id=user_id,
+                    project_name=project_name,
+                    candidate_id=revision.candidate_id,
+                    revision=revision.revision - 1,
+                )
+                parent_payload = None if parent is None else parent.payload
+            expected = build_payload(
+                draft,
+                run=run,
+                profile=profile,
+                actor_id=actor_id,
+                author_kind=author_kind,
+                parent=parent_payload if isinstance(parent_payload, PackagingCandidate) else None,
+            )
+            if (
+                expected != revision.payload
+                or (candidate_id is not None and candidate_id != revision.candidate_id)
+                or expected_head_version != (None if revision.revision == 1 else revision.revision - 1)
+                or revision.lineage.creative_profile_id != run.profile_id
+            ):
+                raise CommandReplayConflictError()
+            return revision, head
         identifier = candidate_id or uuid7()
         head = (
             None

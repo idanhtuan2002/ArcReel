@@ -280,3 +280,146 @@ async def test_a_download_of_a_replaced_selection_is_refused(http) -> None:
         f"/api/v1/projects/project/packaging/exports/{archive_hex}/archive", params={"token": receipt["download_token"]}
     )
     assert refused.status_code == 409
+
+
+def _agent_headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {auth.create_token('embedded-agent', expiry_seconds=900, via='embedded-agent')}"}
+
+
+async def test_the_embedded_agent_authors_as_agent_and_cannot_select_or_export(http) -> None:
+    env = http
+    appended = await env["client"].post(
+        "/api/v1/projects/project/packaging/revisions",
+        json={"command_id": "rev-agent", "quality_run_id": env["run"].run_id, "draft": _draft(env)},
+        headers=_agent_headers(),
+    )
+    assert appended.status_code == 200, appended.text
+    provenance = appended.json()["revision"]["payload"]["provenance"]
+    assert {(p["author_kind"], p["actor_id"]) for p in provenance} == {("AGENT", "embedded-agent")}
+    selected = await env["client"].post(
+        "/api/v1/projects/project/packaging/selections",
+        json={"command_id": "s", "preview_id": "x", "preview_digest": "sha256:" + "0" * 64, "expected_head_version": 0},
+        headers=_agent_headers(),
+    )
+    assert selected.status_code == 401
+    exported = await env["client"].post(
+        "/api/v1/projects/project/packaging/exports",
+        json={
+            "command_id": "e",
+            "source_artifact_key": "k",
+            "cohort_id": "c",
+            "product_surface": "s",
+            "selection_id": "x",
+            "selection_digest": "sha256:" + "0" * 64,
+        },
+        headers=_agent_headers(),
+    )
+    assert exported.status_code == 401
+
+
+async def test_reusing_a_revision_command_for_another_draft_conflicts(http) -> None:
+    env = http
+    body = {"command_id": "rev-1", "quality_run_id": env["run"].run_id, "draft": _draft(env)}
+    assert (
+        await env["client"].post("/api/v1/projects/project/packaging/revisions", json=body, headers=_headers())
+    ).status_code == 200
+    changed = body | {"draft": _draft(env) | {"title": "A different history of the river"}}
+    response = await env["client"].post(
+        "/api/v1/projects/project/packaging/revisions", json=changed, headers=_headers()
+    )
+    assert response.status_code == 409
+    other_actor = await env["client"].post(
+        "/api/v1/projects/project/packaging/revisions", json=body, headers=_agent_headers()
+    )
+    assert other_actor.status_code == 409
+
+
+async def test_a_stale_revision_head_is_a_conflict_not_a_server_error(http) -> None:
+    env = http
+    first = await env["client"].post(
+        "/api/v1/projects/project/packaging/revisions",
+        json={"command_id": "rev-1", "quality_run_id": env["run"].run_id, "draft": _draft(env)},
+        headers=_headers(),
+    )
+    candidate = first.json()["revision"]["candidate_id"]
+    stale = await env["client"].post(
+        "/api/v1/projects/project/packaging/revisions",
+        json={
+            "command_id": "rev-2",
+            "quality_run_id": env["run"].run_id,
+            "candidate_id": candidate,
+            "expected_head_version": 7,
+            "draft": _draft(env) | {"title": "A history of the river, revised"},
+        },
+        headers=_headers(),
+    )
+    assert stale.status_code == 409
+
+
+async def _exported(env) -> dict[str, Any]:
+    flow = await _flow_to_selection(env)
+    exported = await env["client"].post(
+        "/api/v1/projects/project/packaging/exports",
+        json={
+            "command_id": "export-1",
+            **flow["slot"],
+            "selection_id": flow["selection"]["selection_id"],
+            "selection_digest": flow["selection"]["selection_digest"],
+        },
+        headers=_headers(),
+    )
+    assert exported.status_code == 200, exported.text
+    return exported.json()
+
+
+async def test_a_download_after_the_disposition_is_superseded_is_refused(http) -> None:
+    env = http
+    receipt = await _exported(env)
+    await issue(env, disposition_request(env["run"], "REWORK", command_id="decide-2", version=1))
+    archive_hex = receipt["archive_digest"].removeprefix("sha256:")
+    refused = await env["client"].get(
+        f"/api/v1/projects/project/packaging/exports/{archive_hex}/archive", params={"token": receipt["download_token"]}
+    )
+    assert refused.status_code == 409
+
+
+async def test_altered_archive_bytes_are_never_served(http) -> None:
+    import os
+
+    env = http
+    receipt = await _exported(env)
+    archive_hex = receipt["archive_digest"].removeprefix("sha256:")
+    path = env["project"] / "exports" / f"{archive_hex}.zip"
+    data = bytearray(_bytes(path))
+    data[len(data) // 2] ^= 0xFF
+    _put(path, bytes(data))
+    refused = await env["client"].get(
+        f"/api/v1/projects/project/packaging/exports/{archive_hex}/archive", params={"token": receipt["download_token"]}
+    )
+    assert refused.status_code == 409
+    assert [name for name in os.listdir(env["project"] / "exports") if name.startswith(".work-")] == []
+
+
+async def test_a_download_token_without_expiry_is_refused(http) -> None:
+    import jwt
+
+    env = http
+    receipt = await _exported(env)
+    archive_hex = receipt["archive_digest"].removeprefix("sha256:")
+    forged = jwt.encode(
+        {"sub": ACTOR, "project": "project", "purpose": "m10-export", "archive": receipt["archive_digest"]},
+        auth.get_token_secret(),
+        algorithm="HS256",
+    )
+    refused = await env["client"].get(
+        f"/api/v1/projects/project/packaging/exports/{archive_hex}/archive", params={"token": forged}
+    )
+    assert refused.status_code == 401
+
+
+def _bytes(path) -> bytes:
+    return path.read_bytes()
+
+
+def _put(path, data: bytes) -> None:
+    path.write_bytes(data)

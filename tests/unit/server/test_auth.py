@@ -76,6 +76,18 @@ class TestCreateAndVerifyToken:
         assert payload is not None
         assert payload["exp"] - payload["iat"] == 900
 
+    async def test_a_delegated_token_authenticates_but_is_never_an_interactive_session(self):
+        """内嵌 Agent 的委托凭据可调用普通接口，但永远不能通过 Human 交互会话校验。"""
+        env = {"AUTH_TOKEN_SECRET": "test-secret-key-that-is-at-least-32-bytes", "AUTH_ENABLED": "true"}
+        with patch.dict(os.environ, env):
+            delegated = auth_module.create_token("embedded-agent", expiry_seconds=900, via="embedded-agent")
+            human = auth_module.create_token("admin")
+            assert (await auth_module.get_current_user(delegated)).sub == "embedded-agent"
+            assert (await auth_module.get_current_interactive_user(human)).sub == "admin"
+            with pytest.raises(HTTPException) as refused:
+                await auth_module.get_current_interactive_user(delegated)
+        assert refused.value.status_code == 401
+
     def test_verify_token_invalid(self):
         """无效 token 返回 None"""
         with patch.dict(os.environ, {"AUTH_TOKEN_SECRET": "test-secret-key-that-is-at-least-32-bytes"}):

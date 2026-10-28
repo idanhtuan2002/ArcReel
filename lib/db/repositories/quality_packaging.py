@@ -445,6 +445,37 @@ class ExportRepository:
             request, row.execution_id, row.task_id, manifest, row.manifest_digest, row.identity_digest
         )
 
+    async def receipted_invocations(
+        self, *, project_name: str, archive_digest: str
+    ) -> list[tuple[StoredExportInvocation, p.ExportBundleReceipt]]:
+        """Every receipted export of this exact archive in the project, each verified from its stored rows."""
+        rows = (
+            (
+                await self.session.execute(
+                    sa.select(ExportReceiptModel).filter_by(project_name=project_name, archive_digest=archive_digest)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        found: list[tuple[StoredExportInvocation, p.ExportBundleReceipt]] = []
+        for row in rows:
+            receipt = await self.receipt(user_id=row.user_id, project_name=project_name, execution_id=row.execution_id)
+            invocation_row = await self.session.get(
+                ExportInvocationModel, (row.user_id, project_name, row.execution_id)
+            )
+            if receipt is None or invocation_row is None:
+                raise RequiredEvidenceMissingError()
+            try:
+                request = p.ExportRequest.model_validate(invocation_row.request_json)
+            except (ValueError, TypeError):
+                raise RequiredEvidenceMissingError() from None
+            invocation = await self.invocation(request)
+            if invocation is None or invocation.execution_id != row.execution_id:
+                raise RequiredEvidenceMissingError()
+            found.append((invocation, receipt))
+        return found
+
     async def stage_invocation(self, invocation: StoredExportInvocation, prepared_at: datetime) -> None:
         if self.session.get_bind().dialect.name != "postgresql":
             raise RequiredEvidenceMissingError()

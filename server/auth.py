@@ -107,22 +107,26 @@ def get_token_secret() -> str:
     return _cached_token_secret
 
 
-def create_token(username: str, *, expiry_seconds: int = TOKEN_EXPIRY_SECONDS) -> str:
+def create_token(username: str, *, expiry_seconds: int = TOKEN_EXPIRY_SECONDS, via: str | None = None) -> str:
     """创建 JWT token
 
     Args:
         username: 用户名
         expiry_seconds: token 有效秒数；网页登录沿用 7 天，内嵌 Agent 使用短时效。
+        via: 委托凭据来源（如内嵌 Agent）；带此声明的 token 永远不是交互式 Human 会话。
 
     Returns:
         JWT token 字符串
     """
     now = time.time()
-    payload = {
+    payload: dict[str, object] = {
         "sub": username,
         "iat": now,
         "exp": now + expiry_seconds,
     }
+    if via is not None:
+        # A delegated credential (e.g. the embedded agent) is never an interactive Human session.
+        payload["via"] = via
     return jwt.encode(payload, get_token_secret(), algorithm="HS256")
 
 

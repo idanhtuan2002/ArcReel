@@ -1,0 +1,261 @@
+{
+  "schema_id": "m10.b5-review.v1",
+  "reviewed_head": "821978d23",
+  "reviewed_head_full": "821978d239f42f5523a095f2e1ba3e24056cc27f",
+  "reviewer": "Codex independent critical source review (main agent; no delegated acceptance)",
+  "verdict": "NOT ACCEPTED",
+  "scope": "B5 part 1 authenticated packaging routes and carried B2/B3 conditions. Source read-only except this review artifact; no commit. UI, pilots, production activation and license review excluded.",
+  "commands_run": [
+    {
+      "command": "git rev-parse HEAD; git status --short; git show --stat --oneline 821978d23; git show 821978d23 -- lib/i18n/en/errors.py lib/i18n/vi/errors.py lib/i18n/zh/errors.py server/app.py",
+      "result": "Requested full HEAD confirmed. Initially clean. Later an unrelated untracked frontend/src/features/packaging/ appeared; preserved. Tracked server/lib/r2/tests diff against reviewed HEAD remained empty."
+    },
+    {
+      "command": "git diff --check 821978d23^ 821978d23",
+      "result": "PASS, exit 0."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache uv run pytest -q tests/unit/lib/i18n tests/integration/server/routers/test_packaging_routes.py tests/integration/server/services/test_quality_package_selection.py",
+      "result": "Exit 1: 20 i18n tests passed; 44 integration setup errors in 12.94s. Socket creation denied with PermissionError [Errno 1] Operation not permitted. No PG test body ran; these are execution-unavailable results, not product failures."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:55491/arcreel_test UV_CACHE_DIR=/tmp/codex-uv-cache uv run pytest -q --maxfail=1 --tb=short tests/integration/server/routers/test_packaging_routes.py",
+      "result": "Exit 1: first setup failed in 1.39s, confirming socket creation denial before a test body."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (in-memory authentication/replay/error/path probes)",
+      "procedure": "Set AUTH_ENABLED=true and an ephemeral in-process AUTH_TOKEN_SECRET. Call get_current_interactive_user and packaging._author_kind with auth.create_token('embedded-agent', expiry_seconds=300). Call packaging._run with an async operation raising real CandidateConflictError; repeat through a bare FastAPI app with registered error handlers and ASGITransport(raise_app_exceptions=False). Execute real append_packaging_revision and _replay with fake session/repositories: a stored PACKAGING revision/head receipt has an unrelated original command_digest, while subsequent calls change actor, author kind, run, candidate, expected version and draft. Probe _verify_export_token with expired and absent-exp signed payloads. Call _regular_file(Path('/proc/self/root/etc/hosts')). No files or database rows written.",
+      "result": "Exit 0: embedded-agent admitted as interactive and classified HUMAN; CandidateConflictError escaped _run and produced HTTP 500; changed append request returned the same revision/head without conflict; expired token refused 401, missing-exp token accepted; symlink ancestor accepted by _regular_file. This is function/ASGI evidence with mocked repositories, not PG or end-to-end export evidence."
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' (download currentness probe)",
+      "procedure": "Execute real _still_current with one fake receipted export and a matching current selection. PackagingDeps has grant_reader=None and no readiness inputs; repositories return a verified-receipt stand-in and matching slot head.",
+      "result": "Exit 0: returned True without any governance/readiness/master/profile/run/disposition validation. Confirms the limited predicate; does not reproduce a live PG invalidation schedule."
+    },
+    {
+      "command": "codebase-memory list_projects; search_graph; check_index_coverage (requested files and dependency paths)",
+      "result": "list_projects returned an index rooted in the main checkout, not this worktree. Structural search and both coverage calls were approval-blocked under approval_policy=never. No graph completeness or freshness claim; direct source fallback used."
+    },
+    {
+      "command": "Numbered source reads and targeted rg over files_read; git diff 821978d23 -- server lib r2 tests; git status --short; git rev-parse HEAD",
+      "result": "Source findings pinned to requested HEAD; tracked implementation/test paths unchanged during review. No formatter, staging, commit or provider call."
+    },
+    {
+      "command": "Parse review JSON and assert schema/head/finding keys; git rev-parse HEAD; git diff --name-only; git status --short",
+      "result": "Review JSON validated: NOT ACCEPTED, H=3/M=3/L=2. HEAD unchanged. Concurrent frontend changes listed in workspace_preservation were preserved; review did not commit."
+    }
+  ],
+  "not_verified": [
+    "Independent real PostgreSQL execution, actual grant checkpoint transition, custody sockets, concurrent append schedules, crash rollback or existing-head preservation.",
+    "Live filesystem mutation or concurrent authority drift during a download. H2/H3 are confirmed source omissions, supported by bounded function probes, not reproduced end-to-end attacks.",
+    "Complete export worker/confinement/regression suites, migrations, full static gates, frontend UI, production activation and pilots. Historical B4 evidence is not fresh execution.",
+    "Graph generation and path coverage; search/coverage were blocked. No exhaustive whole-repository absence claim.",
+    "Unrelated untracked frontend/src/features/packaging/ work. Only requested review JSON is authored by this review."
+  ],
+  "findings": {
+    "H": [
+      {
+        "id": "H1",
+        "file": "server/routers/packaging.py",
+        "line": 151,
+        "related_locations": [
+          "server/routers/packaging.py:296",
+          "server/routers/packaging.py:346",
+          "server/auth.py:459",
+          "server/agent_runtime/options_assembler.py:399",
+          "server/services/package_export.py:687"
+        ],
+        "title": "Embedded-agent JWT passes the Human boundary and stamps HUMAN provenance",
+        "status": "CONFIRMED by source and real-token function probe",
+        "scenario": "The SDK environment receives create_token('embedded-agent'), which has the same claim shape as a browser session. get_current_interactive_user accepts it (it has neither an apikey prefix nor a via claim). _author_kind therefore returns HUMAN for actual agent-authored input. The same credential passes InteractiveUser and PackageExportService._require_actor, so the agent can request export of an existing valid Human selection. Selection still requires a signed showrunner grant for its principal; this finding does not claim that an ungranted embedded-agent can mint a selection lease. Nevertheless agent export and false HUMAN authorship violate the requested Human-only/delegated-refused boundary and B2 C4.",
+        "fix": "Distinguish interactive login sessions from delegated/embedded credentials at issuance and validation, reject delegated credentials for Human actions, and derive AGENT authorship from authenticated credential class. Add HTTP tests using the actual embedded-agent token issuance path, alongside API-key, via/delegated JWT and auth-disabled cases; export must refuse before invoking its service."
+      },
+      {
+        "id": "H2",
+        "file": "server/routers/packaging.py",
+        "line": 403,
+        "related_locations": [
+          "server/routers/packaging.py:395",
+          "server/routers/packaging.py:421",
+          "server/services/package_export.py:766",
+          "lib/db/repositories/quality_packaging.py:210"
+        ],
+        "title": "Download currentness omits all readiness authorities and takes no guarding locks",
+        "status": "CONFIRMED by source and mocked predicate probe",
+        "scenario": "After export, promote a master, publish a staling profile, seal a newer run, supersede/expire the disposition or revoke required Human evidence while leaving the packaging slot head unchanged. _still_current still returns True: it only compares the selection id in an unlocked slot-head projection. Even slot replacement can race the read because its session ends before response delivery. A valid five-minute token can therefore serve an export that section 6 requires the server to refuse as stale. The function does not use the activated reader at all.",
+        "fix": "Apply the existing export currentness/readiness validation and documented lock order in the download authorization transaction, resolving the receipted selection and its exact master/profile/run/disposition/slot bindings. Establish the guarded snapshot before acquiring the bytes to serve. Add HTTP invalidation cases for each authority, expiry/revocation, and an observed concurrent selection/update schedule. Keep historical export status distinct from current exportability."
+      },
+      {
+        "id": "H3",
+        "file": "server/routers/packaging.py",
+        "line": 397,
+        "related_locations": [
+          "server/routers/packaging.py:400",
+          "server/routers/packaging.py:427",
+          "server/services/quality_packaging.py:99",
+          "server/services/package_export.py:556"
+        ],
+        "title": "Download serves a mutable pathname without archive integrity or ancestor confinement",
+        "status": "CONFIRMED source defect; symlink-ancestor predicate probe",
+        "scenario": "Replace an exported ZIP with different regular-file bytes after successful export: the old archive token and receipt still authorize those bytes because no archive size/digest is checked at download. Replacing the exports directory with a symlink also passes _regular_file, whose no-follow applies only to the leaf. FileResponse later opens the pathname again, so even a leaf checked as regular can be swapped after stat. This bypasses the descriptor-pinned, no-follow and verified-byte behavior used by the B2/B4 services; a hex basename alone does not protect ancestors or file generations.",
+        "fix": "Reuse the existing no-follow descriptor-walk and archive verification behavior to acquire a stable verified snapshot bound to receipt.archive_digest/archive_byte_size, then stream that snapshot or descriptor without reopening an attacker-mutable path. Add RED tests for altered bytes, exports/root ancestor swaps, leaf symlinks and a swap between validation and response open."
+      }
+    ],
+    "M": [
+      {
+        "id": "M1",
+        "file": "server/services/packaging_candidates.py",
+        "line": 163,
+        "related_locations": [
+          "server/services/packaging_candidates.py:217",
+          "server/services/packaging_candidates.py:243",
+          "lib/db/repositories/advanced_creative.py:235",
+          "lib/db/repositories/advanced_creative.py:336"
+        ],
+        "title": "Append replay bypasses the semantic request and actor comparison",
+        "status": "CONFIRMED by source and real-function replay probe; concurrent consequence source-only",
+        "scenario": "Repeat a successful command_id with a different valid run, draft, candidate, expected version or authenticated actor. _replay looks up the shared user_id actor_scope and matches only the result head digest; it never compares receipt.command_digest to the incoming request. It returns 200 with the previous revision before the M8 repository can reject command reuse. All current principals map to the same default user id, so distinct principals also collide. Conversely simultaneous identical genesis requests can both miss the outer replay and generate different UUIDs/timestamps before M8 serializes them, causing its command-digest conflict instead of exact replay. Run/profile reads also precede the purported receipt-first replay.",
+        "fix": "Bind a stable normalized HTTP request digest, including authenticated actor/credential class and all semantic client fields, to a serialized command boundary. Replay only after exact comparison; conflict on differences. Persist/reuse generated candidate identity and timestamp so concurrent identical retries resolve to the same recorded result while retaining M8 append/CAS semantics. Add changed-field, cross-principal, simultaneous-identical, moved-head and late-read replay tests."
+      },
+      {
+        "id": "M2",
+        "file": "server/routers/packaging.py",
+        "line": 120,
+        "related_locations": [
+          "server/services/packaging_candidates.py:206",
+          "lib/db/repositories/advanced_creative.py:275",
+          "server/routers/formats.py:97",
+          "server/error_handlers.py:141"
+        ],
+        "title": "Expected M8 append conflicts escape as HTTP 500",
+        "status": "CONFIRMED by real exception and ASGI probe",
+        "scenario": "Append to an existing packaging candidate with a stale expected_head_version, send a genesis request with a non-null expected version, or hit an M8 command conflict during simultaneous retry. ExplorationRepository raises CandidateConflictError/CommandConflictError, both M8Error RuntimeErrors. _run catches only M10Error and ValueError; the global handler returns generic 500. This loses the expected recoverable 409 behavior that formats already maps. Download receipt validation can also raise M10Error outside _run, yielding 500 on corrupted persisted evidence rather than a typed refusal.",
+        "fix": "Map the reused M8 errors explicitly to the existing 409/404 API errors, and put download domain validation through the same typed boundary. Add HTTP stale-CAS, genesis misuse, command-conflict and corrupted-receipt refusal tests; ensure unrelated unexpected failures retain 500."
+      },
+      {
+        "id": "M3",
+        "file": "tests/integration/server/services/test_quality_package_selection.py",
+        "line": 776,
+        "related_locations": [
+          "tests/integration/server/services/test_quality_package_selection.py:785",
+          "docs/r2/evidence/m10-b-reviews/b3-codex-delta2-review.json"
+        ],
+        "title": "Carried crash condition lacks failure-between-writes and existing-head recovery coverage",
+        "status": "CONFIRMED test coverage gap; PG execution unavailable",
+        "scenario": "The new crash_once raises before calling append_selection, with no preexisting selection/head. The (0,0) assertion therefore proves refusal before either write, not rollback of an inserted selection when head CAS fails, nor preservation of an existing head. B3 explicitly carried failure-between-selection/head-write recovery, unchanged existing head and retry behavior into integrated route/recovery acceptance. The current fixture closes only an inert-lease/pre-write subset.",
+        "fix": "Start from an existing selection/head, issue a fresh lease, inject failure after staging/flushing the new selection and before advancing the head in the owning transaction, and assert no orphan selection plus unchanged original head/version. Retry the same semantic command and verify exactly one new selection/head advancement and stable replay. Run the signed-revocation and both crash cases on the requested PG target."
+      }
+    ],
+    "L": [
+      {
+        "id": "L1",
+        "file": "server/routers/packaging.py",
+        "line": 378,
+        "title": "Token verifier does not require expiry or subject claims",
+        "status": "NOTE ONLY; demonstrated with a server-signed synthetic payload",
+        "scenario": "jwt.decode checks exp when present but does not require it. A correctly signed m10-export payload with matching project/archive but no exp or sub is accepted. The current create_export_token always includes both, so no client-side minting exploit or cross-user breach is claimed.",
+        "fix": "Require exp, iat and sub and validate their types and maximum lifetime as defense in depth; add missing-claim, expired, purpose/archive/project mismatch tests."
+      },
+      {
+        "id": "L2",
+        "file": "server/services/packaging_candidates.py",
+        "line": 102,
+        "title": "Carried variant authorship comparison ignores its group field",
+        "status": "NOTE ONLY; source observation",
+        "scenario": "A group can keep group_id, variant_id and identical text value while changing field from title to description. The old variant provenance is preserved because field is outside the comparison. For asset-role alternatives, changed asset bytes are also outside this comparison. Clarify whether provenance attests the value token alone or its semantic field/asset binding.",
+        "fix": "If provenance attests the authored alternative in context, include group field and resolved asset identity in the unchanged predicate and add an agent-edit regression."
+      }
+    ]
+  },
+  "conditions": [
+    {
+      "id": "B2_C4_AUTHENTICATED_PROVENANCE",
+      "status": "PARTIAL / NOT CLOSED",
+      "evidence": "Strict draft/variant contracts forbid extra provenance and bindings; host builds master/profile/policy/closures/lineage from scoped stored run/profile. However actual embedded credentials receive HUMAN provenance (H1); replay does not bind the incoming actor/request (M1)."
+    },
+    {
+      "id": "D5_HUMAN_SELECTION_EXPORT",
+      "status": "NOT CLOSED",
+      "evidence": "API keys, JWT via claims, auth-disabled mode and missing credentials are refused by the shared interactive helper; selection still uses the real grant custodian and DB-time lease. Actual embedded JWT passes that helper. The five route tests cover absent credentials but omit API-key/delegated/embedded/auth-disabled matrices. See H1."
+    },
+    {
+      "id": "REVOCATION_AFTER_LEASE",
+      "status": "SOURCE ADDRESSED; RUNTIME UNVERIFIED",
+      "evidence": "Lines 746-763 use the signed importer to persist REVOKE sequence 2 after lease issuance, require an unauthorized/stale refusal and assert zero selections/heads. This is materially stronger than a mocked reader. No PG body could execute here; existing-head preservation is not asserted."
+    },
+    {
+      "id": "CRASH_AFTER_LEASE",
+      "status": "PARTIAL / NOT CLOSED",
+      "evidence": "New test covers failure before append_selection and a successful fresh-lease retry from an empty head. The explicitly carried between-writes and existing-head-preservation cases remain absent (M3). No actual process termination or PG rollback execution is claimed."
+    },
+    {
+      "id": "APP_REGISTRATION_PROJECT_MIGRATION",
+      "status": "SOURCE SOUND WITH READ-ONLY LIMIT",
+      "evidence": "server/app.py:710-717 mounts command routes behind get_current_user plus require_project_migration_ok, and mounts download without Bearer as required for scoped query tokens. App-wide require_valid_project_name remains active (app.py:549). Download lacks the migration dependency, but require_project_migration_ok explicitly returns immediately for GET/HEAD/OPTIONS (dependencies.py:74); merely adding it would not change this GET. No migration-bypass defect is claimed. The bare route test app does not verify production registration."
+    },
+    {
+      "id": "I18N",
+      "status": "VERIFIED FOR ADDED KEYS / CONSISTENCY",
+      "evidence": "All 12 added error keys occur in en/vi/zh errors modules; the 20 tests under tests/unit/lib/i18n passed. This is locale-key consistency, not a claim that every possible runtime error is translated or correctly mapped."
+    },
+    {
+      "id": "B5_READ_SURFACE_AND_RED_MATRIX",
+      "status": "INCOMPLETE FOR FULL SECTION 6 ACCEPTANCE",
+      "evidence": "This part implements five POST handlers and archive GET. Section 6 export status/history DTOs with current exportable and typed refusal reasons are absent in packaging.py. Treat them and UI as later B5 scope, not as delivered part-1 behavior. Before route acceptance add authority-envelope/actor injection, API-key/delegated/auth-disabled, changed/concurrent replay, CAS error mapping, token expiry/purpose/archive, authority invalidation and filesystem download RED tests. No broader missing-test claim is made."
+    },
+    {
+      "id": "PG_EXECUTION",
+      "status": "UNAVAILABLE",
+      "evidence": "Both attempts failed before test bodies because sandbox socket creation is denied. Obtain fresh PG evidence after repairing H/M findings; prior packet runtime claims do not substitute for this review."
+    }
+  ],
+  "files_read": [
+    "server/routers/packaging.py",
+    "server/services/packaging_candidates.py",
+    "server/app.py (registration, global dependencies and relevant diff)",
+    "server/auth.py (token issuance, verification and principal dependencies)",
+    "server/agent_runtime/options_assembler.py:393-403",
+    "server/dependencies.py",
+    "server/error_handlers.py",
+    "server/routers/formats.py (error/route patterns)",
+    "server/routers/projects.py (download-token handlers)",
+    "server/services/package_export.py (export actor, replay, resolve/currentness, archive path/open/verify seams)",
+    "server/services/quality_package_selection.py (evidence, custodian/admission and selection seams)",
+    "server/services/quality_packaging.py (evidence/check and safe-open seams)",
+    "lib/db/repositories/advanced_creative.py (command/head/append/replay/history)",
+    "lib/db/repositories/quality_packaging.py (slot/head and receipt verification)",
+    "lib/db/models/quality_packaging.py (head identity)",
+    "r2/contracts/advanced_creative.py (strict contract base)",
+    "r2/contracts/packaging.py (export receipt)",
+    "r2/advanced_creative/errors.py",
+    "r2/quality/errors.py",
+    "lib/i18n/en/errors.py (diff)",
+    "lib/i18n/vi/errors.py (diff)",
+    "lib/i18n/zh/errors.py (diff)",
+    "tests/integration/server/routers/test_packaging_routes.py",
+    "tests/integration/server/services/test_quality_package_selection.py",
+    "tests/integration/server/services/test_quality_packaging.py (fixture and candidate setup)",
+    "tests/unit/lib/i18n/test_i18n_consistency.py",
+    "docs/superpowers/specs/2026-10-28-r2-m10-b-packaging-export-design.md",
+    "docs/r2/evidence/m10-b-reviews/b2-codex-delta3-review.json",
+    "docs/r2/evidence/m10-b-reviews/b3-codex-delta2-review.json",
+    "docs/r2/evidence/m10-b-reviews/export-route-qualification.json",
+    "CONTRIBUTING.md (test selection)"
+  ],
+  "workspace_preservation": {
+    "review_authored": [
+      "docs/r2/evidence/m10-b-reviews/b5-codex-review.json"
+    ],
+    "unrelated_concurrent_changes_preserved": [
+      "frontend/src/features/packaging/",
+      "frontend/src/app-routes.ts",
+      "frontend/src/components/canvas/StudioCanvasRouter.tsx",
+      "frontend/src/components/layout/AssetSidebar.tsx",
+      "frontend/src/i18n/en/dashboard.ts",
+      "frontend/src/i18n/vi/dashboard.ts",
+      "frontend/src/i18n/zh/dashboard.ts"
+    ],
+    "head_at_end": "821978d239f42f5523a095f2e1ba3e24056cc27f",
+    "note": "Tracked frontend changes appeared during final verification; they are outside the review and were not authored or changed by this reviewer."
+  }
+}

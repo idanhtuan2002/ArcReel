@@ -123,6 +123,7 @@ SWEEP_AFTER_SECONDS = 300
 OWNER_LOCK = "owner.lock"
 MANIFEST_FILE = "manifest.bytes"
 PARTIAL_FILE = "archive.partial"
+DOWNLOAD_FILE = "download.zip"
 WORKER_BASE_MS = 30000
 WORKER_BYTES_PER_SECOND = 50 << 20
 WORKER_OUTPUT_CAP = 65536
@@ -662,6 +663,57 @@ def admit_worker_config(work: WorkDirectory, plan: ExportPlan) -> None:
         raise OperationalEnvelopeExceededError()
 
 
+@dataclass
+class Download:
+    """An open, verified private archive snapshot; ``close`` removes it and releases its scratch."""
+
+    descriptor: int
+    work: WorkDirectory
+    store: int
+
+    def close(self) -> None:
+        with contextlib.suppress(OSError):
+            os.close(self.descriptor)
+        self.work.close()
+        with contextlib.suppress(OSError):
+            os.close(self.store)
+
+
+def _snapshot_archive(
+    store: int, work: WorkDirectory, name: str, digest: str, size: int
+) -> tuple[int, tuple[int, int, int, int, int]]:
+    """Copy the published archive into private scratch while hashing; return the copy's descriptor and source generation."""
+    try:
+        source = os.open(name, os.O_RDONLY | _NOFOLLOW | _NONBLOCK, dir_fd=store)
+    except OSError:
+        raise ExportIntegrityFailedError() from None
+    target = work.create(DOWNLOAD_FILE)
+    try:
+        with os.fdopen(source, "rb", buffering=0) as reader:
+            before = os.fstat(reader.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size != size:
+                raise ExportIntegrityFailedError()
+            hasher = hashlib.sha256()
+            copied = 0
+            while chunk := reader.read(min(1 << 20, size + 1 - copied)):
+                copied += len(chunk)
+                if copied > size:
+                    raise ExportIntegrityFailedError()
+                hasher.update(chunk)
+                view = memoryview(chunk)
+                while view:
+                    view = view[os.write(target, view) :]
+            if _generation(os.fstat(reader.fileno())) != _generation(before):
+                raise ExportIntegrityFailedError()
+        if (copied, "sha256:" + hasher.hexdigest()) != (size, digest):
+            raise ExportIntegrityFailedError()
+        os.lseek(target, 0, os.SEEK_SET)
+    except BaseException:
+        os.close(target)
+        raise
+    return target, _generation(before)
+
+
 class PackageExportService:
     """Export the current selection of one PACKAGING_SLOT as a deterministic local archive."""
 
@@ -734,6 +786,59 @@ class PackageExportService:
                 await asyncio.to_thread(work.close)
         finally:
             os.close(store)
+
+    async def open_download(self, user_id: str, project_name: str, archive_digest: str) -> Download:
+        """A verified private snapshot of a receipted archive whose selection is still current and READY.
+
+        The bytes are copied (no-follow, by descriptor) and checked against the receipt's digest and size first;
+        then currentness is revalidated under the global lock order and the published file's generation must be
+        unchanged. The caller streams the returned descriptor and closes the download when done.
+        """
+        async with self._sessions() as session:
+            receipted = await ExportRepository(session).receipted_invocations(
+                project_name=project_name, archive_digest=archive_digest
+            )
+        receipted = [(i, r) for i, r in receipted if i.request.command.user_id == user_id]
+        if not receipted:
+            raise RequiredEvidenceMissingError()
+        reader = await self._grant_reader()
+        store = await asyncio.to_thread(open_export_store, self._project_root)
+        try:
+            work = await asyncio.to_thread(WorkDirectory, store, self._project_root)
+        except BaseException:
+            os.close(store)
+            raise
+        try:
+            name = PurePosixPath(archive_ref(archive_digest)).name
+            descriptor, generation = await asyncio.to_thread(
+                _snapshot_archive, store, work, name, archive_digest, receipted[0][1].archive_byte_size
+            )
+            try:
+                last: Exception | None = None
+                for invocation, _receipt in receipted:
+                    try:
+                        async with self._sessions() as session, session.begin():
+                            selection = await PackageSelectionRepository(session).selection(
+                                user_id=user_id,
+                                project_name=project_name,
+                                selection_id=invocation.request.subject.selection_id,
+                            )
+                            if selection is None:
+                                raise RequiredEvidenceMissingError()
+                            await self._require_current(session, reader, invocation.request, selection)
+                            if published_generation(store, name) != generation:
+                                raise ExportIntegrityFailedError()
+                        return Download(descriptor, work, store)
+                    except M10Error as error:
+                        last = error
+                raise last if last is not None else RequiredEvidenceMissingError()
+            except BaseException:
+                os.close(descriptor)
+                raise
+        except BaseException:
+            work.close()
+            os.close(store)
+            raise
 
     async def _resolve(
         self, session: AsyncSession, request: p.ExportRequest
@@ -1126,6 +1231,7 @@ def sweep_work(project_root: Path) -> int:
 
 __all__ = [
     "EXPORT_DIRECTORY",
+    "Download",
     "PackageExportService",
     "archive_ref",
     "builder_identity_digest",

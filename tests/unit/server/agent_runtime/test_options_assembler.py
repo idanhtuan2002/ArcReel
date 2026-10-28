@@ -146,6 +146,7 @@ async def test_build_injects_short_lived_arcreel_api_credentials(
     assert options.env["ARCREEL_API_BASE"] == "http://127.0.0.1:9123/api/v1"
     assert payload is not None
     assert payload["sub"] == "embedded-agent"
+    assert payload["via"] == "embedded-agent"
     assert payload["exp"] - payload["iat"] == 900
 
 

@@ -396,7 +396,9 @@ class OptionsAssembler:
                 "ARCREEL_EMBEDDED_AGENT": "1",
                 "ARCREEL_API_BASE": (os.environ.get("ARCREEL_API_BASE") or "http://127.0.0.1:1241/api/v1").rstrip("/"),
                 "ARCREEL_API_TOKEN": (
-                    create_token("embedded-agent", expiry_seconds=_EMBEDDED_AGENT_TOKEN_EXPIRY_SECONDS)
+                    create_token(
+                        "embedded-agent", expiry_seconds=_EMBEDDED_AGENT_TOKEN_EXPIRY_SECONDS, via="embedded-agent"
+                    )
                     if is_auth_enabled()
                     else ""
                 ),

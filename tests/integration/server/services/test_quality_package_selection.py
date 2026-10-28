@@ -790,3 +790,39 @@ async def test_a_lease_whose_selection_crashed_leaves_nothing_and_a_retry_select
     ).select(request, retry_lease)
     assert selection.head_version == 1
     assert await _counts(env) == (1, 1)
+
+
+async def test_a_crash_between_the_selection_and_head_writes_keeps_the_existing_head(ready_host, monkeypatch) -> None:
+    from lib.db.repositories.quality_packaging import PackageSelectionRepository
+
+    env = ready_host
+    first = await select(env, selection_request(env, await preview(env), command_id="select-1"))
+    second = selection_request(
+        env, await preview(env, preview_request(env, command_id="preview-2")), command_id="select-2"
+    )
+    real = PackageSelectionRepository.append_selection
+    failed = {"once": True}
+
+    async def crash_after_both_writes(self, *args, **kwargs):
+        await real(self, *args, **kwargs)
+        if failed.pop("once", False):
+            raise RuntimeError("crash after the selection and head were staged, before commit")
+
+    monkeypatch.setattr(PackageSelectionRepository, "append_selection", crash_after_both_writes)
+    guard = custodian(env, second)
+    lease = await guard.authorize_selection(second)
+    with pytest.raises(RuntimeError):
+        await PackageSelectionService(sessions=env["factory"], custodian=guard, project_root=env["project"]).select(
+            second, lease
+        )
+    async with env["factory"]() as session:
+        head = (await session.execute(sa.select(PackagingHeadModel))).scalar_one()
+    assert (head.current_selection_id, head.head_version) == (first.selection_id, 1)
+    assert await _counts(env) == (1, 1)
+    retry_guard = custodian(env, second)
+    retry_lease = await retry_guard.authorize_selection(second)
+    replaced = await PackageSelectionService(
+        sessions=env["factory"], custodian=retry_guard, project_root=env["project"]
+    ).select(second, retry_lease)
+    assert replaced.head_version == 2
+    assert await _counts(env) == (2, 1)
